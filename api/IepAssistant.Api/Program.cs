@@ -62,6 +62,8 @@ builder.Services.AddSingleton<IepProcessingQueue>();
 builder.Services.AddHostedService<IepProcessingWorker>();
 builder.Services.AddSingleton<IepAnalysisQueue>();
 builder.Services.AddHostedService<IepAnalysisWorker>();
+builder.Services.AddSingleton<MeetingPrepQueue>();
+builder.Services.AddHostedService<MeetingPrepWorker>();
 
 // Add controllers
 builder.Services.AddControllers()
