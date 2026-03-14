@@ -13,6 +13,7 @@ export interface User {
   state: string | null;
   role: string;
   fullName: string;
+  mfaEnabled?: boolean;
 }
 
 export interface UpdateProfileRequest {
@@ -27,9 +28,37 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
+  token?: string;
+  expiresAt?: string;
+  user?: User;
+  requiresMfa?: boolean;
+  mfaPendingToken?: string;
+}
+
+// MFA types
+export interface MfaSetupResponse {
+  otpauthUri: string;
+  manualEntryKey: string;
+}
+
+export interface MfaVerifySetupResponse {
+  recoveryCodes: string[];
+}
+
+// Password reset types
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
   token: string;
-  expiresAt: string;
-  user: User;
+  newPassword: string;
+}
+
+// Account types
+export interface DeleteAccountRequest {
+  password: string;
+  mfaCode?: string;
 }
 
 export interface RegisterRequest {

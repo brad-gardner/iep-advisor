@@ -22,6 +22,8 @@ export function LoginPage() {
 
     if (result.success) {
       navigate('/dashboard');
+    } else if (result.requiresMfa && result.mfaPendingToken) {
+      navigate('/mfa-verify', { state: { mfaPendingToken: result.mfaPendingToken } });
     } else {
       setError(result.error || 'Login failed');
     }
@@ -45,14 +47,24 @@ export function LoginPage() {
           placeholder="you@example.com"
         />
 
-        <Input
-          label="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          placeholder="********"
-        />
+        <div>
+          <Input
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            placeholder="********"
+          />
+          <div className="mt-1 text-right">
+            <Link
+              to="/forgot-password"
+              className="text-xs text-brand-teal-500 hover:text-brand-teal-600"
+            >
+              Forgot password?
+            </Link>
+          </div>
+        </div>
 
         <Button type="submit" disabled={isLoading} className="w-full">
           {isLoading ? 'Signing in...' : 'Sign In'}

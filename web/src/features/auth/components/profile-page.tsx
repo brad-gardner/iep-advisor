@@ -1,10 +1,121 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/use-auth';
+import { disableMfa } from '../api/auth-api';
 import { StateSelector } from './state-selector';
+import { AccountDeletionSection } from './account-deletion-section';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Notice } from '@/components/ui/notice';
+
+function MfaSection() {
+  const { user } = useAuth();
+  const [showDisable, setShowDisable] = useState(false);
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [disableSuccess, setDisableSuccess] = useState(false);
+
+  const handleDisable = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+    try {
+      const response = await disableMfa(password, code.trim());
+      if (response.success) {
+        setDisableSuccess(true);
+        setShowDisable(false);
+      } else {
+        setError(response.message || 'Failed to disable MFA');
+      }
+    } catch {
+      setError('An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const isMfaEnabled = user?.mfaEnabled && !disableSuccess;
+
+  return (
+    <div className="space-y-3">
+      {disableSuccess && (
+        <Notice variant="success" title="MFA has been disabled" />
+      )}
+
+      {isMfaEnabled ? (
+        <>
+          <div className="flex items-center gap-2">
+            <Badge variant="success">MFA Enabled</Badge>
+          </div>
+
+          {!showDisable ? (
+            <Button variant="ghost" onClick={() => setShowDisable(true)}>
+              Disable MFA
+            </Button>
+          ) : (
+            <div className="border border-brand-slate-100 rounded-card p-4">
+              {error && (
+                <div className="mb-3">
+                  <Notice variant="error" title={error} />
+                </div>
+              )}
+              <form onSubmit={handleDisable} className="space-y-3">
+                <Input
+                  label="Password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="Enter your password"
+                />
+                <Input
+                  label="Authenticator Code"
+                  type="text"
+                  inputMode="numeric"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  required
+                  placeholder="000000"
+                  maxLength={6}
+                />
+                <div className="flex gap-3">
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading ? 'Disabling...' : 'Confirm Disable'}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={() => {
+                      setShowDisable(false);
+                      setPassword('');
+                      setCode('');
+                      setError('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </div>
+          )}
+        </>
+      ) : (
+        <div>
+          <p className="text-sm text-brand-slate-400 mb-2">
+            Add an extra layer of security with two-factor authentication.
+          </p>
+          <Link to="/mfa-setup">
+            <Button variant="secondary">Enable MFA</Button>
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ProfilePage() {
   const { user, updateProfile } = useAuth();
@@ -81,6 +192,20 @@ export function ProfilePage() {
             {isSubmitting ? 'Saving...' : 'Save Changes'}
           </Button>
         </form>
+      </Card>
+
+      <Card className="max-w-lg">
+        <h2 className="text-lg font-serif font-semibold text-brand-slate-800 mb-4">
+          Two-Factor Authentication
+        </h2>
+        <MfaSection />
+      </Card>
+
+      <Card className="max-w-lg">
+        <h2 className="text-lg font-serif font-semibold text-brand-slate-800 mb-4">
+          Account
+        </h2>
+        <AccountDeletionSection />
       </Card>
     </div>
   );

@@ -6,6 +6,10 @@ import { LoginPage } from '@/features/auth/components/login-page';
 import { RegisterPage } from '@/features/auth/components/register-page';
 import { DashboardPage } from '@/features/auth/components/dashboard-page';
 import { ProfilePage } from '@/features/auth/components/profile-page';
+import { MfaVerifyPage } from '@/features/auth/components/mfa-verify-page';
+import { MfaSetupPage } from '@/features/auth/components/mfa-setup-page';
+import { ForgotPasswordPage } from '@/features/auth/components/forgot-password-page';
+import { ResetPasswordPage } from '@/features/auth/components/reset-password-page';
 import { ChildrenListPage } from '@/features/children/components/children-list-page';
 import { CreateChildPage } from '@/features/children/components/create-child-page';
 import { ChildDetailPage } from '@/features/children/components/child-detail-page';
@@ -71,6 +75,27 @@ export function AppRouter() {
         }
       />
       <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <AuthLayout>
+              <ForgotPasswordPage />
+            </AuthLayout>
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <PublicRoute>
+            <AuthLayout>
+              <ResetPasswordPage />
+            </AuthLayout>
+          </PublicRoute>
+        }
+      />
+      <Route path="/mfa-verify" element={<MfaVerifyPage />} />
+      <Route
         path="/dashboard"
         element={
           <ProtectedRoute>
@@ -126,6 +151,16 @@ export function AppRouter() {
           <ProtectedRoute>
             <MainLayout>
               <ProfilePage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/mfa-setup"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <MfaSetupPage />
             </MainLayout>
           </ProtectedRoute>
         }
