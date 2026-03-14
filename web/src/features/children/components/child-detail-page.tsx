@@ -8,6 +8,8 @@ import { IepUpload } from '@/features/iep-documents/components/iep-upload';
 import { IepDocumentList } from '@/features/iep-documents/components/iep-document-list';
 import { useAdvocacyGoals } from '@/features/advocacy-goals/hooks/use-advocacy-goals';
 import { AdvocacyGoalsList } from '@/features/advocacy-goals/components/advocacy-goals-list';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 export function ChildDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -70,7 +72,7 @@ export function ChildDetailPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
       </div>
     );
   }
@@ -78,8 +80,8 @@ export function ChildDetailPage() {
   if (!child) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Child profile not found.</p>
-        <Link to="/children" className="text-blue-600 hover:underline mt-2 inline-block">
+        <p className="text-brand-slate-400">Child profile not found.</p>
+        <Link to="/children" className="text-brand-teal-500 hover:underline mt-2 inline-block">
           Back to children
         </Link>
       </div>
@@ -90,13 +92,10 @@ export function ChildDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <h1 className="text-3xl font-bold text-gray-900">Edit {child.firstName}</h1>
-          <button
-            onClick={() => setIsEditing(false)}
-            className="text-sm text-gray-500 hover:text-gray-900"
-          >
+          <h1 className="font-serif">Edit {child.firstName}</h1>
+          <Button variant="ghost" onClick={() => setIsEditing(false)}>
             Cancel
-          </button>
+          </Button>
         </div>
         <ChildForm
           initialValues={{
@@ -117,60 +116,53 @@ export function ChildDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">
+        <h1 className="font-serif">
           {child.firstName} {child.lastName}
         </h1>
         <div className="flex gap-2">
-          <button
-            onClick={() => setIsEditing(true)}
-            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-sm transition-colors text-gray-700"
-          >
+          <Button variant="secondary" onClick={() => setIsEditing(true)}>
             Edit
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded text-sm transition-colors disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="danger" onClick={handleDelete} disabled={isDeleting}>
             {isDeleting ? 'Removing...' : 'Remove'}
-          </button>
+          </Button>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-        <h2 className="text-lg font-semibold mb-4 text-gray-900">Profile</h2>
+      <Card>
+        <h2 className="font-serif mb-4">Profile</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {child.dateOfBirth && (
-            <div className="bg-gray-50 rounded p-3 border border-gray-200">
-              <p className="text-gray-500 text-sm">Date of Birth</p>
-              <p className="font-medium text-gray-900">
+            <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">Date of Birth</p>
+              <p className="text-sm font-medium text-brand-slate-800 mt-1">
                 {new Date(child.dateOfBirth).toLocaleDateString()}
               </p>
             </div>
           )}
           {child.gradeLevel && (
-            <div className="bg-gray-50 rounded p-3 border border-gray-200">
-              <p className="text-gray-500 text-sm">Grade Level</p>
-              <p className="font-medium text-gray-900">{child.gradeLevel}</p>
+            <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">Grade Level</p>
+              <p className="text-sm font-medium text-brand-slate-800 mt-1">{child.gradeLevel}</p>
             </div>
           )}
           {child.disabilityCategory && (
-            <div className="bg-gray-50 rounded p-3 border border-gray-200">
-              <p className="text-gray-500 text-sm">Disability Category</p>
-              <p className="font-medium text-gray-900">{child.disabilityCategory}</p>
+            <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">Disability Category</p>
+              <p className="text-sm font-medium text-brand-slate-800 mt-1">{child.disabilityCategory}</p>
             </div>
           )}
           {child.schoolDistrict && (
-            <div className="bg-gray-50 rounded p-3 border border-gray-200">
-              <p className="text-gray-500 text-sm">School District</p>
-              <p className="font-medium text-gray-900">{child.schoolDistrict}</p>
+            <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">School District</p>
+              <p className="text-sm font-medium text-brand-slate-800 mt-1">{child.schoolDistrict}</p>
             </div>
           )}
         </div>
-      </div>
+      </Card>
 
-      <div className="bg-white rounded-lg p-6 space-y-4 shadow-sm border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">Your Advocacy Goals</h2>
+      <Card>
+        <h2 className="font-serif mb-4">Your Advocacy Goals</h2>
         <AdvocacyGoalsList
           childId={Number(id)}
           childName={child.firstName}
@@ -178,13 +170,13 @@ export function ChildDetailPage() {
           isLoading={goalsLoading}
           onReload={reloadGoals}
         />
-      </div>
+      </Card>
 
-      <div className="bg-white rounded-lg p-6 space-y-4 shadow-sm border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">IEP Documents</h2>
+      <Card>
+        <h2 className="font-serif mb-4">IEP Documents</h2>
         <IepUpload childId={Number(id)} onUploaded={reloadDocs} />
         <IepDocumentList documents={documents} isLoading={docsLoading} onDeleted={reloadDocs} />
-      </div>
+      </Card>
     </div>
   );
 }

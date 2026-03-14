@@ -21,7 +21,7 @@ export function CreateChildPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Add Child</h1>
+      <h1 className="font-serif">Add Child</h1>
       <ChildForm onSubmit={handleSubmit} submitLabel="Create Profile" />
     </div>
   );

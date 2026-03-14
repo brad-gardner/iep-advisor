@@ -1,5 +1,8 @@
 import { Link } from 'react-router-dom';
+import { Users } from 'lucide-react';
 import { useChildren } from '../hooks/use-children';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 export function ChildrenListPage() {
   const { children, isLoading } = useChildren();
@@ -7,7 +10,7 @@ export function ChildrenListPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
       </div>
     );
   }
@@ -15,42 +18,38 @@ export function ChildrenListPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Children</h1>
-        <Link
-          to="/children/new"
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded font-medium text-white transition-colors"
-        >
-          Add Child
+        <h1 className="font-serif">Your Children</h1>
+        <Link to="/children/new">
+          <Button>Add Child</Button>
         </Link>
       </div>
 
       {children.length === 0 ? (
-        <div className="bg-white rounded-lg p-8 text-center shadow-sm border border-gray-200">
-          <p className="text-gray-500 mb-4">No child profiles yet.</p>
-          <Link
-            to="/children/new"
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded font-medium text-white transition-colors"
-          >
-            Add Your First Child
+        <Card className="text-center py-12">
+          <Users className="w-12 h-12 mx-auto text-brand-slate-300 mb-3" strokeWidth={1.8} aria-hidden="true" />
+          <p className="text-brand-slate-400 mb-4">No child profiles yet.</p>
+          <Link to="/children/new">
+            <Button>Add Your First Child</Button>
           </Link>
-        </div>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {children.map((child) => (
             <Link
               key={child.id}
               to={`/children/${child.id}`}
-              className="bg-white rounded-lg p-5 hover:bg-gray-50 transition-colors block shadow-sm border border-gray-200"
+              className="block"
             >
-              <h3 className="text-lg font-semibold text-gray-900">
-                {child.firstName} {child.lastName}
-              </h3>
-              <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-500">
-                {child.gradeLevel && <span>Grade: {child.gradeLevel}</span>}
-                {child.disabilityCategory && <span>{child.disabilityCategory}</span>}
-                {child.schoolDistrict && <span>{child.schoolDistrict}</span>}
-              </div>
-              <p className="mt-3 text-sm text-gray-400">0 IEPs uploaded</p>
+              <Card className="hover:border-brand-teal-200 transition-colors">
+                <h3 className="font-serif text-brand-slate-800">
+                  {child.firstName} {child.lastName}
+                </h3>
+                <div className="mt-2 flex flex-wrap gap-3 text-xs text-brand-slate-400">
+                  {child.gradeLevel && <span>Grade: {child.gradeLevel}</span>}
+                  {child.disabilityCategory && <span>{child.disabilityCategory}</span>}
+                  {child.schoolDistrict && <span>{child.schoolDistrict}</span>}
+                </div>
+              </Card>
             </Link>
           ))}
         </div>

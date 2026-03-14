@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import type { CreateChildProfileRequest } from '@/types/api';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Notice } from '@/components/ui/notice';
 
 interface ChildFormProps {
   initialValues?: Partial<CreateChildProfileRequest>;
@@ -41,99 +45,54 @@ export function ChildForm({ initialValues, onSubmit, submitLabel }: ChildFormPro
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-lg p-6 max-w-lg space-y-4 shadow-sm border border-gray-200">
-      {error && (
-        <div className="p-3 rounded text-sm bg-red-50 text-red-600">{error}</div>
-      )}
+    <Card className="max-w-lg">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && <Notice variant="error" title={error} />}
 
-      <div>
-        <label htmlFor="firstName" className="block text-sm text-gray-500 mb-1">
-          First Name *
-        </label>
-        <input
-          id="firstName"
-          type="text"
+        <Input
+          label="First Name *"
           required
           value={firstName}
           onChange={(e) => setFirstName(e.target.value)}
-          className="w-full px-3 py-2 bg-white rounded text-gray-900 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
 
-      <div>
-        <label htmlFor="lastName" className="block text-sm text-gray-500 mb-1">
-          Last Name
-        </label>
-        <input
-          id="lastName"
-          type="text"
+        <Input
+          label="Last Name"
           value={lastName}
           onChange={(e) => setLastName(e.target.value)}
-          className="w-full px-3 py-2 bg-white rounded text-gray-900 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
 
-      <div>
-        <label htmlFor="dateOfBirth" className="block text-sm text-gray-500 mb-1">
-          Date of Birth
-        </label>
-        <input
-          id="dateOfBirth"
+        <Input
+          label="Date of Birth"
           type="date"
           value={dateOfBirth}
           onChange={(e) => setDateOfBirth(e.target.value)}
-          className="w-full px-3 py-2 bg-white rounded text-gray-900 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
 
-      <div>
-        <label htmlFor="gradeLevel" className="block text-sm text-gray-500 mb-1">
-          Grade Level
-        </label>
-        <input
-          id="gradeLevel"
-          type="text"
+        <Input
+          label="Grade Level"
           placeholder="e.g. 3rd, 7th, 10th"
           value={gradeLevel}
           onChange={(e) => setGradeLevel(e.target.value)}
-          className="w-full px-3 py-2 bg-white rounded text-gray-900 placeholder-gray-400 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
 
-      <div>
-        <label htmlFor="disabilityCategory" className="block text-sm text-gray-500 mb-1">
-          Disability Category
-        </label>
-        <input
-          id="disabilityCategory"
-          type="text"
+        <Input
+          label="Disability Category"
           placeholder="e.g. Autism, SLD, Speech/Language"
           value={disabilityCategory}
           onChange={(e) => setDisabilityCategory(e.target.value)}
-          className="w-full px-3 py-2 bg-white rounded text-gray-900 placeholder-gray-400 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
 
-      <div>
-        <label htmlFor="schoolDistrict" className="block text-sm text-gray-500 mb-1">
-          School District
-        </label>
-        <input
-          id="schoolDistrict"
-          type="text"
+        <Input
+          label="School District"
           value={schoolDistrict}
           onChange={(e) => setSchoolDistrict(e.target.value)}
-          className="w-full px-3 py-2 bg-white rounded text-gray-900 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded font-medium text-white transition-colors"
-      >
-        {isSubmitting ? 'Saving...' : submitLabel}
-      </button>
-    </form>
+        <Button type="submit" disabled={isSubmitting} className="w-full">
+          {isSubmitting ? 'Saving...' : submitLabel}
+        </Button>
+      </form>
+    </Card>
   );
 }
