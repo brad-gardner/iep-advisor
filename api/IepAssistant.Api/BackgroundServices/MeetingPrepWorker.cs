@@ -7,7 +7,8 @@ namespace IepAssistant.Api.BackgroundServices;
 
 public class MeetingPrepQueue
 {
-    private readonly Channel<int> _channel = Channel.CreateUnbounded<int>();
+    private readonly Channel<int> _channel = Channel.CreateBounded<int>(
+        new BoundedChannelOptions(100) { FullMode = BoundedChannelFullMode.Wait });
 
     public async ValueTask EnqueueAsync(int checklistId, CancellationToken cancellationToken = default)
         => await _channel.Writer.WriteAsync(checklistId, cancellationToken);
