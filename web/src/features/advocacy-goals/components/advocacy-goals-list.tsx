@@ -94,7 +94,7 @@ export function AdvocacyGoalsList({
   if (isLoading) {
     return (
       <div className="flex justify-center py-6">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900" />
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-teal-500" />
       </div>
     );
   }
@@ -106,14 +106,14 @@ export function AdvocacyGoalsList({
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-center">
-        <p className="text-xs text-gray-500">
+        <p className="text-[11px] text-brand-slate-400">
           {goals.length}/10 goals
           {goals.length >= 10 && ' — Focused goals produce better analysis. Consider consolidating.'}
         </p>
         {!isAdding && goals.length < 10 && (
           <button
             onClick={() => setIsAdding(true)}
-            className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
+            className="text-sm text-brand-teal-500 hover:text-brand-teal-600 transition-colors"
           >
             + Add Goal
           </button>
@@ -121,7 +121,7 @@ export function AdvocacyGoalsList({
       </div>
 
       {isAdding && (
-        <div className="bg-white rounded-lg p-4 border border-blue-200">
+        <div className="bg-white rounded-card p-4 border-[0.5px] border-brand-teal-200">
           <AdvocacyGoalForm
             onSubmit={handleCreate}
             onCancel={() => setIsAdding(false)}
@@ -132,7 +132,7 @@ export function AdvocacyGoalsList({
 
       {goals.map((goal, index) =>
         editingId === goal.id ? (
-          <div key={goal.id} className="bg-white rounded-lg p-4 border border-blue-200">
+          <div key={goal.id} className="bg-white rounded-card p-4 border-[0.5px] border-brand-teal-200">
             <AdvocacyGoalForm
               initialValues={{ goalText: goal.goalText, category: goal.category || '' }}
               onSubmit={(data) => handleUpdate(goal.id, data)}

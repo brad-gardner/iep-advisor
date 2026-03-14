@@ -1,6 +1,6 @@
 export const CATEGORY_COLORS: Record<string, string> = {
-  academic: 'bg-blue-100 text-blue-700',
-  behavioral: 'bg-purple-100 text-purple-700',
-  services: 'bg-green-100 text-green-700',
-  placement: 'bg-orange-100 text-orange-700',
+  academic: 'bg-brand-teal-50 text-brand-teal-600 border-brand-teal-100',
+  behavioral: 'bg-brand-amber-50 text-brand-amber-500 border-brand-amber-100',
+  services: 'bg-brand-teal-50 text-brand-teal-600 border-brand-teal-100',
+  placement: 'bg-brand-slate-50 text-brand-slate-600 border-brand-slate-200',
 };
