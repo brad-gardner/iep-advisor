@@ -57,11 +57,19 @@ builder.Host.UseSerilog();
 builder.Services.AddDomain(builder.Configuration);
 builder.Services.AddServices();
 
+// Named HttpClient for Claude API calls (avoids socket exhaustion from new HttpClient per request)
+builder.Services.AddHttpClient("Claude", client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(5);
+});
+
 // Background processing
 builder.Services.AddSingleton<IepProcessingQueue>();
 builder.Services.AddHostedService<IepProcessingWorker>();
 builder.Services.AddSingleton<IepAnalysisQueue>();
 builder.Services.AddHostedService<IepAnalysisWorker>();
+builder.Services.AddSingleton<MeetingPrepQueue>();
+builder.Services.AddHostedService<MeetingPrepWorker>();
 
 // Add controllers
 builder.Services.AddControllers()

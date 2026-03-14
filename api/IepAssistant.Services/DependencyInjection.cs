@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.AddScoped<IIepAnalysisService, IepAnalysisService>();
         services.AddScoped<IParentAdvocacyGoalService, ParentAdvocacyGoalService>();
         services.AddScoped<IAccountService, AccountService>();
+        services.AddScoped<IMeetingPrepService, MeetingPrepService>();
 
         return services;
     }
