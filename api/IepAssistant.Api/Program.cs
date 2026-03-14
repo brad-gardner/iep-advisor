@@ -1,0 +1,153 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using Scalar.AspNetCore;
+using Serilog;
+using Serilog.Events;
+using Elastic.Ingest.Elasticsearch;
+using Elastic.Ingest.Elasticsearch.DataStreams;
+using Elastic.Serilog.Sinks;
+using Elastic.Transport;
+using IepAssistant.Api.Middleware;
+using IepAssistant.Domain;
+using IepAssistant.Domain.Data;
+using IepAssistant.Api.BackgroundServices;
+using IepAssistant.Services;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Configure Serilog with Elasticsearch
+var logConfiguration = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
+    .MinimumLevel.Override("System", LogEventLevel.Warning)
+    .WriteTo.Console();
+
+if (builder.Environment.IsProduction())
+{
+    var elasticUrl = builder.Configuration["Elastic:Url"];
+    var elasticUsername = builder.Configuration["Elastic:Username"];
+    var elasticPassword = builder.Configuration["Elastic:Password"];
+
+    if (!string.IsNullOrEmpty(elasticUrl) && !string.IsNullOrEmpty(elasticUsername) && !string.IsNullOrEmpty(elasticPassword))
+    {
+        logConfiguration
+            .WriteTo.Elasticsearch(new[] { new Uri(elasticUrl) }, opts =>
+            {
+                opts.DataStream = new DataStreamName("app-logs", "iepassistant-api", "production");
+                opts.BootstrapMethod = BootstrapMethod.Failure;
+            }, transport =>
+            {
+                transport.Authentication(new BasicAuthentication(elasticUsername, elasticPassword));
+            });
+
+        builder.Services.AddAllElasticApm();
+    }
+}
+
+Log.Logger = logConfiguration.CreateLogger();
+builder.Host.UseSerilog();
+
+// Add layers via extension methods
+builder.Services.AddDomain(builder.Configuration);
+builder.Services.AddServices();
+
+// Background processing
+builder.Services.AddSingleton<IepProcessingQueue>();
+builder.Services.AddHostedService<IepProcessingWorker>();
+builder.Services.AddSingleton<IepAnalysisQueue>();
+builder.Services.AddHostedService<IepAnalysisWorker>();
+
+// Add controllers
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
+
+// Configure OpenAPI (.NET 9)
+builder.Services.AddOpenApi();
+
+// Configure JWT Authentication
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? throw new InvalidOperationException("JWT Key must be configured in appsettings.json");
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "IepAssistant.Api";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "IepAssistant.Client";
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+        ClockSkew = TimeSpan.Zero
+    };
+});
+
+builder.Services.AddAuthorization();
+
+// Configure CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+            ?? new[] { "http://localhost:5200", "http://localhost:3000" };
+        policy.WithOrigins(origins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
+// Add Health Checks
+builder.Services.AddHealthChecks()
+    .AddSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")!);
+
+var app = builder.Build();
+
+// Initialize database (only in development)
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    DbInitializer.Initialize(context);
+}
+
+// Global exception handling
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
+// Configure pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.MapScalarApiReference(options =>
+    {
+        options.Title = "IepAssistant API";
+        options.Theme = ScalarTheme.BluePlanet;
+    });
+}
+
+app.UseCors("AllowFrontend");
+
+app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+app.MapHealthChecks("/health");
+
+app.Run();

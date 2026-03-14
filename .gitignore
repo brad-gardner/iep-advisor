@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+*.lcov
+.nyc_output
+
+# Production
+build/
+dist/
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+appsettings.Development.json
+appsettings.*.json
+
+# Mobile
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.expo/
+.expo-shared/
+
+# Firebase (sensitive configs only)
+web/src/config/firebase.ts
+api/firebase/serviceAccountKey.jsondocs/
+docs/
