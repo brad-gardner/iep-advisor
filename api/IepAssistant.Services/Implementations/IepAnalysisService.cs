@@ -19,6 +19,7 @@ public class IepAnalysisService : IIepAnalysisService
     private readonly IParentAdvocacyGoalRepository _goalRepository;
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _configuration;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<IepAnalysisService> _logger;
 
     private static readonly JsonSerializerOptions CamelCaseOptions = new()
@@ -36,12 +37,14 @@ public class IepAnalysisService : IIepAnalysisService
         IParentAdvocacyGoalRepository goalRepository,
         ApplicationDbContext context,
         IConfiguration configuration,
+        IHttpClientFactory httpClientFactory,
         ILogger<IepAnalysisService> logger)
     {
         _documentRepository = documentRepository;
         _goalRepository = goalRepository;
         _context = context;
         _configuration = configuration;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
@@ -215,7 +218,7 @@ public class IepAnalysisService : IIepAnalysisService
             return null;
         }
 
-        var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+        var httpClient = _httpClientFactory.CreateClient("Claude");
         var client = new AnthropicClient(apiKey, httpClient);
 
         var systemPrompt = @"You are an expert IEP (Individualized Education Program) analyst helping parents understand their child's IEP.

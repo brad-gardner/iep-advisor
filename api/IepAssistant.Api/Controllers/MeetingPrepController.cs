@@ -31,7 +31,11 @@ public class MeetingPrepController : ControllerBase
         var result = await _meetingPrepService.GenerateFromGoalsAsync(childId, userId, cancellationToken);
 
         if (!result.Success)
+        {
+            if (result.Message?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
+                return NotFound(ApiResponse<object>.Error(result.Message));
             return BadRequest(ApiResponse<object>.Error(result.Message ?? "Generation failed"));
+        }
 
         await _queue.EnqueueAsync(result.Data, cancellationToken);
 
@@ -49,7 +53,11 @@ public class MeetingPrepController : ControllerBase
         var result = await _meetingPrepService.GenerateFromIepAsync(iepId, userId, cancellationToken);
 
         if (!result.Success)
+        {
+            if (result.Message?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
+                return NotFound(ApiResponse<object>.Error(result.Message));
             return BadRequest(ApiResponse<object>.Error(result.Message ?? "Generation failed"));
+        }
 
         await _queue.EnqueueAsync(result.Data, cancellationToken);
 

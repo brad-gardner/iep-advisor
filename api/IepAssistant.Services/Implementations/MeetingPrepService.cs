@@ -19,6 +19,7 @@ public class MeetingPrepService : IMeetingPrepService
     private readonly IParentAdvocacyGoalRepository _goalRepository;
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _configuration;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<MeetingPrepService> _logger;
 
     private static readonly JsonSerializerOptions CamelCaseOptions = new()
@@ -36,12 +37,14 @@ public class MeetingPrepService : IMeetingPrepService
         IParentAdvocacyGoalRepository goalRepository,
         ApplicationDbContext context,
         IConfiguration configuration,
+        IHttpClientFactory httpClientFactory,
         ILogger<MeetingPrepService> logger)
     {
         _documentRepository = documentRepository;
         _goalRepository = goalRepository;
         _context = context;
         _configuration = configuration;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
@@ -194,7 +197,7 @@ public class MeetingPrepService : IMeetingPrepService
             _logger.LogError(ex, "Error generating meeting prep checklist {ChecklistId}", checklistId);
             checklist.Status = "error";
             checklist.ErrorMessage = "An unexpected error occurred during checklist generation.";
-            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync(CancellationToken.None); // Use None so error status saves even during shutdown
         }
     }
 
@@ -386,7 +389,7 @@ public class MeetingPrepService : IMeetingPrepService
             return null;
         }
 
-        var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+        var httpClient = _httpClientFactory.CreateClient("Claude");
         var client = new AnthropicClient(apiKey, httpClient);
 
         var systemPrompt = @"You are an IEP meeting preparation expert helping a parent prepare for their child's IEP meeting.
