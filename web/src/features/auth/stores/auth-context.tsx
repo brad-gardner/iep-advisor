@@ -8,13 +8,22 @@ import {
 } from '../api/auth-api';
 import { getToken, setToken, removeToken, setStoredUser, getStoredUser } from '@/lib/auth';
 
+interface LoginResult {
+  success: boolean;
+  error?: string;
+  requiresMfa?: boolean;
+  mfaPendingToken?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (data: LoginRequest) => Promise<{ success: boolean; error?: string }>;
+  mfaPendingToken: string | null;
+  login: (data: LoginRequest) => Promise<LoginResult>;
   register: (data: RegisterRequest) => Promise<{ success: boolean; error?: string }>;
   updateProfile: (data: UpdateProfileRequest) => Promise<{ success: boolean; error?: string }>;
+  completeMfaLogin: (token: string, user: User) => void;
   logout: () => void;
 }
 
@@ -23,6 +32,7 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [mfaPendingToken, setMfaPendingToken] = useState<string | null>(null);
 
   const loadUser = useCallback(async () => {
     const token = getToken();
@@ -59,19 +69,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadUser();
   }, [loadUser]);
 
-  const login = async (data: LoginRequest) => {
+  const login = async (data: LoginRequest): Promise<LoginResult> => {
     try {
       const response = await loginApi(data);
       if (response.success && response.data) {
-        setToken(response.data.token);
-        setUser(response.data.user);
-        setStoredUser(JSON.stringify(response.data.user));
-        return { success: true };
+        // Check if MFA is required
+        if (response.data.requiresMfa && response.data.mfaPendingToken) {
+          setMfaPendingToken(response.data.mfaPendingToken);
+          return {
+            success: false,
+            requiresMfa: true,
+            mfaPendingToken: response.data.mfaPendingToken,
+          };
+        }
+
+        // Normal login (no MFA)
+        if (response.data.token && response.data.user) {
+          setToken(response.data.token);
+          setUser(response.data.user);
+          setStoredUser(JSON.stringify(response.data.user));
+          return { success: true };
+        }
       }
       return { success: false, error: response.message || 'Login failed' };
     } catch (error) {
       return { success: false, error: 'An error occurred during login' };
     }
+  };
+
+  const completeMfaLogin = (token: string, userData: User) => {
+    setToken(token);
+    setUser(userData);
+    setStoredUser(JSON.stringify(userData));
+    setMfaPendingToken(null);
   };
 
   const register = async (data: RegisterRequest) => {
@@ -103,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     removeToken();
     setUser(null);
+    setMfaPendingToken(null);
   };
 
   return (
@@ -111,9 +142,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         isAuthenticated: !!user,
         isLoading,
+        mfaPendingToken,
         login,
         register,
         updateProfile,
+        completeMfaLogin,
         logout,
       }}
     >

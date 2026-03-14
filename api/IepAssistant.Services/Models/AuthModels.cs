@@ -42,3 +42,16 @@ public class UpdateProfileModel
     public string? LastName { get; set; }
     public string? State { get; set; }
 }
+
+public class MfaSetupResult
+{
+    public string OtpauthUri { get; set; } = string.Empty;
+    public string ManualEntryKey { get; set; } = string.Empty;
+}
+
+public class LoginResult
+{
+    public bool RequiresMfa { get; set; }
+    public string? MfaPendingToken { get; set; }
+    public AuthResult? AuthResult { get; set; }
+}

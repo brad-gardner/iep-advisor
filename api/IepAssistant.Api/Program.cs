@@ -1,5 +1,8 @@
+using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Serilog;
@@ -95,9 +98,73 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
         ClockSkew = TimeSpan.Zero
     };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            // Reject MFA pending tokens used as regular auth
+            var tokenType = context.Principal?.FindFirst("token_type")?.Value;
+            if (tokenType == "mfa_pending")
+            {
+                context.Fail("MFA pending tokens cannot be used for authorization.");
+                return;
+            }
+
+            // Validate SecurityStamp
+            var stampClaim = context.Principal?.FindFirst("SecurityStamp")?.Value;
+            var userIdClaim = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (stampClaim != null && userIdClaim != null && int.TryParse(userIdClaim, out var userId))
+            {
+                var dbContext = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+                var user = await dbContext.Users.FindAsync(userId);
+                if (user == null || user.SecurityStamp.ToString() != stampClaim)
+                {
+                    context.Fail("Token has been revoked.");
+                    return;
+                }
+            }
+        }
+    };
 });
 
 builder.Services.AddAuthorization();
+
+// Rate limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("login", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(15),
+                SegmentsPerWindow = 3
+            }));
+
+    options.AddPolicy("mfa", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(15),
+                SegmentsPerWindow = 3
+            }));
+
+    options.AddPolicy("password-reset", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromHours(1),
+                SegmentsPerWindow = 6
+            }));
+});
 
 // Configure CORS
 builder.Services.AddCors(options =>
@@ -146,6 +213,7 @@ app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 app.MapHealthChecks("/health");
