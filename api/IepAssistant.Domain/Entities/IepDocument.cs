@@ -3,8 +3,8 @@ namespace IepAssistant.Domain.Entities;
 public class IepDocument : BaseEntity, IAuditableEntity
 {
     public int ChildProfileId { get; set; }
-    public string FileName { get; set; } = string.Empty;
-    public string BlobUri { get; set; } = string.Empty;
+    public string? FileName { get; set; }
+    public string? BlobUri { get; set; }
     public DateTime UploadDate { get; set; } = DateTime.UtcNow;
     public DateTime? IepDate { get; set; }
     public string? MeetingType { get; set; }  // initial, annual_review, amendment, reevaluation

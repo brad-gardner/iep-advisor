@@ -5,7 +5,7 @@ namespace IepAssistant.Api.DTOs.IepDocuments;
 public class CreateIepRequest
 {
     [Required(ErrorMessage = "Meeting date is required")]
-    public DateTime IepDate { get; set; }
+    public DateTime? IepDate { get; set; }
 
     [Required(ErrorMessage = "Meeting type is required")]
     [MaxLength(50)]

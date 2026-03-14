@@ -68,7 +68,7 @@ public class IepDocumentsController : ControllerBase
         var userId = User.GetUserId();
         var model = new CreateIepDocumentModel
         {
-            IepDate = request.IepDate,
+            IepDate = request.IepDate!.Value,
             MeetingType = request.MeetingType,
             Attendees = request.Attendees,
             Notes = request.Notes
@@ -92,14 +92,21 @@ public class IepDocumentsController : ControllerBase
         if (file == null || file.Length == 0)
             return BadRequest(ApiResponse<object>.Error("No file provided"));
 
-        if (!file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)
-            && !file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        if (!file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
             return BadRequest(ApiResponse<object>.Error("Only PDF files are supported"));
 
+        // Validate PDF magic bytes
+        using var stream = file.OpenReadStream();
+        var header = new byte[5];
+        var bytesRead = await stream.ReadAsync(header, 0, 5, cancellationToken);
+        if (bytesRead < 5 || System.Text.Encoding.ASCII.GetString(header) != "%PDF-")
+            return BadRequest(ApiResponse<object>.Error("File does not appear to be a valid PDF"));
+        stream.Position = 0;
+
+        var sanitizedFileName = Path.GetFileName(file.FileName);
         var userId = User.GetUserId();
 
-        using var stream = file.OpenReadStream();
-        var result = await _iepDocumentService.AttachFileAsync(id, userId, file.FileName, stream, file.Length, cancellationToken);
+        var result = await _iepDocumentService.AttachFileAsync(id, userId, sanitizedFileName, stream, file.Length, cancellationToken);
 
         if (!result.Success)
             return BadRequest(ApiResponse<object>.Error(result.Message ?? "Upload failed"));

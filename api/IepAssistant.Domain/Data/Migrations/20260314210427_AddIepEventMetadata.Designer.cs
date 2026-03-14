@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace IepAssistant.Domain.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260314205141_AddIepEventMetadata")]
+    [Migration("20260314210427_AddIepEventMetadata")]
     partial class AddIepEventMetadata
     {
         /// <inheritdoc />
@@ -208,7 +208,6 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("BlobUri")
-                        .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
@@ -222,7 +221,6 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("FileName")
-                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 

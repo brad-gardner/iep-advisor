@@ -205,7 +205,6 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("BlobUri")
-                        .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
@@ -219,7 +218,6 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("FileName")
-                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 

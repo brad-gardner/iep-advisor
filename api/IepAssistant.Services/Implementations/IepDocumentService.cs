@@ -83,6 +83,9 @@ public class IepDocumentService : IIepDocumentService
         if (document == null || document.ChildProfile.UserId != userId)
             return ServiceResult<IepDocumentModel>.FailureResult("Document not found.");
 
+        if (document.Status == "processing")
+            return ServiceResult<IepDocumentModel>.FailureResult("Cannot replace file while document is being processed. Please wait for processing to complete.");
+
         // Delete existing blob if replacing
         if (!string.IsNullOrEmpty(document.BlobUri))
         {
