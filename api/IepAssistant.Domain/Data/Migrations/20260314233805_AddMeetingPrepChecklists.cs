@@ -41,7 +41,7 @@ namespace IepAssistant.Domain.Data.Migrations
                         column: x => x.ChildProfileId,
                         principalTable: "ChildProfiles",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_MeetingPrepChecklists_IepDocuments_IepDocumentId",
                         column: x => x.IepDocumentId,

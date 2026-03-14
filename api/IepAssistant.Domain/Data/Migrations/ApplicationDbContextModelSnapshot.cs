@@ -623,7 +623,7 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasOne("IepAssistant.Domain.Entities.ChildProfile", "ChildProfile")
                         .WithMany()
                         .HasForeignKey("ChildProfileId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("IepAssistant.Domain.Entities.IepDocument", "IepDocument")

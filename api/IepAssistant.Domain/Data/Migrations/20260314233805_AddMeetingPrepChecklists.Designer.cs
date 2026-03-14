@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace IepAssistant.Domain.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260314231000_AddMeetingPrepChecklists")]
+    [Migration("20260314233805_AddMeetingPrepChecklists")]
     partial class AddMeetingPrepChecklists
     {
         /// <inheritdoc />
@@ -626,7 +626,7 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasOne("IepAssistant.Domain.Entities.ChildProfile", "ChildProfile")
                         .WithMany()
                         .HasForeignKey("ChildProfileId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("IepAssistant.Domain.Entities.IepDocument", "IepDocument")

@@ -15,7 +15,7 @@ public class MeetingPrepChecklistConfiguration : IEntityTypeConfiguration<Meetin
         builder.HasOne(m => m.ChildProfile)
             .WithMany()
             .HasForeignKey(m => m.ChildProfileId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(m => m.IepDocument)
             .WithMany()
