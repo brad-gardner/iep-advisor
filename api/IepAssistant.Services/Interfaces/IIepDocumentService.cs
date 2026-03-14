@@ -6,6 +6,9 @@ public interface IIepDocumentService
 {
     Task<IEnumerable<IepDocumentModel>> GetByChildIdAsync(int childProfileId, int userId, CancellationToken cancellationToken = default);
     Task<IepDocumentModel?> GetByIdAsync(int id, int userId, CancellationToken cancellationToken = default);
+    Task<ServiceResult<IepDocumentModel>> CreateAsync(int childProfileId, int userId, CreateIepDocumentModel model, CancellationToken cancellationToken = default);
+    Task<ServiceResult<IepDocumentModel>> AttachFileAsync(int id, int userId, string fileName, Stream fileStream, long fileSize, CancellationToken cancellationToken = default);
+    Task<ServiceResult> UpdateMetadataAsync(int id, int userId, UpdateIepMetadataModel model, CancellationToken cancellationToken = default);
     Task<ServiceResult<IepDocumentModel>> UploadAsync(int childProfileId, int userId, string fileName, Stream fileStream, long fileSize, CancellationToken cancellationToken = default);
     Task<ServiceResult> DeleteAsync(int id, int userId, CancellationToken cancellationToken = default);
     Task<string?> GetDownloadUrlAsync(int id, int userId, CancellationToken cancellationToken = default);

@@ -14,6 +14,11 @@ public class IepDocumentService : IIepDocumentService
     private readonly IBlobStorageService _blobStorage;
     private readonly ApplicationDbContext _context;
 
+    private static readonly HashSet<string> ValidMeetingTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "initial", "annual_review", "amendment", "reevaluation"
+    };
+
     public IepDocumentService(
         IIepDocumentRepository documentRepository,
         IChildProfileRepository childProfileRepository,
@@ -45,6 +50,90 @@ public class IepDocumentService : IIepDocumentService
         return MapToModel(document);
     }
 
+    public async Task<ServiceResult<IepDocumentModel>> CreateAsync(int childProfileId, int userId, CreateIepDocumentModel model, CancellationToken cancellationToken = default)
+    {
+        var child = await _childProfileRepository.GetByIdForUserAsync(childProfileId, userId, cancellationToken);
+        if (child == null)
+            return ServiceResult<IepDocumentModel>.FailureResult("Child profile not found.");
+
+        if (!ValidMeetingTypes.Contains(model.MeetingType))
+            return ServiceResult<IepDocumentModel>.FailureResult("Invalid meeting type. Must be: initial, annual_review, amendment, or reevaluation.");
+
+        var entity = new IepDocument
+        {
+            ChildProfileId = childProfileId,
+            IepDate = model.IepDate,
+            MeetingType = model.MeetingType.ToLowerInvariant(),
+            Attendees = model.Attendees?.Trim(),
+            Notes = model.Notes?.Trim(),
+            Status = "created",
+            CreatedById = userId,
+            UpdatedById = userId
+        };
+
+        await _documentRepository.AddAsync(entity, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return ServiceResult<IepDocumentModel>.SuccessResult(MapToModel(entity), "IEP created successfully.");
+    }
+
+    public async Task<ServiceResult<IepDocumentModel>> AttachFileAsync(int id, int userId, string fileName, Stream fileStream, long fileSize, CancellationToken cancellationToken = default)
+    {
+        var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
+        if (document == null || document.ChildProfile.UserId != userId)
+            return ServiceResult<IepDocumentModel>.FailureResult("Document not found.");
+
+        // Delete existing blob if replacing
+        if (!string.IsNullOrEmpty(document.BlobUri))
+        {
+            await _blobStorage.DeleteAsync(document.BlobUri, cancellationToken);
+        }
+
+        var blobPath = $"users/{userId}/children/{document.ChildProfileId}/{Guid.NewGuid()}/{fileName}";
+        await _blobStorage.UploadAsync(blobPath, fileStream, "application/pdf", cancellationToken);
+
+        document.FileName = fileName;
+        document.BlobUri = blobPath;
+        document.FileSizeBytes = fileSize;
+        document.UploadDate = DateTime.UtcNow;
+        document.Status = "uploaded";
+        document.UpdatedById = userId;
+
+        _documentRepository.Update(document);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return ServiceResult<IepDocumentModel>.SuccessResult(MapToModel(document), "File attached successfully.");
+    }
+
+    public async Task<ServiceResult> UpdateMetadataAsync(int id, int userId, UpdateIepMetadataModel model, CancellationToken cancellationToken = default)
+    {
+        var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
+        if (document == null || document.ChildProfile.UserId != userId)
+            return ServiceResult.FailureResult("Document not found.");
+
+        if (model.IepDate.HasValue)
+            document.IepDate = model.IepDate.Value;
+
+        if (model.MeetingType != null)
+        {
+            if (!ValidMeetingTypes.Contains(model.MeetingType))
+                return ServiceResult.FailureResult("Invalid meeting type.");
+            document.MeetingType = model.MeetingType.ToLowerInvariant();
+        }
+
+        if (model.Attendees != null)
+            document.Attendees = model.Attendees.Trim();
+
+        if (model.Notes != null)
+            document.Notes = model.Notes.Trim();
+
+        document.UpdatedById = userId;
+        _documentRepository.Update(document);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return ServiceResult.SuccessResult("Metadata updated successfully.");
+    }
+
     public async Task<ServiceResult<IepDocumentModel>> UploadAsync(int childProfileId, int userId, string fileName, Stream fileStream, long fileSize, CancellationToken cancellationToken = default)
     {
         var child = await _childProfileRepository.GetByIdForUserAsync(childProfileId, userId, cancellationToken);
@@ -52,7 +141,7 @@ public class IepDocumentService : IIepDocumentService
             return ServiceResult<IepDocumentModel>.FailureResult("Child profile not found.");
 
         var blobPath = $"users/{userId}/children/{childProfileId}/{Guid.NewGuid()}/{fileName}";
-        var blobUri = await _blobStorage.UploadAsync(blobPath, fileStream, "application/pdf", cancellationToken);
+        await _blobStorage.UploadAsync(blobPath, fileStream, "application/pdf", cancellationToken);
 
         var entity = new IepDocument
         {
@@ -77,7 +166,10 @@ public class IepDocumentService : IIepDocumentService
         if (document == null || document.ChildProfile.UserId != userId)
             return ServiceResult.FailureResult("Document not found.");
 
-        await _blobStorage.DeleteAsync(document.BlobUri, cancellationToken);
+        if (!string.IsNullOrEmpty(document.BlobUri))
+        {
+            await _blobStorage.DeleteAsync(document.BlobUri, cancellationToken);
+        }
 
         document.IsActive = false;
         document.UpdatedById = userId;
@@ -93,6 +185,9 @@ public class IepDocumentService : IIepDocumentService
         if (document == null || document.ChildProfile.UserId != userId)
             return null;
 
+        if (string.IsNullOrEmpty(document.BlobUri))
+            return null;
+
         return await _blobStorage.GetDownloadUrlAsync(document.BlobUri);
     }
 
@@ -103,6 +198,9 @@ public class IepDocumentService : IIepDocumentService
         FileName = entity.FileName,
         UploadDate = entity.UploadDate,
         IepDate = entity.IepDate,
+        MeetingType = entity.MeetingType,
+        Attendees = entity.Attendees,
+        Notes = entity.Notes,
         Status = entity.Status,
         FileSizeBytes = entity.FileSizeBytes,
         CreatedAt = entity.CreatedAt
