@@ -14,6 +14,7 @@ import { ChildrenListPage } from '@/features/children/components/children-list-p
 import { CreateChildPage } from '@/features/children/components/create-child-page';
 import { ChildDetailPage } from '@/features/children/components/child-detail-page';
 import { IepViewerPage } from '@/features/iep-documents/components/iep-viewer-page';
+import { ComparisonPage } from '@/features/iep-comparison/components/comparison-page';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -131,6 +132,16 @@ export function AppRouter() {
           <ProtectedRoute>
             <MainLayout>
               <ChildDetailPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/children/:childId/compare/:iepId/:otherId"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <ComparisonPage />
             </MainLayout>
           </ProtectedRoute>
         }

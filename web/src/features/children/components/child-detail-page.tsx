@@ -10,6 +10,7 @@ import { useAdvocacyGoals } from '@/features/advocacy-goals/hooks/use-advocacy-g
 import { AdvocacyGoalsList } from '@/features/advocacy-goals/components/advocacy-goals-list';
 import { useMeetingPrep } from '@/features/meeting-prep/hooks/use-meeting-prep';
 import { MeetingPrepTab } from '@/features/meeting-prep/components/meeting-prep-tab';
+import { IepTimeline } from '@/features/iep-comparison/components/iep-timeline';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -242,6 +243,11 @@ export function ChildDetailPage() {
           </div>
         )}
         <IepDocumentList documents={documents} isLoading={docsLoading} onDeleted={reloadDocs} />
+      </Card>
+
+      <Card>
+        <h2 className="font-serif mb-4">IEP Timeline</h2>
+        <IepTimeline childId={Number(id)} />
       </Card>
     </div>
   );
