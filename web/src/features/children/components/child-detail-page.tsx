@@ -8,8 +8,11 @@ import { CreateIepForm } from '@/features/iep-documents/components/create-iep-fo
 import { IepDocumentList } from '@/features/iep-documents/components/iep-document-list';
 import { useAdvocacyGoals } from '@/features/advocacy-goals/hooks/use-advocacy-goals';
 import { AdvocacyGoalsList } from '@/features/advocacy-goals/components/advocacy-goals-list';
+import { useMeetingPrep } from '@/features/meeting-prep/hooks/use-meeting-prep';
+import { MeetingPrepTab } from '@/features/meeting-prep/components/meeting-prep-tab';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 export function ChildDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +24,13 @@ export function ChildDetailPage() {
   const [showCreateIep, setShowCreateIep] = useState(false);
   const { documents, isLoading: docsLoading, reload: reloadDocs } = useIepDocuments(Number(id));
   const { goals, isLoading: goalsLoading, reload: reloadGoals } = useAdvocacyGoals(Number(id));
+  const {
+    checklist: meetingPrepChecklist,
+    isLoading: meetingPrepLoading,
+    isGenerating: meetingPrepGenerating,
+    generateFromGoals: generateMeetingPrep,
+    reload: reloadMeetingPrep,
+  } = useMeetingPrep(Number(id));
 
   useEffect(() => {
     async function load() {
@@ -170,6 +180,43 @@ export function ChildDetailPage() {
           goals={goals}
           isLoading={goalsLoading}
           onReload={reloadGoals}
+        />
+      </Card>
+
+      <Card>
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-3">
+            <h2 className="font-serif">Meeting Prep</h2>
+            {meetingPrepChecklist?.status && (
+              <Badge
+                variant={
+                  meetingPrepChecklist.status === 'completed'
+                    ? 'success'
+                    : meetingPrepChecklist.status === 'error'
+                      ? 'error'
+                      : 'neutral'
+                }
+              >
+                {meetingPrepChecklist.status}
+              </Badge>
+            )}
+          </div>
+          {!meetingPrepChecklist && !meetingPrepLoading && (
+            <Button
+              variant="secondary"
+              onClick={generateMeetingPrep}
+              disabled={meetingPrepGenerating}
+            >
+              {meetingPrepGenerating ? 'Generating...' : 'Prep for Meeting'}
+            </Button>
+          )}
+        </div>
+        <MeetingPrepTab
+          checklist={meetingPrepChecklist}
+          isLoading={meetingPrepLoading}
+          isGenerating={meetingPrepGenerating}
+          onGenerate={generateMeetingPrep}
+          onReload={reloadMeetingPrep}
         />
       </Card>
 

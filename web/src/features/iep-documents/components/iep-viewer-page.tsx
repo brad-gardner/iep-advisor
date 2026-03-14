@@ -6,7 +6,9 @@ import { getIepDocument, getIepSections, getDownloadUrl, reprocessIep } from '..
 import { Badge } from '@/components/ui/badge';
 import { useIepAnalysis } from '../hooks/use-iep-analysis';
 import { useAdvocacyGoals } from '@/features/advocacy-goals/hooks/use-advocacy-goals';
+import { useMeetingPrep } from '@/features/meeting-prep/hooks/use-meeting-prep';
 import { AnalysisTab } from './analysis-tab';
+import { MeetingPrepTab } from '@/features/meeting-prep/components/meeting-prep-tab';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
@@ -40,7 +42,7 @@ export function IepViewerPage() {
   const [sections, setSections] = useState<IepSection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeSectionId, setActiveSectionId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'document' | 'analysis'>('document');
+  const [activeTab, setActiveTab] = useState<'document' | 'analysis' | 'meeting-prep'>('document');
   const [notesExpanded, setNotesExpanded] = useState(false);
 
   const {
@@ -52,6 +54,14 @@ export function IepViewerPage() {
   } = useIepAnalysis(documentId);
 
   const { goals: advocacyGoals } = useAdvocacyGoals(document?.childProfileId ?? 0);
+
+  const {
+    checklist: meetingPrepChecklist,
+    isLoading: meetingPrepLoading,
+    isGenerating: meetingPrepGenerating,
+    generateFromIep: generateMeetingPrep,
+    reload: reloadMeetingPrep,
+  } = useMeetingPrep(document?.childProfileId ?? 0, documentId);
 
   useEffect(() => {
     async function load() {
@@ -220,6 +230,19 @@ export function IepViewerPage() {
                 <span className="ml-2 inline-block w-2 h-2 rounded-full bg-brand-teal-500" />
               )}
             </button>
+            <button
+              onClick={() => setActiveTab('meeting-prep')}
+              className={`px-4 py-2 text-[13px] font-medium transition-colors ${
+                activeTab === 'meeting-prep'
+                  ? 'text-brand-slate-800 border-b-2 border-brand-teal-500'
+                  : 'text-brand-slate-400 hover:text-brand-slate-800'
+              }`}
+            >
+              Meeting Prep
+              {meetingPrepChecklist?.status === 'completed' && (
+                <span className="ml-2 inline-block w-2 h-2 rounded-full bg-brand-teal-500" />
+              )}
+            </button>
           </div>
 
           {/* Tab content */}
@@ -317,6 +340,16 @@ export function IepViewerPage() {
               advocacyGoals={advocacyGoals}
               onTrigger={triggerAnalysis}
               onReload={reloadAnalysis}
+            />
+          )}
+
+          {activeTab === 'meeting-prep' && (
+            <MeetingPrepTab
+              checklist={meetingPrepChecklist}
+              isLoading={meetingPrepLoading}
+              isGenerating={meetingPrepGenerating}
+              onGenerate={() => generateMeetingPrep(documentId)}
+              onReload={reloadMeetingPrep}
             />
           )}
         </>

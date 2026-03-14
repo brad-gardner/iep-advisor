@@ -260,3 +260,33 @@ export interface LegalReference {
   provision: string;
   summary: string;
 }
+
+// Meeting Prep types
+
+export interface ChecklistItem {
+  text: string;
+  context: string | null;
+  legalBasis: string | null;
+  isChecked: boolean;
+}
+
+export interface MeetingPrepChecklist {
+  id: number;
+  childProfileId: number;
+  iepDocumentId: number | null;
+  status: 'pending' | 'generating' | 'completed' | 'error';
+  questionsToAsk: ChecklistItem[];
+  documentsToBring: ChecklistItem[];
+  redFlagsToRaise: ChecklistItem[];
+  rightsToReference: ChecklistItem[];
+  goalGaps: ChecklistItem[];
+  generalTips: ChecklistItem[];
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+export interface CheckItemRequest {
+  section: string;
+  index: number;
+  isChecked: boolean;
+}
