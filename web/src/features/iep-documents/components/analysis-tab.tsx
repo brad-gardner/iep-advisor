@@ -7,6 +7,9 @@ import { AnalysisSectionDetail } from './analysis-section-detail';
 import { AnalysisGoalsList } from './analysis-goals-list';
 import { AdvocacyGapAnalysisSection } from './advocacy-gap-analysis';
 import { StaleAnalysisBanner } from './stale-analysis-banner';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Notice } from '@/components/ui/notice';
 
 interface AnalysisTabProps {
   analysis: IepAnalysis | null;
@@ -64,7 +67,7 @@ export function AnalysisTab({
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
       </div>
     );
   }
@@ -79,19 +82,16 @@ export function AnalysisTab({
   if (analysis.status === 'error') {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">
-        <div className="bg-red-50 border border-red-300 rounded-lg p-6 max-w-md text-center">
-          <h3 className="text-lg font-semibold text-red-700 mb-2">Analysis Failed</h3>
-          <p className="text-sm text-gray-600 mb-4">
+        <Card className="max-w-md text-center">
+          <Notice variant="error" title="Analysis Failed">
             {analysis.errorMessage || 'An error occurred during analysis.'}
-          </p>
-          <button
-            onClick={onTrigger}
-            disabled={isTriggering}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded text-sm text-white transition-colors"
-          >
-            {isTriggering ? 'Retrying...' : 'Retry Analysis'}
-          </button>
-        </div>
+          </Notice>
+          <div className="mt-4">
+            <Button onClick={onTrigger} disabled={isTriggering}>
+              {isTriggering ? 'Retrying...' : 'Retry Analysis'}
+            </Button>
+          </div>
+        </Card>
       </div>
     );
   }
@@ -99,6 +99,23 @@ export function AnalysisTab({
   const sectionTypes = analysis.sectionAnalyses.map((sa) => sa.sectionType);
   const hasGoals = analysis.goalAnalyses.length > 0;
   const hasGapAnalysis = analysis.advocacyGapAnalysis != null;
+
+  const sidebarButton = (key: string, label: string, count?: number) => (
+    <button
+      key={key}
+      onClick={() => setActiveView(key)}
+      className={`w-full text-left px-3 py-2 rounded-button text-[13px] font-medium transition-colors ${
+        activeView === key
+          ? 'bg-brand-teal-50 text-brand-teal-600 border-l-2 border-l-brand-teal-500'
+          : 'text-brand-slate-600 hover:bg-brand-slate-50'
+      }`}
+    >
+      {label}
+      {count !== undefined && (
+        <span className="ml-2 text-[11px] opacity-70">({count})</span>
+      )}
+    </button>
+  );
 
   const renderContent = () => {
     if (activeView === 'overview') {
@@ -138,70 +155,29 @@ export function AnalysisTab({
 
   return (
     <div className="flex gap-4 min-h-[500px]">
-      <nav className="w-56 shrink-0 space-y-1">
-        <button
-          onClick={() => setActiveView('overview')}
-          className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-            activeView === 'overview'
-              ? 'bg-blue-600 text-white'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          Overview
-        </button>
+      <nav className="w-56 shrink-0 space-y-0.5">
+        {sidebarButton('overview', 'Overview')}
 
-        {hasGapAnalysis && (
-          <button
-            onClick={() => setActiveView('gap-analysis')}
-            className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-              activeView === 'gap-analysis'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Your Goals
-            <span className="ml-2 text-xs opacity-70">
-              ({analysis.advocacyGapAnalysis?.goalAlignments.length ?? 0})
-            </span>
-          </button>
+        {hasGapAnalysis &&
+          sidebarButton(
+            'gap-analysis',
+            'Your Goals',
+            analysis.advocacyGapAnalysis?.goalAlignments.length ?? 0
+          )}
+
+        {hasGoals &&
+          sidebarButton('goals', 'Goal Analysis', analysis.goalAnalyses.length)}
+
+        <div className="border-t border-brand-slate-200 my-2" />
+
+        {sectionTypes.map((type) =>
+          sidebarButton(type, SECTION_LABELS[type] || type)
         )}
-
-        {hasGoals && (
-          <button
-            onClick={() => setActiveView('goals')}
-            className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-              activeView === 'goals'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Goal Analysis
-            <span className="ml-2 text-xs opacity-70">
-              ({analysis.goalAnalyses.length})
-            </span>
-          </button>
-        )}
-
-        <div className="border-t border-gray-200 my-2" />
-
-        {sectionTypes.map((type) => (
-          <button
-            key={type}
-            onClick={() => setActiveView(type)}
-            className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-              activeView === type
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            {SECTION_LABELS[type] || type}
-          </button>
-        ))}
       </nav>
 
-      <div className="flex-1 bg-white rounded-lg p-6 overflow-y-auto shadow-sm border border-gray-200">
+      <Card className="flex-1 overflow-y-auto">
         {renderContent()}
-      </div>
+      </Card>
     </div>
   );
 }

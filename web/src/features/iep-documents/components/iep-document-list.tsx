@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Download, Trash2, Eye } from 'lucide-react';
 import type { IepDocument } from '@/types/api';
 import { deleteIepDocument, getDownloadUrl } from '../api/iep-documents-api';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface IepDocumentListProps {
   documents: IepDocument[];
@@ -15,19 +18,12 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function statusBadge(status: string) {
-  const colors: Record<string, string> = {
-    uploaded: 'bg-gray-200 text-gray-700',
-    processing: 'bg-yellow-100 text-yellow-700',
-    parsed: 'bg-green-100 text-green-700',
-    error: 'bg-red-100 text-red-700',
-  };
-  return (
-    <span className={`text-xs px-2 py-0.5 rounded ${colors[status] || colors.uploaded}`}>
-      {status}
-    </span>
-  );
-}
+const STATUS_VARIANTS: Record<string, 'neutral' | 'warning' | 'success' | 'error'> = {
+  uploaded: 'neutral',
+  processing: 'warning',
+  parsed: 'success',
+  error: 'error',
+};
 
 export function IepDocumentList({ documents, isLoading, onDeleted }: IepDocumentListProps) {
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -35,13 +31,13 @@ export function IepDocumentList({ documents, isLoading, onDeleted }: IepDocument
   if (isLoading) {
     return (
       <div className="flex justify-center py-4">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900" />
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-teal-500" />
       </div>
     );
   }
 
   if (documents.length === 0) {
-    return <p className="text-gray-400 text-sm">No IEP documents uploaded yet.</p>;
+    return <p className="text-brand-slate-400 text-sm">No IEP documents uploaded yet.</p>;
   }
 
   const handleDownload = async (id: number) => {
@@ -67,40 +63,51 @@ export function IepDocumentList({ documents, isLoading, onDeleted }: IepDocument
   return (
     <div className="space-y-2">
       {documents.map((doc) => (
-        <div key={doc.id} className="bg-gray-50 rounded p-3 flex items-center justify-between border border-gray-200">
+        <Card key={doc.id} className="p-3 flex items-center justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <Link to={`/ieps/${doc.id}`} className="font-medium truncate text-gray-900 hover:text-blue-600 transition-colors">
+              <Link
+                to={`/ieps/${doc.id}`}
+                className="text-[13px] font-medium truncate text-brand-slate-800 hover:text-brand-teal-500 transition-colors"
+              >
                 {doc.fileName}
               </Link>
-              {statusBadge(doc.status)}
+              <Badge variant={STATUS_VARIANTS[doc.status] || 'neutral'}>
+                {doc.status}
+              </Badge>
             </div>
-            <div className="flex gap-3 text-xs text-gray-500 mt-1">
+            <div className="flex gap-3 text-[11px] text-brand-slate-400 mt-1">
               <span>{formatFileSize(doc.fileSizeBytes)}</span>
               <span>Uploaded {new Date(doc.uploadDate).toLocaleDateString()}</span>
             </div>
           </div>
           <div className="flex gap-2 ml-3 shrink-0">
             {doc.status === 'parsed' && (
-              <Link to={`/ieps/${doc.id}`} className="text-sm text-green-600 hover:text-green-700">
+              <Link
+                to={`/ieps/${doc.id}`}
+                className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-teal-500 hover:text-brand-teal-600 transition-colors"
+              >
+                <Eye className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
                 View
               </Link>
             )}
             <button
               onClick={() => handleDownload(doc.id)}
-              className="text-sm text-blue-600 hover:text-blue-700"
+              className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
             >
+              <Download className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
               Download
             </button>
             <button
               onClick={() => handleDelete(doc.id)}
               disabled={deletingId === doc.id}
-              className="text-sm text-red-600 hover:text-red-700 disabled:opacity-50"
+              className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-red hover:text-red-800 disabled:opacity-50 transition-colors"
             >
+              <Trash2 className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
               {deletingId === doc.id ? '...' : 'Delete'}
             </button>
           </div>
-        </div>
+        </Card>
       ))}
     </div>
   );

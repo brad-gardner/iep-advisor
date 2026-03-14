@@ -1,5 +1,7 @@
+import { MessageCircleQuestion } from 'lucide-react';
 import type { RedFlag, SuggestedQuestion } from '@/types/api';
 import { RedFlagCard } from './red-flag-card';
+import { Notice } from '@/components/ui/notice';
 
 interface AnalysisOverviewProps {
   overallSummary: string;
@@ -33,15 +35,17 @@ export function AnalysisOverview({
   return (
     <div className="space-y-8">
       <section>
-        <h2 className="text-xl font-semibold mb-3 text-gray-900">Overview</h2>
-        <div className="text-gray-600 leading-relaxed whitespace-pre-wrap">
+        <h2 className="font-serif text-[22px] font-semibold mb-3 text-brand-slate-800">
+          Overview
+        </h2>
+        <div className="text-brand-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
           {overallSummary}
         </div>
       </section>
 
       {overallRedFlags.length > 0 && (
         <section>
-          <h2 className="text-xl font-semibold mb-3 text-gray-900">
+          <h2 className="font-serif text-[22px] font-semibold mb-3 text-brand-slate-800">
             Areas of Concern ({overallRedFlags.length})
           </h2>
           <div className="space-y-3">
@@ -54,21 +58,23 @@ export function AnalysisOverview({
 
       {suggestedQuestions.length > 0 && (
         <section>
-          <h2 className="text-xl font-semibold mb-3 text-gray-900">
+          <h2 className="font-serif text-[22px] font-semibold mb-3 text-brand-slate-800">
             Questions for Your IEP Meeting
           </h2>
           <div className="space-y-4">
             {Object.entries(questionsByCategory).map(([category, questions]) => (
               <div key={category}>
-                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
+                <h3 className="text-[10px] font-semibold text-brand-teal-500 uppercase tracking-wide mb-2">
                   {CATEGORY_LABELS[category] || category}
                 </h3>
                 <div className="space-y-2">
                   {questions.map((q, i) => (
-                    <div key={i} className="bg-gray-50 rounded p-3 border border-gray-200">
-                      <p className="font-medium text-sm text-gray-900">{q.question}</p>
-                      <p className="text-xs text-gray-500 mt-1">{q.context}</p>
-                    </div>
+                    <Notice key={i} variant="info" title={q.question}>
+                      <div className="flex items-start gap-1.5">
+                        <MessageCircleQuestion className="w-3.5 h-3.5 text-brand-teal-500 shrink-0 mt-0.5" strokeWidth={1.8} aria-hidden="true" />
+                        <span className="text-[11px] text-brand-slate-400">{q.context}</span>
+                      </div>
+                    </Notice>
                   ))}
                 </div>
               </div>

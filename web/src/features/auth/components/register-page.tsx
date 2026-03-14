@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/use-auth';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Notice } from '@/components/ui/notice';
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -52,104 +55,64 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="w-full max-w-md">
-      <h2 className="text-3xl font-bold text-center mb-8 text-gray-900">Create Account</h2>
+    <div className="w-full">
+      <h2 className="text-2xl font-serif font-semibold text-center mb-6 text-brand-slate-800">Create Your Account</h2>
 
-      {error && (
-        <div className="bg-red-50 border border-red-300 text-red-600 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
+      {error && <div className="mb-4"><Notice variant="error" title={error} /></div>}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="firstName" className="block text-sm font-medium mb-2 text-gray-700">
-              First Name
-            </label>
-            <input
-              id="firstName"
-              name="firstName"
-              type="text"
-              value={formData.firstName}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2 rounded bg-white border border-gray-300 text-gray-900 focus:border-blue-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label htmlFor="lastName" className="block text-sm font-medium mb-2 text-gray-700">
-              Last Name
-            </label>
-            <input
-              id="lastName"
-              name="lastName"
-              type="text"
-              value={formData.lastName}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2 rounded bg-white border border-gray-300 text-gray-900 focus:border-blue-500 focus:outline-none"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium mb-2 text-gray-700">
-            Email
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            value={formData.email}
+          <Input
+            label="First Name"
+            name="firstName"
+            value={formData.firstName}
             onChange={handleChange}
             required
-            className="w-full px-4 py-2 rounded bg-white border border-gray-300 text-gray-900 focus:border-blue-500 focus:outline-none"
+          />
+          <Input
+            label="Last Name"
+            name="lastName"
+            value={formData.lastName}
+            onChange={handleChange}
+            required
           />
         </div>
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium mb-2 text-gray-700">
-            Password
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            className="w-full px-4 py-2 rounded bg-white border border-gray-300 text-gray-900 focus:border-blue-500 focus:outline-none"
-          />
-        </div>
+        <Input
+          label="Email"
+          name="email"
+          type="email"
+          value={formData.email}
+          onChange={handleChange}
+          required
+        />
 
-        <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium mb-2 text-gray-700">
-            Confirm Password
-          </label>
-          <input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            required
-            className="w-full px-4 py-2 rounded bg-white border border-gray-300 text-gray-900 focus:border-blue-500 focus:outline-none"
-          />
-        </div>
+        <Input
+          label="Password"
+          name="password"
+          type="password"
+          value={formData.password}
+          onChange={handleChange}
+          required
+        />
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed rounded font-medium text-white transition-colors"
-        >
+        <Input
+          label="Confirm Password"
+          name="confirmPassword"
+          type="password"
+          value={formData.confirmPassword}
+          onChange={handleChange}
+          required
+        />
+
+        <Button type="submit" disabled={isLoading} className="w-full">
           {isLoading ? 'Creating account...' : 'Create Account'}
-        </button>
+        </Button>
       </form>
 
-      <p className="mt-6 text-center text-gray-500">
+      <p className="mt-6 text-center text-sm text-brand-slate-400">
         Already have an account?{' '}
-        <Link to="/login" className="text-blue-600 hover:text-blue-700">
+        <Link to="/login" className="text-brand-teal-500 hover:text-brand-teal-600">
           Sign in
         </Link>
       </p>

@@ -1,46 +1,60 @@
+import { CircleCheck, AlertTriangle, Lightbulb } from 'lucide-react';
 import type { GoalAnalysis } from '@/types/api';
 import { SmartCriteriaGrid } from './smart-criteria-grid';
+import { Badge } from '@/components/ui/badge';
 
 interface AnalysisGoalCardProps {
   goalAnalysis: GoalAnalysis;
 }
 
-const RATING_BADGES: Record<string, { label: string; className: string }> = {
-  green: { label: 'Strong', className: 'bg-green-100 text-green-700 border-green-300' },
-  yellow: { label: 'Needs Improvement', className: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
-  red: { label: 'Significant Concerns', className: 'bg-red-100 text-red-700 border-red-300' },
+const RATING_BADGES: Record<string, { label: string; variant: 'success' | 'warning' | 'error' }> = {
+  green: { label: 'Strong', variant: 'success' },
+  yellow: { label: 'Needs Improvement', variant: 'warning' },
+  red: { label: 'Significant Concerns', variant: 'error' },
 };
 
 export function AnalysisGoalCard({ goalAnalysis }: AnalysisGoalCardProps) {
   const badge = RATING_BADGES[goalAnalysis.overallRating] || RATING_BADGES.yellow;
 
   return (
-    <div className="bg-gray-50 rounded-lg p-5 space-y-4 border border-gray-200">
+    <div className="bg-white rounded-card border-[0.5px] border-brand-slate-200 p-5 space-y-4">
+      {/* Eyebrow + badge */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
           {goalAnalysis.domain && (
-            <span className="text-xs text-gray-500 uppercase tracking-wide">
-              {goalAnalysis.domain}
+            <span className="text-[10px] font-semibold text-brand-teal-500 uppercase tracking-wide">
+              GOAL &middot; {goalAnalysis.domain.toUpperCase()}
             </span>
           )}
-          <p className="font-medium text-sm mt-1 text-gray-900">{goalAnalysis.goalText}</p>
+          <h3 className="font-serif text-[17px] font-semibold text-brand-slate-800 mt-1">
+            {goalAnalysis.goalText}
+          </h3>
         </div>
-        <span className={`shrink-0 text-xs px-2 py-1 rounded border ${badge.className}`}>
+        <Badge variant={badge.variant} className="shrink-0">
           {badge.label}
-        </span>
+        </Badge>
       </div>
 
-      <p className="text-sm text-gray-600">{goalAnalysis.plainLanguageSummary}</p>
+      {/* Goal text in italic panel */}
+      <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+        <p className="text-sm italic text-brand-slate-600 leading-relaxed">
+          {goalAnalysis.plainLanguageSummary}
+        </p>
+      </div>
 
       <SmartCriteriaGrid smartAnalysis={goalAnalysis.smartAnalysis} />
 
+      {/* What this means panel — teal left border */}
       {goalAnalysis.strengths.length > 0 && (
-        <div>
-          <h4 className="text-sm font-medium text-green-600 mb-1">Strengths</h4>
+        <div className="border-l-2 border-l-brand-teal-500 bg-brand-teal-50 rounded-r-card p-3">
+          <h4 className="text-[13px] font-medium text-brand-teal-600 mb-1.5 flex items-center gap-1.5">
+            <CircleCheck className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />
+            Strengths
+          </h4>
           <ul className="space-y-1">
             {goalAnalysis.strengths.map((s, i) => (
-              <li key={i} className="text-sm text-gray-600 flex gap-2">
-                <span className="text-green-600 shrink-0">+</span>
+              <li key={i} className="text-sm text-brand-slate-600 flex gap-2">
+                <span className="text-brand-teal-500 shrink-0">+</span>
                 <span>{s}</span>
               </li>
             ))}
@@ -48,13 +62,17 @@ export function AnalysisGoalCard({ goalAnalysis }: AnalysisGoalCardProps) {
         </div>
       )}
 
+      {/* Flag panel — amber left border */}
       {goalAnalysis.concerns.length > 0 && (
-        <div>
-          <h4 className="text-sm font-medium text-yellow-600 mb-1">Concerns</h4>
+        <div className="border-l-2 border-l-brand-amber-400 bg-brand-amber-50 rounded-r-card p-3">
+          <h4 className="text-[13px] font-medium text-brand-amber-500 mb-1.5 flex items-center gap-1.5">
+            <AlertTriangle className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />
+            Concerns
+          </h4>
           <ul className="space-y-1">
             {goalAnalysis.concerns.map((c, i) => (
-              <li key={i} className="text-sm text-gray-600 flex gap-2">
-                <span className="text-yellow-600 shrink-0">-</span>
+              <li key={i} className="text-sm text-brand-slate-600 flex gap-2">
+                <span className="text-brand-amber-500 shrink-0">-</span>
                 <span>{c}</span>
               </li>
             ))}
@@ -63,12 +81,15 @@ export function AnalysisGoalCard({ goalAnalysis }: AnalysisGoalCardProps) {
       )}
 
       {goalAnalysis.suggestedImprovements.length > 0 && (
-        <div>
-          <h4 className="text-sm font-medium text-blue-600 mb-1">Suggested Improvements</h4>
+        <div className="border-l-2 border-l-brand-teal-500 bg-brand-teal-50 rounded-r-card p-3">
+          <h4 className="text-[13px] font-medium text-brand-teal-600 mb-1.5 flex items-center gap-1.5">
+            <Lightbulb className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />
+            Suggested Improvements
+          </h4>
           <ul className="space-y-1">
             {goalAnalysis.suggestedImprovements.map((imp, i) => (
-              <li key={i} className="text-sm text-gray-600 flex gap-2">
-                <span className="text-blue-600 shrink-0">*</span>
+              <li key={i} className="text-sm text-brand-slate-600 flex gap-2">
+                <span className="text-brand-teal-500 shrink-0">*</span>
                 <span>{imp}</span>
               </li>
             ))}

@@ -1,3 +1,6 @@
+import { Target } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
 interface AdvocacyGoalsEmptyStateProps {
   childName: string;
   onAdd: () => void;
@@ -6,24 +9,17 @@ interface AdvocacyGoalsEmptyStateProps {
 export function AdvocacyGoalsEmptyState({ childName, onAdd }: AdvocacyGoalsEmptyStateProps) {
   return (
     <div className="text-center py-8 px-4">
-      <div className="text-3xl mb-3">
-        <svg className="w-12 h-12 mx-auto text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+      <div className="w-12 h-12 mx-auto mb-3 bg-brand-teal-50 rounded-full flex items-center justify-center">
+        <Target className="text-brand-teal-500" size={24} strokeWidth={1.8} aria-hidden="true" />
       </div>
-      <h3 className="text-sm font-semibold text-gray-700 mb-1">
+      <h3 className="font-serif text-brand-slate-800 mb-1">
         Define your priorities for {childName}
       </h3>
-      <p className="text-xs text-gray-500 max-w-sm mx-auto mb-4">
+      <p className="text-xs text-brand-slate-400 max-w-sm mx-auto mb-4">
         When you analyze an IEP, we'll check whether these goals are addressed
         and flag any gaps.
       </p>
-      <button
-        onClick={onAdd}
-        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm text-white transition-colors"
-      >
-        Add Your First Goal
-      </button>
+      <Button onClick={onAdd}>Add Your First Goal</Button>
     </div>
   );
 }

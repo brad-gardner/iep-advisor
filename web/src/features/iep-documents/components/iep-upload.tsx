@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
+import { Upload } from 'lucide-react';
 import { uploadIepDocument } from '../api/iep-documents-api';
+import { Notice } from '@/components/ui/notice';
 
 interface IepUploadProps {
   childId: number;
@@ -59,7 +61,9 @@ export function IepUpload({ childId, onUploaded }: IepUploadProps) {
   return (
     <div>
       {error && (
-        <div className="p-3 rounded text-sm bg-red-50 text-red-600 mb-3">{error}</div>
+        <div className="mb-3">
+          <Notice variant="error" title={error} />
+        </div>
       )}
 
       <label
@@ -69,10 +73,10 @@ export function IepUpload({ childId, onUploaded }: IepUploadProps) {
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        className={`block border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+        className={`block border-2 border-dashed rounded-card p-8 text-center cursor-pointer transition-colors ${
           isDragging
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-300 hover:border-gray-400'
+            ? 'border-brand-teal-500 bg-brand-teal-50'
+            : 'border-brand-slate-200 hover:border-brand-teal-300'
         } ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
       >
         <input
@@ -84,13 +88,14 @@ export function IepUpload({ childId, onUploaded }: IepUploadProps) {
         />
         {isUploading ? (
           <div className="flex flex-col items-center gap-2">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500" />
-            <p className="text-gray-500 text-sm">Uploading...</p>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-teal-500" />
+            <p className="text-brand-slate-400 text-sm">Uploading...</p>
           </div>
         ) : (
-          <div>
-            <p className="text-gray-600">Drop a PDF here or click to browse</p>
-            <p className="text-gray-400 text-sm mt-1">PDF files only, up to 50MB</p>
+          <div className="flex flex-col items-center gap-2">
+            <Upload className="w-6 h-6 text-brand-slate-400" strokeWidth={1.8} aria-hidden="true" />
+            <p className="text-brand-slate-600 text-sm">Drop a PDF here or click to browse</p>
+            <p className="text-brand-slate-400 text-[11px]">PDF files only, up to 50MB</p>
           </div>
         )}
       </label>

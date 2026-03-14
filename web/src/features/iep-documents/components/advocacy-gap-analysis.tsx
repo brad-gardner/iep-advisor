@@ -14,10 +14,10 @@ export function AdvocacyGapAnalysisSection({ gapAnalysis }: AdvocacyGapAnalysisP
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-1">
+        <h2 className="font-serif text-[22px] font-semibold text-brand-slate-800 mb-1">
           Your Advocacy Goals ({addressed}/{total} addressed)
         </h2>
-        <p className="text-sm text-gray-600">{gapAnalysis.summary}</p>
+        <p className="text-sm text-brand-slate-600">{gapAnalysis.summary}</p>
       </div>
 
       <div className="space-y-3">

@@ -9,7 +9,7 @@ export function AnalysisGoalsList({ goalAnalyses }: AnalysisGoalsListProps) {
   if (goalAnalyses.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-gray-500">No goal analyses available.</p>
+        <p className="text-brand-slate-400">No goal analyses available.</p>
       </div>
     );
   }
@@ -21,18 +21,18 @@ export function AnalysisGoalsList({ goalAnalyses }: AnalysisGoalsListProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold mb-2 text-gray-900">
+        <h2 className="font-serif text-[22px] font-semibold mb-2 text-brand-slate-800">
           Goal Analysis ({goalAnalyses.length} goals)
         </h2>
-        <div className="flex gap-4 text-sm">
+        <div className="flex gap-4 text-[13px] font-medium">
           {greenCount > 0 && (
-            <span className="text-green-600">{greenCount} strong</span>
+            <span className="text-brand-teal-600">{greenCount} strong</span>
           )}
           {yellowCount > 0 && (
-            <span className="text-yellow-600">{yellowCount} need improvement</span>
+            <span className="text-brand-amber-500">{yellowCount} need improvement</span>
           )}
           {redCount > 0 && (
-            <span className="text-red-600">{redCount} significant concerns</span>
+            <span className="text-brand-red">{redCount} significant concerns</span>
           )}
         </div>
       </div>

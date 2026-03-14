@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/use-auth';
 import { StateSelector } from './state-selector';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Notice } from '@/components/ui/notice';
 
 export function ProfilePage() {
   const { user, updateProfile } = useAuth();
@@ -32,78 +36,52 @@ export function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900">Profile</h1>
+      <h1 className="font-serif">Your Profile</h1>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-lg p-6 max-w-lg space-y-4 shadow-sm border border-gray-200">
-        {message && (
-          <div
-            className={`p-3 rounded text-sm ${
-              message.type === 'success'
-                ? 'bg-green-50 text-green-600'
-                : 'bg-red-50 text-red-600'
-            }`}
-          >
-            {message.text}
-          </div>
-        )}
+      <Card className="max-w-lg">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {message && (
+            <Notice
+              variant={message.type === 'success' ? 'success' : 'error'}
+              title={message.text}
+            />
+          )}
 
-        <div>
-          <label htmlFor="email" className="block text-sm text-gray-500 mb-1">
-            Email
-          </label>
-          <input
-            id="email"
+          <Input
+            label="Email"
             type="text"
             value={user?.email ?? ''}
             disabled
-            className="w-full px-3 py-2 bg-gray-100 rounded text-gray-500 cursor-not-allowed border border-gray-200"
+            className="bg-brand-slate-50 text-brand-slate-400 cursor-not-allowed"
           />
-        </div>
 
-        <div>
-          <label htmlFor="firstName" className="block text-sm text-gray-500 mb-1">
-            First Name
-          </label>
-          <input
-            id="firstName"
-            type="text"
+          <Input
+            label="First Name"
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
-            className="w-full px-3 py-2 bg-white rounded text-gray-900 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-        </div>
 
-        <div>
-          <label htmlFor="lastName" className="block text-sm text-gray-500 mb-1">
-            Last Name
-          </label>
-          <input
-            id="lastName"
-            type="text"
+          <Input
+            label="Last Name"
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
-            className="w-full px-3 py-2 bg-white rounded text-gray-900 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-        </div>
 
-        <div>
-          <label htmlFor="state" className="block text-sm text-gray-500 mb-1">
-            State / Jurisdiction
-          </label>
-          <StateSelector value={state} onChange={setState} />
-          <p className="text-xs text-gray-400 mt-1">
-            Used to provide state-specific IEP guidance and regulations
-          </p>
-        </div>
+          <div>
+            <label htmlFor="state" className="block text-[13px] font-medium text-brand-slate-600 mb-1">
+              State / Jurisdiction
+            </label>
+            <StateSelector value={state} onChange={setState} />
+            <p className="text-[11px] text-brand-slate-300 mt-1">
+              Used to provide state-specific IEP guidance and regulations
+            </p>
+          </div>
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded font-medium text-white transition-colors"
-        >
-          {isSubmitting ? 'Saving...' : 'Save Changes'}
-        </button>
-      </form>
+          <Button type="submit" disabled={isSubmitting} className="w-full">
+            {isSubmitting ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </form>
+      </Card>
     </div>
   );
 }

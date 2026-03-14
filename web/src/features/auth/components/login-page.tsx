@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/use-auth';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Notice } from '@/components/ui/notice';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -27,58 +30,38 @@ export function LoginPage() {
   };
 
   return (
-    <div className="w-full max-w-md">
-      <h2 className="text-3xl font-bold text-center mb-8 text-gray-900">Sign In</h2>
+    <div className="w-full">
+      <h2 className="text-2xl font-serif font-semibold text-center mb-6 text-brand-slate-800">Welcome Back</h2>
 
-      {error && (
-        <div className="bg-red-50 border border-red-300 text-red-600 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
+      {error && <div className="mb-4"><Notice variant="error" title={error} /></div>}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium mb-2 text-gray-700">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full px-4 py-2 rounded bg-white border border-gray-300 text-gray-900 focus:border-blue-500 focus:outline-none"
-            placeholder="you@example.com"
-          />
-        </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          placeholder="you@example.com"
+        />
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium mb-2 text-gray-700">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full px-4 py-2 rounded bg-white border border-gray-300 text-gray-900 focus:border-blue-500 focus:outline-none"
-            placeholder="********"
-          />
-        </div>
+        <Input
+          label="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          placeholder="********"
+        />
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed rounded font-medium text-white transition-colors"
-        >
+        <Button type="submit" disabled={isLoading} className="w-full">
           {isLoading ? 'Signing in...' : 'Sign In'}
-        </button>
+        </Button>
       </form>
 
-      <p className="mt-6 text-center text-gray-500">
+      <p className="mt-6 text-center text-sm text-brand-slate-400">
         Don't have an account?{' '}
-        <Link to="/register" className="text-blue-600 hover:text-blue-700">
+        <Link to="/register" className="text-brand-teal-500 hover:text-brand-teal-600">
           Sign up
         </Link>
       </p>

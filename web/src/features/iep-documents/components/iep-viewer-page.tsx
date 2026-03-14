@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { ArrowLeft, Download, Play } from 'lucide-react';
 import type { IepDocument, IepSection } from '@/types/api';
 import { getIepDocument, getIepSections, getDownloadUrl, reprocessIep } from '../api/iep-documents-api';
 import { useIepAnalysis } from '../hooks/use-iep-analysis';
 import { useAdvocacyGoals } from '@/features/advocacy-goals/hooks/use-advocacy-goals';
 import { AnalysisTab } from './analysis-tab';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Notice } from '@/components/ui/notice';
 
 const SECTION_LABELS: Record<string, string> = {
   student_profile: 'Student Profile',
@@ -81,7 +85,7 @@ export function IepViewerPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
       </div>
     );
   }
@@ -89,7 +93,7 @@ export function IepViewerPage() {
   if (!document) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Document not found.</p>
+        <p className="text-brand-slate-400">Document not found.</p>
       </div>
     );
   }
@@ -102,80 +106,72 @@ export function IepViewerPage() {
         <div>
           <Link
             to={`/children/${document.childProfileId}`}
-            className="text-sm text-gray-500 hover:text-gray-900"
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
           >
+            <ArrowLeft className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />
             Back to child
           </Link>
-          <h1 className="text-2xl font-bold mt-1 text-gray-900">{document.fileName}</h1>
+          <h1 className="font-serif text-[32px] font-semibold leading-tight mt-1 text-brand-slate-800">
+            {document.fileName}
+          </h1>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={handleDownload}
-            className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 rounded text-sm transition-colors text-gray-700"
-          >
+          <Button variant="ghost" onClick={handleDownload}>
+            <Download className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
             Download PDF
-          </button>
+          </Button>
           {(document.status === 'error' || document.status === 'uploaded') && (
-            <button
-              onClick={handleReprocess}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm text-white transition-colors"
-            >
+            <Button onClick={handleReprocess}>
+              <Play className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
               Process
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {document.status === 'processing' && (
-        <div className="bg-yellow-50 border border-yellow-400 rounded p-4 flex items-center gap-3">
-          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-500" />
-          <p className="text-yellow-700 text-sm">
-            Document is being processed. This may take a minute...
-          </p>
-        </div>
+        <Notice variant="warning" title="Processing">
+          Document is being processed. This may take a minute...
+        </Notice>
       )}
 
       {document.status === 'error' && (
-        <div className="bg-red-50 border border-red-300 rounded p-4">
-          <p className="text-red-600 text-sm">
-            Processing failed. Try re-uploading or click Process to retry.
-          </p>
-        </div>
+        <Notice variant="error" title="Processing failed">
+          Try re-uploading or click Process to retry.
+        </Notice>
       )}
 
       {document.status === 'uploaded' && (
-        <div className="bg-gray-50 rounded p-4 border border-gray-200">
-          <p className="text-gray-500 text-sm">
-            Document uploaded but not yet processed. Click Process to extract and analyze.
-          </p>
-        </div>
+        <Notice variant="info" title="Not yet processed">
+          Document uploaded but not yet processed. Click Process to extract and analyze.
+        </Notice>
       )}
 
       {document.status === 'parsed' && sections.length > 0 && (
         <>
           {/* Tab bar */}
-          <div className="flex border-b border-gray-200">
+          <div className="flex border-b border-brand-slate-200">
             <button
               onClick={() => setActiveTab('document')}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
+              className={`px-4 py-2 text-[13px] font-medium transition-colors ${
                 activeTab === 'document'
-                  ? 'text-gray-900 border-b-2 border-blue-500'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'text-brand-slate-800 border-b-2 border-brand-teal-500'
+                  : 'text-brand-slate-400 hover:text-brand-slate-800'
               }`}
             >
               Document
             </button>
             <button
               onClick={() => setActiveTab('analysis')}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
+              className={`px-4 py-2 text-[13px] font-medium transition-colors ${
                 activeTab === 'analysis'
-                  ? 'text-gray-900 border-b-2 border-blue-500'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'text-brand-slate-800 border-b-2 border-brand-teal-500'
+                  : 'text-brand-slate-400 hover:text-brand-slate-800'
               }`}
             >
               Analysis
               {analysis?.status === 'completed' && (
-                <span className="ml-2 inline-block w-2 h-2 rounded-full bg-green-500" />
+                <span className="ml-2 inline-block w-2 h-2 rounded-full bg-brand-teal-500" />
               )}
             </button>
           </div>
@@ -184,76 +180,76 @@ export function IepViewerPage() {
           {activeTab === 'document' && (
             <div className="flex gap-4 min-h-[500px]">
               {/* Section nav */}
-              <nav className="w-56 shrink-0 space-y-1">
+              <nav className="w-56 shrink-0 space-y-0.5">
                 {sections.map((s) => (
                   <button
                     key={s.id}
                     onClick={() => setActiveSectionId(s.id)}
-                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                    className={`w-full text-left px-3 py-2 rounded-button text-[13px] font-medium transition-colors ${
                       activeSectionId === s.id
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-600 hover:bg-gray-100'
+                        ? 'bg-brand-teal-50 text-brand-teal-600 border-l-2 border-l-brand-teal-500'
+                        : 'text-brand-slate-600 hover:bg-brand-slate-50'
                     }`}
                   >
                     {SECTION_LABELS[s.sectionType] || s.sectionType}
                     {s.goals.length > 0 && (
-                      <span className="ml-2 text-xs opacity-70">({s.goals.length})</span>
+                      <span className="ml-2 text-[11px] opacity-70">({s.goals.length})</span>
                     )}
                   </button>
                 ))}
               </nav>
 
               {/* Section content */}
-              <div className="flex-1 bg-white rounded-lg p-6 overflow-y-auto shadow-sm border border-gray-200">
+              <Card className="flex-1 overflow-y-auto">
                 {currentSection && (
                   <div>
-                    <h2 className="text-xl font-semibold mb-4 text-gray-900">
+                    <h2 className="font-serif text-[22px] font-semibold mb-4 text-brand-slate-800">
                       {SECTION_LABELS[currentSection.sectionType] || currentSection.sectionType}
                     </h2>
 
                     {currentSection.rawText && (
-                      <div className="text-gray-600 whitespace-pre-wrap text-sm leading-relaxed">
+                      <div className="text-brand-slate-600 whitespace-pre-wrap text-sm leading-relaxed">
                         {currentSection.rawText}
                       </div>
                     )}
 
                     {currentSection.goals.length > 0 && (
                       <div className="mt-6 space-y-4">
-                        <h3 className="text-lg font-medium text-gray-900">
+                        <h3 className="font-serif text-[17px] font-semibold text-brand-slate-800">
                           Goals ({currentSection.goals.length})
                         </h3>
                         {currentSection.goals.map((goal) => (
-                          <div key={goal.id} className="bg-gray-50 rounded p-4 space-y-2 border border-gray-200">
-                            <p className="font-medium text-gray-900">{goal.goalText}</p>
+                          <div key={goal.id} className="bg-brand-slate-50 rounded-card p-4 space-y-2 border-[0.5px] border-brand-slate-200">
+                            <p className="font-medium text-sm text-brand-slate-800">{goal.goalText}</p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                               {goal.domain && (
                                 <div>
-                                  <span className="text-gray-500">Domain: </span>
-                                  <span className="text-gray-700">{goal.domain}</span>
+                                  <span className="text-brand-slate-400">Domain: </span>
+                                  <span className="text-brand-slate-600">{goal.domain}</span>
                                 </div>
                               )}
                               {goal.baseline && (
                                 <div>
-                                  <span className="text-gray-500">Baseline: </span>
-                                  <span className="text-gray-700">{goal.baseline}</span>
+                                  <span className="text-brand-slate-400">Baseline: </span>
+                                  <span className="text-brand-slate-600">{goal.baseline}</span>
                                 </div>
                               )}
                               {goal.targetCriteria && (
                                 <div>
-                                  <span className="text-gray-500">Target: </span>
-                                  <span className="text-gray-700">{goal.targetCriteria}</span>
+                                  <span className="text-brand-slate-400">Target: </span>
+                                  <span className="text-brand-slate-600">{goal.targetCriteria}</span>
                                 </div>
                               )}
                               {goal.measurementMethod && (
                                 <div>
-                                  <span className="text-gray-500">Measurement: </span>
-                                  <span className="text-gray-700">{goal.measurementMethod}</span>
+                                  <span className="text-brand-slate-400">Measurement: </span>
+                                  <span className="text-brand-slate-600">{goal.measurementMethod}</span>
                                 </div>
                               )}
                               {goal.timeframe && (
                                 <div>
-                                  <span className="text-gray-500">Timeframe: </span>
-                                  <span className="text-gray-700">{goal.timeframe}</span>
+                                  <span className="text-brand-slate-400">Timeframe: </span>
+                                  <span className="text-brand-slate-600">{goal.timeframe}</span>
                                 </div>
                               )}
                             </div>
@@ -263,7 +259,7 @@ export function IepViewerPage() {
                     )}
                   </div>
                 )}
-              </div>
+              </Card>
             </div>
           )}
 
