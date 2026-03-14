@@ -154,6 +154,16 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(15),
                 SegmentsPerWindow = 3
             }));
+
+    options.AddPolicy("password-reset", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromHours(1),
+                SegmentsPerWindow = 6
+            }));
 });
 
 // Configure CORS

@@ -11,6 +11,8 @@ public static class DependencyInjection
         services.AddSingleton<MfaSecretProtector>();
         services.AddScoped<ITotpService, TotpService>();
         services.AddScoped<IMfaService, MfaService>();
+        services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<IPasswordResetService, PasswordResetService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IChildProfileService, ChildProfileService>();

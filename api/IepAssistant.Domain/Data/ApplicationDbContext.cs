@@ -18,6 +18,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<IepAnalysis> IepAnalyses => Set<IepAnalysis>();
     public DbSet<ParentAdvocacyGoal> ParentAdvocacyGoals => Set<ParentAdvocacyGoal>();
     public DbSet<UserRecoveryCode> UserRecoveryCodes => Set<UserRecoveryCode>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

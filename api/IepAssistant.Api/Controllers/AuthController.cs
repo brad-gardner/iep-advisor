@@ -15,11 +15,13 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly IMfaService _mfaService;
+    private readonly IPasswordResetService _passwordResetService;
 
-    public AuthController(IAuthService authService, IMfaService mfaService)
+    public AuthController(IAuthService authService, IMfaService mfaService, IPasswordResetService passwordResetService)
     {
         _authService = authService;
         _mfaService = mfaService;
+        _passwordResetService = passwordResetService;
     }
 
     /// <summary>
@@ -278,6 +280,44 @@ public class AuthController : ControllerBase
         };
 
         return Ok(ApiResponse<LoginResponse>.SuccessResponse(response));
+    }
+
+    /// <summary>
+    /// Request a password reset email
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("forgot-password")]
+    [EnableRateLimiting("password-reset")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        await _passwordResetService.InitiateResetAsync(request.Email, cancellationToken);
+
+        // Always return 202 regardless of whether the email exists
+        return Accepted(ApiResponse<object>.SuccessResponse(null, "If an account with that email exists, a reset link has been sent."));
+    }
+
+    /// <summary>
+    /// Reset password using a reset token
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("reset-password")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var result = await _passwordResetService.ResetPasswordAsync(request.Token, request.NewPassword, cancellationToken);
+
+        if (!result.Success)
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Password reset failed"));
+
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 
     /// <summary>
