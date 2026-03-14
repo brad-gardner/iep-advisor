@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/api-client';
-import type { ApiResponse, IepAnalysis, IepDocument, IepSection } from '@/types/api';
+import type { ApiResponse, CreateIepRequest, IepAnalysis, IepDocument, IepSection, UpdateIepMetadataRequest } from '@/types/api';
 
 export async function getIepDocuments(childId: number): Promise<ApiResponse<IepDocument[]>> {
   const response = await apiClient.get<ApiResponse<IepDocument[]>>(
@@ -25,6 +25,25 @@ export async function uploadIepDocument(
     formData,
     { headers: { 'Content-Type': 'multipart/form-data' } }
   );
+  return response.data;
+}
+
+export async function createIep(childId: number, data: CreateIepRequest): Promise<ApiResponse<IepDocument>> {
+  const response = await apiClient.post<ApiResponse<IepDocument>>(`/api/children/${childId}/ieps`, data);
+  return response.data;
+}
+
+export async function attachFile(iepId: number, file: File): Promise<ApiResponse<IepDocument>> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiClient.post<ApiResponse<IepDocument>>(`/api/ieps/${iepId}/upload`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}
+
+export async function updateIepMetadata(iepId: number, data: UpdateIepMetadataRequest): Promise<ApiResponse<null>> {
+  const response = await apiClient.put<ApiResponse<null>>(`/api/ieps/${iepId}/metadata`, data);
   return response.data;
 }
 

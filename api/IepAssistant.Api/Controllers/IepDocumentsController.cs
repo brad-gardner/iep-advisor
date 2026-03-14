@@ -5,6 +5,7 @@ using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.IepDocuments;
 using IepAssistant.Api.Extensions;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Models;
 
 namespace IepAssistant.Api.Controllers;
 
@@ -59,20 +60,53 @@ public class IepDocumentsController : ControllerBase
     [HttpPost("api/children/{childId}/ieps")]
     [ProducesResponseType(typeof(ApiResponse<IepDocumentDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Create(int childId, [FromBody] CreateIepRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var userId = User.GetUserId();
+        var model = new CreateIepDocumentModel
+        {
+            IepDate = request.IepDate!.Value,
+            MeetingType = request.MeetingType,
+            Attendees = request.Attendees,
+            Notes = request.Notes
+        };
+
+        var result = await _iepDocumentService.CreateAsync(childId, userId, model, cancellationToken);
+
+        if (!result.Success)
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Creation failed"));
+
+        var dto = MapToDto(result.Data!);
+        return CreatedAtAction(nameof(GetById), new { id = dto.Id }, ApiResponse<IepDocumentDto>.SuccessResponse(dto, "IEP created successfully"));
+    }
+
+    [HttpPost("api/ieps/{id}/upload")]
+    [ProducesResponseType(typeof(ApiResponse<IepDocumentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [RequestSizeLimit(50 * 1024 * 1024)] // 50MB
-    public async Task<IActionResult> Upload(int childId, IFormFile file, CancellationToken cancellationToken)
+    public async Task<IActionResult> AttachFile(int id, IFormFile file, CancellationToken cancellationToken)
     {
         if (file == null || file.Length == 0)
             return BadRequest(ApiResponse<object>.Error("No file provided"));
 
-        if (!file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)
-            && !file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        if (!file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
             return BadRequest(ApiResponse<object>.Error("Only PDF files are supported"));
 
+        // Validate PDF magic bytes
+        using var stream = file.OpenReadStream();
+        var header = new byte[5];
+        var bytesRead = await stream.ReadAsync(header, 0, 5, cancellationToken);
+        if (bytesRead < 5 || System.Text.Encoding.ASCII.GetString(header) != "%PDF-")
+            return BadRequest(ApiResponse<object>.Error("File does not appear to be a valid PDF"));
+        stream.Position = 0;
+
+        var sanitizedFileName = Path.GetFileName(file.FileName);
         var userId = User.GetUserId();
 
-        using var stream = file.OpenReadStream();
-        var result = await _iepDocumentService.UploadAsync(childId, userId, file.FileName, stream, file.Length, cancellationToken);
+        var result = await _iepDocumentService.AttachFileAsync(id, userId, sanitizedFileName, stream, file.Length, cancellationToken);
 
         if (!result.Success)
             return BadRequest(ApiResponse<object>.Error(result.Message ?? "Upload failed"));
@@ -82,7 +116,33 @@ public class IepDocumentsController : ControllerBase
         // Enqueue background processing
         await _processingQueue.EnqueueAsync(dto.Id, cancellationToken);
 
-        return CreatedAtAction(nameof(GetById), new { id = dto.Id }, ApiResponse<IepDocumentDto>.SuccessResponse(dto, "IEP document uploaded successfully"));
+        return Ok(ApiResponse<IepDocumentDto>.SuccessResponse(dto, "File attached successfully"));
+    }
+
+    [HttpPut("api/ieps/{id}/metadata")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateMetadata(int id, [FromBody] UpdateIepMetadataRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var model = new UpdateIepMetadataModel
+        {
+            IepDate = request.IepDate,
+            MeetingType = request.MeetingType,
+            Attendees = request.Attendees,
+            Notes = request.Notes
+        };
+
+        var result = await _iepDocumentService.UpdateMetadataAsync(id, userId, model, cancellationToken);
+
+        if (!result.Success)
+        {
+            if (result.Message?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
+                return NotFound(ApiResponse<object>.Error(result.Message));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Update failed"));
+        }
+
+        return Ok(ApiResponse<object>.SuccessResponse(null, "Metadata updated successfully"));
     }
 
     [HttpGet("api/ieps/{id}/download")]
@@ -171,7 +231,7 @@ public class IepDocumentsController : ControllerBase
         return Ok(ApiResponse<IepAnalysisDto>.SuccessResponse(MapToAnalysisDto(analysis)));
     }
 
-    private static IepAnalysisDto MapToAnalysisDto(Services.Models.IepAnalysisModel model) => new()
+    private static IepAnalysisDto MapToAnalysisDto(IepAnalysisModel model) => new()
     {
         Id = model.Id,
         IepDocumentId = model.IepDocumentId,
@@ -187,13 +247,16 @@ public class IepDocumentsController : ControllerBase
         CreatedAt = model.CreatedAt,
     };
 
-    private static IepDocumentDto MapToDto(Services.Models.IepDocumentModel model) => new()
+    private static IepDocumentDto MapToDto(IepDocumentModel model) => new()
     {
         Id = model.Id,
         ChildProfileId = model.ChildProfileId,
         FileName = model.FileName,
         UploadDate = model.UploadDate,
         IepDate = model.IepDate,
+        MeetingType = model.MeetingType,
+        Attendees = model.Attendees,
+        Notes = model.Notes,
         Status = model.Status,
         FileSizeBytes = model.FileSizeBytes,
         CreatedAt = model.CreatedAt

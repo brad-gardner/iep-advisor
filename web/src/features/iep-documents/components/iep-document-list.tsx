@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Download, Trash2, Eye } from 'lucide-react';
 import type { IepDocument } from '@/types/api';
 import { deleteIepDocument, getDownloadUrl } from '../api/iep-documents-api';
+import { IepUpload } from './iep-upload';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
@@ -13,17 +14,31 @@ interface IepDocumentListProps {
 }
 
 function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 const STATUS_VARIANTS: Record<string, 'neutral' | 'warning' | 'success' | 'error'> = {
+  created: 'neutral',
   uploaded: 'neutral',
   processing: 'warning',
   parsed: 'success',
   error: 'error',
 };
+
+const MEETING_TYPE_LABELS: Record<string, string> = {
+  initial: 'Initial IEP',
+  annual_review: 'Annual Review',
+  amendment: 'Amendment',
+  reevaluation: 'Reevaluation',
+};
+
+function formatMeetingDate(dateStr: string | null): string {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString();
+}
 
 export function IepDocumentList({ documents, isLoading, onDeleted }: IepDocumentListProps) {
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -37,7 +52,7 @@ export function IepDocumentList({ documents, isLoading, onDeleted }: IepDocument
   }
 
   if (documents.length === 0) {
-    return <p className="text-brand-slate-400 text-sm">No IEP documents uploaded yet.</p>;
+    return <p className="text-brand-slate-400 text-sm">No IEP documents yet.</p>;
   }
 
   const handleDownload = async (id: number) => {
@@ -63,50 +78,66 @@ export function IepDocumentList({ documents, isLoading, onDeleted }: IepDocument
   return (
     <div className="space-y-2">
       {documents.map((doc) => (
-        <Card key={doc.id} className="p-3 flex items-center justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <Link
-                to={`/ieps/${doc.id}`}
-                className="text-[13px] font-medium truncate text-brand-slate-800 hover:text-brand-teal-500 transition-colors"
-              >
-                {doc.fileName}
-              </Link>
-              <Badge variant={STATUS_VARIANTS[doc.status] || 'neutral'}>
-                {doc.status}
-              </Badge>
+        <Card key={doc.id} className="p-3">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Link
+                  to={`/ieps/${doc.id}`}
+                  className="text-[13px] font-medium truncate text-brand-slate-800 hover:text-brand-teal-500 transition-colors"
+                >
+                  {doc.fileName || (doc.meetingType ? MEETING_TYPE_LABELS[doc.meetingType] || doc.meetingType : `IEP #${doc.id}`)}
+                </Link>
+                {doc.meetingType && (
+                  <Badge variant="neutral">
+                    {MEETING_TYPE_LABELS[doc.meetingType] || doc.meetingType}
+                  </Badge>
+                )}
+                <Badge variant={STATUS_VARIANTS[doc.status] || 'neutral'}>
+                  {doc.status}
+                </Badge>
+              </div>
+              <div className="flex gap-3 text-[11px] text-brand-slate-400 mt-1">
+                {doc.iepDate && <span>Meeting: {formatMeetingDate(doc.iepDate)}</span>}
+                {doc.fileSizeBytes > 0 && <span>{formatFileSize(doc.fileSizeBytes)}</span>}
+                <span>Created {new Date(doc.createdAt).toLocaleDateString()}</span>
+              </div>
             </div>
-            <div className="flex gap-3 text-[11px] text-brand-slate-400 mt-1">
-              <span>{formatFileSize(doc.fileSizeBytes)}</span>
-              <span>Uploaded {new Date(doc.uploadDate).toLocaleDateString()}</span>
+            <div className="flex gap-2 ml-3 shrink-0">
+              {doc.status === 'parsed' && (
+                <Link
+                  to={`/ieps/${doc.id}`}
+                  className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-teal-500 hover:text-brand-teal-600 transition-colors"
+                >
+                  <Eye className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
+                  View
+                </Link>
+              )}
+              {doc.fileSizeBytes > 0 && (
+                <button
+                  onClick={() => handleDownload(doc.id)}
+                  className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
+                  Download
+                </button>
+              )}
+              <button
+                onClick={() => handleDelete(doc.id)}
+                disabled={deletingId === doc.id}
+                className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-red hover:text-red-800 disabled:opacity-50 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
+                {deletingId === doc.id ? '...' : 'Delete'}
+              </button>
             </div>
           </div>
-          <div className="flex gap-2 ml-3 shrink-0">
-            {doc.status === 'parsed' && (
-              <Link
-                to={`/ieps/${doc.id}`}
-                className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-teal-500 hover:text-brand-teal-600 transition-colors"
-              >
-                <Eye className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
-                View
-              </Link>
-            )}
-            <button
-              onClick={() => handleDownload(doc.id)}
-              className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
-              Download
-            </button>
-            <button
-              onClick={() => handleDelete(doc.id)}
-              disabled={deletingId === doc.id}
-              className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-red hover:text-red-800 disabled:opacity-50 transition-colors"
-            >
-              <Trash2 className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
-              {deletingId === doc.id ? '...' : 'Delete'}
-            </button>
-          </div>
+
+          {doc.status === 'created' && (
+            <div className="mt-3">
+              <IepUpload iepId={doc.id} onUploaded={onDeleted} />
+            </div>
+          )}
         </Card>
       ))}
     </div>

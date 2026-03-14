@@ -1,14 +1,14 @@
 import { useCallback, useState } from 'react';
 import { Upload } from 'lucide-react';
-import { uploadIepDocument } from '../api/iep-documents-api';
+import { attachFile } from '../api/iep-documents-api';
 import { Notice } from '@/components/ui/notice';
 
 interface IepUploadProps {
-  childId: number;
+  iepId: number;
   onUploaded: () => void;
 }
 
-export function IepUpload({ childId, onUploaded }: IepUploadProps) {
+export function IepUpload({ iepId, onUploaded }: IepUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +24,7 @@ export function IepUpload({ childId, onUploaded }: IepUploadProps) {
       setError(null);
 
       try {
-        const response = await uploadIepDocument(childId, file);
+        const response = await attachFile(iepId, file);
         if (response.success) {
           onUploaded();
         } else {
@@ -36,7 +36,7 @@ export function IepUpload({ childId, onUploaded }: IepUploadProps) {
         setIsUploading(false);
       }
     },
-    [childId, onUploaded]
+    [iepId, onUploaded]
   );
 
   const handleDrop = useCallback(
@@ -73,7 +73,7 @@ export function IepUpload({ childId, onUploaded }: IepUploadProps) {
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        className={`block border-2 border-dashed rounded-card p-8 text-center cursor-pointer transition-colors ${
+        className={`block border-2 border-dashed rounded-card p-6 text-center cursor-pointer transition-colors ${
           isDragging
             ? 'border-brand-teal-500 bg-brand-teal-50'
             : 'border-brand-slate-200 hover:border-brand-teal-300'
@@ -88,14 +88,14 @@ export function IepUpload({ childId, onUploaded }: IepUploadProps) {
         />
         {isUploading ? (
           <div className="flex flex-col items-center gap-2">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-teal-500" />
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-teal-500" />
             <p className="text-brand-slate-400 text-sm">Uploading...</p>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-2">
-            <Upload className="w-6 h-6 text-brand-slate-400" strokeWidth={1.8} aria-hidden="true" />
-            <p className="text-brand-slate-600 text-sm">Drop a PDF here or click to browse</p>
-            <p className="text-brand-slate-400 text-[11px]">PDF files only, up to 50MB</p>
+          <div className="flex flex-col items-center gap-1">
+            <Upload className="w-5 h-5 text-brand-slate-400" strokeWidth={1.8} aria-hidden="true" />
+            <p className="text-brand-slate-600 text-sm">Attach PDF</p>
+            <p className="text-brand-slate-400 text-[11px]">Drop a PDF here or click to browse</p>
           </div>
         )}
       </label>
