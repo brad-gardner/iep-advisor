@@ -16,12 +16,14 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly IMfaService _mfaService;
     private readonly IPasswordResetService _passwordResetService;
+    private readonly IAccountService _accountService;
 
-    public AuthController(IAuthService authService, IMfaService mfaService, IPasswordResetService passwordResetService)
+    public AuthController(IAuthService authService, IMfaService mfaService, IPasswordResetService passwordResetService, IAccountService accountService)
     {
         _authService = authService;
         _mfaService = mfaService;
         _passwordResetService = passwordResetService;
+        _accountService = accountService;
     }
 
     /// <summary>
@@ -336,6 +338,69 @@ public class AuthController : ControllerBase
         var result = await _mfaService.DisableAsync(userId, request.Password, request.Code, cancellationToken);
         if (!result.Success)
             return BadRequest(ApiResponse<object>.Error(result.Message ?? "Failed to disable MFA"));
+
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
+    }
+
+    /// <summary>
+    /// Export all user data as JSON
+    /// </summary>
+    [Authorize]
+    [HttpGet("data-export")]
+    [EnableRateLimiting("login")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> DataExport(CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId == 0)
+            return Unauthorized();
+
+        var data = await _accountService.ExportDataAsync(userId, cancellationToken);
+        return Ok(ApiResponse<object>.SuccessResponse(data));
+    }
+
+    /// <summary>
+    /// Schedule account for deletion (30-day grace period)
+    /// </summary>
+    [Authorize]
+    [HttpPost("delete-account")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> DeleteAccount([FromBody] DeleteAccountRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId == 0)
+            return Unauthorized();
+
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var result = await _accountService.ScheduleDeletionAsync(userId, request.Password, request.MfaCode, cancellationToken);
+
+        if (!result.Success)
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Failed to schedule deletion"));
+
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
+    }
+
+    /// <summary>
+    /// Cancel a pending account deletion
+    /// </summary>
+    [Authorize]
+    [HttpPost("cancel-deletion")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CancelDeletion(CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId == 0)
+            return Unauthorized();
+
+        var result = await _accountService.CancelDeletionAsync(userId, cancellationToken);
+
+        if (!result.Success)
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Failed to cancel deletion"));
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
