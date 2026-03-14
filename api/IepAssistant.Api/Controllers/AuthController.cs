@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using IepAssistant.Api.DTOs.Auth;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.Extensions;
@@ -13,16 +14,19 @@ namespace IepAssistant.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IMfaService _mfaService;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IMfaService mfaService)
     {
         _authService = authService;
+        _mfaService = mfaService;
     }
 
     /// <summary>
-    /// Authenticate user and return JWT token
+    /// Authenticate user and return JWT token (or MFA pending token if MFA enabled)
     /// </summary>
     [HttpPost("login")]
+    [EnableRateLimiting("login")]
     [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
@@ -35,18 +39,28 @@ public class AuthController : ControllerBase
         if (result == null)
             return Unauthorized(ApiResponse<object>.Error("Invalid email or password"));
 
+        if (result.RequiresMfa)
+        {
+            return Ok(ApiResponse<object>.SuccessResponse(new
+            {
+                requiresMfa = true,
+                mfaPendingToken = result.MfaPendingToken
+            }));
+        }
+
+        var authResult = result.AuthResult!;
         var response = new LoginResponse
         {
-            Token = result.Token,
-            ExpiresAt = result.ExpiresAt,
+            Token = authResult.Token,
+            ExpiresAt = authResult.ExpiresAt,
             User = new UserDto
             {
-                Id = result.User.Id,
-                Email = result.User.Email,
-                FirstName = result.User.FirstName,
-                LastName = result.User.LastName,
-                State = result.User.State,
-                Role = result.User.Role
+                Id = authResult.User.Id,
+                Email = authResult.User.Email,
+                FirstName = authResult.User.FirstName,
+                LastName = authResult.User.LastName,
+                State = authResult.User.State,
+                Role = authResult.User.Role
             }
         };
 
@@ -148,5 +162,141 @@ public class AuthController : ControllerBase
         };
 
         return Ok(ApiResponse<UserDto>.SuccessResponse(dto, "Profile updated successfully"));
+    }
+
+    /// <summary>
+    /// Initiate MFA setup — returns otpauth URI and manual entry key
+    /// </summary>
+    [Authorize]
+    [HttpPost("mfa/setup")]
+    [ProducesResponseType(typeof(ApiResponse<MfaSetupResult>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> MfaSetup(CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId == 0)
+            return Unauthorized();
+
+        var result = await _mfaService.SetupAsync(userId, cancellationToken);
+        return Ok(ApiResponse<MfaSetupResult>.SuccessResponse(result));
+    }
+
+    /// <summary>
+    /// Verify MFA setup with a TOTP code — enables MFA and returns recovery codes
+    /// </summary>
+    [Authorize]
+    [HttpPost("mfa/verify-setup")]
+    [ProducesResponseType(typeof(ApiResponse<List<string>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> MfaVerifySetup([FromBody] MfaVerifySetupRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId == 0)
+            return Unauthorized();
+
+        var result = await _mfaService.VerifySetupAsync(userId, request.Code, cancellationToken);
+        if (!result.Success)
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Verification failed"));
+
+        return Ok(ApiResponse<List<string>>.SuccessResponse(result.Data!, result.Message));
+    }
+
+    /// <summary>
+    /// Verify MFA code during login — returns full JWT
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("mfa/verify")]
+    [EnableRateLimiting("mfa")]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> MfaVerify([FromBody] MfaVerifyRequest request, CancellationToken cancellationToken)
+    {
+        var userId = _authService.ValidateMfaPendingToken(request.MfaPendingToken);
+        if (userId == null)
+            return Unauthorized(ApiResponse<object>.Error("Invalid or expired MFA token"));
+
+        var valid = await _mfaService.ValidateCodeAsync(userId.Value, request.Code, cancellationToken);
+        if (!valid)
+            return Unauthorized(ApiResponse<object>.Error("Invalid MFA code"));
+
+        var authResult = await _authService.CompleteMfaLoginAsync(userId.Value, cancellationToken);
+        if (authResult == null)
+            return Unauthorized(ApiResponse<object>.Error("Login failed"));
+
+        var response = new LoginResponse
+        {
+            Token = authResult.Token,
+            ExpiresAt = authResult.ExpiresAt,
+            User = new UserDto
+            {
+                Id = authResult.User.Id,
+                Email = authResult.User.Email,
+                FirstName = authResult.User.FirstName,
+                LastName = authResult.User.LastName,
+                State = authResult.User.State,
+                Role = authResult.User.Role
+            }
+        };
+
+        return Ok(ApiResponse<LoginResponse>.SuccessResponse(response));
+    }
+
+    /// <summary>
+    /// Use a recovery code during login — returns full JWT
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("mfa/recovery")]
+    [EnableRateLimiting("mfa")]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> MfaRecovery([FromBody] MfaRecoveryRequest request, CancellationToken cancellationToken)
+    {
+        var userId = _authService.ValidateMfaPendingToken(request.MfaPendingToken);
+        if (userId == null)
+            return Unauthorized(ApiResponse<object>.Error("Invalid or expired MFA token"));
+
+        var valid = await _mfaService.ValidateRecoveryCodeAsync(userId.Value, request.RecoveryCode, cancellationToken);
+        if (!valid)
+            return Unauthorized(ApiResponse<object>.Error("Invalid recovery code"));
+
+        var authResult = await _authService.CompleteMfaLoginAsync(userId.Value, cancellationToken);
+        if (authResult == null)
+            return Unauthorized(ApiResponse<object>.Error("Login failed"));
+
+        var response = new LoginResponse
+        {
+            Token = authResult.Token,
+            ExpiresAt = authResult.ExpiresAt,
+            User = new UserDto
+            {
+                Id = authResult.User.Id,
+                Email = authResult.User.Email,
+                FirstName = authResult.User.FirstName,
+                LastName = authResult.User.LastName,
+                State = authResult.User.State,
+                Role = authResult.User.Role
+            }
+        };
+
+        return Ok(ApiResponse<LoginResponse>.SuccessResponse(response));
+    }
+
+    /// <summary>
+    /// Disable MFA — requires password and current TOTP code
+    /// </summary>
+    [Authorize]
+    [HttpPost("mfa/disable")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> MfaDisable([FromBody] MfaDisableRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId == 0)
+            return Unauthorized();
+
+        var result = await _mfaService.DisableAsync(userId, request.Password, request.Code, cancellationToken);
+        if (!result.Success)
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Failed to disable MFA"));
+
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 }

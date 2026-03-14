@@ -8,6 +8,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddServices(this IServiceCollection services)
     {
+        services.AddSingleton<MfaSecretProtector>();
+        services.AddScoped<ITotpService, TotpService>();
+        services.AddScoped<IMfaService, MfaService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IChildProfileService, ChildProfileService>();
