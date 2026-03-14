@@ -68,7 +68,24 @@ export interface IepDocument {
   iepDate: string | null;
   status: string;
   fileSizeBytes: number;
+  meetingType: string | null;
+  attendees: string | null;
+  notes: string | null;
   createdAt: string;
+}
+
+export interface CreateIepRequest {
+  iepDate: string;
+  meetingType: string;
+  attendees?: string;
+  notes?: string;
+}
+
+export interface UpdateIepMetadataRequest {
+  iepDate?: string;
+  meetingType?: string;
+  attendees?: string;
+  notes?: string;
 }
 
 export interface IepSection {

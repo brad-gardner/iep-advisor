@@ -4,7 +4,7 @@ import type { ChildProfile, CreateChildProfileRequest } from '@/types/api';
 import { getChild, updateChild, deleteChild } from '../api/children-api';
 import { ChildForm } from './child-form';
 import { useIepDocuments } from '@/features/iep-documents/hooks/use-iep-documents';
-import { IepUpload } from '@/features/iep-documents/components/iep-upload';
+import { CreateIepForm } from '@/features/iep-documents/components/create-iep-form';
 import { IepDocumentList } from '@/features/iep-documents/components/iep-document-list';
 import { useAdvocacyGoals } from '@/features/advocacy-goals/hooks/use-advocacy-goals';
 import { AdvocacyGoalsList } from '@/features/advocacy-goals/components/advocacy-goals-list';
@@ -18,6 +18,7 @@ export function ChildDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showCreateIep, setShowCreateIep] = useState(false);
   const { documents, isLoading: docsLoading, reload: reloadDocs } = useIepDocuments(Number(id));
   const { goals, isLoading: goalsLoading, reload: reloadGoals } = useAdvocacyGoals(Number(id));
 
@@ -173,8 +174,26 @@ export function ChildDetailPage() {
       </Card>
 
       <Card>
-        <h2 className="font-serif mb-4">IEP Documents</h2>
-        <IepUpload childId={Number(id)} onUploaded={reloadDocs} />
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="font-serif">IEP Documents</h2>
+          {!showCreateIep && (
+            <Button variant="secondary" onClick={() => setShowCreateIep(true)}>
+              New IEP
+            </Button>
+          )}
+        </div>
+        {showCreateIep && (
+          <div className="mb-4">
+            <CreateIepForm
+              childId={Number(id)}
+              onCreated={() => {
+                setShowCreateIep(false);
+                reloadDocs();
+              }}
+              onCancel={() => setShowCreateIep(false)}
+            />
+          </div>
+        )}
         <IepDocumentList documents={documents} isLoading={docsLoading} onDeleted={reloadDocs} />
       </Card>
     </div>

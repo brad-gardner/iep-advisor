@@ -1,14 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Download, Play } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, Download, Play } from 'lucide-react';
 import type { IepDocument, IepSection } from '@/types/api';
 import { getIepDocument, getIepSections, getDownloadUrl, reprocessIep } from '../api/iep-documents-api';
+import { Badge } from '@/components/ui/badge';
 import { useIepAnalysis } from '../hooks/use-iep-analysis';
 import { useAdvocacyGoals } from '@/features/advocacy-goals/hooks/use-advocacy-goals';
 import { AnalysisTab } from './analysis-tab';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
+
+const MEETING_TYPE_LABELS: Record<string, string> = {
+  initial: 'Initial IEP',
+  annual_review: 'Annual Review',
+  amendment: 'Amendment',
+  reevaluation: 'Reevaluation',
+};
 
 const SECTION_LABELS: Record<string, string> = {
   student_profile: 'Student Profile',
@@ -33,6 +41,7 @@ export function IepViewerPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeSectionId, setActiveSectionId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'document' | 'analysis'>('document');
+  const [notesExpanded, setNotesExpanded] = useState(false);
 
   const {
     analysis,
@@ -112,8 +121,45 @@ export function IepViewerPage() {
             Back to child
           </Link>
           <h1 className="font-serif text-[32px] font-semibold leading-tight mt-1 text-brand-slate-800">
-            {document.fileName}
+            {document.fileName || (document.meetingType ? MEETING_TYPE_LABELS[document.meetingType] || document.meetingType : `IEP #${document.id}`)}
           </h1>
+          <div className="flex items-center gap-3 mt-2 flex-wrap">
+            {document.meetingType && (
+              <Badge variant="neutral">
+                {MEETING_TYPE_LABELS[document.meetingType] || document.meetingType}
+              </Badge>
+            )}
+            {document.iepDate && (
+              <span className="text-[13px] text-brand-slate-500">
+                {new Date(document.iepDate).toLocaleDateString()}
+              </span>
+            )}
+            {document.attendees && (
+              <span className="text-[13px] text-brand-slate-500">
+                Attendees: {document.attendees}
+              </span>
+            )}
+          </div>
+          {document.notes && (
+            <div className="mt-2">
+              <button
+                onClick={() => setNotesExpanded(!notesExpanded)}
+                className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors"
+              >
+                {notesExpanded ? (
+                  <ChevronUp className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
+                )}
+                Notes
+              </button>
+              {notesExpanded && (
+                <p className="mt-1 text-sm text-brand-slate-600 whitespace-pre-wrap bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+                  {document.notes}
+                </p>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" onClick={handleDownload}>
