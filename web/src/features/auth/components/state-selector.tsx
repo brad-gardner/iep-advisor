@@ -63,7 +63,7 @@ export function StateSelector({ value, onChange }: StateSelectorProps) {
       id="state"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2 bg-white rounded text-gray-900 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      className="w-full px-3 py-2 bg-white rounded-input text-sm text-brand-slate-800 border border-brand-slate-200 focus:outline-none focus:border-brand-teal-400 focus:ring-[3px] focus:ring-brand-teal-50 transition-colors"
     >
       <option value="">Select a state...</option>
       {US_STATES.map((s) => (
