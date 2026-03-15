@@ -117,7 +117,9 @@ public class IepAnalysisService : IIepAnalysisService
             return;
         }
 
-        if (!await _subscriptionService.CanPerformAnalysisAsync(userId, document.ChildProfileId, cancellationToken))
+        // Atomically check limit and record usage to prevent race conditions
+        var usageRecorded = await _subscriptionService.TryRecordUsageAsync(userId, document.ChildProfileId, "analysis", 5, cancellationToken);
+        if (!usageRecorded)
         {
             _logger.LogWarning("Analysis limit reached for user {UserId}, child {ChildId}", userId, document.ChildProfileId);
             var errorAnalysis = await _context.IepAnalyses
@@ -212,9 +214,6 @@ public class IepAnalysisService : IIepAnalysisService
 
             analysis.Status = "completed";
             await _context.SaveChangesAsync(cancellationToken);
-
-            // Record usage after successful analysis
-            await _subscriptionService.RecordUsageAsync(userId, document.ChildProfileId, "analysis", cancellationToken);
 
             _logger.LogInformation("Analysis completed for document {DocumentId}", documentId);
         }

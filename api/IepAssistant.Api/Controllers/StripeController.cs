@@ -13,10 +13,12 @@ namespace IepAssistant.Api.Controllers;
 public class StripeController : ControllerBase
 {
     private readonly ISubscriptionService _subscriptionService;
+    private readonly IConfiguration _config;
 
-    public StripeController(ISubscriptionService subscriptionService)
+    public StripeController(ISubscriptionService subscriptionService, IConfiguration config)
     {
         _subscriptionService = subscriptionService;
+        _config = config;
     }
 
     [HttpPost("api/stripe/create-checkout-session")]
@@ -26,6 +28,12 @@ public class StripeController : ControllerBase
     {
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var frontendUrl = _config["App:FrontendUrl"] ?? "http://localhost:5173";
+        if (!request.SuccessUrl.StartsWith(frontendUrl, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(ApiResponse<object>.Error("Invalid redirect URL"));
+        if (!request.CancelUrl.StartsWith(frontendUrl, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(ApiResponse<object>.Error("Invalid redirect URL"));
 
         try
         {
@@ -46,6 +54,10 @@ public class StripeController : ControllerBase
     {
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var frontendUrl = _config["App:FrontendUrl"] ?? "http://localhost:5173";
+        if (!request.ReturnUrl.StartsWith(frontendUrl, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(ApiResponse<object>.Error("Invalid redirect URL"));
 
         try
         {

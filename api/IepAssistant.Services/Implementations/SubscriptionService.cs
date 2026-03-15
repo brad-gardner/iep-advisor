@@ -1,5 +1,7 @@
+using System.Data;
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Stripe;
@@ -190,7 +192,19 @@ public class SubscriptionService : ISubscriptionService
     public async Task<bool> HasActiveSubscriptionAsync(int userId, CancellationToken ct = default)
     {
         var user = await _context.Users.FindAsync([userId], ct);
-        return user?.SubscriptionStatus == "active";
+        if (user == null) return false;
+
+        if (user.SubscriptionStatus != "active") return false;
+
+        // Check if subscription has expired (especially for beta codes with no Stripe renewal)
+        if (user.SubscriptionExpiresAt.HasValue && user.SubscriptionExpiresAt.Value < DateTime.UtcNow)
+        {
+            user.SubscriptionStatus = "expired";
+            await _context.SaveChangesAsync(ct);
+            return false;
+        }
+
+        return true;
     }
 
     public async Task<bool> CanPerformAnalysisAsync(int userId, int childId, CancellationToken ct = default)
@@ -226,6 +240,55 @@ public class SubscriptionService : ISubscriptionService
         await _context.SaveChangesAsync(ct);
     }
 
+    public async Task<bool> TryRecordUsageAsync(int userId, int childId, string operationType, int limit, CancellationToken ct = default)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        try
+        {
+            var user = await _context.Users.FindAsync([userId], ct);
+            if (user == null || user.SubscriptionStatus != "active")
+            {
+                await transaction.RollbackAsync(ct);
+                return false;
+            }
+
+            var subscriptionStart = GetSubscriptionYearStart(user);
+
+            var count = await _context.UsageRecords
+                .CountAsync(ur =>
+                    ur.UserId == userId &&
+                    ur.ChildProfileId == childId &&
+                    ur.OperationType == operationType &&
+                    ur.CreatedAt >= subscriptionStart,
+                    ct);
+
+            if (count >= limit)
+            {
+                await transaction.RollbackAsync(ct);
+                return false;
+            }
+
+            var record = new UsageRecord
+            {
+                UserId = userId,
+                ChildProfileId = childId,
+                OperationType = operationType,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _context.UsageRecords.AddAsync(record, ct);
+            await _context.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+
+            return true;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
+
     public async Task<ServiceResult> RedeemBetaCodeAsync(int userId, string code, CancellationToken ct = default)
     {
         var user = await _context.Users.FindAsync([userId], ct);
@@ -235,21 +298,16 @@ public class SubscriptionService : ISubscriptionService
         if (user.SubscriptionStatus == "active")
             return ServiceResult.FailureResult("You already have an active subscription");
 
-        var betaCode = await _context.BetaInviteCodes
-            .FirstOrDefaultAsync(b => b.Code == code && b.IsActive, ct);
+        // Atomic redemption: only update if code is valid AND not yet redeemed
+        var rowsAffected = await _context.Set<BetaInviteCode>()
+            .Where(c => c.Code == code && c.IsActive && c.RedeemedByUserId == null
+                && (c.ExpiresAt == null || c.ExpiresAt > DateTime.UtcNow))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(c => c.RedeemedByUserId, userId)
+                .SetProperty(c => c.RedeemedAt, DateTime.UtcNow), ct);
 
-        if (betaCode == null)
-            return ServiceResult.FailureResult("Invalid invite code");
-
-        if (betaCode.RedeemedByUserId != null)
-            return ServiceResult.FailureResult("This invite code has already been redeemed");
-
-        if (betaCode.ExpiresAt.HasValue && betaCode.ExpiresAt.Value < DateTime.UtcNow)
-            return ServiceResult.FailureResult("This invite code has expired");
-
-        // Redeem the code
-        betaCode.RedeemedByUserId = userId;
-        betaCode.RedeemedAt = DateTime.UtcNow;
+        if (rowsAffected == 0)
+            return ServiceResult.FailureResult("Invalid invite code.");
 
         // Grant subscription
         user.SubscriptionStatus = "active";
