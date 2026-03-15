@@ -52,7 +52,7 @@ public class KnowledgeBaseService : IKnowledgeBaseService
     {
         var entry = await _context.KnowledgeBaseEntries
             .AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == id, ct);
+            .FirstOrDefaultAsync(e => e.Id == id && e.IsActive, ct);
 
         return entry == null ? null : MapToModel(entry);
     }
