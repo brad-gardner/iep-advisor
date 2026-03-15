@@ -59,6 +59,18 @@ export function Sidebar({ onLogout }: SidebarProps) {
             </span>
           </div>
           <Link
+            to="/admin"
+            onClick={() => setMobileOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-button text-sm transition-colors ${
+              location.pathname === '/admin'
+                ? 'text-brand-teal-400 bg-brand-slate-700 border-l-2 border-brand-teal-500 -ml-px'
+                : 'text-brand-slate-400 hover:text-brand-slate-200 hover:bg-brand-slate-700'
+            }`}
+          >
+            <LayoutDashboard size={18} strokeWidth={1.8} />
+            Dashboard
+          </Link>
+          <Link
             to="/admin/users"
             onClick={() => setMobileOpen(false)}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-button text-sm transition-colors ${

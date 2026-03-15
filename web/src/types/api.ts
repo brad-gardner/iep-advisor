@@ -439,6 +439,37 @@ export interface UpdateUserRequest {
   isActive?: boolean;
 }
 
+export interface AdminDashboardStats {
+  totalUsers: number;
+  activeUsers: number;
+  adminUsers: number;
+  usersWithSubscription: number;
+  usersOnboarded: number;
+  totalChildren: number;
+  totalDocuments: number;
+  documentsParsed: number;
+  documentsCreated: number;
+  documentsError: number;
+  totalAnalyses: number;
+  analysesCompleted: number;
+  analysesError: number;
+  totalGoals: number;
+  totalChecklists: number;
+  checklistsCompleted: number;
+  totalAnalysisUsage: number;
+  totalMeetingPrepUsage: number;
+  totalBetaCodes: number;
+  redeemedBetaCodes: number;
+  totalSharedAccess: number;
+  newUsersLast7Days: number;
+  newDocumentsLast7Days: number;
+  analysesLast7Days: number;
+  documentsByMeetingType: Record<string, number>;
+  goalsByCategory: Record<string, number>;
+  childrenByDisabilityCategory: Record<string, number>;
+  usersBySubscriptionStatus: Record<string, number>;
+}
+
 // Subscription types
 
 export interface SubscriptionStatus {

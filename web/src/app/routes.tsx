@@ -24,6 +24,7 @@ import { SubscriptionSuccessPage } from '@/features/subscription/components/subs
 import { SubscriptionCancelPage } from '@/features/subscription/components/subscription-cancel-page';
 import { KnowledgeBasePage } from '@/features/knowledge-base/components/knowledge-base-page';
 import { AdminRouteGuard } from '@/features/admin/components/admin-route-guard';
+import { AdminDashboardPage } from '@/features/admin/components/admin-dashboard-page';
 import { AdminUsersPage } from '@/features/admin/components/admin-users-page';
 import { AdminUserDetail } from '@/features/admin/components/admin-user-detail';
 
@@ -261,6 +262,18 @@ export function AppRouter() {
           <ProtectedRoute>
             <MainLayout>
               <RedeemInvitePage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <AdminRouteGuard>
+                <AdminDashboardPage />
+              </AdminRouteGuard>
             </MainLayout>
           </ProtectedRoute>
         }
