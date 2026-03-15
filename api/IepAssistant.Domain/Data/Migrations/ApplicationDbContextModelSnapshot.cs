@@ -77,6 +77,8 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("ChildProfileId");
 
+                    b.HasIndex("InviteToken");
+
                     b.HasIndex("UserId");
 
                     b.HasIndex("ChildProfileId", "UserId")

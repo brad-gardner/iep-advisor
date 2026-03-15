@@ -14,10 +14,12 @@ namespace IepAssistant.Api.Controllers;
 public class ChildrenController : ControllerBase
 {
     private readonly IChildProfileService _childProfileService;
+    private readonly IAccessService _accessService;
 
-    public ChildrenController(IChildProfileService childProfileService)
+    public ChildrenController(IChildProfileService childProfileService, IAccessService accessService)
     {
         _childProfileService = childProfileService;
+        _accessService = accessService;
     }
 
     [HttpGet]
@@ -26,7 +28,12 @@ public class ChildrenController : ControllerBase
     {
         var userId = User.GetUserId();
         var profiles = await _childProfileService.GetByUserIdAsync(userId, cancellationToken);
-        var dtos = profiles.Select(MapToDto);
+        var dtos = new List<ChildProfileDto>();
+        foreach (var profile in profiles)
+        {
+            var role = await _accessService.GetRoleAsync(profile.Id, userId, cancellationToken);
+            dtos.Add(MapToDto(profile, role?.ToString()));
+        }
         return Ok(ApiResponse<IEnumerable<ChildProfileDto>>.SuccessResponse(dtos));
     }
 
@@ -41,7 +48,8 @@ public class ChildrenController : ControllerBase
         if (profile == null)
             return NotFound(ApiResponse<object>.Error("Child profile not found"));
 
-        return Ok(ApiResponse<ChildProfileDto>.SuccessResponse(MapToDto(profile)));
+        var role = await _accessService.GetRoleAsync(id, userId, cancellationToken);
+        return Ok(ApiResponse<ChildProfileDto>.SuccessResponse(MapToDto(profile, role?.ToString())));
     }
 
     [HttpPost]
@@ -110,7 +118,7 @@ public class ChildrenController : ControllerBase
         return Ok(ApiResponse<object>.SuccessResponse(null, "Child profile deleted successfully"));
     }
 
-    private static ChildProfileDto MapToDto(ChildProfileModel model) => new()
+    private static ChildProfileDto MapToDto(ChildProfileModel model, string? role = null) => new()
     {
         Id = model.Id,
         FirstName = model.FirstName,
@@ -120,6 +128,7 @@ public class ChildrenController : ControllerBase
         DisabilityCategory = model.DisabilityCategory,
         SchoolDistrict = model.SchoolDistrict,
         CreatedAt = model.CreatedAt,
-        UpdatedAt = model.UpdatedAt
+        UpdatedAt = model.UpdatedAt,
+        Role = role
     };
 }

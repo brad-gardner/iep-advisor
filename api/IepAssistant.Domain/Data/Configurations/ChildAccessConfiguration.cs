@@ -30,6 +30,7 @@ public class ChildAccessConfiguration : IEntityTypeConfiguration<ChildAccess>
 
         builder.HasIndex(ca => ca.ChildProfileId);
         builder.HasIndex(ca => ca.UserId);
+        builder.HasIndex(ca => ca.InviteToken);
 
         builder.HasIndex(ca => new { ca.ChildProfileId, ca.UserId })
             .IsUnique()

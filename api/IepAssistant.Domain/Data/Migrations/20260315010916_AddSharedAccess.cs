@@ -61,6 +61,11 @@ namespace IepAssistant.Domain.Data.Migrations
                 filter: "[UserId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ChildAccesses_InviteToken",
+                table: "ChildAccesses",
+                column: "InviteToken");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ChildAccesses_UserId",
                 table: "ChildAccesses",
                 column: "UserId");
@@ -70,7 +75,6 @@ namespace IepAssistant.Domain.Data.Migrations
                 INSERT INTO ChildAccesses (ChildProfileId, UserId, Role, AcceptedAt, IsActive, CreatedAt, UpdatedAt)
                 SELECT Id, UserId, 'Owner', GETUTCDATE(), 1, GETUTCDATE(), GETUTCDATE()
                 FROM ChildProfiles
-                WHERE IsActive = 1
             ");
         }
 

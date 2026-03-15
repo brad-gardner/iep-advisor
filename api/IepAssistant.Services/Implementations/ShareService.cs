@@ -90,11 +90,8 @@ public class ShareService : IShareService
         _context.ChildAccesses.Add(childAccess);
         await _context.SaveChangesAsync(ct);
 
-        _logger.LogInformation("User {UserId} invited {Email} to child {ChildId} with role {Role}",
-            userId, email, childId, role);
-
-        // TODO: Send actual invite email when email service supports it
-        _logger.LogInformation("Invite token for {Email}: {Token} (log-only — email not sent yet)", email, rawToken);
+        _logger.LogInformation("Invite created for {Email} on child {ChildId} with role {Role}",
+            email, childId, role);
 
         var model = MapToModel(childAccess, inviteeUser);
         return ServiceResult<ChildAccessModel>.SuccessResult(model, "Invite sent successfully.");
@@ -112,6 +109,15 @@ public class ShareService : IShareService
 
         if (invite == null)
             return ServiceResult.FailureResult("Invalid or expired invite token.");
+
+        // Verify the accepting user's email matches the invite
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null)
+            return ServiceResult.FailureResult("User not found.");
+
+        if (!string.IsNullOrEmpty(invite.InviteEmail) &&
+            !string.Equals(user.Email, invite.InviteEmail, StringComparison.OrdinalIgnoreCase))
+            return ServiceResult.FailureResult("This invite was sent to a different email address.");
 
         // Check if the user already has accepted access for this child
         var existingAccess = await _context.ChildAccesses
