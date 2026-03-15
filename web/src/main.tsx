@@ -15,6 +15,7 @@ if (sentryDsn) {
     ],
     tracesSampleRate: 0.1, // 10% of transactions for performance monitoring
     replaysOnErrorSampleRate: 1.0, // Capture replay on 100% of errors
+    sendDefaultPii: true
   });
 }
 
