@@ -22,6 +22,7 @@ import { SubscriptionPage } from '@/features/subscription/components/subscriptio
 import { RedeemInvitePage } from '@/features/subscription/components/redeem-invite-page';
 import { SubscriptionSuccessPage } from '@/features/subscription/components/subscription-success-page';
 import { SubscriptionCancelPage } from '@/features/subscription/components/subscription-cancel-page';
+import { KnowledgeBasePage } from '@/features/knowledge-base/components/knowledge-base-page';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -187,6 +188,16 @@ export function AppRouter() {
           <ProtectedRoute>
             <MainLayout>
               <MfaSetupPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/knowledge-base"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <KnowledgeBasePage />
             </MainLayout>
           </ProtectedRoute>
         }

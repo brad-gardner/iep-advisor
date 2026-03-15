@@ -9,7 +9,7 @@ const navItems = [
   { to: '/children', label: 'My Children', Icon: Users },
   { to: '/profile', label: 'Profile', Icon: UserCircle },
   { to: '/subscription', label: 'Subscription', Icon: CreditCard },
-  { to: '/iep-101', label: 'IEP 101', Icon: BookOpen },
+  { to: '/knowledge-base', label: 'Knowledge Base', Icon: BookOpen },
 ];
 
 interface SidebarProps {
