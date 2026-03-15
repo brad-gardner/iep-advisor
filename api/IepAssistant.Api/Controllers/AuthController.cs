@@ -88,7 +88,8 @@ public class AuthController : ControllerBase
             Email = request.Email,
             Password = request.Password,
             FirstName = request.FirstName,
-            LastName = request.LastName
+            LastName = request.LastName,
+            InviteCode = request.InviteCode
         };
 
         var result = await _authService.RegisterAsync(model, cancellationToken);

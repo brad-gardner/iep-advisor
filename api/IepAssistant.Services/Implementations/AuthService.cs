@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using IepAssistant.Domain.Entities;
@@ -86,6 +87,15 @@ public class AuthService : IAuthService
 
     public async Task<ServiceResult> RegisterAsync(RegisterModel model, CancellationToken cancellationToken = default)
     {
+        // Validate invite code (closed beta — registration requires a valid code)
+        var inviteCode = await _context.Set<BetaInviteCode>()
+            .FirstOrDefaultAsync(c => c.Code == model.InviteCode && c.IsActive
+                && c.RedeemedByUserId == null
+                && (c.ExpiresAt == null || c.ExpiresAt > DateTime.UtcNow), cancellationToken);
+
+        if (inviteCode == null)
+            return ServiceResult.FailureResult("Invalid or expired invite code.");
+
         var existingUser = await _userRepository.GetByEmailAsync(model.Email, cancellationToken);
         if (existingUser != null)
             return ServiceResult.FailureResult("Email is already registered.");
@@ -98,11 +108,18 @@ public class AuthService : IAuthService
             LastName = model.LastName,
             Role = "User",
             IsActive = true,
+            SubscriptionStatus = "active",
+            SubscriptionExpiresAt = DateTime.UtcNow.AddYears(1),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
         await _userRepository.AddAsync(user, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // Redeem the invite code
+        inviteCode.RedeemedByUserId = user.Id;
+        inviteCode.RedeemedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
 
         return ServiceResult.SuccessResult("User registered successfully.");

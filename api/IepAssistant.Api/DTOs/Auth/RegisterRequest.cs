@@ -19,4 +19,7 @@ public class RegisterRequest
     [Required(ErrorMessage = "Last name is required")]
     [MaxLength(100)]
     public string LastName { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Invite code is required")]
+    public string InviteCode { get; set; } = string.Empty;
 }
