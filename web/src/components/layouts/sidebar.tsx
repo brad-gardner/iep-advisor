@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, BookOpen, CreditCard, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Users, UserCircle, BookOpen, CreditCard, LogOut, Menu, X, Shield } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/features/auth/hooks/use-auth';
@@ -50,6 +50,28 @@ export function Sidebar({ onLogout }: SidebarProps) {
           );
         })}
       </nav>
+
+      {user?.role === 'Admin' && (
+        <div className="px-3 mt-2">
+          <div className="border-t border-brand-slate-700 pt-3 mb-2">
+            <span className="px-3 text-[10px] uppercase tracking-wider font-semibold text-brand-teal-400">
+              Admin
+            </span>
+          </div>
+          <Link
+            to="/admin/users"
+            onClick={() => setMobileOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-button text-sm transition-colors ${
+              isActive('/admin/users')
+                ? 'text-brand-teal-400 bg-brand-slate-700 border-l-2 border-brand-teal-500 -ml-px'
+                : 'text-brand-slate-400 hover:text-brand-slate-200 hover:bg-brand-slate-700'
+            }`}
+          >
+            <Shield size={18} strokeWidth={1.8} />
+            Users
+          </Link>
+        </div>
+      )}
 
       <div className="p-4 border-t border-brand-slate-700">
         <p className="text-sm text-brand-slate-300 truncate mb-2">

@@ -23,6 +23,9 @@ import { RedeemInvitePage } from '@/features/subscription/components/redeem-invi
 import { SubscriptionSuccessPage } from '@/features/subscription/components/subscription-success-page';
 import { SubscriptionCancelPage } from '@/features/subscription/components/subscription-cancel-page';
 import { KnowledgeBasePage } from '@/features/knowledge-base/components/knowledge-base-page';
+import { AdminRouteGuard } from '@/features/admin/components/admin-route-guard';
+import { AdminUsersPage } from '@/features/admin/components/admin-users-page';
+import { AdminUserDetail } from '@/features/admin/components/admin-user-detail';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -258,6 +261,30 @@ export function AppRouter() {
           <ProtectedRoute>
             <MainLayout>
               <RedeemInvitePage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/users"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <AdminRouteGuard>
+                <AdminUsersPage />
+              </AdminRouteGuard>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/users/:id"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <AdminRouteGuard>
+                <AdminUserDetail />
+              </AdminRouteGuard>
             </MainLayout>
           </ProtectedRoute>
         }
