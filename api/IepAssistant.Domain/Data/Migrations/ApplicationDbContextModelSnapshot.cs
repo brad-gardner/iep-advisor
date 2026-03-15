@@ -643,7 +643,7 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasOne("IepAssistant.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("ChildProfile");
 

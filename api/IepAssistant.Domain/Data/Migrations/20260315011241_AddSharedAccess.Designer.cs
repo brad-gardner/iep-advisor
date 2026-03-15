@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace IepAssistant.Domain.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260315010916_AddSharedAccess")]
+    [Migration("20260315011241_AddSharedAccess")]
     partial class AddSharedAccess
     {
         /// <inheritdoc />
@@ -646,7 +646,7 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasOne("IepAssistant.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("ChildProfile");
 

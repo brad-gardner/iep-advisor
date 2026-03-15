@@ -26,7 +26,7 @@ public class ChildAccessConfiguration : IEntityTypeConfiguration<ChildAccess>
         builder.HasOne(ca => ca.User)
             .WithMany()
             .HasForeignKey(ca => ca.UserId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(ca => ca.ChildProfileId);
         builder.HasIndex(ca => ca.UserId);

@@ -45,7 +45,7 @@ namespace IepAssistant.Domain.Data.Migrations
                         column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateIndex(
@@ -70,7 +70,7 @@ namespace IepAssistant.Domain.Data.Migrations
                 table: "ChildAccesses",
                 column: "UserId");
 
-            // Seed owner access records for all existing child profiles
+            // Seed Owner access records for all existing child profiles
             migrationBuilder.Sql(@"
                 INSERT INTO ChildAccesses (ChildProfileId, UserId, Role, AcceptedAt, IsActive, CreatedAt, UpdatedAt)
                 SELECT Id, UserId, 'Owner', GETUTCDATE(), 1, GETUTCDATE(), GETUTCDATE()
