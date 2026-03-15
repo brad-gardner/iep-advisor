@@ -417,6 +417,27 @@ export interface CategoryCount {
   count: number;
 }
 
+// Admin types
+
+export interface AdminUser {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  state: string | null;
+  role: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface UpdateUserRequest {
+  firstName?: string;
+  lastName?: string;
+  state?: string;
+  role?: string;
+  isActive?: boolean;
+}
+
 // Subscription types
 
 export interface SubscriptionStatus {
