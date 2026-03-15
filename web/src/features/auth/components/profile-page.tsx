@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/use-auth';
 import { disableMfa } from '../api/auth-api';
 import { StateSelector } from './state-selector';
 import { AccountDeletionSection } from './account-deletion-section';
+import { SubscriptionStatusCard } from '@/features/subscription/components/subscription-status';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -193,6 +194,16 @@ export function ProfilePage() {
           </Button>
         </form>
       </Card>
+
+      <div className="max-w-lg space-y-3">
+        <SubscriptionStatusCard />
+        <Link
+          to="/redeem-invite"
+          className="inline-block text-sm text-brand-teal-500 hover:text-brand-teal-600 underline"
+        >
+          Redeem Invite Code
+        </Link>
+      </div>
 
       <Card className="max-w-lg">
         <h2 className="text-lg font-serif font-semibold text-brand-slate-800 mb-4">

@@ -15,6 +15,7 @@ export interface User {
   fullName: string;
   mfaEnabled?: boolean;
   onboardingCompleted: boolean;
+  subscriptionStatus: string;
 }
 
 export interface UpdateProfileRequest {
@@ -397,4 +398,19 @@ export interface ComparisonResult {
   sectionChanges: SectionChanges;
   redFlagResolution: RedFlagResolutionResult;
   summary: ComparisonSummary;
+}
+
+// Subscription types
+
+export interface SubscriptionStatus {
+  status: string; // none, active, past_due, canceled, expired
+  expiresAt: string | null;
+  childUsage: Record<string, ChildUsage>;
+}
+
+export interface ChildUsage {
+  childId: number;
+  childName: string;
+  analysisCount: number;
+  analysisLimit: number;
 }

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Users, FileText, UserCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../hooks/use-auth';
+import { SubscriptionStatusCard } from '@/features/subscription/components/subscription-status';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,8 @@ export function DashboardPage() {
           to get jurisdiction-specific IEP guidance.
         </Notice>
       )}
+
+      <SubscriptionStatusCard />
 
       <Card>
         <h2 className="font-serif mb-4">Your Account</h2>

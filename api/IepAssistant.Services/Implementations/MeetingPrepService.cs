@@ -18,6 +18,7 @@ public class MeetingPrepService : IMeetingPrepService
     private readonly IIepDocumentRepository _documentRepository;
     private readonly IParentAdvocacyGoalRepository _goalRepository;
     private readonly IAccessService _accessService;
+    private readonly ISubscriptionService _subscriptionService;
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _configuration;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -37,6 +38,7 @@ public class MeetingPrepService : IMeetingPrepService
         IIepDocumentRepository documentRepository,
         IParentAdvocacyGoalRepository goalRepository,
         IAccessService accessService,
+        ISubscriptionService subscriptionService,
         ApplicationDbContext context,
         IConfiguration configuration,
         IHttpClientFactory httpClientFactory,
@@ -45,6 +47,7 @@ public class MeetingPrepService : IMeetingPrepService
         _documentRepository = documentRepository;
         _goalRepository = goalRepository;
         _accessService = accessService;
+        _subscriptionService = subscriptionService;
         _context = context;
         _configuration = configuration;
         _httpClientFactory = httpClientFactory;
@@ -145,6 +148,17 @@ public class MeetingPrepService : IMeetingPrepService
         if (checklist.Status != "pending")
         {
             _logger.LogInformation("Checklist {ChecklistId} is in '{Status}' status, skipping duplicate generation", checklistId, checklist.Status);
+            return;
+        }
+
+        // Subscription check — use the checklist creator as the billable user
+        var billableUserId = checklist.CreatedById ?? checklist.ChildProfile.UserId;
+        if (!await _subscriptionService.HasActiveSubscriptionAsync(billableUserId, ct))
+        {
+            _logger.LogWarning("User {UserId} does not have active subscription for meeting prep checklist {ChecklistId}", billableUserId, checklistId);
+            checklist.Status = "error";
+            checklist.ErrorMessage = "Active subscription required";
+            await _context.SaveChangesAsync(ct);
             return;
         }
 

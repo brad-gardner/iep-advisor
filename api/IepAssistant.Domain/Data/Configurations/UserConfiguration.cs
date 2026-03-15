@@ -16,6 +16,9 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.PasswordHash).HasMaxLength(256).IsRequired();
         builder.Property(u => u.State).HasMaxLength(2);
         builder.Property(u => u.Role).HasMaxLength(50).IsRequired();
+        builder.Property(u => u.StripeCustomerId).HasMaxLength(256);
+        builder.Property(u => u.StripeSubscriptionId).HasMaxLength(256);
+        builder.Property(u => u.SubscriptionStatus).HasMaxLength(20).HasDefaultValue("none");
 
         // Ignore computed property
         builder.Ignore(u => u.FullName);

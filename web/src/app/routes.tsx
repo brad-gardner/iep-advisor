@@ -18,6 +18,10 @@ import { ComparisonPage } from '@/features/iep-comparison/components/comparison-
 import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
 import { Iep101Page } from '@/features/onboarding/components/iep-101-page';
 import { AcceptInvitePage } from '@/features/auth/components/accept-invite-page';
+import { SubscriptionPage } from '@/features/subscription/components/subscription-page';
+import { RedeemInvitePage } from '@/features/subscription/components/redeem-invite-page';
+import { SubscriptionSuccessPage } from '@/features/subscription/components/subscription-success-page';
+import { SubscriptionCancelPage } from '@/features/subscription/components/subscription-cancel-page';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -203,6 +207,46 @@ export function AppRouter() {
           <ProtectedRoute>
             <MainLayout>
               <AcceptInvitePage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/subscription"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <SubscriptionPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/subscription/success"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <SubscriptionSuccessPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/subscription/cancel"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <SubscriptionCancelPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/redeem-invite"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <RedeemInvitePage />
             </MainLayout>
           </ProtectedRoute>
         }
