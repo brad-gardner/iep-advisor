@@ -67,7 +67,7 @@ function ManageButton() {
 
 function StatusContent({ data }: { data: SubscriptionStatusType }) {
   const isActive = data.status === 'active';
-  const usageEntries = Object.values(data.childUsage);
+  const usageEntries = data.childUsage ? Object.values(data.childUsage) : [];
 
   return (
     <div className="space-y-4">
