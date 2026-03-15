@@ -65,7 +65,9 @@ public class AuthController : ControllerBase
                 LastName = authResult.User.LastName,
                 State = authResult.User.State,
                 Role = authResult.User.Role,
-                OnboardingCompleted = authResult.User.OnboardingCompleted
+                IsActive = authResult.User.IsActive,
+                OnboardingCompleted = authResult.User.OnboardingCompleted,
+                CreatedAt = authResult.User.CreatedAt
             }
         };
 
@@ -126,7 +128,9 @@ public class AuthController : ControllerBase
             LastName = user.LastName,
             State = user.State,
             Role = user.Role,
-            OnboardingCompleted = user.OnboardingCompleted
+            IsActive = user.IsActive,
+            OnboardingCompleted = user.OnboardingCompleted,
+            CreatedAt = user.CreatedAt
         };
 
         return Ok(ApiResponse<UserDto>.SuccessResponse(dto));
@@ -166,7 +170,9 @@ public class AuthController : ControllerBase
             LastName = user.LastName,
             State = user.State,
             Role = user.Role,
-            OnboardingCompleted = user.OnboardingCompleted
+            IsActive = user.IsActive,
+            OnboardingCompleted = user.OnboardingCompleted,
+            CreatedAt = user.CreatedAt
         };
 
         return Ok(ApiResponse<UserDto>.SuccessResponse(dto, "Profile updated successfully"));
@@ -242,7 +248,9 @@ public class AuthController : ControllerBase
                 LastName = authResult.User.LastName,
                 State = authResult.User.State,
                 Role = authResult.User.Role,
-                OnboardingCompleted = authResult.User.OnboardingCompleted
+                IsActive = authResult.User.IsActive,
+                OnboardingCompleted = authResult.User.OnboardingCompleted,
+                CreatedAt = authResult.User.CreatedAt
             }
         };
 
@@ -283,7 +291,9 @@ public class AuthController : ControllerBase
                 LastName = authResult.User.LastName,
                 State = authResult.User.State,
                 Role = authResult.User.Role,
-                OnboardingCompleted = authResult.User.OnboardingCompleted
+                IsActive = authResult.User.IsActive,
+                OnboardingCompleted = authResult.User.OnboardingCompleted,
+                CreatedAt = authResult.User.CreatedAt
             }
         };
 

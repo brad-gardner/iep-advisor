@@ -291,6 +291,8 @@ public class AuthService : IAuthService
         LastName = user.LastName,
         State = user.State,
         Role = user.Role,
-        OnboardingCompleted = user.OnboardingCompletedAt.HasValue
+        IsActive = user.IsActive,
+        OnboardingCompleted = user.OnboardingCompletedAt.HasValue,
+        CreatedAt = user.CreatedAt
     };
 }

@@ -16,7 +16,9 @@ public class UserModel
     public string LastName { get; set; } = string.Empty;
     public string? State { get; set; }
     public string Role { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
     public bool OnboardingCompleted { get; set; }
+    public DateTime CreatedAt { get; set; }
     public string FullName => $"{FirstName} {LastName}";
 }
 

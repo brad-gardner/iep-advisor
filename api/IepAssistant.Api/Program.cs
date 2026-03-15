@@ -126,7 +126,7 @@ builder.Services.AddAuthentication(options =>
             {
                 var dbContext = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
                 var user = await dbContext.Users.FindAsync(userId);
-                if (user == null || user.SecurityStamp.ToString() != stampClaim)
+                if (user == null || !user.IsActive || user.SecurityStamp.ToString() != stampClaim)
                 {
                     context.Fail("Token has been revoked.");
                     return;

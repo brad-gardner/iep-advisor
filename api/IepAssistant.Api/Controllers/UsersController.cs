@@ -21,59 +21,29 @@ public class UsersController : ControllerBase
         _userService = userService;
     }
 
-    /// <summary>
-    /// Get all users (Admin only)
-    /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<UserDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         var users = await _userService.GetAllUsersAsync(cancellationToken);
-
-        var dtos = users.Select(u => new UserDto
-        {
-            Id = u.Id,
-            Email = u.Email,
-            FirstName = u.FirstName,
-            LastName = u.LastName,
-            State = u.State,
-            Role = u.Role
-        });
-
+        var dtos = users.Select(MapToDto);
         return Ok(ApiResponse<IEnumerable<UserDto>>.SuccessResponse(dtos));
     }
 
-    /// <summary>
-    /// Get user by ID (Admin only)
-    /// </summary>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(ApiResponse<UserDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
         var user = await _userService.GetUserByIdAsync(id, cancellationToken);
-
         if (user == null)
             return NotFound(ApiResponse<object>.Error("User not found"));
 
-        var dto = new UserDto
-        {
-            Id = user.Id,
-            Email = user.Email,
-            FirstName = user.FirstName,
-            LastName = user.LastName,
-            State = user.State,
-            Role = user.Role
-        };
-
-        return Ok(ApiResponse<UserDto>.SuccessResponse(dto));
+        return Ok(ApiResponse<UserDto>.SuccessResponse(MapToDto(user)));
     }
 
-    /// <summary>
-    /// Update user (Admin only)
-    /// </summary>
     [HttpPut("{id}")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<UserDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateUserRequest request, CancellationToken cancellationToken)
     {
@@ -91,12 +61,11 @@ public class UsersController : ControllerBase
         if (!result.Success)
             return NotFound(ApiResponse<object>.Error(result.Message ?? "Update failed"));
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "User updated successfully"));
+        // Return the updated user data
+        var updated = await _userService.GetUserByIdAsync(id, cancellationToken);
+        return Ok(ApiResponse<UserDto>.SuccessResponse(MapToDto(updated!), "User updated successfully"));
     }
 
-    /// <summary>
-    /// Delete user (soft delete, Admin only)
-    /// </summary>
     [HttpDelete("{id}")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -109,4 +78,17 @@ public class UsersController : ControllerBase
 
         return Ok(ApiResponse<object>.SuccessResponse(null, "User deleted successfully"));
     }
+
+    private static UserDto MapToDto(UserModel user) => new()
+    {
+        Id = user.Id,
+        Email = user.Email,
+        FirstName = user.FirstName,
+        LastName = user.LastName,
+        State = user.State,
+        Role = user.Role,
+        IsActive = user.IsActive,
+        OnboardingCompleted = user.OnboardingCompleted,
+        CreatedAt = user.CreatedAt
+    };
 }

@@ -47,7 +47,11 @@ public class UserService : IUserService
             user.Role = model.Role;
 
         if (model.IsActive.HasValue)
+        {
             user.IsActive = model.IsActive.Value;
+            if (!model.IsActive.Value)
+                user.SecurityStamp++; // Invalidate existing tokens when deactivating
+        }
 
         user.UpdatedAt = DateTime.UtcNow;
 
@@ -64,6 +68,7 @@ public class UserService : IUserService
             return ServiceResult.FailureResult("User not found.");
 
         user.IsActive = false;
+        user.SecurityStamp++; // Invalidate existing tokens immediately
         user.UpdatedAt = DateTime.UtcNow;
 
         _userRepository.Update(user);
@@ -79,6 +84,8 @@ public class UserService : IUserService
         FirstName = user.FirstName,
         LastName = user.LastName,
         State = user.State,
-        Role = user.Role
+        Role = user.Role,
+        IsActive = user.IsActive,
+        CreatedAt = user.CreatedAt
     };
 }
