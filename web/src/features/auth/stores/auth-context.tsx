@@ -135,10 +135,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const completeOnboarding = async () => {
     try {
       const response = await completeOnboardingApi();
-      if (response.success && user) {
-        const updatedUser = { ...user, onboardingCompleted: true };
-        setUser(updatedUser);
-        setStoredUser(JSON.stringify(updatedUser));
+      if (response.success) {
+        setUser((prev) => {
+          if (!prev) return prev;
+          const updated = { ...prev, onboardingCompleted: true };
+          setStoredUser(JSON.stringify(updated));
+          return updated;
+        });
         return { success: true };
       }
       return { success: false, error: response.message || 'Failed to complete onboarding' };

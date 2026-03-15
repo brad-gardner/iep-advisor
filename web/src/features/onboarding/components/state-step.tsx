@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Notice } from '@/components/ui/notice';
 import { StateSelector } from '@/features/auth/components/state-selector';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 
@@ -12,12 +13,18 @@ export function StateStep({ onNext, onSkip }: StateStepProps) {
   const { user, updateProfile } = useAuth();
   const [state, setState] = useState(user?.state ?? '');
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const handleContinue = async () => {
     if (!state) return;
+    setError('');
     setIsSaving(true);
-    await updateProfile({ state });
+    const result = await updateProfile({ state });
     setIsSaving(false);
+    if (!result.success) {
+      setError(result.error || 'Failed to save state.');
+      return;
+    }
     onNext();
   };
 
@@ -32,6 +39,8 @@ export function StateStep({ onNext, onSkip }: StateStepProps) {
           child's education. We'll tailor our guidance to your jurisdiction.
         </p>
       </div>
+
+      {error && <Notice variant="error" title={error} />}
 
       <div className="max-w-sm">
         <label
