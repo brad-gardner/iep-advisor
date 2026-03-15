@@ -17,6 +17,7 @@ public class User : BaseEntity, IAuditableEntity
     public int FailedLoginAttempts { get; set; } = 0;
     public DateTime? LockedUntil { get; set; }
     public int SecurityStamp { get; set; } = 0;
+    public DateTime? OnboardingCompletedAt { get; set; }
     public DateTime? DeletionRequestedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

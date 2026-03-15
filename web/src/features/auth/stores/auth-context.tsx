@@ -5,6 +5,7 @@ import {
   register as registerApi,
   getCurrentUser,
   updateProfile as updateProfileApi,
+  completeOnboarding as completeOnboardingApi,
 } from '../api/auth-api';
 import { getToken, setToken, removeToken, setStoredUser, getStoredUser } from '@/lib/auth';
 
@@ -23,6 +24,7 @@ interface AuthContextType {
   login: (data: LoginRequest) => Promise<LoginResult>;
   register: (data: RegisterRequest) => Promise<{ success: boolean; error?: string }>;
   updateProfile: (data: UpdateProfileRequest) => Promise<{ success: boolean; error?: string }>;
+  completeOnboarding: () => Promise<{ success: boolean; error?: string }>;
   completeMfaLogin: (token: string, user: User) => void;
   logout: () => void;
 }
@@ -130,6 +132,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const completeOnboarding = async () => {
+    try {
+      const response = await completeOnboardingApi();
+      if (response.success) {
+        setUser((prev) => {
+          if (!prev) return prev;
+          const updated = { ...prev, onboardingCompleted: true };
+          setStoredUser(JSON.stringify(updated));
+          return updated;
+        });
+        return { success: true };
+      }
+      return { success: false, error: response.message || 'Failed to complete onboarding' };
+    } catch {
+      return { success: false, error: 'An error occurred completing onboarding' };
+    }
+  };
+
   const logout = () => {
     removeToken();
     setUser(null);
@@ -146,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         updateProfile,
+        completeOnboarding,
         completeMfaLogin,
         logout,
       }}

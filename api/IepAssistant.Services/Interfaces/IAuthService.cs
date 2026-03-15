@@ -11,4 +11,5 @@ public interface IAuthService
     Task<ServiceResult> UpdateProfileAsync(int userId, UpdateProfileModel model, CancellationToken cancellationToken = default);
     int? ValidateMfaPendingToken(string token);
     Task<AuthResult?> CompleteMfaLoginAsync(int userId, CancellationToken cancellationToken = default);
+    Task<ServiceResult> CompleteOnboardingAsync(int userId, CancellationToken cancellationToken = default);
 }

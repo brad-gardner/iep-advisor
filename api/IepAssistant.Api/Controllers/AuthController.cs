@@ -64,7 +64,8 @@ public class AuthController : ControllerBase
                 FirstName = authResult.User.FirstName,
                 LastName = authResult.User.LastName,
                 State = authResult.User.State,
-                Role = authResult.User.Role
+                Role = authResult.User.Role,
+                OnboardingCompleted = authResult.User.OnboardingCompleted
             }
         };
 
@@ -123,7 +124,8 @@ public class AuthController : ControllerBase
             FirstName = user.FirstName,
             LastName = user.LastName,
             State = user.State,
-            Role = user.Role
+            Role = user.Role,
+            OnboardingCompleted = user.OnboardingCompleted
         };
 
         return Ok(ApiResponse<UserDto>.SuccessResponse(dto));
@@ -162,7 +164,8 @@ public class AuthController : ControllerBase
             FirstName = user.FirstName,
             LastName = user.LastName,
             State = user.State,
-            Role = user.Role
+            Role = user.Role,
+            OnboardingCompleted = user.OnboardingCompleted
         };
 
         return Ok(ApiResponse<UserDto>.SuccessResponse(dto, "Profile updated successfully"));
@@ -237,7 +240,8 @@ public class AuthController : ControllerBase
                 FirstName = authResult.User.FirstName,
                 LastName = authResult.User.LastName,
                 State = authResult.User.State,
-                Role = authResult.User.Role
+                Role = authResult.User.Role,
+                OnboardingCompleted = authResult.User.OnboardingCompleted
             }
         };
 
@@ -277,7 +281,8 @@ public class AuthController : ControllerBase
                 FirstName = authResult.User.FirstName,
                 LastName = authResult.User.LastName,
                 State = authResult.User.State,
-                Role = authResult.User.Role
+                Role = authResult.User.Role,
+                OnboardingCompleted = authResult.User.OnboardingCompleted
             }
         };
 
@@ -402,6 +407,22 @@ public class AuthController : ControllerBase
         if (!result.Success)
             return BadRequest(ApiResponse<object>.Error(result.Message ?? "Failed to cancel deletion"));
 
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
+    }
+
+    /// <summary>
+    /// Mark onboarding as completed
+    /// </summary>
+    [Authorize]
+    [HttpPost("complete-onboarding")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CompleteOnboarding(CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId == 0)
+            return Unauthorized();
+
+        var result = await _authService.CompleteOnboardingAsync(userId, cancellationToken);
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 }

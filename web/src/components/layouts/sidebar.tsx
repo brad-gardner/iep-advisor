@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Users, UserCircle, BookOpen, LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/features/auth/hooks/use-auth';
@@ -8,6 +8,7 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { to: '/children', label: 'My Children', Icon: Users },
   { to: '/profile', label: 'Profile', Icon: UserCircle },
+  { to: '/iep-101', label: 'IEP 101', Icon: BookOpen },
 ];
 
 interface SidebarProps {
