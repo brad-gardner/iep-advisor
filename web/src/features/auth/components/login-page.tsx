@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/use-auth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,9 @@ import { Notice } from '@/components/ui/notice';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+  const successMessage = (location.state as { message?: string })?.message;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -35,6 +37,7 @@ export function LoginPage() {
     <div className="w-full">
       <h2 className="text-2xl font-serif font-semibold text-center mb-6 text-brand-slate-800">Welcome Back</h2>
 
+      {successMessage && <div className="mb-4"><Notice variant="success" title={successMessage} /></div>}
       {error && <div className="mb-4"><Notice variant="error" title={error} /></div>}
 
       <form onSubmit={handleSubmit} className="space-y-4">
