@@ -23,6 +23,8 @@ public static class DependencyInjection
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IMeetingPrepService, MeetingPrepService>();
         services.AddScoped<IIepComparisonService, IepComparisonService>();
+        services.AddScoped<IAccessService, AccessService>();
+        services.AddScoped<IShareService, ShareService>();
 
         return services;
     }
