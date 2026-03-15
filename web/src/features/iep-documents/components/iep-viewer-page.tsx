@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronUp, Download, Play } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, ChevronDown, ChevronUp, Download, Play, ArrowRightLeft } from 'lucide-react';
 import type { IepDocument, IepSection } from '@/types/api';
-import { getIepDocument, getIepSections, getDownloadUrl, reprocessIep } from '../api/iep-documents-api';
+import { getIepDocument, getIepSections, getDownloadUrl, reprocessIep, getIepDocuments } from '../api/iep-documents-api';
 import { Badge } from '@/components/ui/badge';
 import { useIepAnalysis } from '../hooks/use-iep-analysis';
 import { useAdvocacyGoals } from '@/features/advocacy-goals/hooks/use-advocacy-goals';
@@ -37,6 +37,7 @@ const SECTION_LABELS: Record<string, string> = {
 
 export function IepViewerPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const documentId = Number(id);
   const [document, setDocument] = useState<IepDocument | null>(null);
   const [sections, setSections] = useState<IepSection[]>([]);
@@ -44,6 +45,9 @@ export function IepViewerPage() {
   const [activeSectionId, setActiveSectionId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'document' | 'analysis' | 'meeting-prep'>('document');
   const [notesExpanded, setNotesExpanded] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [otherIeps, setOtherIeps] = useState<IepDocument[]>([]);
+  const compareRef = useRef<HTMLDivElement>(null);
 
   const {
     analysis,
@@ -88,6 +92,35 @@ export function IepViewerPage() {
     }
     load();
   }, [documentId]);
+
+  // Load other IEPs for comparison when document is available
+  useEffect(() => {
+    if (!document?.childProfileId) return;
+    async function loadOthers() {
+      try {
+        const res = await getIepDocuments(document!.childProfileId);
+        if (res.success && res.data) {
+          setOtherIeps(res.data.filter((d) => d.id !== documentId));
+        }
+      } catch {
+        // non-critical
+      }
+    }
+    loadOthers();
+  }, [document?.childProfileId, documentId]);
+
+  // Close compare dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (compareRef.current && !compareRef.current.contains(e.target as Node)) {
+        setCompareOpen(false);
+      }
+    }
+    if (compareOpen) {
+      window.addEventListener('mousedown', handleClickOutside);
+      return () => window.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [compareOpen]);
 
   const handleDownload = async () => {
     const res = await getDownloadUrl(documentId);
@@ -172,6 +205,44 @@ export function IepViewerPage() {
           )}
         </div>
         <div className="flex gap-2">
+          {otherIeps.length > 0 && (
+            <div className="relative" ref={compareRef}>
+              <Button variant="secondary" onClick={() => setCompareOpen(!compareOpen)}>
+                <ArrowRightLeft className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
+                Compare
+              </Button>
+              {compareOpen && (
+                <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-card border border-brand-slate-200 shadow-lg z-20 py-1">
+                  <p className="px-3 py-1.5 text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
+                    Compare with...
+                  </p>
+                  {otherIeps.map((other) => (
+                    <button
+                      key={other.id}
+                      className="w-full text-left px-3 py-2 text-sm text-brand-slate-700 hover:bg-brand-slate-50 transition-colors"
+                      onClick={() => {
+                        setCompareOpen(false);
+                        navigate(
+                          `/children/${document.childProfileId}/compare/${documentId}/${other.id}`
+                        );
+                      }}
+                    >
+                      <span className="font-medium">
+                        {other.iepDate
+                          ? new Date(other.iepDate).toLocaleDateString()
+                          : `IEP #${other.id}`}
+                      </span>
+                      {other.meetingType && (
+                        <span className="text-brand-slate-400 ml-2 text-[12px]">
+                          {MEETING_TYPE_LABELS[other.meetingType] || other.meetingType}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <Button variant="ghost" onClick={handleDownload}>
             <Download className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
             Download PDF

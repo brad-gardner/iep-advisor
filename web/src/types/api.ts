@@ -290,3 +290,91 @@ export interface CheckItemRequest {
   index: number;
   isChecked: boolean;
 }
+
+// IEP Comparison types
+
+export interface TimelineEntry {
+  id: number;
+  iepDate: string;
+  meetingType: string | null;
+  status: string;
+  goalCount: number;
+  sectionCount: number;
+  redFlagCount: number;
+  hasAnalysis: boolean;
+}
+
+export interface TimelineResult {
+  childId: number;
+  ieps: TimelineEntry[];
+}
+
+export interface GoalDiff {
+  goalText: string;
+  domain: string | null;
+}
+
+export interface GoalChangeDetail {
+  field: string;
+  older: string | null;
+  newer: string | null;
+}
+
+export interface ModifiedGoalDiff {
+  domain: string | null;
+  olderGoalText: string;
+  newerGoalText: string;
+  changes: GoalChangeDetail[];
+}
+
+export interface GoalChanges {
+  added: GoalDiff[];
+  removed: GoalDiff[];
+  modified: ModifiedGoalDiff[];
+}
+
+export interface SectionChanges {
+  added: string[];
+  removed: string[];
+  inBoth: string[];
+}
+
+export interface RedFlagChange {
+  title: string;
+  wasInOlder: boolean;
+  addressedInNewer: boolean;
+}
+
+export interface RedFlagResolution {
+  title: string;
+  wasInOlder: boolean;
+}
+
+export interface ComparisonSummary {
+  goalsAdded: number;
+  goalsRemoved: number;
+  goalsModified: number;
+  goalsUnchanged: number;
+  sectionsAdded: number;
+  sectionsRemoved: number;
+  redFlagsResolved: number;
+  redFlagsPersisting: number;
+  newRedFlags: number;
+}
+
+export interface RedFlagResolutionResult {
+  resolved: RedFlagChange[];
+  persisting: RedFlagChange[];
+  newFlags: RedFlagResolution[];
+}
+
+export interface ComparisonResult {
+  olderIepId: number;
+  newerIepId: number;
+  olderDate: string;
+  newerDate: string;
+  goalChanges: GoalChanges;
+  sectionChanges: SectionChanges;
+  redFlagResolution: RedFlagResolutionResult;
+  summary: ComparisonSummary;
+}
