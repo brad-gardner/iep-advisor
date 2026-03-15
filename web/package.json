@@ -13,6 +13,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
   },
   "dependencies": {
+    "@sentry/react": "^10.43.0",
     "axios": "^1.13.6",
     "lucide-react": "^0.577.0",
     "qrcode.react": "^4.2.0",

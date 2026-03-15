@@ -1,4 +1,5 @@
 import { createContext, useCallback, useEffect, useState } from 'react';
+import * as Sentry from '@sentry/react';
 import type { User, LoginRequest, RegisterRequest, UpdateProfileRequest } from '@/types/api';
 import {
   login as loginApi,
@@ -70,6 +71,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadUser();
   }, [loadUser]);
+
+  // Sync Sentry user context for error tracking
+  useEffect(() => {
+    if (user) {
+      Sentry.setUser({ id: String(user.id), email: user.email });
+    } else {
+      Sentry.setUser(null);
+    }
+  }, [user]);
 
   const login = async (data: LoginRequest): Promise<LoginResult> => {
     try {
