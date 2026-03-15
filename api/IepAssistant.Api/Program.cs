@@ -39,7 +39,7 @@ if (builder.Environment.IsProduction())
         logConfiguration
             .WriteTo.Elasticsearch(new[] { new Uri(elasticUrl) }, opts =>
             {
-                opts.DataStream = new DataStreamName("app-logs", "iepassistant-api", "production");
+                opts.DataStream = new DataStreamName("app-logs", "iepadvisor-api", "production");
                 opts.BootstrapMethod = BootstrapMethod.Failure;
             }, transport =>
             {
