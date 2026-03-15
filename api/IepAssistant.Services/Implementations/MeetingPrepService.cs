@@ -17,6 +17,7 @@ public class MeetingPrepService : IMeetingPrepService
 {
     private readonly IIepDocumentRepository _documentRepository;
     private readonly IParentAdvocacyGoalRepository _goalRepository;
+    private readonly IAccessService _accessService;
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _configuration;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -35,6 +36,7 @@ public class MeetingPrepService : IMeetingPrepService
     public MeetingPrepService(
         IIepDocumentRepository documentRepository,
         IParentAdvocacyGoalRepository goalRepository,
+        IAccessService accessService,
         ApplicationDbContext context,
         IConfiguration configuration,
         IHttpClientFactory httpClientFactory,
@@ -42,6 +44,7 @@ public class MeetingPrepService : IMeetingPrepService
     {
         _documentRepository = documentRepository;
         _goalRepository = goalRepository;
+        _accessService = accessService;
         _context = context;
         _configuration = configuration;
         _httpClientFactory = httpClientFactory;
@@ -50,10 +53,8 @@ public class MeetingPrepService : IMeetingPrepService
 
     public async Task<IEnumerable<MeetingPrepChecklistModel>> GetByChildIdAsync(int childId, int userId, CancellationToken ct = default)
     {
-        var child = await _context.ChildProfiles
-            .FirstOrDefaultAsync(c => c.Id == childId && c.UserId == userId && c.IsActive, ct);
-
-        if (child == null)
+        var role = await _accessService.GetRoleAsync(childId, userId, ct);
+        if (role == null)
             return [];
 
         var checklists = await _context.Set<MeetingPrepChecklist>()
@@ -70,7 +71,11 @@ public class MeetingPrepService : IMeetingPrepService
             .Include(m => m.ChildProfile)
             .FirstOrDefaultAsync(m => m.Id == id && m.IsActive, ct);
 
-        if (checklist == null || checklist.ChildProfile.UserId != userId)
+        if (checklist == null)
+            return null;
+
+        var role = await _accessService.GetRoleAsync(checklist.ChildProfileId, userId, ct);
+        if (role == null)
             return null;
 
         return MapToModel(checklist);
@@ -78,10 +83,7 @@ public class MeetingPrepService : IMeetingPrepService
 
     public async Task<ServiceResult<int>> GenerateFromGoalsAsync(int childId, int userId, CancellationToken ct = default)
     {
-        var child = await _context.ChildProfiles
-            .FirstOrDefaultAsync(c => c.Id == childId && c.UserId == userId && c.IsActive, ct);
-
-        if (child == null)
+        if (!await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, ct))
             return ServiceResult<int>.FailureResult("Child profile not found");
 
         var checklist = new MeetingPrepChecklist
@@ -102,8 +104,10 @@ public class MeetingPrepService : IMeetingPrepService
     public async Task<ServiceResult<int>> GenerateFromIepAsync(int iepDocumentId, int userId, CancellationToken ct = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(iepDocumentId, ct);
+        if (document == null)
+            return ServiceResult<int>.FailureResult("IEP document not found");
 
-        if (document == null || document.ChildProfile.UserId != userId)
+        if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, ct))
             return ServiceResult<int>.FailureResult("IEP document not found");
 
         if (document.Status != "parsed")
@@ -214,7 +218,10 @@ public class MeetingPrepService : IMeetingPrepService
             .Include(m => m.ChildProfile)
             .FirstOrDefaultAsync(m => m.Id == id && m.IsActive, ct);
 
-        if (checklist == null || checklist.ChildProfile.UserId != userId)
+        if (checklist == null)
+            return ServiceResult.FailureResult("Checklist not found");
+
+        if (!await _accessService.HasMinimumRoleAsync(checklist.ChildProfileId, userId, AccessRole.Collaborator, ct))
             return ServiceResult.FailureResult("Checklist not found");
 
         // Single mapping: section name → (getter, setter) to avoid duplicate switch
@@ -252,7 +259,10 @@ public class MeetingPrepService : IMeetingPrepService
             .Include(m => m.ChildProfile)
             .FirstOrDefaultAsync(m => m.Id == id && m.IsActive, ct);
 
-        if (checklist == null || checklist.ChildProfile.UserId != userId)
+        if (checklist == null)
+            return ServiceResult.FailureResult("Checklist not found");
+
+        if (!await _accessService.HasMinimumRoleAsync(checklist.ChildProfileId, userId, AccessRole.Owner, ct))
             return ServiceResult.FailureResult("Checklist not found");
 
         checklist.IsActive = false;

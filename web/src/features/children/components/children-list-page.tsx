@@ -3,6 +3,7 @@ import { Users } from 'lucide-react';
 import { useChildren } from '../hooks/use-children';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { SharedBadge } from '@/features/sharing/components/shared-badge';
 
 export function ChildrenListPage() {
   const { children, isLoading } = useChildren();
@@ -44,6 +45,11 @@ export function ChildrenListPage() {
                 <h3 className="font-serif text-brand-slate-800">
                   {child.firstName} {child.lastName}
                 </h3>
+                {child.role !== 'owner' && (
+                  <div className="mt-1">
+                    <SharedBadge role={child.role} />
+                  </div>
+                )}
                 <div className="mt-2 flex flex-wrap gap-3 text-xs text-brand-slate-400">
                   {child.gradeLevel && <span>Grade: {child.gradeLevel}</span>}
                   {child.disabilityCategory && <span>{child.disabilityCategory}</span>}

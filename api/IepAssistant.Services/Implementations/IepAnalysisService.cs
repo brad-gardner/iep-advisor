@@ -17,6 +17,7 @@ public class IepAnalysisService : IIepAnalysisService
 {
     private readonly IIepDocumentRepository _documentRepository;
     private readonly IParentAdvocacyGoalRepository _goalRepository;
+    private readonly IAccessService _accessService;
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _configuration;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -35,6 +36,7 @@ public class IepAnalysisService : IIepAnalysisService
     public IepAnalysisService(
         IIepDocumentRepository documentRepository,
         IParentAdvocacyGoalRepository goalRepository,
+        IAccessService accessService,
         ApplicationDbContext context,
         IConfiguration configuration,
         IHttpClientFactory httpClientFactory,
@@ -42,6 +44,7 @@ public class IepAnalysisService : IIepAnalysisService
     {
         _documentRepository = documentRepository;
         _goalRepository = goalRepository;
+        _accessService = accessService;
         _context = context;
         _configuration = configuration;
         _httpClientFactory = httpClientFactory;
@@ -51,7 +54,11 @@ public class IepAnalysisService : IIepAnalysisService
     public async Task<IepAnalysisModel?> GetAnalysisAsync(int documentId, int userId, CancellationToken cancellationToken = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(documentId, cancellationToken);
-        if (document == null || document.ChildProfile.UserId != userId)
+        if (document == null)
+            return null;
+
+        var role = await _accessService.GetRoleAsync(document.ChildProfileId, userId, cancellationToken);
+        if (role == null)
             return null;
 
         var analysis = await _context.IepAnalyses

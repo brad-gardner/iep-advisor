@@ -4,6 +4,7 @@ using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.IepDocuments;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -16,6 +17,7 @@ public class IepDocumentsController : ControllerBase
     private readonly IIepDocumentService _iepDocumentService;
     private readonly IIepProcessingService _iepProcessingService;
     private readonly IIepAnalysisService _analysisService;
+    private readonly IAccessService _accessService;
     private readonly IepProcessingQueue _processingQueue;
     private readonly IepAnalysisQueue _analysisQueue;
 
@@ -23,12 +25,14 @@ public class IepDocumentsController : ControllerBase
         IIepDocumentService iepDocumentService,
         IIepProcessingService iepProcessingService,
         IIepAnalysisService analysisService,
+        IAccessService accessService,
         IepProcessingQueue processingQueue,
         IepAnalysisQueue analysisQueue)
     {
         _iepDocumentService = iepDocumentService;
         _iepProcessingService = iepProcessingService;
         _analysisService = analysisService;
+        _accessService = accessService;
         _processingQueue = processingQueue;
         _analysisQueue = analysisQueue;
     }
@@ -194,6 +198,9 @@ public class IepDocumentsController : ControllerBase
         if (document == null)
             return NotFound(ApiResponse<object>.Error("Document not found"));
 
+        if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
+            return StatusCode(403, ApiResponse<object>.Error("Insufficient permissions"));
+
         await _processingQueue.EnqueueAsync(id, cancellationToken);
         return Accepted(ApiResponse<object>.SuccessResponse(null, "Document queued for processing"));
     }
@@ -209,6 +216,9 @@ public class IepDocumentsController : ControllerBase
 
         if (document == null)
             return NotFound(ApiResponse<object>.Error("Document not found"));
+
+        if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
+            return StatusCode(403, ApiResponse<object>.Error("Insufficient permissions"));
 
         if (document.Status != "parsed")
             return BadRequest(ApiResponse<object>.Error("Document must be parsed before analysis"));

@@ -9,11 +9,13 @@ namespace IepAssistant.Services.Implementations;
 public class ChildProfileService : IChildProfileService
 {
     private readonly IChildProfileRepository _repository;
+    private readonly IAccessService _accessService;
     private readonly ApplicationDbContext _context;
 
-    public ChildProfileService(IChildProfileRepository repository, ApplicationDbContext context)
+    public ChildProfileService(IChildProfileRepository repository, IAccessService accessService, ApplicationDbContext context)
     {
         _repository = repository;
+        _accessService = accessService;
         _context = context;
     }
 
@@ -45,6 +47,18 @@ public class ChildProfileService : IChildProfileService
         };
 
         await _repository.AddAsync(entity, cancellationToken);
+
+        var access = new ChildAccess
+        {
+            ChildProfileId = entity.Id,
+            UserId = userId,
+            Role = AccessRole.Owner,
+            AcceptedAt = DateTime.UtcNow,
+            CreatedById = userId,
+            UpdatedById = userId
+        };
+        await _context.Set<ChildAccess>().AddAsync(access, cancellationToken);
+
         await _context.SaveChangesAsync(cancellationToken);
 
         return ServiceResult<ChildProfileModel>.SuccessResult(MapToModel(entity), "Child profile created successfully.");
@@ -52,6 +66,9 @@ public class ChildProfileService : IChildProfileService
 
     public async Task<ServiceResult> UpdateAsync(int id, int userId, UpdateChildProfileModel model, CancellationToken cancellationToken = default)
     {
+        if (!await _accessService.HasMinimumRoleAsync(id, userId, AccessRole.Owner, cancellationToken))
+            return ServiceResult.FailureResult("Child profile not found.");
+
         var entity = await _repository.GetByIdForUserAsync(id, userId, cancellationToken);
         if (entity == null)
             return ServiceResult.FailureResult("Child profile not found.");
@@ -83,6 +100,9 @@ public class ChildProfileService : IChildProfileService
 
     public async Task<ServiceResult> DeleteAsync(int id, int userId, CancellationToken cancellationToken = default)
     {
+        if (!await _accessService.HasMinimumRoleAsync(id, userId, AccessRole.Owner, cancellationToken))
+            return ServiceResult.FailureResult("Child profile not found.");
+
         var entity = await _repository.GetByIdForUserAsync(id, userId, cancellationToken);
         if (entity == null)
             return ServiceResult.FailureResult("Child profile not found.");

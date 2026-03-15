@@ -11,6 +11,7 @@ public class ChildProfileModel
     public string? SchoolDistrict { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string? Role { get; set; }
 }
 
 public class CreateChildProfileModel

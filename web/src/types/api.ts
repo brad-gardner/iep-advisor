@@ -77,8 +77,27 @@ export interface ChildProfile {
   gradeLevel: string | null;
   disabilityCategory: string | null;
   schoolDistrict: string | null;
+  role: 'owner' | 'viewer' | 'collaborator';
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ChildAccessEntry {
+  id: number;
+  childProfileId: number;
+  userId: number | null;
+  userEmail: string | null;
+  userName: string | null;
+  inviteEmail: string | null;
+  role: string;
+  acceptedAt: string | null;
+  isPending: boolean;
+  createdAt: string;
+}
+
+export interface CreateInviteRequest {
+  email: string;
+  role: string;
 }
 
 export interface CreateChildProfileRequest {

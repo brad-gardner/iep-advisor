@@ -11,6 +11,7 @@ public class IepDocumentService : IIepDocumentService
 {
     private readonly IIepDocumentRepository _documentRepository;
     private readonly IChildProfileRepository _childProfileRepository;
+    private readonly IAccessService _accessService;
     private readonly IBlobStorageService _blobStorage;
     private readonly ApplicationDbContext _context;
 
@@ -22,19 +23,21 @@ public class IepDocumentService : IIepDocumentService
     public IepDocumentService(
         IIepDocumentRepository documentRepository,
         IChildProfileRepository childProfileRepository,
+        IAccessService accessService,
         IBlobStorageService blobStorage,
         ApplicationDbContext context)
     {
         _documentRepository = documentRepository;
         _childProfileRepository = childProfileRepository;
+        _accessService = accessService;
         _blobStorage = blobStorage;
         _context = context;
     }
 
     public async Task<IEnumerable<IepDocumentModel>> GetByChildIdAsync(int childProfileId, int userId, CancellationToken cancellationToken = default)
     {
-        var child = await _childProfileRepository.GetByIdForUserAsync(childProfileId, userId, cancellationToken);
-        if (child == null)
+        var role = await _accessService.GetRoleAsync(childProfileId, userId, cancellationToken);
+        if (role == null)
             return [];
 
         var documents = await _documentRepository.GetByChildProfileIdAsync(childProfileId, cancellationToken);
@@ -44,7 +47,11 @@ public class IepDocumentService : IIepDocumentService
     public async Task<IepDocumentModel?> GetByIdAsync(int id, int userId, CancellationToken cancellationToken = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
-        if (document == null || document.ChildProfile.UserId != userId)
+        if (document == null)
+            return null;
+
+        var role = await _accessService.GetRoleAsync(document.ChildProfileId, userId, cancellationToken);
+        if (role == null)
             return null;
 
         return MapToModel(document);
@@ -52,8 +59,7 @@ public class IepDocumentService : IIepDocumentService
 
     public async Task<ServiceResult<IepDocumentModel>> CreateAsync(int childProfileId, int userId, CreateIepDocumentModel model, CancellationToken cancellationToken = default)
     {
-        var child = await _childProfileRepository.GetByIdForUserAsync(childProfileId, userId, cancellationToken);
-        if (child == null)
+        if (!await _accessService.HasMinimumRoleAsync(childProfileId, userId, AccessRole.Collaborator, cancellationToken))
             return ServiceResult<IepDocumentModel>.FailureResult("Child profile not found.");
 
         if (!ValidMeetingTypes.Contains(model.MeetingType))
@@ -80,7 +86,10 @@ public class IepDocumentService : IIepDocumentService
     public async Task<ServiceResult<IepDocumentModel>> AttachFileAsync(int id, int userId, string fileName, Stream fileStream, long fileSize, CancellationToken cancellationToken = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
-        if (document == null || document.ChildProfile.UserId != userId)
+        if (document == null)
+            return ServiceResult<IepDocumentModel>.FailureResult("Document not found.");
+
+        if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
             return ServiceResult<IepDocumentModel>.FailureResult("Document not found.");
 
         if (document.Status == "processing")
@@ -92,7 +101,7 @@ public class IepDocumentService : IIepDocumentService
             await _blobStorage.DeleteAsync(document.BlobUri, cancellationToken);
         }
 
-        var blobPath = $"users/{userId}/children/{document.ChildProfileId}/{Guid.NewGuid()}/{fileName}";
+        var blobPath = $"children/{document.ChildProfileId}/{Guid.NewGuid()}/{fileName}";
         await _blobStorage.UploadAsync(blobPath, fileStream, "application/pdf", cancellationToken);
 
         document.FileName = fileName;
@@ -111,7 +120,10 @@ public class IepDocumentService : IIepDocumentService
     public async Task<ServiceResult> UpdateMetadataAsync(int id, int userId, UpdateIepMetadataModel model, CancellationToken cancellationToken = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
-        if (document == null || document.ChildProfile.UserId != userId)
+        if (document == null)
+            return ServiceResult.FailureResult("Document not found.");
+
+        if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
             return ServiceResult.FailureResult("Document not found.");
 
         if (model.IepDate.HasValue)
@@ -139,11 +151,10 @@ public class IepDocumentService : IIepDocumentService
 
     public async Task<ServiceResult<IepDocumentModel>> UploadAsync(int childProfileId, int userId, string fileName, Stream fileStream, long fileSize, CancellationToken cancellationToken = default)
     {
-        var child = await _childProfileRepository.GetByIdForUserAsync(childProfileId, userId, cancellationToken);
-        if (child == null)
+        if (!await _accessService.HasMinimumRoleAsync(childProfileId, userId, AccessRole.Collaborator, cancellationToken))
             return ServiceResult<IepDocumentModel>.FailureResult("Child profile not found.");
 
-        var blobPath = $"users/{userId}/children/{childProfileId}/{Guid.NewGuid()}/{fileName}";
+        var blobPath = $"children/{childProfileId}/{Guid.NewGuid()}/{fileName}";
         await _blobStorage.UploadAsync(blobPath, fileStream, "application/pdf", cancellationToken);
 
         var entity = new IepDocument
@@ -166,7 +177,10 @@ public class IepDocumentService : IIepDocumentService
     public async Task<ServiceResult> DeleteAsync(int id, int userId, CancellationToken cancellationToken = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
-        if (document == null || document.ChildProfile.UserId != userId)
+        if (document == null)
+            return ServiceResult.FailureResult("Document not found.");
+
+        if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Owner, cancellationToken))
             return ServiceResult.FailureResult("Document not found.");
 
         if (!string.IsNullOrEmpty(document.BlobUri))
@@ -185,7 +199,11 @@ public class IepDocumentService : IIepDocumentService
     public async Task<string?> GetDownloadUrlAsync(int id, int userId, CancellationToken cancellationToken = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
-        if (document == null || document.ChildProfile.UserId != userId)
+        if (document == null)
+            return null;
+
+        var role = await _accessService.GetRoleAsync(document.ChildProfileId, userId, cancellationToken);
+        if (role == null)
             return null;
 
         if (string.IsNullOrEmpty(document.BlobUri))

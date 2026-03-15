@@ -17,6 +17,7 @@ import { IepViewerPage } from '@/features/iep-documents/components/iep-viewer-pa
 import { ComparisonPage } from '@/features/iep-comparison/components/comparison-page';
 import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
 import { Iep101Page } from '@/features/onboarding/components/iep-101-page';
+import { AcceptInvitePage } from '@/features/auth/components/accept-invite-page';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -192,6 +193,16 @@ export function AppRouter() {
           <ProtectedRoute>
             <MainLayout>
               <Iep101Page />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/accept-invite"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <AcceptInvitePage />
             </MainLayout>
           </ProtectedRoute>
         }

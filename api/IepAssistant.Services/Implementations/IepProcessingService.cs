@@ -17,6 +17,7 @@ public class IepProcessingService : IIepProcessingService
 {
     private readonly IIepDocumentRepository _documentRepository;
     private readonly IChildProfileRepository _childProfileRepository;
+    private readonly IAccessService _accessService;
     private readonly IBlobStorageService _blobStorage;
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _configuration;
@@ -25,6 +26,7 @@ public class IepProcessingService : IIepProcessingService
     public IepProcessingService(
         IIepDocumentRepository documentRepository,
         IChildProfileRepository childProfileRepository,
+        IAccessService accessService,
         IBlobStorageService blobStorage,
         ApplicationDbContext context,
         IConfiguration configuration,
@@ -32,6 +34,7 @@ public class IepProcessingService : IIepProcessingService
     {
         _documentRepository = documentRepository;
         _childProfileRepository = childProfileRepository;
+        _accessService = accessService;
         _blobStorage = blobStorage;
         _context = context;
         _configuration = configuration;
@@ -131,7 +134,11 @@ public class IepProcessingService : IIepProcessingService
     public async Task<IEnumerable<IepSectionModel>> GetSectionsAsync(int documentId, int userId, CancellationToken cancellationToken = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(documentId, cancellationToken);
-        if (document == null || document.ChildProfile.UserId != userId)
+        if (document == null)
+            return [];
+
+        var role = await _accessService.GetRoleAsync(document.ChildProfileId, userId, cancellationToken);
+        if (role == null)
             return [];
 
         var sections = await _context.IepSections

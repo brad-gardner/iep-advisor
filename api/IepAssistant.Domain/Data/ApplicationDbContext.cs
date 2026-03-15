@@ -20,6 +20,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<UserRecoveryCode> UserRecoveryCodes => Set<UserRecoveryCode>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<MeetingPrepChecklist> MeetingPrepChecklists => Set<MeetingPrepChecklist>();
+    public DbSet<ChildAccess> ChildAccesses => Set<ChildAccess>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

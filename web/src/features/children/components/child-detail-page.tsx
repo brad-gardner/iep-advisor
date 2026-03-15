@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Share2 } from 'lucide-react';
 import type { ChildProfile, CreateChildProfileRequest } from '@/types/api';
 import { getChild, updateChild, deleteChild } from '../api/children-api';
 import { ChildForm } from './child-form';
@@ -11,6 +12,9 @@ import { AdvocacyGoalsList } from '@/features/advocacy-goals/components/advocacy
 import { useMeetingPrep } from '@/features/meeting-prep/hooks/use-meeting-prep';
 import { MeetingPrepTab } from '@/features/meeting-prep/components/meeting-prep-tab';
 import { IepTimeline } from '@/features/iep-comparison/components/iep-timeline';
+import { ShareChildDialog } from '@/features/sharing/components/share-child-dialog';
+import { AccessList } from '@/features/sharing/components/access-list';
+import { SharedBadge } from '@/features/sharing/components/shared-badge';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +27,8 @@ export function ChildDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showCreateIep, setShowCreateIep] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [accessListKey, setAccessListKey] = useState(0);
   const { documents, isLoading: docsLoading, reload: reloadDocs } = useIepDocuments(Number(id));
   const { goals, isLoading: goalsLoading, reload: reloadGoals } = useAdvocacyGoals(Number(id));
   const {
@@ -125,21 +131,52 @@ export function ChildDetailPage() {
     );
   }
 
+  const isOwner = child.role === 'owner';
+  const isViewer = child.role === 'viewer';
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="font-serif">
-          {child.firstName} {child.lastName}
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className="font-serif">
+            {child.firstName} {child.lastName}
+          </h1>
+          {!isOwner && <SharedBadge role={child.role} />}
+        </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setIsEditing(true)}>
-            Edit
-          </Button>
-          <Button variant="danger" onClick={handleDelete} disabled={isDeleting}>
-            {isDeleting ? 'Removing...' : 'Remove'}
-          </Button>
+          {isOwner && (
+            <Button variant="secondary" onClick={() => setShowShareDialog(!showShareDialog)}>
+              <Share2 className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
+              Share
+            </Button>
+          )}
+          {isOwner && (
+            <Button variant="secondary" onClick={() => setIsEditing(true)}>
+              Edit
+            </Button>
+          )}
+          {isOwner && (
+            <Button variant="danger" onClick={handleDelete} disabled={isDeleting}>
+              {isDeleting ? 'Removing...' : 'Remove'}
+            </Button>
+          )}
         </div>
       </div>
+
+      {showShareDialog && (
+        <ShareChildDialog
+          childId={Number(id)}
+          onInvited={() => setAccessListKey((k) => k + 1)}
+          onCancel={() => setShowShareDialog(false)}
+        />
+      )}
+
+      {isOwner && (
+        <Card>
+          <h2 className="font-serif mb-4">Who Has Access</h2>
+          <AccessList key={accessListKey} childId={Number(id)} isOwner={isOwner} />
+        </Card>
+      )}
 
       <Card>
         <h2 className="font-serif mb-4">Profile</h2>
@@ -181,6 +218,7 @@ export function ChildDetailPage() {
           goals={goals}
           isLoading={goalsLoading}
           onReload={reloadGoals}
+          readOnly={isViewer}
         />
       </Card>
 
@@ -224,13 +262,13 @@ export function ChildDetailPage() {
       <Card>
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-serif">IEP Documents</h2>
-          {!showCreateIep && (
+          {!isViewer && !showCreateIep && (
             <Button variant="secondary" onClick={() => setShowCreateIep(true)}>
               New IEP
             </Button>
           )}
         </div>
-        {showCreateIep && (
+        {!isViewer && showCreateIep && (
           <div className="mb-4">
             <CreateIepForm
               childId={Number(id)}
