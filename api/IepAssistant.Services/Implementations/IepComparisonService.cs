@@ -12,22 +12,24 @@ public class IepComparisonService : IIepComparisonService
 {
     private readonly ApplicationDbContext _context;
     private readonly IChildProfileRepository _childRepository;
+    private readonly IAccessService _accessService;
 
     private static readonly JsonSerializerOptions CaseInsensitiveOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public IepComparisonService(ApplicationDbContext context, IChildProfileRepository childRepository)
+    public IepComparisonService(ApplicationDbContext context, IChildProfileRepository childRepository, IAccessService accessService)
     {
         _context = context;
         _childRepository = childRepository;
+        _accessService = accessService;
     }
 
     public async Task<TimelineResult?> GetTimelineAsync(int childId, int userId, CancellationToken ct = default)
     {
-        var child = await _childRepository.GetByIdForUserAsync(childId, userId, ct);
-        if (child == null)
+        var role = await _accessService.GetRoleAsync(childId, userId, ct);
+        if (role == null)
             return null;
 
         var documents = await _context.IepDocuments
@@ -114,12 +116,12 @@ public class IepComparisonService : IIepComparisonService
         if (iep1 == null || iep2 == null)
             return null;
 
-        // Both must belong to the same child and the user must own that child
+        // Both must belong to the same child and the user must have access
         if (iep1.ChildProfileId != iep2.ChildProfileId)
             return null;
 
-        var child = await _childRepository.GetByIdForUserAsync(iep1.ChildProfileId, userId, ct);
-        if (child == null)
+        var role = await _accessService.GetRoleAsync(iep1.ChildProfileId, userId, ct);
+        if (role == null)
             return null;
 
         // Determine older vs newer

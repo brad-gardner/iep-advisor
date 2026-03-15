@@ -10,6 +10,7 @@ public class ParentAdvocacyGoalService : IParentAdvocacyGoalService
 {
     private readonly IParentAdvocacyGoalRepository _repository;
     private readonly IChildProfileRepository _childRepository;
+    private readonly IAccessService _accessService;
     private readonly ApplicationDbContext _context;
 
     private static readonly HashSet<string> ValidCategories = new(StringComparer.OrdinalIgnoreCase)
@@ -20,17 +21,19 @@ public class ParentAdvocacyGoalService : IParentAdvocacyGoalService
     public ParentAdvocacyGoalService(
         IParentAdvocacyGoalRepository repository,
         IChildProfileRepository childRepository,
+        IAccessService accessService,
         ApplicationDbContext context)
     {
         _repository = repository;
         _childRepository = childRepository;
+        _accessService = accessService;
         _context = context;
     }
 
     public async Task<IEnumerable<ParentAdvocacyGoalModel>> GetByChildIdAsync(int childId, int userId, CancellationToken cancellationToken = default)
     {
-        var child = await _childRepository.GetByIdForUserAsync(childId, userId, cancellationToken);
-        if (child == null) return [];
+        var role = await _accessService.GetRoleAsync(childId, userId, cancellationToken);
+        if (role == null) return [];
 
         var goals = await _repository.GetByChildIdAsync(childId, cancellationToken);
         return goals.Select(MapToModel);
@@ -38,8 +41,7 @@ public class ParentAdvocacyGoalService : IParentAdvocacyGoalService
 
     public async Task<ServiceResult<ParentAdvocacyGoalModel>> CreateAsync(int childId, int userId, CreateAdvocacyGoalModel model, CancellationToken cancellationToken = default)
     {
-        var child = await _childRepository.GetByIdForUserAsync(childId, userId, cancellationToken);
-        if (child == null)
+        if (!await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, cancellationToken))
             return ServiceResult<ParentAdvocacyGoalModel>.FailureResult("Child profile not found.");
 
         if (model.Category != null && !ValidCategories.Contains(model.Category))
@@ -70,7 +72,10 @@ public class ParentAdvocacyGoalService : IParentAdvocacyGoalService
     public async Task<ServiceResult> UpdateAsync(int id, int userId, UpdateAdvocacyGoalModel model, CancellationToken cancellationToken = default)
     {
         var entity = await _repository.GetByIdWithChildAsync(id, cancellationToken);
-        if (entity == null || entity.ChildProfile.UserId != userId)
+        if (entity == null)
+            return ServiceResult.FailureResult("Advocacy goal not found.");
+
+        if (!await _accessService.HasMinimumRoleAsync(entity.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
             return ServiceResult.FailureResult("Advocacy goal not found.");
 
         if (model.GoalText != null)
@@ -93,7 +98,10 @@ public class ParentAdvocacyGoalService : IParentAdvocacyGoalService
     public async Task<ServiceResult> DeleteAsync(int id, int userId, CancellationToken cancellationToken = default)
     {
         var entity = await _repository.GetByIdWithChildAsync(id, cancellationToken);
-        if (entity == null || entity.ChildProfile.UserId != userId)
+        if (entity == null)
+            return ServiceResult.FailureResult("Advocacy goal not found.");
+
+        if (!await _accessService.HasMinimumRoleAsync(entity.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
             return ServiceResult.FailureResult("Advocacy goal not found.");
 
         entity.IsActive = false;
@@ -106,8 +114,7 @@ public class ParentAdvocacyGoalService : IParentAdvocacyGoalService
 
     public async Task<ServiceResult> ReorderAsync(int childId, int userId, List<ReorderAdvocacyGoalItem> items, CancellationToken cancellationToken = default)
     {
-        var child = await _childRepository.GetByIdForUserAsync(childId, userId, cancellationToken);
-        if (child == null)
+        if (!await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, cancellationToken))
             return ServiceResult.FailureResult("Child profile not found.");
 
         var goals = (await _repository.GetByChildIdAsync(childId, cancellationToken)).ToList();

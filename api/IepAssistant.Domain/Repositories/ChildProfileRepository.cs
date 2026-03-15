@@ -16,8 +16,14 @@ public class ChildProfileRepository : Repository<ChildProfile>, IChildProfileRep
     public ChildProfileRepository(ApplicationDbContext context) : base(context) { }
 
     public async Task<IEnumerable<ChildProfile>> GetByUserIdAsync(int userId, CancellationToken cancellationToken = default)
-        => await _dbSet.Where(c => c.UserId == userId && c.IsActive).OrderBy(c => c.FirstName).ToListAsync(cancellationToken);
+        => await _context.ChildProfiles
+            .Where(c => c.IsActive && _context.Set<ChildAccess>()
+                .Any(ca => ca.ChildProfileId == c.Id && ca.UserId == userId && ca.IsActive && ca.AcceptedAt != null))
+            .OrderBy(c => c.FirstName)
+            .ToListAsync(cancellationToken);
 
     public async Task<ChildProfile?> GetByIdForUserAsync(int id, int userId, CancellationToken cancellationToken = default)
-        => await _dbSet.FirstOrDefaultAsync(c => c.Id == id && c.UserId == userId && c.IsActive, cancellationToken);
+        => await _context.ChildProfiles
+            .FirstOrDefaultAsync(c => c.Id == id && c.IsActive && _context.Set<ChildAccess>()
+                .Any(ca => ca.ChildProfileId == c.Id && ca.UserId == userId && ca.IsActive && ca.AcceptedAt != null), cancellationToken);
 }
