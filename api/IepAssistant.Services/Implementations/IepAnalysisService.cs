@@ -18,6 +18,7 @@ public class IepAnalysisService : IIepAnalysisService
     private readonly IIepDocumentRepository _documentRepository;
     private readonly IParentAdvocacyGoalRepository _goalRepository;
     private readonly IAccessService _accessService;
+    private readonly ISubscriptionService _subscriptionService;
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _configuration;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -37,6 +38,7 @@ public class IepAnalysisService : IIepAnalysisService
         IIepDocumentRepository documentRepository,
         IParentAdvocacyGoalRepository goalRepository,
         IAccessService accessService,
+        ISubscriptionService subscriptionService,
         ApplicationDbContext context,
         IConfiguration configuration,
         IHttpClientFactory httpClientFactory,
@@ -45,6 +47,7 @@ public class IepAnalysisService : IIepAnalysisService
         _documentRepository = documentRepository;
         _goalRepository = goalRepository;
         _accessService = accessService;
+        _subscriptionService = subscriptionService;
         _context = context;
         _configuration = configuration;
         _httpClientFactory = httpClientFactory;
@@ -78,6 +81,59 @@ public class IepAnalysisService : IIepAnalysisService
         if (document == null)
         {
             _logger.LogWarning("Document {DocumentId} not found for analysis", documentId);
+            return;
+        }
+
+        // Subscription check — use the document creator as the billable user
+        var userId = document.CreatedById ?? document.ChildProfileId;
+        // Resolve the actual owner from ChildProfile if CreatedById is null
+        if (document.CreatedById == null)
+        {
+            var child = await _context.ChildProfiles.FindAsync([document.ChildProfileId], cancellationToken);
+            userId = child?.UserId ?? 0;
+        }
+        else
+        {
+            userId = document.CreatedById.Value;
+        }
+
+        if (!await _subscriptionService.HasActiveSubscriptionAsync(userId, cancellationToken))
+        {
+            _logger.LogWarning("User {UserId} does not have active subscription for analysis of document {DocumentId}", userId, documentId);
+            var errorAnalysis = await _context.IepAnalyses
+                .Where(a => a.IepDocumentId == documentId)
+                .OrderByDescending(a => a.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (errorAnalysis == null)
+            {
+                errorAnalysis = new IepAnalysis { IepDocumentId = documentId };
+                await _context.IepAnalyses.AddAsync(errorAnalysis, cancellationToken);
+            }
+
+            errorAnalysis.Status = "error";
+            errorAnalysis.ErrorMessage = "Active subscription required";
+            await _context.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        if (!await _subscriptionService.CanPerformAnalysisAsync(userId, document.ChildProfileId, cancellationToken))
+        {
+            _logger.LogWarning("Analysis limit reached for user {UserId}, child {ChildId}", userId, document.ChildProfileId);
+            var errorAnalysis = await _context.IepAnalyses
+                .Where(a => a.IepDocumentId == documentId)
+                .OrderByDescending(a => a.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (errorAnalysis == null)
+            {
+                errorAnalysis = new IepAnalysis { IepDocumentId = documentId };
+                await _context.IepAnalyses.AddAsync(errorAnalysis, cancellationToken);
+            }
+
+            errorAnalysis.Status = "error";
+            errorAnalysis.ErrorMessage = "Analysis limit reached for this child";
+            await _context.SaveChangesAsync(cancellationToken);
             return;
         }
 
@@ -156,6 +212,9 @@ public class IepAnalysisService : IIepAnalysisService
 
             analysis.Status = "completed";
             await _context.SaveChangesAsync(cancellationToken);
+
+            // Record usage after successful analysis
+            await _subscriptionService.RecordUsageAsync(userId, document.ChildProfileId, "analysis", cancellationToken);
 
             _logger.LogInformation("Analysis completed for document {DocumentId}", documentId);
         }

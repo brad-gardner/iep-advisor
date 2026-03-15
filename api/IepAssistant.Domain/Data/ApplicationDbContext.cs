@@ -21,6 +21,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<MeetingPrepChecklist> MeetingPrepChecklists => Set<MeetingPrepChecklist>();
     public DbSet<ChildAccess> ChildAccesses => Set<ChildAccess>();
+    public DbSet<UsageRecord> UsageRecords => Set<UsageRecord>();
+    public DbSet<BetaInviteCode> BetaInviteCodes => Set<BetaInviteCode>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

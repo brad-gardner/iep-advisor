@@ -18,6 +18,7 @@ public class IepDocumentsController : ControllerBase
     private readonly IIepProcessingService _iepProcessingService;
     private readonly IIepAnalysisService _analysisService;
     private readonly IAccessService _accessService;
+    private readonly ISubscriptionService _subscriptionService;
     private readonly IepProcessingQueue _processingQueue;
     private readonly IepAnalysisQueue _analysisQueue;
 
@@ -26,6 +27,7 @@ public class IepDocumentsController : ControllerBase
         IIepProcessingService iepProcessingService,
         IIepAnalysisService analysisService,
         IAccessService accessService,
+        ISubscriptionService subscriptionService,
         IepProcessingQueue processingQueue,
         IepAnalysisQueue analysisQueue)
     {
@@ -33,6 +35,7 @@ public class IepDocumentsController : ControllerBase
         _iepProcessingService = iepProcessingService;
         _analysisService = analysisService;
         _accessService = accessService;
+        _subscriptionService = subscriptionService;
         _processingQueue = processingQueue;
         _analysisQueue = analysisQueue;
     }
@@ -109,6 +112,10 @@ public class IepDocumentsController : ControllerBase
 
         var sanitizedFileName = Path.GetFileName(file.FileName);
         var userId = User.GetUserId();
+
+        // Check subscription before processing
+        if (!await _subscriptionService.HasActiveSubscriptionAsync(userId, cancellationToken))
+            return StatusCode(402, ApiResponse<object>.Error("Active subscription required to upload and process IEP documents"));
 
         var result = await _iepDocumentService.AttachFileAsync(id, userId, sanitizedFileName, stream, file.Length, cancellationToken);
 
@@ -222,6 +229,14 @@ public class IepDocumentsController : ControllerBase
 
         if (document.Status != "parsed")
             return BadRequest(ApiResponse<object>.Error("Document must be parsed before analysis"));
+
+        // Check subscription
+        if (!await _subscriptionService.HasActiveSubscriptionAsync(userId, cancellationToken))
+            return StatusCode(402, ApiResponse<object>.Error("Active subscription required to analyze IEP documents"));
+
+        // Check per-child analysis limit
+        if (!await _subscriptionService.CanPerformAnalysisAsync(userId, document.ChildProfileId, cancellationToken))
+            return StatusCode(429, ApiResponse<object>.Error("Analysis limit reached for this child. You have used all 5 analyses for this subscription year."));
 
         await _analysisQueue.EnqueueAsync(id, cancellationToken);
         return Accepted(ApiResponse<object>.SuccessResponse(null, "Analysis queued"));

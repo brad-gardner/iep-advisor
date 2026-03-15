@@ -18,6 +18,10 @@ public class User : BaseEntity, IAuditableEntity
     public DateTime? LockedUntil { get; set; }
     public int SecurityStamp { get; set; } = 0;
     public DateTime? OnboardingCompletedAt { get; set; }
+    public string? StripeCustomerId { get; set; }
+    public string? StripeSubscriptionId { get; set; }
+    public string SubscriptionStatus { get; set; } = "none"; // none, active, past_due, canceled, expired
+    public DateTime? SubscriptionExpiresAt { get; set; }
     public DateTime? DeletionRequestedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
