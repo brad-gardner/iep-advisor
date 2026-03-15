@@ -23,6 +23,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ChildAccess> ChildAccesses => Set<ChildAccess>();
     public DbSet<UsageRecord> UsageRecords => Set<UsageRecord>();
     public DbSet<BetaInviteCode> BetaInviteCodes => Set<BetaInviteCode>();
+    public DbSet<KnowledgeBaseEntry> KnowledgeBaseEntries => Set<KnowledgeBaseEntry>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
