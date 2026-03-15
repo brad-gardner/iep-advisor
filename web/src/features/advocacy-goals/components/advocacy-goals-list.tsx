@@ -16,6 +16,7 @@ interface AdvocacyGoalsListProps {
   goals: AdvocacyGoal[];
   isLoading: boolean;
   onReload: () => void;
+  readOnly?: boolean;
 }
 
 export function AdvocacyGoalsList({
@@ -24,6 +25,7 @@ export function AdvocacyGoalsList({
   goals,
   isLoading,
   onReload,
+  readOnly = false,
 }: AdvocacyGoalsListProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -100,6 +102,13 @@ export function AdvocacyGoalsList({
   }
 
   if (goals.length === 0 && !isAdding) {
+    if (readOnly) {
+      return (
+        <p className="text-sm text-brand-slate-400 py-4 text-center">
+          No advocacy goals have been set yet.
+        </p>
+      );
+    }
     return <AdvocacyGoalsEmptyState childName={childName} onAdd={() => setIsAdding(true)} />;
   }
 
@@ -110,7 +119,7 @@ export function AdvocacyGoalsList({
           {goals.length}/10 goals
           {goals.length >= 10 && ' — Focused goals produce better analysis. Consider consolidating.'}
         </p>
-        {!isAdding && goals.length < 10 && (
+        {!readOnly && !isAdding && goals.length < 10 && (
           <button
             onClick={() => setIsAdding(true)}
             className="text-sm text-brand-teal-500 hover:text-brand-teal-600 transition-colors"
@@ -120,7 +129,7 @@ export function AdvocacyGoalsList({
         )}
       </div>
 
-      {isAdding && (
+      {!readOnly && isAdding && (
         <div className="bg-white rounded-card p-4 border-[0.5px] border-brand-teal-200">
           <AdvocacyGoalForm
             onSubmit={handleCreate}
@@ -131,7 +140,7 @@ export function AdvocacyGoalsList({
       )}
 
       {goals.map((goal, index) =>
-        editingId === goal.id ? (
+        !readOnly && editingId === goal.id ? (
           <div key={goal.id} className="bg-white rounded-card p-4 border-[0.5px] border-brand-teal-200">
             <AdvocacyGoalForm
               initialValues={{ goalText: goal.goalText, category: goal.category || '' }}
@@ -146,10 +155,10 @@ export function AdvocacyGoalsList({
             goal={goal}
             isFirst={index === 0}
             isLast={index === goals.length - 1}
-            onMoveUp={() => handleReorder(goal.id, 'up')}
-            onMoveDown={() => handleReorder(goal.id, 'down')}
-            onEdit={() => setEditingId(goal.id)}
-            onDelete={() => handleDelete(goal.id)}
+            onMoveUp={readOnly ? undefined : () => handleReorder(goal.id, 'up')}
+            onMoveDown={readOnly ? undefined : () => handleReorder(goal.id, 'down')}
+            onEdit={readOnly ? undefined : () => setEditingId(goal.id)}
+            onDelete={readOnly ? undefined : () => handleDelete(goal.id)}
           />
         )
       )}
