@@ -31,6 +31,7 @@ public class IepComparisonService : IIepComparisonService
             return null;
 
         var documents = await _context.IepDocuments
+            .AsNoTracking()
             .Where(d => d.ChildProfileId == childId && d.IsActive)
             .OrderByDescending(d => d.IepDate)
             .ThenByDescending(d => d.CreatedAt)
@@ -51,6 +52,7 @@ public class IepComparisonService : IIepComparisonService
             .ToListAsync(ct);
 
         var analyses = await _context.IepAnalyses
+            .AsNoTracking()
             .Where(a => documentIds.Contains(a.IepDocumentId) && a.Status == "completed")
             .ToListAsync(ct);
 
@@ -102,11 +104,11 @@ public class IepComparisonService : IIepComparisonService
     public async Task<ComparisonResult?> CompareAsync(int iepId, int otherIepId, int userId, CancellationToken ct = default)
     {
         var iep1 = await _context.IepDocuments
-            .Include(d => d.ChildProfile)
+            .AsNoTracking()
             .FirstOrDefaultAsync(d => d.Id == iepId && d.IsActive, ct);
 
         var iep2 = await _context.IepDocuments
-            .Include(d => d.ChildProfile)
+            .AsNoTracking()
             .FirstOrDefaultAsync(d => d.Id == otherIepId && d.IsActive, ct);
 
         if (iep1 == null || iep2 == null)
@@ -127,11 +129,13 @@ public class IepComparisonService : IIepComparisonService
 
         // Load sections + goals for both
         var olderSections = await _context.IepSections
+            .AsNoTracking()
             .Include(s => s.Goals)
             .Where(s => s.IepDocumentId == older.Id)
             .ToListAsync(ct);
 
         var newerSections = await _context.IepSections
+            .AsNoTracking()
             .Include(s => s.Goals)
             .Where(s => s.IepDocumentId == newer.Id)
             .ToListAsync(ct);
@@ -291,11 +295,13 @@ public class IepComparisonService : IIepComparisonService
     private async Task<RedFlagResolution> CompareRedFlagsAsync(int olderIepId, int newerIepId, CancellationToken ct)
     {
         var olderAnalysis = await _context.IepAnalyses
+            .AsNoTracking()
             .Where(a => a.IepDocumentId == olderIepId && a.Status == "completed")
             .OrderByDescending(a => a.CreatedAt)
             .FirstOrDefaultAsync(ct);
 
         var newerAnalysis = await _context.IepAnalyses
+            .AsNoTracking()
             .Where(a => a.IepDocumentId == newerIepId && a.Status == "completed")
             .OrderByDescending(a => a.CreatedAt)
             .FirstOrDefaultAsync(ct);
