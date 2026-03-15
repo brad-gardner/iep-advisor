@@ -14,6 +14,7 @@ export function RegisterPage() {
     confirmPassword: '',
     firstName: '',
     lastName: '',
+    inviteCode: '',
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -43,6 +44,7 @@ export function RegisterPage() {
       password: formData.password,
       firstName: formData.firstName,
       lastName: formData.lastName,
+      inviteCode: formData.inviteCode,
     });
 
     if (result.success) {
@@ -61,6 +63,15 @@ export function RegisterPage() {
       {error && <div className="mb-4"><Notice variant="error" title={error} /></div>}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label="Invite Code"
+          name="inviteCode"
+          value={formData.inviteCode}
+          onChange={handleChange}
+          required
+          placeholder="Enter your invite code"
+        />
+
         <div className="grid grid-cols-2 gap-4">
           <Input
             label="First Name"

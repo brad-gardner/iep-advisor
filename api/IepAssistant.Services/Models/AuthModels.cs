@@ -26,6 +26,7 @@ public class RegisterModel
     public string Password { get; set; } = string.Empty;
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
+    public string InviteCode { get; set; } = string.Empty;
 }
 
 public class UpdateUserModel
