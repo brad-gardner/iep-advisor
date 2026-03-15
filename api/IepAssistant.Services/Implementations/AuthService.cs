@@ -142,6 +142,19 @@ public class AuthService : IAuthService
         throw new NotImplementedException("Refresh token functionality not yet implemented.");
     }
 
+    public async Task<ServiceResult> CompleteOnboardingAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
+        if (user == null)
+            return ServiceResult.FailureResult("User not found.");
+
+        user.OnboardingCompletedAt = DateTime.UtcNow;
+        _userRepository.Update(user);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return ServiceResult.SuccessResult("Onboarding completed.");
+    }
+
     public int? ValidateMfaPendingToken(string token)
     {
         var key = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
@@ -260,6 +273,7 @@ public class AuthService : IAuthService
         FirstName = user.FirstName,
         LastName = user.LastName,
         State = user.State,
-        Role = user.Role
+        Role = user.Role,
+        OnboardingCompleted = user.OnboardingCompletedAt.HasValue
     };
 }
