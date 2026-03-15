@@ -1,12 +1,17 @@
 import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Notice } from '@/components/ui/notice';
+import { SubscribeButton } from '@/features/subscription/components/subscribe-button';
 
 interface AnalysisEmptyStateProps {
   onTrigger: () => void;
   isTriggering: boolean;
+  subscriptionStatus?: string;
 }
 
-export function AnalysisEmptyState({ onTrigger, isTriggering }: AnalysisEmptyStateProps) {
+export function AnalysisEmptyState({ onTrigger, isTriggering, subscriptionStatus }: AnalysisEmptyStateProps) {
+  const hasSubscription = subscriptionStatus === 'active';
+
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
       <div className="w-12 h-12 rounded-full bg-brand-teal-50 flex items-center justify-center mb-4">
@@ -20,9 +25,16 @@ export function AnalysisEmptyState({ onTrigger, isTriggering }: AnalysisEmptySta
         explanations, goal evaluations, potential concerns, and suggested questions
         for your next IEP meeting.
       </p>
-      <Button onClick={onTrigger} disabled={isTriggering}>
-        {isTriggering ? 'Starting Analysis...' : 'Analyze IEP'}
-      </Button>
+      {!hasSubscription && subscriptionStatus !== undefined ? (
+        <div className="space-y-4 flex flex-col items-center">
+          <Notice variant="warning" title="Subscribe to analyze this IEP" />
+          <SubscribeButton />
+        </div>
+      ) : (
+        <Button onClick={onTrigger} disabled={isTriggering}>
+          {isTriggering ? 'Starting Analysis...' : 'Analyze IEP'}
+        </Button>
+      )}
     </div>
   );
 }
