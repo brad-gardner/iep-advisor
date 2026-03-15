@@ -82,3 +82,9 @@ export async function cancelDeletion(): Promise<ApiResponse<null>> {
   const response = await apiClient.post<ApiResponse<null>>('/api/auth/cancel-deletion');
   return response.data;
 }
+
+// Onboarding
+export async function completeOnboarding(): Promise<ApiResponse<null>> {
+  const response = await apiClient.post<ApiResponse<null>>('/api/auth/complete-onboarding');
+  return response.data;
+}

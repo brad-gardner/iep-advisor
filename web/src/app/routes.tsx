@@ -15,6 +15,8 @@ import { CreateChildPage } from '@/features/children/components/create-child-pag
 import { ChildDetailPage } from '@/features/children/components/child-detail-page';
 import { IepViewerPage } from '@/features/iep-documents/components/iep-viewer-page';
 import { ComparisonPage } from '@/features/iep-comparison/components/comparison-page';
+import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
+import { Iep101Page } from '@/features/onboarding/components/iep-101-page';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -97,6 +99,14 @@ export function AppRouter() {
       />
       <Route path="/mfa-verify" element={<MfaVerifyPage />} />
       <Route
+        path="/onboarding"
+        element={
+          <ProtectedRoute>
+            <OnboardingFlow />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/dashboard"
         element={
           <ProtectedRoute>
@@ -172,6 +182,16 @@ export function AppRouter() {
           <ProtectedRoute>
             <MainLayout>
               <MfaSetupPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/iep-101"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <Iep101Page />
             </MainLayout>
           </ProtectedRoute>
         }
