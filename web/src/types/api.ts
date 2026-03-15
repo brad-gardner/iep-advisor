@@ -400,6 +400,23 @@ export interface ComparisonResult {
   summary: ComparisonSummary;
 }
 
+// Knowledge Base types
+
+export interface KnowledgeBaseEntry {
+  id: number;
+  title: string;
+  content: string;
+  category: string;
+  legalReference: string | null;
+  state: string | null;
+  tags: string[];
+}
+
+export interface CategoryCount {
+  category: string;
+  count: number;
+}
+
 // Subscription types
 
 export interface SubscriptionStatus {

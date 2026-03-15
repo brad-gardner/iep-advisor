@@ -1,4 +1,5 @@
-import { BookOpen, FileText, Users, Shield, Calendar, Library } from 'lucide-react';
+import { BookOpen, FileText, Users, Shield, Calendar, Library, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 
 function SectionHeader({
@@ -52,6 +53,15 @@ export function Iep101Page() {
           </p>
         </div>
       </div>
+
+      {/* Knowledge Base link */}
+      <Link
+        to="/knowledge-base"
+        className="flex items-center gap-2 text-sm font-medium text-brand-teal-500 hover:text-brand-teal-600 transition-colors"
+      >
+        Explore our full Knowledge Base
+        <ArrowRight size={16} strokeWidth={1.8} />
+      </Link>
 
       {/* What is an IEP? */}
       <Card>
