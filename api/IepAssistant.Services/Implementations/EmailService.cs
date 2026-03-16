@@ -19,7 +19,7 @@ public class EmailService : IEmailService
         _logger = logger;
         _frontendUrl = _configuration["App:FrontendUrl"] ?? "http://localhost:5173";
         _connectionString = _configuration["Email:ConnectionString"];
-        _senderAddress = _configuration["Email:SenderAddress"] ?? "noreply@mail.iep-advisor.com";
+        _senderAddress = _configuration["Email:SenderAddress"] ?? "DoNotReply@mail.iep-advisor.com";
     }
 
     public async Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default)
