@@ -32,7 +32,7 @@ public class ChildrenController : ControllerBase
         foreach (var profile in profiles)
         {
             var role = await _accessService.GetRoleAsync(profile.Id, userId, cancellationToken);
-            dtos.Add(MapToDto(profile, role?.ToString()));
+            dtos.Add(MapToDto(profile, role?.ToString().ToLowerInvariant()));
         }
         return Ok(ApiResponse<IEnumerable<ChildProfileDto>>.SuccessResponse(dtos));
     }
@@ -49,7 +49,7 @@ public class ChildrenController : ControllerBase
             return NotFound(ApiResponse<object>.Error("Child profile not found"));
 
         var role = await _accessService.GetRoleAsync(id, userId, cancellationToken);
-        return Ok(ApiResponse<ChildProfileDto>.SuccessResponse(MapToDto(profile, role?.ToString())));
+        return Ok(ApiResponse<ChildProfileDto>.SuccessResponse(MapToDto(profile, role?.ToString().ToLowerInvariant())));
     }
 
     [HttpPost]
