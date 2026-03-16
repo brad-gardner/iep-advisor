@@ -20,7 +20,7 @@ export function LoginPage() {
     setError('');
     setIsLoading(true);
 
-    const result = await login({ email, password });
+    const result = await login({ email: email.trim(), password });
 
     if (result.success) {
       navigate('/dashboard');
@@ -48,6 +48,7 @@ export function LoginPage() {
           onChange={(e) => setEmail(e.target.value)}
           required
           placeholder="you@example.com"
+          maxLength={256}
         />
 
         <div>
@@ -58,6 +59,7 @@ export function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
             placeholder="********"
+            maxLength={128}
           />
           <div className="mt-1 text-right">
             <Link

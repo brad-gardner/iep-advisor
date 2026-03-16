@@ -132,8 +132,8 @@ export function ProfilePage() {
     setMessage(null);
 
     const result = await updateProfile({
-      firstName,
-      lastName,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
       state: state || undefined,
     });
 
@@ -171,12 +171,14 @@ export function ProfilePage() {
             label="First Name"
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
+            maxLength={100}
           />
 
           <Input
             label="Last Name"
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
+            maxLength={100}
           />
 
           <div>
@@ -189,7 +191,7 @@ export function ProfilePage() {
             </p>
           </div>
 
-          <Button type="submit" disabled={isSubmitting} className="w-full">
+          <Button type="submit" disabled={isSubmitting || !firstName.trim()} className="w-full">
             {isSubmitting ? 'Saving...' : 'Save Changes'}
           </Button>
         </form>

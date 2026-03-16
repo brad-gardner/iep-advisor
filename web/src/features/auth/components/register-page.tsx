@@ -42,11 +42,11 @@ export function RegisterPage() {
     setIsLoading(true);
 
     const result = await register({
-      email: formData.email,
+      email: formData.email.trim(),
       password: formData.password,
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      inviteCode: formData.inviteCode,
+      firstName: formData.firstName.trim(),
+      lastName: formData.lastName.trim(),
+      inviteCode: formData.inviteCode.trim(),
     });
 
     if (result.success) {
@@ -72,6 +72,7 @@ export function RegisterPage() {
           onChange={handleChange}
           required
           placeholder="Enter your invite code"
+          maxLength={20}
         />
 
         <div className="grid grid-cols-2 gap-4">
@@ -81,6 +82,7 @@ export function RegisterPage() {
             value={formData.firstName}
             onChange={handleChange}
             required
+            maxLength={100}
           />
           <Input
             label="Last Name"
@@ -88,6 +90,7 @@ export function RegisterPage() {
             value={formData.lastName}
             onChange={handleChange}
             required
+            maxLength={100}
           />
         </div>
 
@@ -98,6 +101,7 @@ export function RegisterPage() {
           value={formData.email}
           onChange={handleChange}
           required
+          maxLength={256}
         />
 
         <Input
@@ -107,6 +111,7 @@ export function RegisterPage() {
           value={formData.password}
           onChange={handleChange}
           required
+          maxLength={128}
         />
 
         <Input
@@ -116,6 +121,7 @@ export function RegisterPage() {
           value={formData.confirmPassword}
           onChange={handleChange}
           required
+          maxLength={128}
         />
 
         <Button type="submit" disabled={isLoading} className="w-full">

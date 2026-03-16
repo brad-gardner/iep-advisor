@@ -20,6 +20,11 @@ export function IepUpload({ iepId, onUploaded }: IepUploadProps) {
         return;
       }
 
+      if (file.size > 50 * 1024 * 1024) {
+        setError('File is too large. Maximum size is 50MB.');
+        return;
+      }
+
       setIsUploading(true);
       setError(null);
 

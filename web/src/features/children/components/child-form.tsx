@@ -29,12 +29,12 @@ export function ChildForm({ initialValues, onSubmit, submitLabel }: ChildFormPro
     setError(null);
 
     const result = await onSubmit({
-      firstName,
-      lastName: lastName || undefined,
+      firstName: firstName.trim(),
+      lastName: lastName.trim() || undefined,
       dateOfBirth: dateOfBirth || undefined,
-      gradeLevel: gradeLevel || undefined,
-      disabilityCategory: disabilityCategory || undefined,
-      schoolDistrict: schoolDistrict || undefined,
+      gradeLevel: gradeLevel.trim() || undefined,
+      disabilityCategory: disabilityCategory.trim() || undefined,
+      schoolDistrict: schoolDistrict.trim() || undefined,
     });
 
     if (!result.success) {
@@ -54,12 +54,14 @@ export function ChildForm({ initialValues, onSubmit, submitLabel }: ChildFormPro
           required
           value={firstName}
           onChange={(e) => setFirstName(e.target.value)}
+          maxLength={100}
         />
 
         <Input
           label="Last Name"
           value={lastName}
           onChange={(e) => setLastName(e.target.value)}
+          maxLength={100}
         />
 
         <Input
@@ -74,6 +76,7 @@ export function ChildForm({ initialValues, onSubmit, submitLabel }: ChildFormPro
           placeholder="e.g. 3rd, 7th, 10th"
           value={gradeLevel}
           onChange={(e) => setGradeLevel(e.target.value)}
+          maxLength={20}
         />
 
         <Input
@@ -81,12 +84,14 @@ export function ChildForm({ initialValues, onSubmit, submitLabel }: ChildFormPro
           placeholder="e.g. Autism, SLD, Speech/Language"
           value={disabilityCategory}
           onChange={(e) => setDisabilityCategory(e.target.value)}
+          maxLength={100}
         />
 
         <Input
           label="School District"
           value={schoolDistrict}
           onChange={(e) => setSchoolDistrict(e.target.value)}
+          maxLength={200}
         />
 
         <Button type="submit" disabled={isSubmitting} className="w-full">

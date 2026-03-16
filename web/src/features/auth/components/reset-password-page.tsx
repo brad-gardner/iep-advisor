@@ -83,6 +83,7 @@ export function ResetPasswordPage() {
           required
           placeholder="********"
           minLength={8}
+          maxLength={128}
         />
 
         <Input
@@ -93,6 +94,7 @@ export function ResetPasswordPage() {
           required
           placeholder="********"
           minLength={8}
+          maxLength={128}
         />
 
         <Button type="submit" disabled={isLoading} className="w-full">

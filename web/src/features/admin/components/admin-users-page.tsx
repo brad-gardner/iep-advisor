@@ -19,11 +19,15 @@ export function AdminUsersPage() {
   const navigate = useNavigate();
 
   const handleInvite = async () => {
-    if (!inviteEmail) return;
+    const trimmed = inviteEmail.trim();
+    if (!trimmed || !trimmed.includes('@')) {
+      setInviteResult({ success: false, message: 'Please enter a valid email address' });
+      return;
+    }
     setIsInviting(true);
     setInviteResult(null);
     try {
-      await inviteBetaUser(inviteEmail);
+      await inviteBetaUser(trimmed);
       setInviteResult({ success: true, message: `Invite sent to ${inviteEmail}` });
       setInviteEmail('');
       setShowInvite(false);

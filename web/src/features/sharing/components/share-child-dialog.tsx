@@ -66,6 +66,7 @@ export function ShareChildDialog({ childId, onInvited, onCancel }: ShareChildDia
           onChange={(e) => setEmail(e.target.value)}
           placeholder="parent@example.com"
           required
+          maxLength={256}
         />
 
         <Select

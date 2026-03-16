@@ -65,6 +65,7 @@ export function ForgotPasswordPage() {
           required
           placeholder="you@example.com"
           autoFocus
+          maxLength={256}
         />
 
         <Button type="submit" disabled={isLoading} className="w-full">

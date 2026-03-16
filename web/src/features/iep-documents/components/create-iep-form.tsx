@@ -36,8 +36,8 @@ export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormPro
       const response = await createIep(childId, {
         iepDate,
         meetingType,
-        attendees: attendees || undefined,
-        notes: notes || undefined,
+        attendees: attendees.trim() || undefined,
+        notes: notes.trim() || undefined,
       });
       if (response.success) {
         onCreated();
@@ -78,21 +78,29 @@ export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormPro
         </Select>
       </div>
 
-      <Textarea
-        label="Attendees"
-        placeholder="e.g. Teachers, therapists, parents present..."
-        value={attendees}
-        onChange={(e) => setAttendees(e.target.value)}
-        rows={2}
-      />
+      <div>
+        <Textarea
+          label="Attendees"
+          placeholder="e.g. Teachers, therapists, parents present..."
+          value={attendees}
+          onChange={(e) => setAttendees(e.target.value)}
+          rows={2}
+          maxLength={1000}
+        />
+        <p className="text-[11px] text-brand-slate-300 mt-1">{attendees.length}/1000 characters</p>
+      </div>
 
-      <Textarea
-        label="Notes"
-        placeholder="Any notes about this meeting..."
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        rows={3}
-      />
+      <div>
+        <Textarea
+          label="Notes"
+          placeholder="Any notes about this meeting..."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+          maxLength={2000}
+        />
+        <p className="text-[11px] text-brand-slate-300 mt-1">{notes.length}/2000 characters</p>
+      </div>
 
       <div className="flex gap-2">
         <Button type="submit" disabled={isSubmitting || !iepDate || !meetingType}>
