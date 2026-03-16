@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/use-auth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,14 +7,16 @@ import { Notice } from '@/components/ui/notice';
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { register } = useAuth();
+  const codeFromUrl = searchParams.get('code') ?? '';
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     confirmPassword: '',
     firstName: '',
     lastName: '',
-    inviteCode: '',
+    inviteCode: codeFromUrl,
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);

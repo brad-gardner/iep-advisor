@@ -29,3 +29,7 @@ export async function getRecentUsers(count: number = 10): Promise<AdminUser[]> {
   const res = await apiClient.get<ApiResponse<AdminUser[]>>(`/api/admin/recent-users?count=${count}`);
   return res.data.data ?? [];
 }
+
+export async function inviteBetaUser(email: string): Promise<void> {
+  await apiClient.post('/api/admin/invite-beta-user', { email });
+}

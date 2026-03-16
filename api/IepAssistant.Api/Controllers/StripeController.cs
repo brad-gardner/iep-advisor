@@ -122,4 +122,26 @@ public class StripeController : ControllerBase
         var codes = await _subscriptionService.ListBetaCodesAsync(ct);
         return Ok(ApiResponse<IEnumerable<BetaCodeModel>>.SuccessResponse(codes));
     }
+
+    [HttpPost("api/admin/invite-beta-user")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> InviteBetaUser([FromBody] InviteBetaUserRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        // Generate 1 beta code
+        var result = await _subscriptionService.GenerateBetaCodesAsync(1, null, ct);
+        if (!result.Success || result.Data == null || result.Data.Count == 0)
+            return BadRequest(ApiResponse<object>.Error("Failed to generate invite code"));
+
+        var code = result.Data[0];
+
+        // Send the invite email with the code baked into the signup link
+        var emailService = HttpContext.RequestServices.GetRequiredService<IEmailService>();
+        await emailService.SendBetaInviteEmailAsync(request.Email, code, ct);
+
+        return Ok(ApiResponse<object>.SuccessResponse(new { code }, $"Beta invite sent to {request.Email}"));
+    }
 }

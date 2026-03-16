@@ -94,6 +94,44 @@ public class EmailService : IEmailService
         await SendEmailAsync(toEmail, subject, html, plainText, ct);
     }
 
+    public async Task SendBetaInviteEmailAsync(string toEmail, string inviteCode, CancellationToken ct = default)
+    {
+        var signupUrl = $"{_frontendUrl}/register?code={Uri.EscapeDataString(inviteCode)}";
+
+        var subject = "You're invited to IEP Advisor";
+        var html = $@"
+            <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
+                <div style=""text-align: center; margin-bottom: 24px;"">
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
+                </div>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">You're Invited to the Beta</h1>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
+                    You've been invited to join the IEP Advisor beta — a platform that helps parents understand and advocate for their child's Individualized Education Program using AI-powered analysis.
+                </p>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
+                    Click below to create your account. Your invite code is already included.
+                </p>
+                <div style=""text-align: center; margin: 24px 0;"">
+                    <a href=""{signupUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                        Create Your Account
+                    </a>
+                </div>
+                <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
+                    Your invite code: <strong>{inviteCode}</strong><br />
+                    You can also enter this code manually at the sign-up page.
+                </p>
+                <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
+                <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
+                    IEP Advisor — Navigate with confidence
+                </p>
+            </div>";
+
+        var plainText = $"You're invited to join IEP Advisor beta!\n\nCreate your account: {signupUrl}\n\nOr enter invite code manually: {inviteCode}";
+
+        await SendEmailAsync(toEmail, subject, html, plainText, ct);
+    }
+
     private async Task SendEmailAsync(string toEmail, string subject, string htmlContent, string plainTextContent, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(_connectionString))
