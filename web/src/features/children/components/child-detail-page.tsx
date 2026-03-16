@@ -145,12 +145,6 @@ export function ChildDetailPage() {
         </div>
         <div className="flex gap-2">
           {isOwner && (
-            <Button variant="secondary" onClick={() => setShowShareDialog(!showShareDialog)}>
-              <Share2 className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
-              Share
-            </Button>
-          )}
-          {isOwner && (
             <Button variant="secondary" onClick={() => setIsEditing(true)}>
               Edit
             </Button>
@@ -162,21 +156,6 @@ export function ChildDetailPage() {
           )}
         </div>
       </div>
-
-      {showShareDialog && (
-        <ShareChildDialog
-          childId={Number(id)}
-          onInvited={() => setAccessListKey((k) => k + 1)}
-          onCancel={() => setShowShareDialog(false)}
-        />
-      )}
-
-      {isOwner && (
-        <Card>
-          <h2 className="font-serif mb-4">Who Has Access</h2>
-          <AccessList key={accessListKey} childId={Number(id)} isOwner={isOwner} />
-        </Card>
-      )}
 
       <Card>
         <h2 className="font-serif mb-4">Profile</h2>
@@ -209,6 +188,31 @@ export function ChildDetailPage() {
           )}
         </div>
       </Card>
+
+      {isOwner && (
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-serif">Sharing & Access</h2>
+            <Button onClick={() => setShowShareDialog(!showShareDialog)}>
+              <Share2 className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
+              Invite Someone
+            </Button>
+          </div>
+          <p className="text-sm text-brand-slate-400 mb-4">
+            Share {child.firstName}'s IEP information with a co-parent, advocate, or attorney. They'll get their own login and can view or collaborate depending on the role you assign.
+          </p>
+          {showShareDialog && (
+            <div className="mb-4">
+              <ShareChildDialog
+                childId={Number(id)}
+                onInvited={() => { setAccessListKey((k) => k + 1); setShowShareDialog(false); }}
+                onCancel={() => setShowShareDialog(false)}
+              />
+            </div>
+          )}
+          <AccessList key={accessListKey} childId={Number(id)} isOwner={isOwner} />
+        </Card>
+      )}
 
       <Card>
         <h2 className="font-serif mb-4">Your Advocacy Goals</h2>
