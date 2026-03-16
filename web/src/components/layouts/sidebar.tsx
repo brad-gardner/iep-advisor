@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, BookOpen, CreditCard, LogOut, Menu, X, Shield } from 'lucide-react';
+import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, CreditCard, LogOut, Menu, X, Shield } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/features/auth/hooks/use-auth';
@@ -10,6 +10,7 @@ const navItems = [
   { to: '/profile', label: 'Profile', Icon: UserCircle },
   { to: '/subscription', label: 'Subscription', Icon: CreditCard },
   { to: '/knowledge-base', label: 'Knowledge Base', Icon: BookOpen },
+  { to: '/iep-101', label: 'IEP 101', Icon: GraduationCap },
 ];
 
 interface SidebarProps {
