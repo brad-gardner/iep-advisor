@@ -90,7 +90,16 @@ public class ShareService : IShareService
         _context.ChildAccesses.Add(childAccess);
         await _context.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Invite created for {Email} on child {ChildId} with role {Role}",
+        // Send invite email
+        var inviter = await _context.Users.FindAsync(new object[] { userId }, ct);
+        var child = await _context.ChildProfiles.FindAsync(new object[] { childId }, ct);
+        var inviterName = inviter != null ? $"{inviter.FirstName} {inviter.LastName}" : "Someone";
+        var childName = child != null ? child.FirstName : "their child";
+
+        await _emailService.SendShareInviteEmailAsync(
+            email, inviterName, childName, role.ToString(), rawToken, ct);
+
+        _logger.LogInformation("Invite created and email sent for {Email} on child {ChildId} with role {Role}",
             email, childId, role);
 
         var model = MapToModel(childAccess, inviteeUser);
