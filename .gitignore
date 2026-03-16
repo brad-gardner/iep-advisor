@@ -51,4 +51,3 @@ appsettings.*.json
 # Firebase (sensitive configs only)
 web/src/config/firebase.ts
 api/firebase/serviceAccountKey.json
-docs/

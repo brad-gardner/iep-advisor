@@ -1,6 +1,6 @@
 # IEP Advisor — Beta Test Plan
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** 2026-03-15
 **Audience:** Beta testers, QA, internal team
 
@@ -10,27 +10,39 @@
 
 ## Pre-Requisites
 
-- [ ] You have a beta invite code (get one from an admin)
+- [ ] An admin has sent you a beta invite email (or you have an invite code)
 - [ ] You have access to the deployed app URL
 - [ ] You have a sample IEP PDF document to upload (or use any multi-page PDF)
 - [ ] You have Google Authenticator or Authy installed (for MFA testing)
+- [ ] Check your email (including spam) for invite and password reset emails
 
 ---
 
 ## 1. Registration & Login
 
-### 1.1 Registration (Closed Beta)
+### 1.1 Beta Invite Flow (Admin Side)
 
 | # | Test Case | Expected Result | Pass? | Notes |
 |---|-----------|-----------------|-------|-------|
-| 1.1.1 | Go to `/register` | Registration form shown with invite code field | | |
-| 1.1.2 | Submit without invite code | Validation error: "Invite code is required" | | |
-| 1.1.3 | Submit with invalid invite code | Error: "Invalid or expired invite code" | | |
-| 1.1.4 | Submit with valid invite code + all fields | Success: redirected to login with "Registration successful" message | | |
-| 1.1.5 | Try to register again with same invite code | Error: "Invalid or expired invite code" (single-use) | | |
-| 1.1.6 | Try to register with an already-used email | Error: "Email is already registered" | | |
+| 1.1.1 | As admin, go to Admin > Users | "Invite Beta User" button visible | | |
+| 1.1.2 | Click "Invite Beta User", enter email, click "Send Invite" | Success message: "Invite sent to email@example.com" | | |
+| 1.1.3 | Check the invited person's email | Branded email with "Create Your Account" button received | | |
+| 1.1.4 | Check spam folder if not in inbox | Email from DoNotReply@mail.iep-advisor.com | | |
 
-### 1.2 Login
+### 1.2 Registration (Closed Beta)
+
+| # | Test Case | Expected Result | Pass? | Notes |
+|---|-----------|-----------------|-------|-------|
+| 1.2.1 | Click "Create Your Account" link in invite email | Register page opens with invite code auto-filled | | |
+| 1.2.2 | Go to `/register` directly (no code in URL) | Registration form shown with empty invite code field | | |
+| 1.2.3 | Submit without invite code | Validation error: "Invite code is required" | | |
+| 1.2.4 | Submit with invalid invite code | Error: "Invalid or expired invite code" | | |
+| 1.2.5 | Submit with valid invite code + all fields | Success: redirected to login with "Registration successful" message | | |
+| 1.2.6 | Try to register again with same invite code | Error: "Invalid or expired invite code" (single-use) | | |
+| 1.2.7 | Try to register with an already-used email | Error: "Email is already registered" | | |
+| 1.2.8 | After registration, check subscription status | Should be "Active" with 1-year expiry (beta grant) | | |
+
+### 1.3 Login
 
 | # | Test Case | Expected Result | Pass? | Notes |
 |---|-----------|-----------------|-------|-------|
@@ -39,16 +51,18 @@
 | 1.2.3 | Login with non-existent email | Error: "Invalid email or password" (same message — no enumeration) | | |
 | 1.2.4 | Login 10+ times with wrong password | Account should be locked for 15 minutes | | |
 
-### 1.3 Password Reset
+### 1.4 Password Reset
 
 | # | Test Case | Expected Result | Pass? | Notes |
 |---|-----------|-----------------|-------|-------|
-| 1.3.1 | Click "Forgot password?" on login page | Redirected to forgot password page | | |
-| 1.3.2 | Submit email | Success message shown (regardless of whether email exists) | | |
-| 1.3.3 | Check server logs for reset URL | Reset URL logged (email not yet implemented) | | |
-| 1.3.4 | Open reset URL, enter new password | Success: redirected to login | | |
-| 1.3.5 | Login with new password | Successful login | | |
-| 1.3.6 | Try to reuse the reset link | Error: token already used or expired | | |
+| 1.4.1 | Click "Forgot password?" on login page | Redirected to forgot password page | | |
+| 1.4.2 | Submit email | Success message shown (regardless of whether email exists) | | |
+| 1.4.3 | Check email inbox | Branded "Reset Your Password" email received with teal button | | |
+| 1.4.4 | Click "Reset Password" button in email | Reset password page opens with token in URL | | |
+| 1.4.5 | Enter new password + confirm, submit | Success: redirected to login | | |
+| 1.4.6 | Login with new password | Successful login | | |
+| 1.4.7 | Try to reuse the reset link | Error: token already used or expired | | |
+| 1.4.8 | Wait 15+ minutes, try unused reset link | Error: token expired | | |
 
 ---
 
@@ -209,14 +223,15 @@
 | # | Test Case | Expected Result | Pass? | Notes |
 |---|-----------|-----------------|-------|-------|
 | 10.1.1 | On child detail, click "Share" (owner only) | Share dialog appears | | |
-| 10.1.2 | Enter email + select "Viewer" role, click "Send Invite" | Invite created, check server logs for invite link | | |
-| 10.1.3 | View access list | Shows the pending invite with email + "Pending" badge | | |
+| 10.1.2 | Enter email + select "Viewer" role, click "Send Invite" | Invite created, email sent to invitee | | |
+| 10.1.3 | Check invitee's email | Branded invite email received with "Accept Invitation" button | | |
+| 10.1.4 | View access list | Shows the pending invite with email + "Pending" badge | | |
 
 ### 10.2 Accepting
 
 | # | Test Case | Expected Result | Pass? | Notes |
 |---|-----------|-----------------|-------|-------|
-| 10.2.1 | As the invited user, open the invite link | Accept invite page shown | | |
+| 10.2.1 | As the invited user, click "Accept Invitation" in the email | Accept invite page shown | | |
 | 10.2.2 | Invite accepted | Shared child appears in children list with "Shared" badge | | |
 
 ### 10.3 Viewer Permissions
@@ -308,13 +323,24 @@
 | 14.2.6 | Deactivated user tries to login | Login fails (or existing session invalidated) | | |
 | 14.2.7 | Reactivate the user | User can login again | | |
 
-### 14.3 Beta Code Management
+### 14.3 Beta User Invites
 
 | # | Test Case | Expected Result | Pass? | Notes |
 |---|-----------|-----------------|-------|-------|
-| 14.3.1 | Call `POST /api/admin/beta-codes` with `{ "count": 5 }` | 5 new codes generated | | |
-| 14.3.2 | Call `GET /api/admin/beta-codes` | All codes listed with redemption status | | |
-| 14.3.3 | Share a code with a new user | They can register with it | | |
+| 14.3.1 | On admin users page, click "Invite Beta User" | Invite form appears with email input | | |
+| 14.3.2 | Enter a valid email, click "Send Invite" | Success message shown | | |
+| 14.3.3 | Check the invited email's inbox | Branded invite email with "Create Your Account" link | | |
+| 14.3.4 | Click the link in the email | Register page opens with invite code pre-filled | | |
+| 14.3.5 | Invite the same email again | Should still work (generates a new code) | | |
+
+### 14.4 Email Delivery
+
+| # | Test Case | Expected Result | Pass? | Notes |
+|---|-----------|-----------------|-------|-------|
+| 14.4.1 | Beta invite email | Delivered from DoNotReply@mail.iep-advisor.com, branded HTML | | |
+| 14.4.2 | Password reset email | Delivered, "Reset Password" teal button works | | |
+| 14.4.3 | Share invite email | Delivered, shows inviter name + child name + role | | |
+| 14.4.4 | Check spam scoring | Emails should not land in spam (check multiple providers) | | |
 
 ---
 
@@ -382,6 +408,8 @@ When you find an issue, please report it with:
 
 - **URL:** [deployment URL]
 - **Admin account:** [email] (ask the team lead)
-- **Beta codes:** Ask admin to generate via API
+- **Beta invites:** Admin sends invites from Admin > Users > "Invite Beta User"
+- **Emails sent from:** DoNotReply@mail.iep-advisor.com
 - **Sample IEP PDF:** [link to test document if available]
 - **Sentry:** Check [sentry.io] for frontend error reports after testing
+- **Elastic APM:** Check Kibana for backend performance/errors
