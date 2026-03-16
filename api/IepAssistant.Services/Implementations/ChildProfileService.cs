@@ -47,6 +47,7 @@ public class ChildProfileService : IChildProfileService
         };
 
         await _repository.AddAsync(entity, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken); // Save first to get the generated Id
 
         var access = new ChildAccess
         {
@@ -58,7 +59,6 @@ public class ChildProfileService : IChildProfileService
             UpdatedById = userId
         };
         await _context.Set<ChildAccess>().AddAsync(access, cancellationToken);
-
         await _context.SaveChangesAsync(cancellationToken);
 
         return ServiceResult<ChildProfileModel>.SuccessResult(MapToModel(entity), "Child profile created successfully.");
