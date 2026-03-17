@@ -15,7 +15,8 @@ export class IepDocumentsPage {
   }
 
   async expectIepVisible(meetingTypeLabel: string) {
-    await expect(this.page.locator(`text=${meetingTypeLabel}`)).toBeVisible();
+    // Use span selector to target badge, not the hidden select option
+    await expect(this.page.locator(`span:has-text("${meetingTypeLabel}")`).first()).toBeVisible();
   }
 
   async expectFileInputAttached() {
