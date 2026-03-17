@@ -58,7 +58,7 @@ export function AccountDeletionSection() {
   return (
     <div className="space-y-4">
       <div>
-        <Button variant="secondary" onClick={handleExport} disabled={isExporting}>
+        <Button variant="secondary" onClick={handleExport} disabled={isExporting} data-testid="export-data">
           {isExporting ? 'Exporting...' : 'Export My Data'}
         </Button>
         <p className="text-xs text-brand-slate-300 mt-1">
@@ -68,7 +68,7 @@ export function AccountDeletionSection() {
 
       {!showConfirm ? (
         <div>
-          <Button variant="danger" onClick={() => setShowConfirm(true)}>
+          <Button variant="danger" onClick={() => setShowConfirm(true)} data-testid="delete-account">
             Delete Account
           </Button>
         </div>
@@ -95,6 +95,7 @@ export function AccountDeletionSection() {
               onChange={(e) => setPassword(e.target.value)}
               required
               placeholder="Enter your password"
+              data-testid="delete-account-password"
             />
 
             {user?.mfaEnabled && (
@@ -110,12 +111,13 @@ export function AccountDeletionSection() {
             )}
 
             <div className="flex gap-3">
-              <Button variant="danger" type="submit" disabled={isDeleting}>
+              <Button variant="danger" type="submit" disabled={isDeleting} data-testid="confirm-delete-account">
                 {isDeleting ? 'Deleting...' : 'Confirm Deletion'}
               </Button>
               <Button
                 variant="ghost"
                 type="button"
+                data-testid="cancel-delete-account"
                 onClick={() => {
                   setShowConfirm(false);
                   setPassword('');
