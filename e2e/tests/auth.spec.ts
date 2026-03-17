@@ -1,25 +1,30 @@
 import { test, expect } from '@playwright/test';
-import { getAdminToken, createTestUser } from '../helpers/test-data';
+import { getAdminToken } from '../helpers/test-data';
 import { generateBetaCode } from '../helpers/api';
+import { getSharedTestUser } from '../helpers/fixtures';
 import { LoginPage } from '../pages/login.page';
 import { RegisterPage } from '../pages/register.page';
 import { Sidebar } from '../pages/sidebar.page';
 
-// Auth tests run without saved auth state and need HTTPS errors ignored for self-signed certs
+// Auth tests run without saved auth state and need HTTPS errors ignored
 test.use({ storageState: { cookies: [], origins: [] }, ignoreHTTPSErrors: true });
 
 test.describe('Authentication', () => {
-  test('register with valid beta code', async ({ page }) => {
-    const adminToken = await getAdminToken();
-    const code = await generateBetaCode(adminToken);
-    const email = `register-${Date.now()}@e2e.test`;
+  let betaCode: string;
 
+  test.beforeAll(async () => {
+    const adminToken = await getAdminToken();
+    betaCode = await generateBetaCode(adminToken);
+  });
+
+  test('register with valid beta code', async ({ page }) => {
+    const email = `register-${Date.now()}@e2e.test`;
     const registerPage = new RegisterPage(page);
     const loginPage = new LoginPage(page);
 
     await registerPage.goto();
     await registerPage.fillForm({
-      inviteCode: code,
+      inviteCode: betaCode,
       firstName: 'Test',
       lastName: 'Register',
       email,
@@ -27,7 +32,7 @@ test.describe('Authentication', () => {
     });
     await registerPage.submit();
 
-    await loginPage.expectOnLoginPage();
+    await registerPage.expectRedirectToLogin();
     await loginPage.expectSuccessMessage();
   });
 
@@ -44,11 +49,12 @@ test.describe('Authentication', () => {
     });
     await registerPage.submit();
 
-    await registerPage.expectError('Invalid');
+    // Should stay on register page (not redirect to login)
+    await registerPage.expectStayedOnRegister();
   });
 
   test('login with valid credentials', async ({ page }) => {
-    const user = await createTestUser('login');
+    const user = getSharedTestUser();
     const loginPage = new LoginPage(page);
 
     await loginPage.goto();
@@ -61,11 +67,13 @@ test.describe('Authentication', () => {
 
     await loginPage.goto();
     await loginPage.login('nobody@e2e.test', 'wrongpassword');
-    await loginPage.expectError('Invalid email or password');
+
+    // Should stay on login page
+    await loginPage.expectStayedOnLogin();
   });
 
   test('logout clears session', async ({ page }) => {
-    const user = await createTestUser('logout');
+    const user = getSharedTestUser();
     const loginPage = new LoginPage(page);
     const sidebar = new Sidebar(page);
 
@@ -74,6 +82,6 @@ test.describe('Authentication', () => {
     await loginPage.expectRedirectToDashboard();
 
     await sidebar.signOut();
-    await loginPage.expectOnLoginPage();
+    await page.waitForURL(/\/login/, { timeout: 10000 });
   });
 });

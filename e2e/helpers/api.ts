@@ -68,3 +68,18 @@ export async function getCurrentUser(token: string): Promise<{ id: number }> {
   const data = await apiGet('/api/auth/me', token);
   return data.data;
 }
+
+export async function createChildViaApi(
+  token: string,
+  firstName: string,
+  lastName: string,
+  extra?: { gradeLevel?: string; disabilityCategory?: string; schoolDistrict?: string },
+): Promise<{ id: number }> {
+  const data = await apiPost('/api/children', {
+    firstName,
+    lastName,
+    ...extra,
+  }, token);
+  if (!data.data?.id) throw new Error('Create child failed: ' + JSON.stringify(data).substring(0, 300));
+  return data.data;
+}

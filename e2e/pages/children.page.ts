@@ -21,6 +21,16 @@ export class ChildrenPage {
     await this.page.waitForURL(/\/children\/\d+/);
   }
 
+  async clickChildByName(name: string) {
+    await this.page.locator(`main a:has-text("${name}")`).first().click();
+    await this.page.waitForURL(/\/children\/\d+/);
+  }
+
+  async updateGradeLevel(grade: string) {
+    await this.page.getByLabel('Grade Level').clear();
+    await this.page.getByLabel('Grade Level').fill(grade);
+  }
+
   async fillChildForm(data: {
     firstName: string;
     lastName?: string;

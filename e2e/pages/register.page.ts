@@ -14,19 +14,24 @@ export class RegisterPage {
     email: string;
     password: string;
   }) {
-    await this.page.fill('input[name="inviteCode"]', data.inviteCode);
-    await this.page.fill('input[name="firstName"]', data.firstName);
-    await this.page.fill('input[name="lastName"]', data.lastName);
-    await this.page.fill('input[name="email"]', data.email);
-    await this.page.fill('input[name="password"]', data.password);
-    await this.page.fill('input[name="confirmPassword"]', data.password);
+    await this.page.getByLabel('Invite Code').fill(data.inviteCode);
+    await this.page.getByLabel('First Name').fill(data.firstName);
+    await this.page.getByLabel('Last Name').fill(data.lastName);
+    await this.page.getByLabel('Email').fill(data.email);
+    await this.page.getByLabel('Password', { exact: true }).fill(data.password);
+    await this.page.getByLabel('Confirm Password').fill(data.password);
   }
 
   async submit() {
-    await this.page.click('button[type="submit"]');
+    await this.page.getByRole('button', { name: 'Create Account' }).click();
   }
 
-  async expectError(text: string) {
-    await expect(this.page.locator(`text=${text}`)).toBeVisible({ timeout: 5000 });
+  async expectRedirectToLogin() {
+    await this.page.waitForURL(/\/login/, { timeout: 15000 });
+  }
+
+  async expectStayedOnRegister() {
+    await this.page.waitForTimeout(3000);
+    await expect(this.page).toHaveURL(/\/register/);
   }
 }

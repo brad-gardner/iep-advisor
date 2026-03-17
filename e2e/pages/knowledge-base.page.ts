@@ -17,6 +17,6 @@ export class KnowledgeBasePage {
   }
 
   async expectResultVisible(text: string) {
-    await expect(this.page.locator(`text=${text}`)).toBeVisible();
+    await expect(this.page.getByText(text).first()).toBeVisible();
   }
 }

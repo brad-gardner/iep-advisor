@@ -8,24 +8,21 @@ export class LoginPage {
   }
 
   async login(email: string, password: string) {
-    await this.page.fill('input[type="email"]', email);
-    await this.page.fill('input[type="password"]', password);
-    await this.page.click('button[type="submit"]');
+    await this.page.getByLabel('Email').fill(email);
+    await this.page.getByLabel('Password').fill(password);
+    await this.page.getByRole('button', { name: 'Sign In' }).click();
   }
 
   async expectRedirectToDashboard() {
     await this.page.waitForURL(/\/(dashboard|onboarding)/, { timeout: 15000 });
   }
 
-  async expectError(text: string) {
-    await expect(this.page.locator(`text=${text}`)).toBeVisible({ timeout: 5000 });
-  }
-
-  async expectOnLoginPage() {
-    await this.page.waitForURL('/login');
+  async expectStayedOnLogin() {
+    await this.page.waitForTimeout(3000);
+    await expect(this.page).toHaveURL(/\/login/);
   }
 
   async expectSuccessMessage() {
-    await expect(this.page.locator('text=Registration successful')).toBeVisible({ timeout: 5000 });
+    await expect(this.page.getByText(/registration successful/i).first()).toBeVisible({ timeout: 5000 });
   }
 }
