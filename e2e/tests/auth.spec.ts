@@ -5,6 +5,9 @@ import { LoginPage } from '../pages/login.page';
 import { RegisterPage } from '../pages/register.page';
 import { Sidebar } from '../pages/sidebar.page';
 
+// Auth tests run without saved auth state and need HTTPS errors ignored for self-signed certs
+test.use({ storageState: { cookies: [], origins: [] }, ignoreHTTPSErrors: true });
+
 test.describe('Authentication', () => {
   test('register with valid beta code', async ({ page }) => {
     const adminToken = await getAdminToken();
