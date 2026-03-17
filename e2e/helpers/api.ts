@@ -1,3 +1,6 @@
+// Allow self-signed certificates for local dev
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 const API_URL = process.env.API_URL || 'http://localhost:7200';
 
 export async function apiPost(path: string, body: any, token?: string) {
