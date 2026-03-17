@@ -3,7 +3,7 @@ import { ChildrenPage } from '../pages/children.page';
 import { AdvocacyGoalsPage } from '../pages/advocacy-goals.page';
 
 test.describe('Advocacy Goals', () => {
-  test('add advocacy goal with category', async ({ loggedInPage: page }) => {
+  test('add advocacy goal with category', async ({ page }) => {
     const children = new ChildrenPage(page);
     const goals = new AdvocacyGoalsPage(page);
 
@@ -18,7 +18,7 @@ test.describe('Advocacy Goals', () => {
     await goals.expectGoalVisible('Improve reading fluency');
   });
 
-  test('edit existing goal', async ({ loggedInPage: page }) => {
+  test('edit existing goal', async ({ page }) => {
     const children = new ChildrenPage(page);
     const goals = new AdvocacyGoalsPage(page);
 
@@ -30,7 +30,7 @@ test.describe('Advocacy Goals', () => {
     await goals.expectGoalVisible('Updated reading fluency');
   });
 
-  test('delete goal with confirmation', async ({ loggedInPage: page }) => {
+  test('delete goal with confirmation', async ({ page }) => {
     const children = new ChildrenPage(page);
     const goals = new AdvocacyGoalsPage(page);
 

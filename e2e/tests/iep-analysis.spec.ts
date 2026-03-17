@@ -5,7 +5,7 @@ import { IepAnalysisPage } from '../pages/iep-analysis.page';
 test.describe('IEP Analysis', () => {
   test.setTimeout(120_000);
 
-  test('trigger analysis and view results', async ({ loggedInPage: page }) => {
+  test('trigger analysis and view results', async ({ page }) => {
     const children = new ChildrenPage(page);
     const analysis = new IepAnalysisPage(page);
 

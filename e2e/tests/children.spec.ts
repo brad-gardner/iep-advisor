@@ -2,7 +2,7 @@ import { test, expect } from '../helpers/fixtures';
 import { ChildrenPage } from '../pages/children.page';
 
 test.describe('Child Management', () => {
-  test('create child with all fields', async ({ loggedInPage: page }) => {
+  test('create child with all fields', async ({ page }) => {
     const children = new ChildrenPage(page);
 
     await children.gotoNew();
@@ -20,7 +20,7 @@ test.describe('Child Management', () => {
     await children.expectChildVisible('Emma');
   });
 
-  test('edit child profile', async ({ loggedInPage: page }) => {
+  test('edit child profile', async ({ page }) => {
     const children = new ChildrenPage(page);
 
     await children.goto();

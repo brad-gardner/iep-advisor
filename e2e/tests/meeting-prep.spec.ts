@@ -5,7 +5,7 @@ import { MeetingPrepPage } from '../pages/meeting-prep.page';
 test.describe('Meeting Prep', () => {
   test.setTimeout(120_000);
 
-  test('generate checklist from goals (Mode B)', async ({ loggedInPage: page }) => {
+  test('generate checklist from goals (Mode B)', async ({ page }) => {
     const children = new ChildrenPage(page);
     const meetingPrep = new MeetingPrepPage(page);
 

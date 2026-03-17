@@ -3,7 +3,7 @@ import { ChildrenPage } from '../pages/children.page';
 import { IepDocumentsPage } from '../pages/iep-documents.page';
 
 test.describe('IEP Documents', () => {
-  test('create IEP event with date and type', async ({ loggedInPage: page }) => {
+  test('create IEP event with date and type', async ({ page }) => {
     const children = new ChildrenPage(page);
     const iepDocs = new IepDocumentsPage(page);
 
@@ -14,7 +14,7 @@ test.describe('IEP Documents', () => {
     await iepDocs.expectIepVisible('Annual Review');
   });
 
-  test('upload PDF to existing IEP', async ({ loggedInPage: page }) => {
+  test('upload PDF to existing IEP', async ({ page }) => {
     const children = new ChildrenPage(page);
     const iepDocs = new IepDocumentsPage(page);
 
