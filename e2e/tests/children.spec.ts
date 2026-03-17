@@ -4,7 +4,8 @@ test.describe('Child Management', () => {
   test('create child with all fields', async ({ page }) => {
     await page.goto('/children/new');
 
-    await page.getByLabel('First Name *').fill('Emma');
+    const childName = `E2EChild${Date.now()}`;
+    await page.getByLabel('First Name *').fill(childName);
     await page.getByLabel('Last Name').fill('TestChild');
     await page.getByLabel('Date of Birth').fill('2015-06-15');
     await page.getByLabel('Grade Level').fill('3rd');
@@ -15,7 +16,7 @@ test.describe('Child Management', () => {
 
     // Should redirect to children list
     await page.waitForURL('/children');
-    await expect(page.locator('text=Emma')).toBeVisible();
+    await expect(page.getByText(childName).first()).toBeVisible();
   });
 
   test('edit child profile', async ({ page }) => {

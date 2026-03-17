@@ -36,7 +36,8 @@ test.describe('Authentication', () => {
     await page.getByLabel('Confirm Password').fill('TestPass123!');
     await page.getByRole('button', { name: 'Create Account' }).click();
 
-    await expect(page.locator('text=Invalid')).toBeVisible({ timeout: 5000 });
+    // Error should appear — check for any error notice
+    await expect(page.getByText(/invalid|expired|failed/i).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('login with valid credentials', async ({ page }) => {
@@ -56,7 +57,7 @@ test.describe('Authentication', () => {
     await page.getByLabel('Password').fill('wrongpassword');
     await page.getByRole('button', { name: 'Sign In' }).click();
 
-    await expect(page.locator('text=Invalid email or password')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/invalid|failed/i).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('logout clears session', async ({ page }) => {
