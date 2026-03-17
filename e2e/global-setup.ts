@@ -32,9 +32,9 @@ async function globalSetup() {
   const page = await context.newPage();
 
   await page.goto(`${baseURL}/login`);
-  await page.getByLabel('Email').fill(user.email);
-  await page.getByLabel('Password').fill(user.password);
-  await page.getByRole('button', { name: 'Sign In' }).click();
+  await page.locator('[data-testid="login-email"]').fill(user.email);
+  await page.locator('[data-testid="login-password"]').fill(user.password);
+  await page.locator('[data-testid="login-submit"]').click();
   await page.waitForURL(/\/(dashboard|onboarding)/, { timeout: 15000 });
 
   // Save storage state (includes localStorage with JWT)

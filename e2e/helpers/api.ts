@@ -12,7 +12,17 @@ export async function apiPost(path: string, body: any, token?: string) {
     headers,
     body: JSON.stringify(body),
   });
-  return res.json();
+
+  if (res.status === 429) {
+    throw new Error(`Rate limited (429) on ${path}. Wait and retry.`);
+  }
+
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Non-JSON response (${res.status}) from ${path}: ${text.substring(0, 200)}`);
+  }
 }
 
 export async function apiGet(path: string, token?: string) {

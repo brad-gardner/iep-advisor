@@ -16,12 +16,12 @@ export class ChildrenPage {
   }
 
   async clickFirstChild() {
-    await this.page.locator('[data-testid="child-card"] a').first().click();
+    await this.page.locator('main a[href*="/children/"]').first().click();
     await this.page.waitForURL(/\/children\/\d+/);
   }
 
   async clickChildByName(name: string) {
-    await this.page.locator(`[data-testid="child-card"]:has-text("${name}") a`).first().click();
+    await this.page.locator(`main a:has([data-testid="child-card"]:has-text("${name}"))`).first().click();
     await this.page.waitForURL(/\/children\/\d+/);
   }
 

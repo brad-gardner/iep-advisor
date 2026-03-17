@@ -19,7 +19,7 @@ export function AdvocacyGoalsEmptyState({ childName, onAdd }: AdvocacyGoalsEmpty
         When you analyze an IEP, we'll check whether these goals are addressed
         and flag any gaps.
       </p>
-      <Button onClick={onAdd}>Add Your First Goal</Button>
+      <Button onClick={onAdd} data-testid="add-goal-button">Add Your First Goal</Button>
     </div>
   );
 }
