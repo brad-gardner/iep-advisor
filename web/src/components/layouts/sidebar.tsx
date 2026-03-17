@@ -28,16 +28,18 @@ export function Sidebar({ onLogout }: SidebarProps) {
   const navContent = (
     <>
       <div className="p-6">
-        <Logo variant="dark" size="md" />
+        <Logo variant="dark" size="md" data-testid="sidebar-logo" />
       </div>
 
       <nav className="flex-1 px-3 space-y-1">
         {navItems.map(({ to, label, Icon }) => {
           const active = isActive(to);
+          const testId = `nav-${to.slice(1)}`;
           return (
             <Link
               key={to}
               to={to}
+              data-testid={testId}
               onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-button text-sm transition-colors ${
                 active
@@ -61,6 +63,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
           </div>
           <Link
             to="/admin"
+            data-testid="nav-admin-dashboard"
             onClick={() => setMobileOpen(false)}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-button text-sm transition-colors ${
               location.pathname === '/admin'
@@ -73,6 +76,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
           </Link>
           <Link
             to="/admin/users"
+            data-testid="nav-admin-users"
             onClick={() => setMobileOpen(false)}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-button text-sm transition-colors ${
               isActive('/admin/users')
@@ -92,6 +96,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
         </p>
         <button
           onClick={onLogout}
+          data-testid="sidebar-sign-out"
           className="flex items-center gap-2 text-sm text-brand-slate-400 hover:text-brand-slate-200 transition-colors"
         >
           <LogOut size={16} strokeWidth={1.8} />
@@ -107,6 +112,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
       <button
         onClick={() => setMobileOpen(true)}
         className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-button bg-brand-slate-800 text-white"
+        data-testid="mobile-menu-open"
         aria-label="Open navigation"
       >
         <Menu size={20} strokeWidth={1.8} />
@@ -129,6 +135,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
         <button
           onClick={() => setMobileOpen(false)}
           className="absolute top-4 right-4 text-brand-slate-400 hover:text-white"
+          data-testid="mobile-menu-close"
           aria-label="Close navigation"
         >
           <X size={20} strokeWidth={1.8} />

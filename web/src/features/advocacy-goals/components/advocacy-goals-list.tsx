@@ -115,7 +115,7 @@ export function AdvocacyGoalsList({
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-center">
-        <p className="text-[11px] text-brand-slate-400">
+        <p className="text-[11px] text-brand-slate-400" data-testid="goal-count">
           {goals.length}/10 goals
           {goals.length >= 10 && ' — Focused goals produce better analysis. Consider consolidating.'}
         </p>
@@ -123,6 +123,7 @@ export function AdvocacyGoalsList({
           <button
             onClick={() => setIsAdding(true)}
             className="text-sm text-brand-teal-500 hover:text-brand-teal-600 transition-colors"
+            data-testid="add-goal-button"
           >
             + Add Goal
           </button>

@@ -78,6 +78,7 @@ export function IepUpload({ iepId, onUploaded }: IepUploadProps) {
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
+        data-testid="iep-upload-zone"
         className={`block border-2 border-dashed rounded-card p-6 text-center cursor-pointer transition-colors ${
           isDragging
             ? 'border-brand-teal-500 bg-brand-teal-50'
@@ -90,6 +91,7 @@ export function IepUpload({ iepId, onUploaded }: IepUploadProps) {
           onChange={handleFileInput}
           className="hidden"
           disabled={isUploading}
+          data-testid="iep-file-input"
         />
         {isUploading ? (
           <div className="flex flex-col items-center gap-2">

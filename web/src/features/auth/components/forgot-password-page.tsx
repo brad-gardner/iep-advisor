@@ -66,9 +66,10 @@ export function ForgotPasswordPage() {
           placeholder="you@example.com"
           autoFocus
           maxLength={256}
+          data-testid="forgot-email"
         />
 
-        <Button type="submit" disabled={isLoading} className="w-full">
+        <Button type="submit" disabled={isLoading} className="w-full" data-testid="forgot-submit">
           {isLoading ? 'Sending...' : 'Send Reset Link'}
         </Button>
       </form>

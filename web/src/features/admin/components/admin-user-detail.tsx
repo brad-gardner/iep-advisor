@@ -146,6 +146,7 @@ export function AdminUserDetail() {
             label="Role"
             value={role}
             onChange={(e) => setRole((e.target as HTMLSelectElement).value)}
+            data-testid="admin-user-role"
           >
             <option value="User">User</option>
             <option value="Admin">Admin</option>
@@ -158,6 +159,7 @@ export function AdminUserDetail() {
               role="switch"
               aria-checked={isActive}
               onClick={() => setIsActive(!isActive)}
+              data-testid="admin-user-active"
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
                 isActive ? 'bg-brand-teal-500' : 'bg-brand-slate-300'
               }`}
@@ -171,7 +173,7 @@ export function AdminUserDetail() {
           </div>
 
           <div className="pt-2">
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving} data-testid="admin-user-save">
               {saving ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>

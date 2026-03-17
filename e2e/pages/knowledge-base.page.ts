@@ -8,15 +8,17 @@ export class KnowledgeBasePage {
   }
 
   async search(query: string) {
-    await this.page.locator('input[placeholder*="Search"]').fill(query);
+    await this.page.locator('[data-testid="kb-search"]').fill(query);
     await this.page.waitForTimeout(500); // debounce
   }
 
   async selectCategory(name: string) {
-    await this.page.click(`button:has-text("${name}")`);
+    await this.page.locator(`[data-testid^="kb-tab-"]:has-text("${name}")`).click();
   }
 
   async expectResultVisible(text: string) {
-    await expect(this.page.getByText(text).first()).toBeVisible();
+    await expect(
+      this.page.locator(`[data-testid="kb-results"] :has-text("${text}")`).first()
+    ).toBeVisible();
   }
 }

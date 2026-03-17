@@ -207,7 +207,7 @@ export function IepViewerPage() {
         <div className="flex gap-2">
           {otherIeps.length > 0 && (
             <div className="relative" ref={compareRef}>
-              <Button variant="secondary" onClick={() => setCompareOpen(!compareOpen)}>
+              <Button variant="secondary" onClick={() => setCompareOpen(!compareOpen)} data-testid="compare-button">
                 <ArrowRightLeft className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
                 Compare
               </Button>
@@ -280,6 +280,7 @@ export function IepViewerPage() {
           <div className="flex border-b border-brand-slate-200">
             <button
               onClick={() => setActiveTab('document')}
+              data-testid="tab-document"
               className={`px-4 py-2 text-[13px] font-medium transition-colors ${
                 activeTab === 'document'
                   ? 'text-brand-slate-800 border-b-2 border-brand-teal-500'
@@ -290,6 +291,7 @@ export function IepViewerPage() {
             </button>
             <button
               onClick={() => setActiveTab('analysis')}
+              data-testid="tab-analysis"
               className={`px-4 py-2 text-[13px] font-medium transition-colors ${
                 activeTab === 'analysis'
                   ? 'text-brand-slate-800 border-b-2 border-brand-teal-500'
@@ -303,6 +305,7 @@ export function IepViewerPage() {
             </button>
             <button
               onClick={() => setActiveTab('meeting-prep')}
+              data-testid="tab-meeting-prep"
               className={`px-4 py-2 text-[13px] font-medium transition-colors ${
                 activeTab === 'meeting-prep'
                   ? 'text-brand-slate-800 border-b-2 border-brand-teal-500'

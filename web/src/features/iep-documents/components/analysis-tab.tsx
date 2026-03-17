@@ -104,6 +104,7 @@ export function AnalysisTab({
     <button
       key={key}
       onClick={() => setActiveView(key)}
+      data-testid={`analysis-nav-${key}`}
       className={`w-full text-left px-3 py-2 rounded-button text-[13px] font-medium transition-colors ${
         activeView === key
           ? 'bg-brand-teal-50 text-brand-teal-600 border-l-2 border-l-brand-teal-500'

@@ -26,12 +26,12 @@ export function AnalysisEmptyState({ onTrigger, isTriggering, subscriptionStatus
         for your next IEP meeting.
       </p>
       {!hasSubscription && subscriptionStatus !== undefined ? (
-        <div className="space-y-4 flex flex-col items-center">
+        <div className="space-y-4 flex flex-col items-center" data-testid="subscribe-to-analyze">
           <Notice variant="warning" title="Subscribe to analyze this IEP" />
           <SubscribeButton />
         </div>
       ) : (
-        <Button onClick={onTrigger} disabled={isTriggering}>
+        <Button onClick={onTrigger} disabled={isTriggering} data-testid="analyze-button">
           {isTriggering ? 'Starting Analysis...' : 'Analyze IEP'}
         </Button>
       )}

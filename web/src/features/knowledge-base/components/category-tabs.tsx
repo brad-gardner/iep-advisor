@@ -25,6 +25,7 @@ export function CategoryTabs({ categories, active, onChange }: CategoryTabsProps
     <div className="flex gap-1 overflow-x-auto pb-1">
       <button
         onClick={() => onChange(null)}
+        data-testid="kb-tab-all"
         className={`shrink-0 px-3 py-1.5 rounded-button text-sm font-medium transition-colors ${
           active === null
             ? 'bg-brand-teal-50 text-brand-teal-600 border border-brand-teal-200'
@@ -39,6 +40,7 @@ export function CategoryTabs({ categories, active, onChange }: CategoryTabsProps
         <button
           key={category}
           onClick={() => onChange(category)}
+          data-testid={`kb-tab-${category}`}
           className={`shrink-0 px-3 py-1.5 rounded-button text-sm font-medium transition-colors ${
             active === category
               ? 'bg-brand-teal-50 text-brand-teal-600 border border-brand-teal-200'

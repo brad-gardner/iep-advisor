@@ -8,17 +8,16 @@ export class ProfilePage {
   }
 
   async updateFirstName(name: string) {
-    const firstNameInput = this.page.locator('input').nth(1); // Skip disabled email
-    await firstNameInput.clear();
-    await firstNameInput.fill(name);
+    await this.page.locator('[data-testid="profile-first-name"]').clear();
+    await this.page.locator('[data-testid="profile-first-name"]').fill(name);
   }
 
   async selectState(stateCode: string) {
-    await this.page.locator('select#state').selectOption(stateCode);
+    await this.page.locator('[data-testid="profile-state"]').selectOption(stateCode);
   }
 
   async save() {
-    await this.page.click('button:has-text("Save")');
+    await this.page.locator('[data-testid="profile-save"]').click();
   }
 
   async expectSaveSuccess() {

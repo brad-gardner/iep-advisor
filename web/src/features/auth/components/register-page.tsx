@@ -62,9 +62,9 @@ export function RegisterPage() {
     <div className="w-full">
       <h2 className="text-2xl font-serif font-semibold text-center mb-6 text-brand-slate-800">Create Your Account</h2>
 
-      {error && <div className="mb-4"><Notice variant="error" title={error} /></div>}
+      {error && <div className="mb-4" data-testid="register-error"><Notice variant="error" title={error} /></div>}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4" data-testid="register-form">
         <Input
           label="Invite Code"
           name="inviteCode"
@@ -73,6 +73,7 @@ export function RegisterPage() {
           required
           placeholder="Enter your invite code"
           maxLength={20}
+          data-testid="register-invite-code"
         />
 
         <div className="grid grid-cols-2 gap-4">
@@ -83,6 +84,7 @@ export function RegisterPage() {
             onChange={handleChange}
             required
             maxLength={100}
+            data-testid="register-first-name"
           />
           <Input
             label="Last Name"
@@ -91,6 +93,7 @@ export function RegisterPage() {
             onChange={handleChange}
             required
             maxLength={100}
+            data-testid="register-last-name"
           />
         </div>
 
@@ -102,6 +105,7 @@ export function RegisterPage() {
           onChange={handleChange}
           required
           maxLength={256}
+          data-testid="register-email"
         />
 
         <Input
@@ -112,6 +116,7 @@ export function RegisterPage() {
           onChange={handleChange}
           required
           maxLength={128}
+          data-testid="register-password"
         />
 
         <Input
@@ -122,9 +127,10 @@ export function RegisterPage() {
           onChange={handleChange}
           required
           maxLength={128}
+          data-testid="register-confirm-password"
         />
 
-        <Button type="submit" disabled={isLoading} className="w-full">
+        <Button type="submit" disabled={isLoading} className="w-full" data-testid="register-submit">
           {isLoading ? 'Creating account...' : 'Create Account'}
         </Button>
       </form>

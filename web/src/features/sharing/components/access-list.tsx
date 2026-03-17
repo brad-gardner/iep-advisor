@@ -98,6 +98,7 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
                   variant="danger"
                   className="!px-2 !py-1"
                   onClick={() => handleRevoke(entry.id)}
+                  data-testid="revoke-access"
                 >
                   <Trash2 className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
                 </Button>

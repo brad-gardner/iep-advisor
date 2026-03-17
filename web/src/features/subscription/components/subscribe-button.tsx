@@ -20,7 +20,7 @@ export function SubscribeButton() {
   };
 
   return (
-    <Button onClick={handleSubscribe} disabled={isLoading}>
+    <Button onClick={handleSubscribe} disabled={isLoading} data-testid="subscribe-button">
       {isLoading ? 'Redirecting...' : 'Subscribe \u2014 $50/year'}
     </Button>
   );

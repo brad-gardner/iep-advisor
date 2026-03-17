@@ -4,22 +4,23 @@ export class IepDocumentsPage {
   constructor(private page: Page) {}
 
   async clickNewIep() {
-    await this.page.click('button:has-text("New IEP")');
+    await this.page.locator('[data-testid="new-iep-button"]').click();
   }
 
   async createIep(date: string, meetingType: string) {
     await this.clickNewIep();
-    await this.page.fill('input[type="date"]', date);
-    await this.page.locator('select').selectOption(meetingType);
-    await this.page.click('button:has-text("Create IEP")');
+    await this.page.locator('[data-testid="iep-meeting-date"]').fill(date);
+    await this.page.locator('[data-testid="iep-meeting-type"]').selectOption(meetingType);
+    await this.page.locator('[data-testid="iep-create-submit"]').click();
   }
 
   async expectIepVisible(meetingTypeLabel: string) {
-    // Use span selector to target badge, not the hidden select option
-    await expect(this.page.locator(`span:has-text("${meetingTypeLabel}")`).first()).toBeVisible();
+    await expect(
+      this.page.locator(`[data-testid="iep-document-card"]:has-text("${meetingTypeLabel}")`).first()
+    ).toBeVisible();
   }
 
   async expectFileInputAttached() {
-    await expect(this.page.locator('input[type="file"]').first()).toBeAttached();
+    await expect(this.page.locator('[data-testid="iep-file-input"]').first()).toBeAttached();
   }
 }

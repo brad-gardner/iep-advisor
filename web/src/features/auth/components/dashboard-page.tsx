@@ -14,6 +14,7 @@ export function DashboardPage() {
       <h1 className="font-serif">Welcome, {user?.firstName}</h1>
 
       {user && !user.onboardingCompleted && (
+        <div data-testid="onboarding-banner">
         <Notice variant="info" title="Complete your setup to get the most out of IEP Advisor">
           <Link to="/onboarding">
             <Button variant="primary" className="mt-2 gap-1.5">
@@ -22,6 +23,7 @@ export function DashboardPage() {
             </Button>
           </Link>
         </Notice>
+        </div>
       )}
 
       {!user?.state && user?.onboardingCompleted && (
@@ -33,7 +35,9 @@ export function DashboardPage() {
         </Notice>
       )}
 
-      <SubscriptionStatusCard />
+      <div data-testid="dashboard-subscription">
+        <SubscriptionStatusCard />
+      </div>
 
       <Card>
         <h2 className="font-serif mb-4">Your Account</h2>

@@ -16,19 +16,18 @@ export class ChildrenPage {
   }
 
   async clickFirstChild() {
-    // Scope to main content area to avoid matching sidebar "My Children" link
-    await this.page.locator('main a[href*="/children/"]').first().click();
+    await this.page.locator('[data-testid="child-card"] a').first().click();
     await this.page.waitForURL(/\/children\/\d+/);
   }
 
   async clickChildByName(name: string) {
-    await this.page.locator(`main a:has-text("${name}")`).first().click();
+    await this.page.locator(`[data-testid="child-card"]:has-text("${name}") a`).first().click();
     await this.page.waitForURL(/\/children\/\d+/);
   }
 
   async updateGradeLevel(grade: string) {
-    await this.page.getByLabel('Grade Level').clear();
-    await this.page.getByLabel('Grade Level').fill(grade);
+    await this.page.locator('[data-testid="child-grade-level"]').clear();
+    await this.page.locator('[data-testid="child-grade-level"]').fill(grade);
   }
 
   async fillChildForm(data: {
@@ -39,28 +38,28 @@ export class ChildrenPage {
     disabilityCategory?: string;
     schoolDistrict?: string;
   }) {
-    await this.page.getByLabel('First Name *').fill(data.firstName);
-    if (data.lastName) await this.page.getByLabel('Last Name').fill(data.lastName);
-    if (data.dateOfBirth) await this.page.getByLabel('Date of Birth').fill(data.dateOfBirth);
-    if (data.gradeLevel) await this.page.getByLabel('Grade Level').fill(data.gradeLevel);
-    if (data.disabilityCategory) await this.page.getByLabel('Disability Category').fill(data.disabilityCategory);
-    if (data.schoolDistrict) await this.page.getByLabel('School District').fill(data.schoolDistrict);
+    await this.page.locator('[data-testid="child-first-name"]').fill(data.firstName);
+    if (data.lastName) await this.page.locator('[data-testid="child-last-name"]').fill(data.lastName);
+    if (data.dateOfBirth) await this.page.locator('[data-testid="child-date-of-birth"]').fill(data.dateOfBirth);
+    if (data.gradeLevel) await this.page.locator('[data-testid="child-grade-level"]').fill(data.gradeLevel);
+    if (data.disabilityCategory) await this.page.locator('[data-testid="child-disability-category"]').fill(data.disabilityCategory);
+    if (data.schoolDistrict) await this.page.locator('[data-testid="child-school-district"]').fill(data.schoolDistrict);
   }
 
   async submitCreateForm() {
-    await this.page.getByRole('button', { name: 'Create Profile' }).click();
+    await this.page.locator('[data-testid="child-form-submit"]').click();
   }
 
   async clickEdit() {
-    await this.page.getByRole('button', { name: 'Edit' }).click();
+    await this.page.locator('[data-testid="child-edit-button"]').click();
   }
 
   async submitEditForm() {
-    await this.page.getByRole('button', { name: 'Save Changes' }).click();
+    await this.page.locator('[data-testid="child-form-submit"]').click();
   }
 
   async clickNewIep() {
-    await this.page.getByRole('button', { name: 'New IEP' }).click();
+    await this.page.locator('[data-testid="new-iep-button"]').click();
   }
 
   async expectOnChildrenList() {

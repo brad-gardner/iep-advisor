@@ -20,7 +20,7 @@ test.describe('Meeting Prep', () => {
 
     await children.gotoChild(childId);
 
-    const prepButton = page.getByRole('button', { name: /prep for meeting/i });
+    const prepButton = page.locator('[data-testid="generate-meeting-prep"]');
     if (await prepButton.isVisible({ timeout: 3000 }).catch(() => false)) {
       await prepButton.click();
       await page.waitForTimeout(5000);

@@ -67,19 +67,21 @@ export function ShareChildDialog({ childId, onInvited, onCancel }: ShareChildDia
           placeholder="parent@example.com"
           required
           maxLength={256}
+          data-testid="share-email"
         />
 
         <Select
           label="Role"
           value={role}
           onChange={(e) => setRole(e.target.value)}
+          data-testid="share-role"
         >
           <option value="viewer">Viewer</option>
           <option value="collaborator">Collaborator</option>
         </Select>
 
         <div className="flex gap-2 pt-1">
-          <Button type="submit" disabled={isSubmitting || !email.trim()}>
+          <Button type="submit" disabled={isSubmitting || !email.trim()} data-testid="share-submit">
             <Send className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
             {isSubmitting ? 'Sending...' : 'Send Invite'}
           </Button>

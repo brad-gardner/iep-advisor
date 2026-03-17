@@ -46,7 +46,7 @@ export function ChildForm({ initialValues, onSubmit, submitLabel }: ChildFormPro
 
   return (
     <Card className="max-w-lg">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4" data-testid="child-form">
         {error && <Notice variant="error" title={error} />}
 
         <Input
@@ -55,6 +55,7 @@ export function ChildForm({ initialValues, onSubmit, submitLabel }: ChildFormPro
           value={firstName}
           onChange={(e) => setFirstName(e.target.value)}
           maxLength={100}
+          data-testid="child-first-name"
         />
 
         <Input
@@ -62,6 +63,7 @@ export function ChildForm({ initialValues, onSubmit, submitLabel }: ChildFormPro
           value={lastName}
           onChange={(e) => setLastName(e.target.value)}
           maxLength={100}
+          data-testid="child-last-name"
         />
 
         <Input
@@ -69,6 +71,7 @@ export function ChildForm({ initialValues, onSubmit, submitLabel }: ChildFormPro
           type="date"
           value={dateOfBirth}
           onChange={(e) => setDateOfBirth(e.target.value)}
+          data-testid="child-date-of-birth"
         />
 
         <Input
@@ -77,6 +80,7 @@ export function ChildForm({ initialValues, onSubmit, submitLabel }: ChildFormPro
           value={gradeLevel}
           onChange={(e) => setGradeLevel(e.target.value)}
           maxLength={20}
+          data-testid="child-grade-level"
         />
 
         <Input
@@ -85,6 +89,7 @@ export function ChildForm({ initialValues, onSubmit, submitLabel }: ChildFormPro
           value={disabilityCategory}
           onChange={(e) => setDisabilityCategory(e.target.value)}
           maxLength={100}
+          data-testid="child-disability-category"
         />
 
         <Input
@@ -92,9 +97,10 @@ export function ChildForm({ initialValues, onSubmit, submitLabel }: ChildFormPro
           value={schoolDistrict}
           onChange={(e) => setSchoolDistrict(e.target.value)}
           maxLength={200}
+          data-testid="child-school-district"
         />
 
-        <Button type="submit" disabled={isSubmitting} className="w-full">
+        <Button type="submit" disabled={isSubmitting} className="w-full" data-testid="child-form-submit">
           {isSubmitting ? 'Saving...' : submitLabel}
         </Button>
       </form>

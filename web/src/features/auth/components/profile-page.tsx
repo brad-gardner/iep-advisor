@@ -165,6 +165,7 @@ export function ProfilePage() {
             value={user?.email ?? ''}
             disabled
             className="bg-brand-slate-50 text-brand-slate-400 cursor-not-allowed"
+            data-testid="profile-email"
           />
 
           <Input
@@ -172,6 +173,7 @@ export function ProfilePage() {
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             maxLength={100}
+            data-testid="profile-first-name"
           />
 
           <Input
@@ -179,6 +181,7 @@ export function ProfilePage() {
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
             maxLength={100}
+            data-testid="profile-last-name"
           />
 
           <div>
@@ -191,7 +194,7 @@ export function ProfilePage() {
             </p>
           </div>
 
-          <Button type="submit" disabled={isSubmitting || !firstName.trim()} className="w-full">
+          <Button type="submit" disabled={isSubmitting || !firstName.trim()} className="w-full" data-testid="profile-save">
             {isSubmitting ? 'Saving...' : 'Save Changes'}
           </Button>
         </form>
@@ -207,14 +210,14 @@ export function ProfilePage() {
         </Link>
       </div>
 
-      <Card className="max-w-lg">
+      <Card className="max-w-lg" data-testid="mfa-section">
         <h2 className="text-lg font-serif font-semibold text-brand-slate-800 mb-4">
           Two-Factor Authentication
         </h2>
         <MfaSection />
       </Card>
 
-      <Card className="max-w-lg">
+      <Card className="max-w-lg" data-testid="account-section">
         <h2 className="text-lg font-serif font-semibold text-brand-slate-800 mb-4">
           Account
         </h2>

@@ -71,6 +71,7 @@ export function AdvocacyGoalForm({
           placeholder="Describe your priority for your child (e.g., 'Improve reading fluency to grade level')"
           rows={3}
           maxLength={500}
+          data-testid="goal-text-input"
         />
         <p className="text-[11px] text-brand-slate-300 mt-1">{goalText.length}/500 characters</p>
       </div>
@@ -82,6 +83,7 @@ export function AdvocacyGoalForm({
             id="goal-category"
             value={category}
             onChange={(e) => setCategory((e.target as HTMLSelectElement).value)}
+            data-testid="goal-category-select"
           >
             {CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>
@@ -93,11 +95,11 @@ export function AdvocacyGoalForm({
 
         <div className="flex gap-2">
           {onCancel && (
-            <Button variant="ghost" type="button" onClick={onCancel}>
+            <Button variant="ghost" type="button" onClick={onCancel} data-testid="goal-form-cancel">
               Cancel
             </Button>
           )}
-          <Button type="submit" disabled={isSubmitting || goalText.trim().length < 10}>
+          <Button type="submit" disabled={isSubmitting || goalText.trim().length < 10} data-testid="goal-form-submit">
             {isSubmitting ? 'Saving...' : submitLabel}
           </Button>
         </div>

@@ -10,15 +10,15 @@ import type { SubscriptionStatus as SubscriptionStatusType, ChildUsage } from '@
 function statusBadge(status: string) {
   switch (status) {
     case 'active':
-      return <Badge variant="success">Active</Badge>;
+      return <Badge variant="success" data-testid="subscription-status">Active</Badge>;
     case 'past_due':
-      return <Badge variant="warning">Past Due</Badge>;
+      return <Badge variant="warning" data-testid="subscription-status">Past Due</Badge>;
     case 'canceled':
-      return <Badge variant="neutral">Canceled</Badge>;
+      return <Badge variant="neutral" data-testid="subscription-status">Canceled</Badge>;
     case 'expired':
-      return <Badge variant="neutral">Expired</Badge>;
+      return <Badge variant="neutral" data-testid="subscription-status">Expired</Badge>;
     default:
-      return <Badge variant="neutral">No Subscription</Badge>;
+      return <Badge variant="neutral" data-testid="subscription-status">No Subscription</Badge>;
   }
 }
 
@@ -28,7 +28,7 @@ function UsageBar({ usage }: { usage: ChildUsage }) {
     : 0;
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1" data-testid="usage-bar">
       <div className="flex items-center justify-between text-sm">
         <span className="text-brand-slate-600 font-medium">{usage.childName}</span>
         <span className="text-brand-slate-400 text-xs">

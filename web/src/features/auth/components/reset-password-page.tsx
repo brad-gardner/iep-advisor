@@ -84,6 +84,7 @@ export function ResetPasswordPage() {
           placeholder="********"
           minLength={8}
           maxLength={128}
+          data-testid="reset-password"
         />
 
         <Input
@@ -95,9 +96,10 @@ export function ResetPasswordPage() {
           placeholder="********"
           minLength={8}
           maxLength={128}
+          data-testid="reset-confirm-password"
         />
 
-        <Button type="submit" disabled={isLoading} className="w-full">
+        <Button type="submit" disabled={isLoading} className="w-full" data-testid="reset-submit">
           {isLoading ? 'Resetting...' : 'Reset Password'}
         </Button>
       </form>

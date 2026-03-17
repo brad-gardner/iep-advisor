@@ -145,19 +145,19 @@ export function ChildDetailPage() {
         </div>
         <div className="flex gap-2">
           {isOwner && (
-            <Button variant="secondary" onClick={() => setIsEditing(true)}>
+            <Button variant="secondary" onClick={() => setIsEditing(true)} data-testid="child-edit-button">
               Edit
             </Button>
           )}
           {isOwner && (
-            <Button variant="danger" onClick={handleDelete} disabled={isDeleting}>
+            <Button variant="danger" onClick={handleDelete} disabled={isDeleting} data-testid="child-remove-button">
               {isDeleting ? 'Removing...' : 'Remove'}
             </Button>
           )}
         </div>
       </div>
 
-      <Card>
+      <Card data-testid="child-profile-section">
         <h2 className="font-serif mb-4">Profile</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {child.dateOfBirth && (
@@ -190,10 +190,10 @@ export function ChildDetailPage() {
       </Card>
 
       {isOwner && (
-        <Card>
+        <Card data-testid="sharing-section">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-serif">Sharing & Access</h2>
-            <Button onClick={() => setShowShareDialog(!showShareDialog)}>
+            <Button onClick={() => setShowShareDialog(!showShareDialog)} data-testid="share-invite-button">
               <Share2 className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
               Invite Someone
             </Button>
@@ -214,7 +214,7 @@ export function ChildDetailPage() {
         </Card>
       )}
 
-      <Card>
+      <Card data-testid="advocacy-goals-section">
         <h2 className="font-serif mb-4">Your Advocacy Goals</h2>
         <AdvocacyGoalsList
           childId={Number(id)}
@@ -226,7 +226,7 @@ export function ChildDetailPage() {
         />
       </Card>
 
-      <Card>
+      <Card data-testid="meeting-prep-section">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <h2 className="font-serif">Meeting Prep</h2>
@@ -263,11 +263,11 @@ export function ChildDetailPage() {
         />
       </Card>
 
-      <Card>
+      <Card data-testid="iep-documents-section">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-serif">IEP Documents</h2>
           {!isViewer && !showCreateIep && (
-            <Button variant="secondary" onClick={() => setShowCreateIep(true)}>
+            <Button variant="secondary" onClick={() => setShowCreateIep(true)} data-testid="new-iep-button">
               New IEP
             </Button>
           )}
@@ -287,7 +287,7 @@ export function ChildDetailPage() {
         <IepDocumentList documents={documents} isLoading={docsLoading} onDeleted={reloadDocs} />
       </Card>
 
-      <Card>
+      <Card data-testid="timeline-section">
         <h2 className="font-serif mb-4">IEP Timeline</h2>
         <IepTimeline childId={Number(id)} />
       </Card>

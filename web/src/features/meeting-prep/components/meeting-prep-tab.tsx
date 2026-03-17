@@ -127,7 +127,7 @@ export function MeetingPrepTab({
   return (
     <div className="space-y-6">
       {/* Progress bar */}
-      <div className="space-y-2">
+      <div className="space-y-2" data-testid="meeting-prep-progress">
         <div className="flex items-center justify-between">
           <span className="text-[13px] font-medium text-brand-slate-600">
             {checkedCount} of {totalCount} items checked

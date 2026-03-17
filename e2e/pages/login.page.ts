@@ -8,9 +8,9 @@ export class LoginPage {
   }
 
   async login(email: string, password: string) {
-    await this.page.getByLabel('Email').fill(email);
-    await this.page.getByLabel('Password').fill(password);
-    await this.page.getByRole('button', { name: 'Sign In' }).click();
+    await this.page.locator('[data-testid="login-email"]').fill(email);
+    await this.page.locator('[data-testid="login-password"]').fill(password);
+    await this.page.locator('[data-testid="login-submit"]').click();
   }
 
   async expectRedirectToDashboard() {
@@ -23,6 +23,10 @@ export class LoginPage {
   }
 
   async expectSuccessMessage() {
-    await expect(this.page.getByText(/registration successful/i).first()).toBeVisible({ timeout: 5000 });
+    await expect(this.page.locator('[data-testid="login-success-message"]')).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectError() {
+    await expect(this.page.locator('[data-testid="login-error"]')).toBeVisible({ timeout: 5000 });
   }
 }

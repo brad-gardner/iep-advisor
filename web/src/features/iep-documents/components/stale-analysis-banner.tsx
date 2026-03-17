@@ -21,10 +21,10 @@ export function StaleAnalysisBanner({ onReanalyze, isReanalyzing }: StaleAnalysi
         </Notice>
       </div>
       <div className="flex gap-2 shrink-0">
-        <Button variant="ghost" onClick={() => setDismissed(true)} className="text-[11px]">
+        <Button variant="ghost" onClick={() => setDismissed(true)} className="text-[11px]" data-testid="stale-banner-dismiss">
           Dismiss
         </Button>
-        <Button variant="amber" onClick={onReanalyze} disabled={isReanalyzing}>
+        <Button variant="amber" onClick={onReanalyze} disabled={isReanalyzing} data-testid="reanalyze-button">
           {isReanalyzing ? 'Re-analyzing...' : 'Re-analyze'}
         </Button>
       </div>

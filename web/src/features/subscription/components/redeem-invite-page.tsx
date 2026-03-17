@@ -64,8 +64,9 @@ export function RedeemInvitePage() {
             placeholder="ABCD1234"
             maxLength={8}
             required
+            data-testid="redeem-code"
           />
-          <Button type="submit" disabled={isSubmitting || code.length < 8} className="w-full">
+          <Button type="submit" disabled={isSubmitting || code.length < 8} className="w-full" data-testid="redeem-submit">
             {isSubmitting ? 'Redeeming...' : 'Redeem'}
           </Button>
         </form>

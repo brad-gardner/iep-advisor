@@ -14,16 +14,16 @@ export class RegisterPage {
     email: string;
     password: string;
   }) {
-    await this.page.getByLabel('Invite Code').fill(data.inviteCode);
-    await this.page.getByLabel('First Name').fill(data.firstName);
-    await this.page.getByLabel('Last Name').fill(data.lastName);
-    await this.page.getByLabel('Email').fill(data.email);
-    await this.page.getByLabel('Password', { exact: true }).fill(data.password);
-    await this.page.getByLabel('Confirm Password').fill(data.password);
+    await this.page.locator('[data-testid="register-invite-code"]').fill(data.inviteCode);
+    await this.page.locator('[data-testid="register-first-name"]').fill(data.firstName);
+    await this.page.locator('[data-testid="register-last-name"]').fill(data.lastName);
+    await this.page.locator('[data-testid="register-email"]').fill(data.email);
+    await this.page.locator('[data-testid="register-password"]').fill(data.password);
+    await this.page.locator('[data-testid="register-confirm-password"]').fill(data.password);
   }
 
   async submit() {
-    await this.page.getByRole('button', { name: 'Create Account' }).click();
+    await this.page.locator('[data-testid="register-submit"]').click();
   }
 
   async expectRedirectToLogin() {

@@ -37,10 +37,10 @@ export function LoginPage() {
     <div className="w-full">
       <h2 className="text-2xl font-serif font-semibold text-center mb-6 text-brand-slate-800">Welcome Back</h2>
 
-      {successMessage && <div className="mb-4"><Notice variant="success" title={successMessage} /></div>}
-      {error && <div className="mb-4"><Notice variant="error" title={error} /></div>}
+      {successMessage && <div className="mb-4" data-testid="login-success-message"><Notice variant="success" title={successMessage} /></div>}
+      {error && <div className="mb-4" data-testid="login-error"><Notice variant="error" title={error} /></div>}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4" data-testid="login-form">
         <Input
           label="Email"
           type="email"
@@ -49,6 +49,7 @@ export function LoginPage() {
           required
           placeholder="you@example.com"
           maxLength={256}
+          data-testid="login-email"
         />
 
         <div>
@@ -60,25 +61,27 @@ export function LoginPage() {
             required
             placeholder="********"
             maxLength={128}
+            data-testid="login-password"
           />
           <div className="mt-1 text-right">
             <Link
               to="/forgot-password"
               className="text-xs text-brand-teal-500 hover:text-brand-teal-600"
+              data-testid="forgot-password-link"
             >
               Forgot password?
             </Link>
           </div>
         </div>
 
-        <Button type="submit" disabled={isLoading} className="w-full">
+        <Button type="submit" disabled={isLoading} className="w-full" data-testid="login-submit">
           {isLoading ? 'Signing in...' : 'Sign In'}
         </Button>
       </form>
 
       <p className="mt-6 text-center text-sm text-brand-slate-400">
         Don't have an account?{' '}
-        <Link to="/register" className="text-brand-teal-500 hover:text-brand-teal-600">
+        <Link to="/register" className="text-brand-teal-500 hover:text-brand-teal-600" data-testid="register-link">
           Sign up
         </Link>
       </p>

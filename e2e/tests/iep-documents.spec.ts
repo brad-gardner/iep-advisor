@@ -28,7 +28,7 @@ test.describe('IEP Documents', () => {
     await children.gotoChild(childId);
 
     // Check that the upload zone or file input exists for IEPs in "created" status
-    const uploadZone = page.locator('text=Drop PDF here, text=Upload PDF, input[type="file"]').first();
+    const uploadZone = page.locator('[data-testid="iep-upload-zone"], [data-testid="iep-file-input"]').first();
     await expect(uploadZone).toBeVisible({ timeout: 5000 }).catch(() => {
       console.log('No upload zone found — IEP may already have a file attached');
     });

@@ -3,12 +3,8 @@ import { Page, expect } from '@playwright/test';
 export class IepAnalysisPage {
   constructor(private page: Page) {}
 
-  async clickViewLink() {
-    return this.page.locator('a:has-text("View")').first();
-  }
-
   async navigateToFirstIep() {
-    const viewLink = await this.clickViewLink();
+    const viewLink = this.page.locator('[data-testid="iep-document-card"] a').first();
     if (await viewLink.isVisible()) {
       await viewLink.click();
       await this.page.waitForURL(/\/ieps\/\d+/);
@@ -18,11 +14,11 @@ export class IepAnalysisPage {
   }
 
   async clickAnalysisTab() {
-    await this.page.click('button:has-text("Analysis")');
+    await this.page.locator('[data-testid="tab-analysis"]').click();
   }
 
   async triggerAnalysisIfNeeded() {
-    const analyzeButton = this.page.locator('button:has-text("Analyze")');
+    const analyzeButton = this.page.locator('[data-testid="analyze-button"]');
     if (await analyzeButton.isVisible()) {
       await analyzeButton.click();
 
@@ -31,13 +27,13 @@ export class IepAnalysisPage {
         await this.page.reload();
         await this.clickAnalysisTab();
 
-        const overview = this.page.locator('h2:has-text("Overview")');
+        const overview = this.page.locator('[data-testid="analysis-nav-overview"]');
         if (await overview.isVisible()) break;
       }
     }
   }
 
   async expectOverviewVisible() {
-    await expect(this.page.locator('h2:has-text("Overview")')).toBeVisible();
+    await expect(this.page.locator('[data-testid="analysis-nav-overview"]')).toBeVisible();
   }
 }

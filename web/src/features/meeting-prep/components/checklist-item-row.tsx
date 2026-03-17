@@ -17,6 +17,7 @@ export function ChecklistItemRow({ item, index, onCheck }: ChecklistItemRowProps
       <div className="flex items-start gap-3 p-3">
         <button
           onClick={() => onCheck(index, !item.isChecked)}
+          data-testid="checklist-item"
           className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded border-[1.5px] flex items-center justify-center transition-colors ${
             item.isChecked
               ? 'bg-brand-teal-500 border-brand-teal-500'

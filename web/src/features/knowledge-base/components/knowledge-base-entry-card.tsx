@@ -8,7 +8,7 @@ interface KnowledgeBaseEntryCardProps {
 
 export function KnowledgeBaseEntryCard({ entry }: KnowledgeBaseEntryCardProps) {
   return (
-    <Card>
+    <Card data-testid="kb-entry">
       {entry.legalReference && (
         <p className="text-[10px] font-medium uppercase tracking-wider text-brand-teal-500 mb-1.5">
           {entry.legalReference}

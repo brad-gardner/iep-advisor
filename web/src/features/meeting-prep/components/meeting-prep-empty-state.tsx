@@ -20,7 +20,7 @@ export function MeetingPrepEmptyState({ onGenerate, isGenerating }: MeetingPrepE
         documents to bring, rights to reference, and potential red flags based
         on your child's IEP.
       </p>
-      <Button onClick={onGenerate} disabled={isGenerating}>
+      <Button onClick={onGenerate} disabled={isGenerating} data-testid="generate-meeting-prep">
         {isGenerating ? 'Generating...' : 'Generate Meeting Prep'}
       </Button>
     </div>

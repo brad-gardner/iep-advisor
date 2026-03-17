@@ -55,7 +55,7 @@ export function AdminUsersPage() {
           <span className="text-sm text-brand-slate-500">
             {filtered.length} user{filtered.length !== 1 ? 's' : ''}
           </span>
-          <Button onClick={() => setShowInvite(!showInvite)}>
+          <Button onClick={() => setShowInvite(!showInvite)} data-testid="admin-invite-button">
             <Send size={14} strokeWidth={1.8} className="mr-1.5" aria-hidden="true" />
             Invite Beta User
           </Button>
@@ -81,8 +81,9 @@ export function AdminUsersPage() {
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
               className="flex-1"
+              data-testid="admin-invite-email"
             />
-            <Button onClick={handleInvite} disabled={!inviteEmail || isInviting}>
+            <Button onClick={handleInvite} disabled={!inviteEmail || isInviting} data-testid="admin-send-invite">
               {isInviting ? 'Sending...' : 'Send Invite'}
             </Button>
           </div>
@@ -100,6 +101,7 @@ export function AdminUsersPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9"
+          data-testid="admin-user-search"
         />
       </div>
 

@@ -62,12 +62,14 @@ export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormPro
           value={iepDate}
           onChange={(e) => setIepDate(e.target.value)}
           required
+          data-testid="iep-meeting-date"
         />
         <Select
           label="Meeting Type"
           value={meetingType}
           onChange={(e) => setMeetingType(e.target.value)}
           required
+          data-testid="iep-meeting-type"
         >
           <option value="">Select type...</option>
           {MEETING_TYPES.map((t) => (
@@ -86,6 +88,7 @@ export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormPro
           onChange={(e) => setAttendees(e.target.value)}
           rows={2}
           maxLength={1000}
+          data-testid="iep-attendees"
         />
         <p className="text-[11px] text-brand-slate-300 mt-1">{attendees.length}/1000 characters</p>
       </div>
@@ -98,15 +101,16 @@ export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormPro
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
           maxLength={2000}
+          data-testid="iep-notes"
         />
         <p className="text-[11px] text-brand-slate-300 mt-1">{notes.length}/2000 characters</p>
       </div>
 
       <div className="flex gap-2">
-        <Button type="submit" disabled={isSubmitting || !iepDate || !meetingType}>
+        <Button type="submit" disabled={isSubmitting || !iepDate || !meetingType} data-testid="iep-create-submit">
           {isSubmitting ? 'Creating...' : 'Create IEP'}
         </Button>
-        <Button type="button" variant="ghost" onClick={onCancel}>
+        <Button type="button" variant="ghost" onClick={onCancel} data-testid="iep-create-cancel">
           Cancel
         </Button>
       </div>

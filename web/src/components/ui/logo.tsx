@@ -1,6 +1,6 @@
 import { CheckCircle } from 'lucide-react';
 
-interface LogoProps {
+interface LogoProps extends React.ComponentPropsWithoutRef<'div'> {
   variant?: 'light' | 'dark';
   size?: 'sm' | 'md' | 'lg';
   showTagline?: boolean;
@@ -12,12 +12,12 @@ const sizes = {
   lg: { icon: 40, text: 'text-3xl', tagline: 'text-[11px]' },
 };
 
-export function Logo({ variant = 'light', size = 'md', showTagline = true }: LogoProps) {
+export function Logo({ variant = 'light', size = 'md', showTagline = true, ...rest }: LogoProps) {
   const s = sizes[size];
   const textColor = variant === 'dark' ? 'text-white' : 'text-brand-slate-800';
 
   return (
-    <div className="flex items-center gap-2.5">
+    <div className="flex items-center gap-2.5" {...rest}>
       <div className="bg-brand-teal-500 rounded-full p-1.5 flex items-center justify-center">
         <CheckCircle className="text-white" size={s.icon * 0.6} strokeWidth={2.5} />
       </div>

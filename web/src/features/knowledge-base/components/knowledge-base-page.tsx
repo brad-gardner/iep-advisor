@@ -57,7 +57,7 @@ export function KnowledgeBasePage() {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4" data-testid="kb-results">
           {entries.map((entry) => (
             <KnowledgeBaseEntryCard key={entry.id} entry={entry} />
           ))}

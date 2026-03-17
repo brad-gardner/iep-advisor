@@ -19,6 +19,7 @@ function ProgressDots({ current, total }: { current: number; total: number }) {
       aria-valuemin={1}
       aria-valuemax={total}
       aria-label={`Step ${current + 1} of ${total}: ${STEP_LABELS[current]}`}
+      data-testid="onboarding-progress"
       className="flex items-center justify-center gap-2"
     >
       {Array.from({ length: total }, (_, i) => (
@@ -68,7 +69,7 @@ export function OnboardingFlow() {
 
       {/* Content */}
       <div className="flex-1 flex items-start justify-center px-4 pb-12">
-        <div className="bg-white rounded-card border-[0.5px] border-brand-slate-200 p-8 w-full max-w-xl">
+        <div className="bg-white rounded-card border-[0.5px] border-brand-slate-200 p-8 w-full max-w-xl" data-testid="onboarding-step">
           {error && <div className="mb-4"><Notice variant="error" title={error} /></div>}
           {step === 0 && <WelcomeStep onNext={next} />}
           {step === 1 && <StateStep onNext={next} onSkip={next} />}

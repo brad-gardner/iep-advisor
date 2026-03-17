@@ -4,10 +4,10 @@ export class MeetingPrepPage {
   constructor(private page: Page) {}
 
   async clickPrepForMeeting() {
-    return this.page.locator('button:has-text("Prep for Meeting")');
+    await this.page.locator('[data-testid="generate-meeting-prep"]').click();
   }
 
   async expectMeetingPrepVisible() {
-    await expect(this.page.locator('text=Meeting Prep').first()).toBeVisible();
+    await expect(this.page.locator('[data-testid="meeting-prep-progress"]')).toBeVisible();
   }
 }

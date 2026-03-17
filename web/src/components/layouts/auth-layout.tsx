@@ -9,7 +9,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
     <div className="min-h-screen flex items-center justify-center bg-brand-slate-800 px-4">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
-          <Logo variant="dark" size="lg" />
+          <Logo variant="dark" size="lg" data-testid="auth-logo" />
         </div>
         <div className="bg-white rounded-card p-8">
           {children}

@@ -21,12 +21,12 @@ export function ChildrenListPage() {
       <div className="flex justify-between items-center">
         <h1 className="font-serif">Your Children</h1>
         <Link to="/children/new">
-          <Button>Add Child</Button>
+          <Button data-testid="add-child-button">Add Child</Button>
         </Link>
       </div>
 
       {children.length === 0 ? (
-        <Card className="text-center py-12">
+        <Card className="text-center py-12" data-testid="children-empty-state">
           <Users className="w-12 h-12 mx-auto text-brand-slate-300 mb-3" strokeWidth={1.8} aria-hidden="true" />
           <p className="text-brand-slate-400 mb-4">No child profiles yet.</p>
           <Link to="/children/new">
@@ -41,7 +41,7 @@ export function ChildrenListPage() {
               to={`/children/${child.id}`}
               className="block"
             >
-              <Card className="hover:border-brand-teal-200 transition-colors">
+              <Card className="hover:border-brand-teal-200 transition-colors" data-testid="child-card">
                 <h3 className="font-serif text-brand-slate-800">
                   {child.firstName} {child.lastName}
                 </h3>

@@ -78,7 +78,7 @@ export function IepDocumentList({ documents, isLoading, onDeleted }: IepDocument
   return (
     <div className="space-y-2">
       {documents.map((doc) => (
-        <Card key={doc.id} className="p-3">
+        <Card key={doc.id} className="p-3" data-testid="iep-document-card">
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
