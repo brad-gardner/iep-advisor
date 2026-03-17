@@ -33,4 +33,25 @@ test.describe('IEP Documents', () => {
       console.log('No upload zone found — IEP may already have a file attached');
     });
   });
+
+  test('reject non-PDF file upload', async ({ page }) => {
+    const children = new ChildrenPage(page);
+    const iepDocs = new IepDocumentsPage(page);
+
+    // Create a second IEP so we have a fresh upload slot
+    await children.gotoChild(childId);
+    await iepDocs.createIep('2026-04-01', 'initial');
+
+    // Upload a .txt file via the hidden file input
+    const fileInput = page.locator('[data-testid="iep-file-input"]').first();
+    await fileInput.setInputFiles({
+      name: 'fake-document.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('This is not a PDF'),
+    });
+
+    // Should show error
+    await expect(page.locator('[data-testid="iep-upload-error"]')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="iep-upload-error"]')).toContainText('Only PDF files');
+  });
 });

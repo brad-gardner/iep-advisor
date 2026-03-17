@@ -66,7 +66,7 @@ export function IepUpload({ iepId, onUploaded }: IepUploadProps) {
   return (
     <div>
       {error && (
-        <div className="mb-3">
+        <div className="mb-3" data-testid="iep-upload-error">
           <Notice variant="error" title={error} />
         </div>
       )}

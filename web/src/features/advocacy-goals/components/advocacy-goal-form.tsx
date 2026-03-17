@@ -59,8 +59,8 @@ export function AdvocacyGoalForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      {error && <Notice variant="error" title={error} />}
+    <form onSubmit={handleSubmit} className="space-y-3" data-testid="goal-form">
+      {error && <div data-testid="goal-form-error"><Notice variant="error" title={error} /></div>}
 
       <div>
         <Textarea

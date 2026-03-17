@@ -66,7 +66,16 @@ export class ChildrenPage {
     await this.page.waitForURL('/children');
   }
 
+  async clickRemove() {
+    this.page.on('dialog', (dialog) => dialog.accept());
+    await this.page.locator('[data-testid="child-remove-button"]').click();
+  }
+
   async expectChildVisible(name: string) {
     await expect(this.page.getByText(name).first()).toBeVisible();
+  }
+
+  async expectChildNotVisible(name: string) {
+    await expect(this.page.getByText(name)).not.toBeVisible({ timeout: 5000 });
   }
 }

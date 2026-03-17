@@ -45,4 +45,38 @@ test.describe('Advocacy Goals', () => {
 
     await goals.deleteGoal();
   });
+
+  test('goal text under 10 chars shows validation error', async ({ page }) => {
+    const children = new ChildrenPage(page);
+
+    await children.gotoChild(childId);
+
+    // Click add goal button
+    await page.locator('[data-testid="add-goal-button"]').click();
+
+    // Type short text and try to submit
+    await page.locator('[data-testid="goal-text-input"]').fill('Too short');
+
+    // Submit button should be disabled (< 10 chars)
+    await expect(page.locator('[data-testid="goal-form-submit"]')).toBeDisabled();
+  });
+
+  test('reorder goals with up/down arrows', async ({ page }) => {
+    const children = new ChildrenPage(page);
+    const goals = new AdvocacyGoalsPage(page);
+
+    await children.gotoChild(childId);
+
+    // Add two goals for reordering
+    await goals.addGoal('First goal for reorder testing purposes', 'academic');
+    await goals.addGoal('Second goal for reorder testing purposes', 'behavioral');
+
+    // Click move-down on first goal
+    await page.locator('[data-testid="goal-move-down"]').first().click();
+    await page.waitForTimeout(500);
+
+    // Verify the goals are reordered — "Second" should now be first
+    const firstGoal = page.locator('[data-testid="goal-card"]').first();
+    await expect(firstGoal).toContainText('Second goal');
+  });
 });

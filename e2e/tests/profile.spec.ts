@@ -11,4 +11,10 @@ test.describe('Profile', () => {
     await profile.save();
     await profile.expectSaveSuccess();
   });
+
+  test('email field is disabled', async ({ page }) => {
+    await page.goto('/profile');
+    const emailInput = page.locator('[data-testid="profile-email"]');
+    await expect(emailInput).toBeDisabled();
+  });
 });
