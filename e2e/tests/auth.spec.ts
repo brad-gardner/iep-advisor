@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { getAdminToken, createTestUser } from '../helpers/test-data';
+import { getAdminToken } from '../helpers/test-data';
 import { generateBetaCode } from '../helpers/api';
+import { getSharedTestUser } from '../helpers/fixtures';
 
 test.describe('Authentication', () => {
   test('register with valid beta code', async ({ page }) => {
@@ -9,13 +10,13 @@ test.describe('Authentication', () => {
     const email = `register-${Date.now()}@e2e.test`;
 
     await page.goto('/register');
-    await page.fill('input[name="inviteCode"]', code);
-    await page.fill('input[name="firstName"]', 'Test');
-    await page.fill('input[name="lastName"]', 'Register');
-    await page.fill('input[name="email"]', email);
-    await page.fill('input[name="password"]', 'TestPass123!');
-    await page.fill('input[name="confirmPassword"]', 'TestPass123!');
-    await page.click('button[type="submit"]');
+    await page.getByLabel('Invite Code').fill(code);
+    await page.getByLabel('First Name').fill('Test');
+    await page.getByLabel('Last Name').fill('Register');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password', { exact: true }).fill('TestPass123!');
+    await page.getByLabel('Confirm Password').fill('TestPass123!');
+    await page.getByRole('button', { name: 'Create Account' }).click();
 
     // Should redirect to login with success message
     await page.waitForURL('/login');
@@ -24,48 +25,48 @@ test.describe('Authentication', () => {
 
   test('register with invalid code shows error', async ({ page }) => {
     await page.goto('/register');
-    await page.fill('input[name="inviteCode"]', 'INVALIDX');
-    await page.fill('input[name="firstName"]', 'Test');
-    await page.fill('input[name="lastName"]', 'Bad');
-    await page.fill('input[name="email"]', `bad-${Date.now()}@e2e.test`);
-    await page.fill('input[name="password"]', 'TestPass123!');
-    await page.fill('input[name="confirmPassword"]', 'TestPass123!');
-    await page.click('button[type="submit"]');
+    await page.getByLabel('Invite Code').fill('INVALIDX');
+    await page.getByLabel('First Name').fill('Test');
+    await page.getByLabel('Last Name').fill('Bad');
+    await page.getByLabel('Email').fill(`bad-${Date.now()}@e2e.test`);
+    await page.getByLabel('Password', { exact: true }).fill('TestPass123!');
+    await page.getByLabel('Confirm Password').fill('TestPass123!');
+    await page.getByRole('button', { name: 'Create Account' }).click();
 
     await expect(page.locator('text=Invalid')).toBeVisible({ timeout: 5000 });
   });
 
   test('login with valid credentials', async ({ page }) => {
-    const user = await createTestUser('login');
+    const user = getSharedTestUser();
 
     await page.goto('/login');
-    await page.fill('input[type="email"]', user.email);
-    await page.fill('input[type="password"]', user.password);
-    await page.click('button[type="submit"]');
+    await page.getByLabel('Email').fill(user.email);
+    await page.getByLabel('Password').fill(user.password);
+    await page.getByRole('button', { name: 'Sign In' }).click();
 
     await page.waitForURL(/\/(dashboard|onboarding)/);
   });
 
   test('login with wrong password shows error', async ({ page }) => {
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'nobody@e2e.test');
-    await page.fill('input[type="password"]', 'wrongpassword');
-    await page.click('button[type="submit"]');
+    await page.getByLabel('Email').fill('nobody@e2e.test');
+    await page.getByLabel('Password').fill('wrongpassword');
+    await page.getByRole('button', { name: 'Sign In' }).click();
 
     await expect(page.locator('text=Invalid email or password')).toBeVisible({ timeout: 5000 });
   });
 
   test('logout clears session', async ({ page }) => {
-    const user = await createTestUser('logout');
+    const user = getSharedTestUser();
 
     await page.goto('/login');
-    await page.fill('input[type="email"]', user.email);
-    await page.fill('input[type="password"]', user.password);
-    await page.click('button[type="submit"]');
+    await page.getByLabel('Email').fill(user.email);
+    await page.getByLabel('Password').fill(user.password);
+    await page.getByRole('button', { name: 'Sign In' }).click();
     await page.waitForURL(/\/(dashboard|onboarding)/);
 
     // Click sign out in sidebar
-    await page.click('text=Sign Out');
+    await page.getByRole('button', { name: /sign out/i }).click();
     await page.waitForURL('/login');
   });
 });

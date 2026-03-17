@@ -15,6 +15,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
     headless: true,
+    ignoreHTTPSErrors: true,
     // Reuse auth state from global setup — no per-test login needed
     storageState: '.auth-state.json',
   },

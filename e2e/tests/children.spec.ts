@@ -4,16 +4,14 @@ test.describe('Child Management', () => {
   test('create child with all fields', async ({ page }) => {
     await page.goto('/children/new');
 
-    await page.fill('input[id="first-name"]', 'Emma');
-    await page.fill('input[id="last-name"]', 'TestChild');
-    await page.fill('input[type="date"]', '2015-06-15');
+    await page.getByLabel('First Name *').fill('Emma');
+    await page.getByLabel('Last Name').fill('TestChild');
+    await page.getByLabel('Date of Birth').fill('2015-06-15');
+    await page.getByLabel('Grade Level').fill('3rd');
+    await page.getByLabel('Disability Category').fill('Autism');
+    await page.getByLabel('School District').fill('Test District');
 
-    // Use placeholder-based selectors for the remaining fields
-    await page.locator('input[placeholder*="3rd"]').fill('3rd');
-    await page.locator('input[placeholder*="Autism"]').fill('Autism');
-    await page.locator('input[id="school-district"]').fill('Test District');
-
-    await page.click('button:has-text("Create Profile")');
+    await page.getByRole('button', { name: 'Create Profile' }).click();
 
     // Should redirect to children list
     await page.waitForURL('/children');
@@ -21,18 +19,24 @@ test.describe('Child Management', () => {
   });
 
   test('edit child profile', async ({ page }) => {
-    await page.goto('/children');
+    // First create a child to edit
+    await page.goto('/children/new');
+    await page.getByLabel('First Name *').fill('EditTest');
+    await page.getByLabel('Last Name').fill('Child');
+    await page.getByLabel('Grade Level').fill('3rd');
+    await page.getByRole('button', { name: 'Create Profile' }).click();
+    await page.waitForURL('/children');
 
-    // Click on a child
-    await page.locator('a:has-text("Emma")').first().click();
+    // Click on the child we just created (scope to main content area to avoid sidebar)
+    await page.locator('main a[href*="/children/"]').filter({ hasText: 'EditTest' }).first().click();
     await page.waitForURL(/\/children\/\d+/);
 
     // Click edit
-    await page.click('button:has-text("Edit")');
+    await page.getByRole('button', { name: 'Edit' }).click();
 
     // Change grade
-    await page.locator('input[placeholder*="3rd"]').fill('4th');
-    await page.click('button:has-text("Save")');
+    await page.getByLabel('Grade Level').fill('4th');
+    await page.getByRole('button', { name: 'Save Changes' }).click();
 
     // Verify updated
     await expect(page.locator('text=4th')).toBeVisible();

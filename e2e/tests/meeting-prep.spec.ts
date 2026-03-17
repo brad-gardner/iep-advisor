@@ -1,15 +1,25 @@
-import { test, expect } from '../helpers/fixtures';
+import { test, expect, getSharedTestUser } from '../helpers/fixtures';
+import { createChildViaApi } from '../helpers/api';
 
 test.describe('Meeting Prep', () => {
   test.setTimeout(120_000);
 
+  let childId: number;
+
+  test.beforeAll(async () => {
+    const user = getSharedTestUser();
+    const child = await createChildViaApi(user.token, 'MeetingPrepChild', 'E2E', {
+      gradeLevel: '4th',
+    });
+    childId = child.id;
+  });
+
   test('generate checklist from goals (Mode B)', async ({ page }) => {
-    await page.goto('/children');
-    await page.locator('a[href*="/children/"]').first().click();
-    await page.waitForURL(/\/children\/\d+/);
+    await page.goto(`/children/${childId}`);
+    await page.waitForURL(`/children/${childId}`);
 
     // Click "Prep for Meeting" if it exists
-    const prepButton = page.locator('button:has-text("Prep for Meeting")');
+    const prepButton = page.getByRole('button', { name: 'Prep for Meeting' });
     if (await prepButton.isVisible()) {
       await prepButton.click();
 

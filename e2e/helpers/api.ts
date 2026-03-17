@@ -70,3 +70,18 @@ export async function loginUser(email: string, password: string): Promise<string
   if (!data.data?.token) throw new Error('Login failed: ' + JSON.stringify(data));
   return data.data.token;
 }
+
+export async function createChildViaApi(
+  token: string,
+  firstName: string,
+  lastName?: string,
+  options?: { dateOfBirth?: string; gradeLevel?: string; disabilityCategory?: string; schoolDistrict?: string }
+): Promise<{ id: number; firstName: string }> {
+  const data = await apiPost('/api/children', {
+    firstName,
+    lastName,
+    ...options,
+  }, token);
+  if (!data.data) throw new Error('Create child failed: ' + JSON.stringify(data));
+  return data.data;
+}

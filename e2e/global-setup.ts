@@ -26,13 +26,13 @@ async function globalSetup() {
   console.log('Logging in via browser to save auth state...');
   const baseURL = process.env.BASE_URL || 'http://localhost:5200';
   const browser = await chromium.launch();
-  const context = await browser.newContext();
+  const context = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await context.newPage();
 
   await page.goto(`${baseURL}/login`);
-  await page.fill('input[type="email"]', user.email);
-  await page.fill('input[type="password"]', user.password);
-  await page.click('button[type="submit"]');
+  await page.getByLabel('Email').fill(user.email);
+  await page.getByLabel('Password').fill(user.password);
+  await page.getByRole('button', { name: 'Sign In' }).click();
 
   // Wait for redirect — means login succeeded and JWT is in localStorage
   await page.waitForURL(/\/(dashboard|onboarding)/, { timeout: 15000 });
