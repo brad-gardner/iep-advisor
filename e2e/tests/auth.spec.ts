@@ -3,6 +3,9 @@ import { getAdminToken } from '../helpers/test-data';
 import { generateBetaCode } from '../helpers/api';
 import { getSharedTestUser } from '../helpers/fixtures';
 
+// Auth tests must run WITHOUT saved auth state — they test login/register as unauthenticated users
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Authentication', () => {
   test('register with valid beta code', async ({ page }) => {
     const adminToken = await getAdminToken();
