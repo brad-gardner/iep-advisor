@@ -54,7 +54,7 @@ export function AdminDashboardPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6" data-testid="admin-dashboard">
       <div className="flex items-center gap-3 mb-2">
         <LayoutDashboard size={22} strokeWidth={1.8} className="text-brand-teal-500" />
         <h1 className="text-2xl font-serif text-brand-slate-800">Admin Dashboard</h1>
@@ -169,7 +169,7 @@ interface StatCardProps {
 
 function StatCard({ icon: Icon, label, value, delta }: StatCardProps) {
   return (
-    <Card>
+    <Card data-testid={`admin-stat-${label.toLowerCase().replace(/\s+/g, '-')}`}>
       <div className="flex items-start justify-between">
         <div className="flex items-center justify-center w-10 h-10 rounded-full bg-brand-teal-50">
           <Icon size={20} strokeWidth={1.8} className="text-brand-teal-500" />
@@ -292,7 +292,7 @@ interface RecentUsersTableProps {
 
 function RecentUsersTable({ users }: RecentUsersTableProps) {
   return (
-    <Card>
+    <Card data-testid="admin-recent-users">
       <h3 className="text-sm font-medium text-brand-slate-700 mb-4">Recent Users</h3>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
