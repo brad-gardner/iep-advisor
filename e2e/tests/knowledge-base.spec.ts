@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/fixtures';
 
 test.describe('Knowledge Base', () => {
-  test('search returns results', async ({ loggedInPage: page }) => {
+  test('search returns results', async ({ page }) => {
     await page.goto('/knowledge-base');
 
     // Type a search
@@ -14,7 +14,7 @@ test.describe('Knowledge Base', () => {
     await expect(page.locator('text=Free Appropriate Public Education')).toBeVisible();
   });
 
-  test('filter by category', async ({ loggedInPage: page }) => {
+  test('filter by category', async ({ page }) => {
     await page.goto('/knowledge-base');
 
     // Click the Glossary tab

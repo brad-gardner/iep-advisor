@@ -3,7 +3,7 @@ import { test, expect } from '../helpers/fixtures';
 test.describe('Meeting Prep', () => {
   test.setTimeout(120_000);
 
-  test('generate checklist from goals (Mode B)', async ({ loggedInPage: page }) => {
+  test('generate checklist from goals (Mode B)', async ({ page }) => {
     await page.goto('/children');
     await page.locator('a[href*="/children/"]').first().click();
     await page.waitForURL(/\/children\/\d+/);

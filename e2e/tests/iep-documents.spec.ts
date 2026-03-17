@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/fixtures';
 
 test.describe('IEP Documents', () => {
-  test('create IEP event with date and type', async ({ loggedInPage: page }) => {
+  test('create IEP event with date and type', async ({ page }) => {
     await page.goto('/children');
     await page.locator('a[href*="/children/"]').first().click();
     await page.waitForURL(/\/children\/\d+/);
@@ -19,7 +19,7 @@ test.describe('IEP Documents', () => {
     await expect(page.locator('text=Annual Review')).toBeVisible();
   });
 
-  test('upload PDF to existing IEP', async ({ loggedInPage: page }) => {
+  test('upload PDF to existing IEP', async ({ page }) => {
     await page.goto('/children');
     await page.locator('a[href*="/children/"]').first().click();
     await page.waitForURL(/\/children\/\d+/);

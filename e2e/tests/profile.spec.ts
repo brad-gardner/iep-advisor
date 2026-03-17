@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/fixtures';
 
 test.describe('Profile', () => {
-  test('update name and state', async ({ loggedInPage: page }) => {
+  test('update name and state', async ({ page }) => {
     await page.goto('/profile');
 
     // Clear and update first name

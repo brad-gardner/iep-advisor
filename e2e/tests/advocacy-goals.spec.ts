@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/fixtures';
 
 test.describe('Advocacy Goals', () => {
-  test('add advocacy goal with category', async ({ loggedInPage: page }) => {
+  test('add advocacy goal with category', async ({ page }) => {
     await page.goto('/children');
     await page.locator('a[href*="/children/"]').first().click();
     await page.waitForURL(/\/children\/\d+/);
@@ -16,7 +16,7 @@ test.describe('Advocacy Goals', () => {
     await expect(page.locator('text=Improve reading fluency')).toBeVisible();
   });
 
-  test('edit existing goal', async ({ loggedInPage: page }) => {
+  test('edit existing goal', async ({ page }) => {
     await page.goto('/children');
     await page.locator('a[href*="/children/"]').first().click();
     await page.waitForURL(/\/children\/\d+/);
@@ -30,7 +30,7 @@ test.describe('Advocacy Goals', () => {
     await expect(page.locator('text=Updated reading fluency')).toBeVisible();
   });
 
-  test('delete goal with confirmation', async ({ loggedInPage: page }) => {
+  test('delete goal with confirmation', async ({ page }) => {
     await page.goto('/children');
     await page.locator('a[href*="/children/"]').first().click();
     await page.waitForURL(/\/children\/\d+/);

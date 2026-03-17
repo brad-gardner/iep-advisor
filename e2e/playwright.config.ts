@@ -5,7 +5,7 @@ dotenv.config();
 
 export default defineConfig({
   testDir: './tests',
-  fullyParallel: false, // Sequential to avoid data conflicts
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
@@ -15,6 +15,8 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
     headless: true,
+    // Reuse auth state from global setup — no per-test login needed
+    storageState: '.auth-state.json',
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },

@@ -3,7 +3,7 @@ import { test, expect } from '../helpers/fixtures';
 test.describe('IEP Analysis', () => {
   test.setTimeout(120_000); // 2 minutes for AI analysis
 
-  test('trigger analysis and view results', async ({ loggedInPage: page }) => {
+  test('trigger analysis and view results', async ({ page }) => {
     // This test requires a parsed IEP to exist
     // Navigate to an IEP viewer
     await page.goto('/children');

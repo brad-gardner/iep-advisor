@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/fixtures';
 
 test.describe('Child Management', () => {
-  test('create child with all fields', async ({ loggedInPage: page }) => {
+  test('create child with all fields', async ({ page }) => {
     await page.goto('/children/new');
 
     await page.fill('input[id="first-name"]', 'Emma');
@@ -20,7 +20,7 @@ test.describe('Child Management', () => {
     await expect(page.locator('text=Emma')).toBeVisible();
   });
 
-  test('edit child profile', async ({ loggedInPage: page }) => {
+  test('edit child profile', async ({ page }) => {
     await page.goto('/children');
 
     // Click on a child
