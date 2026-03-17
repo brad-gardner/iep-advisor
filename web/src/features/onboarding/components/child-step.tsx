@@ -39,7 +39,7 @@ export function ChildStep({ onNext, onSkip }: ChildStepProps) {
       <ChildForm onSubmit={handleSubmit} submitLabel="Save & Continue" />
 
       <div className="flex justify-start">
-        <Button variant="ghost" onClick={onSkip}>
+        <Button variant="ghost" onClick={onSkip} data-testid="onboarding-skip-child">
           Skip for now
         </Button>
       </div>

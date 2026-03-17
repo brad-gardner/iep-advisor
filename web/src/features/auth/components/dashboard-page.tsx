@@ -17,7 +17,7 @@ export function DashboardPage() {
         <div data-testid="onboarding-banner">
         <Notice variant="info" title="Complete your setup to get the most out of IEP Advisor">
           <Link to="/onboarding">
-            <Button variant="primary" className="mt-2 gap-1.5">
+            <Button variant="primary" className="mt-2 gap-1.5" data-testid="onboarding-get-started">
               Get Started
               <ArrowRight size={14} strokeWidth={1.8} aria-hidden="true" />
             </Button>

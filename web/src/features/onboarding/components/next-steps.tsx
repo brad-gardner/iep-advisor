@@ -68,9 +68,9 @@ export function NextSteps({ onFinish }: NextStepsProps) {
 
       <div className="flex items-center justify-center gap-3 pt-2">
         <Link to="/iep-101">
-          <Button variant="secondary">Learn about IEPs</Button>
+          <Button variant="secondary" data-testid="onboarding-learn">Learn about IEPs</Button>
         </Link>
-        <Button onClick={onFinish}>Go to Dashboard</Button>
+        <Button onClick={onFinish} data-testid="onboarding-finish">Go to Dashboard</Button>
       </div>
     </div>
   );

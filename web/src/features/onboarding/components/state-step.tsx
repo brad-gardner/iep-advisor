@@ -53,10 +53,10 @@ export function StateStep({ onNext, onSkip }: StateStepProps) {
       </div>
 
       <div className="flex items-center justify-between pt-2">
-        <Button variant="ghost" onClick={onSkip}>
+        <Button variant="ghost" onClick={onSkip} data-testid="onboarding-skip-state">
           Skip for now
         </Button>
-        <Button onClick={handleContinue} disabled={!state || isSaving}>
+        <Button onClick={handleContinue} disabled={!state || isSaving} data-testid="onboarding-continue-state">
           {isSaving ? 'Saving...' : 'Continue'}
         </Button>
       </div>

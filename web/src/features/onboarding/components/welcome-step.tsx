@@ -30,7 +30,7 @@ export function WelcomeStep({ onNext }: WelcomeStepProps) {
         </p>
       </div>
 
-      <Button onClick={onNext} className="mt-4">
+      <Button onClick={onNext} className="mt-4" data-testid="onboarding-start">
         Let's get you set up
       </Button>
     </div>
