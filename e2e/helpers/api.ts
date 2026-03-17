@@ -39,9 +39,11 @@ export async function loginAdmin(): Promise<string> {
   const email = process.env.ADMIN_EMAIL || 'admin@example.com';
   const password = process.env.ADMIN_PASSWORD || 'adminpassword';
 
+  console.log(`  Attempting admin login at ${API_URL}/api/auth/login as ${email}`);
   const data = await apiPost('/api/auth/login', { email, password });
-  if (!data.data?.token) throw new Error('Admin login failed: ' + JSON.stringify(data));
-  return data.data.token;
+  const token = data.data?.token || data.data?.authResult?.token || data.token;
+  if (!token) throw new Error('Admin login failed: ' + JSON.stringify(data).substring(0, 300));
+  return token;
 }
 
 export async function generateBetaCode(adminToken: string): Promise<string> {
@@ -56,8 +58,10 @@ export async function registerUser(email: string, password: string, firstName: s
 
 export async function loginUser(email: string, password: string): Promise<string> {
   const data = await apiPost('/api/auth/login', { email, password });
-  if (!data.data?.token) throw new Error('Login failed');
-  return data.data.token;
+  // Handle both direct token and nested response structures
+  const token = data.data?.token || data.data?.authResult?.token || data.token;
+  if (!token) throw new Error('Login failed: ' + JSON.stringify(data).substring(0, 300));
+  return token;
 }
 
 export async function getCurrentUser(token: string): Promise<{ id: number }> {
