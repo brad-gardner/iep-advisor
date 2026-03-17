@@ -18,8 +18,10 @@ async function globalSetup() {
   console.log('Creating shared test user...');
   const user = await createTestUser('shared');
 
+  // Save test user AND admin token so tests don't need to re-login via API
+  const adminToken = await getAdminToken();
   const testDataPath = path.join(__dirname, '.test-data.json');
-  fs.writeFileSync(testDataPath, JSON.stringify(user, null, 2));
+  fs.writeFileSync(testDataPath, JSON.stringify({ ...user, adminToken }, null, 2));
   console.log(`Test user created: ${user.email}`);
 
   // Login once via browser and save auth state (localStorage with JWT)

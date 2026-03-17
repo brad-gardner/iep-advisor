@@ -1,4 +1,6 @@
 import { loginAdmin, generateBetaCode, registerUser, loginUser } from './api';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface TestUser {
   email: string;
@@ -12,7 +14,20 @@ export interface TestUser {
 let _adminToken: string | null = null;
 
 export async function getAdminToken(): Promise<string> {
-  if (!_adminToken) _adminToken = await loginAdmin();
+  if (!_adminToken) {
+    // Try to read cached token from global setup first (avoids rate-limited re-login)
+    try {
+      const dataPath = path.join(__dirname, '..', '.test-data.json');
+      const data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+      if (data.adminToken) {
+        _adminToken = data.adminToken;
+        return _adminToken;
+      }
+    } catch {
+      // File doesn't exist yet (we're in global setup) — login fresh
+    }
+    _adminToken = await loginAdmin();
+  }
   return _adminToken;
 }
 
