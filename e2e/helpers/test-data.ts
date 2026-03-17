@@ -1,4 +1,4 @@
-import { loginAdmin, generateBetaCode, registerUser, loginUser } from './api';
+import { loginAdmin, generateBetaCode, registerUser, loginUser, getCurrentUser } from './api';
 
 export interface TestUser {
   email: string;
@@ -7,6 +7,7 @@ export interface TestUser {
   lastName: string;
   inviteCode: string;
   token: string;
+  userId: number;
 }
 
 let _adminToken: string | null = null;
@@ -30,5 +31,7 @@ export async function createTestUser(suffix?: string): Promise<TestUser> {
   await registerUser(email, password, firstName, lastName, inviteCode);
   const token = await loginUser(email, password);
 
-  return { email, password, firstName, lastName, inviteCode, token };
+  const user = await getCurrentUser(token);
+
+  return { email, password, firstName, lastName, inviteCode, token, userId: user.id };
 }

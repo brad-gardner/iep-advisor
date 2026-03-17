@@ -1,33 +1,26 @@
 import { test, expect } from '../helpers/fixtures';
+import { ChildrenPage } from '../pages/children.page';
+import { IepDocumentsPage } from '../pages/iep-documents.page';
 
 test.describe('IEP Documents', () => {
   test('create IEP event with date and type', async ({ loggedInPage: page }) => {
-    await page.goto('/children');
-    await page.locator('a[href*="/children/"]').first().click();
-    await page.waitForURL(/\/children\/\d+/);
+    const children = new ChildrenPage(page);
+    const iepDocs = new IepDocumentsPage(page);
 
-    // Click New IEP
-    await page.click('button:has-text("New IEP")');
+    await children.goto();
+    await children.clickFirstChild();
 
-    // Fill in meeting details
-    await page.fill('input[type="date"]', '2026-03-15');
-    await page.locator('select').selectOption('annual_review');
-
-    await page.click('button:has-text("Create IEP")');
-
-    // IEP should appear in the list
-    await expect(page.locator('text=Annual Review')).toBeVisible();
+    await iepDocs.createIep('2026-03-15', 'annual_review');
+    await iepDocs.expectIepVisible('Annual Review');
   });
 
   test('upload PDF to existing IEP', async ({ loggedInPage: page }) => {
-    await page.goto('/children');
-    await page.locator('a[href*="/children/"]').first().click();
-    await page.waitForURL(/\/children\/\d+/);
+    const children = new ChildrenPage(page);
+    const iepDocs = new IepDocumentsPage(page);
 
-    // Find the file input in an IEP card's upload zone
-    const fileInput = page.locator('input[type="file"]').first();
+    await children.goto();
+    await children.clickFirstChild();
 
-    // For now, we'll check the upload zone exists
-    await expect(fileInput).toBeAttached();
+    await iepDocs.expectFileInputAttached();
   });
 });

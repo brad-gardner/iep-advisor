@@ -1,41 +1,24 @@
 import { test, expect } from '../helpers/fixtures';
+import { ChildrenPage } from '../pages/children.page';
+import { IepAnalysisPage } from '../pages/iep-analysis.page';
 
 test.describe('IEP Analysis', () => {
-  test.setTimeout(120_000); // 2 minutes for AI analysis
+  test.setTimeout(120_000);
 
   test('trigger analysis and view results', async ({ loggedInPage: page }) => {
-    // This test requires a parsed IEP to exist
-    // Navigate to an IEP viewer
-    await page.goto('/children');
-    const iepLink = page.locator('a:has-text("View")').first();
+    const children = new ChildrenPage(page);
+    const analysis = new IepAnalysisPage(page);
 
-    if (await iepLink.isVisible()) {
-      await iepLink.click();
-      await page.waitForURL(/\/ieps\/\d+/);
+    await children.goto();
 
-      // Click Analysis tab
-      await page.click('button:has-text("Analysis")');
-
-      // If analysis doesn't exist, trigger it
-      const analyzeButton = page.locator('button:has-text("Analyze")');
-      if (await analyzeButton.isVisible()) {
-        await analyzeButton.click();
-
-        // Poll for completion (up to 90 seconds)
-        for (let i = 0; i < 18; i++) {
-          await page.waitForTimeout(5000);
-          await page.reload();
-          await page.click('button:has-text("Analysis")');
-
-          const overview = page.locator('h2:has-text("Overview")');
-          if (await overview.isVisible()) break;
-        }
-      }
-
-      // Verify analysis results are displayed
-      await expect(page.locator('h2:has-text("Overview")')).toBeVisible();
-    } else {
+    const hasIep = await analysis.navigateToFirstIep();
+    if (!hasIep) {
       test.skip(true, 'No parsed IEP available for analysis test');
+      return;
     }
+
+    await analysis.clickAnalysisTab();
+    await analysis.triggerAnalysisIfNeeded();
+    await analysis.expectOverviewVisible();
   });
 });

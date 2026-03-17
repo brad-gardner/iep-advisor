@@ -1,26 +1,20 @@
 import { test, expect } from '../helpers/fixtures';
+import { KnowledgeBasePage } from '../pages/knowledge-base.page';
 
 test.describe('Knowledge Base', () => {
   test('search returns results', async ({ loggedInPage: page }) => {
-    await page.goto('/knowledge-base');
+    const kb = new KnowledgeBasePage(page);
 
-    // Type a search
-    await page.locator('input[placeholder*="Search"]').fill('FAPE');
-
-    // Wait for debounced search
-    await page.waitForTimeout(500);
-
-    // Should see FAPE-related entries
-    await expect(page.locator('text=Free Appropriate Public Education')).toBeVisible();
+    await kb.goto();
+    await kb.search('FAPE');
+    await kb.expectResultVisible('Free Appropriate Public Education');
   });
 
   test('filter by category', async ({ loggedInPage: page }) => {
-    await page.goto('/knowledge-base');
+    const kb = new KnowledgeBasePage(page);
 
-    // Click the Glossary tab
-    await page.click('button:has-text("Glossary")');
-
-    // Should show glossary entries
-    await expect(page.locator('text=FAPE')).toBeVisible();
+    await kb.goto();
+    await kb.selectCategory('Glossary');
+    await kb.expectResultVisible('FAPE');
   });
 });

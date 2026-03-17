@@ -20,6 +20,18 @@ export async function apiGet(path: string, token?: string) {
   return res.json();
 }
 
+export async function apiPut(path: string, body: any, token?: string) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
 export async function loginAdmin(): Promise<string> {
   const email = process.env.ADMIN_EMAIL || 'admin@example.com';
   const password = process.env.ADMIN_PASSWORD || 'adminpassword';
@@ -43,4 +55,9 @@ export async function loginUser(email: string, password: string): Promise<string
   const data = await apiPost('/api/auth/login', { email, password });
   if (!data.data?.token) throw new Error('Login failed');
   return data.data.token;
+}
+
+export async function getCurrentUser(token: string): Promise<{ id: number }> {
+  const data = await apiGet('/api/auth/me', token);
+  return data.data;
 }

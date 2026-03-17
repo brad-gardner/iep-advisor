@@ -20,4 +20,5 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
   globalSetup: './global-setup.ts',
+  globalTeardown: './global-teardown.ts',
 });

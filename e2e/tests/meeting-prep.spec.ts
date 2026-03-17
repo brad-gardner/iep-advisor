@@ -1,23 +1,22 @@
 import { test, expect } from '../helpers/fixtures';
+import { ChildrenPage } from '../pages/children.page';
+import { MeetingPrepPage } from '../pages/meeting-prep.page';
 
 test.describe('Meeting Prep', () => {
   test.setTimeout(120_000);
 
   test('generate checklist from goals (Mode B)', async ({ loggedInPage: page }) => {
-    await page.goto('/children');
-    await page.locator('a[href*="/children/"]').first().click();
-    await page.waitForURL(/\/children\/\d+/);
+    const children = new ChildrenPage(page);
+    const meetingPrep = new MeetingPrepPage(page);
 
-    // Click "Prep for Meeting" if it exists
-    const prepButton = page.locator('button:has-text("Prep for Meeting")');
+    await children.goto();
+    await children.clickFirstChild();
+
+    const prepButton = await meetingPrep.clickPrepForMeeting();
     if (await prepButton.isVisible()) {
       await prepButton.click();
-
-      // Wait for generation
       await page.waitForTimeout(5000);
-
-      // Check that some checklist content appears (or is generating)
-      await expect(page.locator('text=Meeting Prep').first()).toBeVisible();
+      await meetingPrep.expectMeetingPrepVisible();
     } else {
       test.skip(true, 'Meeting prep button not visible');
     }

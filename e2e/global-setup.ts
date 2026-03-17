@@ -5,8 +5,9 @@ import * as path from 'path';
 async function globalSetup() {
   console.log('Global setup: verifying admin access...');
 
+  let adminToken: string;
   try {
-    await getAdminToken();
+    adminToken = await getAdminToken();
     console.log('Admin login successful');
   } catch (e) {
     console.error('Admin login failed. Make sure an admin account exists and .env is configured.');
@@ -17,10 +18,13 @@ async function globalSetup() {
   console.log('Creating shared test user...');
   const user = await createTestUser('shared');
 
-  // Store test user info for tests to read
+  // Store test user info and admin token for tests and teardown to read
   const testDataPath = path.join(__dirname, '.test-data.json');
-  fs.writeFileSync(testDataPath, JSON.stringify(user, null, 2));
-  console.log(`Test user created: ${user.email}`);
+  fs.writeFileSync(
+    testDataPath,
+    JSON.stringify({ ...user, adminToken }, null, 2),
+  );
+  console.log(`Test user created: ${user.email} (ID: ${user.userId})`);
 }
 
 export default globalSetup;
