@@ -11,13 +11,13 @@ export class ChildrenPage {
     await this.page.goto('/children/new');
   }
 
-  async clickFirstChild() {
-    await this.page.locator('a[href*="/children/"]').first().click();
-    await this.page.waitForURL(/\/children\/\d+/);
+  async gotoChild(childId: number) {
+    await this.page.goto(`/children/${childId}`);
   }
 
-  async clickChildByName(name: string) {
-    await this.page.locator(`a:has-text("${name}")`).first().click();
+  async clickFirstChild() {
+    // Scope to main content area to avoid matching sidebar "My Children" link
+    await this.page.locator('main a[href*="/children/"]').first().click();
     await this.page.waitForURL(/\/children\/\d+/);
   }
 
@@ -29,28 +29,28 @@ export class ChildrenPage {
     disabilityCategory?: string;
     schoolDistrict?: string;
   }) {
-    await this.page.fill('input[id="first-name"]', data.firstName);
-    if (data.lastName) await this.page.fill('input[id="last-name"]', data.lastName);
-    if (data.dateOfBirth) await this.page.fill('input[type="date"]', data.dateOfBirth);
-    if (data.gradeLevel) await this.page.locator('input[placeholder*="3rd"]').fill(data.gradeLevel);
-    if (data.disabilityCategory) await this.page.locator('input[placeholder*="Autism"]').fill(data.disabilityCategory);
-    if (data.schoolDistrict) await this.page.locator('input[id="school-district"]').fill(data.schoolDistrict);
+    await this.page.getByLabel('First Name *').fill(data.firstName);
+    if (data.lastName) await this.page.getByLabel('Last Name').fill(data.lastName);
+    if (data.dateOfBirth) await this.page.getByLabel('Date of Birth').fill(data.dateOfBirth);
+    if (data.gradeLevel) await this.page.getByLabel('Grade Level').fill(data.gradeLevel);
+    if (data.disabilityCategory) await this.page.getByLabel('Disability Category').fill(data.disabilityCategory);
+    if (data.schoolDistrict) await this.page.getByLabel('School District').fill(data.schoolDistrict);
   }
 
   async submitCreateForm() {
-    await this.page.click('button:has-text("Create Profile")');
+    await this.page.getByRole('button', { name: 'Create Profile' }).click();
   }
 
   async clickEdit() {
-    await this.page.click('button:has-text("Edit")');
-  }
-
-  async updateGradeLevel(grade: string) {
-    await this.page.locator('input[placeholder*="3rd"]').fill(grade);
+    await this.page.getByRole('button', { name: 'Edit' }).click();
   }
 
   async submitEditForm() {
-    await this.page.click('button:has-text("Save")');
+    await this.page.getByRole('button', { name: 'Save Changes' }).click();
+  }
+
+  async clickNewIep() {
+    await this.page.getByRole('button', { name: 'New IEP' }).click();
   }
 
   async expectOnChildrenList() {
@@ -58,6 +58,6 @@ export class ChildrenPage {
   }
 
   async expectChildVisible(name: string) {
-    await expect(this.page.locator(`text=${name}`)).toBeVisible();
+    await expect(this.page.getByText(name).first()).toBeVisible();
   }
 }
