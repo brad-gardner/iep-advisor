@@ -18,19 +18,22 @@ export async function getAdminToken(): Promise<string> {
 }
 
 export async function createTestUser(suffix?: string): Promise<TestUser> {
+  // Always use a unique email to avoid collisions with previous test runs
   const ts = Date.now();
-  const id = suffix || ts.toString();
-  const email = `test-${id}@e2e.test`;
+  const email = `test-${ts}@e2e.test`;
   const password = 'TestPass123!';
   const firstName = 'Test';
-  const lastName = `User${id}`;
+  const lastName = `User${ts}`;
 
   const adminToken = await getAdminToken();
   const inviteCode = await generateBetaCode(adminToken);
 
-  await registerUser(email, password, firstName, lastName, inviteCode);
-  const token = await loginUser(email, password);
+  const regResult = await registerUser(email, password, firstName, lastName, inviteCode);
+  if (!regResult.success) {
+    throw new Error(`Registration failed for ${email}: ${regResult.message}`);
+  }
 
+  const token = await loginUser(email, password);
   const user = await getCurrentUser(token);
 
   return { email, password, firstName, lastName, inviteCode, token, userId: user.id };
