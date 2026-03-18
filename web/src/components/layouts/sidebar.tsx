@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, CreditCard, LogOut, Menu, X, Shield, LifeBuoy } from 'lucide-react';
+import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/features/auth/hooks/use-auth';
