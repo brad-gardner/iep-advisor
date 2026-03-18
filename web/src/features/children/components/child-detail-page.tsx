@@ -9,7 +9,6 @@ import { CreateIepForm } from "@/features/iep-documents/components/create-iep-fo
 import { IepDocumentList } from "@/features/iep-documents/components/iep-document-list";
 import { useAdvocacyGoals } from "@/features/advocacy-goals/hooks/use-advocacy-goals";
 import { AdvocacyGoalsList } from "@/features/advocacy-goals/components/advocacy-goals-list";
-import { IepTimeline } from "@/features/iep-comparison/components/iep-timeline";
 import { ShareChildDialog } from "@/features/sharing/components/share-child-dialog";
 import { AccessList } from "@/features/sharing/components/access-list";
 import { SharedBadge } from "@/features/sharing/components/shared-badge";
@@ -268,7 +267,7 @@ export function ChildDetailPage() {
 
       <Card data-testid="iep-documents-section">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="font-serif">IEP Documents</h2>
+          <h2 className="font-serif">IEPs</h2>
           {!isViewer && !showCreateIep && (
             <Button
               variant="secondary"
@@ -298,10 +297,6 @@ export function ChildDetailPage() {
         />
       </Card>
 
-      <Card data-testid="timeline-section">
-        <h2 className="font-serif mb-4">IEP Timeline</h2>
-        <IepTimeline childId={Number(id)} />
-      </Card>
     </div>
   );
 }
