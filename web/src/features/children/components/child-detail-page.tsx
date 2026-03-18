@@ -1,23 +1,20 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Share2 } from 'lucide-react';
-import type { ChildProfile, CreateChildProfileRequest } from '@/types/api';
-import { getChild, updateChild, deleteChild } from '../api/children-api';
-import { ChildForm } from './child-form';
-import { useIepDocuments } from '@/features/iep-documents/hooks/use-iep-documents';
-import { CreateIepForm } from '@/features/iep-documents/components/create-iep-form';
-import { IepDocumentList } from '@/features/iep-documents/components/iep-document-list';
-import { useAdvocacyGoals } from '@/features/advocacy-goals/hooks/use-advocacy-goals';
-import { AdvocacyGoalsList } from '@/features/advocacy-goals/components/advocacy-goals-list';
-import { useMeetingPrep } from '@/features/meeting-prep/hooks/use-meeting-prep';
-import { MeetingPrepTab } from '@/features/meeting-prep/components/meeting-prep-tab';
-import { IepTimeline } from '@/features/iep-comparison/components/iep-timeline';
-import { ShareChildDialog } from '@/features/sharing/components/share-child-dialog';
-import { AccessList } from '@/features/sharing/components/access-list';
-import { SharedBadge } from '@/features/sharing/components/shared-badge';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { useEffect, useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { Share2 } from "lucide-react";
+import type { ChildProfile, CreateChildProfileRequest } from "@/types/api";
+import { getChild, updateChild, deleteChild } from "../api/children-api";
+import { ChildForm } from "./child-form";
+import { useIepDocuments } from "@/features/iep-documents/hooks/use-iep-documents";
+import { CreateIepForm } from "@/features/iep-documents/components/create-iep-form";
+import { IepDocumentList } from "@/features/iep-documents/components/iep-document-list";
+import { useAdvocacyGoals } from "@/features/advocacy-goals/hooks/use-advocacy-goals";
+import { AdvocacyGoalsList } from "@/features/advocacy-goals/components/advocacy-goals-list";
+import { IepTimeline } from "@/features/iep-comparison/components/iep-timeline";
+import { ShareChildDialog } from "@/features/sharing/components/share-child-dialog";
+import { AccessList } from "@/features/sharing/components/access-list";
+import { SharedBadge } from "@/features/sharing/components/shared-badge";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 export function ChildDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -29,15 +26,16 @@ export function ChildDetailPage() {
   const [showCreateIep, setShowCreateIep] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [accessListKey, setAccessListKey] = useState(0);
-  const { documents, isLoading: docsLoading, reload: reloadDocs } = useIepDocuments(Number(id));
-  const { goals, isLoading: goalsLoading, reload: reloadGoals } = useAdvocacyGoals(Number(id));
   const {
-    checklist: meetingPrepChecklist,
-    isLoading: meetingPrepLoading,
-    isGenerating: meetingPrepGenerating,
-    generateFromGoals: generateMeetingPrep,
-    reload: reloadMeetingPrep,
-  } = useMeetingPrep(Number(id));
+    documents,
+    isLoading: docsLoading,
+    reload: reloadDocs,
+  } = useIepDocuments(Number(id));
+  const {
+    goals,
+    isLoading: goalsLoading,
+    reload: reloadGoals,
+  } = useAdvocacyGoals(Number(id));
 
   useEffect(() => {
     async function load() {
@@ -66,19 +64,19 @@ export function ChildDetailPage() {
         setIsEditing(false);
         return { success: true };
       }
-      return { success: false, error: response.message || 'Update failed' };
+      return { success: false, error: response.message || "Update failed" };
     } catch {
-      return { success: false, error: 'An error occurred' };
+      return { success: false, error: "An error occurred" };
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to remove this child profile?')) return;
+    if (!confirm("Are you sure you want to remove this child profile?")) return;
     setIsDeleting(true);
     try {
       const response = await deleteChild(Number(id));
       if (response.success) {
-        navigate('/children');
+        navigate("/children");
       }
     } catch {
       // handled by interceptor
@@ -99,7 +97,10 @@ export function ChildDetailPage() {
     return (
       <div className="text-center py-12">
         <p className="text-brand-slate-400">Child profile not found.</p>
-        <Link to="/children" className="text-brand-teal-500 hover:underline mt-2 inline-block">
+        <Link
+          to="/children"
+          className="text-brand-teal-500 hover:underline mt-2 inline-block"
+        >
           Back to children
         </Link>
       </div>
@@ -118,11 +119,11 @@ export function ChildDetailPage() {
         <ChildForm
           initialValues={{
             firstName: child.firstName,
-            lastName: child.lastName ?? '',
-            dateOfBirth: child.dateOfBirth?.split('T')[0] ?? '',
-            gradeLevel: child.gradeLevel ?? '',
-            disabilityCategory: child.disabilityCategory ?? '',
-            schoolDistrict: child.schoolDistrict ?? '',
+            lastName: child.lastName ?? "",
+            dateOfBirth: child.dateOfBirth?.split("T")[0] ?? "",
+            gradeLevel: child.gradeLevel ?? "",
+            disabilityCategory: child.disabilityCategory ?? "",
+            schoolDistrict: child.schoolDistrict ?? "",
           }}
           onSubmit={handleUpdate}
           submitLabel="Save Changes"
@@ -131,8 +132,8 @@ export function ChildDetailPage() {
     );
   }
 
-  const isOwner = child.role === 'owner';
-  const isViewer = child.role === 'viewer';
+  const isOwner = child.role === "owner";
+  const isViewer = child.role === "viewer";
 
   return (
     <div className="space-y-6">
@@ -145,13 +146,22 @@ export function ChildDetailPage() {
         </div>
         <div className="flex gap-2">
           {isOwner && (
-            <Button variant="secondary" onClick={() => setIsEditing(true)} data-testid="child-edit-button">
+            <Button
+              variant="secondary"
+              onClick={() => setIsEditing(true)}
+              data-testid="child-edit-button"
+            >
               Edit
             </Button>
           )}
           {isOwner && (
-            <Button variant="danger" onClick={handleDelete} disabled={isDeleting} data-testid="child-remove-button">
-              {isDeleting ? 'Removing...' : 'Remove'}
+            <Button
+              variant="danger"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              data-testid="child-remove-button"
+            >
+              {isDeleting ? "Removing..." : "Remove"}
             </Button>
           )}
         </div>
@@ -162,7 +172,9 @@ export function ChildDetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {child.dateOfBirth && (
             <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">Date of Birth</p>
+              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
+                Date of Birth
+              </p>
               <p className="text-sm font-medium text-brand-slate-800 mt-1">
                 {new Date(child.dateOfBirth).toLocaleDateString()}
               </p>
@@ -170,20 +182,32 @@ export function ChildDetailPage() {
           )}
           {child.gradeLevel && (
             <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">Grade Level</p>
-              <p className="text-sm font-medium text-brand-slate-800 mt-1">{child.gradeLevel}</p>
+              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
+                Grade Level
+              </p>
+              <p className="text-sm font-medium text-brand-slate-800 mt-1">
+                {child.gradeLevel}
+              </p>
             </div>
           )}
           {child.disabilityCategory && (
             <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">Disability Category</p>
-              <p className="text-sm font-medium text-brand-slate-800 mt-1">{child.disabilityCategory}</p>
+              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
+                Disability Category
+              </p>
+              <p className="text-sm font-medium text-brand-slate-800 mt-1">
+                {child.disabilityCategory}
+              </p>
             </div>
           )}
           {child.schoolDistrict && (
             <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">School District</p>
-              <p className="text-sm font-medium text-brand-slate-800 mt-1">{child.schoolDistrict}</p>
+              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
+                School District
+              </p>
+              <p className="text-sm font-medium text-brand-slate-800 mt-1">
+                {child.schoolDistrict}
+              </p>
             </div>
           )}
         </div>
@@ -193,24 +217,40 @@ export function ChildDetailPage() {
         <Card data-testid="sharing-section">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-serif">Sharing & Access</h2>
-            <Button onClick={() => setShowShareDialog(!showShareDialog)} data-testid="share-invite-button">
-              <Share2 className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
+            <Button
+              onClick={() => setShowShareDialog(!showShareDialog)}
+              data-testid="share-invite-button"
+            >
+              <Share2
+                className="w-4 h-4 mr-1.5"
+                strokeWidth={1.8}
+                aria-hidden="true"
+              />
               Invite Someone
             </Button>
           </div>
           <p className="text-sm text-brand-slate-400 mb-4">
-            Share {child.firstName}'s IEP information with a co-parent, advocate, or attorney. They'll get their own login and can view or collaborate depending on the role you assign.
+            Share {child.firstName}'s IEP information with a co-parent,
+            advocate, or attorney. They'll get their own login and can view or
+            collaborate depending on the role you assign.
           </p>
           {showShareDialog && (
             <div className="mb-4">
               <ShareChildDialog
                 childId={Number(id)}
-                onInvited={() => { setAccessListKey((k) => k + 1); setShowShareDialog(false); }}
+                onInvited={() => {
+                  setAccessListKey((k) => k + 1);
+                  setShowShareDialog(false);
+                }}
                 onCancel={() => setShowShareDialog(false)}
               />
             </div>
           )}
-          <AccessList key={accessListKey} childId={Number(id)} isOwner={isOwner} />
+          <AccessList
+            key={accessListKey}
+            childId={Number(id)}
+            isOwner={isOwner}
+          />
         </Card>
       )}
 
@@ -226,48 +266,15 @@ export function ChildDetailPage() {
         />
       </Card>
 
-      <Card data-testid="meeting-prep-section">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-3">
-            <h2 className="font-serif">Meeting Prep</h2>
-            {meetingPrepChecklist?.status && (
-              <Badge
-                variant={
-                  meetingPrepChecklist.status === 'completed'
-                    ? 'success'
-                    : meetingPrepChecklist.status === 'error'
-                      ? 'error'
-                      : 'neutral'
-                }
-              >
-                {meetingPrepChecklist.status}
-              </Badge>
-            )}
-          </div>
-          {!meetingPrepChecklist && !meetingPrepLoading && (
-            <Button
-              variant="secondary"
-              onClick={generateMeetingPrep}
-              disabled={meetingPrepGenerating}
-            >
-              {meetingPrepGenerating ? 'Generating...' : 'Prep for Meeting'}
-            </Button>
-          )}
-        </div>
-        <MeetingPrepTab
-          checklist={meetingPrepChecklist}
-          isLoading={meetingPrepLoading}
-          isGenerating={meetingPrepGenerating}
-          onGenerate={generateMeetingPrep}
-          onReload={reloadMeetingPrep}
-        />
-      </Card>
-
       <Card data-testid="iep-documents-section">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-serif">IEP Documents</h2>
           {!isViewer && !showCreateIep && (
-            <Button variant="secondary" onClick={() => setShowCreateIep(true)} data-testid="new-iep-button">
+            <Button
+              variant="secondary"
+              onClick={() => setShowCreateIep(true)}
+              data-testid="new-iep-button"
+            >
               New IEP
             </Button>
           )}
@@ -284,7 +291,11 @@ export function ChildDetailPage() {
             />
           </div>
         )}
-        <IepDocumentList documents={documents} isLoading={docsLoading} onDeleted={reloadDocs} />
+        <IepDocumentList
+          documents={documents}
+          isLoading={docsLoading}
+          onDeleted={reloadDocs}
+        />
       </Card>
 
       <Card data-testid="timeline-section">

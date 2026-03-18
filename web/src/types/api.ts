@@ -79,7 +79,7 @@ export interface ChildProfile {
   gradeLevel: string | null;
   disabilityCategory: string | null;
   schoolDistrict: string | null;
-  role: 'owner' | 'viewer' | 'collaborator';
+  role: "owner" | "viewer" | "collaborator";
   createdAt: string;
   updatedAt: string;
 }
@@ -198,7 +198,7 @@ export interface ReorderAdvocacyGoalsRequest {
 export interface IepAnalysis {
   id: number;
   iepDocumentId: number;
-  status: 'pending' | 'analyzing' | 'completed' | 'error';
+  status: "pending" | "analyzing" | "completed" | "error";
   overallSummary: string | null;
   sectionAnalyses: SectionAnalysis[];
   goalAnalyses: GoalAnalysis[];
@@ -218,7 +218,7 @@ export interface AdvocacyGapAnalysis {
 export interface GoalAlignment {
   parentGoalText: string;
   parentGoalCategory: string | null;
-  alignmentStatus: 'addressed' | 'partially_addressed' | 'not_addressed';
+  alignmentStatus: "addressed" | "partially_addressed" | "not_addressed";
   alignedIepGoals: string[];
   explanation: string;
   recommendation: string | null;
@@ -245,7 +245,7 @@ export interface GoalAnalysis {
   goalText: string;
   domain: string | null;
   smartAnalysis: SmartAnalysis;
-  overallRating: 'green' | 'yellow' | 'red';
+  overallRating: "green" | "yellow" | "red";
   plainLanguageSummary: string;
   strengths: string[];
   concerns: string[];
@@ -261,12 +261,12 @@ export interface SmartAnalysis {
 }
 
 export interface SmartCriterion {
-  rating: 'green' | 'yellow' | 'red';
+  rating: "green" | "yellow" | "red";
   explanation: string;
 }
 
 export interface RedFlag {
-  severity: 'yellow' | 'red';
+  severity: "yellow" | "red";
   title: string;
   description: string;
   legalBasis: string | null;
@@ -296,10 +296,12 @@ export interface MeetingPrepChecklist {
   id: number;
   childProfileId: number;
   iepDocumentId: number | null;
-  status: 'pending' | 'generating' | 'completed' | 'error';
+  status: "pending" | "generating" | "completed" | "error";
   questionsToAsk: ChecklistItem[];
-  documentsToBring: ChecklistItem[];
   redFlagsToRaise: ChecklistItem[];
+  preparationNotes: ChecklistItem[];
+  // Legacy fields — present on older checklists
+  documentsToBring: ChecklistItem[];
   rightsToReference: ChecklistItem[];
   goalGaps: ChecklistItem[];
   generalTips: ChecklistItem[];
