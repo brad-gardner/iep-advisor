@@ -10,7 +10,8 @@ public class MeetingPrepChecklist : BaseEntity, IAuditableEntity
     public string? RedFlagsToRaise { get; set; }    // JSON array of ChecklistItem
     public string? RightsToReference { get; set; }  // JSON array of ChecklistItem
     public string? GoalGaps { get; set; }           // JSON array of ChecklistItem
-    public string? GeneralTips { get; set; }        // JSON array of ChecklistItem
+    public string? GeneralTips { get; set; }        // JSON array of ChecklistItem (legacy)
+    public string? PreparationNotes { get; set; }   // JSON array of ChecklistItem
     public string? ErrorMessage { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
