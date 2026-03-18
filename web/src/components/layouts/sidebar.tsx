@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, CreditCard, LogOut, Menu, X, Shield } from 'lucide-react';
+import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, CreditCard, LogOut, Menu, X, Shield, LifeBuoy } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/features/auth/hooks/use-auth';
@@ -8,7 +8,7 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { to: '/children', label: 'My Children', Icon: Users },
   { to: '/profile', label: 'Profile', Icon: UserCircle },
-  { to: '/subscription', label: 'Subscription', Icon: CreditCard },
+  // { to: '/subscription', label: 'Subscription', Icon: CreditCard }, // Hidden during beta
   { to: '/knowledge-base', label: 'Knowledge Base', Icon: BookOpen },
   { to: '/iep-101', label: 'IEP 101', Icon: GraduationCap },
 ];
@@ -52,6 +52,16 @@ export function Sidebar({ onLogout }: SidebarProps) {
             </Link>
           );
         })}
+        <a
+          href="https://docs.google.com/forms/d/e/1FAIpQLSfhj_T_TiRlPp9MYgmxHPqtgKfyNkTk0CXoXQn7HWXILaDmfQ/viewform?usp=publish-editor"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="nav-support"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-button text-sm text-brand-slate-400 hover:text-brand-slate-200 hover:bg-brand-slate-700 transition-colors"
+        >
+          <LifeBuoy size={18} strokeWidth={1.8} />
+          Support
+        </a>
       </nav>
 
       {user?.role === 'Admin' && (

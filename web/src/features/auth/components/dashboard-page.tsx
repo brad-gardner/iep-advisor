@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { Users, FileText, UserCircle, ArrowRight } from "lucide-react";
 import { useAuth } from "../hooks/use-auth";
-import { SubscriptionStatusCard } from "@/features/subscription/components/subscription-status";
 import { DashboardChildrenSection } from "@/features/children/components/dashboard-children-section";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
@@ -44,10 +43,6 @@ export function DashboardPage() {
       )}
 
       <DashboardChildrenSection />
-
-      <div data-testid="dashboard-subscription">
-        <SubscriptionStatusCard />
-      </div>
 
       <Card>
         <h2 className="font-serif mb-4">Your Account</h2>
