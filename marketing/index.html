@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IEP Advisor — Understand Your Child's IEP, Advocate with Confidence</title>
+  <meta name="description"
+    content="Upload your child's IEP and get plain-language explanations, rights guidance, and goal analysis. Join the beta waitlist.">
+  <link rel="canonical" href="https://iep-advisor.com/">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="IEP Advisor — Navigate Your Child's IEP with Confidence">
+  <meta property="og:description"
+    content="AI-powered IEP analysis for parents. Plain-language explanations, rights guidance, and goal tracking.">
+  <meta property="og:image" content="https://iep-advisor.com/og-image.png">
+  <meta property="og:url" content="https://iep-advisor.com/">
+  <meta property="og:type" content="website">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="IEP Advisor — Navigate Your Child's IEP with Confidence">
+  <meta name="twitter:description" content="AI-powered IEP analysis for parents. Join the beta.">
+  <meta name="twitter:image" content="https://iep-advisor.com/og-image.png">
+
+  <!-- Favicons -->
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon-16x16.png" type="image/png" sizes="16x16">
+  <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Lora:wght@400;600;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              teal: {
+                50: '#EDF8F5',
+                100: '#C8EEE6',
+                200: '#A3E4D7',
+                300: '#6DD4C0',
+                400: '#3BC4A9',
+                500: '#1A9478',
+                600: '#0F6652',
+                700: '#0A4D3E',
+                800: '#06342A',
+              },
+              amber: {
+                50: '#FEF7EC',
+                100: '#FCE8C0',
+                200: '#F9D98A',
+                300: '#F0C050',
+                400: '#D4820F',
+                500: '#A8620A',
+                600: '#7C4808',
+              },
+              slate: {
+                50: '#F5F7F7',
+                100: '#E8ECEC',
+                200: '#D1D8D8',
+                300: '#A8B5B5',
+                400: '#7F9292',
+                500: '#5A6F6F',
+                600: '#3E5252',
+                700: '#2C3C3C',
+                800: '#1E2A2A',
+              },
+              red: '#B91C1C',
+            },
+          },
+          fontFamily: {
+            serif: ['Lora', 'Georgia', 'serif'],
+            sans: ['DM Sans', 'system-ui', 'sans-serif'],
+          },
+          borderRadius: {
+            button: '8px',
+            card: '12px',
+          },
+        },
+      },
+    }
+  </script>
+
+  <style>
+    html {
+      scroll-behavior: smooth;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+      .animate-fade-up {
+        animation: none !important;
+        opacity: 1 !important;
+      }
+    }
+
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      color: #1E2A2A;
+    }
+
+    /* Hero background pattern */
+    .hero-bg {
+      background-color: #FAFCFB;
+      background-image:
+        radial-gradient(circle at 20% 50%, #EDF8F510 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, #EDF8F520 0%, transparent 40%);
+    }
+    .hero-bg::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='20' cy='20' r='1' fill='%231A9478' fill-opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+
+    /* Fade-up animation */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-up {
+      animation: fadeUp 0.6s ease-out forwards;
+      opacity: 0;
+    }
+    .animate-delay-1 { animation-delay: 0.1s; }
+    .animate-delay-2 { animation-delay: 0.25s; }
+    .animate-delay-3 { animation-delay: 0.4s; }
+
+    /* Underline accent */
+    .heading-underline {
+      text-decoration-color: #D4820F;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 4px;
+    }
+
+    /* Feature card hover */
+    .feature-card {
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+    .feature-card:hover {
+      border-color: #C8EEE6;
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+
+<body class="bg-white">
+
+  <!-- Skip to content -->
+  <a href="#main"
+    class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-brand-teal-500 focus:text-white focus:px-4 focus:py-2 focus:rounded-button">
+    Skip to main content
+  </a>
+
+  <!-- Navigation -->
+  <header class="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-brand-slate-100"
+    role="banner">
+    <nav class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between" aria-label="Main navigation">
+      <!-- Logo -->
+      <a href="#" class="flex items-center gap-2.5" aria-label="IEP Advisor home">
+        <div class="bg-brand-teal-500 rounded-full p-1.5 flex items-center justify-center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9 12l2 2 4-4" />
+          </svg>
+        </div>
+        <span class="font-serif text-2xl leading-none">
+          <span class="text-brand-slate-800">IEP </span>
+          <span class="text-brand-teal-500 font-semibold">Advisor</span>
+        </span>
+      </a>
+
+      <!-- Nav links -->
+      <div class="flex items-center gap-6">
+        <a href="#features" class="hidden sm:inline text-sm font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors">Features</a>
+        <a href="#about" class="hidden sm:inline text-sm font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors">About</a>
+        <a href="#signup"
+          class="text-sm font-medium text-brand-teal-500 hover:text-brand-teal-600 transition-colors">Join
+          Beta</a>
+        <a href="#" class="text-sm text-brand-slate-400 hover:text-brand-slate-600 transition-colors">Sign In</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main">
+
+    <!-- Hero -->
+    <section class="relative pt-32 pb-20 sm:pt-40 sm:pb-28 px-4 sm:px-6 hero-bg overflow-hidden" aria-labelledby="hero-heading">
+      <div class="max-w-3xl mx-auto text-center relative z-10">
+        <!-- Beta badge -->
+        <div class="animate-fade-up animate-delay-1 mb-6">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium tracking-wide uppercase bg-brand-amber-50 text-brand-amber-400 border border-brand-amber-100" style="border-width: 0.5px;">
+            <span class="w-1.5 h-1.5 rounded-full bg-brand-amber-400"></span>
+            Now accepting beta signups
+          </span>
+        </div>
+
+        <h1 id="hero-heading" class="animate-fade-up animate-delay-1 font-serif text-4xl sm:text-5xl lg:text-[3.5rem] font-semibold text-brand-slate-800 leading-[1.15] tracking-tight">
+          Understand Your Child's IEP.<br class="hidden sm:block">
+          <span class="heading-underline decoration-2 underline">Advocate</span> with Confidence.
+        </h1>
+        <p class="animate-fade-up animate-delay-2 mt-6 text-lg sm:text-xl text-brand-slate-500 font-light max-w-2xl mx-auto leading-relaxed">
+          Upload your child's IEP and get clear, plain-language explanations of every section — plus guidance on your
+          rights and how to advocate for the services your child deserves.
+        </p>
+        <div class="animate-fade-up animate-delay-3 mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a href="#signup"
+            class="inline-flex items-center justify-center min-h-[44px] px-8 py-3 bg-brand-teal-500 text-white font-medium rounded-button hover:bg-brand-teal-600 transition-colors text-lg">
+            Join the Beta Waitlist
+          </a>
+          <a href="#features"
+            class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors">
+            See how it works
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 13l5 5 5-5"/><path d="M12 18V6"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- Decorative bottom edge -->
+      <div class="absolute bottom-0 left-0 right-0 h-px bg-brand-slate-100"></div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="py-20 sm:py-28 px-4 sm:px-6 bg-brand-slate-50" aria-labelledby="features-heading">
+      <div class="max-w-5xl mx-auto">
+        <div class="text-center max-w-xl mx-auto">
+          <p class="text-xs font-medium tracking-widest uppercase text-brand-teal-500 mb-3">What you get</p>
+          <h2 id="features-heading" class="font-serif text-2xl sm:text-3xl font-semibold text-brand-slate-800">
+            Tools designed for parents,<br class="hidden sm:block"> not bureaucrats
+          </h2>
+        </div>
+
+        <div class="mt-14 grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <!-- Document Analysis -->
+          <div class="feature-card bg-white rounded-card p-7 border border-brand-slate-100" style="border-width: 0.5px;">
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0 w-11 h-11 rounded-[10px] bg-brand-teal-50 flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A9478" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="font-serif text-lg font-semibold text-brand-slate-800">Document Analysis</h3>
+                <p class="mt-1.5 text-sm text-brand-slate-500 leading-relaxed">
+                  Upload your child's IEP and get a clear, structured breakdown of every section — goals, services,
+                  accommodations, and more.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Plain-Language Explanations -->
+          <div class="feature-card bg-white rounded-card p-7 border border-brand-slate-100" style="border-width: 0.5px;">
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0 w-11 h-11 rounded-[10px] bg-brand-teal-50 flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A9478" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="font-serif text-lg font-semibold text-brand-slate-800">Plain-Language Explanations</h3>
+                <p class="mt-1.5 text-sm text-brand-slate-500 leading-relaxed">
+                  Complex jargon translated into clear language so you know exactly what your child's IEP says and means.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rights & Advocacy -->
+          <div class="feature-card bg-white rounded-card p-7 border border-brand-slate-100" style="border-width: 0.5px;">
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0 w-11 h-11 rounded-[10px] bg-brand-teal-50 flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A9478" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="font-serif text-lg font-semibold text-brand-slate-800">Rights & Advocacy Guidance</h3>
+                <p class="mt-1.5 text-sm text-brand-slate-500 leading-relaxed">
+                  Know your rights under IDEA, Section 504, and state law. Get specific, actionable guidance for your child's situation.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Goal Tracking -->
+          <div class="feature-card bg-white rounded-card p-7 border border-brand-slate-100" style="border-width: 0.5px;">
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0 w-11 h-11 rounded-[10px] bg-brand-teal-50 flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A9478" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="font-serif text-lg font-semibold text-brand-slate-800">Goal Tracking</h3>
+                <p class="mt-1.5 text-sm text-brand-slate-500 leading-relaxed">
+                  Monitor your child's IEP goals and track progress over time. Stay informed and prepared for every meeting.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- About / Mission -->
+    <section id="about" class="py-20 sm:py-28 px-4 sm:px-6" aria-labelledby="about-heading">
+      <div class="max-w-3xl mx-auto">
+        <div class="text-center">
+          <p class="text-xs font-medium tracking-widest uppercase text-brand-teal-500 mb-3">Our mission</p>
+          <h2 id="about-heading" class="font-serif text-2xl sm:text-3xl font-semibold text-brand-slate-800">
+            Every Parent Deserves to Understand<br class="hidden sm:block"> Their Child's IEP
+          </h2>
+        </div>
+
+        <div class="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-8 items-start">
+          <div class="space-y-4 text-brand-slate-500 leading-relaxed text-[0.95rem]">
+            <p>
+              The IEP process is supposed to be a partnership between families and schools. But too often, parents are
+              handed a dense, jargon-filled document and expected to understand — and advocate — without the tools or
+              knowledge they need.
+            </p>
+            <p>
+              IEP Advisor was created to change that. We believe that when parents truly understand their child's IEP,
+              they become the most powerful advocates their children will ever have.
+            </p>
+          </div>
+          <div class="border-l-2 border-brand-teal-200 pl-6">
+            <blockquote class="font-serif text-xl sm:text-2xl text-brand-slate-700 leading-snug italic">
+              "We're building the tool we wish every parent had from day one."
+            </blockquote>
+            <p class="mt-4 text-sm text-brand-slate-400 font-medium">
+              -- The IEP Advisor Team
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Beta Signup -->
+    <section id="signup" class="py-20 sm:py-28 px-4 sm:px-6 bg-brand-teal-50" aria-labelledby="signup-heading">
+      <div class="max-w-xl mx-auto">
+        <div class="bg-white rounded-card p-8 sm:p-10 border border-brand-teal-100 text-center" style="border-width: 0.5px;">
+          <div class="w-12 h-12 rounded-full bg-brand-teal-50 flex items-center justify-center mx-auto mb-5">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A9478" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+          </div>
+          <h2 id="signup-heading" class="font-serif text-2xl sm:text-3xl font-semibold text-brand-slate-800">
+            Join the Beta Waitlist
+          </h2>
+          <p class="mt-3 text-brand-slate-500 leading-relaxed">
+            We're building IEP Advisor with parents like you. Be among the first to try it — and help shape the
+            tool families need.
+          </p>
+          <div class="mt-8">
+            <a href="#"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center justify-center min-h-[44px] w-full sm:w-auto px-8 py-3.5 bg-brand-teal-500 text-white font-medium rounded-button hover:bg-brand-teal-600 transition-colors text-lg">
+              Sign Up for Early Access
+            </a>
+          </div>
+          <!-- Trust indicators -->
+          <div class="mt-6 flex items-center justify-center gap-4 text-xs text-brand-slate-400">
+            <span class="flex items-center gap-1">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Private & secure
+            </span>
+            <span class="hidden sm:inline text-brand-slate-200">|</span>
+            <span>No spam, ever</span>
+            <span class="hidden sm:inline text-brand-slate-200">|</span>
+            <span>Free during beta</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="py-10 px-4 sm:px-6 border-t border-brand-slate-100 bg-brand-slate-50" role="contentinfo">
+    <div class="max-w-5xl mx-auto">
+      <!-- Logo repeat -->
+      <div class="flex items-center justify-center gap-2 mb-5">
+        <div class="bg-brand-teal-500 rounded-full p-1 flex items-center justify-center">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9 12l2 2 4-4" />
+          </svg>
+        </div>
+        <span class="font-serif text-base text-brand-slate-600">IEP Advisor</span>
+      </div>
+      <p class="text-xs text-brand-slate-400 text-center leading-relaxed max-w-md mx-auto">
+        IEP Advisor provides information and tools to help you understand your child's IEP. It does not provide legal
+        advice.
+      </p>
+      <div class="mt-4 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs text-brand-slate-400">
+        <span>&copy; 2026 IEP Advisor</span>
+        <span class="hidden sm:inline">&middot;</span>
+        <a href="#" class="hover:text-brand-slate-600 transition-colors">Privacy Policy</a>
+        <span class="hidden sm:inline">&middot;</span>
+        <a href="#" class="hover:text-brand-slate-600 transition-colors">Terms of Service</a>
+      </div>
+      <p class="mt-4 text-xs text-brand-slate-300 text-center italic">
+        Built with care for families navigating special education.
+      </p>
+    </div>
+  </footer>
+
+</body>
+
+</html>

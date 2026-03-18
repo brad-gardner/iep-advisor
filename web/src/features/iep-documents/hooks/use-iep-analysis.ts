@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { IepAnalysis } from '@/types/api';
-import { getAnalysis, triggerAnalysis } from '../api/iep-documents-api';
+import { useCallback, useEffect, useState } from "react";
+import type { IepAnalysis } from "@/types/api";
+import { getAnalysis, triggerAnalysis } from "../api/iep-documents-api";
+import { usePolling } from "@/hooks/use-polling";
 
 export function useIepAnalysis(documentId: number) {
   const [analysis, setAnalysis] = useState<IepAnalysis | null>(null);
@@ -33,11 +34,11 @@ export function useIepAnalysis(documentId: number) {
       await triggerAnalysis(documentId);
       setAnalysis((prev) =>
         prev
-          ? { ...prev, status: 'analyzing' }
+          ? { ...prev, status: "analyzing" }
           : {
               id: 0,
               iepDocumentId: documentId,
-              status: 'analyzing',
+              status: "analyzing",
               overallSummary: null,
               sectionAnalyses: [],
               goalAnalyses: [],
@@ -47,7 +48,7 @@ export function useIepAnalysis(documentId: number) {
               parentGoalsSnapshot: null,
               errorMessage: null,
               createdAt: new Date().toISOString(),
-            }
+            },
       );
     } catch {
       // handled by caller
@@ -55,6 +56,18 @@ export function useIepAnalysis(documentId: number) {
       setIsTriggering(false);
     }
   }, [documentId]);
+
+  // Poll while analysis is in progress
+  const pollStatus = useCallback(async () => {
+    const response = await getAnalysis(documentId);
+    if (response.success && response.data) {
+      setAnalysis(response.data);
+    }
+  }, [documentId]);
+
+  const isInProgress =
+    analysis?.status === "analyzing" || analysis?.status === "pending";
+  usePolling(pollStatus, 5000, isInProgress);
 
   return { analysis, isLoading, isTriggering, trigger, reload: load };
 }

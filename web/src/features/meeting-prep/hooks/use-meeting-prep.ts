@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { MeetingPrepChecklist } from '@/types/api';
+import { useCallback, useEffect, useState } from "react";
+import type { MeetingPrepChecklist } from "@/types/api";
 import {
   getChecklistsByChild,
   generateFromGoals as apiGenerateFromGoals,
   generateFromIep as apiGenerateFromIep,
-} from '../api/meeting-prep-api';
+} from "../api/meeting-prep-api";
+import { usePolling } from "@/hooks/use-polling";
 
 export function useMeetingPrep(childId: number, iepDocumentId?: number) {
   const [checklist, setChecklist] = useState<MeetingPrepChecklist | null>(null);
@@ -25,7 +26,8 @@ export function useMeetingPrep(childId: number, iepDocumentId?: number) {
           : response.data;
         // Most recent first
         const sorted = filtered.sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         );
         setChecklist(sorted[0] ?? null);
       } else {
@@ -48,21 +50,22 @@ export function useMeetingPrep(childId: number, iepDocumentId?: number) {
       await apiGenerateFromGoals(childId);
       setChecklist((prev) =>
         prev
-          ? { ...prev, status: 'generating' }
+          ? { ...prev, status: "generating" }
           : {
               id: 0,
               childProfileId: childId,
               iepDocumentId: null,
-              status: 'generating',
+              status: "generating",
               questionsToAsk: [],
               documentsToBring: [],
               redFlagsToRaise: [],
               rightsToReference: [],
               goalGaps: [],
               generalTips: [],
+              preparationNotes: [],
               errorMessage: null,
               createdAt: new Date().toISOString(),
-            }
+            },
       );
     } catch {
       // handled by caller
@@ -78,21 +81,22 @@ export function useMeetingPrep(childId: number, iepDocumentId?: number) {
         await apiGenerateFromIep(iepId);
         setChecklist((prev) =>
           prev
-            ? { ...prev, status: 'generating' }
+            ? { ...prev, status: "generating" }
             : {
                 id: 0,
                 childProfileId: childId,
                 iepDocumentId: iepId,
-                status: 'generating',
+                status: "generating",
                 questionsToAsk: [],
                 documentsToBring: [],
                 redFlagsToRaise: [],
                 rightsToReference: [],
                 goalGaps: [],
                 generalTips: [],
+                preparationNotes: [],
                 errorMessage: null,
                 createdAt: new Date().toISOString(),
-              }
+              },
         );
       } catch {
         // handled by caller
@@ -100,8 +104,37 @@ export function useMeetingPrep(childId: number, iepDocumentId?: number) {
         setIsGenerating(false);
       }
     },
-    [childId]
+    [childId],
   );
 
-  return { checklist, isLoading, isGenerating, generateFromGoals, generateFromIep, reload: load };
+  // Poll while checklist is generating
+  const pollStatus = useCallback(async () => {
+    if (!childId) return;
+    const response = await getChecklistsByChild(childId);
+    if (response.success && response.data) {
+      const filtered = iepDocumentId
+        ? response.data.filter((c) => c.iepDocumentId === iepDocumentId)
+        : response.data;
+      const sorted = filtered.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+      if (sorted[0]) {
+        setChecklist(sorted[0]);
+      }
+    }
+  }, [childId, iepDocumentId]);
+
+  const isInProgress =
+    checklist?.status === "generating" || checklist?.status === "pending";
+  usePolling(pollStatus, 5000, isInProgress);
+
+  return {
+    checklist,
+    isLoading,
+    isGenerating,
+    generateFromGoals,
+    generateFromIep,
+    reload: load,
+  };
 }

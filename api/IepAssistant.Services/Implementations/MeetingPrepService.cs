@@ -207,11 +207,8 @@ public class MeetingPrepService : IMeetingPrepService
             }
 
             checklist.QuestionsToAsk = JsonSerializer.Serialize(result.QuestionsToAsk, CamelCaseOptions);
-            checklist.DocumentsToBring = JsonSerializer.Serialize(result.DocumentsToBring, CamelCaseOptions);
             checklist.RedFlagsToRaise = JsonSerializer.Serialize(result.RedFlagsToRaise, CamelCaseOptions);
-            checklist.RightsToReference = JsonSerializer.Serialize(result.RightsToReference, CamelCaseOptions);
-            checklist.GoalGaps = JsonSerializer.Serialize(result.GoalGaps, CamelCaseOptions);
-            checklist.GeneralTips = JsonSerializer.Serialize(result.GeneralTips, CamelCaseOptions);
+            checklist.PreparationNotes = JsonSerializer.Serialize(result.PreparationNotes, CamelCaseOptions);
             checklist.Status = "completed";
             await _context.SaveChangesAsync(ct);
 
@@ -242,8 +239,10 @@ public class MeetingPrepService : IMeetingPrepService
         var sectionMap = new Dictionary<string, (Func<string?> get, Action<string?> set)>
         {
             ["questionsToAsk"] = (() => checklist.QuestionsToAsk, v => checklist.QuestionsToAsk = v),
-            ["documentsToBring"] = (() => checklist.DocumentsToBring, v => checklist.DocumentsToBring = v),
             ["redFlagsToRaise"] = (() => checklist.RedFlagsToRaise, v => checklist.RedFlagsToRaise = v),
+            ["preparationNotes"] = (() => checklist.PreparationNotes, v => checklist.PreparationNotes = v),
+            // Legacy sections — still checkable on old checklists
+            ["documentsToBring"] = (() => checklist.DocumentsToBring, v => checklist.DocumentsToBring = v),
             ["rightsToReference"] = (() => checklist.RightsToReference, v => checklist.RightsToReference = v),
             ["goalGaps"] = (() => checklist.GoalGaps, v => checklist.GoalGaps = v),
             ["generalTips"] = (() => checklist.GeneralTips, v => checklist.GeneralTips = v),
@@ -367,9 +366,11 @@ public class MeetingPrepService : IMeetingPrepService
             }
         }
 
-        sb.AppendLine("Generate a meeting preparation checklist as JSON with the following sections: questionsToAsk, documentsToBring, redFlagsToRaise, rightsToReference, goalGaps, generalTips.");
+        sb.AppendLine("Generate a focused meeting preparation checklist as JSON with three sections: questionsToAsk, redFlagsToRaise, preparationNotes.");
         sb.AppendLine("Each item should have: text (the actionable item), context (why this matters), and legalBasis (relevant IDEA provision, or null if not applicable).");
-        sb.AppendLine("Focus on specific, actionable items based on the IEP analysis and parent goals.");
+        sb.AppendLine("questionsToAsk: 3-5 specific, open-ended questions based on the IEP analysis and parent goals.");
+        sb.AppendLine("redFlagsToRaise: 3-5 concerns or issues to bring up, referencing specific problems from the IEP or goals.");
+        sb.AppendLine("preparationNotes: 2-3 practical items covering key documents to bring, rights to reference, or other preparation steps.");
 
         return sb.ToString();
     }
@@ -400,9 +401,11 @@ public class MeetingPrepService : IMeetingPrepService
 
         sb.AppendLine("The parent has an upcoming IEP meeting and has not yet received the IEP document, but has defined their priorities for their child.");
         sb.AppendLine();
-        sb.AppendLine("Generate a meeting preparation checklist as JSON with the following sections: questionsToAsk, documentsToBring, redFlagsToRaise, rightsToReference, goalGaps, generalTips.");
+        sb.AppendLine("Generate a focused meeting preparation checklist as JSON with three sections: questionsToAsk, redFlagsToRaise, preparationNotes.");
         sb.AppendLine("Each item should have: text (the actionable item), context (why this matters), and legalBasis (relevant IDEA provision, or null if not applicable).");
-        sb.AppendLine("Focus on helping this parent advocate for their stated goals at the meeting.");
+        sb.AppendLine("questionsToAsk: 3-5 specific, open-ended questions to advocate for the parent's stated goals.");
+        sb.AppendLine("redFlagsToRaise: 3-5 concerns or issues to bring up at the meeting.");
+        sb.AppendLine("preparationNotes: 2-3 practical items covering key documents to bring, rights to reference, or other preparation steps.");
 
         return sb.ToString();
     }
@@ -420,38 +423,25 @@ public class MeetingPrepService : IMeetingPrepService
         var client = new AnthropicClient(apiKey, httpClient);
 
         var systemPrompt = @"You are an IEP meeting preparation expert helping a parent prepare for their child's IEP meeting.
-Your role is to create a practical, actionable checklist that helps the parent walk into the meeting prepared and confident.
+Your role is to create a focused, actionable checklist that helps the parent walk into the meeting prepared and confident.
 
 Return a JSON object with the following structure:
 {
   ""questionsToAsk"": [
     { ""text"": ""Question text"", ""context"": ""Why to ask this"", ""legalBasis"": ""34 CFR 300.xxx or null"" }
   ],
-  ""documentsToBring"": [
-    { ""text"": ""Document name"", ""context"": ""Why you need this"", ""legalBasis"": null }
-  ],
   ""redFlagsToRaise"": [
     { ""text"": ""Issue to bring up"", ""context"": ""Why it matters"", ""legalBasis"": ""..."" }
   ],
-  ""rightsToReference"": [
-    { ""text"": ""Your right"", ""context"": ""How to use it"", ""legalBasis"": ""..."" }
-  ],
-  ""goalGaps"": [
-    { ""text"": ""Goal not addressed"", ""context"": ""What to ask for"", ""legalBasis"": null }
-  ],
-  ""generalTips"": [
-    { ""text"": ""Preparation tip"", ""context"": ""Why it helps"", ""legalBasis"": null }
+  ""preparationNotes"": [
+    { ""text"": ""Preparation step"", ""context"": ""Why it helps"", ""legalBasis"": ""... or null"" }
   ]
 }
 
 Guidelines:
-- Each section should have 3-8 specific, actionable items
-- Questions should be open-ended and specific to the child's situation
-- Documents to bring should be practical and relevant
-- Red flags should reference specific concerns from the IEP or goals
-- Rights should cite specific IDEA provisions
-- Goal gaps should identify parent priorities not reflected in the IEP
-- General tips should be practical meeting preparation advice
+- questionsToAsk: 3-5 open-ended questions specific to the child's situation and IEP concerns
+- redFlagsToRaise: 3-5 specific concerns from the IEP or goals the parent should bring up
+- preparationNotes: 2-3 practical items (key documents to bring, rights to reference, or other preparation steps)
 
 Key IDEA provisions to reference when relevant:
 - 34 CFR 300.320: Content of IEP (required components)
@@ -540,8 +530,9 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             IepDocumentId = entity.IepDocumentId,
             Status = entity.Status,
             QuestionsToAsk = DeserializeOrEmpty(entity.QuestionsToAsk),
-            DocumentsToBring = DeserializeOrEmpty(entity.DocumentsToBring),
             RedFlagsToRaise = DeserializeOrEmpty(entity.RedFlagsToRaise),
+            PreparationNotes = DeserializeOrEmpty(entity.PreparationNotes),
+            DocumentsToBring = DeserializeOrEmpty(entity.DocumentsToBring),
             RightsToReference = DeserializeOrEmpty(entity.RightsToReference),
             GoalGaps = DeserializeOrEmpty(entity.GoalGaps),
             GeneralTips = DeserializeOrEmpty(entity.GeneralTips),

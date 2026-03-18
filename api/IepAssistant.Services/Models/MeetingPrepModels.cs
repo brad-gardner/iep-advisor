@@ -22,11 +22,15 @@ public class MeetingPrepResponse
     [JsonPropertyName("questionsToAsk")]
     public List<ChecklistItem> QuestionsToAsk { get; set; } = [];
 
-    [JsonPropertyName("documentsToBring")]
-    public List<ChecklistItem> DocumentsToBring { get; set; } = [];
-
     [JsonPropertyName("redFlagsToRaise")]
     public List<ChecklistItem> RedFlagsToRaise { get; set; } = [];
+
+    [JsonPropertyName("preparationNotes")]
+    public List<ChecklistItem> PreparationNotes { get; set; } = [];
+
+    // Legacy fields — kept for deserialization of old checklists
+    [JsonPropertyName("documentsToBring")]
+    public List<ChecklistItem> DocumentsToBring { get; set; } = [];
 
     [JsonPropertyName("rightsToReference")]
     public List<ChecklistItem> RightsToReference { get; set; } = [];
@@ -45,8 +49,9 @@ public class MeetingPrepChecklistModel
     public int? IepDocumentId { get; set; }
     public string Status { get; set; } = string.Empty;
     public List<ChecklistItem> QuestionsToAsk { get; set; } = [];
-    public List<ChecklistItem> DocumentsToBring { get; set; } = [];
     public List<ChecklistItem> RedFlagsToRaise { get; set; } = [];
+    public List<ChecklistItem> PreparationNotes { get; set; } = [];
+    public List<ChecklistItem> DocumentsToBring { get; set; } = [];
     public List<ChecklistItem> RightsToReference { get; set; } = [];
     public List<ChecklistItem> GoalGaps { get; set; } = [];
     public List<ChecklistItem> GeneralTips { get; set; } = [];
