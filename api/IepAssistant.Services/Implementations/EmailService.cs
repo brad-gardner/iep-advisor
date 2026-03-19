@@ -98,36 +98,89 @@ public class EmailService : IEmailService
     {
         var signupUrl = $"{_frontendUrl}/register?code={Uri.EscapeDataString(inviteCode)}";
 
-        var subject = "You're invited to IEP Advisor";
+        var subject = "Welcome to the IEP Advisor Beta";
         var html = $@"
             <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
                 <div style=""text-align: center; margin-bottom: 24px;"">
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
                 </div>
-                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">You're Invited to the Beta</h1>
-                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    You've been invited to join the IEP Advisor beta — a platform that helps parents understand and advocate for their child's Individualized Education Program using AI-powered analysis.
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.7;"">
+                    Hi there,
                 </p>
-                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    Click below to create your account. Your invite code is already included.
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.7;"">
+                    Welcome to the IEP Advisor beta. I'm Brad, the founder — and I wanted to reach out personally to say thank you for being here.
                 </p>
-                <div style=""text-align: center; margin: 24px 0;"">
-                    <a href=""{signupUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
-                        Create Your Account
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.7;"">
+                    IEP Advisor exists because parents deserve the same clarity and confidence at the IEP table that the school district's team already has. You're one of the first people to actually use it, which means your experience over the next few weeks will directly shape what this product becomes.
+                </p>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.7; font-weight: 500; color: #1E2A2A;"">
+                    Here's what I'd love your help with:
+                </p>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.9; padding-left: 8px;"">
+                    → Try uploading a real IEP document and tell me if the plain-language explanations actually make sense<br />
+                    → Let me know if anything is confusing, missing, or feels off<br />
+                    → If you hit a bug or something breaks, please don't just close the tab — let me know directly or use the support link on the site!
+                </p>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.7;"">
+                    You can email me directly at <a href=""mailto:bradgardner@sevenhillstechnology.com"" style=""color: #1A9478; text-decoration: none;"">bradgardner@sevenhillstechnology.com</a>
+                </p>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.7; font-weight: 500; color: #1E2A2A;"">
+                    A few things to know about the beta:
+                </p>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.9; padding-left: 8px;"">
+                    • Some features are still in progress — you may see rough edges<br />
+                    • Your data is private and handled with care — not exposed or sold under any circumstance<br />
+                    • This is the best time to influence what gets built next — I'd love to hear what other features you would find useful
+                </p>
+                <div style=""text-align: center; margin: 28px 0;"">
+                    <a href=""{signupUrl}"" style=""display: inline-block; padding: 14px 28px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 500;"">
+                        Get Started
                     </a>
                 </div>
                 <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
                     Your invite code: <strong>{inviteCode}</strong><br />
                     You can also enter this code manually at the sign-up page.
                 </p>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.7; margin-top: 24px;"">
+                    Brad Gardner
+                </p>
                 <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
-                <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
-                    IEP Advisor — Navigate with confidence
+                <p style=""font-size: 11px; color: #A8B5B5; text-align: center; line-height: 1.6;"">
+                    IEP Advisor · iep-advisor.com<br />
+                    You're receiving this because you signed up for the beta.
                 </p>
             </div>";
 
-        var plainText = $"You're invited to join IEP Advisor beta!\n\nCreate your account: {signupUrl}\n\nOr enter invite code manually: {inviteCode}";
+        var plainText = $@"Hi there,
+
+Welcome to the IEP Advisor beta. I'm Brad, the founder — and I wanted to reach out personally to say thank you for being here.
+
+IEP Advisor exists because parents deserve the same clarity and confidence at the IEP table that the school district's team already has. You're one of the first people to actually use it, which means your experience over the next few weeks will directly shape what this product becomes.
+
+Here's what I'd love your help with:
+
+→ Try uploading a real IEP document and tell me if the plain-language explanations actually make sense
+→ Let me know if anything is confusing, missing, or feels off
+→ If you hit a bug or something breaks, please don't just close the tab — let me know directly or use the support link on the site!
+
+You can email me directly at bradgardner@sevenhillstechnology.com
+
+A few things to know about the beta:
+• Some features are still in progress — you may see rough edges
+• Your data is private and handled with care — not exposed or sold under any circumstance
+• This is the best time to influence what gets built next — I'd love to hear what other features you would find useful
+
+To get started: {signupUrl}
+
+Your invite code: {inviteCode}
+You can also enter this code manually at the sign-up page.
+
+Brad Gardner
+
+—
+IEP Advisor · iep-advisor.com
+You're receiving this because you signed up for the beta.";
 
         await SendEmailAsync(toEmail, subject, html, plainText, ct);
     }
