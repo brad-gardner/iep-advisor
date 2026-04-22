@@ -296,6 +296,7 @@ export interface MeetingPrepChecklist {
   id: number;
   childProfileId: number;
   iepDocumentId: number | null;
+  etrDocumentId: number | null;
   status: "pending" | "generating" | "completed" | "error";
   questionsToAsk: ChecklistItem[];
   redFlagsToRaise: ChecklistItem[];

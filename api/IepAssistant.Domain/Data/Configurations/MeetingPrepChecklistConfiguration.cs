@@ -22,7 +22,13 @@ public class MeetingPrepChecklistConfiguration : IEntityTypeConfiguration<Meetin
             .HasForeignKey(m => m.IepDocumentId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.HasOne(m => m.EtrDocument)
+            .WithMany()
+            .HasForeignKey(m => m.EtrDocumentId)
+            .OnDelete(DeleteBehavior.NoAction);
+
         builder.HasIndex(m => m.ChildProfileId);
         builder.HasIndex(m => m.IepDocumentId);
+        builder.HasIndex(m => m.EtrDocumentId);
     }
 }

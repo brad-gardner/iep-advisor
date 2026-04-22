@@ -183,6 +183,174 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.ToTable("ChildProfiles");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.EtrAnalysis", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AssessmentCompleteness")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EligibilityReview")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("EtrDocumentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OverallRedFlags")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OverallSummary")
+                        .HasMaxLength(5000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("SuggestedQuestions")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EtrDocumentId")
+                        .IsUnique();
+
+                    b.ToTable("EtrAnalyses");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.EtrDocument", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BlobUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("ChildProfileId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DocumentState")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("EvaluationDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EvaluationType")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UploadDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChildProfileId");
+
+                    b.ToTable("EtrDocuments");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.EtrSection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EtrDocumentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ParsedContent")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RawText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SectionType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EtrDocumentId");
+
+                    b.ToTable("EtrSections");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.Goal", b =>
                 {
                     b.Property<int>("Id")
@@ -487,6 +655,9 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<int?>("EtrDocumentId")
+                        .HasColumnType("int");
+
                     b.Property<string>("GeneralTips")
                         .HasColumnType("nvarchar(max)");
 
@@ -525,6 +696,8 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ChildProfileId");
+
+                    b.HasIndex("EtrDocumentId");
 
                     b.HasIndex("IepDocumentId");
 
@@ -817,6 +990,39 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.EtrAnalysis", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.EtrDocument", "EtrDocument")
+                        .WithMany()
+                        .HasForeignKey("EtrDocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EtrDocument");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.EtrDocument", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.ChildProfile", "ChildProfile")
+                        .WithMany()
+                        .HasForeignKey("ChildProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChildProfile");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.EtrSection", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.EtrDocument", "EtrDocument")
+                        .WithMany()
+                        .HasForeignKey("EtrDocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EtrDocument");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.Goal", b =>
                 {
                     b.HasOne("IepAssistant.Domain.Entities.IepSection", "IepSection")
@@ -869,12 +1075,19 @@ namespace IepAssistant.Domain.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("IepAssistant.Domain.Entities.EtrDocument", "EtrDocument")
+                        .WithMany()
+                        .HasForeignKey("EtrDocumentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("IepAssistant.Domain.Entities.IepDocument", "IepDocument")
                         .WithMany()
                         .HasForeignKey("IepDocumentId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("ChildProfile");
+
+                    b.Navigation("EtrDocument");
 
                     b.Navigation("IepDocument");
                 });
