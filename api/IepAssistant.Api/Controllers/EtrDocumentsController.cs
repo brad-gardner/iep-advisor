@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.EtrDocuments;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -13,10 +15,23 @@ namespace IepAssistant.Api.Controllers;
 public class EtrDocumentsController : ControllerBase
 {
     private readonly IEtrDocumentService _etrDocumentService;
+    private readonly IEtrProcessingService _etrProcessingService;
+    private readonly IAccessService _accessService;
+    private readonly ISubscriptionService _subscriptionService;
+    private readonly EtrProcessingQueue _processingQueue;
 
-    public EtrDocumentsController(IEtrDocumentService etrDocumentService)
+    public EtrDocumentsController(
+        IEtrDocumentService etrDocumentService,
+        IEtrProcessingService etrProcessingService,
+        IAccessService accessService,
+        ISubscriptionService subscriptionService,
+        EtrProcessingQueue processingQueue)
     {
         _etrDocumentService = etrDocumentService;
+        _etrProcessingService = etrProcessingService;
+        _accessService = accessService;
+        _subscriptionService = subscriptionService;
+        _processingQueue = processingQueue;
     }
 
     [HttpGet("api/children/{childId}/etrs")]
@@ -69,6 +84,52 @@ public class EtrDocumentsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = dto.Id }, ApiResponse<EtrDocumentDto>.SuccessResponse(dto, "ETR created successfully"));
     }
 
+    [HttpPost("api/etrs/{id}/upload")]
+    [ProducesResponseType(typeof(ApiResponse<EtrDocumentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [RequestSizeLimit(50 * 1024 * 1024)] // 50MB
+    public async Task<IActionResult> Upload(int id, IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResponse<object>.Error("No file provided"));
+
+        if (!file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(ApiResponse<object>.Error("Only PDF files are supported"));
+
+        // Validate PDF magic bytes
+        using var stream = file.OpenReadStream();
+        var header = new byte[5];
+        var bytesRead = await stream.ReadAsync(header, 0, 5, cancellationToken);
+        if (bytesRead < 5 || System.Text.Encoding.ASCII.GetString(header) != "%PDF-")
+            return BadRequest(ApiResponse<object>.Error("File does not appear to be a valid PDF"));
+        stream.Position = 0;
+
+        var sanitizedFileName = Path.GetFileName(file.FileName);
+        var userId = User.GetUserId();
+
+        // Ownership + role check before subscription check (mirror IEP: service also checks, but do explicit role gate here)
+        var document = await _etrDocumentService.GetByIdAsync(id, userId, cancellationToken);
+        if (document == null)
+            return NotFound(ApiResponse<object>.Error("ETR document not found"));
+
+        if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
+            return StatusCode(403, ApiResponse<object>.Error("Insufficient permissions"));
+
+        if (!await _subscriptionService.HasActiveSubscriptionAsync(userId, cancellationToken))
+            return StatusCode(402, ApiResponse<object>.Error("Active subscription required to upload and process ETR documents"));
+
+        var result = await _etrDocumentService.AttachFileAsync(id, userId, sanitizedFileName, stream, file.Length, cancellationToken);
+
+        if (!result.Success)
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Upload failed"));
+
+        var dto = MapToDto(result.Data!);
+
+        await _processingQueue.EnqueueAsync(dto.Id, cancellationToken);
+
+        return Ok(ApiResponse<EtrDocumentDto>.SuccessResponse(dto, "File attached successfully"));
+    }
+
     [HttpPut("api/etrs/{id}/metadata")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -93,6 +154,52 @@ public class EtrDocumentsController : ControllerBase
         }
 
         return Ok(ApiResponse<object>.SuccessResponse(null, "Metadata updated successfully"));
+    }
+
+    [HttpGet("api/etrs/{id}/download")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetDownloadUrl(int id, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var url = await _etrDocumentService.GetDownloadUrlAsync(id, userId, cancellationToken);
+
+        if (url == null)
+            return NotFound(ApiResponse<object>.Error("Document not found"));
+
+        return Ok(ApiResponse<object>.SuccessResponse(new { url }));
+    }
+
+    [HttpGet("api/etrs/{id}/sections")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<object>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetSections(int id, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var sections = await _etrProcessingService.GetSectionsAsync(id, userId, cancellationToken);
+        return Ok(ApiResponse<IEnumerable<object>>.SuccessResponse(sections.Cast<object>()));
+    }
+
+    [HttpPost("api/etrs/{id}/process")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Reprocess(int id, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var document = await _etrDocumentService.GetByIdAsync(id, userId, cancellationToken);
+
+        if (document == null)
+            return NotFound(ApiResponse<object>.Error("Document not found"));
+
+        if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
+            return StatusCode(403, ApiResponse<object>.Error("Insufficient permissions"));
+
+        if (document.Status == "processing")
+            return Conflict(ApiResponse<object>.Error("Document is already being processed"));
+
+        await _processingQueue.EnqueueAsync(id, cancellationToken);
+        return Accepted(ApiResponse<object>.SuccessResponse(null, "Document queued for processing"));
     }
 
     [HttpDelete("api/etrs/{id}")]

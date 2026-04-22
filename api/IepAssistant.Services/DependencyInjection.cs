@@ -19,6 +19,7 @@ public static class DependencyInjection
         services.AddScoped<IIepDocumentService, IepDocumentService>();
         services.AddScoped<IEtrDocumentService, EtrDocumentService>();
         services.AddScoped<IIepProcessingService, IepProcessingService>();
+        services.AddScoped<IEtrProcessingService, EtrProcessingService>();
         services.AddScoped<IIepAnalysisService, IepAnalysisService>();
         services.AddScoped<IParentAdvocacyGoalService, ParentAdvocacyGoalService>();
         services.AddScoped<IAccountService, AccountService>();

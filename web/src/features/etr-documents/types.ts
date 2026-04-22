@@ -41,3 +41,28 @@ export const DOCUMENT_STATE_LABELS: Record<string, string> = {
   draft: 'Draft',
   final: 'Final',
 };
+
+export type EtrSectionType =
+  | 'referral_reason'
+  | 'background_information'
+  | 'parent_input'
+  | 'teacher_input'
+  | 'student_input'
+  | 'health_vision_hearing'
+  | 'cognitive_assessment'
+  | 'academic_assessment'
+  | 'behavioral_social_emotional'
+  | 'speech_language'
+  | 'occupational_physical_therapy'
+  | 'adaptive_functional'
+  | 'eligibility_determination'
+  | 'other';
+
+export interface EtrSection {
+  id: number;
+  etrDocumentId: number;
+  sectionType: string;
+  rawText: string | null;
+  parsedContent: string | null;
+  displayOrder: number;
+}

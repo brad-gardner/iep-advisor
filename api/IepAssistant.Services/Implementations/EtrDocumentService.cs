@@ -1,5 +1,6 @@
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Domain.Interfaces;
 using IepAssistant.Domain.Repositories;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
@@ -10,6 +11,7 @@ public class EtrDocumentService : IEtrDocumentService
 {
     private readonly IEtrDocumentRepository _documentRepository;
     private readonly IAccessService _accessService;
+    private readonly IBlobStorageService _blobStorage;
     private readonly ApplicationDbContext _context;
 
     private static readonly HashSet<string> ValidEvaluationTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -25,10 +27,12 @@ public class EtrDocumentService : IEtrDocumentService
     public EtrDocumentService(
         IEtrDocumentRepository documentRepository,
         IAccessService accessService,
+        IBlobStorageService blobStorage,
         ApplicationDbContext context)
     {
         _documentRepository = documentRepository;
         _accessService = accessService;
+        _blobStorage = blobStorage;
         _context = context;
     }
 
@@ -120,6 +124,55 @@ public class EtrDocumentService : IEtrDocumentService
         return ServiceResult.SuccessResult("Metadata updated successfully.");
     }
 
+    public async Task<ServiceResult<EtrDocumentModel>> AttachFileAsync(int id, int userId, string fileName, Stream fileStream, long fileSize, CancellationToken cancellationToken = default)
+    {
+        var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
+        if (document == null)
+            return ServiceResult<EtrDocumentModel>.FailureResult("Document not found.");
+
+        if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
+            return ServiceResult<EtrDocumentModel>.FailureResult("Document not found.");
+
+        if (document.Status == "processing")
+            return ServiceResult<EtrDocumentModel>.FailureResult("Cannot replace file while document is being processed. Please wait for processing to complete.");
+
+        if (!string.IsNullOrEmpty(document.BlobUri))
+        {
+            await _blobStorage.DeleteAsync(document.BlobUri, cancellationToken);
+        }
+
+        var blobPath = $"etrs/{document.ChildProfileId}/{Guid.NewGuid()}/{fileName}";
+        await _blobStorage.UploadAsync(blobPath, fileStream, "application/pdf", cancellationToken);
+
+        document.FileName = fileName;
+        document.BlobUri = blobPath;
+        document.FileSizeBytes = fileSize;
+        document.UploadDate = DateTime.UtcNow;
+        document.Status = "uploaded";
+        document.UpdatedById = userId;
+
+        _documentRepository.Update(document);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return ServiceResult<EtrDocumentModel>.SuccessResult(MapToModel(document), "File attached successfully.");
+    }
+
+    public async Task<string?> GetDownloadUrlAsync(int id, int userId, CancellationToken cancellationToken = default)
+    {
+        var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
+        if (document == null)
+            return null;
+
+        var role = await _accessService.GetRoleAsync(document.ChildProfileId, userId, cancellationToken);
+        if (role == null)
+            return null;
+
+        if (string.IsNullOrEmpty(document.BlobUri))
+            return null;
+
+        return await _blobStorage.GetDownloadUrlAsync(document.BlobUri);
+    }
+
     public async Task<ServiceResult> DeleteAsync(int id, int userId, CancellationToken cancellationToken = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
@@ -128,6 +181,11 @@ public class EtrDocumentService : IEtrDocumentService
 
         if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Owner, cancellationToken))
             return ServiceResult.FailureResult("Document not found.");
+
+        if (!string.IsNullOrEmpty(document.BlobUri))
+        {
+            await _blobStorage.DeleteAsync(document.BlobUri, cancellationToken);
+        }
 
         document.IsActive = false;
         document.UpdatedById = userId;

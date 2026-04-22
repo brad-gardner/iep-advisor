@@ -66,6 +66,8 @@ builder.Services.AddHttpClient("Claude", client =>
 // Background processing
 builder.Services.AddSingleton<IepProcessingQueue>();
 builder.Services.AddHostedService<IepProcessingWorker>();
+builder.Services.AddSingleton<EtrProcessingQueue>();
+builder.Services.AddHostedService<EtrProcessingWorker>();
 builder.Services.AddSingleton<IepAnalysisQueue>();
 builder.Services.AddHostedService<IepAnalysisWorker>();
 builder.Services.AddSingleton<MeetingPrepQueue>();
