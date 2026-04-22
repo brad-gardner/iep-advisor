@@ -15,6 +15,13 @@ export async function generateFromIep(iepId: number): Promise<ApiResponse<Meetin
   return response.data;
 }
 
+export async function generateFromEtr(etrId: number): Promise<ApiResponse<MeetingPrepChecklist>> {
+  const response = await apiClient.post<ApiResponse<MeetingPrepChecklist>>(
+    `/api/etrs/${etrId}/meeting-prep`
+  );
+  return response.data;
+}
+
 export async function getChecklistsByChild(childId: number): Promise<ApiResponse<MeetingPrepChecklist[]>> {
   const response = await apiClient.get<ApiResponse<MeetingPrepChecklist[]>>(
     `/api/children/${childId}/meeting-prep`

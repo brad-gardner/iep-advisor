@@ -20,6 +20,7 @@ interface MeetingPrepTabProps {
   onGenerate: () => void;
   onReload?: () => void;
   analysisCreatedAt?: string | null;
+  contextLabel?: 'IEP' | 'ETR';
 }
 
 const SECTIONS = [
@@ -68,8 +69,14 @@ function getAllItems(checklist: MeetingPrepChecklist) {
 }
 
 export function MeetingPrepTab(props: MeetingPrepTabProps) {
-  const { checklist, isLoading, isGenerating, onGenerate, analysisCreatedAt } =
-    props;
+  const {
+    checklist,
+    isLoading,
+    isGenerating,
+    onGenerate,
+    analysisCreatedAt,
+    contextLabel,
+  } = props;
   const [localChecklist, setLocalChecklist] =
     useState<MeetingPrepChecklist | null>(null);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
@@ -98,6 +105,7 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
       <MeetingPrepEmptyState
         onGenerate={onGenerate}
         isGenerating={isGenerating}
+        contextLabel={contextLabel}
       />
     );
   }

@@ -4,9 +4,18 @@ import { Button } from '@/components/ui/button';
 interface MeetingPrepEmptyStateProps {
   onGenerate: () => void;
   isGenerating: boolean;
+  contextLabel?: 'IEP' | 'ETR';
 }
 
-export function MeetingPrepEmptyState({ onGenerate, isGenerating }: MeetingPrepEmptyStateProps) {
+export function MeetingPrepEmptyState({
+  onGenerate,
+  isGenerating,
+  contextLabel = 'IEP',
+}: MeetingPrepEmptyStateProps) {
+  const sourceSentence =
+    contextLabel === 'ETR'
+      ? "on your child's ETR."
+      : "on your child's IEP.";
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
       <div className="w-12 h-12 rounded-full bg-brand-teal-50 flex items-center justify-center mb-4">
@@ -18,7 +27,7 @@ export function MeetingPrepEmptyState({ onGenerate, isGenerating }: MeetingPrepE
       <p className="text-brand-slate-400 text-sm text-center max-w-md mb-6">
         Generate a personalized meeting prep checklist with questions to ask,
         documents to bring, rights to reference, and potential red flags based
-        on your child's IEP.
+        {' '}{sourceSentence}
       </p>
       <Button onClick={onGenerate} disabled={isGenerating} data-testid="generate-meeting-prep">
         {isGenerating ? 'Generating...' : 'Generate Meeting Prep'}

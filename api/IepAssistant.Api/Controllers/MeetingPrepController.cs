@@ -66,6 +66,28 @@ public class MeetingPrepController : ControllerBase
             "Meeting prep checklist generation started"));
     }
 
+    [HttpPost("api/etrs/{etrId}/meeting-prep")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GenerateFromEtr(int etrId, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var result = await _meetingPrepService.GenerateFromEtrAsync(etrId, userId, cancellationToken);
+
+        if (!result.Success)
+        {
+            if (result.Message?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
+                return NotFound(ApiResponse<object>.Error(result.Message));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Generation failed"));
+        }
+
+        await _queue.EnqueueAsync(result.Data, cancellationToken);
+
+        return Accepted(ApiResponse<object>.SuccessResponse(
+            new { id = result.Data },
+            "Meeting prep checklist generation started"));
+    }
+
     [HttpGet("api/children/{childId}/meeting-prep")]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<MeetingPrepChecklistModel>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetByChild(int childId, CancellationToken cancellationToken)

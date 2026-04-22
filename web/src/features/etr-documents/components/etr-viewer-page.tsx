@@ -18,6 +18,7 @@ import { EtrProcessingBanner } from './etr-processing-banner';
 import { EtrErrorBanner } from './etr-error-banner';
 import { EtrSectionsList } from './etr-sections-list';
 import { EtrAnalysisTab } from './etr-analysis-tab';
+import { EtrMeetingPrepTab } from './etr-meeting-prep-tab';
 
 type TabKey = 'overview' | 'sections' | 'analysis' | 'meeting-prep';
 
@@ -71,6 +72,16 @@ export function EtrViewerPage() {
           ? 'Processing...'
           : undefined;
 
+  const meetingPrepTabDisabled = etr.status !== 'parsed';
+  const meetingPrepTabHint =
+    etr.status === 'created'
+      ? 'Upload a document first'
+      : etr.status === 'error'
+        ? 'Processing failed'
+        : IN_FLIGHT.has(etr.status)
+          ? 'Processing...'
+          : undefined;
+
   const analysisTabDisabled = etr.status !== 'parsed';
   const analysisTabHint =
     etr.status === 'created'
@@ -95,7 +106,12 @@ export function EtrViewerPage() {
       disabled: analysisTabDisabled,
       hint: analysisTabHint,
     },
-    { key: 'meeting-prep', label: 'Meeting Prep', disabled: true, hint: 'Soon' },
+    {
+      key: 'meeting-prep',
+      label: 'Meeting Prep',
+      disabled: meetingPrepTabDisabled,
+      hint: meetingPrepTabHint,
+    },
   ];
 
   return (
@@ -213,6 +229,13 @@ export function EtrViewerPage() {
 
       {activeTab === 'analysis' && !analysisTabDisabled && (
         <EtrAnalysisTab etrId={documentId} />
+      )}
+
+      {activeTab === 'meeting-prep' && !meetingPrepTabDisabled && (
+        <EtrMeetingPrepTab
+          etrId={documentId}
+          childProfileId={etr.childProfileId}
+        />
       )}
     </div>
   );
