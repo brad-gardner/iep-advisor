@@ -72,12 +72,11 @@ export function useEtrAnalysis(etrId: number): UseEtrAnalysisResult {
               status: 'analyzing',
               assessmentCompleteness: null,
               eligibilityReview: null,
-              overallRedFlags: null,
-              suggestedQuestions: null,
+              overallRedFlags: [],
+              suggestedQuestions: [],
               overallSummary: null,
               errorMessage: null,
               createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
             }
       );
     } catch (err: unknown) {
