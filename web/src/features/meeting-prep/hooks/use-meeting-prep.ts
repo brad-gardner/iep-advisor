@@ -36,6 +36,11 @@ export function useMeetingPrep(
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Depend on primitives, not the anchor object reference (callers commonly
+  // pass a fresh object literal each render, which would loop effects).
+  const anchorType = anchor?.type;
+  const anchorId = anchor && "id" in anchor ? anchor.id : undefined;
+
   const load = useCallback(async () => {
     if (!childId) {
       setIsLoading(false);
@@ -45,8 +50,16 @@ export function useMeetingPrep(
     try {
       const response = await getChecklistsByChild(childId);
       if (response.success && response.data) {
+        const resolvedAnchor: MeetingPrepAnchor | undefined =
+          anchorType === "iep" && anchorId != null
+            ? { type: "iep", id: anchorId }
+            : anchorType === "etr" && anchorId != null
+            ? { type: "etr", id: anchorId }
+            : anchorType === "goals"
+            ? { type: "goals" }
+            : undefined;
         const filtered = response.data.filter((c) =>
-          matchesAnchor(c, anchor, iepDocumentId),
+          matchesAnchor(c, resolvedAnchor, iepDocumentId),
         );
         // Most recent first
         const sorted = filtered.sort(
@@ -62,7 +75,7 @@ export function useMeetingPrep(
     } finally {
       setIsLoading(false);
     }
-  }, [childId, iepDocumentId, anchor]);
+  }, [childId, iepDocumentId, anchorType, anchorId]);
 
   useEffect(() => {
     load();
@@ -145,8 +158,16 @@ export function useMeetingPrep(
     if (!childId) return;
     const response = await getChecklistsByChild(childId);
     if (response.success && response.data) {
+      const resolvedAnchor: MeetingPrepAnchor | undefined =
+        anchorType === "iep" && anchorId != null
+          ? { type: "iep", id: anchorId }
+          : anchorType === "etr" && anchorId != null
+          ? { type: "etr", id: anchorId }
+          : anchorType === "goals"
+          ? { type: "goals" }
+          : undefined;
       const filtered = response.data.filter((c) =>
-        matchesAnchor(c, anchor, iepDocumentId),
+        matchesAnchor(c, resolvedAnchor, iepDocumentId),
       );
       const sorted = filtered.sort(
         (a, b) =>
@@ -156,7 +177,7 @@ export function useMeetingPrep(
         setChecklist(sorted[0]);
       }
     }
-  }, [childId, iepDocumentId, anchor]);
+  }, [childId, iepDocumentId, anchorType, anchorId]);
 
   const isInProgress =
     checklist?.status === "generating" || checklist?.status === "pending";
