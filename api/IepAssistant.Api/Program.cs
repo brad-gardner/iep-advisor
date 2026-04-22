@@ -57,10 +57,13 @@ builder.Host.UseSerilog();
 builder.Services.AddDomain(builder.Configuration);
 builder.Services.AddServices();
 
-// Named HttpClient for Claude API calls (avoids socket exhaustion from new HttpClient per request)
+// Named HttpClient for Claude API calls (avoids socket exhaustion from new HttpClient per request).
+// Timeout is generous because long-document (30+ page ETR/IEP) non-streaming responses with
+// large output token budgets can take several minutes. Consider switching to streaming if this
+// becomes a sustained issue.
 builder.Services.AddHttpClient("Claude", client =>
 {
-    client.Timeout = TimeSpan.FromMinutes(5);
+    client.Timeout = TimeSpan.FromMinutes(15);
 });
 
 // Background processing
