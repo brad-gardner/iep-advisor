@@ -79,14 +79,13 @@ export interface EtrAnalysis {
   id: number;
   etrDocumentId: number;
   status: EtrAnalysisStatus;
-  assessmentCompleteness: string | null;
-  eligibilityReview: string | null;
-  overallRedFlags: string | null;
-  suggestedQuestions: string | null;
+  assessmentCompleteness: AssessmentCompleteness | null;
+  eligibilityReview: EligibilityReview | null;
+  overallRedFlags: EtrRedFlag[];
+  suggestedQuestions: EtrSuggestedQuestion[];
   overallSummary: string | null;
   errorMessage: string | null;
   createdAt: string;
-  updatedAt: string;
 }
 
 export type AdequacyRating = 'strong' | 'adequate' | 'thin' | 'concerning' | string;
