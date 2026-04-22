@@ -9,6 +9,7 @@ public interface IEtrDocumentRepository : IRepository<EtrDocument>
 {
     Task<IEnumerable<EtrDocument>> GetByChildProfileIdAsync(int childProfileId, CancellationToken cancellationToken = default);
     Task<EtrDocument?> GetByIdWithChildAsync(int id, CancellationToken cancellationToken = default);
+    Task<IEnumerable<EtrDocument>> GetAllByUserAsync(int userId, CancellationToken cancellationToken = default);
 }
 
 public class EtrDocumentRepository : Repository<EtrDocument>, IEtrDocumentRepository
@@ -25,4 +26,17 @@ public class EtrDocumentRepository : Repository<EtrDocument>, IEtrDocumentReposi
         => await _dbSet
             .Include(d => d.ChildProfile)
             .FirstOrDefaultAsync(d => d.Id == id && d.IsActive, cancellationToken);
+
+    public async Task<IEnumerable<EtrDocument>> GetAllByUserAsync(int userId, CancellationToken cancellationToken = default)
+        => await _dbSet
+            .Include(d => d.ChildProfile)
+            .Where(d => d.IsActive
+                && d.ChildProfile!.IsActive
+                && _context.Set<ChildAccess>()
+                    .Any(ca => ca.ChildProfileId == d.ChildProfileId
+                            && ca.UserId == userId
+                            && ca.IsActive
+                            && ca.AcceptedAt != null))
+            .OrderByDescending(d => d.EvaluationDate ?? d.UploadDate)
+            .ToListAsync(cancellationToken);
 }

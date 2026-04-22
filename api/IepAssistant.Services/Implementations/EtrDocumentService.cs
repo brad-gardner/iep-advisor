@@ -46,6 +46,12 @@ public class EtrDocumentService : IEtrDocumentService
         return documents.Select(MapToModel);
     }
 
+    public async Task<IEnumerable<EtrDocumentListItemModel>> GetAllForUserAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        var documents = await _documentRepository.GetAllByUserAsync(userId, cancellationToken);
+        return documents.Select(MapToListItemModel);
+    }
+
     public async Task<EtrDocumentModel?> GetByIdAsync(int id, int userId, CancellationToken cancellationToken = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
@@ -194,6 +200,24 @@ public class EtrDocumentService : IEtrDocumentService
 
         return ServiceResult.SuccessResult("Document deleted successfully.");
     }
+
+    private static EtrDocumentListItemModel MapToListItemModel(EtrDocument entity) => new()
+    {
+        Id = entity.Id,
+        ChildProfileId = entity.ChildProfileId,
+        FileName = entity.FileName,
+        UploadDate = entity.UploadDate,
+        EvaluationDate = entity.EvaluationDate,
+        EvaluationType = entity.EvaluationType,
+        DocumentState = entity.DocumentState,
+        Notes = entity.Notes,
+        Status = entity.Status,
+        FileSizeBytes = entity.FileSizeBytes,
+        CreatedAt = entity.CreatedAt,
+        ChildId = entity.ChildProfileId,
+        ChildFirstName = entity.ChildProfile?.FirstName ?? string.Empty,
+        ChildLastName = entity.ChildProfile?.LastName
+    };
 
     private static EtrDocumentModel MapToModel(EtrDocument entity) => new()
     {

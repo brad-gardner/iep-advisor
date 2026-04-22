@@ -15,6 +15,7 @@ import { CreateChildPage } from '@/features/children/components/create-child-pag
 import { ChildDetailPage } from '@/features/children/components/child-detail-page';
 import { IepViewerPage } from '@/features/iep-documents/components/iep-viewer-page';
 import { EtrViewerPage } from '@/features/etr-documents/components/etr-viewer-page';
+import { EtrListPage } from '@/features/etr-documents/components/etr-list-page';
 import { ComparisonPage } from '@/features/iep-comparison/components/comparison-page';
 import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
 import { Iep101Page } from '@/features/onboarding/components/iep-101-page';
@@ -173,6 +174,16 @@ export function AppRouter() {
           <ProtectedRoute>
             <MainLayout>
               <IepViewerPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/etrs"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <EtrListPage />
             </MainLayout>
           </ProtectedRoute>
         }

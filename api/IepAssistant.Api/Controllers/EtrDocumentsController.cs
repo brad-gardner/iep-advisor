@@ -50,6 +50,16 @@ public class EtrDocumentsController : ControllerBase
         return Ok(ApiResponse<IEnumerable<EtrDocumentDto>>.SuccessResponse(dtos));
     }
 
+    [HttpGet("api/etrs")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<EtrDocumentListItemDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var documents = await _etrDocumentService.GetAllForUserAsync(userId, cancellationToken);
+        var dtos = documents.Select(MapToListItemDto).ToList();
+        return Ok(ApiResponse<List<EtrDocumentListItemDto>>.SuccessResponse(dtos));
+    }
+
     [HttpGet("api/etrs/{id}")]
     [ProducesResponseType(typeof(ApiResponse<EtrDocumentDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -289,6 +299,24 @@ public class EtrDocumentsController : ControllerBase
 
         return Ok(ApiResponse<object>.SuccessResponse(null, "Document deleted successfully"));
     }
+
+    private static EtrDocumentListItemDto MapToListItemDto(EtrDocumentListItemModel model) => new()
+    {
+        Id = model.Id,
+        ChildProfileId = model.ChildProfileId,
+        FileName = model.FileName,
+        UploadDate = model.UploadDate,
+        EvaluationDate = model.EvaluationDate,
+        EvaluationType = model.EvaluationType,
+        DocumentState = model.DocumentState,
+        Notes = model.Notes,
+        Status = model.Status,
+        FileSizeBytes = model.FileSizeBytes,
+        CreatedAt = model.CreatedAt,
+        ChildId = model.ChildId,
+        ChildFirstName = model.ChildFirstName,
+        ChildLastName = model.ChildLastName
+    };
 
     private static EtrDocumentDto MapToDto(EtrDocumentModel model) => new()
     {

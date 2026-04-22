@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy } from 'lucide-react';
+import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/features/auth/hooks/use-auth';
@@ -7,6 +7,7 @@ import { useAuth } from '@/features/auth/hooks/use-auth';
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { to: '/children', label: 'My Children', Icon: Users },
+  { to: '/etrs', label: 'ETRs', Icon: FileSearch },
   { to: '/profile', label: 'Profile', Icon: UserCircle },
   // { to: '/subscription', label: 'Subscription', Icon: CreditCard }, // Hidden during beta
   { to: '/knowledge-base', label: 'Knowledge Base', Icon: BookOpen },

@@ -15,6 +15,13 @@ public class EtrDocumentModel
     public DateTime CreatedAt { get; set; }
 }
 
+public class EtrDocumentListItemModel : EtrDocumentModel
+{
+    public int ChildId { get; set; }
+    public string ChildFirstName { get; set; } = string.Empty;
+    public string? ChildLastName { get; set; }
+}
+
 public class CreateEtrDocumentModel
 {
     public DateTime EvaluationDate { get; set; }

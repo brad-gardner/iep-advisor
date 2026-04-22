@@ -16,6 +16,12 @@ export interface EtrDocument {
   createdAt: string;
 }
 
+export interface EtrDocumentListItem extends EtrDocument {
+  childId: number;
+  childFirstName: string;
+  childLastName: string;
+}
+
 export interface CreateEtrRequest {
   evaluationDate: string;
   evaluationType: EvaluationType;

@@ -4,9 +4,15 @@ import type {
   CreateEtrRequest,
   EtrAnalysis,
   EtrDocument,
+  EtrDocumentListItem,
   EtrSection,
   UpdateEtrMetadataRequest,
 } from '../types';
+
+export async function listAllForUser(): Promise<ApiResponse<EtrDocumentListItem[]>> {
+  const response = await apiClient.get<ApiResponse<EtrDocumentListItem[]>>('/api/etrs');
+  return response.data;
+}
 
 export async function listByChild(childId: number): Promise<ApiResponse<EtrDocument[]>> {
   const response = await apiClient.get<ApiResponse<EtrDocument[]>>(
