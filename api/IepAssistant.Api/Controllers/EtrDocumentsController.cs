@@ -16,22 +16,28 @@ public class EtrDocumentsController : ControllerBase
 {
     private readonly IEtrDocumentService _etrDocumentService;
     private readonly IEtrProcessingService _etrProcessingService;
+    private readonly IEtrAnalysisService _etrAnalysisService;
     private readonly IAccessService _accessService;
     private readonly ISubscriptionService _subscriptionService;
     private readonly EtrProcessingQueue _processingQueue;
+    private readonly EtrAnalysisQueue _analysisQueue;
 
     public EtrDocumentsController(
         IEtrDocumentService etrDocumentService,
         IEtrProcessingService etrProcessingService,
+        IEtrAnalysisService etrAnalysisService,
         IAccessService accessService,
         ISubscriptionService subscriptionService,
-        EtrProcessingQueue processingQueue)
+        EtrProcessingQueue processingQueue,
+        EtrAnalysisQueue analysisQueue)
     {
         _etrDocumentService = etrDocumentService;
         _etrProcessingService = etrProcessingService;
+        _etrAnalysisService = etrAnalysisService;
         _accessService = accessService;
         _subscriptionService = subscriptionService;
         _processingQueue = processingQueue;
+        _analysisQueue = analysisQueue;
     }
 
     [HttpGet("api/children/{childId}/etrs")]
@@ -201,6 +207,74 @@ public class EtrDocumentsController : ControllerBase
         await _processingQueue.EnqueueAsync(id, cancellationToken);
         return Accepted(ApiResponse<object>.SuccessResponse(null, "Document queued for processing"));
     }
+
+    [HttpPost("api/etrs/{id}/analyze")]
+    [ProducesResponseType(typeof(ApiResponse<EtrAnalysisDto>), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Analyze(int id, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var document = await _etrDocumentService.GetByIdAsync(id, userId, cancellationToken);
+
+        if (document == null)
+            return NotFound(ApiResponse<object>.Error("ETR document not found"));
+
+        if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
+            return StatusCode(403, ApiResponse<object>.Error("Insufficient permissions"));
+
+        if (document.Status != "parsed")
+            return BadRequest(ApiResponse<object>.Error("ETR must be parsed before analysis"));
+
+        // Subscription gate (mirrors IEP /analyze)
+        if (!await _subscriptionService.HasActiveSubscriptionAsync(userId, cancellationToken))
+            return StatusCode(402, ApiResponse<object>.Error("Active subscription required to analyze ETR documents"));
+
+        // Per-child ETR analysis limit (distinct from IEP). Currently returns true; see TODO in EtrAnalysisService.
+        if (!await _etrAnalysisService.CheckEtrAnalysisLimitAsync(userId, document.ChildProfileId, cancellationToken))
+            return StatusCode(429, ApiResponse<object>.Error("ETR analysis limit reached for this child."));
+
+        // Create/reset the analysis row so the caller can poll immediately.
+        var existing = await _etrAnalysisService.GetAnalysisAsync(id, userId, cancellationToken);
+        var dto = new EtrAnalysisDto
+        {
+            Id = existing?.Id ?? 0,
+            EtrDocumentId = id,
+            Status = "pending",
+            CreatedAt = existing?.CreatedAt ?? DateTime.UtcNow,
+        };
+
+        await _analysisQueue.EnqueueAsync(id, cancellationToken);
+        return Accepted(ApiResponse<EtrAnalysisDto>.SuccessResponse(dto, "ETR analysis queued"));
+    }
+
+    [HttpGet("api/etrs/{id}/analysis")]
+    [ProducesResponseType(typeof(ApiResponse<EtrAnalysisDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAnalysis(int id, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var analysis = await _etrAnalysisService.GetAnalysisAsync(id, userId, cancellationToken);
+
+        if (analysis == null)
+            return NotFound(ApiResponse<object>.Error("No analysis found for this ETR"));
+
+        return Ok(ApiResponse<EtrAnalysisDto>.SuccessResponse(MapToAnalysisDto(analysis)));
+    }
+
+    private static EtrAnalysisDto MapToAnalysisDto(EtrAnalysisModel model) => new()
+    {
+        Id = model.Id,
+        EtrDocumentId = model.EtrDocumentId,
+        Status = model.Status,
+        AssessmentCompleteness = model.AssessmentCompleteness,
+        EligibilityReview = model.EligibilityReview,
+        OverallRedFlags = model.OverallRedFlags,
+        SuggestedQuestions = model.SuggestedQuestions,
+        OverallSummary = model.OverallSummary,
+        ErrorMessage = model.ErrorMessage,
+        CreatedAt = model.CreatedAt,
+    };
 
     [HttpDelete("api/etrs/{id}")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]

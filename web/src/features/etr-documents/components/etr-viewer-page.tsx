@@ -17,6 +17,7 @@ import { EtrUpload } from './etr-upload';
 import { EtrProcessingBanner } from './etr-processing-banner';
 import { EtrErrorBanner } from './etr-error-banner';
 import { EtrSectionsList } from './etr-sections-list';
+import { EtrAnalysisTab } from './etr-analysis-tab';
 
 type TabKey = 'overview' | 'sections' | 'analysis' | 'meeting-prep';
 
@@ -70,6 +71,16 @@ export function EtrViewerPage() {
           ? 'Processing...'
           : undefined;
 
+  const analysisTabDisabled = etr.status !== 'parsed';
+  const analysisTabHint =
+    etr.status === 'created'
+      ? 'Upload a document first'
+      : etr.status === 'error'
+        ? 'Processing failed'
+        : IN_FLIGHT.has(etr.status)
+          ? 'Processing...'
+          : undefined;
+
   const TABS: { key: TabKey; label: string; disabled: boolean; hint?: string }[] = [
     { key: 'overview', label: 'Overview', disabled: false },
     {
@@ -78,7 +89,12 @@ export function EtrViewerPage() {
       disabled: sectionsTabDisabled,
       hint: sectionsTabHint,
     },
-    { key: 'analysis', label: 'Analysis', disabled: true, hint: 'Soon' },
+    {
+      key: 'analysis',
+      label: 'Analysis',
+      disabled: analysisTabDisabled,
+      hint: analysisTabHint,
+    },
     { key: 'meeting-prep', label: 'Meeting Prep', disabled: true, hint: 'Soon' },
   ];
 
@@ -193,6 +209,10 @@ export function EtrViewerPage() {
           isLoading={sectionsLoading}
           error={sectionsError}
         />
+      )}
+
+      {activeTab === 'analysis' && !analysisTabDisabled && (
+        <EtrAnalysisTab etrId={documentId} />
       )}
     </div>
   );
