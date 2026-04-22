@@ -1078,7 +1078,7 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasOne("IepAssistant.Domain.Entities.EtrDocument", "EtrDocument")
                         .WithMany()
                         .HasForeignKey("EtrDocumentId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("IepAssistant.Domain.Entities.IepDocument", "IepDocument")
                         .WithMany()

@@ -27,7 +27,7 @@ namespace IepAssistant.Domain.Data.Migrations
                 column: "EtrDocumentId",
                 principalTable: "EtrDocuments",
                 principalColumn: "Id",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.NoAction);
         }
 
         /// <inheritdoc />
