@@ -298,7 +298,7 @@ OUTPUT RULES:
         {
             Messages = messages,
             Model = "claude-sonnet-4-20250514",
-            MaxTokens = 16384,
+            MaxTokens = 32000,
             System = [new SystemMessage(systemPrompt)],
         };
 
@@ -310,6 +310,11 @@ OUTPUT RULES:
             _logger.LogWarning("Empty response from Claude for ETR analysis");
             return null;
         }
+
+        var stopReason = response.StopReason;
+        _logger.LogInformation(
+            "ETR analysis Claude response: {Length} chars, stop_reason={StopReason}",
+            responseText.Length, stopReason);
 
         // Strip markdown code fences defensively in case Claude adds them
         responseText = responseText.Trim();
@@ -329,7 +334,11 @@ OUTPUT RULES:
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "Failed to parse Claude ETR analysis response as JSON");
+            var head = responseText[..Math.Min(500, responseText.Length)];
+            var tail = responseText[Math.Max(0, responseText.Length - 500)..];
+            _logger.LogError(ex,
+                "Failed to parse Claude ETR analysis response as JSON. stop_reason={StopReason}, total_length={Length}. HEAD: {Head} ... TAIL: {Tail}",
+                stopReason, responseText.Length, head, tail);
             return null;
         }
     }
