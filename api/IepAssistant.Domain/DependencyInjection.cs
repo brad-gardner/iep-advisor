@@ -19,6 +19,7 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IChildProfileRepository, ChildProfileRepository>();
         services.AddScoped<IIepDocumentRepository, IepDocumentRepository>();
+        services.AddScoped<IEtrDocumentRepository, EtrDocumentRepository>();
         services.AddScoped<IParentAdvocacyGoalRepository, ParentAdvocacyGoalRepository>();
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 

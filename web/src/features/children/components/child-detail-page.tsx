@@ -7,6 +7,9 @@ import { ChildForm } from "./child-form";
 import { useIepDocuments } from "@/features/iep-documents/hooks/use-iep-documents";
 import { CreateIepForm } from "@/features/iep-documents/components/create-iep-form";
 import { IepDocumentList } from "@/features/iep-documents/components/iep-document-list";
+import { useEtrDocuments } from "@/features/etr-documents/hooks/use-etr-documents";
+import { CreateEtrForm } from "@/features/etr-documents/components/create-etr-form";
+import { EtrDocumentList } from "@/features/etr-documents/components/etr-document-list";
 import { useAdvocacyGoals } from "@/features/advocacy-goals/hooks/use-advocacy-goals";
 import { AdvocacyGoalsList } from "@/features/advocacy-goals/components/advocacy-goals-list";
 import { ShareChildDialog } from "@/features/sharing/components/share-child-dialog";
@@ -23,6 +26,7 @@ export function ChildDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showCreateIep, setShowCreateIep] = useState(false);
+  const [showCreateEtr, setShowCreateEtr] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [accessListKey, setAccessListKey] = useState(0);
   const {
@@ -30,6 +34,11 @@ export function ChildDetailPage() {
     isLoading: docsLoading,
     reload: reloadDocs,
   } = useIepDocuments(Number(id));
+  const {
+    etrs,
+    isLoading: etrsLoading,
+    reload: reloadEtrs,
+  } = useEtrDocuments(Number(id));
   const {
     goals,
     isLoading: goalsLoading,
@@ -294,6 +303,38 @@ export function ChildDetailPage() {
           documents={documents}
           isLoading={docsLoading}
           onDeleted={reloadDocs}
+        />
+      </Card>
+
+      <Card data-testid="etr-documents-section">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="font-serif">ETRs</h2>
+          {!isViewer && !showCreateEtr && (
+            <Button
+              variant="secondary"
+              onClick={() => setShowCreateEtr(true)}
+              data-testid="new-etr-button"
+            >
+              New ETR
+            </Button>
+          )}
+        </div>
+        {!isViewer && showCreateEtr && (
+          <div className="mb-4">
+            <CreateEtrForm
+              childId={Number(id)}
+              onCreated={() => {
+                setShowCreateEtr(false);
+                reloadEtrs();
+              }}
+              onCancel={() => setShowCreateEtr(false)}
+            />
+          </div>
+        )}
+        <EtrDocumentList
+          etrs={etrs}
+          isLoading={etrsLoading}
+          onDeleted={reloadEtrs}
         />
       </Card>
 

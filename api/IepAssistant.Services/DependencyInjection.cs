@@ -17,6 +17,7 @@ public static class DependencyInjection
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IChildProfileService, ChildProfileService>();
         services.AddScoped<IIepDocumentService, IepDocumentService>();
+        services.AddScoped<IEtrDocumentService, EtrDocumentService>();
         services.AddScoped<IIepProcessingService, IepProcessingService>();
         services.AddScoped<IIepAnalysisService, IepAnalysisService>();
         services.AddScoped<IParentAdvocacyGoalService, ParentAdvocacyGoalService>();

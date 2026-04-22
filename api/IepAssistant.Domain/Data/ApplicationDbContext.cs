@@ -16,6 +16,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<IepSection> IepSections => Set<IepSection>();
     public DbSet<Goal> Goals => Set<Goal>();
     public DbSet<IepAnalysis> IepAnalyses => Set<IepAnalysis>();
+    public DbSet<EtrDocument> EtrDocuments => Set<EtrDocument>();
     public DbSet<ParentAdvocacyGoal> ParentAdvocacyGoals => Set<ParentAdvocacyGoal>();
     public DbSet<UserRecoveryCode> UserRecoveryCodes => Set<UserRecoveryCode>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
