@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<IEtrSectionRepository, EtrSectionRepository>();
         services.AddScoped<IEtrAnalysisRepository, EtrAnalysisRepository>();
         services.AddScoped<IParentAdvocacyGoalRepository, ParentAdvocacyGoalRepository>();
+        services.AddScoped<IProgressReportRepository, ProgressReportRepository>();
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
         var blobConnectionString = configuration.GetConnectionString("BlobStorage")

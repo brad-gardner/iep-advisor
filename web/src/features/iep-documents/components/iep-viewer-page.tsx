@@ -27,6 +27,7 @@ import { MeetingPrepTab } from "@/features/meeting-prep/components/meeting-prep-
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { PdfViewer } from "@/components/ui/pdf-viewer";
+import { ProgressReportsTab } from "@/features/progress-reports/components/progress-reports-tab";
 
 const MEETING_TYPE_LABELS: Record<string, string> = {
   initial: "Initial IEP",
@@ -43,7 +44,7 @@ export function IepViewerPage() {
   const [sections, setSections] = useState<IepSection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
-    "document" | "analysis" | "meeting-prep"
+    "document" | "analysis" | "meeting-prep" | "progress-reports"
   >("document");
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -420,6 +421,17 @@ export function IepViewerPage() {
                 <span className="ml-2 inline-block w-2 h-2 rounded-full bg-brand-teal-500" />
               )}
             </button>
+            <button
+              onClick={() => setActiveTab("progress-reports")}
+              data-testid="tab-progress-reports"
+              className={`px-4 py-2 text-[13px] font-medium transition-colors ${
+                activeTab === "progress-reports"
+                  ? "text-brand-slate-800 border-b-2 border-brand-teal-500"
+                  : "text-brand-slate-400 hover:text-brand-slate-800"
+              }`}
+            >
+              Progress Reports
+            </button>
           </div>
 
           {/* Tab content */}
@@ -459,6 +471,14 @@ export function IepViewerPage() {
               analysisCreatedAt={
                 analysis?.status === "completed" ? analysis.createdAt : null
               }
+            />
+          )}
+
+          {activeTab === "progress-reports" && (
+            <ProgressReportsTab
+              iepId={documentId}
+              childId={document.childProfileId}
+              canEdit={childRole !== null && childRole !== "viewer"}
             />
           )}
         </>

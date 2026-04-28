@@ -19,6 +19,7 @@ import { ChildEtrsTab } from '@/features/children/components/child-etrs-tab';
 import { ChildGoalsTab } from '@/features/children/components/child-goals-tab';
 import { IepViewerPage } from '@/features/iep-documents/components/iep-viewer-page';
 import { IepRouteRedirect } from '@/features/iep-documents/components/iep-route-redirect';
+import { ProgressReportViewerPage } from '@/features/progress-reports/components/progress-report-viewer-page';
 import { EtrViewerPage } from '@/features/etr-documents/components/etr-viewer-page';
 import { EtrRouteRedirect } from '@/features/etr-documents/components/etr-route-redirect';
 import { EtrListPage } from '@/features/etr-documents/components/etr-list-page';
@@ -176,6 +177,16 @@ export function AppRouter() {
           <ProtectedRoute>
             <MainLayout>
               <IepViewerPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/children/:childId/ieps/:id/progress-reports/:prId"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <ProgressReportViewerPage />
             </MainLayout>
           </ProtectedRoute>
         }
