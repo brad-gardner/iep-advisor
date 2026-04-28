@@ -3,6 +3,7 @@ import type { ApiResponse } from "@/types/api";
 import type {
   CreateProgressReportRequest,
   ProgressReport,
+  ProgressReportAnalysis,
 } from "../types";
 
 export async function listByIep(
@@ -69,6 +70,24 @@ export async function getDownloadUrl(
 export async function remove(id: number): Promise<ApiResponse<null>> {
   const response = await apiClient.delete<ApiResponse<null>>(
     `/api/progress-reports/${id}`
+  );
+  return response.data;
+}
+
+export async function getAnalysis(
+  id: number
+): Promise<ApiResponse<ProgressReportAnalysis>> {
+  const response = await apiClient.get<ApiResponse<ProgressReportAnalysis>>(
+    `/api/progress-reports/${id}/analysis`
+  );
+  return response.data;
+}
+
+export async function startAnalysis(
+  id: number
+): Promise<ApiResponse<null>> {
+  const response = await apiClient.post<ApiResponse<null>>(
+    `/api/progress-reports/${id}/analyze`
   );
   return response.data;
 }

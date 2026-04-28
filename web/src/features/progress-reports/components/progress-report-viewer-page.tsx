@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/ui/notice";
 import { PdfViewer } from "@/components/ui/pdf-viewer";
 import { getById, getDownloadUrl } from "../api/progress-reports-api";
+import { ProgressReportAnalysisTab } from "./progress-report-analysis-tab";
 import type { ProgressReport } from "../types";
 
 const STATUS_VARIANTS: Record<
@@ -41,6 +42,7 @@ export function ProgressReportViewerPage() {
   const reportId = Number(prId);
   const [report, setReport] = useState<ProgressReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"document" | "analysis">("document");
 
   useEffect(() => {
     let cancelled = false;
@@ -135,13 +137,46 @@ export function ProgressReportViewerPage() {
       )}
 
       {report.status !== "created" && (
-        <PdfViewer
-          fileName={report.fileName}
-          loadUrl={async () => {
-            const res = await getDownloadUrl(report.id);
-            return res.success && res.data ? res.data.url : null;
-          }}
-        />
+        <>
+          <div className="flex border-b border-brand-slate-200">
+            <button
+              onClick={() => setActiveTab("document")}
+              data-testid="pr-tab-document"
+              className={`px-4 py-2 text-[13px] font-medium transition-colors ${
+                activeTab === "document"
+                  ? "text-brand-slate-800 border-b-2 border-brand-teal-500"
+                  : "text-brand-slate-400 hover:text-brand-slate-800"
+              }`}
+            >
+              Document
+            </button>
+            <button
+              onClick={() => setActiveTab("analysis")}
+              data-testid="pr-tab-analysis"
+              className={`px-4 py-2 text-[13px] font-medium transition-colors ${
+                activeTab === "analysis"
+                  ? "text-brand-slate-800 border-b-2 border-brand-teal-500"
+                  : "text-brand-slate-400 hover:text-brand-slate-800"
+              }`}
+            >
+              Analysis
+            </button>
+          </div>
+
+          {activeTab === "document" && (
+            <PdfViewer
+              fileName={report.fileName}
+              loadUrl={async () => {
+                const res = await getDownloadUrl(report.id);
+                return res.success && res.data ? res.data.url : null;
+              }}
+            />
+          )}
+
+          {activeTab === "analysis" && (
+            <ProgressReportAnalysisTab progressReportId={report.id} />
+          )}
+        </>
       )}
     </div>
   );

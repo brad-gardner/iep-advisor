@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.ProgressReports;
 using IepAssistant.Api.Extensions;
@@ -13,10 +14,17 @@ namespace IepAssistant.Api.Controllers;
 public class ProgressReportsController : ControllerBase
 {
     private readonly IProgressReportService _service;
+    private readonly IProgressReportAnalysisService _analysisService;
+    private readonly ProgressReportAnalysisQueue _analysisQueue;
 
-    public ProgressReportsController(IProgressReportService service)
+    public ProgressReportsController(
+        IProgressReportService service,
+        IProgressReportAnalysisService analysisService,
+        ProgressReportAnalysisQueue analysisQueue)
     {
         _service = service;
+        _analysisService = analysisService;
+        _analysisQueue = analysisQueue;
     }
 
     [HttpGet("api/ieps/{iepId}/progress-reports")]
@@ -88,6 +96,9 @@ public class ProgressReportsController : ControllerBase
         if (!result.Success)
             return BadRequest(ApiResponse<object>.Error(result.Message ?? "Upload failed"));
 
+        // Kick off analysis in the background as soon as the file is attached.
+        await _analysisQueue.EnqueueAsync(result.Data!.Id, cancellationToken);
+
         return Ok(ApiResponse<ProgressReportDto>.SuccessResponse(MapToDto(result.Data!), "File attached"));
     }
 
@@ -124,6 +135,37 @@ public class ProgressReportsController : ControllerBase
         return Ok(ApiResponse<object>.SuccessResponse(new { url }));
     }
 
+    [HttpGet("api/progress-reports/{id}/analysis")]
+    [ProducesResponseType(typeof(ApiResponse<ProgressReportAnalysisDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAnalysis(int id, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var analysis = await _analysisService.GetAnalysisAsync(id, userId, cancellationToken);
+        if (analysis == null)
+            return NotFound(ApiResponse<object>.Error("Analysis not found"));
+
+        return Ok(ApiResponse<ProgressReportAnalysisDto>.SuccessResponse(MapAnalysisToDto(analysis)));
+    }
+
+    [HttpPost("api/progress-reports/{id}/analyze")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> StartAnalysis(int id, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var report = await _service.GetByIdAsync(id, userId, cancellationToken);
+        if (report == null)
+            return NotFound(ApiResponse<object>.Error("Progress report not found"));
+
+        if (string.IsNullOrEmpty(report.FileName))
+            return BadRequest(ApiResponse<object>.Error("Upload the progress report PDF before running analysis."));
+
+        await _analysisQueue.EnqueueAsync(id, cancellationToken);
+        return Accepted(ApiResponse<object>.SuccessResponse(null, "Analysis queued"));
+    }
+
     [HttpDelete("api/progress-reports/{id}")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -136,6 +178,21 @@ public class ProgressReportsController : ControllerBase
 
         return Ok(ApiResponse<object>.SuccessResponse(null, "Progress report deleted"));
     }
+
+    private static ProgressReportAnalysisDto MapAnalysisToDto(ProgressReportAnalysisModel m) => new()
+    {
+        Id = m.Id,
+        ProgressReportId = m.ProgressReportId,
+        Status = m.Status,
+        Summary = m.Summary,
+        GoalProgressFindings = m.GoalProgressFindings,
+        RedFlags = m.RedFlags,
+        AdvocacyGapAnalysis = m.AdvocacyGapAnalysis,
+        ParentGoalsSnapshot = m.ParentGoalsSnapshot,
+        IepGoalsSnapshot = m.IepGoalsSnapshot,
+        ErrorMessage = m.ErrorMessage,
+        CreatedAt = m.CreatedAt
+    };
 
     private static ProgressReportDto MapToDto(ProgressReportModel m) => new()
     {
