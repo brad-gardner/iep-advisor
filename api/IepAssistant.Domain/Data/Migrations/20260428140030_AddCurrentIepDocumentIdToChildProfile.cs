@@ -10,6 +10,18 @@ namespace IepAssistant.Domain.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<string>(
+                name: "AdvocacyGapAnalysis",
+                table: "EtrAnalyses",
+                type: "nvarchar(max)",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "ParentGoalsSnapshot",
+                table: "EtrAnalyses",
+                type: "nvarchar(max)",
+                nullable: true);
+
             migrationBuilder.AddColumn<int>(
                 name: "CurrentIepDocumentId",
                 table: "ChildProfiles",
@@ -26,8 +38,7 @@ namespace IepAssistant.Domain.Data.Migrations
                 table: "ChildProfiles",
                 column: "CurrentIepDocumentId",
                 principalTable: "IepDocuments",
-                principalColumn: "Id",
-                onDelete: ReferentialAction.SetNull);
+                principalColumn: "Id");
         }
 
         /// <inheritdoc />
@@ -40,6 +51,14 @@ namespace IepAssistant.Domain.Data.Migrations
             migrationBuilder.DropIndex(
                 name: "IX_ChildProfiles_CurrentIepDocumentId",
                 table: "ChildProfiles");
+
+            migrationBuilder.DropColumn(
+                name: "AdvocacyGapAnalysis",
+                table: "EtrAnalyses");
+
+            migrationBuilder.DropColumn(
+                name: "ParentGoalsSnapshot",
+                table: "EtrAnalyses");
 
             migrationBuilder.DropColumn(
                 name: "CurrentIepDocumentId",

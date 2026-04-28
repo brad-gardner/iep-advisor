@@ -57,7 +57,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("RedeemedByUserId");
 
-                    b.ToTable("BetaInviteCodes");
+                    b.ToTable("BetaInviteCodes", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.ChildAccess", b =>
@@ -123,7 +123,7 @@ namespace IepAssistant.Domain.Data.Migrations
                         .IsUnique()
                         .HasFilter("[UserId] IS NOT NULL");
 
-                    b.ToTable("ChildAccesses");
+                    b.ToTable("ChildAccesses", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.ChildProfile", b =>
@@ -185,7 +185,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("ChildProfiles");
+                    b.ToTable("ChildProfiles", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.EtrAnalysis", b =>
@@ -247,7 +247,7 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasIndex("EtrDocumentId")
                         .IsUnique();
 
-                    b.ToTable("EtrAnalyses");
+                    b.ToTable("EtrAnalyses", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.EtrDocument", b =>
@@ -315,7 +315,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("ChildProfileId");
 
-                    b.ToTable("EtrDocuments");
+                    b.ToTable("EtrDocuments", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.EtrSection", b =>
@@ -359,7 +359,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("EtrDocumentId");
 
-                    b.ToTable("EtrSections");
+                    b.ToTable("EtrSections", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.Goal", b =>
@@ -411,7 +411,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("IepSectionId");
 
-                    b.ToTable("Goals");
+                    b.ToTable("Goals", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.IepAnalysis", b =>
@@ -472,7 +472,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("IepDocumentId");
 
-                    b.ToTable("IepAnalyses");
+                    b.ToTable("IepAnalyses", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.IepDocument", b =>
@@ -539,7 +539,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("ChildProfileId");
 
-                    b.ToTable("IepDocuments");
+                    b.ToTable("IepDocuments", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.IepSection", b =>
@@ -583,7 +583,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("IepDocumentId");
 
-                    b.ToTable("IepSections");
+                    b.ToTable("IepSections", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.KnowledgeBaseEntry", b =>
@@ -639,7 +639,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("State");
 
-                    b.ToTable("KnowledgeBaseEntries");
+                    b.ToTable("KnowledgeBaseEntries", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.MeetingPrepChecklist", b =>
@@ -712,7 +712,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("IepDocumentId");
 
-                    b.ToTable("MeetingPrepChecklists");
+                    b.ToTable("MeetingPrepChecklists", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.ParentAdvocacyGoal", b =>
@@ -757,7 +757,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("ChildProfileId");
 
-                    b.ToTable("ParentAdvocacyGoals");
+                    b.ToTable("ParentAdvocacyGoals", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.PasswordResetToken", b =>
@@ -791,7 +791,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("PasswordResetTokens");
+                    b.ToTable("PasswordResetTokens", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.UsageRecord", b =>
@@ -822,7 +822,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UsageRecords");
+                    b.ToTable("UsageRecords", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.User", b =>
@@ -930,7 +930,7 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.UserRecoveryCode", b =>
@@ -959,7 +959,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserRecoveryCodes");
+                    b.ToTable("UserRecoveryCodes", (string)null);
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.BetaInviteCode", b =>
@@ -995,7 +995,7 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasOne("IepAssistant.Domain.Entities.IepDocument", "CurrentIepDocument")
                         .WithMany()
                         .HasForeignKey("CurrentIepDocumentId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("IepAssistant.Domain.Entities.User", "User")
                         .WithMany()

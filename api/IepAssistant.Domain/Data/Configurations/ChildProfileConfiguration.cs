@@ -20,10 +20,12 @@ public class ChildProfileConfiguration : IEntityTypeConfiguration<ChildProfile>
             .HasForeignKey(c => c.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // NoAction to avoid SQL Server cascade-cycle (IepDocument cascades from ChildProfile).
+        // IepDocumentService.DeleteAsync clears CurrentIepDocumentId before deleting the referenced IEP.
         builder.HasOne(c => c.CurrentIepDocument)
             .WithMany()
             .HasForeignKey(c => c.CurrentIepDocumentId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasIndex(c => c.UserId);
     }

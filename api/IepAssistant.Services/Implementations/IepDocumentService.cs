@@ -192,6 +192,13 @@ public class IepDocumentService : IIepDocumentService
             await _blobStorage.DeleteAsync(document.BlobUri, cancellationToken);
         }
 
+        var child = await _childProfileRepository.GetByIdAsync(document.ChildProfileId, cancellationToken);
+        if (child != null && child.CurrentIepDocumentId == id)
+        {
+            child.CurrentIepDocumentId = null;
+            _childProfileRepository.Update(child);
+        }
+
         document.IsActive = false;
         document.UpdatedById = userId;
         _documentRepository.Update(document);

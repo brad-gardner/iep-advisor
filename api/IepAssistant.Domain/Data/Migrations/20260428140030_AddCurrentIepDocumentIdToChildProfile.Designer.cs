@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace IepAssistant.Domain.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260428134023_AddCurrentIepDocumentIdToChildProfile")]
+    [Migration("20260428140030_AddCurrentIepDocumentIdToChildProfile")]
     partial class AddCurrentIepDocumentIdToChildProfile
     {
         /// <inheritdoc />
@@ -199,6 +199,9 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AdvocacyGapAnalysis")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("AssessmentCompleteness")
                         .HasColumnType("nvarchar(max)");
 
@@ -223,6 +226,9 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.Property<string>("OverallSummary")
                         .HasMaxLength(5000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ParentGoalsSnapshot")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Status")
@@ -992,7 +998,7 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasOne("IepAssistant.Domain.Entities.IepDocument", "CurrentIepDocument")
                         .WithMany()
                         .HasForeignKey("CurrentIepDocumentId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("IepAssistant.Domain.Entities.User", "User")
                         .WithMany()
