@@ -34,7 +34,7 @@ export function EtrListRow({ etr }: EtrListRowProps) {
 
   return (
     <Link
-      to={`/etrs/${etr.id}`}
+      to={`/children/${etr.childProfileId}/etrs/${etr.id}`}
       data-testid="etr-list-row"
       className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-button hover:bg-brand-slate-50 transition-colors"
     >

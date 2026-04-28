@@ -83,7 +83,7 @@ export function IepDocumentList({ documents, isLoading, onDeleted }: IepDocument
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <Link
-                  to={`/ieps/${doc.id}`}
+                  to={`/children/${doc.childProfileId}/ieps/${doc.id}`}
                   className="text-[13px] font-medium truncate text-brand-slate-800 hover:text-brand-teal-500 transition-colors"
                 >
                   {doc.fileName || (doc.meetingType ? MEETING_TYPE_LABELS[doc.meetingType] || doc.meetingType : `IEP #${doc.id}`)}
@@ -106,7 +106,7 @@ export function IepDocumentList({ documents, isLoading, onDeleted }: IepDocument
             <div className="flex gap-2 ml-3 shrink-0">
               {doc.status === 'parsed' && (
                 <Link
-                  to={`/ieps/${doc.id}`}
+                  to={`/children/${doc.childProfileId}/ieps/${doc.id}`}
                   className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-teal-500 hover:text-brand-teal-600 transition-colors"
                 >
                   <Eye className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />

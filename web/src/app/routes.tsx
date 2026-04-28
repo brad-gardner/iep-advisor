@@ -13,8 +13,14 @@ import { ResetPasswordPage } from '@/features/auth/components/reset-password-pag
 import { ChildrenListPage } from '@/features/children/components/children-list-page';
 import { CreateChildPage } from '@/features/children/components/create-child-page';
 import { ChildDetailPage } from '@/features/children/components/child-detail-page';
+import { ChildOverviewTab } from '@/features/children/components/child-overview-tab';
+import { ChildIepsTab } from '@/features/children/components/child-ieps-tab';
+import { ChildEtrsTab } from '@/features/children/components/child-etrs-tab';
+import { ChildGoalsTab } from '@/features/children/components/child-goals-tab';
 import { IepViewerPage } from '@/features/iep-documents/components/iep-viewer-page';
+import { IepRouteRedirect } from '@/features/iep-documents/components/iep-route-redirect';
 import { EtrViewerPage } from '@/features/etr-documents/components/etr-viewer-page';
+import { EtrRouteRedirect } from '@/features/etr-documents/components/etr-route-redirect';
 import { EtrListPage } from '@/features/etr-documents/components/etr-list-page';
 import { ComparisonPage } from '@/features/iep-comparison/components/comparison-page';
 import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
@@ -149,11 +155,37 @@ export function AppRouter() {
         }
       />
       <Route
-        path="/children/:id"
+        path="/children/:childId"
         element={
           <ProtectedRoute>
             <MainLayout>
               <ChildDetailPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="overview" replace />} />
+        <Route path="overview" element={<ChildOverviewTab />} />
+        <Route path="ieps" element={<ChildIepsTab />} />
+        <Route path="etrs" element={<ChildEtrsTab />} />
+        <Route path="goals" element={<ChildGoalsTab />} />
+      </Route>
+      <Route
+        path="/children/:childId/ieps/:id"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <IepViewerPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/children/:childId/etrs/:id"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <EtrViewerPage />
             </MainLayout>
           </ProtectedRoute>
         }
@@ -173,7 +205,7 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <MainLayout>
-              <IepViewerPage />
+              <IepRouteRedirect />
             </MainLayout>
           </ProtectedRoute>
         }
@@ -193,7 +225,7 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <MainLayout>
-              <EtrViewerPage />
+              <EtrRouteRedirect />
             </MainLayout>
           </ProtectedRoute>
         }

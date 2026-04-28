@@ -72,7 +72,7 @@ export function EtrDocumentList({ etrs, isLoading, onDeleted }: EtrDocumentListP
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Link
-                    to={`/etrs/${etr.id}`}
+                    to={`/children/${etr.childProfileId}/etrs/${etr.id}`}
                     className="text-[13px] font-medium truncate text-brand-slate-800 hover:text-brand-teal-500 transition-colors"
                     data-testid="etr-title-link"
                   >
@@ -99,7 +99,7 @@ export function EtrDocumentList({ etrs, isLoading, onDeleted }: EtrDocumentListP
               </div>
               <div className="flex gap-2 ml-3 shrink-0">
                 <Link
-                  to={`/etrs/${etr.id}`}
+                  to={`/children/${etr.childProfileId}/etrs/${etr.id}`}
                   className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-teal-500 hover:text-brand-teal-600 transition-colors"
                   data-testid="etr-view-link"
                 >

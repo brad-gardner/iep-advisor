@@ -1,54 +1,25 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { Share2 } from "lucide-react";
+import { useParams, useNavigate, Link, Outlet } from "react-router-dom";
 import type { ChildProfile, CreateChildProfileRequest } from "@/types/api";
 import { getChild, updateChild, deleteChild } from "../api/children-api";
 import { ChildForm } from "./child-form";
-import { useIepDocuments } from "@/features/iep-documents/hooks/use-iep-documents";
-import { CreateIepForm } from "@/features/iep-documents/components/create-iep-form";
-import { IepDocumentList } from "@/features/iep-documents/components/iep-document-list";
-import { useEtrDocuments } from "@/features/etr-documents/hooks/use-etr-documents";
-import { CreateEtrForm } from "@/features/etr-documents/components/create-etr-form";
-import { EtrDocumentList } from "@/features/etr-documents/components/etr-document-list";
-import { useAdvocacyGoals } from "@/features/advocacy-goals/hooks/use-advocacy-goals";
-import { AdvocacyGoalsList } from "@/features/advocacy-goals/components/advocacy-goals-list";
-import { ShareChildDialog } from "@/features/sharing/components/share-child-dialog";
-import { AccessList } from "@/features/sharing/components/access-list";
 import { SharedBadge } from "@/features/sharing/components/shared-badge";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TabsNav, TabLink } from "@/components/ui/tabs";
 
 export function ChildDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { childId: childIdParam } = useParams<{ childId: string }>();
+  const childId = Number(childIdParam);
   const navigate = useNavigate();
   const [child, setChild] = useState<ChildProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showCreateIep, setShowCreateIep] = useState(false);
-  const [showCreateEtr, setShowCreateEtr] = useState(false);
-  const [showShareDialog, setShowShareDialog] = useState(false);
-  const [accessListKey, setAccessListKey] = useState(0);
-  const {
-    documents,
-    isLoading: docsLoading,
-    reload: reloadDocs,
-  } = useIepDocuments(Number(id));
-  const {
-    etrs,
-    isLoading: etrsLoading,
-    reload: reloadEtrs,
-  } = useEtrDocuments(Number(id));
-  const {
-    goals,
-    isLoading: goalsLoading,
-    reload: reloadGoals,
-  } = useAdvocacyGoals(Number(id));
 
   useEffect(() => {
     async function load() {
       try {
-        const response = await getChild(Number(id));
+        const response = await getChild(childId);
         if (response.success && response.data) {
           setChild(response.data);
         }
@@ -59,13 +30,13 @@ export function ChildDetailPage() {
       }
     }
     load();
-  }, [id]);
+  }, [childId]);
 
   const handleUpdate = async (data: CreateChildProfileRequest) => {
     try {
-      const response = await updateChild(Number(id), data);
+      const response = await updateChild(childId, data);
       if (response.success) {
-        const refreshed = await getChild(Number(id));
+        const refreshed = await getChild(childId);
         if (refreshed.success && refreshed.data) {
           setChild(refreshed.data);
         }
@@ -82,7 +53,7 @@ export function ChildDetailPage() {
     if (!confirm("Are you sure you want to remove this child profile?")) return;
     setIsDeleting(true);
     try {
-      const response = await deleteChild(Number(id));
+      const response = await deleteChild(childId);
       if (response.success) {
         navigate("/children");
       }
@@ -141,7 +112,7 @@ export function ChildDetailPage() {
   }
 
   const isOwner = child.role === "owner";
-  const isViewer = child.role === "viewer";
+  const base = `/children/${childId}`;
 
   return (
     <div className="space-y-6">
@@ -175,169 +146,27 @@ export function ChildDetailPage() {
         </div>
       </div>
 
-      <Card data-testid="child-profile-section">
-        <h2 className="font-serif mb-4">Profile</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {child.dateOfBirth && (
-            <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
-                Date of Birth
-              </p>
-              <p className="text-sm font-medium text-brand-slate-800 mt-1">
-                {new Date(child.dateOfBirth).toLocaleDateString()}
-              </p>
-            </div>
-          )}
-          {child.gradeLevel && (
-            <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
-                Grade Level
-              </p>
-              <p className="text-sm font-medium text-brand-slate-800 mt-1">
-                {child.gradeLevel}
-              </p>
-            </div>
-          )}
-          {child.disabilityCategory && (
-            <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
-                Disability Category
-              </p>
-              <p className="text-sm font-medium text-brand-slate-800 mt-1">
-                {child.disabilityCategory}
-              </p>
-            </div>
-          )}
-          {child.schoolDistrict && (
-            <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-              <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
-                School District
-              </p>
-              <p className="text-sm font-medium text-brand-slate-800 mt-1">
-                {child.schoolDistrict}
-              </p>
-            </div>
-          )}
-        </div>
-      </Card>
+      <TabsNav>
+        <TabLink to={`${base}/overview`} testId="tab-overview">
+          Overview
+        </TabLink>
+        <TabLink to={`${base}/ieps`} testId="tab-ieps">
+          IEPs
+        </TabLink>
+        <TabLink to={`${base}/etrs`} testId="tab-etrs">
+          ETRs
+        </TabLink>
+        <TabLink to={`${base}/goals`} testId="tab-goals">
+          Goals
+        </TabLink>
+      </TabsNav>
 
-      {isOwner && (
-        <Card data-testid="sharing-section">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-serif">Sharing & Access</h2>
-            <Button
-              onClick={() => setShowShareDialog(!showShareDialog)}
-              data-testid="share-invite-button"
-            >
-              <Share2
-                className="w-4 h-4 mr-1.5"
-                strokeWidth={1.8}
-                aria-hidden="true"
-              />
-              Invite Someone
-            </Button>
-          </div>
-          <p className="text-sm text-brand-slate-400 mb-4">
-            Share {child.firstName}'s IEP information with a co-parent,
-            advocate, or attorney. They'll get their own login and can view or
-            collaborate depending on the role you assign.
-          </p>
-          {showShareDialog && (
-            <div className="mb-4">
-              <ShareChildDialog
-                childId={Number(id)}
-                onInvited={() => {
-                  setAccessListKey((k) => k + 1);
-                  setShowShareDialog(false);
-                }}
-                onCancel={() => setShowShareDialog(false)}
-              />
-            </div>
-          )}
-          <AccessList
-            key={accessListKey}
-            childId={Number(id)}
-            isOwner={isOwner}
-          />
-        </Card>
-      )}
-
-      <Card data-testid="advocacy-goals-section">
-        <h2 className="font-serif mb-4">Your Advocacy Goals</h2>
-        <AdvocacyGoalsList
-          childId={Number(id)}
-          childName={child.firstName}
-          goals={goals}
-          isLoading={goalsLoading}
-          onReload={reloadGoals}
-          readOnly={isViewer}
-        />
-      </Card>
-
-      <Card data-testid="iep-documents-section">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="font-serif">IEPs</h2>
-          {!isViewer && !showCreateIep && (
-            <Button
-              variant="secondary"
-              onClick={() => setShowCreateIep(true)}
-              data-testid="new-iep-button"
-            >
-              New IEP
-            </Button>
-          )}
-        </div>
-        {!isViewer && showCreateIep && (
-          <div className="mb-4">
-            <CreateIepForm
-              childId={Number(id)}
-              onCreated={() => {
-                setShowCreateIep(false);
-                reloadDocs();
-              }}
-              onCancel={() => setShowCreateIep(false)}
-            />
-          </div>
-        )}
-        <IepDocumentList
-          documents={documents}
-          isLoading={docsLoading}
-          onDeleted={reloadDocs}
-        />
-      </Card>
-
-      <Card data-testid="etr-documents-section">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="font-serif">ETRs</h2>
-          {!isViewer && !showCreateEtr && (
-            <Button
-              variant="secondary"
-              onClick={() => setShowCreateEtr(true)}
-              data-testid="new-etr-button"
-            >
-              New ETR
-            </Button>
-          )}
-        </div>
-        {!isViewer && showCreateEtr && (
-          <div className="mb-4">
-            <CreateEtrForm
-              childId={Number(id)}
-              onCreated={() => {
-                setShowCreateEtr(false);
-                reloadEtrs();
-              }}
-              onCancel={() => setShowCreateEtr(false)}
-            />
-          </div>
-        )}
-        <EtrDocumentList
-          etrs={etrs}
-          isLoading={etrsLoading}
-          onDeleted={reloadEtrs}
-        />
-      </Card>
-
+      <Outlet context={{ child, childId } satisfies ChildOutletContext} />
     </div>
   );
+}
+
+export interface ChildOutletContext {
+  child: ChildProfile;
+  childId: number;
 }
