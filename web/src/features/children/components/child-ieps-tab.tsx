@@ -8,7 +8,7 @@ import { IepDocumentList } from "@/features/iep-documents/components/iep-documen
 import type { ChildOutletContext } from "./child-detail-page";
 
 export function ChildIepsTab() {
-  const { child, childId } = useOutletContext<ChildOutletContext>();
+  const { child, childId, reloadChild } = useOutletContext<ChildOutletContext>();
   const [showCreateIep, setShowCreateIep] = useState(false);
   const {
     documents,
@@ -38,6 +38,7 @@ export function ChildIepsTab() {
             onCreated={() => {
               setShowCreateIep(false);
               reloadDocs();
+              reloadChild();
             }}
             onCancel={() => setShowCreateIep(false)}
           />
@@ -46,7 +47,13 @@ export function ChildIepsTab() {
       <IepDocumentList
         documents={documents}
         isLoading={docsLoading}
-        onDeleted={reloadDocs}
+        onDeleted={() => {
+          reloadDocs();
+          reloadChild();
+        }}
+        currentIepId={child.currentIepDocumentId}
+        canSetCurrent={!isViewer}
+        onCurrentChanged={reloadChild}
       />
     </Card>
   );

@@ -16,13 +16,17 @@ export function ChildDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const reloadChild = async () => {
+    const response = await getChild(childId);
+    if (response.success && response.data) {
+      setChild(response.data);
+    }
+  };
+
   useEffect(() => {
     async function load() {
       try {
-        const response = await getChild(childId);
-        if (response.success && response.data) {
-          setChild(response.data);
-        }
+        await reloadChild();
       } catch {
         // handled by interceptor
       } finally {
@@ -30,6 +34,7 @@ export function ChildDetailPage() {
       }
     }
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [childId]);
 
   const handleUpdate = async (data: CreateChildProfileRequest) => {
@@ -161,7 +166,9 @@ export function ChildDetailPage() {
         </TabLink>
       </TabsNav>
 
-      <Outlet context={{ child, childId } satisfies ChildOutletContext} />
+      <Outlet
+        context={{ child, childId, reloadChild } satisfies ChildOutletContext}
+      />
     </div>
   );
 }
@@ -169,4 +176,5 @@ export function ChildDetailPage() {
 export interface ChildOutletContext {
   child: ChildProfile;
   childId: number;
+  reloadChild: () => Promise<void>;
 }

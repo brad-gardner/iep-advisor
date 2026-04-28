@@ -9,4 +9,5 @@ public interface IChildProfileService
     Task<ServiceResult<ChildProfileModel>> CreateAsync(int userId, CreateChildProfileModel model, CancellationToken cancellationToken = default);
     Task<ServiceResult> UpdateAsync(int id, int userId, UpdateChildProfileModel model, CancellationToken cancellationToken = default);
     Task<ServiceResult> DeleteAsync(int id, int userId, CancellationToken cancellationToken = default);
+    Task<ServiceResult> SetCurrentIepAsync(int childId, int iepDocumentId, int userId, CancellationToken cancellationToken = default);
 }

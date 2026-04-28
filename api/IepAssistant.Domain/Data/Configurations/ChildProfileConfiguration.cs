@@ -20,6 +20,11 @@ public class ChildProfileConfiguration : IEntityTypeConfiguration<ChildProfile>
             .HasForeignKey(c => c.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasOne(c => c.CurrentIepDocument)
+            .WithMany()
+            .HasForeignKey(c => c.CurrentIepDocumentId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasIndex(c => c.UserId);
     }
 }

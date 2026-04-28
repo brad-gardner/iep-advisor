@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Download, Trash2, Eye } from 'lucide-react';
 import type { IepDocument } from '@/types/api';
 import { deleteIepDocument, getDownloadUrl } from '../api/iep-documents-api';
+import { setCurrentIep } from '@/features/children/api/children-api';
 import { IepUpload } from './iep-upload';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +12,9 @@ interface IepDocumentListProps {
   documents: IepDocument[];
   isLoading: boolean;
   onDeleted: () => void;
+  currentIepId?: number | null;
+  canSetCurrent?: boolean;
+  onCurrentChanged?: () => void;
 }
 
 function formatFileSize(bytes: number): string {
@@ -40,8 +44,28 @@ function formatMeetingDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleDateString();
 }
 
-export function IepDocumentList({ documents, isLoading, onDeleted }: IepDocumentListProps) {
+export function IepDocumentList({
+  documents,
+  isLoading,
+  onDeleted,
+  currentIepId,
+  canSetCurrent,
+  onCurrentChanged,
+}: IepDocumentListProps) {
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [settingCurrentId, setSettingCurrentId] = useState<number | null>(null);
+
+  const handleSetCurrent = async (doc: IepDocument) => {
+    setSettingCurrentId(doc.id);
+    try {
+      const response = await setCurrentIep(doc.childProfileId, doc.id);
+      if (response.success) onCurrentChanged?.();
+    } catch {
+      // handled by interceptor
+    } finally {
+      setSettingCurrentId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -96,6 +120,11 @@ export function IepDocumentList({ documents, isLoading, onDeleted }: IepDocument
                 <Badge variant={STATUS_VARIANTS[doc.status] || 'neutral'}>
                   {doc.status}
                 </Badge>
+                {currentIepId === doc.id && (
+                  <Badge variant="success" data-testid="current-iep-badge">
+                    Current
+                  </Badge>
+                )}
               </div>
               <div className="flex gap-3 text-[11px] text-brand-slate-400 mt-1">
                 {doc.iepDate && <span>Meeting: {formatMeetingDate(doc.iepDate)}</span>}
@@ -104,6 +133,16 @@ export function IepDocumentList({ documents, isLoading, onDeleted }: IepDocument
               </div>
             </div>
             <div className="flex gap-2 ml-3 shrink-0">
+              {canSetCurrent && currentIepId !== doc.id && (
+                <button
+                  onClick={() => handleSetCurrent(doc)}
+                  disabled={settingCurrentId === doc.id}
+                  data-testid="set-current-iep-button"
+                  className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 disabled:opacity-50 transition-colors"
+                >
+                  {settingCurrentId === doc.id ? '...' : 'Set as current'}
+                </button>
+              )}
               {doc.status === 'parsed' && (
                 <Link
                   to={`/children/${doc.childProfileId}/ieps/${doc.id}`}

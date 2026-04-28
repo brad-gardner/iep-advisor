@@ -16,6 +16,7 @@ import {
   reprocessIep,
   getIepDocuments,
 } from "../api/iep-documents-api";
+import { getChild, setCurrentIep } from "@/features/children/api/children-api";
 import { usePolling } from "@/hooks/use-polling";
 import { Badge } from "@/components/ui/badge";
 import { useIepAnalysis } from "../hooks/use-iep-analysis";
@@ -63,6 +64,9 @@ export function IepViewerPage() {
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [otherIeps, setOtherIeps] = useState<IepDocument[]>([]);
+  const [childCurrentIepId, setChildCurrentIepId] = useState<number | null>(null);
+  const [childRole, setChildRole] = useState<string | null>(null);
+  const [settingCurrent, setSettingCurrent] = useState(false);
   const compareRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -145,6 +149,37 @@ export function IepViewerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [document?.childProfileId, documentId]);
 
+  // Load child profile to know whether this IEP is "current"
+  useEffect(() => {
+    if (!document?.childProfileId) return;
+    async function loadChild() {
+      try {
+        const res = await getChild(document!.childProfileId);
+        if (res.success && res.data) {
+          setChildCurrentIepId(res.data.currentIepDocumentId);
+          setChildRole(res.data.role);
+        }
+      } catch {
+        // non-critical
+      }
+    }
+    loadChild();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [document?.childProfileId]);
+
+  const handleMakeCurrent = async () => {
+    if (!document) return;
+    setSettingCurrent(true);
+    try {
+      const res = await setCurrentIep(document.childProfileId, document.id);
+      if (res.success) setChildCurrentIepId(document.id);
+    } catch {
+      // handled by interceptor
+    } finally {
+      setSettingCurrent(false);
+    }
+  };
+
   // Close compare dropdown on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -219,6 +254,21 @@ export function IepViewerPage() {
                 {MEETING_TYPE_LABELS[document.meetingType] ||
                   document.meetingType}
               </Badge>
+            )}
+            {childCurrentIepId === document.id && (
+              <Badge variant="success" data-testid="current-iep-badge">
+                Current IEP
+              </Badge>
+            )}
+            {childCurrentIepId !== document.id && childRole && childRole !== "viewer" && (
+              <button
+                onClick={handleMakeCurrent}
+                disabled={settingCurrent}
+                data-testid="make-current-iep-button"
+                className="text-[12px] font-medium text-brand-slate-400 hover:text-brand-teal-500 disabled:opacity-50 transition-colors"
+              >
+                {settingCurrent ? "Setting..." : "Make current"}
+              </button>
             )}
             {document.iepDate && (
               <span className="text-[13px] text-brand-slate-500">

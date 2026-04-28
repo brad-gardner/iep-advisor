@@ -118,6 +118,20 @@ public class ChildrenController : ControllerBase
         return Ok(ApiResponse<object>.SuccessResponse(null, "Child profile deleted successfully"));
     }
 
+    [HttpPut("{childId}/current-iep/{iepId}")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetCurrentIep(int childId, int iepId, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var result = await _childProfileService.SetCurrentIepAsync(childId, iepId, userId, cancellationToken);
+
+        if (!result.Success)
+            return NotFound(ApiResponse<object>.Error(result.Message ?? "Set current IEP failed"));
+
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message ?? "Current IEP updated"));
+    }
+
     private static ChildProfileDto MapToDto(ChildProfileModel model, string? role = null) => new()
     {
         Id = model.Id,
@@ -129,6 +143,7 @@ public class ChildrenController : ControllerBase
         SchoolDistrict = model.SchoolDistrict,
         CreatedAt = model.CreatedAt,
         UpdatedAt = model.UpdatedAt,
-        Role = role
+        Role = role,
+        CurrentIepDocumentId = model.CurrentIepDocumentId
     };
 }

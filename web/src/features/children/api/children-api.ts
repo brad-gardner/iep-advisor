@@ -35,3 +35,13 @@ export async function deleteChild(id: number): Promise<ApiResponse<null>> {
   const response = await apiClient.delete<ApiResponse<null>>(`/api/children/${id}`);
   return response.data;
 }
+
+export async function setCurrentIep(
+  childId: number,
+  iepId: number
+): Promise<ApiResponse<null>> {
+  const response = await apiClient.put<ApiResponse<null>>(
+    `/api/children/${childId}/current-iep/${iepId}`
+  );
+  return response.data;
+}
