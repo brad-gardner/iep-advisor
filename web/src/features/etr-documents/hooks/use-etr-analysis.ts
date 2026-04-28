@@ -75,6 +75,8 @@ export function useEtrAnalysis(etrId: number): UseEtrAnalysisResult {
               overallRedFlags: [],
               suggestedQuestions: [],
               overallSummary: null,
+              advocacyGapAnalysis: null,
+              parentGoalsSnapshot: null,
               errorMessage: null,
               createdAt: new Date().toISOString(),
             }

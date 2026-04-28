@@ -84,6 +84,8 @@ export interface EtrAnalysis {
   overallRedFlags: EtrRedFlag[];
   suggestedQuestions: EtrSuggestedQuestion[];
   overallSummary: string | null;
+  advocacyGapAnalysis: import("@/types/api").AdvocacyGapAnalysis | null;
+  parentGoalsSnapshot: import("@/types/api").ParentGoalSnapshot[] | null;
   errorMessage: string | null;
   createdAt: string;
 }

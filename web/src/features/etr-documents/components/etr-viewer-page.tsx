@@ -228,7 +228,10 @@ export function EtrViewerPage() {
       )}
 
       {activeTab === 'analysis' && !analysisTabDisabled && (
-        <EtrAnalysisTab etrId={documentId} />
+        <EtrAnalysisTab
+          etrId={documentId}
+          childProfileId={etr.childProfileId}
+        />
       )}
 
       {activeTab === 'meeting-prep' && !meetingPrepTabDisabled && (

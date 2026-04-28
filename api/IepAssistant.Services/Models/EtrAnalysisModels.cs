@@ -20,6 +20,9 @@ public class EtrAnalysisResponse
 
     [JsonPropertyName("overall_summary")]
     public string? OverallSummary { get; set; }
+
+    [JsonPropertyName("advocacy_gap_analysis")]
+    public AdvocacyGapAnalysisResponse? AdvocacyGapAnalysis { get; set; }
 }
 
 public class AssessmentCompletenessResult
@@ -124,6 +127,8 @@ public class EtrAnalysisModel
     public List<EtrRedFlag> OverallRedFlags { get; set; } = [];
     public List<EtrSuggestedQuestion> SuggestedQuestions { get; set; } = [];
     public string? OverallSummary { get; set; }
+    public AdvocacyGapAnalysisResponse? AdvocacyGapAnalysis { get; set; }
+    public List<ParentGoalSnapshot> ParentGoalsSnapshot { get; set; } = [];
     public string? ErrorMessage { get; set; }
     public DateTime CreatedAt { get; set; }
 }

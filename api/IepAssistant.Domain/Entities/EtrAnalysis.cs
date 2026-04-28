@@ -9,6 +9,8 @@ public class EtrAnalysis : BaseEntity, IAuditableEntity
     public string? OverallRedFlags { get; set; } // JSON array
     public string? SuggestedQuestions { get; set; } // JSON array
     public string? OverallSummary { get; set; }
+    public string? AdvocacyGapAnalysis { get; set; } // JSON
+    public string? ParentGoalsSnapshot { get; set; } // JSON
     public string? ErrorMessage { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
