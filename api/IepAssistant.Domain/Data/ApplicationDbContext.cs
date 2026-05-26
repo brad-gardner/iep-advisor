@@ -27,6 +27,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<UsageRecord> UsageRecords => Set<UsageRecord>();
     public DbSet<BetaInviteCode> BetaInviteCodes => Set<BetaInviteCode>();
     public DbSet<KnowledgeBaseEntry> KnowledgeBaseEntries => Set<KnowledgeBaseEntry>();
+    public DbSet<ProgressReport> ProgressReports => Set<ProgressReport>();
+    public DbSet<ProgressReportAnalysis> ProgressReportAnalyses => Set<ProgressReportAnalysis>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

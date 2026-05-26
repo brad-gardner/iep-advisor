@@ -80,6 +80,8 @@ public class IepDocumentService : IIepDocumentService
         await _documentRepository.AddAsync(entity, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
+        await EnsureCurrentIepAsync(childProfileId, entity.Id, cancellationToken);
+
         return ServiceResult<IepDocumentModel>.SuccessResult(MapToModel(entity), "IEP created successfully.");
     }
 
@@ -171,6 +173,8 @@ public class IepDocumentService : IIepDocumentService
         await _documentRepository.AddAsync(entity, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
+        await EnsureCurrentIepAsync(childProfileId, entity.Id, cancellationToken);
+
         return ServiceResult<IepDocumentModel>.SuccessResult(MapToModel(entity), "IEP document uploaded successfully.");
     }
 
@@ -186,6 +190,13 @@ public class IepDocumentService : IIepDocumentService
         if (!string.IsNullOrEmpty(document.BlobUri))
         {
             await _blobStorage.DeleteAsync(document.BlobUri, cancellationToken);
+        }
+
+        var child = await _childProfileRepository.GetByIdAsync(document.ChildProfileId, cancellationToken);
+        if (child != null && child.CurrentIepDocumentId == id)
+        {
+            child.CurrentIepDocumentId = null;
+            _childProfileRepository.Update(child);
         }
 
         document.IsActive = false;
@@ -210,6 +221,17 @@ public class IepDocumentService : IIepDocumentService
             return null;
 
         return await _blobStorage.GetDownloadUrlAsync(document.BlobUri);
+    }
+
+    private async Task EnsureCurrentIepAsync(int childProfileId, int newIepId, CancellationToken cancellationToken)
+    {
+        var child = await _childProfileRepository.GetByIdAsync(childProfileId, cancellationToken);
+        if (child == null || child.CurrentIepDocumentId.HasValue)
+            return;
+
+        child.CurrentIepDocumentId = newIepId;
+        _childProfileRepository.Update(child);
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     private static IepDocumentModel MapToModel(IepDocument entity) => new()

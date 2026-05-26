@@ -30,6 +30,8 @@ public static class DependencyInjection
         services.AddScoped<IShareService, ShareService>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
+        services.AddScoped<IProgressReportService, ProgressReportService>();
+        services.AddScoped<IProgressReportAnalysisService, ProgressReportAnalysisService>();
 
         return services;
     }

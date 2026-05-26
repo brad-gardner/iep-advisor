@@ -140,6 +140,9 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Property<int?>("CreatedById")
                         .HasColumnType("int");
 
+                    b.Property<int?>("CurrentIepDocumentId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("DateOfBirth")
                         .HasColumnType("datetime2");
 
@@ -178,6 +181,8 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CurrentIepDocumentId");
+
                     b.HasIndex("UserId");
 
                     b.ToTable("ChildProfiles");
@@ -190,6 +195,9 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AdvocacyGapAnalysis")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("AssessmentCompleteness")
                         .HasColumnType("nvarchar(max)");
@@ -215,6 +223,9 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.Property<string>("OverallSummary")
                         .HasMaxLength(5000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ParentGoalsSnapshot")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Status")
@@ -783,6 +794,139 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.ToTable("PasswordResetTokens");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.ProgressReport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BlobUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("ChildProfileId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("IepDocumentId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("RawText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ReportingPeriodEnd")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ReportingPeriodStart")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UploadDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChildProfileId");
+
+                    b.HasIndex("IepDocumentId");
+
+                    b.ToTable("ProgressReports");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.ProgressReportAnalysis", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AdvocacyGapAnalysis")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("GoalProgressFindings")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("IepGoalsSnapshot")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ParentGoalsSnapshot")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ProgressReportId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RedFlags")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(5000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProgressReportId")
+                        .IsUnique();
+
+                    b.ToTable("ProgressReportAnalyses");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.UsageRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -981,11 +1125,18 @@ namespace IepAssistant.Domain.Data.Migrations
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.ChildProfile", b =>
                 {
+                    b.HasOne("IepAssistant.Domain.Entities.IepDocument", "CurrentIepDocument")
+                        .WithMany()
+                        .HasForeignKey("CurrentIepDocumentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("IepAssistant.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("CurrentIepDocument");
 
                     b.Navigation("User");
                 });
@@ -1112,6 +1263,36 @@ namespace IepAssistant.Domain.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.ProgressReport", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.ChildProfile", "ChildProfile")
+                        .WithMany()
+                        .HasForeignKey("ChildProfileId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.IepDocument", "IepDocument")
+                        .WithMany()
+                        .HasForeignKey("IepDocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChildProfile");
+
+                    b.Navigation("IepDocument");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.ProgressReportAnalysis", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.ProgressReport", "ProgressReport")
+                        .WithMany()
+                        .HasForeignKey("ProgressReportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProgressReport");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.UsageRecord", b =>

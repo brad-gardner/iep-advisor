@@ -11,15 +11,20 @@ import { EtrAssessmentCompletenessView } from './etr-assessment-completeness-vie
 import { EtrEligibilityReviewView } from './etr-eligibility-review-view';
 import { EtrRedFlagsList } from './etr-red-flags-list';
 import { EtrSuggestedQuestionsList } from './etr-suggested-questions-list';
+import { AdvocacyGapAnalysisSection } from '@/features/iep-documents/components/advocacy-gap-analysis';
+import { StaleAnalysisBanner } from '@/features/iep-documents/components/stale-analysis-banner';
+import { useAdvocacyGoals } from '@/features/advocacy-goals/hooks/use-advocacy-goals';
 
 interface EtrAnalysisTabProps {
   etrId: number;
+  childProfileId: number;
 }
 
 type AnalysisView =
   | 'overview'
   | 'assessment'
   | 'eligibility'
+  | 'advocacy'
   | 'red-flags'
   | 'questions';
 
@@ -27,13 +32,15 @@ const VIEW_LABELS: Record<AnalysisView, string> = {
   overview: 'Overview',
   assessment: 'Assessment Completeness',
   eligibility: 'Eligibility Review',
+  advocacy: 'Advocacy Goals',
   'red-flags': 'Red Flags',
   questions: 'Suggested Questions',
 };
 
-export function EtrAnalysisTab({ etrId }: EtrAnalysisTabProps) {
+export function EtrAnalysisTab({ etrId, childProfileId }: EtrAnalysisTabProps) {
   const { analysis, status, loading, isTriggering, error, start, refresh } =
     useEtrAnalysis(etrId);
+  const { goals: parentGoals } = useAdvocacyGoals(childProfileId);
   const [activeView, setActiveView] = useState<AnalysisView>('overview');
 
   const parsed = useMemo(
@@ -99,10 +106,16 @@ export function EtrAnalysisTab({ etrId }: EtrAnalysisTabProps) {
     );
   }
 
+  const hasAdvocacyGap = !!analysis?.advocacyGapAnalysis;
+  const isStale =
+    parentGoals.length > 0 &&
+    (!analysis?.parentGoalsSnapshot || analysis.parentGoalsSnapshot.length === 0);
+
   const tabs: AnalysisView[] = [
     'overview',
     'assessment',
     'eligibility',
+    ...(hasAdvocacyGap ? (['advocacy'] as AnalysisView[]) : []),
     'red-flags',
     'questions',
   ];
@@ -123,6 +136,12 @@ export function EtrAnalysisTab({ etrId }: EtrAnalysisTabProps) {
         ) : (
           <EmptySection message="No eligibility review data available." />
         );
+      case 'advocacy':
+        return analysis?.advocacyGapAnalysis ? (
+          <AdvocacyGapAnalysisSection gapAnalysis={analysis.advocacyGapAnalysis} />
+        ) : (
+          <EmptySection message="No advocacy goal alignment data available." />
+        );
       case 'red-flags':
         return <EtrRedFlagsList redFlags={parsed.redFlags} />;
       case 'questions':
@@ -132,6 +151,9 @@ export function EtrAnalysisTab({ etrId }: EtrAnalysisTabProps) {
 
   return (
     <div className="space-y-4" data-testid="etr-analysis-tab">
+      {isStale && (
+        <StaleAnalysisBanner onReanalyze={start} isReanalyzing={isTriggering} />
+      )}
       <nav className="flex gap-1 flex-wrap border-b border-brand-slate-200">
         {tabs.map((view) => {
           const isActive = activeView === view;

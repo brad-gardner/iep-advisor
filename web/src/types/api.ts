@@ -80,6 +80,7 @@ export interface ChildProfile {
   disabilityCategory: string | null;
   schoolDistrict: string | null;
   role: "owner" | "viewer" | "collaborator";
+  currentIepDocumentId: number | null;
   createdAt: string;
   updatedAt: string;
 }

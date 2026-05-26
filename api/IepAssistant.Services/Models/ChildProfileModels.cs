@@ -12,6 +12,7 @@ public class ChildProfileModel
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public string? Role { get; set; }
+    public int? CurrentIepDocumentId { get; set; }
 }
 
 public class CreateChildProfileModel

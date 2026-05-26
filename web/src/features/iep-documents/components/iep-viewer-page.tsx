@@ -16,6 +16,7 @@ import {
   reprocessIep,
   getIepDocuments,
 } from "../api/iep-documents-api";
+import { getChild, setCurrentIep } from "@/features/children/api/children-api";
 import { usePolling } from "@/hooks/use-polling";
 import { Badge } from "@/components/ui/badge";
 import { useIepAnalysis } from "../hooks/use-iep-analysis";
@@ -24,29 +25,15 @@ import { useMeetingPrep } from "@/features/meeting-prep/hooks/use-meeting-prep";
 import { AnalysisTab } from "./analysis-tab";
 import { MeetingPrepTab } from "@/features/meeting-prep/components/meeting-prep-tab";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
+import { PdfViewer } from "@/components/ui/pdf-viewer";
+import { ProgressReportsTab } from "@/features/progress-reports/components/progress-reports-tab";
 
 const MEETING_TYPE_LABELS: Record<string, string> = {
   initial: "Initial IEP",
   annual_review: "Annual Review",
   amendment: "Amendment",
   reevaluation: "Reevaluation",
-};
-
-const SECTION_LABELS: Record<string, string> = {
-  student_profile: "Student Profile",
-  present_levels: "Present Levels of Performance",
-  evaluations: "Evaluations",
-  assessments: "Assessments & Test Scores",
-  eligibility: "Eligibility",
-  annual_goals: "Annual Goals",
-  services: "Services",
-  accommodations: "Accommodations",
-  placement: "Placement",
-  transition: "Transition Planning",
-  progress_monitoring: "Progress Monitoring",
-  other: "Other",
 };
 
 export function IepViewerPage() {
@@ -56,13 +43,15 @@ export function IepViewerPage() {
   const [document, setDocument] = useState<IepDocument | null>(null);
   const [sections, setSections] = useState<IepSection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeSectionId, setActiveSectionId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "document" | "analysis" | "meeting-prep"
+    "document" | "analysis" | "meeting-prep" | "progress-reports"
   >("document");
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [otherIeps, setOtherIeps] = useState<IepDocument[]>([]);
+  const [childCurrentIepId, setChildCurrentIepId] = useState<number | null>(null);
+  const [childRole, setChildRole] = useState<string | null>(null);
+  const [settingCurrent, setSettingCurrent] = useState(false);
   const compareRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -89,11 +78,8 @@ export function IepViewerPage() {
     const secRes = await getIepSections(documentId);
     if (secRes.success && secRes.data) {
       setSections(secRes.data);
-      if (secRes.data.length > 0 && !activeSectionId) {
-        setActiveSectionId(secRes.data[0].id);
-      }
     }
-  }, [documentId, activeSectionId]);
+  }, [documentId]);
 
   useEffect(() => {
     async function load() {
@@ -145,6 +131,37 @@ export function IepViewerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [document?.childProfileId, documentId]);
 
+  // Load child profile to know whether this IEP is "current"
+  useEffect(() => {
+    if (!document?.childProfileId) return;
+    async function loadChild() {
+      try {
+        const res = await getChild(document!.childProfileId);
+        if (res.success && res.data) {
+          setChildCurrentIepId(res.data.currentIepDocumentId);
+          setChildRole(res.data.role);
+        }
+      } catch {
+        // non-critical
+      }
+    }
+    loadChild();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [document?.childProfileId]);
+
+  const handleMakeCurrent = async () => {
+    if (!document) return;
+    setSettingCurrent(true);
+    try {
+      const res = await setCurrentIep(document.childProfileId, document.id);
+      if (res.success) setChildCurrentIepId(document.id);
+    } catch {
+      // handled by interceptor
+    } finally {
+      setSettingCurrent(false);
+    }
+  };
+
   // Close compare dropdown on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -189,8 +206,6 @@ export function IepViewerPage() {
     );
   }
 
-  const currentSection = sections.find((s) => s.id === activeSectionId);
-
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -219,6 +234,21 @@ export function IepViewerPage() {
                 {MEETING_TYPE_LABELS[document.meetingType] ||
                   document.meetingType}
               </Badge>
+            )}
+            {childCurrentIepId === document.id && (
+              <Badge variant="success" data-testid="current-iep-badge">
+                Current IEP
+              </Badge>
+            )}
+            {childCurrentIepId !== document.id && childRole && childRole !== "viewer" && (
+              <button
+                onClick={handleMakeCurrent}
+                disabled={settingCurrent}
+                data-testid="make-current-iep-button"
+                className="text-[12px] font-medium text-brand-slate-400 hover:text-brand-teal-500 disabled:opacity-50 transition-colors"
+              >
+                {settingCurrent ? "Setting..." : "Make current"}
+              </button>
             )}
             {document.iepDate && (
               <span className="text-[13px] text-brand-slate-500">
@@ -391,121 +421,33 @@ export function IepViewerPage() {
                 <span className="ml-2 inline-block w-2 h-2 rounded-full bg-brand-teal-500" />
               )}
             </button>
+            <button
+              onClick={() => setActiveTab("progress-reports")}
+              data-testid="tab-progress-reports"
+              className={`px-4 py-2 text-[13px] font-medium transition-colors ${
+                activeTab === "progress-reports"
+                  ? "text-brand-slate-800 border-b-2 border-brand-teal-500"
+                  : "text-brand-slate-400 hover:text-brand-slate-800"
+              }`}
+            >
+              Progress Reports
+            </button>
           </div>
 
           {/* Tab content */}
           {activeTab === "document" && (
-            <div className="flex gap-4 min-h-[500px]">
-              {/* Section nav */}
-              <nav className="w-56 shrink-0 space-y-0.5">
-                {sections.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setActiveSectionId(s.id)}
-                    className={`w-full text-left px-3 py-2 rounded-button text-[13px] font-medium transition-colors ${
-                      activeSectionId === s.id
-                        ? "bg-brand-teal-50 text-brand-teal-600 border-l-2 border-l-brand-teal-500"
-                        : "text-brand-slate-600 hover:bg-brand-slate-50"
-                    }`}
-                  >
-                    {SECTION_LABELS[s.sectionType] || s.sectionType}
-                    {s.goals.length > 0 && (
-                      <span className="ml-2 text-[11px] opacity-70">
-                        ({s.goals.length})
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </nav>
-
-              {/* Section content */}
-              <Card className="flex-1 overflow-y-auto">
-                {currentSection && (
-                  <div>
-                    <h2 className="font-serif text-[22px] font-semibold mb-4 text-brand-slate-800">
-                      {SECTION_LABELS[currentSection.sectionType] ||
-                        currentSection.sectionType}
-                    </h2>
-
-                    {currentSection.rawText && (
-                      <div className="text-brand-slate-600 whitespace-pre-wrap text-sm leading-relaxed">
-                        {currentSection.rawText}
-                      </div>
-                    )}
-
-                    {currentSection.goals.length > 0 && (
-                      <div className="mt-6 space-y-4">
-                        <h3 className="font-serif text-[17px] font-semibold text-brand-slate-800">
-                          Goals ({currentSection.goals.length})
-                        </h3>
-                        {currentSection.goals.map((goal) => (
-                          <div
-                            key={goal.id}
-                            className="bg-brand-slate-50 rounded-card p-4 space-y-2 border-[0.5px] border-brand-slate-200"
-                          >
-                            <p className="font-medium text-sm text-brand-slate-800">
-                              {goal.goalText}
-                            </p>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                              {goal.domain && (
-                                <div>
-                                  <span className="text-brand-slate-400">
-                                    Domain:{" "}
-                                  </span>
-                                  <span className="text-brand-slate-600">
-                                    {goal.domain}
-                                  </span>
-                                </div>
-                              )}
-                              {goal.baseline && (
-                                <div>
-                                  <span className="text-brand-slate-400">
-                                    Baseline:{" "}
-                                  </span>
-                                  <span className="text-brand-slate-600">
-                                    {goal.baseline}
-                                  </span>
-                                </div>
-                              )}
-                              {goal.targetCriteria && (
-                                <div>
-                                  <span className="text-brand-slate-400">
-                                    Target:{" "}
-                                  </span>
-                                  <span className="text-brand-slate-600">
-                                    {goal.targetCriteria}
-                                  </span>
-                                </div>
-                              )}
-                              {goal.measurementMethod && (
-                                <div>
-                                  <span className="text-brand-slate-400">
-                                    Measurement:{" "}
-                                  </span>
-                                  <span className="text-brand-slate-600">
-                                    {goal.measurementMethod}
-                                  </span>
-                                </div>
-                              )}
-                              {goal.timeframe && (
-                                <div>
-                                  <span className="text-brand-slate-400">
-                                    Timeframe:{" "}
-                                  </span>
-                                  <span className="text-brand-slate-600">
-                                    {goal.timeframe}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </Card>
-            </div>
+            <PdfViewer
+              fileName={document.fileName}
+              parsedNote={
+                sections.length > 0
+                  ? `We've already parsed this IEP. Head to the Analysis tab for findings, goal review, and advocacy alignment.`
+                  : undefined
+              }
+              loadUrl={async () => {
+                const res = await getDownloadUrl(documentId);
+                return res.success && res.data ? res.data.url : null;
+              }}
+            />
           )}
 
           {activeTab === "analysis" && (
@@ -529,6 +471,14 @@ export function IepViewerPage() {
               analysisCreatedAt={
                 analysis?.status === "completed" ? analysis.createdAt : null
               }
+            />
+          )}
+
+          {activeTab === "progress-reports" && (
+            <ProgressReportsTab
+              iepId={documentId}
+              childId={document.childProfileId}
+              canEdit={childRole !== null && childRole !== "viewer"}
             />
           )}
         </>

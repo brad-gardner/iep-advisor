@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Repositories;
@@ -115,6 +116,28 @@ public class ChildProfileService : IChildProfileService
         return ServiceResult.SuccessResult("Child profile deleted successfully.");
     }
 
+    public async Task<ServiceResult> SetCurrentIepAsync(int childId, int iepDocumentId, int userId, CancellationToken cancellationToken = default)
+    {
+        if (!await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, cancellationToken))
+            return ServiceResult.FailureResult("Child profile not found.");
+
+        var child = await _repository.GetByIdForUserAsync(childId, userId, cancellationToken);
+        if (child == null)
+            return ServiceResult.FailureResult("Child profile not found.");
+
+        var iep = await _context.IepDocuments
+            .FirstOrDefaultAsync(d => d.Id == iepDocumentId && d.ChildProfileId == childId, cancellationToken);
+        if (iep == null)
+            return ServiceResult.FailureResult("IEP not found for this child.");
+
+        child.CurrentIepDocumentId = iepDocumentId;
+        child.UpdatedById = userId;
+        _repository.Update(child);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return ServiceResult.SuccessResult("Current IEP updated.");
+    }
+
     private static ChildProfileModel MapToModel(ChildProfile entity) => new()
     {
         Id = entity.Id,
@@ -125,6 +148,7 @@ public class ChildProfileService : IChildProfileService
         DisabilityCategory = entity.DisabilityCategory,
         SchoolDistrict = entity.SchoolDistrict,
         CreatedAt = entity.CreatedAt,
-        UpdatedAt = entity.UpdatedAt
+        UpdatedAt = entity.UpdatedAt,
+        CurrentIepDocumentId = entity.CurrentIepDocumentId
     };
 }

@@ -77,6 +77,8 @@ builder.Services.AddSingleton<EtrAnalysisQueue>();
 builder.Services.AddHostedService<EtrAnalysisWorker>();
 builder.Services.AddSingleton<MeetingPrepQueue>();
 builder.Services.AddHostedService<MeetingPrepWorker>();
+builder.Services.AddSingleton<ProgressReportAnalysisQueue>();
+builder.Services.AddHostedService<ProgressReportAnalysisWorker>();
 
 // Add controllers
 builder.Services.AddControllers()
