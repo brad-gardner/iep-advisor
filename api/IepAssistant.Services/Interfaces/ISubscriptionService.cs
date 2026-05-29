@@ -12,6 +12,8 @@ public interface ISubscriptionService
     Task<bool> CanPerformAnalysisAsync(int userId, int childId, CancellationToken ct = default);
     Task RecordUsageAsync(int userId, int childId, string operationType, CancellationToken ct = default);
     Task<bool> TryRecordUsageAsync(int userId, int childId, string operationType, int limit, CancellationToken ct = default);
+    Task<int?> TryReserveUsageAsync(int userId, int childId, string operationType, int limit, CancellationToken ct = default);
+    Task ReleaseUsageByIdAsync(int usageRecordId, CancellationToken ct = default);
     Task<ServiceResult> RedeemBetaCodeAsync(int userId, string code, CancellationToken ct = default);
     Task<ServiceResult<List<string>>> GenerateBetaCodesAsync(int count, DateTime? expiresAt, CancellationToken ct = default);
     Task<IEnumerable<BetaCodeModel>> ListBetaCodesAsync(CancellationToken ct = default);

@@ -3,6 +3,7 @@ namespace IepAssistant.Domain.Entities;
 public class AnalysisRun : BaseEntity, IAuditableEntity
 {
     public int ChildProfileId { get; set; }
+    public int? UsageRecordId { get; set; } // Id of the UsageRecord reserved for this run; null once refunded
     public AnalysisRunStatus Status { get; set; } = AnalysisRunStatus.Pending;
     public string? OverallSummary { get; set; }
     public string? CrossDocSynthesis { get; set; } // JSON — cross-document synthesis narrative; null for single-source runs

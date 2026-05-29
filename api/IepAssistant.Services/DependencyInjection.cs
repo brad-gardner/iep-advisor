@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
         services.AddScoped<IProgressReportService, ProgressReportService>();
         services.AddScoped<IProgressReportAnalysisService, ProgressReportAnalysisService>();
+        services.AddScoped<IAnalysisRunService, AnalysisRunService>();
 
         return services;
     }
