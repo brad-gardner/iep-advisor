@@ -6,6 +6,7 @@ import { ChildForm } from "./child-form";
 import { SharedBadge } from "@/features/sharing/components/shared-badge";
 import { Button } from "@/components/ui/button";
 import { TabsNav, TabLink } from "@/components/ui/tabs";
+import { useFeatureFlag } from "@/hooks/use-feature-flags";
 
 export function ChildDetailPage() {
   const { childId: childIdParam } = useParams<{ childId: string }>();
@@ -15,6 +16,7 @@ export function ChildDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const analysisEnabled = useFeatureFlag("AnalysisRun");
 
   const reloadChild = async () => {
     const response = await getChild(childId);
@@ -158,6 +160,11 @@ export function ChildDetailPage() {
         <TabLink to={`${base}/goals`} testId="tab-goals">
           Goals
         </TabLink>
+        {analysisEnabled && (
+          <TabLink to={`${base}/analysis`} testId="tab-analysis">
+            Analysis
+          </TabLink>
+        )}
         <TabLink to={`${base}/ieps`} testId="tab-ieps">
           IEPs
         </TabLink>

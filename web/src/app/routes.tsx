@@ -17,6 +17,8 @@ import { ChildOverviewTab } from '@/features/children/components/child-overview-
 import { ChildIepsTab } from '@/features/children/components/child-ieps-tab';
 import { ChildEtrsTab } from '@/features/children/components/child-etrs-tab';
 import { ChildGoalsTab } from '@/features/children/components/child-goals-tab';
+import { ChildAnalysisTab } from '@/features/analysis/components/child-analysis-tab';
+import { useFeatureFlagStatus } from '@/hooks/use-feature-flags';
 import { IepViewerPage } from '@/features/iep-documents/components/iep-viewer-page';
 import { IepRouteRedirect } from '@/features/iep-documents/components/iep-route-redirect';
 import { ProgressReportViewerPage } from '@/features/progress-reports/components/progress-report-viewer-page';
@@ -50,6 +52,32 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+// Gates a route element behind a feature flag. Waits for /api/config to load
+// before deciding, so a flag-off feature can't be reached by direct URL.
+function FeatureRoute({
+  flag,
+  children,
+}: {
+  flag: string;
+  children: React.ReactNode;
+}) {
+  const { enabled, loaded } = useFeatureFlagStatus(flag);
+
+  if (!loaded) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+      </div>
+    );
+  }
+
+  if (!enabled) {
+    return <Navigate to="../overview" replace />;
   }
 
   return <>{children}</>;
@@ -170,6 +198,14 @@ export function AppRouter() {
         <Route path="ieps" element={<ChildIepsTab />} />
         <Route path="etrs" element={<ChildEtrsTab />} />
         <Route path="goals" element={<ChildGoalsTab />} />
+        <Route
+          path="analysis"
+          element={
+            <FeatureRoute flag="AnalysisRun">
+              <ChildAnalysisTab />
+            </FeatureRoute>
+          }
+        />
       </Route>
       <Route
         path="/children/:childId/ieps/:id"
