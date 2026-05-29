@@ -1,8 +1,5 @@
 using System.Text.Json;
-using Anthropic.SDK;
-using Anthropic.SDK.Messaging;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -22,8 +19,7 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
     private readonly IAccessService _accessService;
     private readonly IBlobStorageService _blobStorage;
     private readonly ApplicationDbContext _context;
-    private readonly IConfiguration _configuration;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IClaudeClient _claudeClient;
     private readonly ILogger<ProgressReportAnalysisService> _logger;
 
     private static readonly JsonSerializerOptions CamelCaseOptions = new()
@@ -44,8 +40,7 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
         IAccessService accessService,
         IBlobStorageService blobStorage,
         ApplicationDbContext context,
-        IConfiguration configuration,
-        IHttpClientFactory httpClientFactory,
+        IClaudeClient claudeClient,
         ILogger<ProgressReportAnalysisService> logger)
     {
         _reportRepository = reportRepository;
@@ -55,8 +50,7 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
         _accessService = accessService;
         _blobStorage = blobStorage;
         _context = context;
-        _configuration = configuration;
-        _httpClientFactory = httpClientFactory;
+        _claudeClient = claudeClient;
         _logger = logger;
     }
 
@@ -214,55 +208,20 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
         List<ParentAdvocacyGoal> parentGoals,
         CancellationToken cancellationToken)
     {
-        var apiKey = _configuration["Anthropic:ApiKey"];
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            _logger.LogError("Anthropic API key not configured");
-            return null;
-        }
-
-        var httpClient = _httpClientFactory.CreateClient("Claude");
-        var client = new AnthropicClient(apiKey, httpClient);
-
         var hasParentGoals = parentGoals.Count > 0;
 
         var systemPrompt = BuildSystemPrompt(hasParentGoals);
         var userText = BuildUserPrompt(iepGoals, parentGoals);
 
-        var pdfBase64 = Convert.ToBase64String(pdfBytes);
-
-        var content = new List<ContentBase>
+        var responseText = await _claudeClient.CompleteAsync(new ClaudeCompletionRequest
         {
-            new DocumentContent
-            {
-                Source = new DocumentSource
-                {
-                    MediaType = "application/pdf",
-                    Data = pdfBase64,
-                },
-            },
-            new TextContent
-            {
-                Text = userText,
-            },
-        };
-
-        var messages = new List<Message>
-        {
-            new Message { Role = RoleType.User, Content = content },
-        };
-
-        var parameters = new MessageParameters
-        {
-            Messages = messages,
+            SystemPrompt = systemPrompt,
+            UserText = userText,
+            PdfDocument = pdfBytes,
             Model = "claude-sonnet-4-20250514",
             MaxTokens = 16384,
-            System = [new SystemMessage(systemPrompt)],
-        };
+        }, cancellationToken);
 
-        var response = await client.Messages.GetClaudeMessageAsync(parameters, cancellationToken);
-
-        var responseText = (response.Content?.FirstOrDefault() as TextContent)?.Text;
         if (string.IsNullOrEmpty(responseText))
         {
             _logger.LogWarning("Empty response from Claude for progress report analysis");

@@ -1,9 +1,6 @@
 using System.Text;
 using System.Text.Json;
-using Anthropic.SDK;
-using Anthropic.SDK.Messaging;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -21,8 +18,7 @@ public class MeetingPrepService : IMeetingPrepService
     private readonly IAccessService _accessService;
     private readonly ISubscriptionService _subscriptionService;
     private readonly ApplicationDbContext _context;
-    private readonly IConfiguration _configuration;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IClaudeClient _claudeClient;
     private readonly ILogger<MeetingPrepService> _logger;
 
     private static readonly JsonSerializerOptions CamelCaseOptions = new()
@@ -134,8 +130,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         IAccessService accessService,
         ISubscriptionService subscriptionService,
         ApplicationDbContext context,
-        IConfiguration configuration,
-        IHttpClientFactory httpClientFactory,
+        IClaudeClient claudeClient,
         ILogger<MeetingPrepService> logger)
     {
         _documentRepository = documentRepository;
@@ -144,8 +139,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         _accessService = accessService;
         _subscriptionService = subscriptionService;
         _context = context;
-        _configuration = configuration;
-        _httpClientFactory = httpClientFactory;
+        _claudeClient = claudeClient;
         _logger = logger;
     }
 
@@ -689,40 +683,14 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
 
     private async Task<MeetingPrepResponse?> CallClaudeAsync(string userPrompt, string systemPrompt, CancellationToken ct)
     {
-        var apiKey = _configuration["Anthropic:ApiKey"];
-        if (string.IsNullOrEmpty(apiKey))
+        var responseText = await _claudeClient.CompleteAsync(new ClaudeCompletionRequest
         {
-            _logger.LogError("Anthropic API key not configured");
-            return null;
-        }
-
-        var httpClient = _httpClientFactory.CreateClient("Claude");
-        var client = new AnthropicClient(apiKey, httpClient);
-
-        var content = new List<ContentBase>
-        {
-            new TextContent
-            {
-                Text = userPrompt,
-            },
-        };
-
-        var messages = new List<Message>
-        {
-            new Message { Role = RoleType.User, Content = content },
-        };
-
-        var parameters = new MessageParameters
-        {
-            Messages = messages,
+            SystemPrompt = systemPrompt,
+            UserText = userPrompt,
             Model = "claude-sonnet-4-20250514",
             MaxTokens = 8192,
-            System = [new SystemMessage(systemPrompt)],
-        };
+        }, ct);
 
-        var response = await client.Messages.GetClaudeMessageAsync(parameters, ct);
-
-        var responseText = (response.Content?.FirstOrDefault() as TextContent)?.Text;
         if (string.IsNullOrEmpty(responseText))
         {
             _logger.LogWarning("Empty response from Claude for meeting prep");

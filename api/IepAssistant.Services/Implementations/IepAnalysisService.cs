@@ -1,9 +1,6 @@
 using System.Text;
 using System.Text.Json;
-using Anthropic.SDK;
-using Anthropic.SDK.Messaging;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -20,8 +17,7 @@ public class IepAnalysisService : IIepAnalysisService
     private readonly IAccessService _accessService;
     private readonly ISubscriptionService _subscriptionService;
     private readonly ApplicationDbContext _context;
-    private readonly IConfiguration _configuration;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IClaudeClient _claudeClient;
     private readonly ILogger<IepAnalysisService> _logger;
 
     private static readonly JsonSerializerOptions CamelCaseOptions = new()
@@ -40,8 +36,7 @@ public class IepAnalysisService : IIepAnalysisService
         IAccessService accessService,
         ISubscriptionService subscriptionService,
         ApplicationDbContext context,
-        IConfiguration configuration,
-        IHttpClientFactory httpClientFactory,
+        IClaudeClient claudeClient,
         ILogger<IepAnalysisService> logger)
     {
         _documentRepository = documentRepository;
@@ -49,8 +44,7 @@ public class IepAnalysisService : IIepAnalysisService
         _accessService = accessService;
         _subscriptionService = subscriptionService;
         _context = context;
-        _configuration = configuration;
-        _httpClientFactory = httpClientFactory;
+        _claudeClient = claudeClient;
         _logger = logger;
     }
 
@@ -276,16 +270,6 @@ public class IepAnalysisService : IIepAnalysisService
 
     private async Task<AnalysisResponse?> AnalyzeWithClaudeAsync(string iepContent, bool hasParentGoals, CancellationToken cancellationToken)
     {
-        var apiKey = _configuration["Anthropic:ApiKey"];
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            _logger.LogError("Anthropic API key not configured");
-            return null;
-        }
-
-        var httpClient = _httpClientFactory.CreateClient("Claude");
-        var client = new AnthropicClient(apiKey, httpClient);
-
         var systemPrompt = @"You are an expert IEP (Individualized Education Program) analyst helping parents understand their child's IEP.
 Your role is to act as a knowledgeable parent advocate — translating complex educational and legal jargon into clear,
 actionable language that any parent can understand.
@@ -429,30 +413,14 @@ Always be:
 
 Return ONLY valid JSON, no markdown formatting or code fences.";
 
-        var content = new List<ContentBase>
+        var responseText = await _claudeClient.CompleteAsync(new ClaudeCompletionRequest
         {
-            new TextContent
-            {
-                Text = $"Analyze this IEP document and provide a comprehensive analysis for the parent.\n\n{iepContent}",
-            },
-        };
-
-        var messages = new List<Message>
-        {
-            new Message { Role = RoleType.User, Content = content },
-        };
-
-        var parameters = new MessageParameters
-        {
-            Messages = messages,
+            SystemPrompt = systemPrompt,
+            UserText = $"Analyze this IEP document and provide a comprehensive analysis for the parent.\n\n{iepContent}",
             Model = "claude-sonnet-4-20250514",
             MaxTokens = 16384,
-            System = [new SystemMessage(systemPrompt)],
-        };
+        }, cancellationToken);
 
-        var response = await client.Messages.GetClaudeMessageAsync(parameters, cancellationToken);
-
-        var responseText = (response.Content?.FirstOrDefault() as TextContent)?.Text;
         if (string.IsNullOrEmpty(responseText))
         {
             _logger.LogWarning("Empty response from Claude for analysis");
