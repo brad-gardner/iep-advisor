@@ -11,6 +11,9 @@ public class AnalysisRun : BaseEntity, IAuditableEntity
     public string? AdvocacyGapAnalysis { get; set; } // JSON
     public string? ParentGoalsSnapshot { get; set; } // JSON
     public string? ErrorMessage { get; set; }
+    // Idempotency marker for the legacy-analysis backfill, e.g. "IepAnalysis:42" / "EtrAnalysis:7".
+    // Null for runs created through the normal flow; unique (filtered) when present.
+    public string? BackfillSourceKey { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public int? CreatedById { get; set; }

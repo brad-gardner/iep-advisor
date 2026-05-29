@@ -81,6 +81,8 @@ builder.Services.AddSingleton<ProgressReportAnalysisQueue>();
 builder.Services.AddHostedService<ProgressReportAnalysisWorker>();
 builder.Services.AddSingleton<AnalysisRunQueue>();
 builder.Services.AddHostedService<AnalysisRunWorker>();
+// One-off, idempotent legacy-analysis backfill (runs once at startup; skips already-migrated rows).
+builder.Services.AddHostedService<AnalysisRunBackfillHostedService>();
 
 // Add controllers
 builder.Services.AddControllers()
