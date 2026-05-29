@@ -1,0 +1,28 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using IepAssistant.Domain.Entities;
+
+namespace IepAssistant.Domain.Data.Configurations;
+
+public class AnalysisRunConfiguration : IEntityTypeConfiguration<AnalysisRun>
+{
+    public void Configure(EntityTypeBuilder<AnalysisRun> builder)
+    {
+        builder.HasKey(a => a.Id);
+
+        builder.Property(a => a.Status)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(a => a.OverallSummary).HasMaxLength(5000);
+        builder.Property(a => a.ErrorMessage).HasMaxLength(2000);
+
+        builder.HasOne(a => a.ChildProfile)
+            .WithMany()
+            .HasForeignKey(a => a.ChildProfileId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(a => a.ChildProfileId);
+    }
+}

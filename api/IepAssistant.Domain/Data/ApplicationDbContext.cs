@@ -19,6 +19,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<EtrDocument> EtrDocuments => Set<EtrDocument>();
     public DbSet<EtrSection> EtrSections => Set<EtrSection>();
     public DbSet<EtrAnalysis> EtrAnalyses => Set<EtrAnalysis>();
+    public DbSet<AnalysisRun> AnalysisRuns => Set<AnalysisRun>();
+    public DbSet<AnalysisRunSource> AnalysisRunSources => Set<AnalysisRunSource>();
+    public DbSet<AnalysisRunSection> AnalysisRunSections => Set<AnalysisRunSection>();
     public DbSet<ParentAdvocacyGoal> ParentAdvocacyGoals => Set<ParentAdvocacyGoal>();
     public DbSet<UserRecoveryCode> UserRecoveryCodes => Set<UserRecoveryCode>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
