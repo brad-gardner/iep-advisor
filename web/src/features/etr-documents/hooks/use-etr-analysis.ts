@@ -73,7 +73,6 @@ export function useEtrAnalysis(etrId: number): UseEtrAnalysisResult {
               assessmentCompleteness: null,
               eligibilityReview: null,
               overallRedFlags: [],
-              suggestedQuestions: [],
               overallSummary: null,
               advocacyGapAnalysis: null,
               parentGoalsSnapshot: null,

@@ -43,7 +43,6 @@ export function useIepAnalysis(documentId: number) {
               sectionAnalyses: [],
               goalAnalyses: [],
               overallRedFlags: [],
-              suggestedQuestions: [],
               advocacyGapAnalysis: null,
               parentGoalsSnapshot: null,
               errorMessage: null,

@@ -19,6 +19,7 @@ import { EtrErrorBanner } from './etr-error-banner';
 import { EtrSectionsList } from './etr-sections-list';
 import { EtrAnalysisTab } from './etr-analysis-tab';
 import { EtrMeetingPrepTab } from './etr-meeting-prep-tab';
+import { useFeatureFlagStatus } from '@/hooks/use-feature-flags';
 
 type TabKey = 'overview' | 'sections' | 'analysis' | 'meeting-prep';
 
@@ -39,6 +40,16 @@ export function EtrViewerPage() {
 
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [notesExpanded, setNotesExpanded] = useState(false);
+
+  // When the standalone Meeting Prep tab is on, it lives at the child level and
+  // is no longer rendered embedded inside the ETR viewer. Gate on `loaded` so the
+  // embedded tab doesn't flash during the /api/config fetch.
+  // Gate on `loaded` so the embedded tab is hidden until the flag is known —
+  // avoids a flash when standalone is on and any dead-state (the tab button is
+  // the only way to select meeting-prep, and it never renders before resolve).
+  const { enabled: meetingPrepStandalone, loaded: flagsLoaded } =
+    useFeatureFlagStatus('MeetingPrepStandalone');
+  const showEmbeddedMeetingPrep = flagsLoaded && !meetingPrepStandalone;
 
   if (isLoading) {
     return (
@@ -106,12 +117,16 @@ export function EtrViewerPage() {
       disabled: analysisTabDisabled,
       hint: analysisTabHint,
     },
-    {
-      key: 'meeting-prep',
-      label: 'Meeting Prep',
-      disabled: meetingPrepTabDisabled,
-      hint: meetingPrepTabHint,
-    },
+    ...(showEmbeddedMeetingPrep
+      ? [
+          {
+            key: 'meeting-prep' as TabKey,
+            label: 'Meeting Prep',
+            disabled: meetingPrepTabDisabled,
+            hint: meetingPrepTabHint,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -234,7 +249,7 @@ export function EtrViewerPage() {
         />
       )}
 
-      {activeTab === 'meeting-prep' && !meetingPrepTabDisabled && (
+      {activeTab === 'meeting-prep' && !meetingPrepTabDisabled && showEmbeddedMeetingPrep && (
         <EtrMeetingPrepTab
           etrId={documentId}
           childProfileId={etr.childProfileId}

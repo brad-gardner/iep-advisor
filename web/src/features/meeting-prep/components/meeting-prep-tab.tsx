@@ -21,6 +21,9 @@ interface MeetingPrepTabProps {
   onReload?: () => void;
   analysisCreatedAt?: string | null;
   contextLabel?: 'IEP' | 'ETR';
+  // Suppress the empty-state's own generate button when a generate affordance
+  // is provided elsewhere (e.g. the standalone tab's date control).
+  hideEmptyStateCta?: boolean;
 }
 
 const SECTIONS = [
@@ -76,6 +79,7 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
     onGenerate,
     analysisCreatedAt,
     contextLabel,
+    hideEmptyStateCta,
   } = props;
   const [localChecklist, setLocalChecklist] =
     useState<MeetingPrepChecklist | null>(null);
@@ -106,6 +110,7 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
         onGenerate={onGenerate}
         isGenerating={isGenerating}
         contextLabel={contextLabel}
+        hideCta={hideEmptyStateCta}
       />
     );
   }

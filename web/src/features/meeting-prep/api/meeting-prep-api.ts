@@ -1,9 +1,13 @@
 import { apiClient } from '@/lib/api-client';
 import type { ApiResponse, MeetingPrepChecklist, CheckItemRequest } from '@/types/api';
 
-export async function generateFromGoals(childId: number): Promise<ApiResponse<MeetingPrepChecklist>> {
+export async function generateFromGoals(
+  childId: number,
+  meetingDate?: string
+): Promise<ApiResponse<MeetingPrepChecklist>> {
   const response = await apiClient.post<ApiResponse<MeetingPrepChecklist>>(
-    `/api/children/${childId}/meeting-prep`
+    `/api/children/${childId}/meeting-prep`,
+    meetingDate ? { meetingDate } : undefined
   );
   return response.data;
 }

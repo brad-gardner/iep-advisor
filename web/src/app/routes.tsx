@@ -18,6 +18,7 @@ import { ChildIepsTab } from '@/features/children/components/child-ieps-tab';
 import { ChildEtrsTab } from '@/features/children/components/child-etrs-tab';
 import { ChildGoalsTab } from '@/features/children/components/child-goals-tab';
 import { ChildAnalysisTab } from '@/features/analysis/components/child-analysis-tab';
+import { ChildMeetingPrepTab } from '@/features/meeting-prep/components/child-meeting-prep-tab';
 import { useFeatureFlagStatus } from '@/hooks/use-feature-flags';
 import { IepViewerPage } from '@/features/iep-documents/components/iep-viewer-page';
 import { IepRouteRedirect } from '@/features/iep-documents/components/iep-route-redirect';
@@ -203,6 +204,14 @@ export function AppRouter() {
           element={
             <FeatureRoute flag="AnalysisRun">
               <ChildAnalysisTab />
+            </FeatureRoute>
+          }
+        />
+        <Route
+          path="meeting-prep"
+          element={
+            <FeatureRoute flag="MeetingPrepStandalone">
+              <ChildMeetingPrepTab />
             </FeatureRoute>
           }
         />

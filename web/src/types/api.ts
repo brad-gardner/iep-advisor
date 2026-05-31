@@ -204,7 +204,6 @@ export interface IepAnalysis {
   sectionAnalyses: SectionAnalysis[];
   goalAnalyses: GoalAnalysis[];
   overallRedFlags: RedFlag[];
-  suggestedQuestions: SuggestedQuestion[];
   advocacyGapAnalysis: AdvocacyGapAnalysis | null;
   parentGoalsSnapshot: ParentGoalSnapshot[] | null;
   errorMessage: string | null;
@@ -273,12 +272,6 @@ export interface RedFlag {
   legalBasis: string | null;
 }
 
-export interface SuggestedQuestion {
-  question: string;
-  context: string;
-  category: string;
-}
-
 export interface LegalReference {
   provision: string;
   summary: string;
@@ -298,6 +291,7 @@ export interface MeetingPrepChecklist {
   childProfileId: number;
   iepDocumentId: number | null;
   etrDocumentId: number | null;
+  meetingDate?: string | null;
   status: "pending" | "generating" | "completed" | "error";
   questionsToAsk: ChecklistItem[];
   redFlagsToRaise: ChecklistItem[];

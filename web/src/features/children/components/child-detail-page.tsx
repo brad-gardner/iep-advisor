@@ -17,6 +17,7 @@ export function ChildDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const analysisEnabled = useFeatureFlag("AnalysisRun");
+  const meetingPrepStandalone = useFeatureFlag("MeetingPrepStandalone");
 
   const reloadChild = async () => {
     const response = await getChild(childId);
@@ -163,6 +164,11 @@ export function ChildDetailPage() {
         {analysisEnabled && (
           <TabLink to={`${base}/analysis`} testId="tab-analysis">
             Analysis
+          </TabLink>
+        )}
+        {meetingPrepStandalone && (
+          <TabLink to={`${base}/meeting-prep`} testId="tab-meeting-prep">
+            Meeting Prep
           </TabLink>
         )}
         <TabLink to={`${base}/ieps`} testId="tab-ieps">

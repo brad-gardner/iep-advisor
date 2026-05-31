@@ -3,14 +3,12 @@ import type {
   EligibilityReview,
   EtrAnalysis,
   EtrRedFlag,
-  EtrSuggestedQuestion,
 } from '../types';
 
 export interface ParsedEtrAnalysis {
   assessmentCompleteness: AssessmentCompleteness | null;
   eligibilityReview: EligibilityReview | null;
   redFlags: EtrRedFlag[];
-  suggestedQuestions: EtrSuggestedQuestion[];
   overallSummary: string;
 }
 
@@ -49,9 +47,6 @@ export function parseEtrAnalysis(analysis: EtrAnalysis): ParsedEtrAnalysis {
     assessmentCompleteness: normalizeAssessmentCompleteness(analysis.assessmentCompleteness),
     eligibilityReview: normalizeEligibilityReview(analysis.eligibilityReview),
     redFlags: Array.isArray(analysis.overallRedFlags) ? analysis.overallRedFlags : [],
-    suggestedQuestions: Array.isArray(analysis.suggestedQuestions)
-      ? analysis.suggestedQuestions
-      : [],
     overallSummary: analysis.overallSummary || '',
   };
 }

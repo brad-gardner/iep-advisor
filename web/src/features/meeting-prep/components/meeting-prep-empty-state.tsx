@@ -5,12 +5,16 @@ interface MeetingPrepEmptyStateProps {
   onGenerate: () => void;
   isGenerating: boolean;
   contextLabel?: 'IEP' | 'ETR';
+  // When the generate affordance is provided elsewhere (e.g. the standalone
+  // tab's date control), suppress this empty state's own button.
+  hideCta?: boolean;
 }
 
 export function MeetingPrepEmptyState({
   onGenerate,
   isGenerating,
   contextLabel = 'IEP',
+  hideCta = false,
 }: MeetingPrepEmptyStateProps) {
   const sourceSentence =
     contextLabel === 'ETR'
@@ -29,9 +33,11 @@ export function MeetingPrepEmptyState({
         documents to bring, rights to reference, and potential red flags based
         {' '}{sourceSentence}
       </p>
-      <Button onClick={onGenerate} disabled={isGenerating} data-testid="generate-meeting-prep">
-        {isGenerating ? 'Generating...' : 'Generate Meeting Prep'}
-      </Button>
+      {!hideCta && (
+        <Button onClick={onGenerate} disabled={isGenerating} data-testid="generate-meeting-prep">
+          {isGenerating ? 'Generating...' : 'Generate Meeting Prep'}
+        </Button>
+      )}
     </div>
   );
 }

@@ -101,19 +101,22 @@ export function useMeetingPrep(
     [childId],
   );
 
-  const generateFromGoals = useCallback(async () => {
-    setIsGenerating(true);
-    try {
-      await apiGenerateFromGoals(childId);
-      setChecklist((prev) =>
-        prev ? { ...prev, status: "generating" } : makePlaceholder({}),
-      );
-    } catch {
-      // handled by caller
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [childId, makePlaceholder]);
+  const generateFromGoals = useCallback(
+    async (meetingDate?: string) => {
+      setIsGenerating(true);
+      try {
+        await apiGenerateFromGoals(childId, meetingDate);
+        setChecklist((prev) =>
+          prev ? { ...prev, status: "generating" } : makePlaceholder({}),
+        );
+      } catch {
+        // handled by caller
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [childId, makePlaceholder],
+  );
 
   const generateFromIep = useCallback(
     async (iepId: number) => {
