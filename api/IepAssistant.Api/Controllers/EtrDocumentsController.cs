@@ -280,7 +280,6 @@ public class EtrDocumentsController : ControllerBase
         AssessmentCompleteness = model.AssessmentCompleteness,
         EligibilityReview = model.EligibilityReview,
         OverallRedFlags = model.OverallRedFlags,
-        SuggestedQuestions = model.SuggestedQuestions,
         OverallSummary = model.OverallSummary,
         ErrorMessage = model.ErrorMessage,
         CreatedAt = model.CreatedAt,

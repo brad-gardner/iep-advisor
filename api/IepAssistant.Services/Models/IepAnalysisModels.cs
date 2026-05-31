@@ -18,9 +18,6 @@ public class AnalysisResponse
     [JsonPropertyName("overallRedFlags")]
     public List<RedFlag> OverallRedFlags { get; set; } = [];
 
-    [JsonPropertyName("suggestedQuestions")]
-    public List<SuggestedQuestion> SuggestedQuestions { get; set; } = [];
-
     [JsonPropertyName("advocacyGapAnalysis")]
     public AdvocacyGapAnalysisResponse? AdvocacyGapAnalysis { get; set; }
 }
@@ -190,7 +187,6 @@ public class IepAnalysisModel
     public List<SectionAnalysisResult> SectionAnalyses { get; set; } = [];
     public List<GoalAnalysisResult> GoalAnalyses { get; set; } = [];
     public List<RedFlag> OverallRedFlags { get; set; } = [];
-    public List<SuggestedQuestion> SuggestedQuestions { get; set; } = [];
     public AdvocacyGapAnalysisResponse? AdvocacyGapAnalysis { get; set; }
     public List<ParentGoalSnapshot> ParentGoalsSnapshot { get; set; } = [];
     public string? ErrorMessage { get; set; }

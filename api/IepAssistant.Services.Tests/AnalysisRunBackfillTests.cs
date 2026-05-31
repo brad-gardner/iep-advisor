@@ -29,7 +29,6 @@ public class AnalysisRunBackfillTests
             GoalAnalyses = goalAnalyses,
             OverallSummary = "IEP overall summary",
             OverallRedFlags = "[\"flag\"]",
-            SuggestedQuestions = "[\"q1\"]",
             AdvocacyGapAnalysis = "{\"gap\":true}",
             ParentGoalsSnapshot = "[{\"goal\":\"read\"}]",
             ErrorMessage = errorMessage,
@@ -55,7 +54,6 @@ public class AnalysisRunBackfillTests
             EligibilityReview = eligibilityReview,
             OverallSummary = "ETR overall summary",
             OverallRedFlags = "[\"etr flag\"]",
-            SuggestedQuestions = "[\"q1\"]",
             AdvocacyGapAnalysis = "{\"gap\":false}",
             ParentGoalsSnapshot = "[{\"goal\":\"math\"}]",
             CreatedAt = new DateTime(2024, 12, 1, 9, 0, 0, DateTimeKind.Utc)
@@ -140,7 +138,10 @@ public class AnalysisRunBackfillTests
         Assert.Equal("assessment_completeness", etrSections[0].SectionKind);
         Assert.Equal("eligibility", etrSections[1].SectionKind);
 
-        // Carried-across fields (and SuggestedQuestions deliberately NOT carried).
+        // Carried-across fields. The AnalysisRun model has no suggested-questions concept
+        // at all (the legacy SuggestedQuestions column was dropped in P2a), so there is
+        // nothing for the backfill to copy — meeting-relevant questions now live only in
+        // Meeting Prep.
         Assert.Equal("IEP overall summary", iepRun.OverallSummary);
         Assert.Equal("[\"flag\"]", iepRun.OverallRedFlags);
         Assert.Equal("{\"gap\":true}", iepRun.AdvocacyGapAnalysis);

@@ -173,7 +173,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         return MapToModel(checklist);
     }
 
-    public async Task<ServiceResult<int>> GenerateFromGoalsAsync(int childId, int userId, CancellationToken ct = default)
+    public async Task<ServiceResult<int>> GenerateFromGoalsAsync(int childId, int userId, DateTime? meetingDate = null, CancellationToken ct = default)
     {
         if (!await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, ct))
             return ServiceResult<int>.FailureResult("Child profile not found");
@@ -182,6 +182,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         {
             ChildProfileId = childId,
             IepDocumentId = null,
+            MeetingDate = meetingDate,
             Status = "pending",
             CreatedById = userId,
             UpdatedById = userId
@@ -193,7 +194,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         return ServiceResult<int>.SuccessResult(checklist.Id);
     }
 
-    public async Task<ServiceResult<int>> GenerateFromIepAsync(int iepDocumentId, int userId, CancellationToken ct = default)
+    public async Task<ServiceResult<int>> GenerateFromIepAsync(int iepDocumentId, int userId, DateTime? meetingDate = null, CancellationToken ct = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(iepDocumentId, ct);
         if (document == null)
@@ -210,6 +211,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             ChildProfileId = document.ChildProfileId,
             IepDocumentId = iepDocumentId,
             EtrDocumentId = null,
+            MeetingDate = meetingDate,
             Status = "pending",
             CreatedById = userId,
             UpdatedById = userId
@@ -224,7 +226,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         return ServiceResult<int>.SuccessResult(checklist.Id);
     }
 
-    public async Task<ServiceResult<int>> GenerateFromEtrAsync(int etrDocumentId, int userId, CancellationToken ct = default)
+    public async Task<ServiceResult<int>> GenerateFromEtrAsync(int etrDocumentId, int userId, DateTime? meetingDate = null, CancellationToken ct = default)
     {
         var document = await _etrDocumentRepository.GetByIdWithChildAsync(etrDocumentId, ct);
         if (document == null || !document.IsActive)
@@ -241,6 +243,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             ChildProfileId = document.ChildProfileId,
             IepDocumentId = null,
             EtrDocumentId = etrDocumentId,
+            MeetingDate = meetingDate,
             Status = "pending",
             CreatedById = userId,
             UpdatedById = userId
@@ -643,13 +646,6 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
                 sb.AppendLine($"<etr_analysis>{analysis.OverallRedFlags}</etr_analysis>");
                 sb.AppendLine();
             }
-
-            if (!string.IsNullOrEmpty(analysis.SuggestedQuestions))
-            {
-                sb.AppendLine("QUESTIONS SUGGESTED BY PRIOR ANALYSIS (treat as input, do not simply restate):");
-                sb.AppendLine($"<etr_analysis>{analysis.SuggestedQuestions}</etr_analysis>");
-                sb.AppendLine();
-            }
         }
 
         if (sections.Count > 0)
@@ -728,6 +724,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             ChildProfileId = entity.ChildProfileId,
             IepDocumentId = entity.IepDocumentId,
             EtrDocumentId = entity.EtrDocumentId,
+            MeetingDate = entity.MeetingDate,
             Status = entity.Status,
             QuestionsToAsk = DeserializeOrEmpty(entity.QuestionsToAsk),
             RedFlagsToRaise = DeserializeOrEmpty(entity.RedFlagsToRaise),

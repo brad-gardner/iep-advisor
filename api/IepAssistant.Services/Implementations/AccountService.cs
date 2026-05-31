@@ -135,7 +135,6 @@ public class AccountService : IAccountService
                         a.GoalAnalyses,
                         a.OverallSummary,
                         a.OverallRedFlags,
-                        a.SuggestedQuestions,
                         a.AdvocacyGapAnalysis,
                         a.ParentGoalsSnapshot,
                         a.CreatedAt

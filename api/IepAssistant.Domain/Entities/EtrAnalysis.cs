@@ -7,7 +7,6 @@ public class EtrAnalysis : BaseEntity, IAuditableEntity
     public string? AssessmentCompleteness { get; set; } // JSON
     public string? EligibilityReview { get; set; } // JSON
     public string? OverallRedFlags { get; set; } // JSON array
-    public string? SuggestedQuestions { get; set; } // JSON array
     public string? OverallSummary { get; set; }
     public string? AdvocacyGapAnalysis { get; set; } // JSON
     public string? ParentGoalsSnapshot { get; set; } // JSON

@@ -184,7 +184,6 @@ public class IepAnalysisService : IIepAnalysisService
             analysis.SectionAnalyses = JsonSerializer.Serialize(analysisResult.SectionAnalyses, CamelCaseOptions);
             analysis.GoalAnalyses = JsonSerializer.Serialize(analysisResult.GoalAnalyses, CamelCaseOptions);
             analysis.OverallRedFlags = JsonSerializer.Serialize(analysisResult.OverallRedFlags, CamelCaseOptions);
-            analysis.SuggestedQuestions = JsonSerializer.Serialize(analysisResult.SuggestedQuestions, CamelCaseOptions);
 
             if (hasParentGoals)
             {
@@ -344,14 +343,6 @@ Analyze the provided IEP document and return a JSON response with the following 
       ""description"": ""Why this is a concern and what the parent should know"",
       ""legalBasis"": ""Relevant IDEA or legal provision""
     }
-  ],
-
-  ""suggestedQuestions"": [
-    {
-      ""question"": ""A specific question the parent should ask at the IEP meeting"",
-      ""context"": ""Brief explanation of why this question matters"",
-      ""category"": ""goals"" | ""services"" | ""placement"" | ""rights"" | ""general""
-    }
   ]
 }" + (hasParentGoals ? @"
 
@@ -461,7 +452,6 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             SectionAnalyses = DeserializeOrEmpty<List<SectionAnalysisResult>>(entity.SectionAnalyses),
             GoalAnalyses = DeserializeOrEmpty<List<GoalAnalysisResult>>(entity.GoalAnalyses),
             OverallRedFlags = DeserializeOrEmpty<List<RedFlag>>(entity.OverallRedFlags),
-            SuggestedQuestions = DeserializeOrEmpty<List<SuggestedQuestion>>(entity.SuggestedQuestions),
             AdvocacyGapAnalysis = DeserializeOrNull<AdvocacyGapAnalysisResponse>(entity.AdvocacyGapAnalysis),
             ParentGoalsSnapshot = DeserializeOrEmpty<List<ParentGoalSnapshot>>(entity.ParentGoalsSnapshot),
             ErrorMessage = entity.ErrorMessage,
