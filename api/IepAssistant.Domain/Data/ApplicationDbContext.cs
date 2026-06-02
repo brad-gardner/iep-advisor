@@ -44,6 +44,13 @@ public class ApplicationDbContext : DbContext
     public DbSet<IepDraftServiceLine> IepDraftServiceLines => Set<IepDraftServiceLine>();
     public DbSet<IepDraftAccommodation> IepDraftAccommodations => Set<IepDraftAccommodation>();
     public DbSet<IepDraftTransitionItem> IepDraftTransitionItems => Set<IepDraftTransitionItem>();
+    public DbSet<IepVersion> IepVersions => Set<IepVersion>();
+    public DbSet<IepVersionSection> IepVersionSections => Set<IepVersionSection>();
+    public DbSet<IepVersionGoal> IepVersionGoals => Set<IepVersionGoal>();
+    public DbSet<IepVersionServiceLine> IepVersionServiceLines => Set<IepVersionServiceLine>();
+    public DbSet<IepVersionAccommodation> IepVersionAccommodations => Set<IepVersionAccommodation>();
+    public DbSet<IepVersionTransitionItem> IepVersionTransitionItems => Set<IepVersionTransitionItem>();
+    public DbSet<IepVersionPdf> IepVersionPdfs => Set<IepVersionPdf>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

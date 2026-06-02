@@ -14,7 +14,8 @@ public static class DependencyInjection
     public static IServiceCollection AddDomain(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
+                .AddInterceptors(new ImmutableVersionInterceptor()));
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IChildProfileRepository, ChildProfileRepository>();

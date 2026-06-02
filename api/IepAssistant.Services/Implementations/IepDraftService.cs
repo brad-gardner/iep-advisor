@@ -463,19 +463,32 @@ public class IepDraftService : IIepDraftService
         return ServiceResult.SuccessResult();
     }
 
-    /// <summary>Resolves the draft to its student, then runs the SchoolId-bound + role check.</summary>
+    /// <summary>
+    /// Resolves the draft to its student, then runs the SchoolId-bound + role check.
+    /// For mutating callers (<paramref name="minimumRole"/> &gt;= Collaborator) this also enforces the
+    /// P5 edit-freeze: if the draft is currently being finalized (Status == Finalizing) the mutation
+    /// is rejected. Paired with the serializable finalize transaction, this guarantees a concurrent
+    /// edit can never be partially captured into the immutable snapshot.
+    /// </summary>
     private async Task<ServiceResult> ResolveDraftAccessAsync(int userId, int draftId, AccessRole minimumRole, CancellationToken ct)
     {
-        var studentId = await _context.IepDrafts
+        var draftInfo = await _context.IepDrafts
             .AsNoTracking()
             .Where(d => d.Id == draftId)
-            .Select(d => (int?)d.SchoolStudentId)
+            .Select(d => new { d.SchoolStudentId, d.Status })
             .FirstOrDefaultAsync(ct);
 
-        if (studentId == null)
+        if (draftInfo == null)
             return ServiceResult.FailureResult(DraftNotFoundMessage);
 
-        return await CheckStudentAccessAsync(userId, studentId.Value, minimumRole, ct);
+        var access = await CheckStudentAccessAsync(userId, draftInfo.SchoolStudentId, minimumRole, ct);
+        if (!access.Success)
+            return access;
+
+        if (minimumRole >= AccessRole.Collaborator && draftInfo.Status == IepDraftStatus.Finalizing)
+            return ServiceResult.FailureResult("The draft is being finalized; try again in a moment.");
+
+        return access;
     }
 
     private static async Task<int> NextOrderAsync(IQueryable<int> displayOrders, CancellationToken ct)
