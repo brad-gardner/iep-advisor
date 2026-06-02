@@ -3,7 +3,7 @@ import { useCallback, useMemo, useRef } from 'react';
 export interface FlushRegistry {
   // A row registers its flush fn; returns an unregister cleanup.
   register: (key: string, flush: () => Promise<void>) => () => void;
-  // Flush every pending row save (used by useBlocker before navigating away).
+  // Flush every pending row save (used on a hard unload via beforeunload).
   flushAll: () => Promise<void>;
 }
 

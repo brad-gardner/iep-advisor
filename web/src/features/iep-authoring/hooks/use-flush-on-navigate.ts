@@ -1,18 +1,14 @@
 import { useEffect } from 'react';
-import { useBlocker } from 'react-router-dom';
 import type { FlushRegistry } from './use-flush-registry';
 
-// Blocks in-app navigation once, flushes all pending row saves, then proceeds.
-// Also flushes on a hard unload (tab close / refresh) on a best-effort basis.
+// Best-effort flush of pending row saves on a hard unload (tab close / refresh).
+//
+// In-app route navigation is already covered without a router-level blocker: leaving
+// the workspace unmounts the row components, and each row's autosave flushes its pending
+// save in its unmount cleanup (see use-row-autosave). We deliberately do NOT use
+// `useBlocker` here — it requires React Router's data router (createBrowserRouter), and
+// this app uses the component <Routes>/<BrowserRouter> setup, so useBlocker throws.
 export function useFlushOnNavigate(registry: FlushRegistry) {
-  const blocker = useBlocker(true);
-
-  useEffect(() => {
-    if (blocker.state === 'blocked') {
-      void registry.flushAll().finally(() => blocker.proceed());
-    }
-  }, [blocker, registry]);
-
   useEffect(() => {
     const handler = () => {
       void registry.flushAll();
