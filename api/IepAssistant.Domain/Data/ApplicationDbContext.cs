@@ -54,6 +54,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<AccessAuditLog> AccessAuditLogs => Set<AccessAuditLog>();
     public DbSet<StudentProfile> StudentProfiles => Set<StudentProfile>();
     public DbSet<StudentInvite> StudentInvites => Set<StudentInvite>();
+    public DbSet<StudentWorkspace> StudentWorkspaces => Set<StudentWorkspace>();
+    public DbSet<StudentWorkspaceEntry> StudentWorkspaceEntries => Set<StudentWorkspaceEntry>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
