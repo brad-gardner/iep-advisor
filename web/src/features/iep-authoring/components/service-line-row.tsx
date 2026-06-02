@@ -1,8 +1,12 @@
+import { useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { assistServiceLine } from '../api/iep-assist-api';
+import type { AssistKind } from '../api/iep-assist-types';
 import { useEditorContext } from '../hooks/use-editor-context';
 import { useRowAutosave } from '../hooks/use-row-autosave';
 import type { ServiceLineDto } from '../types';
+import { AssistPopover } from './assist/assist-popover';
 import { LastEditedStamp } from './last-edited-stamp';
 import { RowDeleteButton } from './row-delete-button';
 
@@ -15,7 +19,7 @@ interface ServiceLineRowProps {
 const toDateInput = (iso: string | null) => (iso ? iso.slice(0, 10) : '');
 
 export function ServiceLineRow({ service, onDelete }: ServiceLineRowProps) {
-  const { draftApi, bus, registry, currentUserId } = useEditorContext();
+  const { draftId, draftApi, bus, registry, currentUserId } = useEditorContext();
   const { schedule, cancel } = useRowAutosave({
     rowKey: `service-${service.id}`,
     save: () => draftApi.saveServiceLine(service.id),
@@ -27,6 +31,11 @@ export function ServiceLineRow({ service, onDelete }: ServiceLineRowProps) {
     draftApi.patchServiceLine(service.id, patch);
     schedule();
   };
+
+  const assistRequest = useCallback(
+    (kind: AssistKind) => assistServiceLine(draftId, service.id, kind),
+    [draftId, service.id]
+  );
 
   // Cancel any pending debounced save first so the unmount-flush is a no-op and
   // no PUT races the DELETE against a now-deleted id.
@@ -85,6 +94,13 @@ export function ServiceLineRow({ service, onDelete }: ServiceLineRowProps) {
           data-testid={`service-end-${service.id}`}
         />
       </div>
+      {/* Services assist is about completeness — no single target field, so the
+          suggestion is display-only (Dismiss only, no Accept). */}
+      <AssistPopover
+        requestFn={assistRequest}
+        kinds={['Improve', 'SuggestMeasurement']}
+        testIdPrefix={`service-assist-${service.id}`}
+      />
       <div className="flex items-center justify-between pt-1">
         <LastEditedStamp
           lastEditedAt={service.lastEditedAt}

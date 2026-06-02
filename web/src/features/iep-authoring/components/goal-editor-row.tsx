@@ -1,8 +1,12 @@
+import { useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input, Textarea } from '@/components/ui/input';
+import { assistGoal } from '../api/iep-assist-api';
+import type { AssistKind } from '../api/iep-assist-types';
 import { useEditorContext } from '../hooks/use-editor-context';
 import { useRowAutosave } from '../hooks/use-row-autosave';
 import type { GoalDto } from '../types';
+import { AssistPopover } from './assist/assist-popover';
 import { LastEditedStamp } from './last-edited-stamp';
 import { RowDeleteButton } from './row-delete-button';
 
@@ -12,7 +16,7 @@ interface GoalEditorRowProps {
 }
 
 export function GoalEditorRow({ goal, onDelete }: GoalEditorRowProps) {
-  const { draftApi, bus, registry, currentUserId } = useEditorContext();
+  const { draftId, draftApi, bus, registry, currentUserId } = useEditorContext();
   const { schedule, cancel } = useRowAutosave({
     rowKey: `goal-${goal.id}`,
     save: () => draftApi.saveGoal(goal.id),
@@ -24,6 +28,11 @@ export function GoalEditorRow({ goal, onDelete }: GoalEditorRowProps) {
     draftApi.patchGoal(goal.id, patch);
     schedule();
   };
+
+  const assistRequest = useCallback(
+    (kind: AssistKind) => assistGoal(draftId, goal.id, kind),
+    [draftId, goal.id]
+  );
 
   // Cancel any pending debounced save first so the unmount-flush is a no-op and
   // no PUT races the DELETE against a now-deleted id.
@@ -48,13 +57,20 @@ export function GoalEditorRow({ goal, onDelete }: GoalEditorRowProps) {
           data-testid={`goal-timeframe-${goal.id}`}
         />
       </div>
-      <Textarea
-        label="Goal"
-        rows={3}
-        value={goal.goalText ?? ''}
-        onChange={(e) => edit({ goalText: e.target.value })}
-        data-testid={`goal-text-${goal.id}`}
-      />
+      <div className="space-y-2">
+        <Textarea
+          label="Goal"
+          rows={3}
+          value={goal.goalText ?? ''}
+          onChange={(e) => edit({ goalText: e.target.value })}
+          data-testid={`goal-text-${goal.id}`}
+        />
+        <AssistPopover
+          requestFn={assistRequest}
+          onApply={(text) => edit({ goalText: text })}
+          testIdPrefix={`goal-assist-${goal.id}`}
+        />
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Input
           label="Baseline"

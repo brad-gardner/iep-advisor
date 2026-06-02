@@ -1,9 +1,13 @@
+import { useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/input';
+import { assistSection } from '../api/iep-assist-api';
+import type { AssistKind } from '../api/iep-assist-types';
 import { useEditorContext } from '../hooks/use-editor-context';
 import { useRowAutosave } from '../hooks/use-row-autosave';
 import { sectionKindLabel } from '../lib/section-kinds';
 import type { SectionDto } from '../types';
+import { AssistPopover } from './assist/assist-popover';
 import { LastEditedStamp } from './last-edited-stamp';
 import { RowDeleteButton } from './row-delete-button';
 
@@ -13,7 +17,7 @@ interface SectionEditorProps {
 }
 
 export function SectionEditor({ section, onDelete }: SectionEditorProps) {
-  const { draftApi, bus, registry, currentUserId } = useEditorContext();
+  const { draftId, draftApi, bus, registry, currentUserId } = useEditorContext();
   const { schedule, cancel } = useRowAutosave({
     rowKey: `section-${section.id}`,
     save: () => draftApi.saveSection(section.id),
@@ -25,6 +29,11 @@ export function SectionEditor({ section, onDelete }: SectionEditorProps) {
     draftApi.patchSection(section.id, { richText });
     schedule();
   };
+
+  const assistRequest = useCallback(
+    (kind: AssistKind) => assistSection(draftId, section.id, kind),
+    [draftId, section.id]
+  );
 
   // Cancel any pending debounced save first so the unmount-flush is a no-op and
   // no PUT races the DELETE against a now-deleted id.
@@ -47,6 +56,12 @@ export function SectionEditor({ section, onDelete }: SectionEditorProps) {
         placeholder="Write the narrative for this section…"
         data-testid={`section-text-${section.id}`}
         aria-label={`${sectionKindLabel(section.sectionKind)} narrative`}
+      />
+      <AssistPopover
+        requestFn={assistRequest}
+        kinds={['Rewrite', 'Improve']}
+        onApply={(text) => edit(text)}
+        testIdPrefix={`section-assist-${section.id}`}
       />
       <div className="flex items-center justify-between pt-1">
         <LastEditedStamp
