@@ -42,6 +42,8 @@ import { AdminUserDetail } from '@/features/admin/components/admin-user-detail';
 import { EducatorHomePage } from '@/features/educator/pages/educator-home-page';
 import { EducatorStudentsPage } from '@/features/educator/pages/educator-students-page';
 import { EducatorStudentDetailPage } from '@/features/educator/pages/educator-student-detail-page';
+import { IepDraftListPage } from '@/features/iep-authoring/pages/iep-draft-list-page';
+import { IepAuthoringWorkspacePage } from '@/features/iep-authoring/pages/iep-authoring-workspace-page';
 import { AcceptLinkPage } from '@/features/child-links/components/accept-link-page';
 import { RoleHome } from '@/app/role-routing';
 import { roleHome } from '@/app/role-home';
@@ -375,6 +377,30 @@ export function AppRouter() {
             <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
               <MainLayout>
                 <EducatorStudentDetailPage />
+              </MainLayout>
+            </FeatureRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/students/:studentId/iep-drafts"
+        element={
+          <ProtectedRoute>
+            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
+              <MainLayout>
+                <IepDraftListPage />
+              </MainLayout>
+            </FeatureRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/students/:studentId/iep-drafts/:draftId"
+        element={
+          <ProtectedRoute>
+            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
+              <MainLayout>
+                <IepAuthoringWorkspacePage />
               </MainLayout>
             </FeatureRoute>
           </ProtectedRoute>

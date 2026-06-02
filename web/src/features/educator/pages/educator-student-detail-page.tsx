@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import {
   getStudent,
@@ -134,6 +135,18 @@ export function EducatorStudentDetailPage() {
           )}
         </dl>
       </Card>
+
+      <section className="space-y-3">
+        <h2 className="font-serif text-lg">IEPs</h2>
+        <Card className="max-w-lg flex items-center justify-between gap-4">
+          <p className="text-sm text-brand-slate-600">
+            Build and edit IEP drafts for this student.
+          </p>
+          <Link to={`/educator/students/${studentId}/iep-drafts`} data-testid="build-ieps">
+            <Button variant="secondary">Build / view IEPs</Button>
+          </Link>
+        </Card>
+      </section>
 
       <InviteParentForm onInvite={handleInvite} />
 
