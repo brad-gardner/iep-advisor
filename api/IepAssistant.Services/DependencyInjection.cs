@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IIepDraftService, IepDraftService>();
         services.AddScoped<IIepVersionService, IepVersionService>();
         services.AddScoped<IIepVersionPdfService, IepVersionPdfService>();
+        services.AddScoped<IIepAssistService, IepAssistService>();
 
         return services;
     }
