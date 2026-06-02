@@ -83,6 +83,29 @@ public class ChildLinkController : ControllerBase
         }, result.Message));
     }
 
+    [HttpGet("/api/children/{childId}/school-links")]
+    [ProducesResponseType(typeof(ApiResponse<List<ChildSchoolLinkDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetChildSchoolLinks(int childId, CancellationToken ct)
+    {
+        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
+            return NotFound();
+
+        var result = await _childLinkService.GetChildSchoolLinksAsync(User.GetUserId(), childId, ct);
+        if (!result.Success)
+            return MapFailure<List<ChildSchoolLinkDto>>(result.Message);
+
+        var dtos = result.Data!.Select(l => new ChildSchoolLinkDto
+        {
+            Id = l.Id,
+            SchoolStudentId = l.SchoolStudentId,
+            SchoolName = l.SchoolName,
+            StudentFirstName = l.StudentFirstName,
+            StudentLastName = l.StudentLastName,
+            LinkedAt = l.LinkedAt
+        }).ToList();
+        return Ok(ApiResponse<List<ChildSchoolLinkDto>>.SuccessResponse(dtos));
+    }
+
     private IActionResult MapFailure<T>(string? message)
     {
         message ??= "Request failed";

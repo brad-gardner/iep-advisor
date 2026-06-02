@@ -4,6 +4,9 @@ import type { ChildProfile, CreateChildProfileRequest } from "@/types/api";
 import { getChild, updateChild, deleteChild } from "../api/children-api";
 import { ChildForm } from "./child-form";
 import { SharedBadge } from "@/features/sharing/components/shared-badge";
+import { SchoolLinkBadge } from "@/features/child-links/components/school-link-badge";
+import { getChildSchoolLinks } from "@/features/child-links/api/child-links-api";
+import type { ChildSchoolLink } from "@/features/child-links/types";
 import { Button } from "@/components/ui/button";
 import { TabsNav, TabLink } from "@/components/ui/tabs";
 import { useFeatureFlag } from "@/hooks/use-feature-flags";
@@ -18,6 +21,8 @@ export function ChildDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const analysisEnabled = useFeatureFlag("AnalysisRun");
   const meetingPrepStandalone = useFeatureFlag("MeetingPrepStandalone");
+  const schoolSideEnabled = useFeatureFlag("SchoolSide");
+  const [schoolLinks, setSchoolLinks] = useState<ChildSchoolLink[]>([]);
 
   const reloadChild = async () => {
     const response = await getChild(childId);
@@ -39,6 +44,23 @@ export function ChildDetailPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [childId]);
+
+  useEffect(() => {
+    if (!schoolSideEnabled || !childId) return;
+    let active = true;
+    getChildSchoolLinks(childId)
+      .then((res) => {
+        if (active && res.success && res.data) {
+          setSchoolLinks(res.data);
+        }
+      })
+      .catch(() => {
+        // Non-critical: the badge simply won't render.
+      });
+    return () => {
+      active = false;
+    };
+  }, [childId, schoolSideEnabled]);
 
   const handleUpdate = async (data: CreateChildProfileRequest) => {
     try {
@@ -130,6 +152,7 @@ export function ChildDetailPage() {
             {child.firstName} {child.lastName}
           </h1>
           {!isOwner && <SharedBadge role={child.role} />}
+          {schoolSideEnabled && <SchoolLinkBadge links={schoolLinks} />}
         </div>
         <div className="flex gap-2">
           {isOwner && (

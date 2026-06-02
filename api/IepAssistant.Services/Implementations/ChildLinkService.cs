@@ -328,6 +328,32 @@ public class ChildLinkService : IChildLinkService
         return ServiceResult<List<ChildLinkModel>>.SuccessResult(links.Select(MapToModel).ToList());
     }
 
+    // ----------------------------------------------------------------- Parent: a child's school links
+
+    public async Task<ServiceResult<List<ChildSchoolLinkModel>>> GetChildSchoolLinksAsync(int parentUserId, int childProfileId, CancellationToken ct = default)
+    {
+        // Parent must have access to the child (any role).
+        var role = await _accessService.GetRoleAsync(childProfileId, parentUserId, ct);
+        if (role == null)
+            return ServiceResult<List<ChildSchoolLinkModel>>.FailureResult("You do not have permission to view this child.");
+
+        var links = await _context.ChildLinks
+            .AsNoTracking()
+            .Where(l => l.ChildProfileId == childProfileId && l.IsActive && l.AcceptedAt != null)
+            .Select(l => new ChildSchoolLinkModel
+            {
+                Id = l.Id,
+                SchoolStudentId = l.SchoolStudentId,
+                SchoolName = l.SchoolStudent.School.Name,
+                StudentFirstName = l.SchoolStudent.FirstName,
+                StudentLastName = l.SchoolStudent.LastName,
+                LinkedAt = l.LinkedAt
+            })
+            .ToListAsync(ct);
+
+        return ServiceResult<List<ChildSchoolLinkModel>>.SuccessResult(links);
+    }
+
     // ----------------------------------------------------------------- Helpers
 
     /// <summary>

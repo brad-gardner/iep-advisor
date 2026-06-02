@@ -1,17 +1,27 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch } from 'lucide-react';
+import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/features/auth/hooks/use-auth';
+import { useFeatureFlag } from '@/hooks/use-feature-flags';
 
-const navItems = [
-  { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
-  { to: '/children', label: 'My Children', Icon: Users },
-  { to: '/etrs', label: 'ETRs', Icon: FileSearch },
+// Common items shown to every role, after any role-specific section above.
+const commonNavItems = [
   { to: '/profile', label: 'Profile', Icon: UserCircle },
   // { to: '/subscription', label: 'Subscription', Icon: CreditCard }, // Hidden during beta
   { to: '/knowledge-base', label: 'Knowledge Base', Icon: BookOpen },
   { to: '/iep-101', label: 'IEP 101', Icon: GraduationCap },
+];
+
+const parentNavItems = [
+  { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  { to: '/children', label: 'My Children', Icon: Users },
+  { to: '/etrs', label: 'ETRs', Icon: FileSearch },
+];
+
+const educatorNavItems = [
+  { to: '/educator', label: 'Dashboard', Icon: LayoutDashboard },
+  { to: '/educator/students', label: 'Students', Icon: School },
 ];
 
 interface SidebarProps {
@@ -21,10 +31,22 @@ interface SidebarProps {
 export function Sidebar({ onLogout }: SidebarProps) {
   const location = useLocation();
   const { user } = useAuth();
+  const schoolSideEnabled = useFeatureFlag('SchoolSide');
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(path + '/');
+
+  // Show educator nav only when SchoolSide is on AND the user is an Educator;
+  // otherwise fall back to the parent nav. Common items appear for both.
+  const showEducatorNav = schoolSideEnabled && user?.role === 'Educator';
+  const roleNavItems = showEducatorNav ? educatorNavItems : parentNavItems;
+  const navItems = [...roleNavItems, ...commonNavItems];
+
+  // The educator Dashboard (/educator) must use an exact match so it doesn't
+  // stay highlighted while on /educator/students.
+  const itemIsActive = (to: string) =>
+    to === '/educator' ? location.pathname === '/educator' : isActive(to);
 
   const navContent = (
     <>
@@ -34,7 +56,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
 
       <nav className="flex-1 px-3 space-y-1">
         {navItems.map(({ to, label, Icon }) => {
-          const active = isActive(to);
+          const active = itemIsActive(to);
           const testId = `nav-${to.slice(1)}`;
           return (
             <Link

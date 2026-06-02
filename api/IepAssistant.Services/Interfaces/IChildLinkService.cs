@@ -18,4 +18,7 @@ public interface IChildLinkService
 
     /// <summary>EDUCATOR action: list a student's links (pending + accepted), SchoolId-bound.</summary>
     Task<ServiceResult<List<ChildLinkModel>>> GetLinksForStudentAsync(int educatorUserId, int studentId, CancellationToken ct = default);
+
+    /// <summary>PARENT action: list a child's active accepted school links (for the "linked to [School]" indicator).</summary>
+    Task<ServiceResult<List<ChildSchoolLinkModel>>> GetChildSchoolLinksAsync(int parentUserId, int childProfileId, CancellationToken ct = default);
 }

@@ -5,13 +5,15 @@ export interface ApiResponse<T> {
   errors?: string[];
 }
 
+export type UserRole = 'Parent' | 'Educator' | 'Student' | 'Admin';
+
 export interface User {
   id: number;
   email: string;
   firstName: string;
   lastName: string;
   state: string | null;
-  role: string;
+  role: UserRole;
   fullName: string;
   mfaEnabled?: boolean;
   onboardingCompleted: boolean;

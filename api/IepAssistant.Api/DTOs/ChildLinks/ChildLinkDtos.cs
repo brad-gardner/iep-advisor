@@ -35,3 +35,13 @@ public class AcceptedChildLinkDto
     public bool IsAccepted { get; set; }
     public DateTime? LinkedAt { get; set; }
 }
+
+public class ChildSchoolLinkDto
+{
+    public int Id { get; set; }
+    public int SchoolStudentId { get; set; }
+    public string? SchoolName { get; set; }
+    public string StudentFirstName { get; set; } = string.Empty;
+    public string? StudentLastName { get; set; }
+    public DateTime? LinkedAt { get; set; }
+}

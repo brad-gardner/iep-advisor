@@ -18,6 +18,19 @@ public class ChildLinkModel
 }
 
 /// <summary>
+/// Parent-facing summary of a child's active school link, for the "linked to [School]" indicator.
+/// </summary>
+public class ChildSchoolLinkModel
+{
+    public int Id { get; set; }
+    public int SchoolStudentId { get; set; }
+    public string? SchoolName { get; set; }
+    public string StudentFirstName { get; set; } = string.Empty;
+    public string? StudentLastName { get; set; }
+    public DateTime? LinkedAt { get; set; }
+}
+
+/// <summary>
 /// One of the parent's own (Owner) ChildProfiles offered as a "link existing" candidate
 /// on the invite-preview screen.
 /// </summary>

@@ -39,6 +39,12 @@ import { AdminRouteGuard } from '@/features/admin/components/admin-route-guard';
 import { AdminDashboardPage } from '@/features/admin/components/admin-dashboard-page';
 import { AdminUsersPage } from '@/features/admin/components/admin-users-page';
 import { AdminUserDetail } from '@/features/admin/components/admin-user-detail';
+import { EducatorHomePage } from '@/features/educator/pages/educator-home-page';
+import { EducatorStudentsPage } from '@/features/educator/pages/educator-students-page';
+import { EducatorStudentDetailPage } from '@/features/educator/pages/educator-student-detail-page';
+import { AcceptLinkPage } from '@/features/child-links/components/accept-link-page';
+import { RoleHome } from '@/app/role-routing';
+import { roleHome } from '@/app/role-home';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -62,9 +68,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 // before deciding, so a flag-off feature can't be reached by direct URL.
 function FeatureRoute({
   flag,
+  redirectTo = '../overview',
   children,
 }: {
   flag: string;
+  redirectTo?: string;
   children: React.ReactNode;
 }) {
   const { enabled, loaded } = useFeatureFlagStatus(flag);
@@ -78,14 +86,14 @@ function FeatureRoute({
   }
 
   if (!enabled) {
-    return <Navigate to="../overview" replace />;
+    return <Navigate to={redirectTo} replace />;
   }
 
   return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -95,8 +103,8 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+  if (isAuthenticated && user) {
+    return <Navigate to={roleHome(user.role)} replace />;
   }
 
   return <>{children}</>;
@@ -337,6 +345,54 @@ export function AppRouter() {
         }
       />
       <Route
+        path="/educator"
+        element={
+          <ProtectedRoute>
+            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
+              <MainLayout>
+                <EducatorHomePage />
+              </MainLayout>
+            </FeatureRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/students"
+        element={
+          <ProtectedRoute>
+            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
+              <MainLayout>
+                <EducatorStudentsPage />
+              </MainLayout>
+            </FeatureRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/students/:studentId"
+        element={
+          <ProtectedRoute>
+            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
+              <MainLayout>
+                <EducatorStudentDetailPage />
+              </MainLayout>
+            </FeatureRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/accept-link"
+        element={
+          <ProtectedRoute>
+            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
+              <MainLayout>
+                <AcceptLinkPage />
+              </MainLayout>
+            </FeatureRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/subscription"
         element={
           <ProtectedRoute>
@@ -412,8 +468,8 @@ export function AppRouter() {
           </ProtectedRoute>
         }
       />
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<RoleHome />} />
+      <Route path="*" element={<RoleHome />} />
     </Routes>
   );
 }
