@@ -84,11 +84,13 @@ public sealed class IepVersionServiceTests : IDisposable
         ctx.Database.EnsureCreated();
     }
 
+    private readonly CapturingAuditLogger _audit = new();
+
     private ApplicationDbContext CreateContext() => new(_options);
     private IepVersionService CreateVersionService(ApplicationDbContext ctx, IBlobStorageService? blob = null)
-        => new(ctx, new AccessService(ctx), blob ?? new SuccessBlobStorageFake(), NullLogger<IepVersionService>.Instance);
+        => new(ctx, new AccessService(ctx), blob ?? new SuccessBlobStorageFake(), _audit, NullLogger<IepVersionService>.Instance);
     private IepDraftService CreateDraftService(ApplicationDbContext ctx)
-        => new(ctx, NullLogger<IepDraftService>.Instance);
+        => new(ctx, _audit, NullLogger<IepDraftService>.Instance);
 
     // ---------------------------------------------------------------- Seed helpers
 
@@ -521,6 +523,46 @@ public sealed class IepVersionServiceTests : IDisposable
             Assert.False(string.IsNullOrWhiteSpace(pdf.Checksum));
         }
         Assert.NotEmpty(blob.LastBytes!);
+    }
+
+    // ---------------------------------------------------------------- Audit (P6a)
+
+    [Fact]
+    public async Task Finalize_RecordsOneFinalizeAuditEntry()
+    {
+        var s = SeedSchoolWithStudent("audit-finalize");
+        var draftId = await CreateDraftAsync(s);
+        await AddGoalAsync(s, draftId, "G");
+
+        _audit.Entries.Clear();
+        var v = await FinalizeAsync(s, draftId);
+
+        var entry = Assert.Single(_audit.Entries);
+        Assert.Equal(AuditAction.Finalize, entry.Action);
+        Assert.Equal(s.EducatorUserId, entry.ActorUserId);
+        Assert.Equal("IepVersion", entry.ResourceType);
+        Assert.Equal(v.Id, entry.ResourceId);
+    }
+
+    [Fact]
+    public async Task GetVersion_RecordsOneViewAuditEntry()
+    {
+        var s = SeedSchoolWithStudent("audit-getversion");
+        var draftId = await CreateDraftAsync(s);
+        var v = await FinalizeAsync(s, draftId);
+
+        _audit.Entries.Clear();
+        using (var ctx = CreateContext())
+        {
+            var get = await CreateVersionService(ctx).GetVersionAsync(s.EducatorUserId, v.Id);
+            Assert.True(get.Success, get.Message);
+        }
+
+        var entry = Assert.Single(_audit.Entries);
+        Assert.Equal(AuditAction.View, entry.Action);
+        Assert.Equal(s.EducatorUserId, entry.ActorUserId);
+        Assert.Equal("IepVersion", entry.ResourceType);
+        Assert.Equal(v.Id, entry.ResourceId);
     }
 
     public void Dispose() => _connection.Dispose();

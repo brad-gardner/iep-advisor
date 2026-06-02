@@ -30,13 +30,15 @@ public class IepVersionService : IIepVersionService
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _accessService;
     private readonly IBlobStorageService _blob;
+    private readonly IAuditLogger _audit;
     private readonly ILogger<IepVersionService> _logger;
 
-    public IepVersionService(ApplicationDbContext context, IAccessService accessService, IBlobStorageService blob, ILogger<IepVersionService> logger)
+    public IepVersionService(ApplicationDbContext context, IAccessService accessService, IBlobStorageService blob, IAuditLogger audit, ILogger<IepVersionService> logger)
     {
         _context = context;
         _accessService = accessService;
         _blob = blob;
+        _audit = audit;
         _logger = logger;
     }
 
@@ -188,6 +190,9 @@ public class IepVersionService : IIepVersionService
             throw;
         }
 
+        // FERPA audit: record the finalize against the newly-created version, after commit.
+        _audit.Record(AuditAction.Finalize, userId, "IepVersion", summary.Id);
+
         // 10. The PDF render is enqueued by the controller AFTER this commit, failure-isolated and
         //     OUTSIDE the transaction (the worker must never read an uncommitted version). The
         //     IepVersionPdf row is created Pending above; the worker flips it to Rendered/Error.
@@ -257,6 +262,7 @@ public class IepVersionService : IIepVersionService
         if (version == null)
             return ServiceResult<IepVersionModel>.FailureResult(VersionNotFoundMessage);
 
+        _audit.Record(AuditAction.View, userId, "IepVersion", versionId);
         return ServiceResult<IepVersionModel>.SuccessResult(MapVersionFull(version));
     }
 
@@ -327,6 +333,9 @@ public class IepVersionService : IIepVersionService
             // Build a short-lived download URL from the deterministic blob path (SAS when supported).
             var blobPath = IIepVersionPdfService.BlobPathFor(versionId, version.VersionNumber);
             model.Url = await _blob.GetDownloadUrlAsync(blobPath);
+
+            // FERPA audit: a Rendered download URL is actually being handed out — log the export.
+            _audit.Record(AuditAction.Export, userId, "IepVersion", versionId);
         }
 
         return ServiceResult<IepVersionPdfStatusModel>.SuccessResult(model);
@@ -349,11 +358,16 @@ public class IepVersionService : IIepVersionService
         if (student == null)
             return ServiceResult.FailureResult(PermissionMessage);
 
-        var hasAccess = await _context.SchoolStudentAccesses
+        // Role is stored as a string (HasConversion<string>), so a `>= minimumRole` predicate would
+        // translate to an *alphabetical* SQL comparison ("Collaborator" < "Viewer"), not an enum-rank
+        // comparison. Fetch the role and compare in memory, matching IepDraftService.
+        var role = await _context.SchoolStudentAccesses
             .AsNoTracking()
-            .AnyAsync(a => a.SchoolStudentId == studentId && a.UserId == userId && a.IsActive && a.Role >= minimumRole, ct);
+            .Where(a => a.SchoolStudentId == studentId && a.UserId == userId && a.IsActive)
+            .Select(a => (AccessRole?)a.Role)
+            .FirstOrDefaultAsync(ct);
 
-        return hasAccess
+        return role != null && role.Value >= minimumRole
             ? ServiceResult.SuccessResult()
             : ServiceResult.FailureResult(PermissionMessage);
     }

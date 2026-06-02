@@ -16,6 +16,8 @@ using IepAssistant.Domain;
 using IepAssistant.Domain.Data;
 using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Services;
+using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Interfaces;
 
 // QuestPDF runs under the free Community license (org is under the $1M-revenue threshold). Set once
 // at startup before any rendering — the P5b PDF worker generates IepVersion PDFs headless.
@@ -89,6 +91,10 @@ builder.Services.AddSingleton<IepVersionPdfQueue>();
 builder.Services.AddHostedService<IepVersionPdfWorker>();
 // One-off, idempotent legacy-analysis backfill (runs once at startup; skips already-migrated rows).
 builder.Services.AddHostedService<AnalysisRunBackfillHostedService>();
+// FERPA-aligned access logging (P6a): singleton fire-and-forget enqueue + hosted drain-and-insert.
+builder.Services.AddSingleton<AuditLogger>();
+builder.Services.AddSingleton<IAuditLogger>(sp => sp.GetRequiredService<AuditLogger>());
+builder.Services.AddHostedService<AccessAuditLogWorker>();
 
 // Add controllers
 builder.Services.AddControllers()

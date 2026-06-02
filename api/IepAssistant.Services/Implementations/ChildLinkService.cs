@@ -21,17 +21,20 @@ public class ChildLinkService : IChildLinkService
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _accessService;
     private readonly IEmailService _emailService;
+    private readonly IAuditLogger _audit;
     private readonly ILogger<ChildLinkService> _logger;
 
     public ChildLinkService(
         ApplicationDbContext context,
         IAccessService accessService,
         IEmailService emailService,
+        IAuditLogger audit,
         ILogger<ChildLinkService> logger)
     {
         _context = context;
         _accessService = accessService;
         _emailService = emailService;
+        _audit = audit;
         _logger = logger;
     }
 
@@ -110,6 +113,14 @@ public class ChildLinkService : IChildLinkService
             parentEmail, educatorName, schoolName ?? "the school", studentName, rawToken, ct);
 
         _logger.LogInformation("School link invite created and email sent for {Email} on student {StudentId}", parentEmail, studentId);
+
+        // FERPA audit: a SchoolStudent record is being shared with a parent. If that parent already
+        // has an account, capture their user id as the recipient; otherwise leave it null (invite-only).
+        var recipientUserId = await _context.Users
+            .Where(u => u.Email.ToLower() == parentEmail.ToLower())
+            .Select(u => (int?)u.Id)
+            .FirstOrDefaultAsync(ct);
+        _audit.Record(AuditAction.Share, educatorUserId, "SchoolStudent", studentId, recipientUserId);
 
         return ServiceResult<ChildLinkModel>.SuccessResult(MapToModel(link), "Invite sent successfully.");
     }

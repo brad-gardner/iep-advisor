@@ -51,6 +51,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<IepVersionAccommodation> IepVersionAccommodations => Set<IepVersionAccommodation>();
     public DbSet<IepVersionTransitionItem> IepVersionTransitionItems => Set<IepVersionTransitionItem>();
     public DbSet<IepVersionPdf> IepVersionPdfs => Set<IepVersionPdf>();
+    public DbSet<AccessAuditLog> AccessAuditLogs => Set<AccessAuditLog>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

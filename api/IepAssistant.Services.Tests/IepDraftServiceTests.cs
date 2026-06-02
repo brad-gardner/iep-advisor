@@ -34,8 +34,10 @@ public sealed class IepDraftServiceTests : IDisposable
 
     private ApplicationDbContext CreateContext() => new(_options);
 
+    private readonly CapturingAuditLogger _audit = new();
+
     private IepDraftService CreateService(ApplicationDbContext ctx)
-        => new(ctx, NullLogger<IepDraftService>.Instance);
+        => new(ctx, _audit, NullLogger<IepDraftService>.Instance);
 
     // ---------------------------------------------------------------- Seed helpers
 
@@ -359,6 +361,55 @@ public sealed class IepDraftServiceTests : IDisposable
         var result = await CreateService(ctx).ListDraftsAsync(viewerId, s.StudentId);
         Assert.True(result.Success);
         Assert.Single(result.Data!);
+    }
+
+    // ---------------------------------------------------------------- Audit (P6a)
+
+    [Fact]
+    public async Task GetDraft_RecordsOneViewAuditEntry()
+    {
+        var s = SeedSchoolWithStudent("audit-view");
+        var draftId = await CreateDraftAsync(s);
+
+        _audit.Entries.Clear();
+        using (var ctx = CreateContext())
+        {
+            var get = await CreateService(ctx).GetDraftAsync(s.CollaboratorUserId, draftId);
+            Assert.True(get.Success);
+        }
+
+        var entry = Assert.Single(_audit.Entries);
+        Assert.Equal(AuditAction.View, entry.Action);
+        Assert.Equal(s.CollaboratorUserId, entry.ActorUserId);
+        Assert.Equal("IepDraft", entry.ResourceType);
+        Assert.Equal(draftId, entry.ResourceId);
+    }
+
+    [Fact]
+    public async Task UpdateGoal_RecordsOneEditAuditEntry()
+    {
+        var s = SeedSchoolWithStudent("audit-edit");
+        var draftId = await CreateDraftAsync(s);
+
+        int goalId;
+        using (var ctx = CreateContext())
+        {
+            var add = await CreateService(ctx).AddGoalAsync(s.CollaboratorUserId, draftId, new UpsertIepDraftGoalModel { GoalText = "G" });
+            goalId = add.Data!.Id;
+        }
+
+        _audit.Entries.Clear();
+        using (var ctx = CreateContext())
+        {
+            var upd = await CreateService(ctx).UpdateGoalAsync(s.CollaboratorUserId, draftId, goalId, new UpsertIepDraftGoalModel { GoalText = "G2" });
+            Assert.True(upd.Success);
+        }
+
+        var entry = Assert.Single(_audit.Entries);
+        Assert.Equal(AuditAction.Edit, entry.Action);
+        Assert.Equal(s.CollaboratorUserId, entry.ActorUserId);
+        Assert.Equal("IepDraft", entry.ResourceType);
+        Assert.Equal(draftId, entry.ResourceId);
     }
 
     public void Dispose() => _connection.Dispose();

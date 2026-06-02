@@ -18,11 +18,13 @@ public class IepDraftService : IIepDraftService
     private const string DraftNotFoundMessage = "IEP draft not found.";
 
     private readonly ApplicationDbContext _context;
+    private readonly IAuditLogger _audit;
     private readonly ILogger<IepDraftService> _logger;
 
-    public IepDraftService(ApplicationDbContext context, ILogger<IepDraftService> logger)
+    public IepDraftService(ApplicationDbContext context, IAuditLogger audit, ILogger<IepDraftService> logger)
     {
         _context = context;
+        _audit = audit;
         _logger = logger;
     }
 
@@ -86,6 +88,7 @@ public class IepDraftService : IIepDraftService
         if (draft == null)
             return ServiceResult<IepDraftModel>.FailureResult(DraftNotFoundMessage);
 
+        _audit.Record(AuditAction.View, userId, "IepDraft", draftId);
         return ServiceResult<IepDraftModel>.SuccessResult(MapDraftFull(draft));
     }
 
@@ -114,6 +117,7 @@ public class IepDraftService : IIepDraftService
         await StampDraftAsync(draftId, userId, now, ct);
         await _context.SaveChangesAsync(ct);
 
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult<IepDraftSectionModel>.SuccessResult(MapSection(entity));
     }
 
@@ -135,6 +139,7 @@ public class IepDraftService : IIepDraftService
         await StampDraftAsync(draftId, userId, now, ct);
         await _context.SaveChangesAsync(ct);
 
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult<IepDraftSectionModel>.SuccessResult(MapSection(entity));
     }
 
@@ -151,6 +156,7 @@ public class IepDraftService : IIepDraftService
         _context.IepDraftSections.Remove(entity);
         await StampDraftAsync(draftId, userId, DateTime.UtcNow, ct);
         await _context.SaveChangesAsync(ct);
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult.SuccessResult();
     }
 
@@ -183,6 +189,7 @@ public class IepDraftService : IIepDraftService
         await StampDraftAsync(draftId, userId, now, ct);
         await _context.SaveChangesAsync(ct);
 
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult<IepDraftGoalModel>.SuccessResult(MapGoal(entity));
     }
 
@@ -208,6 +215,7 @@ public class IepDraftService : IIepDraftService
         await StampDraftAsync(draftId, userId, now, ct);
         await _context.SaveChangesAsync(ct);
 
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult<IepDraftGoalModel>.SuccessResult(MapGoal(entity));
     }
 
@@ -224,6 +232,7 @@ public class IepDraftService : IIepDraftService
         _context.IepDraftGoals.Remove(entity);
         await StampDraftAsync(draftId, userId, DateTime.UtcNow, ct);
         await _context.SaveChangesAsync(ct);
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult.SuccessResult();
     }
 
@@ -257,6 +266,7 @@ public class IepDraftService : IIepDraftService
         await StampDraftAsync(draftId, userId, now, ct);
         await _context.SaveChangesAsync(ct);
 
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult<IepDraftServiceLineModel>.SuccessResult(MapServiceLine(entity));
     }
 
@@ -283,6 +293,7 @@ public class IepDraftService : IIepDraftService
         await StampDraftAsync(draftId, userId, now, ct);
         await _context.SaveChangesAsync(ct);
 
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult<IepDraftServiceLineModel>.SuccessResult(MapServiceLine(entity));
     }
 
@@ -299,6 +310,7 @@ public class IepDraftService : IIepDraftService
         _context.IepDraftServiceLines.Remove(entity);
         await StampDraftAsync(draftId, userId, DateTime.UtcNow, ct);
         await _context.SaveChangesAsync(ct);
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult.SuccessResult();
     }
 
@@ -327,6 +339,7 @@ public class IepDraftService : IIepDraftService
         await StampDraftAsync(draftId, userId, now, ct);
         await _context.SaveChangesAsync(ct);
 
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult<IepDraftAccommodationModel>.SuccessResult(MapAccommodation(entity));
     }
 
@@ -348,6 +361,7 @@ public class IepDraftService : IIepDraftService
         await StampDraftAsync(draftId, userId, now, ct);
         await _context.SaveChangesAsync(ct);
 
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult<IepDraftAccommodationModel>.SuccessResult(MapAccommodation(entity));
     }
 
@@ -364,6 +378,7 @@ public class IepDraftService : IIepDraftService
         _context.IepDraftAccommodations.Remove(entity);
         await StampDraftAsync(draftId, userId, DateTime.UtcNow, ct);
         await _context.SaveChangesAsync(ct);
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult.SuccessResult();
     }
 
@@ -392,6 +407,7 @@ public class IepDraftService : IIepDraftService
         await StampDraftAsync(draftId, userId, now, ct);
         await _context.SaveChangesAsync(ct);
 
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult<IepDraftTransitionItemModel>.SuccessResult(MapTransitionItem(entity));
     }
 
@@ -413,6 +429,7 @@ public class IepDraftService : IIepDraftService
         await StampDraftAsync(draftId, userId, now, ct);
         await _context.SaveChangesAsync(ct);
 
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult<IepDraftTransitionItemModel>.SuccessResult(MapTransitionItem(entity));
     }
 
@@ -429,6 +446,7 @@ public class IepDraftService : IIepDraftService
         _context.IepDraftTransitionItems.Remove(entity);
         await StampDraftAsync(draftId, userId, DateTime.UtcNow, ct);
         await _context.SaveChangesAsync(ct);
+        _audit.Record(AuditAction.Edit, userId, "IepDraft", draftId);
         return ServiceResult.SuccessResult();
     }
 
