@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School } from 'lucide-react';
+import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/features/auth/hooks/use-auth';
@@ -24,6 +24,10 @@ const educatorNavItems = [
   { to: '/educator/students', label: 'Students', Icon: School },
 ];
 
+const studentNavItems = [
+  { to: '/student', label: 'Home', Icon: Home },
+];
+
 interface SidebarProps {
   onLogout: () => void;
 }
@@ -32,21 +36,30 @@ export function Sidebar({ onLogout }: SidebarProps) {
   const location = useLocation();
   const { user } = useAuth();
   const schoolSideEnabled = useFeatureFlag('SchoolSide');
+  const studentWorkspaceEnabled = useFeatureFlag('StudentWorkspace');
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(path + '/');
 
-  // Show educator nav only when SchoolSide is on AND the user is an Educator;
-  // otherwise fall back to the parent nav. Common items appear for both.
+  // Pick the role-specific nav: educator when SchoolSide is on and the user is
+  // an Educator; student when StudentWorkspace is on and the user is a Student;
+  // otherwise the parent nav. Common items appear for every role.
   const showEducatorNav = schoolSideEnabled && user?.role === 'Educator';
-  const roleNavItems = showEducatorNav ? educatorNavItems : parentNavItems;
+  const showStudentNav = studentWorkspaceEnabled && user?.role === 'Student';
+  const roleNavItems = showEducatorNav
+    ? educatorNavItems
+    : showStudentNav
+      ? studentNavItems
+      : parentNavItems;
   const navItems = [...roleNavItems, ...commonNavItems];
 
-  // The educator Dashboard (/educator) must use an exact match so it doesn't
-  // stay highlighted while on /educator/students.
+  // Exact-match the section roots (/educator, /student) so they don't stay
+  // highlighted while on a nested route.
   const itemIsActive = (to: string) =>
-    to === '/educator' ? location.pathname === '/educator' : isActive(to);
+    to === '/educator' || to === '/student'
+      ? location.pathname === to
+      : isActive(to);
 
   const navContent = (
     <>

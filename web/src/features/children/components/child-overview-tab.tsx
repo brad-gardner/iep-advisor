@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { ShareChildDialog } from "@/features/sharing/components/share-child-dialog";
 import { AccessList } from "@/features/sharing/components/access-list";
 import { SchoolIepsCard } from "@/features/iep-versions/components/school-ieps-card";
+import { InviteStudentForm } from "@/features/student/components/invite-student-form";
+import { inviteStudentFromParent } from "@/features/student/api/student-invite-api";
+import { useFeatureFlag } from "@/hooks/use-feature-flags";
 import type { ChildOutletContext } from "./child-detail-page";
 
 export function ChildOverviewTab() {
@@ -13,6 +16,16 @@ export function ChildOverviewTab() {
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [accessListKey, setAccessListKey] = useState(0);
   const isOwner = child.role === "owner";
+  const studentWorkspaceEnabled = useFeatureFlag("StudentWorkspace");
+
+  const handleInviteStudent = async (email: string) => {
+    try {
+      const response = await inviteStudentFromParent(childId, email);
+      return { success: response.success, message: response.message };
+    } catch {
+      return { success: false, message: "An error occurred sending the invitation" };
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -84,6 +97,13 @@ export function ChildOverviewTab() {
             isOwner={isOwner}
           />
         </Card>
+      )}
+
+      {isOwner && studentWorkspaceEnabled && (
+        <InviteStudentForm
+          onInvite={handleInviteStudent}
+          description={`Invite ${child.firstName} to activate their own account and take part in their IEP process.`}
+        />
       )}
     </div>
   );

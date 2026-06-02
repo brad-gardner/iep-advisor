@@ -46,6 +46,8 @@ import { IepDraftListPage } from '@/features/iep-authoring/pages/iep-draft-list-
 import { IepAuthoringWorkspacePage } from '@/features/iep-authoring/pages/iep-authoring-workspace-page';
 import { AcceptLinkPage } from '@/features/child-links/components/accept-link-page';
 import { EducatorVersionDetailPage } from '@/features/iep-versions/components/educator-version-detail-page';
+import { StudentHomePage } from '@/features/student/pages/student-home-page';
+import { StudentAcceptInvitePage } from '@/features/student/components/student-accept-invite-page';
 import { ParentVersionDetailPage } from '@/features/iep-versions/components/parent-version-detail-page';
 import { RoleHome } from '@/app/role-routing';
 import { roleHome } from '@/app/role-home';
@@ -427,6 +429,30 @@ export function AppRouter() {
             <FeatureRoute flag="SchoolSide" redirectTo="/children">
               <MainLayout>
                 <ParentVersionDetailPage />
+              </MainLayout>
+            </FeatureRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student"
+        element={
+          <ProtectedRoute>
+            <FeatureRoute flag="StudentWorkspace" redirectTo="/dashboard">
+              <MainLayout>
+                <StudentHomePage />
+              </MainLayout>
+            </FeatureRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/accept-invite"
+        element={
+          <ProtectedRoute>
+            <FeatureRoute flag="StudentWorkspace" redirectTo="/dashboard">
+              <MainLayout>
+                <StudentAcceptInvitePage />
               </MainLayout>
             </FeatureRoute>
           </ProtectedRoute>

@@ -14,6 +14,9 @@ import { InviteParentForm } from '../components/invite-parent-form';
 import { StudentLinksList } from '../components/student-links-list';
 import { VersionHistoryList } from '@/features/iep-versions/components/version-history-list';
 import { useStudentVersions } from '@/features/iep-versions/hooks/use-version-list';
+import { InviteStudentForm } from '@/features/student/components/invite-student-form';
+import { inviteStudentFromEducator } from '@/features/student/api/student-invite-api';
+import { useFeatureFlag } from '@/hooks/use-feature-flags';
 
 export function EducatorStudentDetailPage() {
   const { studentId: studentIdParam } = useParams<{ studentId: string }>();
@@ -25,6 +28,16 @@ export function EducatorStudentDetailPage() {
   const [revokingId, setRevokingId] = useState<number | null>(null);
   const [revokeNote, setRevokeNote] = useState<string | null>(null);
   const { versions, isLoading: versionsLoading } = useStudentVersions(studentId);
+  const studentWorkspaceEnabled = useFeatureFlag('StudentWorkspace');
+
+  const handleInviteStudent = async (email: string) => {
+    try {
+      const response = await inviteStudentFromEducator(studentId, email);
+      return { success: response.success, message: response.message };
+    } catch {
+      return { success: false, message: 'An error occurred sending the invitation' };
+    }
+  };
 
   const reloadLinks = useCallback(async () => {
     try {
@@ -163,6 +176,13 @@ export function EducatorStudentDetailPage() {
       </section>
 
       <InviteParentForm onInvite={handleInvite} />
+
+      {studentWorkspaceEnabled && (
+        <InviteStudentForm
+          onInvite={handleInviteStudent}
+          description={`Invite ${student.firstName} to activate their own account and take part in their IEP process.`}
+        />
+      )}
 
       <section className="space-y-3">
         <h2 className="font-serif text-lg">Parent links</h2>
