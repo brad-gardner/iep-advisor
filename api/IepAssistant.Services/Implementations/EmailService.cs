@@ -94,6 +94,44 @@ public class EmailService : IEmailService
         await SendEmailAsync(toEmail, subject, html, plainText, ct);
     }
 
+    public async Task SendSchoolLinkInviteEmailAsync(string toEmail, string educatorName, string schoolName, string studentName, string inviteToken, CancellationToken ct = default)
+    {
+        // Escape the base64 token (may contain +, /, =) so it survives the URL intact.
+        var inviteUrl = $"{_frontendUrl}/accept-link?token={Uri.EscapeDataString(inviteToken)}";
+
+        var subject = $"{educatorName} invited you to connect on IEP Advisor";
+        var html = $@"
+            <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
+                <div style=""text-align: center; margin-bottom: 24px;"">
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
+                </div>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">You've Been Invited to Connect</h1>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
+                    <strong>{educatorName}</strong> at <strong>{schoolName}</strong> has invited you to connect with <strong>{studentName}</strong>'s record on IEP Advisor.
+                </p>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
+                    Linking lets you receive and understand your child's IEP information directly from the school.
+                </p>
+                <div style=""text-align: center; margin: 24px 0;"">
+                    <a href=""{inviteUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                        Accept Invitation
+                    </a>
+                </div>
+                <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
+                    This invitation expires in 14 days. If you don't have an IEP Advisor account, you'll be asked to create one.
+                </p>
+                <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
+                <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
+                    IEP Advisor — Navigate with confidence
+                </p>
+            </div>";
+
+        var plainText = $"{educatorName} at {schoolName} has invited you to connect with {studentName}'s record on IEP Advisor.\n\nAccept the invitation: {inviteUrl}\n\nThis invitation expires in 14 days.";
+
+        await SendEmailAsync(toEmail, subject, html, plainText, ct);
+    }
+
     public async Task SendBetaInviteEmailAsync(string toEmail, string inviteCode, CancellationToken ct = default)
     {
         var signupUrl = $"{_frontendUrl}/register?code={Uri.EscapeDataString(inviteCode)}";

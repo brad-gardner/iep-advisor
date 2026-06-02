@@ -14,11 +14,13 @@ namespace IepAssistant.Api.Controllers;
 public class EducatorController : ControllerBase
 {
     private readonly IEducatorService _educatorService;
+    private readonly IChildLinkService _childLinkService;
     private readonly IFeatureFlags _featureFlags;
 
-    public EducatorController(IEducatorService educatorService, IFeatureFlags featureFlags)
+    public EducatorController(IEducatorService educatorService, IChildLinkService childLinkService, IFeatureFlags featureFlags)
     {
         _educatorService = educatorService;
+        _childLinkService = childLinkService;
         _featureFlags = featureFlags;
     }
 
@@ -122,6 +124,73 @@ public class EducatorController : ControllerBase
 
         return Ok(ApiResponse<SchoolStudentDto>.SuccessResponse(MapStudent(result.Data!)));
     }
+
+    [HttpPost("students/{studentId}/invite-parent")]
+    [ProducesResponseType(typeof(ApiResponse<ChildLinkDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> InviteParent(int studentId, [FromBody] InviteParentRequest request, CancellationToken ct)
+    {
+        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
+            return NotFound();
+
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var result = await _childLinkService.InviteParentAsync(User.GetUserId(), studentId, request.ParentEmail, ct);
+
+        if (!result.Success)
+            return MapFailure<ChildLinkDto>(result.Message);
+
+        return Ok(ApiResponse<ChildLinkDto>.SuccessResponse(MapLink(result.Data!), result.Message));
+    }
+
+    [HttpGet("students/{studentId}/links")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<ChildLinkDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetLinks(int studentId, CancellationToken ct)
+    {
+        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
+            return NotFound();
+
+        var result = await _childLinkService.GetLinksForStudentAsync(User.GetUserId(), studentId, ct);
+
+        if (!result.Success)
+            return MapFailure<IEnumerable<ChildLinkDto>>(result.Message);
+
+        return Ok(ApiResponse<IEnumerable<ChildLinkDto>>.SuccessResponse(result.Data!.Select(MapLink)));
+    }
+
+    [HttpDelete("students/{studentId}/links/{linkId}")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RevokeLink(int studentId, int linkId, CancellationToken ct)
+    {
+        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
+            return NotFound();
+
+        var result = await _childLinkService.RevokeLinkAsync(User.GetUserId(), studentId, linkId, ct);
+
+        if (!result.Success)
+            return MapFailure<object>(result.Message);
+
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
+    }
+
+    private static ChildLinkDto MapLink(ChildLinkModel m) => new()
+    {
+        Id = m.Id,
+        SchoolStudentId = m.SchoolStudentId,
+        ChildProfileId = m.ChildProfileId,
+        InviteEmail = m.InviteEmail,
+        IsActive = m.IsActive,
+        IsAccepted = m.IsAccepted,
+        AcceptedAt = m.AcceptedAt,
+        LinkedAt = m.LinkedAt,
+        InviteExpiresAt = m.InviteExpiresAt,
+        CreatedAt = m.CreatedAt
+    };
 
     private IActionResult MapFailure<T>(string? message)
     {
