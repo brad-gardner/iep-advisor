@@ -12,6 +12,8 @@ import {
 import type { ChildLink, SchoolStudent } from '../types';
 import { InviteParentForm } from '../components/invite-parent-form';
 import { StudentLinksList } from '../components/student-links-list';
+import { VersionHistoryList } from '@/features/iep-versions/components/version-history-list';
+import { useStudentVersions } from '@/features/iep-versions/hooks/use-version-list';
 
 export function EducatorStudentDetailPage() {
   const { studentId: studentIdParam } = useParams<{ studentId: string }>();
@@ -22,6 +24,7 @@ export function EducatorStudentDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [revokingId, setRevokingId] = useState<number | null>(null);
   const [revokeNote, setRevokeNote] = useState<string | null>(null);
+  const { versions, isLoading: versionsLoading } = useStudentVersions(studentId);
 
   const reloadLinks = useCallback(async () => {
     try {
@@ -145,6 +148,17 @@ export function EducatorStudentDetailPage() {
           <Link to={`/educator/students/${studentId}/iep-drafts`} data-testid="build-ieps">
             <Button variant="secondary">Build / view IEPs</Button>
           </Link>
+        </Card>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-serif text-lg">IEP versions</h2>
+        <Card className="max-w-lg" data-testid="iep-versions-section">
+          <VersionHistoryList
+            versions={versions}
+            isLoading={versionsLoading}
+            linkBase={`/educator/students/${studentId}/iep-versions`}
+          />
         </Card>
       </section>
 

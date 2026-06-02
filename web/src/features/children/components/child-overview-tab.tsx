@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ShareChildDialog } from "@/features/sharing/components/share-child-dialog";
 import { AccessList } from "@/features/sharing/components/access-list";
+import { SchoolIepsCard } from "@/features/iep-versions/components/school-ieps-card";
 import type { ChildOutletContext } from "./child-detail-page";
 
 export function ChildOverviewTab() {
@@ -41,6 +42,8 @@ export function ChildOverviewTab() {
           )}
         </div>
       </Card>
+
+      <SchoolIepsCard childId={childId} />
 
       {isOwner && (
         <Card data-testid="sharing-section">

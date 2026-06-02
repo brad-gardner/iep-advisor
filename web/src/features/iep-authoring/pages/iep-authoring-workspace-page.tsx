@@ -11,6 +11,7 @@ import { useFlushOnNavigate } from '../hooks/use-flush-on-navigate';
 import { useFlushRegistry } from '../hooks/use-flush-registry';
 import { useIepDraft } from '../hooks/use-iep-draft';
 import { useSaveStatusBus } from '../hooks/use-save-status-bus';
+import { FinalizeSection } from '@/features/iep-versions/components/finalize-section';
 
 export function IepAuthoringWorkspacePage() {
   const { studentId, draftId: draftIdParam } = useParams<{
@@ -65,7 +66,14 @@ export function IepAuthoringWorkspacePage() {
           </Link>
           <div className="flex items-center justify-between gap-4">
             <h1 className="font-serif">{draftApi.draft.title || 'Untitled IEP draft'}</h1>
-            <SaveStatusIndicator status={bus.status} />
+            <div className="flex items-center gap-4">
+              <SaveStatusIndicator status={bus.status} />
+              <FinalizeSection
+                draftId={draftId}
+                studentId={Number(studentId)}
+                flushBeforeFinalize={registry.flushAll}
+              />
+            </div>
           </div>
         </header>
 
