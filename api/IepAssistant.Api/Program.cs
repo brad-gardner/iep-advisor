@@ -17,6 +17,10 @@ using IepAssistant.Domain.Data;
 using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Services;
 
+// QuestPDF runs under the free Community license (org is under the $1M-revenue threshold). Set once
+// at startup before any rendering — the P5b PDF worker generates IepVersion PDFs headless.
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure Serilog with Elasticsearch
@@ -81,6 +85,8 @@ builder.Services.AddSingleton<ProgressReportAnalysisQueue>();
 builder.Services.AddHostedService<ProgressReportAnalysisWorker>();
 builder.Services.AddSingleton<AnalysisRunQueue>();
 builder.Services.AddHostedService<AnalysisRunWorker>();
+builder.Services.AddSingleton<IepVersionPdfQueue>();
+builder.Services.AddHostedService<IepVersionPdfWorker>();
 // One-off, idempotent legacy-analysis backfill (runs once at startup; skips already-migrated rows).
 builder.Services.AddHostedService<AnalysisRunBackfillHostedService>();
 

@@ -9,6 +9,19 @@ public class FinalizeIepDraftRequest
 
 // ---- Responses ----
 
+/// <summary>
+/// PDF availability for a version. When <see cref="Url"/> is non-null the PDF is rendered and the
+/// URL is a short-lived download link; otherwise the UI shows the status (Pending/Error) instead.
+/// </summary>
+public class IepVersionPdfStatusDto
+{
+    public int VersionId { get; set; }
+    public string RenderStatus { get; set; } = string.Empty;
+    public string? Url { get; set; }
+    public DateTime? RenderedAt { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
 public class IepVersionSummaryDto
 {
     public int Id { get; set; }

@@ -3,8 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Domain.Interfaces;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Models;
+using QuestPDF.Infrastructure;
 using Xunit;
 
 namespace IepAssistant.Services.Tests;
@@ -22,6 +24,53 @@ public sealed class IepVersionServiceTests : IDisposable
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<ApplicationDbContext> _options;
 
+    // QuestPDF requires the license to be set once before any headless rendering.
+    static IepVersionServiceTests()
+    {
+        QuestPDF.Settings.License = LicenseType.Community;
+    }
+
+    // ---- Hand-written blob fakes (no Azure dependency) ----
+    private sealed class SuccessBlobStorageFake : IBlobStorageService
+    {
+        public string? LastBlobPath { get; private set; }
+        public byte[]? LastBytes { get; private set; }
+
+        public async Task<string> UploadAsync(string blobPath, Stream content, string contentType, CancellationToken cancellationToken = default)
+        {
+            LastBlobPath = blobPath;
+            using var ms = new MemoryStream();
+            await content.CopyToAsync(ms, cancellationToken);
+            LastBytes = ms.ToArray();
+            return $"https://fake.blob/{blobPath}";
+        }
+
+        public Task<Stream> DownloadAsync(string blobPath, CancellationToken cancellationToken = default)
+            => Task.FromResult<Stream>(new MemoryStream(LastBytes ?? Array.Empty<byte>()));
+
+        public Task DeleteAsync(string blobPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<string> GetDownloadUrlAsync(string blobPath, TimeSpan? expiry = null)
+            => Task.FromResult($"https://fake.blob/{blobPath}?sas=token");
+    }
+
+    private sealed class FailingBlobStorageFake : IBlobStorageService
+    {
+        public Task<string> UploadAsync(string blobPath, Stream content, string contentType, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("blob upload exploded");
+
+        public Task<Stream> DownloadAsync(string blobPath, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("download exploded");
+
+        public Task DeleteAsync(string blobPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<string> GetDownloadUrlAsync(string blobPath, TimeSpan? expiry = null)
+            => Task.FromResult($"https://fake.blob/{blobPath}");
+    }
+
+    private IepVersionPdfService CreatePdfService(ApplicationDbContext ctx, IBlobStorageService blob)
+        => new(ctx, blob, NullLogger<IepVersionPdfService>.Instance);
+
     public IepVersionServiceTests()
     {
         _connection = new SqliteConnection("DataSource=:memory:");
@@ -36,8 +85,8 @@ public sealed class IepVersionServiceTests : IDisposable
     }
 
     private ApplicationDbContext CreateContext() => new(_options);
-    private IepVersionService CreateVersionService(ApplicationDbContext ctx)
-        => new(ctx, new AccessService(ctx), NullLogger<IepVersionService>.Instance);
+    private IepVersionService CreateVersionService(ApplicationDbContext ctx, IBlobStorageService? blob = null)
+        => new(ctx, new AccessService(ctx), blob ?? new SuccessBlobStorageFake(), NullLogger<IepVersionService>.Instance);
     private IepDraftService CreateDraftService(ApplicationDbContext ctx)
         => new(ctx, NullLogger<IepDraftService>.Instance);
 
@@ -385,6 +434,93 @@ public sealed class IepVersionServiceTests : IDisposable
             Assert.False(get.Success);
             Assert.Contains("permission", get.Message!, StringComparison.OrdinalIgnoreCase);
         }
+    }
+
+    // ---------------------------------------------------------------- P5b: PDF render
+
+    [Fact]
+    public async Task RenderAsync_Success_MarksRenderedWithBlobChecksumAndBytes()
+    {
+        var s = SeedSchoolWithStudent("pdf-ok");
+        var draftId = await CreateDraftAsync(s);
+        await AddGoalAsync(s, draftId, "Improve reading fluency");
+        var v = await FinalizeAsync(s, draftId);
+
+        var blob = new SuccessBlobStorageFake();
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, blob).RenderAsync(v.Id);
+
+        // QuestPDF generated a real, non-empty PDF byte[] headless.
+        Assert.NotNull(blob.LastBytes);
+        Assert.NotEmpty(blob.LastBytes!);
+        Assert.Equal($"iep-versions/{v.Id}/iep-v{v.VersionNumber}.pdf", blob.LastBlobPath);
+
+        using (var ctx = CreateContext())
+        {
+            var pdf = ctx.IepVersionPdfs.Single(p => p.IepVersionId == v.Id);
+            Assert.Equal(PdfRenderStatus.Rendered, pdf.RenderStatus);
+            Assert.False(string.IsNullOrWhiteSpace(pdf.BlobUri));
+            Assert.False(string.IsNullOrWhiteSpace(pdf.Checksum));
+            Assert.NotNull(pdf.RenderedAt);
+            Assert.Null(pdf.ErrorMessage);
+        }
+    }
+
+    [Fact]
+    public async Task RenderAsync_BlobFailure_MarksErrorAndLeavesVersionValid()
+    {
+        var s = SeedSchoolWithStudent("pdf-fail");
+        var draftId = await CreateDraftAsync(s);
+        await AddGoalAsync(s, draftId, "Goal text");
+        var v = await FinalizeAsync(s, draftId);
+
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, new FailingBlobStorageFake()).RenderAsync(v.Id); // does not throw
+
+        using (var ctx = CreateContext())
+        {
+            var pdf = ctx.IepVersionPdfs.Single(p => p.IepVersionId == v.Id);
+            Assert.Equal(PdfRenderStatus.Error, pdf.RenderStatus);
+            Assert.False(string.IsNullOrWhiteSpace(pdf.ErrorMessage));
+            Assert.Null(pdf.RenderedAt);
+
+            // The immutable version + its children are untouched/valid (interceptor not tripped).
+            var version = ctx.IepVersions
+                .Where(x => x.Id == v.Id)
+                .Select(x => new { x.Id, GoalCount = x.Goals.Count })
+                .Single();
+            Assert.Equal(v.Id, version.Id);
+            Assert.Equal(1, version.GoalCount);
+        }
+    }
+
+    [Fact]
+    public async Task RenderAsync_RetryAfterError_Succeeds()
+    {
+        var s = SeedSchoolWithStudent("pdf-retry");
+        var draftId = await CreateDraftAsync(s);
+        await AddGoalAsync(s, draftId, "Goal");
+        var v = await FinalizeAsync(s, draftId);
+
+        // First render fails.
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, new FailingBlobStorageFake()).RenderAsync(v.Id);
+        using (var ctx = CreateContext())
+            Assert.Equal(PdfRenderStatus.Error, ctx.IepVersionPdfs.Single(p => p.IepVersionId == v.Id).RenderStatus);
+
+        // Retry with a working blob -> Rendered (overwrites the Error fields).
+        var blob = new SuccessBlobStorageFake();
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, blob).RenderAsync(v.Id);
+
+        using (var ctx = CreateContext())
+        {
+            var pdf = ctx.IepVersionPdfs.Single(p => p.IepVersionId == v.Id);
+            Assert.Equal(PdfRenderStatus.Rendered, pdf.RenderStatus);
+            Assert.Null(pdf.ErrorMessage);
+            Assert.False(string.IsNullOrWhiteSpace(pdf.Checksum));
+        }
+        Assert.NotEmpty(blob.LastBytes!);
     }
 
     public void Dispose() => _connection.Dispose();

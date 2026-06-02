@@ -86,6 +86,16 @@ public class IepVersionTransitionItemModel
     public Guid LineageId { get; set; }
 }
 
+/// <summary>PDF availability for a version. Url is set only when RenderStatus is Rendered.</summary>
+public class IepVersionPdfStatusModel
+{
+    public int VersionId { get; set; }
+    public PdfRenderStatus RenderStatus { get; set; }
+    public string? Url { get; set; }
+    public DateTime? RenderedAt { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
 /// <summary>Lightweight summary returned by list endpoints and by FinalizeAsync.</summary>
 public class IepVersionSummaryModel
 {

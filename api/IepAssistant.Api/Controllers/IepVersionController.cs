@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.IepVersions;
 using IepAssistant.Api.Extensions;
@@ -19,11 +20,13 @@ public class IepVersionController : ControllerBase
 {
     private readonly IIepVersionService _service;
     private readonly IFeatureFlags _featureFlags;
+    private readonly IepVersionPdfQueue _pdfQueue;
 
-    public IepVersionController(IIepVersionService service, IFeatureFlags featureFlags)
+    public IepVersionController(IIepVersionService service, IFeatureFlags featureFlags, IepVersionPdfQueue pdfQueue)
     {
         _service = service;
         _featureFlags = featureFlags;
+        _pdfQueue = pdfQueue;
     }
 
     // ---------------------------------------------------------------- Finalize
@@ -38,6 +41,10 @@ public class IepVersionController : ControllerBase
 
         var result = await _service.FinalizeAsync(User.GetUserId(), draftId, request?.EffectiveDate, ct);
         if (!result.Success) return MapFailure(result.Message);
+
+        // After-commit, failure-isolated: FinalizeAsync already committed the version (+ a Pending
+        // IepVersionPdf). Enqueue the render now; a queue hiccup never rolls back the legal record.
+        await _pdfQueue.EnqueueAsync(result.Data!.Id, ct);
 
         var dto = IepVersionMappers.MapSummary(result.Data!);
         return CreatedAtAction(nameof(GetVersion), new { versionId = dto.Id }, ApiResponse<IepVersionSummaryDto>.SuccessResponse(dto));
@@ -87,6 +94,47 @@ public class IepVersionController : ControllerBase
         if (!result.Success) return MapFailure(result.Message);
 
         return Ok(ApiResponse<IepVersionDto>.SuccessResponse(IepVersionMappers.MapFull(result.Data!)));
+    }
+
+    // ---------------------------------------------------------------- PDF retry + download
+
+    [HttpPost("api/iep-versions/{versionId}/pdf/retry")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> RetryPdf(int versionId, CancellationToken ct)
+    {
+        if (!Enabled) return NotFound();
+
+        var result = await _service.RequestPdfRetryAsync(User.GetUserId(), versionId, ct);
+        if (!result.Success) return MapFailure(result.Message);
+
+        // Set Pending in the service committed; now enqueue the re-render (after-commit, isolated).
+        await _pdfQueue.EnqueueAsync(result.Data, ct);
+
+        return Ok(ApiResponse<object>.SuccessResponse(new { versionId, status = "Pending" }));
+    }
+
+    [HttpGet("api/iep-versions/{versionId}/pdf")]
+    [ProducesResponseType(typeof(ApiResponse<IepVersionPdfStatusDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetPdf(int versionId, CancellationToken ct)
+    {
+        if (!Enabled) return NotFound();
+
+        var result = await _service.GetPdfStatusAsync(User.GetUserId(), versionId, ct);
+        if (!result.Success) return MapFailure(result.Message);
+
+        var m = result.Data!;
+        return Ok(ApiResponse<IepVersionPdfStatusDto>.SuccessResponse(new IepVersionPdfStatusDto
+        {
+            VersionId = m.VersionId,
+            RenderStatus = m.RenderStatus.ToString(),
+            Url = m.Url,
+            RenderedAt = m.RenderedAt,
+            ErrorMessage = m.ErrorMessage
+        }));
     }
 
     // ---------------------------------------------------------------- Helpers

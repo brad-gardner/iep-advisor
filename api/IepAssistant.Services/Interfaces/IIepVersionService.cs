@@ -20,4 +20,17 @@ public interface IIepVersionService
 
     /// <summary>Full version (children + PDF status). Educator-with-access OR linked-parent-with-access.</summary>
     Task<ServiceResult<IepVersionModel>> GetVersionAsync(int userId, int versionId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Re-queue a version's PDF render (educator, Collaborator+). Allowed when the current
+    /// RenderStatus is Error or Pending; sets it back to Pending and returns the version id so the
+    /// controller can enqueue. The version itself is never modified.
+    /// </summary>
+    Task<ServiceResult<int>> RequestPdfRetryAsync(int userId, int versionId, CancellationToken ct = default);
+
+    /// <summary>
+    /// PDF status + (when Rendered) a short-lived download URL. Educator-with-access OR
+    /// linked-parent-with-access (same authorization as <see cref="GetVersionAsync"/>).
+    /// </summary>
+    Task<ServiceResult<IepVersionPdfStatusModel>> GetPdfStatusAsync(int userId, int versionId, CancellationToken ct = default);
 }

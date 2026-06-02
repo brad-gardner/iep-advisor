@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Domain.Interfaces;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -28,12 +29,14 @@ public class IepVersionService : IIepVersionService
 
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _accessService;
+    private readonly IBlobStorageService _blob;
     private readonly ILogger<IepVersionService> _logger;
 
-    public IepVersionService(ApplicationDbContext context, IAccessService accessService, ILogger<IepVersionService> logger)
+    public IepVersionService(ApplicationDbContext context, IAccessService accessService, IBlobStorageService blob, ILogger<IepVersionService> logger)
     {
         _context = context;
         _accessService = accessService;
+        _blob = blob;
         _logger = logger;
     }
 
@@ -185,10 +188,9 @@ public class IepVersionService : IIepVersionService
             throw;
         }
 
-        // 10. After commit, failure-isolated, OUTSIDE the transaction: P5b enqueues the PDF render here.
-        //     (Never enqueue inside the tx — the worker must not read an uncommitted version.)
-        _logger.LogInformation("TODO P5b: enqueue PDF render for version {VersionId}", summary.Id);
-
+        // 10. The PDF render is enqueued by the controller AFTER this commit, failure-isolated and
+        //     OUTSIDE the transaction (the worker must never read an uncommitted version). The
+        //     IepVersionPdf row is created Pending above; the worker flips it to Rendered/Error.
         return ServiceResult<IepVersionSummaryModel>.SuccessResult(summary);
     }
 
@@ -256,6 +258,78 @@ public class IepVersionService : IIepVersionService
             return ServiceResult<IepVersionModel>.FailureResult(VersionNotFoundMessage);
 
         return ServiceResult<IepVersionModel>.SuccessResult(MapVersionFull(version));
+    }
+
+    // ---------------------------------------------------------------- PDF retry + download
+
+    public async Task<ServiceResult<int>> RequestPdfRetryAsync(int userId, int versionId, CancellationToken ct = default)
+    {
+        var version = await _context.IepVersions
+            .AsNoTracking()
+            .Where(v => v.Id == versionId)
+            .Select(v => new { v.SchoolStudentId })
+            .FirstOrDefaultAsync(ct);
+
+        if (version == null)
+            return ServiceResult<int>.FailureResult(VersionNotFoundMessage);
+
+        // Retry is an authoring action — Collaborator+ educator on the student's school.
+        var access = await CheckStudentAccessAsync(userId, version.SchoolStudentId, AccessRole.Collaborator, ct);
+        if (!access.Success)
+            return ServiceResult<int>.FailureResult(access.Message!);
+
+        var pdf = await _context.IepVersionPdfs.FirstOrDefaultAsync(p => p.IepVersionId == versionId, ct);
+        if (pdf == null)
+            return ServiceResult<int>.FailureResult("This version has no PDF record to retry.");
+
+        if (pdf.RenderStatus == PdfRenderStatus.Rendered)
+            return ServiceResult<int>.FailureResult("This version's PDF is already rendered.");
+
+        // Error or Pending -> set Pending so the UI shows "generating" until the worker re-renders.
+        pdf.RenderStatus = PdfRenderStatus.Pending;
+        pdf.ErrorMessage = null;
+        pdf.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(ct);
+
+        return ServiceResult<int>.SuccessResult(versionId);
+    }
+
+    public async Task<ServiceResult<IepVersionPdfStatusModel>> GetPdfStatusAsync(int userId, int versionId, CancellationToken ct = default)
+    {
+        var version = await _context.IepVersions
+            .AsNoTracking()
+            .Where(v => v.Id == versionId)
+            .Select(v => new { v.SchoolStudentId, v.VersionNumber })
+            .FirstOrDefaultAsync(ct);
+
+        if (version == null)
+            return ServiceResult<IepVersionPdfStatusModel>.FailureResult(VersionNotFoundMessage);
+
+        // Same authorization as GetVersionAsync: educator-with-access OR linked-parent-with-access.
+        var educatorAccess = await CheckStudentAccessAsync(userId, version.SchoolStudentId, AccessRole.Viewer, ct);
+        if (!educatorAccess.Success && !await ParentCanViewStudentAsync(userId, version.SchoolStudentId, ct))
+            return ServiceResult<IepVersionPdfStatusModel>.FailureResult(PermissionMessage);
+
+        var pdf = await _context.IepVersionPdfs
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.IepVersionId == versionId, ct);
+
+        var model = new IepVersionPdfStatusModel
+        {
+            VersionId = versionId,
+            RenderStatus = pdf?.RenderStatus ?? PdfRenderStatus.Pending,
+            RenderedAt = pdf?.RenderedAt,
+            ErrorMessage = pdf?.ErrorMessage
+        };
+
+        if (pdf?.RenderStatus == PdfRenderStatus.Rendered)
+        {
+            // Build a short-lived download URL from the deterministic blob path (SAS when supported).
+            var blobPath = IIepVersionPdfService.BlobPathFor(versionId, version.VersionNumber);
+            model.Url = await _blob.GetDownloadUrlAsync(blobPath);
+        }
+
+        return ServiceResult<IepVersionPdfStatusModel>.SuccessResult(model);
     }
 
     // ---------------------------------------------------------------- Access helpers
