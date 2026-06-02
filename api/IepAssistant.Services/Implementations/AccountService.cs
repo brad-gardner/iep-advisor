@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using IepAssistant.Domain.Data;
+using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Repositories;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
@@ -34,9 +35,17 @@ public class AccountService : IAccountService
         if (user == null)
             return new { error = "User not found" };
 
+        // ChildAccess is the authoritative authz plane (mirrors ChildProfileRepository): include
+        // children where the user holds an accepted, active Owner ChildAccess, so a co-owner's
+        // export covers co-owned children — not only those they are the denormalized primary owner of.
         var children = await _context.ChildProfiles
             .AsNoTracking()
-            .Where(c => c.UserId == userId)
+            .Where(c => _context.Set<ChildAccess>()
+                .Any(ca => ca.ChildProfileId == c.Id
+                        && ca.UserId == userId
+                        && ca.Role == AccessRole.Owner
+                        && ca.IsActive
+                        && ca.AcceptedAt != null))
             .ToListAsync(ct);
 
         var childIds = children.Select(c => c.Id).ToList();
@@ -73,7 +82,7 @@ public class AccountService : IAccountService
                 user.FirstName,
                 user.LastName,
                 user.State,
-                user.Role,
+                Role = user.Role.ToString(),
                 user.MfaEnabled,
                 user.CreatedAt,
                 user.UpdatedAt

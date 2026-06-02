@@ -44,7 +44,14 @@ public class UserService : IUserService
             user.State = model.State;
 
         if (model.Role != null)
-            user.Role = model.Role;
+        {
+            // Tolerantly accept the legacy "User" alias as well as the enum names.
+            var requestedRole = model.Role == "User" ? "Parent" : model.Role;
+            if (Enum.TryParse<Domain.Entities.UserRole>(requestedRole, ignoreCase: true, out var parsedRole))
+                user.Role = parsedRole;
+            else
+                return ServiceResult.FailureResult($"Invalid role '{model.Role}'.");
+        }
 
         if (model.IsActive.HasValue)
         {
@@ -84,7 +91,7 @@ public class UserService : IUserService
         FirstName = user.FirstName,
         LastName = user.LastName,
         State = user.State,
-        Role = user.Role,
+        Role = user.Role.ToString(),
         IsActive = user.IsActive,
         CreatedAt = user.CreatedAt
     };

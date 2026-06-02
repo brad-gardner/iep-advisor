@@ -5,6 +5,7 @@ using IepAssistant.Api.DTOs.Admin;
 using IepAssistant.Api.DTOs.Auth;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Domain.Data;
+using IepAssistant.Domain.Entities;
 
 namespace IepAssistant.Api.Controllers;
 
@@ -29,7 +30,7 @@ public class AdminController : ControllerBase
         // Users
         var totalUsers = await _db.Users.AsNoTracking().CountAsync(ct);
         var activeUsers = await _db.Users.AsNoTracking().CountAsync(u => u.IsActive, ct);
-        var adminUsers = await _db.Users.AsNoTracking().CountAsync(u => u.Role == "Admin", ct);
+        var adminUsers = await _db.Users.AsNoTracking().CountAsync(u => u.Role == UserRole.Admin, ct);
         var usersWithSubscription = await _db.Users.AsNoTracking().CountAsync(u => u.SubscriptionStatus == "active", ct);
         var usersOnboarded = await _db.Users.AsNoTracking().CountAsync(u => u.OnboardingCompletedAt != null, ct);
         var newUsersLast7Days = await _db.Users.AsNoTracking().CountAsync(u => u.CreatedAt >= sevenDaysAgo, ct);
@@ -140,7 +141,7 @@ public class AdminController : ControllerBase
                 FirstName = u.FirstName,
                 LastName = u.LastName,
                 State = u.State,
-                Role = u.Role,
+                Role = u.Role.ToString(),
                 IsActive = u.IsActive,
                 OnboardingCompleted = u.OnboardingCompletedAt != null,
                 CreatedAt = u.CreatedAt,

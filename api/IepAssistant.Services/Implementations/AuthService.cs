@@ -106,7 +106,7 @@ public class AuthService : IAuthService
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password),
             FirstName = model.FirstName,
             LastName = model.LastName,
-            Role = "User",
+            Role = UserRole.Parent,
             IsActive = true,
             SubscriptionStatus = "active",
             SubscriptionExpiresAt = DateTime.UtcNow.AddYears(1),
@@ -240,7 +240,7 @@ public class AuthService : IAuthService
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Role, user.Role),
+            new Claim(ClaimTypes.Role, user.Role.ToString()),
             new Claim("FirstName", user.FirstName),
             new Claim("LastName", user.LastName),
             new Claim("SecurityStamp", user.SecurityStamp.ToString())
@@ -290,7 +290,7 @@ public class AuthService : IAuthService
         FirstName = user.FirstName,
         LastName = user.LastName,
         State = user.State,
-        Role = user.Role,
+        Role = user.Role.ToString(),
         IsActive = user.IsActive,
         OnboardingCompleted = user.OnboardingCompletedAt.HasValue,
         CreatedAt = user.CreatedAt

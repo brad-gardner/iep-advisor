@@ -20,7 +20,7 @@ public static class DbInitializer
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
             FirstName = "Admin",
             LastName = "User",
-            Role = "Admin",
+            Role = UserRole.Admin,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -32,7 +32,7 @@ public static class DbInitializer
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("User123!"),
             FirstName = "Test",
             LastName = "User",
-            Role = "User",
+            Role = UserRole.Parent,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
