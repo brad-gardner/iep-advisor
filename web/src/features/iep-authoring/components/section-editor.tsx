@@ -8,6 +8,7 @@ import { useRowAutosave } from '../hooks/use-row-autosave';
 import { sectionKindLabel } from '../lib/section-kinds';
 import type { SectionDto } from '../types';
 import { AssistPopover } from './assist/assist-popover';
+import { PullFromStudentButton } from './pull-from-student/pull-from-student-button';
 import { LastEditedStamp } from './last-edited-stamp';
 import { RowDeleteButton } from './row-delete-button';
 
@@ -57,12 +58,18 @@ export function SectionEditor({ section, onDelete }: SectionEditorProps) {
         data-testid={`section-text-${section.id}`}
         aria-label={`${sectionKindLabel(section.sectionKind)} narrative`}
       />
-      <AssistPopover
-        requestFn={assistRequest}
-        kinds={['Rewrite', 'Improve']}
-        onApply={(text) => edit(text)}
-        testIdPrefix={`section-assist-${section.id}`}
-      />
+      <div className="flex flex-wrap items-start gap-2">
+        <AssistPopover
+          requestFn={assistRequest}
+          kinds={['Rewrite', 'Improve']}
+          onApply={(text) => edit(text)}
+          testIdPrefix={`section-assist-${section.id}`}
+        />
+        <PullFromStudentButton
+          onPick={(content) => edit(content)}
+          testIdPrefix={`section-pull-${section.id}`}
+        />
+      </div>
       <div className="flex items-center justify-between pt-1">
         <LastEditedStamp
           lastEditedAt={section.lastEditedAt}

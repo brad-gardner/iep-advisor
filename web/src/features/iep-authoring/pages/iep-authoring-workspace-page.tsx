@@ -57,7 +57,14 @@ export function IepAuthoringWorkspacePage() {
 
   return (
     <IepEditorContext.Provider
-      value={{ draftId, currentUserId: user.id, bus, registry, draftApi }}
+      value={{
+        draftId,
+        studentId: Number(studentId),
+        currentUserId: user.id,
+        bus,
+        registry,
+        draftApi,
+      }}
     >
       <div className="space-y-6">
         <header className="space-y-2">

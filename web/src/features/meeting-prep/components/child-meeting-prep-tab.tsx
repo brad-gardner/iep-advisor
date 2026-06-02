@@ -4,6 +4,7 @@ import type { ChildOutletContext } from "@/features/children/components/child-de
 import { useMeetingPrep } from "../hooks/use-meeting-prep";
 import { MeetingPrepTab } from "./meeting-prep-tab";
 import { MeetingPrepDateControl } from "./meeting-prep-date-control";
+import { StudentSharedEntries } from "./student-shared-entries";
 
 /**
  * Child-level (standalone) Meeting Prep tab, gated behind the
@@ -19,6 +20,7 @@ export function ChildMeetingPrepTab() {
 
   return (
     <div className="space-y-6">
+      <StudentSharedEntries childId={childId} />
       <MeetingPrepDateControl
         meetingDate={meetingDate}
         onMeetingDateChange={setMeetingDate}

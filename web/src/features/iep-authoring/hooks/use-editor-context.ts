@@ -5,6 +5,9 @@ import type { useIepDraft } from './use-iep-draft';
 
 export interface IepEditorContextValue {
   draftId: number;
+  // The school student this draft belongs to (route param). Used to pull
+  // shareable entries from the student's self-advocacy workspace (P8b).
+  studentId: number;
   currentUserId: number;
   bus: SaveStatusBus;
   registry: FlushRegistry;

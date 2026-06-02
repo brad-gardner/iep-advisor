@@ -7,6 +7,7 @@ import { useEditorContext } from '../hooks/use-editor-context';
 import { useRowAutosave } from '../hooks/use-row-autosave';
 import type { GoalDto } from '../types';
 import { AssistPopover } from './assist/assist-popover';
+import { PullFromStudentButton } from './pull-from-student/pull-from-student-button';
 import { LastEditedStamp } from './last-edited-stamp';
 import { RowDeleteButton } from './row-delete-button';
 
@@ -65,11 +66,17 @@ export function GoalEditorRow({ goal, onDelete }: GoalEditorRowProps) {
           onChange={(e) => edit({ goalText: e.target.value })}
           data-testid={`goal-text-${goal.id}`}
         />
-        <AssistPopover
-          requestFn={assistRequest}
-          onApply={(text) => edit({ goalText: text })}
-          testIdPrefix={`goal-assist-${goal.id}`}
-        />
+        <div className="flex flex-wrap items-start gap-2">
+          <AssistPopover
+            requestFn={assistRequest}
+            onApply={(text) => edit({ goalText: text })}
+            testIdPrefix={`goal-assist-${goal.id}`}
+          />
+          <PullFromStudentButton
+            onPick={(content) => edit({ goalText: content })}
+            testIdPrefix={`goal-pull-${goal.id}`}
+          />
+        </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Input
