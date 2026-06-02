@@ -42,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<IIepVersionService, IepVersionService>();
         services.AddScoped<IIepVersionPdfService, IepVersionPdfService>();
         services.AddScoped<IIepAssistService, IepAssistService>();
+        services.AddScoped<IStudentInviteService, StudentInviteService>();
 
         return services;
     }
