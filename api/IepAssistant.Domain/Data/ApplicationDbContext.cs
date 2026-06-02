@@ -38,6 +38,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<SchoolStudent> SchoolStudents => Set<SchoolStudent>();
     public DbSet<SchoolStudentAccess> SchoolStudentAccesses => Set<SchoolStudentAccess>();
     public DbSet<ChildLink> ChildLinks => Set<ChildLink>();
+    public DbSet<IepDraft> IepDrafts => Set<IepDraft>();
+    public DbSet<IepDraftSection> IepDraftSections => Set<IepDraftSection>();
+    public DbSet<IepDraftGoal> IepDraftGoals => Set<IepDraftGoal>();
+    public DbSet<IepDraftServiceLine> IepDraftServiceLines => Set<IepDraftServiceLine>();
+    public DbSet<IepDraftAccommodation> IepDraftAccommodations => Set<IepDraftAccommodation>();
+    public DbSet<IepDraftTransitionItem> IepDraftTransitionItems => Set<IepDraftTransitionItem>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

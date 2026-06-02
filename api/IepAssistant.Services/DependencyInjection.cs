@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IAnalysisRunBackfillService, AnalysisRunBackfillService>();
         services.AddScoped<IEducatorService, EducatorService>();
         services.AddScoped<IChildLinkService, ChildLinkService>();
+        services.AddScoped<IIepDraftService, IepDraftService>();
 
         return services;
     }
