@@ -82,7 +82,6 @@ export interface EtrAnalysis {
   assessmentCompleteness: AssessmentCompleteness | null;
   eligibilityReview: EligibilityReview | null;
   overallRedFlags: EtrRedFlag[];
-  suggestedQuestions: EtrSuggestedQuestion[];
   overallSummary: string | null;
   advocacyGapAnalysis: import("@/types/api").AdvocacyGapAnalysis | null;
   parentGoalsSnapshot: import("@/types/api").ParentGoalSnapshot[] | null;
@@ -128,18 +127,4 @@ export interface EtrRedFlag {
   finding: string;
   why_it_matters: string;
   parent_right_implicated?: string;
-}
-
-export type SuggestedQuestionCategory =
-  | 'clarification'
-  | 'challenge_eligibility'
-  | 'iee_request'
-  | 'procedural'
-  | 'services_next_steps'
-  | string;
-
-export interface EtrSuggestedQuestion {
-  category: SuggestedQuestionCategory;
-  question: string;
-  rationale: string;
 }

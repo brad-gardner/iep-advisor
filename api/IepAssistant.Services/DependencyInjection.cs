@@ -8,6 +8,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddServices(this IServiceCollection services)
     {
+        services.AddScoped<IClaudeClient, ClaudeClient>();
+        services.AddScoped<IFeatureFlags, ConfigurationFeatureFlags>();
         services.AddSingleton<MfaSecretProtector>();
         services.AddScoped<ITotpService, TotpService>();
         services.AddScoped<IMfaService, MfaService>();
@@ -32,6 +34,16 @@ public static class DependencyInjection
         services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
         services.AddScoped<IProgressReportService, ProgressReportService>();
         services.AddScoped<IProgressReportAnalysisService, ProgressReportAnalysisService>();
+        services.AddScoped<IAnalysisRunService, AnalysisRunService>();
+        services.AddScoped<IAnalysisRunBackfillService, AnalysisRunBackfillService>();
+        services.AddScoped<IEducatorService, EducatorService>();
+        services.AddScoped<IChildLinkService, ChildLinkService>();
+        services.AddScoped<IIepDraftService, IepDraftService>();
+        services.AddScoped<IIepVersionService, IepVersionService>();
+        services.AddScoped<IIepVersionPdfService, IepVersionPdfService>();
+        services.AddScoped<IIepAssistService, IepAssistService>();
+        services.AddScoped<IStudentInviteService, StudentInviteService>();
+        services.AddScoped<IStudentWorkspaceService, StudentWorkspaceService>();
 
         return services;
     }

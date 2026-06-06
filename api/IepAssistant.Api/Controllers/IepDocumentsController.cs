@@ -265,7 +265,6 @@ public class IepDocumentsController : ControllerBase
         SectionAnalyses = model.SectionAnalyses,
         GoalAnalyses = model.GoalAnalyses,
         OverallRedFlags = model.OverallRedFlags,
-        SuggestedQuestions = model.SuggestedQuestions,
         AdvocacyGapAnalysis = model.AdvocacyGapAnalysis,
         ParentGoalsSnapshot = model.ParentGoalsSnapshot,
         ErrorMessage = model.ErrorMessage,

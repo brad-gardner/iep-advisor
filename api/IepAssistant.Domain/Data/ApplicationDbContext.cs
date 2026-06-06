@@ -19,6 +19,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<EtrDocument> EtrDocuments => Set<EtrDocument>();
     public DbSet<EtrSection> EtrSections => Set<EtrSection>();
     public DbSet<EtrAnalysis> EtrAnalyses => Set<EtrAnalysis>();
+    public DbSet<AnalysisRun> AnalysisRuns => Set<AnalysisRun>();
+    public DbSet<AnalysisRunSource> AnalysisRunSources => Set<AnalysisRunSource>();
+    public DbSet<AnalysisRunSection> AnalysisRunSections => Set<AnalysisRunSection>();
     public DbSet<ParentAdvocacyGoal> ParentAdvocacyGoals => Set<ParentAdvocacyGoal>();
     public DbSet<UserRecoveryCode> UserRecoveryCodes => Set<UserRecoveryCode>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
@@ -29,6 +32,30 @@ public class ApplicationDbContext : DbContext
     public DbSet<KnowledgeBaseEntry> KnowledgeBaseEntries => Set<KnowledgeBaseEntry>();
     public DbSet<ProgressReport> ProgressReports => Set<ProgressReport>();
     public DbSet<ProgressReportAnalysis> ProgressReportAnalyses => Set<ProgressReportAnalysis>();
+    public DbSet<District> Districts => Set<District>();
+    public DbSet<School> Schools => Set<School>();
+    public DbSet<TeacherProfile> TeacherProfiles => Set<TeacherProfile>();
+    public DbSet<SchoolStudent> SchoolStudents => Set<SchoolStudent>();
+    public DbSet<SchoolStudentAccess> SchoolStudentAccesses => Set<SchoolStudentAccess>();
+    public DbSet<ChildLink> ChildLinks => Set<ChildLink>();
+    public DbSet<IepDraft> IepDrafts => Set<IepDraft>();
+    public DbSet<IepDraftSection> IepDraftSections => Set<IepDraftSection>();
+    public DbSet<IepDraftGoal> IepDraftGoals => Set<IepDraftGoal>();
+    public DbSet<IepDraftServiceLine> IepDraftServiceLines => Set<IepDraftServiceLine>();
+    public DbSet<IepDraftAccommodation> IepDraftAccommodations => Set<IepDraftAccommodation>();
+    public DbSet<IepDraftTransitionItem> IepDraftTransitionItems => Set<IepDraftTransitionItem>();
+    public DbSet<IepVersion> IepVersions => Set<IepVersion>();
+    public DbSet<IepVersionSection> IepVersionSections => Set<IepVersionSection>();
+    public DbSet<IepVersionGoal> IepVersionGoals => Set<IepVersionGoal>();
+    public DbSet<IepVersionServiceLine> IepVersionServiceLines => Set<IepVersionServiceLine>();
+    public DbSet<IepVersionAccommodation> IepVersionAccommodations => Set<IepVersionAccommodation>();
+    public DbSet<IepVersionTransitionItem> IepVersionTransitionItems => Set<IepVersionTransitionItem>();
+    public DbSet<IepVersionPdf> IepVersionPdfs => Set<IepVersionPdf>();
+    public DbSet<AccessAuditLog> AccessAuditLogs => Set<AccessAuditLog>();
+    public DbSet<StudentProfile> StudentProfiles => Set<StudentProfile>();
+    public DbSet<StudentInvite> StudentInvites => Set<StudentInvite>();
+    public DbSet<StudentWorkspace> StudentWorkspaces => Set<StudentWorkspace>();
+    public DbSet<StudentWorkspaceEntry> StudentWorkspaceEntries => Set<StudentWorkspaceEntry>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

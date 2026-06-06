@@ -25,10 +25,10 @@ public class MeetingPrepController : ControllerBase
     [HttpPost("api/children/{childId}/meeting-prep")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status202Accepted)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GenerateFromGoals(int childId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GenerateFromGoals(int childId, [FromBody] GenerateMeetingPrepRequest? request, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
-        var result = await _meetingPrepService.GenerateFromGoalsAsync(childId, userId, cancellationToken);
+        var result = await _meetingPrepService.GenerateFromGoalsAsync(childId, userId, request?.MeetingDate, cancellationToken);
 
         if (!result.Success)
         {
@@ -47,10 +47,10 @@ public class MeetingPrepController : ControllerBase
     [HttpPost("api/ieps/{iepId}/meeting-prep")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status202Accepted)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GenerateFromIep(int iepId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GenerateFromIep(int iepId, [FromBody] GenerateMeetingPrepRequest? request, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
-        var result = await _meetingPrepService.GenerateFromIepAsync(iepId, userId, cancellationToken);
+        var result = await _meetingPrepService.GenerateFromIepAsync(iepId, userId, request?.MeetingDate, cancellationToken);
 
         if (!result.Success)
         {
@@ -69,10 +69,10 @@ public class MeetingPrepController : ControllerBase
     [HttpPost("api/etrs/{etrId}/meeting-prep")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status202Accepted)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GenerateFromEtr(int etrId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GenerateFromEtr(int etrId, [FromBody] GenerateMeetingPrepRequest? request, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
-        var result = await _meetingPrepService.GenerateFromEtrAsync(etrId, userId, cancellationToken);
+        var result = await _meetingPrepService.GenerateFromEtrAsync(etrId, userId, request?.MeetingDate, cancellationToken);
 
         if (!result.Success)
         {

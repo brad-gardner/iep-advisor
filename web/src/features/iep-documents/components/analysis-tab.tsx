@@ -130,7 +130,6 @@ export function AnalysisTab({
           <AnalysisOverview
             overallSummary={analysis.overallSummary || ''}
             overallRedFlags={analysis.overallRedFlags}
-            suggestedQuestions={analysis.suggestedQuestions}
           />
         </>
       );

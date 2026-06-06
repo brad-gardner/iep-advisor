@@ -31,7 +31,6 @@ public class EtrAnalysisRepository : Repository<EtrAnalysis>, IEtrAnalysisReposi
         existing.AssessmentCompleteness = analysis.AssessmentCompleteness;
         existing.EligibilityReview = analysis.EligibilityReview;
         existing.OverallRedFlags = analysis.OverallRedFlags;
-        existing.SuggestedQuestions = analysis.SuggestedQuestions;
         existing.OverallSummary = analysis.OverallSummary;
         existing.ErrorMessage = analysis.ErrorMessage;
         return existing;

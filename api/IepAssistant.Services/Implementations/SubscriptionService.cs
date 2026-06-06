@@ -241,6 +241,9 @@ public class SubscriptionService : ISubscriptionService
     }
 
     public async Task<bool> TryRecordUsageAsync(int userId, int childId, string operationType, int limit, CancellationToken ct = default)
+        => await TryReserveUsageAsync(userId, childId, operationType, limit, ct) is not null;
+
+    public async Task<int?> TryReserveUsageAsync(int userId, int childId, string operationType, int limit, CancellationToken ct = default)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         try
@@ -249,7 +252,7 @@ public class SubscriptionService : ISubscriptionService
             if (user == null || user.SubscriptionStatus != "active")
             {
                 await transaction.RollbackAsync(ct);
-                return false;
+                return null;
             }
 
             var subscriptionStart = GetSubscriptionYearStart(user);
@@ -265,7 +268,7 @@ public class SubscriptionService : ISubscriptionService
             if (count >= limit)
             {
                 await transaction.RollbackAsync(ct);
-                return false;
+                return null;
             }
 
             var record = new UsageRecord
@@ -280,13 +283,29 @@ public class SubscriptionService : ISubscriptionService
             await _context.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
 
-            return true;
+            return record.Id;
         }
         catch
         {
             await transaction.RollbackAsync(ct);
             throw;
         }
+    }
+
+    public async Task ReleaseUsageByIdAsync(int usageRecordId, CancellationToken ct = default)
+    {
+        // Refund a previously reserved usage unit by its exact id. Idempotent: no-op if already gone.
+        var record = await _context.UsageRecords
+            .FirstOrDefaultAsync(ur => ur.Id == usageRecordId, ct);
+
+        if (record == null)
+        {
+            _logger.LogWarning("ReleaseUsageByIdAsync found no usage record {UsageRecordId} to refund", usageRecordId);
+            return;
+        }
+
+        _context.UsageRecords.Remove(record);
+        await _context.SaveChangesAsync(ct);
     }
 
     public async Task<ServiceResult> RedeemBetaCodeAsync(int userId, string code, CancellationToken ct = default)

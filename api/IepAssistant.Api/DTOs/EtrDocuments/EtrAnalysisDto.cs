@@ -10,7 +10,6 @@ public class EtrAnalysisDto
     public AssessmentCompletenessResult? AssessmentCompleteness { get; set; }
     public EligibilityReviewResult? EligibilityReview { get; set; }
     public List<EtrRedFlag> OverallRedFlags { get; set; } = [];
-    public List<EtrSuggestedQuestion> SuggestedQuestions { get; set; } = [];
     public string? OverallSummary { get; set; }
     public string? ErrorMessage { get; set; }
     public DateTime CreatedAt { get; set; }

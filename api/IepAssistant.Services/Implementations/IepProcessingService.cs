@@ -1,8 +1,5 @@
 using System.Text.Json;
-using Anthropic.SDK;
-using Anthropic.SDK.Messaging;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -20,7 +17,7 @@ public class IepProcessingService : IIepProcessingService
     private readonly IAccessService _accessService;
     private readonly IBlobStorageService _blobStorage;
     private readonly ApplicationDbContext _context;
-    private readonly IConfiguration _configuration;
+    private readonly IClaudeClient _claudeClient;
     private readonly ILogger<IepProcessingService> _logger;
 
     public IepProcessingService(
@@ -29,7 +26,7 @@ public class IepProcessingService : IIepProcessingService
         IAccessService accessService,
         IBlobStorageService blobStorage,
         ApplicationDbContext context,
-        IConfiguration configuration,
+        IClaudeClient claudeClient,
         ILogger<IepProcessingService> logger)
     {
         _documentRepository = documentRepository;
@@ -37,7 +34,7 @@ public class IepProcessingService : IIepProcessingService
         _accessService = accessService;
         _blobStorage = blobStorage;
         _context = context;
-        _configuration = configuration;
+        _claudeClient = claudeClient;
         _logger = logger;
     }
 
@@ -177,16 +174,6 @@ public class IepProcessingService : IIepProcessingService
 
     private async Task<ParsedIep?> StructureWithClaudeAsync(byte[] pdfBytes, CancellationToken cancellationToken)
     {
-        var apiKey = _configuration["Anthropic:ApiKey"];
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            _logger.LogError("Anthropic API key not configured");
-            return null;
-        }
-
-        var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-        var client = new AnthropicClient(apiKey, httpClient);
-
         var systemPrompt = @"You are an expert IEP (Individualized Education Program) document parser.
 Your job is to extract and structure the COMPLETE content of an IEP document into standard sections.
 
@@ -236,40 +223,15 @@ Rules:
 - Each unique section in the document should map to exactly one entry — do not create duplicate sectionType entries
 - Return ONLY valid JSON, no markdown or other formatting";
 
-        var pdfBase64 = Convert.ToBase64String(pdfBytes);
-
-        var content = new List<ContentBase>
+        var responseText = await _claudeClient.CompleteAsync(new ClaudeCompletionRequest
         {
-            new DocumentContent
-            {
-                Source = new DocumentSource
-                {
-                    MediaType = "application/pdf",
-                    Data = pdfBase64,
-                },
-            },
-            new TextContent
-            {
-                Text = "Parse this IEP document and return structured JSON. Extract every section completely, including all test scores, evaluation data, and assessment results.",
-            },
-        };
-
-        var messages = new List<Message>
-        {
-            new Message { Role = RoleType.User, Content = content },
-        };
-
-        var parameters = new MessageParameters
-        {
-            Messages = messages,
+            SystemPrompt = systemPrompt,
+            UserText = "Parse this IEP document and return structured JSON. Extract every section completely, including all test scores, evaluation data, and assessment results.",
+            PdfDocument = pdfBytes,
             Model = "claude-sonnet-4-20250514",
             MaxTokens = 16384,
-            System = [new SystemMessage(systemPrompt)],
-        };
+        }, cancellationToken);
 
-        var response = await client.Messages.GetClaudeMessageAsync(parameters, cancellationToken);
-
-        var responseText = (response.Content?.FirstOrDefault() as TextContent)?.Text;
         if (string.IsNullOrEmpty(responseText))
         {
             _logger.LogWarning("Empty response from Claude");

@@ -1,8 +1,5 @@
 using System.Text.Json;
-using Anthropic.SDK;
-using Anthropic.SDK.Messaging;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -20,8 +17,7 @@ public class EtrProcessingService : IEtrProcessingService
     private readonly IAccessService _accessService;
     private readonly IBlobStorageService _blobStorage;
     private readonly ApplicationDbContext _context;
-    private readonly IConfiguration _configuration;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IClaudeClient _claudeClient;
     private readonly ILogger<EtrProcessingService> _logger;
 
     public EtrProcessingService(
@@ -30,8 +26,7 @@ public class EtrProcessingService : IEtrProcessingService
         IAccessService accessService,
         IBlobStorageService blobStorage,
         ApplicationDbContext context,
-        IConfiguration configuration,
-        IHttpClientFactory httpClientFactory,
+        IClaudeClient claudeClient,
         ILogger<EtrProcessingService> logger)
     {
         _documentRepository = documentRepository;
@@ -39,8 +34,7 @@ public class EtrProcessingService : IEtrProcessingService
         _accessService = accessService;
         _blobStorage = blobStorage;
         _context = context;
-        _configuration = configuration;
-        _httpClientFactory = httpClientFactory;
+        _claudeClient = claudeClient;
         _logger = logger;
     }
 
@@ -167,16 +161,6 @@ public class EtrProcessingService : IEtrProcessingService
 
     private async Task<ParsedEtr?> StructureWithClaudeAsync(byte[] pdfBytes, CancellationToken cancellationToken)
     {
-        var apiKey = _configuration["Anthropic:ApiKey"];
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            _logger.LogError("Anthropic API key not configured");
-            return null;
-        }
-
-        var httpClient = _httpClientFactory.CreateClient("Claude");
-        var client = new AnthropicClient(apiKey, httpClient);
-
         var systemPrompt = @"You are an expert parser of Evaluation Team Reports (ETRs) — the multidisciplinary
 evaluation documents that U.S. public schools use to determine a student's eligibility for special education
 services under IDEA. ETRs differ from IEPs: they focus on ASSESSMENT RESULTS and ELIGIBILITY DETERMINATION,
@@ -279,50 +263,24 @@ Rules:
 - This is an ETR, not an IEP: do NOT emit goals, services, accommodations, or placement content. If the document contains
   such content (some districts mix), capture it under section_type ""other"" rather than forcing an IEP schema.";
 
-        var pdfBase64 = Convert.ToBase64String(pdfBytes);
-
-        var content = new List<ContentBase>
+        var responseText = await _claudeClient.CompleteAsync(new ClaudeCompletionRequest
         {
-            new DocumentContent
-            {
-                Source = new DocumentSource
-                {
-                    MediaType = "application/pdf",
-                    Data = pdfBase64,
-                },
-            },
-            new TextContent
-            {
-                Text = "Parse this ETR document and return structured JSON per the system instructions. Extract every section present, preserve all assessment scores verbatim, and do not invent data.",
-            },
-        };
-
-        var messages = new List<Message>
-        {
-            new Message { Role = RoleType.User, Content = content },
-        };
-
-        var parameters = new MessageParameters
-        {
-            Messages = messages,
+            SystemPrompt = systemPrompt,
+            UserText = "Parse this ETR document and return structured JSON per the system instructions. Extract every section present, preserve all assessment scores verbatim, and do not invent data.",
+            PdfDocument = pdfBytes,
             Model = "claude-sonnet-4-20250514",
             MaxTokens = 32000,
-            System = [new SystemMessage(systemPrompt)],
-        };
+        }, cancellationToken);
 
-        var response = await client.Messages.GetClaudeMessageAsync(parameters, cancellationToken);
-
-        var responseText = (response.Content?.FirstOrDefault() as TextContent)?.Text;
         if (string.IsNullOrEmpty(responseText))
         {
             _logger.LogWarning("Empty response from Claude for ETR parsing");
             return null;
         }
 
-        var stopReason = response.StopReason;
         _logger.LogInformation(
-            "ETR parsing Claude response: {Length} chars, stop_reason={StopReason}",
-            responseText.Length, stopReason);
+            "ETR parsing Claude response: {Length} chars",
+            responseText.Length);
 
         responseText = responseText.Trim();
         if (responseText.StartsWith("```"))
@@ -347,8 +305,8 @@ Rules:
             var head = responseText[..Math.Min(500, responseText.Length)];
             var tail = responseText[Math.Max(0, responseText.Length - 500)..];
             _logger.LogError(ex,
-                "Failed to parse Claude ETR response as JSON. stop_reason={StopReason}, total_length={Length}. HEAD: {Head} ... TAIL: {Tail}",
-                stopReason, responseText.Length, head, tail);
+                "Failed to parse Claude ETR response as JSON. total_length={Length}. HEAD: {Head} ... TAIL: {Tail}",
+                responseText.Length, head, tail);
             return null;
         }
     }

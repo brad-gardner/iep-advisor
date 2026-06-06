@@ -48,6 +48,7 @@ public class MeetingPrepChecklistModel
     public int ChildProfileId { get; set; }
     public int? IepDocumentId { get; set; }
     public int? EtrDocumentId { get; set; }
+    public DateTime? MeetingDate { get; set; }
     public string Status { get; set; } = string.Empty;
     public List<ChecklistItem> QuestionsToAsk { get; set; } = [];
     public List<ChecklistItem> RedFlagsToRaise { get; set; } = [];

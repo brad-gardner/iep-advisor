@@ -10,7 +10,6 @@ import { EtrAnalysisOverview } from './etr-analysis-overview';
 import { EtrAssessmentCompletenessView } from './etr-assessment-completeness-view';
 import { EtrEligibilityReviewView } from './etr-eligibility-review-view';
 import { EtrRedFlagsList } from './etr-red-flags-list';
-import { EtrSuggestedQuestionsList } from './etr-suggested-questions-list';
 import { AdvocacyGapAnalysisSection } from '@/features/iep-documents/components/advocacy-gap-analysis';
 import { StaleAnalysisBanner } from '@/features/iep-documents/components/stale-analysis-banner';
 import { useAdvocacyGoals } from '@/features/advocacy-goals/hooks/use-advocacy-goals';
@@ -25,8 +24,7 @@ type AnalysisView =
   | 'assessment'
   | 'eligibility'
   | 'advocacy'
-  | 'red-flags'
-  | 'questions';
+  | 'red-flags';
 
 const VIEW_LABELS: Record<AnalysisView, string> = {
   overview: 'Overview',
@@ -34,7 +32,6 @@ const VIEW_LABELS: Record<AnalysisView, string> = {
   eligibility: 'Eligibility Review',
   advocacy: 'Advocacy Goals',
   'red-flags': 'Red Flags',
-  questions: 'Suggested Questions',
 };
 
 export function EtrAnalysisTab({ etrId, childProfileId }: EtrAnalysisTabProps) {
@@ -117,7 +114,6 @@ export function EtrAnalysisTab({ etrId, childProfileId }: EtrAnalysisTabProps) {
     'eligibility',
     ...(hasAdvocacyGap ? (['advocacy'] as AnalysisView[]) : []),
     'red-flags',
-    'questions',
   ];
 
   const renderContent = () => {
@@ -144,8 +140,6 @@ export function EtrAnalysisTab({ etrId, childProfileId }: EtrAnalysisTabProps) {
         );
       case 'red-flags':
         return <EtrRedFlagsList redFlags={parsed.redFlags} />;
-      case 'questions':
-        return <EtrSuggestedQuestionsList questions={parsed.suggestedQuestions} />;
     }
   };
 
@@ -158,11 +152,7 @@ export function EtrAnalysisTab({ etrId, childProfileId }: EtrAnalysisTabProps) {
         {tabs.map((view) => {
           const isActive = activeView === view;
           const count =
-            view === 'red-flags'
-              ? parsed.redFlags.length
-              : view === 'questions'
-                ? parsed.suggestedQuestions.length
-                : undefined;
+            view === 'red-flags' ? parsed.redFlags.length : undefined;
           return (
             <button
               key={view}

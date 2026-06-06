@@ -15,9 +15,6 @@ public class EtrAnalysisResponse
     [JsonPropertyName("red_flags")]
     public List<EtrRedFlag> RedFlags { get; set; } = [];
 
-    [JsonPropertyName("suggested_questions")]
-    public List<EtrSuggestedQuestion> SuggestedQuestions { get; set; } = [];
-
     [JsonPropertyName("overall_summary")]
     public string? OverallSummary { get; set; }
 
@@ -125,7 +122,6 @@ public class EtrAnalysisModel
     public AssessmentCompletenessResult? AssessmentCompleteness { get; set; }
     public EligibilityReviewResult? EligibilityReview { get; set; }
     public List<EtrRedFlag> OverallRedFlags { get; set; } = [];
-    public List<EtrSuggestedQuestion> SuggestedQuestions { get; set; } = [];
     public string? OverallSummary { get; set; }
     public AdvocacyGapAnalysisResponse? AdvocacyGapAnalysis { get; set; }
     public List<ParentGoalSnapshot> ParentGoalsSnapshot { get; set; } = [];

@@ -5,6 +5,7 @@ public class MeetingPrepChecklist : BaseEntity, IAuditableEntity
     public int ChildProfileId { get; set; }
     public int? IepDocumentId { get; set; }
     public int? EtrDocumentId { get; set; }
+    public DateTime? MeetingDate { get; set; }
     public string Status { get; set; } = "pending"; // pending, generating, completed, error
     public string? QuestionsToAsk { get; set; }     // JSON array of ChecklistItem
     public string? DocumentsToBring { get; set; }   // JSON array of ChecklistItem

@@ -7,7 +7,7 @@ public class User : BaseEntity, IAuditableEntity
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string? State { get; set; }
-    public string Role { get; set; } = "User";
+    public UserRole Role { get; set; } = UserRole.Parent;
     public bool IsActive { get; set; } = true;
     public bool MfaEnabled { get; set; } = false;
     public string? MfaSecret { get; set; }

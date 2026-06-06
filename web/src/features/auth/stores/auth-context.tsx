@@ -27,6 +27,7 @@ interface AuthContextType {
   updateProfile: (data: UpdateProfileRequest) => Promise<{ success: boolean; error?: string }>;
   completeOnboarding: () => Promise<{ success: boolean; error?: string }>;
   completeMfaLogin: (token: string, user: User) => void;
+  refreshUser: () => Promise<void>;
   logout: () => void;
 }
 
@@ -160,6 +161,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshUser = async () => {
+    try {
+      const response = await getCurrentUser();
+      if (response.success && response.data) {
+        setUser(response.data);
+        setStoredUser(JSON.stringify(response.data));
+      }
+    } catch {
+      // Keep the existing user on a transient failure.
+    }
+  };
+
   const logout = () => {
     removeToken();
     setUser(null);
@@ -178,6 +191,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateProfile,
         completeOnboarding,
         completeMfaLogin,
+        refreshUser,
         logout,
       }}
     >
