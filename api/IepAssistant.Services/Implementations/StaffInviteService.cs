@@ -320,23 +320,23 @@ public class StaffInviteService : IStaffInviteService
 
     // ================================================================= Deactivate / reactivate staff
 
-    public async Task<ServiceResult> DeactivateStaffAsync(int callerUserId, int staffProfileId, CancellationToken ct = default)
+    public async Task<ServiceResult<DeactivateStaffResult>> DeactivateStaffAsync(int callerUserId, int staffProfileId, CancellationToken ct = default)
     {
         var caller = await _orgAccess.GetStaffContextAsync(callerUserId, ct);
         if (caller == null)
-            return ServiceResult.FailureResult("Staff profile not found.");
+            return ServiceResult<DeactivateStaffResult>.FailureResult("Staff profile not found.");
 
         var target = await _context.StaffProfiles
             .FirstOrDefaultAsync(p => p.Id == staffProfileId && p.DistrictId == caller.DistrictId, ct);
         if (target == null)
-            return ServiceResult.FailureResult("Staff member not found.");
+            return ServiceResult<DeactivateStaffResult>.FailureResult("Staff member not found.");
 
         var scope = CheckStaffMutationScope(caller, target);
         if (!scope.Success)
-            return scope;
+            return ServiceResult<DeactivateStaffResult>.FailureResult(scope.Message!);
 
         if (!target.IsActive)
-            return ServiceResult.SuccessResult("Staff member is already deactivated.");
+            return ServiceResult<DeactivateStaffResult>.SuccessResult(new DeactivateStaffResult(), "Staff member is already deactivated.");
 
         // Last-admin guard: never strip a district of its final active DistrictAdmin (incl. self).
         if (target.OrgRoleId == OrgRoleIds.DistrictAdmin)
@@ -346,8 +346,14 @@ public class StaffInviteService : IStaffInviteService
                               && p.OrgRoleId == OrgRoleIds.DistrictAdmin
                               && p.IsActive, ct);
             if (activeAdmins <= 1)
-                return ServiceResult.FailureResult("You cannot deactivate the last active District Admin of the district.");
+                return ServiceResult<DeactivateStaffResult>.FailureResult("You cannot deactivate the last active District Admin of the district.");
         }
+
+        // Reassignment hint: students where the target holds the ONLY active non-admin (Teacher/SchoolAdmin
+        // staff) access. District admins act by scope, not by grants, so their access rows never count
+        // toward "non-admin" ownership. Computed BEFORE we flip IsActive so the target's own grant is still
+        // active and counted.
+        var solelyOwned = await BuildSolelyOwnedAsync(target.UserId, ct);
 
         target.IsActive = false;
         target.UpdatedById = callerUserId;
@@ -362,9 +368,57 @@ public class StaffInviteService : IStaffInviteService
 
         await _context.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Staff profile {StaffProfileId} (user {UserId}) deactivated by user {CallerId}",
-            staffProfileId, target.UserId, callerUserId);
-        return ServiceResult.SuccessResult("Staff member deactivated.");
+        _logger.LogInformation("Staff profile {StaffProfileId} (user {UserId}) deactivated by user {CallerId}; {Count} solely-owned student(s)",
+            staffProfileId, target.UserId, callerUserId, solelyOwned.Count);
+        return ServiceResult<DeactivateStaffResult>.SuccessResult(new DeactivateStaffResult
+        {
+            SolelyOwnedStudentCount = solelyOwned.Count,
+            SolelyOwnedStudents = solelyOwned
+        }, "Staff member deactivated.");
+    }
+
+    /// <summary>
+    /// Students for which <paramref name="targetUserId"/> holds the only active SchoolStudentAccess among
+    /// NON-ADMIN staff (Teacher/SchoolAdmin). DistrictAdmin access rows are ignored — admins reach students
+    /// by scope, not by grant, so a student isn't "orphaned" just because they have one. Used only as a UI
+    /// reassignment hint.
+    /// </summary>
+    private async Task<List<DeactivatedStaffStudentModel>> BuildSolelyOwnedAsync(int targetUserId, CancellationToken ct)
+    {
+        // Student ids the target has an active grant on.
+        var studentIds = await _context.SchoolStudentAccesses.AsNoTracking()
+            .Where(a => a.UserId == targetUserId && a.IsActive)
+            .Select(a => a.SchoolStudentId)
+            .Distinct()
+            .ToListAsync(ct);
+        if (studentIds.Count == 0)
+            return new List<DeactivatedStaffStudentModel>();
+
+        // For each of those students, count OTHER active non-admin staff holders. A student is "solely
+        // owned" when that count is zero. (A non-admin holder = an active grant whose user has an active
+        // non-DistrictAdmin StaffProfile.)
+        var otherHolderStudentIds = await (
+            from a in _context.SchoolStudentAccesses.AsNoTracking()
+            where studentIds.Contains(a.SchoolStudentId) && a.IsActive && a.UserId != targetUserId
+            join p in _context.StaffProfiles.AsNoTracking() on a.UserId equals p.UserId
+            where p.IsActive && p.OrgRoleId != OrgRoleIds.DistrictAdmin
+            select a.SchoolStudentId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var solelyOwnedIds = studentIds.Where(id => !otherHolderStudentIds.Contains(id)).ToList();
+        if (solelyOwnedIds.Count == 0)
+            return new List<DeactivatedStaffStudentModel>();
+
+        return await _context.SchoolStudents.AsNoTracking()
+            .Where(s => solelyOwnedIds.Contains(s.Id))
+            .OrderBy(s => s.LastName).ThenBy(s => s.FirstName)
+            .Select(s => new DeactivatedStaffStudentModel
+            {
+                StudentId = s.Id,
+                Name = (s.FirstName + " " + (s.LastName ?? string.Empty)).Trim()
+            })
+            .ToListAsync(ct);
     }
 
     public async Task<ServiceResult> ReactivateStaffAsync(int callerUserId, int staffProfileId, CancellationToken ct = default)

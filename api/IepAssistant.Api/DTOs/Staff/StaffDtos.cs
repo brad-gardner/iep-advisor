@@ -86,6 +86,20 @@ public class StaffPendingInviteDto
     public string Status { get; set; } = "pending";
 }
 
+/// <summary>Response to a staff deactivation: carries the reassignment hint (students the deactivated
+/// staff solely owned among non-admin staff).</summary>
+public class DeactivateStaffResponseDto
+{
+    public int SolelyOwnedStudentCount { get; set; }
+    public List<DeactivatedStaffStudentDto> SolelyOwnedStudents { get; set; } = new();
+}
+
+public class DeactivatedStaffStudentDto
+{
+    public int StudentId { get; set; }
+    public string Name { get; set; } = string.Empty;
+}
+
 public class StaffInvitePreviewDto
 {
     public string DistrictName { get; set; } = string.Empty;

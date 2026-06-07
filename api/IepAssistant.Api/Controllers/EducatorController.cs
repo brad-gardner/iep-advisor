@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Educator;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -73,7 +74,8 @@ public class EducatorController : ControllerBase
             DateOfBirth = request.DateOfBirth,
             StateCode = request.StateCode,
             GradeLevel = request.GradeLevel,
-            DisabilityCategory = request.DisabilityCategory
+            DisabilityCategory = request.DisabilityCategory,
+            SchoolId = request.SchoolId
         }, ct);
 
         if (!result.Success)
@@ -154,6 +156,77 @@ public class EducatorController : ControllerBase
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 
+    // ----------------------------------------------------------------- Staff assignment
+
+    [HttpGet("students/{studentId}/staff-access")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<StudentStaffAccessDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetStaffAccess(int studentId, CancellationToken ct)
+    {
+        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
+            return NotFound();
+
+        var result = await _educatorService.GetStudentStaffAccessAsync(User.GetUserId(), studentId, ct);
+        if (!result.Success)
+            return MapFailure<IEnumerable<StudentStaffAccessDto>>(result.Message);
+
+        return Ok(ApiResponse<IEnumerable<StudentStaffAccessDto>>.SuccessResponse(result.Data!.Select(MapStaffAccess)));
+    }
+
+    [HttpPost("students/{studentId}/staff-access")]
+    [ProducesResponseType(typeof(ApiResponse<StudentStaffAccessDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GrantStaffAccess(int studentId, [FromBody] GrantStudentStaffAccessRequest request, CancellationToken ct)
+    {
+        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
+            return NotFound();
+
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        AccessRole accessRole = AccessRole.Collaborator;
+        if (!string.IsNullOrWhiteSpace(request.AccessRole) &&
+            !Enum.TryParse(request.AccessRole, ignoreCase: true, out accessRole))
+            return BadRequest(ApiResponse<object>.Error("Invalid access role."));
+
+        var result = await _educatorService.GrantStudentStaffAccessAsync(User.GetUserId(), studentId,
+            new GrantStudentStaffAccessModel { StaffProfileId = request.StaffProfileId, AccessRole = accessRole }, ct);
+        if (!result.Success)
+            return MapFailure<StudentStaffAccessDto>(result.Message);
+
+        return Ok(ApiResponse<StudentStaffAccessDto>.SuccessResponse(MapStaffAccess(result.Data!)));
+    }
+
+    [HttpDelete("students/{studentId}/staff-access/{accessId}")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RevokeStaffAccess(int studentId, int accessId, CancellationToken ct)
+    {
+        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
+            return NotFound();
+
+        var result = await _educatorService.RevokeStudentStaffAccessAsync(User.GetUserId(), studentId, accessId, ct);
+        if (!result.Success)
+            return MapFailure<object>(result.Message);
+
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
+    }
+
+    private static StudentStaffAccessDto MapStaffAccess(StudentStaffAccessModel m) => new()
+    {
+        AccessId = m.AccessId,
+        StaffProfileId = m.StaffProfileId,
+        UserId = m.UserId,
+        FirstName = m.FirstName,
+        LastName = m.LastName,
+        Email = m.Email,
+        OrgRoleName = m.OrgRoleName,
+        AccessRole = m.AccessRole.ToString(),
+        GrantedAt = m.GrantedAt
+    };
+
     private static ChildLinkDto MapLink(ChildLinkModel m) => new()
     {
         Id = m.Id,
@@ -201,6 +274,7 @@ public class EducatorController : ControllerBase
     {
         Id = m.Id,
         SchoolId = m.SchoolId,
+        SchoolName = m.SchoolName,
         FirstName = m.FirstName,
         LastName = m.LastName,
         DateOfBirth = m.DateOfBirth,

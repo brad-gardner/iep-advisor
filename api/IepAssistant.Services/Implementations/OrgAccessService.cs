@@ -37,10 +37,11 @@ public class OrgAccessService : IOrgAccessService
 
         if (ctx.OrgRoleId == OrgRoleIds.DistrictAdmin)
         {
-            // DistrictAdmin may act on any school within their district.
+            // DistrictAdmin may act on any ACTIVE school within their district. (Inactive schools are
+            // out of scope — keeps admin authz aligned with the roster, which hides inactive schools.)
             return await _context.Schools
                 .AsNoTracking()
-                .AnyAsync(s => s.Id == schoolId && s.DistrictId == ctx.DistrictId, ct);
+                .AnyAsync(s => s.Id == schoolId && s.DistrictId == ctx.DistrictId && s.IsActive, ct);
         }
 
         // SchoolAdmin / Teacher: only their own school.
@@ -64,11 +65,12 @@ public class OrgAccessService : IOrgAccessService
 
         if (ctx.OrgRoleId == OrgRoleIds.DistrictAdmin)
         {
-            // Player-coach superset: any active student-bearing school in the district, no
-            // SchoolStudentAccess row required.
+            // Player-coach superset: any student in an ACTIVE school of the district, no
+            // SchoolStudentAccess row required. The IsActive filter keeps detail authz aligned with the
+            // DistrictAdmin roster (GetStudentsAsync), which excludes inactive-school students.
             return await _context.Schools
                 .AsNoTracking()
-                .AnyAsync(s => s.Id == studentSchoolId.Value && s.DistrictId == ctx.DistrictId, ct);
+                .AnyAsync(s => s.Id == studentSchoolId.Value && s.DistrictId == ctx.DistrictId && s.IsActive, ct);
         }
 
         if (ctx.OrgRoleId == OrgRoleIds.SchoolAdmin)

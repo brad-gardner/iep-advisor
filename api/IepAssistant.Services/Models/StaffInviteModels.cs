@@ -60,6 +60,23 @@ public class StaffPendingInviteModel
     public string Status { get; set; } = "pending";
 }
 
+/// <summary>
+/// Result of deactivating a staff member. Surfaces the students for which the deactivated staff held
+/// the ONLY active non-admin access ("solely-owned") so the UI can prompt for reassignment. Admins keep
+/// scope-wide visibility regardless (no orphaning by construction); this is purely an advisory hint.
+/// </summary>
+public class DeactivateStaffResult
+{
+    public int SolelyOwnedStudentCount { get; set; }
+    public List<DeactivatedStaffStudentModel> SolelyOwnedStudents { get; set; } = new();
+}
+
+public class DeactivatedStaffStudentModel
+{
+    public int StudentId { get; set; }
+    public string Name { get; set; } = string.Empty;
+}
+
 /// <summary>Preview of a staff invite for the anonymous accept page.</summary>
 public class StaffInvitePreviewModel
 {

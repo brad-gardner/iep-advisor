@@ -86,7 +86,7 @@ public class StaffController : ControllerBase
     }
 
     [HttpPost("{staffProfileId}/deactivate")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<DeactivateStaffResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -96,7 +96,14 @@ public class StaffController : ControllerBase
         if (!result.Success)
             return MapFailure(result.Message);
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
+        var data = result.Data!;
+        return Ok(ApiResponse<DeactivateStaffResponseDto>.SuccessResponse(new DeactivateStaffResponseDto
+        {
+            SolelyOwnedStudentCount = data.SolelyOwnedStudentCount,
+            SolelyOwnedStudents = data.SolelyOwnedStudents
+                .Select(s => new DeactivatedStaffStudentDto { StudentId = s.StudentId, Name = s.Name })
+                .ToList()
+        }, result.Message));
     }
 
     [HttpPost("{staffProfileId}/reactivate")]

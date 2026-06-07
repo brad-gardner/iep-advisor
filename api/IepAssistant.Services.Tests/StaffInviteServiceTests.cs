@@ -101,6 +101,28 @@ public sealed class StaffInviteServiceTests : IDisposable
         return (userId, p.Id);
     }
 
+    private int SeedStudent(int schoolId, string firstName = "Stu", string lastName = "Dent")
+    {
+        using var ctx = CreateContext();
+        var s = new SchoolStudent { SchoolId = schoolId, FirstName = firstName, LastName = lastName, IsActive = true };
+        ctx.SchoolStudents.Add(s);
+        ctx.SaveChanges();
+        return s.Id;
+    }
+
+    private void SeedAccess(int studentId, int userId, AccessRole role = AccessRole.Owner)
+    {
+        using var ctx = CreateContext();
+        ctx.SchoolStudentAccesses.Add(new SchoolStudentAccess
+        {
+            SchoolStudentId = studentId,
+            UserId = userId,
+            Role = role,
+            IsActive = true
+        });
+        ctx.SaveChanges();
+    }
+
     // ================================================================= Invite: role matrix
 
     [Theory]
@@ -973,6 +995,58 @@ public sealed class StaffInviteServiceTests : IDisposable
 
         using var ctx2 = CreateContext();
         Assert.True(ctx2.StaffProfiles.Single(p => p.Id == teacherProfile).IsActive);
+    }
+
+    [Fact]
+    public async Task Deactivate_SurfacesSolelyOwnedStudents_CountAndList()
+    {
+        var districtId = SeedDistrict("Maple");
+        var schoolId = SeedSchool(districtId, "Elm");
+        var (adminUserId, _) = SeedStaff("admin@x.com", districtId, null, OrgRoleIds.DistrictAdmin);
+        var (teacherA, teacherAProfile) = SeedStaff("a@x.com", districtId, schoolId, OrgRoleIds.Teacher);
+        var (teacherB, _) = SeedStaff("b@x.com", districtId, schoolId, OrgRoleIds.Teacher);
+        var email = new CapturingEmailService();
+
+        // Teacher A solely owns two students.
+        var solo1 = SeedStudent(schoolId, "Solo", "One");
+        var solo2 = SeedStudent(schoolId, "Solo", "Two");
+        SeedAccess(solo1, teacherA);
+        SeedAccess(solo2, teacherA);
+
+        // A third student shared with teacher B -> NOT solely owned.
+        var shared = SeedStudent(schoolId, "Shared", "Three");
+        SeedAccess(shared, teacherA);
+        SeedAccess(shared, teacherB);
+
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx, email).DeactivateStaffAsync(adminUserId, teacherAProfile);
+        Assert.True(result.Success);
+        Assert.Equal(2, result.Data!.SolelyOwnedStudentCount);
+        Assert.Equal(2, result.Data.SolelyOwnedStudents.Count);
+        Assert.Contains(result.Data.SolelyOwnedStudents, s => s.StudentId == solo1);
+        Assert.Contains(result.Data.SolelyOwnedStudents, s => s.StudentId == solo2);
+        Assert.DoesNotContain(result.Data.SolelyOwnedStudents, s => s.StudentId == shared);
+    }
+
+    [Fact]
+    public async Task Deactivate_DistrictAdminAccessDoesNotCountAsSharedHolder()
+    {
+        // A student "shared" only with a DistrictAdmin is still solely owned by the teacher, because the
+        // admin reaches students by scope rather than by grant.
+        var districtId = SeedDistrict("Maple");
+        var schoolId = SeedSchool(districtId, "Elm");
+        var (adminUserId, _) = SeedStaff("admin@x.com", districtId, null, OrgRoleIds.DistrictAdmin);
+        var (teacherA, teacherAProfile) = SeedStaff("a@x.com", districtId, schoolId, OrgRoleIds.Teacher);
+        var email = new CapturingEmailService();
+
+        var student = SeedStudent(schoolId, "Only", "Teacher");
+        SeedAccess(student, teacherA);
+        SeedAccess(student, adminUserId); // an admin grant should not count as a non-admin co-holder
+
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx, email).DeactivateStaffAsync(adminUserId, teacherAProfile);
+        Assert.True(result.Success);
+        Assert.Equal(1, result.Data!.SolelyOwnedStudentCount);
     }
 
     // ================================================================= List

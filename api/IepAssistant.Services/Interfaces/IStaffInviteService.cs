@@ -14,7 +14,7 @@ public interface IStaffInviteService
     Task<ServiceResult> RevokeAsync(int callerUserId, int inviteId, CancellationToken ct = default);
     Task<ServiceResult<StaffInviteModel>> ResendAsync(int callerUserId, int inviteId, CancellationToken ct = default);
 
-    Task<ServiceResult> DeactivateStaffAsync(int callerUserId, int staffProfileId, CancellationToken ct = default);
+    Task<ServiceResult<DeactivateStaffResult>> DeactivateStaffAsync(int callerUserId, int staffProfileId, CancellationToken ct = default);
     Task<ServiceResult> ReactivateStaffAsync(int callerUserId, int staffProfileId, CancellationToken ct = default);
 
     // Anonymous accept flow.
