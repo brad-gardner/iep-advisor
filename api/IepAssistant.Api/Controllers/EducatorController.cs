@@ -24,30 +24,6 @@ public class EducatorController : ControllerBase
         _featureFlags = featureFlags;
     }
 
-    [HttpPost("onboard")]
-    [ProducesResponseType(typeof(ApiResponse<EducatorProfileDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Onboard([FromBody] OnboardEducatorRequest request, CancellationToken ct)
-    {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
-        if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
-
-        var result = await _educatorService.OnboardAsync(User.GetUserId(), new OnboardEducatorModel
-        {
-            DistrictName = request.DistrictName,
-            SchoolName = request.SchoolName,
-            StateCode = request.StateCode
-        }, ct);
-
-        if (!result.Success)
-            return MapFailure<EducatorProfileDto>(result.Message);
-
-        return Ok(ApiResponse<EducatorProfileDto>.SuccessResponse(MapProfile(result.Data!)));
-    }
-
     [HttpGet("me")]
     [ProducesResponseType(typeof(ApiResponse<EducatorProfileDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]

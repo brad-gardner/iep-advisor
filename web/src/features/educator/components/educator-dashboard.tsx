@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DistrictOverviewCard } from '@/features/district-admin/components/district-overview-card';
+import { SetupChecklistCard } from '@/features/district-admin/components/setup-checklist-card';
 import { ORG_ROLE } from '../types';
 import type { EducatorProfile } from '../types';
 
@@ -14,6 +15,7 @@ export function EducatorDashboard({ profile }: EducatorDashboardProps) {
 
   return (
     <div className="space-y-6">
+      {isDistrictAdmin && <SetupChecklistCard />}
       {isDistrictAdmin && <DistrictOverviewCard />}
 
       <Card className="max-w-lg" data-testid="educator-dashboard">

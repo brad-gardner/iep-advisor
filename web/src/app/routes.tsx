@@ -43,6 +43,7 @@ import { EducatorHomePage } from '@/features/educator/pages/educator-home-page';
 import { EducatorStudentsPage } from '@/features/educator/pages/educator-students-page';
 import { EducatorStudentDetailPage } from '@/features/educator/pages/educator-student-detail-page';
 import { DistrictSchoolsPage } from '@/features/district-admin/pages/district-schools-page';
+import { DistrictSetupWizard } from '@/features/district-admin/pages/district-setup-wizard';
 import { DistrictStaffPage } from '@/features/staff-invites/pages/district-staff-page';
 import { StaffAcceptInvitePage } from '@/features/staff-invites/pages/staff-accept-invite-page';
 import { IepDraftListPage } from '@/features/iep-authoring/pages/iep-draft-list-page';
@@ -371,6 +372,18 @@ export function AppRouter() {
               <MainLayout>
                 <EducatorHomePage />
               </MainLayout>
+            </FeatureRoute>
+          </ProtectedRoute>
+        }
+      />
+      {/* Full-screen first-run wizard (own chrome, no MainLayout) — like
+          /onboarding. The page itself guards to DistrictAdmin. */}
+      <Route
+        path="/educator/setup"
+        element={
+          <ProtectedRoute>
+            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
+              <DistrictSetupWizard />
             </FeatureRoute>
           </ProtectedRoute>
         }

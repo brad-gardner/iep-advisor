@@ -10,9 +10,9 @@ using Xunit;
 namespace IepAssistant.Services.Tests;
 
 /// <summary>
-/// P3b coverage: self-serve educator onboarding (find-or-create District/School, idempotent
-/// StaffProfile, role flip), student creation under the educator's school with Owner access,
-/// and SchoolId-bound scoping that rejects cross-school student access. Uses a real SQLite
+/// P3b coverage: student creation under the educator's school with Owner access, and SchoolId-bound
+/// scoping that rejects cross-school student access. Staff are provisioned by direct seeding
+/// (District + School + StaffProfile) — self-serve onboarding was removed in P5. Uses a real SQLite
 /// in-memory engine (same pattern as <see cref="AnalysisRunTestFixture"/>).
 /// </summary>
 public sealed class EducatorServiceTests : IDisposable
@@ -46,92 +46,52 @@ public sealed class EducatorServiceTests : IDisposable
             PasswordHash = "x",
             FirstName = "Ed",
             LastName = "Ucator",
-            Role = UserRole.Parent
+            Role = UserRole.Educator
         };
         ctx.Users.Add(user);
         ctx.SaveChanges();
         return user.Id;
     }
 
-    [Fact]
-    public async Task Onboard_CreatesDistrictSchoolProfile_AndSetsEducatorRole()
+    private int SeedDistrict(string name, string? stateCode = null)
     {
-        var userId = SeedUser("teacher@example.com");
-
-        using (var ctx = CreateContext())
-        {
-            var result = await CreateService(ctx).OnboardAsync(userId, new OnboardEducatorModel
-            {
-                DistrictName = "Maple District",
-                SchoolName = "Maple Elementary",
-                StateCode = "OH"
-            });
-
-            Assert.True(result.Success);
-            Assert.Equal("Maple District", result.Data!.DistrictName);
-            Assert.Equal("Maple Elementary", result.Data.SchoolName);
-        }
-
-        using (var ctx = CreateContext())
-        {
-            Assert.Single(ctx.Districts);
-            Assert.Single(ctx.Schools);
-            Assert.Single(ctx.StaffProfiles);
-
-            var user = ctx.Users.Single(u => u.Id == userId);
-            Assert.Equal(UserRole.Educator, user.Role);
-        }
+        using var ctx = CreateContext();
+        var d = new District { Name = name, StateCode = stateCode };
+        ctx.Districts.Add(d);
+        ctx.SaveChanges();
+        return d.Id;
     }
 
-    [Fact]
-    public async Task Onboard_CalledTwice_IsIdempotent()
+    private int SeedSchool(int districtId, string name, string? stateCode = null)
     {
-        var userId = SeedUser("teacher2@example.com");
+        using var ctx = CreateContext();
+        var s = new School { DistrictId = districtId, Name = name, StateCode = stateCode, IsActive = true };
+        ctx.Schools.Add(s);
+        ctx.SaveChanges();
+        return s.Id;
+    }
 
-        var model = new OnboardEducatorModel
+    private void SeedStaff(int userId, int districtId, int? schoolId, int orgRoleId = OrgRoleIds.Teacher)
+    {
+        using var ctx = CreateContext();
+        ctx.StaffProfiles.Add(new StaffProfile
         {
-            DistrictName = "Oak District",
-            SchoolName = "Oak High",
-            StateCode = "OH"
-        };
-
-        using (var ctx = CreateContext())
-        {
-            var first = await CreateService(ctx).OnboardAsync(userId, model);
-            Assert.True(first.Success);
-        }
-
-        using (var ctx = CreateContext())
-        {
-            var second = await CreateService(ctx).OnboardAsync(userId, model);
-            Assert.True(second.Success);
-        }
-
-        using (var ctx = CreateContext())
-        {
-            // No duplicate district, school, or staff profile.
-            Assert.Single(ctx.Districts);
-            Assert.Single(ctx.Schools);
-            Assert.Single(ctx.StaffProfiles);
-        }
+            UserId = userId,
+            DistrictId = districtId,
+            SchoolId = schoolId,
+            OrgRoleId = orgRoleId,
+            IsActive = true
+        });
+        ctx.SaveChanges();
     }
 
     [Fact]
     public async Task CreateStudent_PlacesStudentInEducatorSchool_AndGrantsOwnerAccess()
     {
         var userId = SeedUser("teacher3@example.com");
-
-        int schoolId;
-        using (var ctx = CreateContext())
-        {
-            var profile = await CreateService(ctx).OnboardAsync(userId, new OnboardEducatorModel
-            {
-                DistrictName = "Pine District",
-                SchoolName = "Pine Middle",
-                StateCode = "OH"
-            });
-            schoolId = profile.Data!.SchoolId!.Value;
-        }
+        var districtId = SeedDistrict("Pine District", "OH");
+        var schoolId = SeedSchool(districtId, "Pine Middle", "OH");
+        SeedStaff(userId, districtId, schoolId);
 
         int studentId;
         using (var ctx = CreateContext())
@@ -177,27 +137,15 @@ public sealed class EducatorServiceTests : IDisposable
         var educatorA = SeedUser("a-school@example.com");
         var educatorB = SeedUser("b-school@example.com");
 
-        // Educator A in school A.
-        using (var ctx = CreateContext())
-        {
-            await CreateService(ctx).OnboardAsync(educatorA, new OnboardEducatorModel
-            {
-                DistrictName = "District A",
-                SchoolName = "School A",
-                StateCode = "OH"
-            });
-        }
+        // Educator A in district/school A.
+        var districtA = SeedDistrict("District A", "OH");
+        var schoolA = SeedSchool(districtA, "School A", "OH");
+        SeedStaff(educatorA, districtA, schoolA);
 
         // Educator B in a different district/school.
-        using (var ctx = CreateContext())
-        {
-            await CreateService(ctx).OnboardAsync(educatorB, new OnboardEducatorModel
-            {
-                DistrictName = "District B",
-                SchoolName = "School B",
-                StateCode = "OH"
-            });
-        }
+        var districtB = SeedDistrict("District B", "OH");
+        var schoolB = SeedSchool(districtB, "School B", "OH");
+        SeedStaff(educatorB, districtB, schoolB);
 
         // Educator B creates a student in school B.
         int studentInB;
@@ -234,17 +182,13 @@ public sealed class EducatorServiceTests : IDisposable
         var educatorA = SeedUser("list-a@example.com");
         var educatorB = SeedUser("list-b@example.com");
 
-        using (var ctx = CreateContext())
-        {
-            await CreateService(ctx).OnboardAsync(educatorA, new OnboardEducatorModel
-            {
-                DistrictName = "List District A", SchoolName = "List School A", StateCode = "OH"
-            });
-            await CreateService(ctx).OnboardAsync(educatorB, new OnboardEducatorModel
-            {
-                DistrictName = "List District B", SchoolName = "List School B", StateCode = "OH"
-            });
-        }
+        var districtA = SeedDistrict("List District A", "OH");
+        var schoolA = SeedSchool(districtA, "List School A", "OH");
+        SeedStaff(educatorA, districtA, schoolA);
+
+        var districtB = SeedDistrict("List District B", "OH");
+        var schoolB = SeedSchool(districtB, "List School B", "OH");
+        SeedStaff(educatorB, districtB, schoolB);
 
         using (var ctx = CreateContext())
         {

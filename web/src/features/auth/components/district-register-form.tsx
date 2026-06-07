@@ -61,7 +61,8 @@ export function DistrictRegisterForm() {
     });
 
     if (result.success) {
-      navigate('/educator');
+      // New districts land in the first-run setup wizard.
+      navigate('/educator/setup');
     } else {
       setError(result.error || 'Registration failed');
       setIsLoading(false);

@@ -20,81 +20,6 @@ public class EducatorService : IEducatorService
         _logger = logger;
     }
 
-    public async Task<ServiceResult<EducatorProfileModel>> OnboardAsync(int userId, OnboardEducatorModel model, CancellationToken ct = default)
-    {
-        if (string.IsNullOrWhiteSpace(model.DistrictName))
-            return ServiceResult<EducatorProfileModel>.FailureResult("District name is required.");
-        if (string.IsNullOrWhiteSpace(model.SchoolName))
-            return ServiceResult<EducatorProfileModel>.FailureResult("School name is required.");
-
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
-        if (user == null)
-            return ServiceResult<EducatorProfileModel>.FailureResult("User not found.");
-
-        var districtName = model.DistrictName.Trim();
-        var schoolName = model.SchoolName.Trim();
-        var stateCode = string.IsNullOrWhiteSpace(model.StateCode) ? null : model.StateCode.Trim();
-
-        // Find-or-create the District by (Name, StateCode).
-        var district = await _context.Districts
-            .FirstOrDefaultAsync(d => d.Name == districtName && d.StateCode == stateCode, ct);
-        if (district == null)
-        {
-            district = new District
-            {
-                Name = districtName,
-                StateCode = stateCode,
-                CreatedById = userId
-            };
-            await _context.Districts.AddAsync(district, ct);
-            await _context.SaveChangesAsync(ct);
-        }
-
-        // Find-or-create the School by (DistrictId, Name).
-        var school = await _context.Schools
-            .FirstOrDefaultAsync(s => s.DistrictId == district.Id && s.Name == schoolName, ct);
-        if (school == null)
-        {
-            school = new School
-            {
-                DistrictId = district.Id,
-                Name = schoolName,
-                StateCode = stateCode,
-                CreatedById = userId
-            };
-            await _context.Schools.AddAsync(school, ct);
-            await _context.SaveChangesAsync(ct);
-        }
-
-        // Idempotent: reuse an existing StaffProfile for this user.
-        var profile = await _context.StaffProfiles
-            .FirstOrDefaultAsync(t => t.UserId == userId, ct);
-        if (profile == null)
-        {
-            // Interim stamping until self-onboard is removed (later phase): a self-onboarding educator
-            // becomes a Teacher in the resolved school, with DistrictId carried from that school.
-            profile = new StaffProfile
-            {
-                UserId = userId,
-                DistrictId = district.Id,
-                SchoolId = school.Id,
-                OrgRoleId = OrgRoleIds.Teacher,
-                IsActive = true,
-                CreatedById = userId
-            };
-            await _context.StaffProfiles.AddAsync(profile, ct);
-        }
-
-        // Flip the user's role to Educator (single-role model).
-        if (user.Role != UserRole.Educator)
-            user.Role = UserRole.Educator;
-
-        await _context.SaveChangesAsync(ct);
-
-        return ServiceResult<EducatorProfileModel>.SuccessResult(
-            BuildProfileModel(profile, district, school, orgRoleName: "Teacher"));
-    }
-
     public async Task<ServiceResult<EducatorProfileModel>> GetMeAsync(int userId, CancellationToken ct = default)
     {
         var profile = await _context.StaffProfiles
@@ -201,23 +126,6 @@ public class EducatorService : IEducatorService
         SchoolName = profile.School?.Name,
         IsActive = profile.IsActive,
         StateCode = profile.School?.StateCode ?? profile.District?.StateCode,
-        Title = profile.Title,
-        Credentials = profile.Credentials
-    };
-
-    /// <summary>Builds the profile model from explicit org entities (Onboard path, navigations unloaded).</summary>
-    private static EducatorProfileModel BuildProfileModel(StaffProfile profile, District district, School? school, string orgRoleName) => new()
-    {
-        StaffProfileId = profile.Id,
-        UserId = profile.UserId,
-        OrgRoleId = profile.OrgRoleId,
-        OrgRoleName = orgRoleName,
-        DistrictId = district.Id,
-        DistrictName = district.Name,
-        SchoolId = school?.Id,
-        SchoolName = school?.Name,
-        IsActive = profile.IsActive,
-        StateCode = school?.StateCode ?? district.StateCode,
         Title = profile.Title,
         Credentials = profile.Credentials
     };

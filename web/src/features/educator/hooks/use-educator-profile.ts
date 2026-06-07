@@ -11,7 +11,6 @@ interface UseEducatorProfileOptions {
 
 interface UseEducatorProfileResult {
   profile: EducatorProfile | null;
-  isOnboarded: boolean;
   isLoading: boolean;
   reload: () => Promise<void>;
 }
@@ -85,5 +84,5 @@ export function useEducatorProfile(
     };
   }, [enabled]);
 
-  return { profile, isOnboarded: profile !== null, isLoading, reload };
+  return { profile, isLoading, reload };
 }

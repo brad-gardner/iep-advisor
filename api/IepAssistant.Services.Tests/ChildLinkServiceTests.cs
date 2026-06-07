@@ -52,19 +52,56 @@ public sealed class ChildLinkServiceTests : IDisposable
         return user.Id;
     }
 
-    /// <summary>Onboards an educator and creates a student under their school; returns (educatorUserId, studentId).</summary>
+    /// <summary>Provisions a Teacher (direct District/School/StaffProfile seed); returns the educator user id.</summary>
+    private int SeedEducator(string educatorEmail, string district, string school)
+    {
+        var educatorId = SeedUser(educatorEmail, UserRole.Educator);
+        using var ctx = CreateContext();
+        var districtEntity = new District { Name = district, StateCode = "OH" };
+        ctx.Districts.Add(districtEntity);
+        ctx.SaveChanges();
+        var schoolEntity = new School { DistrictId = districtEntity.Id, Name = school, StateCode = "OH", IsActive = true };
+        ctx.Schools.Add(schoolEntity);
+        ctx.SaveChanges();
+        ctx.StaffProfiles.Add(new StaffProfile
+        {
+            UserId = educatorId,
+            DistrictId = districtEntity.Id,
+            SchoolId = schoolEntity.Id,
+            OrgRoleId = OrgRoleIds.Teacher,
+            IsActive = true
+        });
+        ctx.SaveChanges();
+        return educatorId;
+    }
+
+    /// <summary>
+    /// Provisions a Teacher (direct District/School/StaffProfile seed) and creates a student under
+    /// their school; returns (educatorUserId, studentId).
+    /// </summary>
     private async Task<(int educatorId, int studentId)> SeedEducatorWithStudent(
         string educatorEmail, string district, string school, string studentFirst = "Sam", string studentLast = "Student")
     {
-        var educatorId = SeedUser(educatorEmail);
-        int studentId;
+        var educatorId = SeedUser(educatorEmail, UserRole.Educator);
         using (var ctx = CreateContext())
         {
-            await CreateEducator(ctx).OnboardAsync(educatorId, new OnboardEducatorModel
+            var districtEntity = new District { Name = district, StateCode = "OH" };
+            ctx.Districts.Add(districtEntity);
+            ctx.SaveChanges();
+            var schoolEntity = new School { DistrictId = districtEntity.Id, Name = school, StateCode = "OH", IsActive = true };
+            ctx.Schools.Add(schoolEntity);
+            ctx.SaveChanges();
+            ctx.StaffProfiles.Add(new StaffProfile
             {
-                DistrictName = district, SchoolName = school, StateCode = "OH"
+                UserId = educatorId,
+                DistrictId = districtEntity.Id,
+                SchoolId = schoolEntity.Id,
+                OrgRoleId = OrgRoleIds.Teacher,
+                IsActive = true
             });
+            ctx.SaveChanges();
         }
+        int studentId;
         using (var ctx = CreateContext())
         {
             var created = await CreateEducator(ctx).CreateStudentAsync(educatorId, new CreateSchoolStudentModel
@@ -365,12 +402,7 @@ public sealed class ChildLinkServiceTests : IDisposable
     public async Task Invite_FromEducatorInAnotherSchool_IsRejected()
     {
         var (educatorA, studentInA) = await SeedEducatorWithStudent("edA@x.com", "DistrictA", "SchoolA");
-        var educatorB = SeedUser("edB@x.com");
-        using (var ctx = CreateContext())
-            await CreateEducator(ctx).OnboardAsync(educatorB, new OnboardEducatorModel
-            {
-                DistrictName = "DistrictB", SchoolName = "SchoolB", StateCode = "OH"
-            });
+        var educatorB = SeedEducator("edB@x.com", "DistrictB", "SchoolB");
         var email = new CapturingEmailService();
 
         using (var ctx = CreateContext())
@@ -388,12 +420,7 @@ public sealed class ChildLinkServiceTests : IDisposable
     public async Task Revoke_FromEducatorInAnotherSchool_IsRejected()
     {
         var (educatorA, studentInA) = await SeedEducatorWithStudent("edA2@x.com", "DistrictA2", "SchoolA2");
-        var educatorB = SeedUser("edB2@x.com");
-        using (var ctx = CreateContext())
-            await CreateEducator(ctx).OnboardAsync(educatorB, new OnboardEducatorModel
-            {
-                DistrictName = "DistrictB2", SchoolName = "SchoolB2", StateCode = "OH"
-            });
+        var educatorB = SeedEducator("edB2@x.com", "DistrictB2", "SchoolB2");
         var email = new CapturingEmailService();
 
         int linkId;

@@ -2,20 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace IepAssistant.Api.DTOs.Educator;
 
-public class OnboardEducatorRequest
-{
-    [Required]
-    [MaxLength(200)]
-    public string DistrictName { get; set; } = string.Empty;
-
-    [Required]
-    [MaxLength(200)]
-    public string SchoolName { get; set; } = string.Empty;
-
-    [MaxLength(2)]
-    public string? StateCode { get; set; }
-}
-
 public class CreateSchoolStudentRequest
 {
     [Required]

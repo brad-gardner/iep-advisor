@@ -5,19 +5,8 @@ import type {
   CreateSchoolStudentRequest,
   EducatorProfile,
   InviteParentRequest,
-  OnboardEducatorRequest,
   SchoolStudent,
 } from '../types';
-
-export async function onboardEducator(
-  data: OnboardEducatorRequest
-): Promise<ApiResponse<EducatorProfile>> {
-  const response = await apiClient.post<ApiResponse<EducatorProfile>>(
-    '/api/educator/onboard',
-    data
-  );
-  return response.data;
-}
 
 export async function getEducatorProfile(): Promise<ApiResponse<EducatorProfile>> {
   const response = await apiClient.get<ApiResponse<EducatorProfile>>('/api/educator/me');

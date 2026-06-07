@@ -1,12 +1,5 @@
 namespace IepAssistant.Services.Models;
 
-public class OnboardEducatorModel
-{
-    public string DistrictName { get; set; } = string.Empty;
-    public string SchoolName { get; set; } = string.Empty;
-    public string? StateCode { get; set; }
-}
-
 public class EducatorProfileModel
 {
     public int StaffProfileId { get; set; }

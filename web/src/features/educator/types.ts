@@ -1,11 +1,5 @@
 // Mirrors api/IepAssistant.Api/DTOs/Educator/*.cs
 
-export interface OnboardEducatorRequest {
-  districtName: string;
-  schoolName: string;
-  stateCode?: string;
-}
-
 // Org role IDs are stable, seeded server-side (OrgRoleIds): 1=DistrictAdmin,
 // 2=SchoolAdmin, 3=Teacher.
 export const ORG_ROLE = {
