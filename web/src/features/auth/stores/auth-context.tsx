@@ -35,6 +35,7 @@ interface AuthContextType {
   updateProfile: (data: UpdateProfileRequest) => Promise<{ success: boolean; error?: string }>;
   completeOnboarding: () => Promise<{ success: boolean; error?: string }>;
   completeMfaLogin: (token: string, user: User) => void;
+  applySession: (token: string, user: User) => void;
   refreshUser: () => Promise<void>;
   logout: () => void;
 }
@@ -130,6 +131,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMfaPendingToken(null);
   };
 
+  // Public entry point for flows that already hold a minted JWT + user from the
+  // backend (e.g. staff invite acceptance) and just need to persist the session
+  // through the single source of truth.
+  const applySession = (token: string, userData: User) => {
+    persistSession(token, userData);
+  };
+
   const registerDistrict = async (data: RegisterDistrictRequest) => {
     try {
       const response = await registerDistrictApi(data);
@@ -219,6 +227,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateProfile,
         completeOnboarding,
         completeMfaLogin,
+        applySession,
         refreshUser,
         logout,
       }}

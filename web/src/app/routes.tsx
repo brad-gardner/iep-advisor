@@ -43,6 +43,8 @@ import { EducatorHomePage } from '@/features/educator/pages/educator-home-page';
 import { EducatorStudentsPage } from '@/features/educator/pages/educator-students-page';
 import { EducatorStudentDetailPage } from '@/features/educator/pages/educator-student-detail-page';
 import { DistrictSchoolsPage } from '@/features/district-admin/pages/district-schools-page';
+import { DistrictStaffPage } from '@/features/staff-invites/pages/district-staff-page';
+import { StaffAcceptInvitePage } from '@/features/staff-invites/pages/staff-accept-invite-page';
 import { IepDraftListPage } from '@/features/iep-authoring/pages/iep-draft-list-page';
 import { IepAuthoringWorkspacePage } from '@/features/iep-authoring/pages/iep-authoring-workspace-page';
 import { AcceptLinkPage } from '@/features/child-links/components/accept-link-page';
@@ -158,6 +160,16 @@ export function AppRouter() {
               <ResetPasswordPage />
             </AuthLayout>
           </PublicRoute>
+        }
+      />
+      {/* Bare route (no PublicRoute): an authenticated user is NOT bounced —
+          they get a "sign out to continue" prompt on the accept page. */}
+      <Route
+        path="/staff/accept-invite"
+        element={
+          <AuthLayout>
+            <StaffAcceptInvitePage />
+          </AuthLayout>
         }
       />
       <Route path="/mfa-verify" element={<MfaVerifyPage />} />
@@ -370,6 +382,18 @@ export function AppRouter() {
             <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
               <MainLayout>
                 <DistrictSchoolsPage />
+              </MainLayout>
+            </FeatureRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/admin/staff"
+        element={
+          <ProtectedRoute>
+            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
+              <MainLayout>
+                <DistrictStaffPage />
               </MainLayout>
             </FeatureRoute>
           </ProtectedRoute>

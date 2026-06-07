@@ -30,10 +30,17 @@ const studentNavItems = [
   { to: '/student', label: 'Home', Icon: Home },
 ];
 
-// District-admin-only "Administration" group. P4 adds a Staff item here — keep
-// it a one-line addition.
-const districtAdminNavItems = [
-  { to: '/educator/admin/schools', label: 'Schools', Icon: School },
+// "Administration" group. Schools is DistrictAdmin-only; Staff is visible to
+// both DistrictAdmin and SchoolAdmin. Each item declares whether SchoolAdmin
+// may see it so the group can mix scopes.
+const adminNavItems: {
+  to: string;
+  label: string;
+  Icon: typeof School;
+  schoolAdmin: boolean;
+}[] = [
+  { to: '/educator/admin/schools', label: 'Schools', Icon: School, schoolAdmin: false },
+  { to: '/educator/admin/staff', label: 'Staff', Icon: Users, schoolAdmin: true },
 ];
 
 interface SidebarProps {
@@ -70,6 +77,14 @@ export function Sidebar({ onLogout }: SidebarProps) {
   });
   const isDistrictAdmin =
     showEducatorNav && educatorProfile?.orgRoleId === ORG_ROLE.DistrictAdmin;
+  const isSchoolAdmin =
+    showEducatorNav && educatorProfile?.orgRoleId === ORG_ROLE.SchoolAdmin;
+  // The Administration group appears for any admin scope; items inside are
+  // gated individually (Schools is DistrictAdmin-only).
+  const showAdminGroup = isDistrictAdmin || isSchoolAdmin;
+  const visibleAdminItems = adminNavItems.filter(
+    (item) => isDistrictAdmin || (isSchoolAdmin && item.schoolAdmin)
+  );
 
   // Exact-match the section roots (/educator, /student) so they don't stay
   // highlighted while on a nested route.
@@ -117,14 +132,14 @@ export function Sidebar({ onLogout }: SidebarProps) {
         </a>
       </nav>
 
-      {isDistrictAdmin && (
+      {showAdminGroup && (
         <div className="px-3 mt-2" data-testid="district-admin-nav">
           <div className="border-t border-brand-slate-700 pt-3 mb-2">
             <span className="px-3 text-[10px] uppercase tracking-wider font-semibold text-brand-teal-400">
               Administration
             </span>
           </div>
-          {districtAdminNavItems.map(({ to, label, Icon }) => (
+          {visibleAdminItems.map(({ to, label, Icon }) => (
             <Link
               key={to}
               to={to}

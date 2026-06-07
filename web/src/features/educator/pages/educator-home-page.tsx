@@ -1,6 +1,7 @@
 import { useEducatorProfile } from '../hooks/use-educator-profile';
 import { EducatorOnboardingForm } from '../components/educator-onboarding-form';
 import { EducatorDashboard } from '../components/educator-dashboard';
+import { DeactivatedAccessNotice } from '../components/deactivated-access-notice';
 
 export function EducatorHomePage() {
   const { profile, isOnboarded, isLoading } = useEducatorProfile();
@@ -13,10 +14,16 @@ export function EducatorHomePage() {
     );
   }
 
+  // A deactivated staff member still has a profile (isActive=false). Show a
+  // clear state instead of the dashboard.
+  const isDeactivated = profile != null && !profile.isActive;
+
   return (
     <div className="space-y-6">
       <h1 className="font-serif">Educator</h1>
-      {isOnboarded && profile ? (
+      {isDeactivated ? (
+        <DeactivatedAccessNotice />
+      ) : isOnboarded && profile ? (
         <EducatorDashboard profile={profile} />
       ) : (
         <EducatorOnboardingForm />
