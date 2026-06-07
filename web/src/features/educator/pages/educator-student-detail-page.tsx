@@ -10,8 +10,11 @@ import {
   revokeStudentLink,
 } from '../api/educator-api';
 import type { ChildLink, SchoolStudent } from '../types';
+import { ORG_ROLE } from '../types';
+import { useEducatorProfile } from '../hooks/use-educator-profile';
 import { InviteParentForm } from '../components/invite-parent-form';
 import { StudentLinksList } from '../components/student-links-list';
+import { StudentStaffAccessPanel } from '../components/staff-access/student-staff-access-panel';
 import { VersionHistoryList } from '@/features/iep-versions/components/version-history-list';
 import { useStudentVersions } from '@/features/iep-versions/hooks/use-version-list';
 import { InviteStudentForm } from '@/features/student/components/invite-student-form';
@@ -29,6 +32,10 @@ export function EducatorStudentDetailPage() {
   const [revokeNote, setRevokeNote] = useState<string | null>(null);
   const { versions, isLoading: versionsLoading } = useStudentVersions(studentId);
   const studentWorkspaceEnabled = useFeatureFlag('StudentWorkspace');
+  const { profile } = useEducatorProfile();
+  const canManageStaffAccess =
+    profile?.orgRoleId === ORG_ROLE.DistrictAdmin ||
+    profile?.orgRoleId === ORG_ROLE.SchoolAdmin;
 
   const handleInviteStudent = async (email: string) => {
     try {
@@ -173,6 +180,15 @@ export function EducatorStudentDetailPage() {
             linkBase={`/educator/students/${studentId}/iep-versions`}
           />
         </Card>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-serif text-lg">Assigned staff</h2>
+        <StudentStaffAccessPanel
+          studentId={studentId}
+          studentSchoolId={student.schoolId}
+          canManage={canManageStaffAccess}
+        />
       </section>
 
       <InviteParentForm onInvite={handleInvite} />

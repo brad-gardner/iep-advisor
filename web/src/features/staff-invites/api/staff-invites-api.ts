@@ -3,6 +3,7 @@ import type { ApiResponse, LoginResponse } from '@/types/api';
 import type {
   AcceptStaffInviteRequest,
   CreateStaffInviteRequest,
+  DeactivateStaffResponse,
   StaffInvite,
   StaffInvitePreview,
   StaffList,
@@ -43,8 +44,8 @@ export async function resendStaffInvite(
 
 export async function deactivateStaff(
   staffProfileId: number
-): Promise<ApiResponse<null>> {
-  const response = await apiClient.post<ApiResponse<null>>(
+): Promise<ApiResponse<DeactivateStaffResponse>> {
+  const response = await apiClient.post<ApiResponse<DeactivateStaffResponse>>(
     `/api/district/staff/${staffProfileId}/deactivate`
   );
   return response.data;

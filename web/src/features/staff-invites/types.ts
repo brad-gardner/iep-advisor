@@ -44,6 +44,18 @@ export interface StaffList {
   pendingInvites: StaffPendingInvite[];
 }
 
+// Response to a staff deactivation — carries the reassignment hint (students the
+// deactivated staff member solely owned among non-admin staff).
+export interface DeactivatedStaffStudent {
+  studentId: number;
+  name: string;
+}
+
+export interface DeactivateStaffResponse {
+  solelyOwnedStudentCount: number;
+  solelyOwnedStudents: DeactivatedStaffStudent[];
+}
+
 export interface CreateStaffInviteRequest {
   email: string;
   orgRoleId: number;

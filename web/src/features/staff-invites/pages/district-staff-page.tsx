@@ -14,7 +14,12 @@ import {
 import { InviteForm } from '../components/invite-form';
 import { InvitesList } from '../components/invites-list';
 import { StaffList } from '../components/staff-list';
-import type { CreateStaffInviteRequest, StaffList as StaffListData } from '../types';
+import { DeactivateSolelyOwnedNotice } from '../components/deactivate-solely-owned-notice';
+import type {
+  CreateStaffInviteRequest,
+  DeactivateStaffResponse,
+  StaffList as StaffListData,
+} from '../types';
 
 const EMPTY_LIST: StaffListData = { members: [], pendingInvites: [] };
 
@@ -23,6 +28,9 @@ export function DistrictStaffPage() {
   const [staff, setStaff] = useState<StaffListData>(EMPTY_LIST);
   const [schools, setSchools] = useState<DistrictSchool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // After a deactivate, surface students that were only accessible to that staff
+  // member so an admin can reassign them.
+  const [solelyOwned, setSolelyOwned] = useState<DeactivateStaffResponse | null>(null);
 
   const reloadStaff = useCallback(async () => {
     try {
@@ -93,10 +101,15 @@ export function DistrictStaffPage() {
   };
 
   const handleDeactivate = async (staffProfileId: number) => {
+    setSolelyOwned(null);
     try {
       const response = await deactivateStaff(staffProfileId);
       if (response.success) {
         await reloadStaff();
+        // Surface the reassignment hint at the page level when present.
+        if (response.data && response.data.solelyOwnedStudentCount > 0) {
+          setSolelyOwned(response.data);
+        }
         return { success: true };
       }
       // Backend returns an explicit message for the last-DistrictAdmin guard.
@@ -155,6 +168,12 @@ export function DistrictStaffPage() {
 
           <section className="space-y-3">
             <h2 className="font-serif text-lg">Staff</h2>
+            {solelyOwned && (
+              <DeactivateSolelyOwnedNotice
+                result={solelyOwned}
+                onDismiss={() => setSolelyOwned(null)}
+              />
+            )}
             <StaffList
               members={staff.members}
               onDeactivate={handleDeactivate}
