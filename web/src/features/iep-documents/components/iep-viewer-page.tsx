@@ -18,13 +18,10 @@ import {
 } from "../api/iep-documents-api";
 import { getChild, setCurrentIep } from "@/features/children/api/children-api";
 import { usePolling } from "@/hooks/use-polling";
-import { useFeatureFlagStatus } from "@/hooks/use-feature-flags";
 import { Badge } from "@/components/ui/badge";
 import { useIepAnalysis } from "../hooks/use-iep-analysis";
 import { useAdvocacyGoals } from "@/features/advocacy-goals/hooks/use-advocacy-goals";
-import { useMeetingPrep } from "@/features/meeting-prep/hooks/use-meeting-prep";
 import { AnalysisTab } from "./analysis-tab";
-import { MeetingPrepTab } from "@/features/meeting-prep/components/meeting-prep-tab";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { PdfViewer } from "@/components/ui/pdf-viewer";
@@ -45,7 +42,7 @@ export function IepViewerPage() {
   const [sections, setSections] = useState<IepSection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
-    "document" | "analysis" | "meeting-prep" | "progress-reports"
+    "document" | "analysis" | "progress-reports"
   >("document");
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -67,27 +64,8 @@ export function IepViewerPage() {
     document?.childProfileId ?? 0,
   );
 
-  const {
-    checklist: meetingPrepChecklist,
-    isLoading: meetingPrepLoading,
-    isGenerating: meetingPrepGenerating,
-    generateFromIep: generateMeetingPrep,
-    reload: reloadMeetingPrep,
-  } = useMeetingPrep(document?.childProfileId ?? 0, documentId);
-
-  // When the standalone Meeting Prep tab is on, it lives at the child level and
-  // is no longer rendered embedded inside the document viewer.
-  const { enabled: meetingPrepStandalone, loaded: flagsLoaded } =
-    useFeatureFlagStatus("MeetingPrepStandalone");
-  // Only show the embedded Meeting Prep tab once flags are known AND the
-  // standalone feature is off — avoids both a duplicate-affordance flash
-  // (flag on) and a dead blank panel if the tab is hidden mid-session.
-  // Gate on `loaded` (not just `!enabled`) so the embedded tab is hidden until
-  // the flag is known: that prevents both a duplicate-affordance flash when the
-  // standalone feature is on, and any dead-state where "meeting-prep" is the
-  // active tab while its button/panel are hidden (the tab button is the only way
-  // to select it, and it never renders before the flag resolves).
-  const showEmbeddedMeetingPrep = flagsLoaded && !meetingPrepStandalone;
+  // Meeting Prep lives at the child level now (standalone tab), so it is no
+  // longer rendered embedded inside the document viewer.
 
   const loadSections = useCallback(async () => {
     const secRes = await getIepSections(documentId);
@@ -422,22 +400,6 @@ export function IepViewerPage() {
                 <span className="ml-2 inline-block w-2 h-2 rounded-full bg-brand-teal-500" />
               )}
             </button>
-            {showEmbeddedMeetingPrep && (
-              <button
-                onClick={() => setActiveTab("meeting-prep")}
-                data-testid="tab-meeting-prep"
-                className={`px-4 py-2 text-[13px] font-medium transition-colors ${
-                  activeTab === "meeting-prep"
-                    ? "text-brand-slate-800 border-b-2 border-brand-teal-500"
-                    : "text-brand-slate-400 hover:text-brand-slate-800"
-                }`}
-              >
-                Meeting Prep
-                {meetingPrepChecklist?.status === "completed" && (
-                  <span className="ml-2 inline-block w-2 h-2 rounded-full bg-brand-teal-500" />
-                )}
-              </button>
-            )}
             <button
               onClick={() => setActiveTab("progress-reports")}
               data-testid="tab-progress-reports"
@@ -475,19 +437,6 @@ export function IepViewerPage() {
               advocacyGoals={advocacyGoals}
               onTrigger={triggerAnalysis}
               onReload={reloadAnalysis}
-            />
-          )}
-
-          {activeTab === "meeting-prep" && showEmbeddedMeetingPrep && (
-            <MeetingPrepTab
-              checklist={meetingPrepChecklist}
-              isLoading={meetingPrepLoading}
-              isGenerating={meetingPrepGenerating}
-              onGenerate={() => generateMeetingPrep(documentId)}
-              onReload={reloadMeetingPrep}
-              analysisCreatedAt={
-                analysis?.status === "completed" ? analysis.createdAt : null
-              }
             />
           )}
 

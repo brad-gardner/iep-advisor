@@ -14,12 +14,10 @@ namespace IepAssistant.Api.Controllers;
 public class ChildLinkController : ControllerBase
 {
     private readonly IChildLinkService _childLinkService;
-    private readonly IFeatureFlags _featureFlags;
 
-    public ChildLinkController(IChildLinkService childLinkService, IFeatureFlags featureFlags)
+    public ChildLinkController(IChildLinkService childLinkService)
     {
         _childLinkService = childLinkService;
-        _featureFlags = featureFlags;
     }
 
     [HttpGet("preview")]
@@ -27,9 +25,6 @@ public class ChildLinkController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Preview([FromQuery] string token, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         if (string.IsNullOrWhiteSpace(token))
             return BadRequest(ApiResponse<object>.Error("Token is required."));
 
@@ -60,9 +55,6 @@ public class ChildLinkController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Accept([FromBody] AcceptChildLinkRequest request, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
@@ -87,9 +79,6 @@ public class ChildLinkController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<List<ChildSchoolLinkDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetChildSchoolLinks(int childId, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         var result = await _childLinkService.GetChildSchoolLinksAsync(User.GetUserId(), childId, ct);
         if (!result.Success)
             return MapFailure<List<ChildSchoolLinkDto>>(result.Message);

@@ -19,7 +19,6 @@ import { VersionHistoryList } from '@/features/iep-versions/components/version-h
 import { useStudentVersions } from '@/features/iep-versions/hooks/use-version-list';
 import { InviteStudentForm } from '@/features/student/components/invite-student-form';
 import { inviteStudentFromEducator } from '@/features/student/api/student-invite-api';
-import { useFeatureFlag } from '@/hooks/use-feature-flags';
 
 export function EducatorStudentDetailPage() {
   const { studentId: studentIdParam } = useParams<{ studentId: string }>();
@@ -31,7 +30,6 @@ export function EducatorStudentDetailPage() {
   const [revokingId, setRevokingId] = useState<number | null>(null);
   const [revokeNote, setRevokeNote] = useState<string | null>(null);
   const { versions, isLoading: versionsLoading } = useStudentVersions(studentId);
-  const studentWorkspaceEnabled = useFeatureFlag('StudentWorkspace');
   const { profile } = useEducatorProfile();
   const canManageStaffAccess =
     profile?.orgRoleId === ORG_ROLE.DistrictAdmin ||
@@ -193,12 +191,10 @@ export function EducatorStudentDetailPage() {
 
       <InviteParentForm onInvite={handleInvite} />
 
-      {studentWorkspaceEnabled && (
-        <InviteStudentForm
-          onInvite={handleInviteStudent}
-          description={`Invite ${student.firstName} to activate their own account and take part in their IEP process.`}
-        />
-      )}
+      <InviteStudentForm
+        onInvite={handleInviteStudent}
+        description={`Invite ${student.firstName} to activate their own account and take part in their IEP process.`}
+      />
 
       <section className="space-y-3">
         <h2 className="font-serif text-lg">Parent links</h2>

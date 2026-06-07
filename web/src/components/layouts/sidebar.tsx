@@ -3,7 +3,6 @@ import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Me
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { useFeatureFlag } from '@/hooks/use-feature-flags';
 import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
 import { ORG_ROLE } from '@/features/educator/types';
 
@@ -50,18 +49,16 @@ interface SidebarProps {
 export function Sidebar({ onLogout }: SidebarProps) {
   const location = useLocation();
   const { user } = useAuth();
-  const schoolSideEnabled = useFeatureFlag('SchoolSide');
-  const studentWorkspaceEnabled = useFeatureFlag('StudentWorkspace');
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(path + '/');
 
-  // Pick the role-specific nav: educator when SchoolSide is on and the user is
-  // an Educator; student when StudentWorkspace is on and the user is a Student;
-  // otherwise the parent nav. Common items appear for every role.
-  const showEducatorNav = schoolSideEnabled && user?.role === 'Educator';
-  const showStudentNav = studentWorkspaceEnabled && user?.role === 'Student';
+  // Pick the role-specific nav purely by the user's role: educator nav for
+  // Educators, student nav for Students, otherwise the parent nav. Common items
+  // appear for every role.
+  const showEducatorNav = user?.role === 'Educator';
+  const showStudentNav = user?.role === 'Student';
   const roleNavItems = showEducatorNav
     ? educatorNavItems
     : showStudentNav

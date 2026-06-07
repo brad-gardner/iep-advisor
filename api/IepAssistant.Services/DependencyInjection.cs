@@ -10,7 +10,6 @@ public static class DependencyInjection
     public static IServiceCollection AddServices(this IServiceCollection services)
     {
         services.AddScoped<IClaudeClient, ClaudeClient>();
-        services.AddScoped<IFeatureFlags, ConfigurationFeatureFlags>();
         services.AddSingleton<MfaSecretProtector>();
         services.AddScoped<ITotpService, TotpService>();
         services.AddScoped<IMfaService, MfaService>();

@@ -1,5 +1,4 @@
 import { Card } from '@/components/ui/card';
-import { useFeatureFlag } from '@/hooks/use-feature-flags';
 import { useChildVersions } from '../hooks/use-version-list';
 import { VersionHistoryList } from './version-history-list';
 
@@ -8,13 +7,11 @@ interface SchoolIepsCardProps {
 }
 
 // Parent-side card showing finalized IEP versions the school has shared.
-// Gated on the SchoolSide flag; renders nothing when off or when there are
-// no versions yet (avoids an empty card for parents with no school link).
+// Renders nothing when there are no versions yet — avoids an empty card for
+// parents whose child has no school link.
 export function SchoolIepsCard({ childId }: SchoolIepsCardProps) {
-  const schoolSideEnabled = useFeatureFlag('SchoolSide');
-  const { versions, isLoading } = useChildVersions(childId, schoolSideEnabled);
+  const { versions, isLoading } = useChildVersions(childId);
 
-  if (!schoolSideEnabled) return null;
   if (!isLoading && versions.length === 0) return null;
 
   return (

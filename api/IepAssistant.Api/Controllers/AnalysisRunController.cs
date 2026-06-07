@@ -16,16 +16,13 @@ public class AnalysisRunController : ControllerBase
 {
     private readonly IAnalysisRunService _analysisRunService;
     private readonly AnalysisRunQueue _queue;
-    private readonly IFeatureFlags _featureFlags;
 
     public AnalysisRunController(
         IAnalysisRunService analysisRunService,
-        AnalysisRunQueue queue,
-        IFeatureFlags featureFlags)
+        AnalysisRunQueue queue)
     {
         _analysisRunService = analysisRunService;
         _queue = queue;
-        _featureFlags = featureFlags;
     }
 
     [HttpPost("api/children/{childId}/analysis-runs")]
@@ -35,9 +32,6 @@ public class AnalysisRunController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Create(int childId, [FromBody] CreateAnalysisRunRequest request, CancellationToken cancellationToken)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.AnalysisRun))
-            return NotFound();
-
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
@@ -67,9 +61,6 @@ public class AnalysisRunController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<AnalysisRunDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetByChild(int childId, CancellationToken cancellationToken)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.AnalysisRun))
-            return NotFound();
-
         var userId = User.GetUserId();
         var result = await _analysisRunService.GetRunsAsync(childId, userId, cancellationToken);
 
@@ -85,9 +76,6 @@ public class AnalysisRunController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int childId, int runId, CancellationToken cancellationToken)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.AnalysisRun))
-            return NotFound();
-
         var userId = User.GetUserId();
         var result = await _analysisRunService.GetRunAsync(runId, userId, cancellationToken);
 

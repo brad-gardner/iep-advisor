@@ -48,7 +48,7 @@ export function useStudentVersions(studentId: number): UseVersionListResult {
 }
 
 // Parent: finalized versions for the SchoolStudent linked to this child.
-// Pass `enabled` (the SchoolSide flag) so it never fires when the feature is off.
-export function useChildVersions(childId: number, enabled: boolean): UseVersionListResult {
-  return useVersionList(childId, enabled, listVersionsForChild);
+// Always fetches; the API returns an empty list for children with no school link.
+export function useChildVersions(childId: number): UseVersionListResult {
+  return useVersionList(childId, true, listVersionsForChild);
 }

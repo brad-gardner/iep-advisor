@@ -10,9 +10,9 @@ export function RoleHome() {
   return <Navigate to={user ? roleHome(user.role) : '/dashboard'} replace />;
 }
 
-// Gates a route to a set of roles, redirecting others to their own home. The
-// educator shell intentionally does NOT use this (a Parent must reach /educator
-// to onboard and convert); kept available for future role-gated routes.
+// Gates a route to a set of roles, redirecting others to their own home. Used
+// by the educator and student shells: a Parent hitting /educator/* is bounced
+// to /dashboard, an Educator hitting /student/* to /educator, etc.
 export function RoleRoute({
   allow,
   children,

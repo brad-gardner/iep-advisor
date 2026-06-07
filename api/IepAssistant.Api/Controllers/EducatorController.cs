@@ -16,13 +16,11 @@ public class EducatorController : ControllerBase
 {
     private readonly IEducatorService _educatorService;
     private readonly IChildLinkService _childLinkService;
-    private readonly IFeatureFlags _featureFlags;
 
-    public EducatorController(IEducatorService educatorService, IChildLinkService childLinkService, IFeatureFlags featureFlags)
+    public EducatorController(IEducatorService educatorService, IChildLinkService childLinkService)
     {
         _educatorService = educatorService;
         _childLinkService = childLinkService;
-        _featureFlags = featureFlags;
     }
 
     [HttpGet("me")]
@@ -30,9 +28,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetMe(CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         var result = await _educatorService.GetMeAsync(User.GetUserId(), ct);
 
         if (!result.Success)
@@ -45,9 +40,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<SchoolStudentDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStudents(CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         var result = await _educatorService.GetStudentsAsync(User.GetUserId(), ct);
 
         if (!result.Success)
@@ -61,9 +53,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateStudent([FromBody] CreateSchoolStudentRequest request, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
@@ -92,9 +81,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStudent(int studentId, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         var result = await _educatorService.GetStudentAsync(User.GetUserId(), studentId, ct);
 
         if (!result.Success)
@@ -109,9 +95,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> InviteParent(int studentId, [FromBody] InviteParentRequest request, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
@@ -128,9 +111,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetLinks(int studentId, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         var result = await _childLinkService.GetLinksForStudentAsync(User.GetUserId(), studentId, ct);
 
         if (!result.Success)
@@ -145,9 +125,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RevokeLink(int studentId, int linkId, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         var result = await _childLinkService.RevokeLinkAsync(User.GetUserId(), studentId, linkId, ct);
 
         if (!result.Success)
@@ -163,9 +140,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetStaffAccess(int studentId, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         var result = await _educatorService.GetStudentStaffAccessAsync(User.GetUserId(), studentId, ct);
         if (!result.Success)
             return MapFailure<IEnumerable<StudentStaffAccessDto>>(result.Message);
@@ -179,9 +153,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GrantStaffAccess(int studentId, [FromBody] GrantStudentStaffAccessRequest request, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
@@ -204,9 +175,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RevokeStaffAccess(int studentId, int accessId, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         var result = await _educatorService.RevokeStudentStaffAccessAsync(User.GetUserId(), studentId, accessId, ct);
         if (!result.Success)
             return MapFailure<object>(result.Message);
