@@ -5,6 +5,11 @@ public class School : BaseEntity, IAuditableEntity
     public int DistrictId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? StateCode { get; set; }
+
+    /// <summary>Soft-delete flag. Deactivated (<c>false</c>) schools are hidden from directory/picker
+    /// listings; deactivation is blocked while the school has active students or active staff.</summary>
+    public bool IsActive { get; set; } = true;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public int? CreatedById { get; set; }
