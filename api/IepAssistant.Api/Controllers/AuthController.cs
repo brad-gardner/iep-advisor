@@ -103,6 +103,57 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Register a new school/district. Open signup (no invite code) — creates the first DistrictAdmin plus
+    /// a brand-new District and returns a JWT (same shape as login) so the frontend can auto-login.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("register-district")]
+    [EnableRateLimiting("login")]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> RegisterDistrict([FromBody] RegisterDistrictRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var model = new RegisterDistrictModel
+        {
+            Email = request.Email,
+            Password = request.Password,
+            FirstName = request.FirstName,
+            LastName = request.LastName,
+            DistrictName = request.DistrictName,
+            StateCode = request.StateCode
+        };
+
+        var result = await _authService.RegisterDistrictAsync(model, cancellationToken);
+
+        if (!result.Success)
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Registration failed"));
+
+        var authResult = result.AuthResult!;
+        var response = new LoginResponse
+        {
+            Token = authResult.Token,
+            ExpiresAt = authResult.ExpiresAt,
+            User = new UserDto
+            {
+                Id = authResult.User.Id,
+                Email = authResult.User.Email,
+                FirstName = authResult.User.FirstName,
+                LastName = authResult.User.LastName,
+                State = authResult.User.State,
+                Role = authResult.User.Role,
+                IsActive = authResult.User.IsActive,
+                OnboardingCompleted = authResult.User.OnboardingCompleted,
+                CreatedAt = authResult.User.CreatedAt
+            }
+        };
+
+        return Ok(ApiResponse<LoginResponse>.SuccessResponse(response));
+    }
+
+    /// <summary>
     /// Get current authenticated user
     /// </summary>
     [Authorize]

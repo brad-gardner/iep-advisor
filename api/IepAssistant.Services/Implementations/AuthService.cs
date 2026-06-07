@@ -125,6 +125,84 @@ public class AuthService : IAuthService
         return ServiceResult.SuccessResult("User registered successfully.");
     }
 
+    public async Task<RegisterDistrictResult> RegisterDistrictAsync(RegisterDistrictModel model, CancellationToken cancellationToken = default)
+    {
+        // Email-already-registered short-circuit (same shape/message as RegisterAsync). The unique index
+        // on Email is the real backstop — if a collision slips past this check the transaction below
+        // rolls back, so no partial District/StaffProfile is ever persisted.
+        var existingUser = await _userRepository.GetByEmailAsync(model.Email, cancellationToken);
+        if (existingUser != null)
+            return RegisterDistrictResult.Failure("Email is already registered.");
+
+        // One atomic transaction: User + (ALWAYS NEW) District + StaffProfile(DistrictAdmin). The District
+        // is never find-or-create/matched by name — matching by name would let a stranger join an existing
+        // org, a security hole. Duplicate district names are intentionally allowed.
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var now = DateTime.UtcNow;
+
+            var user = new User
+            {
+                Email = model.Email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password),
+                FirstName = model.FirstName,
+                LastName = model.LastName,
+                Role = UserRole.Educator,
+                IsActive = true,
+                SubscriptionStatus = "active",
+                SubscriptionExpiresAt = now.AddYears(1),
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            await _userRepository.AddAsync(user, cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            var district = new District
+            {
+                Name = model.DistrictName,
+                StateCode = string.IsNullOrWhiteSpace(model.StateCode) ? null : model.StateCode,
+                CreatedById = user.Id,
+                UpdatedById = user.Id,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            _context.Districts.Add(district);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            var staffProfile = new StaffProfile
+            {
+                UserId = user.Id,
+                DistrictId = district.Id,
+                SchoolId = null,
+                OrgRoleId = OrgRoleIds.DistrictAdmin,
+                IsActive = true,
+                CreatedById = user.Id,
+                UpdatedById = user.Id,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            _context.StaffProfiles.Add(staffProfile);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+
+            var token = GenerateJwtToken(user);
+            var expiryDays = int.Parse(_configuration["Jwt:ExpiryInDays"] ?? "7");
+            return RegisterDistrictResult.Ok(new AuthResult
+            {
+                Token = token,
+                ExpiresAt = now.AddDays(expiryDays),
+                User = MapToUserModel(user)
+            });
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
     public async Task<UserModel?> GetUserByIdAsync(int userId, CancellationToken cancellationToken = default)
     {
         var user = await _userRepository.GetByIdAsync(userId, cancellationToken);

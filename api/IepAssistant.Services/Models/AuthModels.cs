@@ -31,6 +31,30 @@ public class RegisterModel
     public string InviteCode { get; set; } = string.Empty;
 }
 
+public class RegisterDistrictModel
+{
+    public string Email { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string DistrictName { get; set; } = string.Empty;
+    public string? StateCode { get; set; }
+}
+
+/// <summary>
+/// Outcome of <c>RegisterDistrictAsync</c>. On success carries an <see cref="AuthResult"/> (JWT + user)
+/// so the frontend can auto-login exactly as it does after a normal login; on failure carries a message.
+/// </summary>
+public class RegisterDistrictResult
+{
+    public bool Success { get; init; }
+    public string? Message { get; init; }
+    public AuthResult? AuthResult { get; init; }
+
+    public static RegisterDistrictResult Failure(string message) => new() { Success = false, Message = message };
+    public static RegisterDistrictResult Ok(AuthResult auth) => new() { Success = true, AuthResult = auth };
+}
+
 public class UpdateUserModel
 {
     public string? FirstName { get; set; }
