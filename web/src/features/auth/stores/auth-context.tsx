@@ -1,9 +1,16 @@
 import { createContext, useCallback, useEffect, useState } from 'react';
 import * as Sentry from '@sentry/react';
-import type { User, LoginRequest, RegisterRequest, UpdateProfileRequest } from '@/types/api';
+import type {
+  User,
+  LoginRequest,
+  RegisterRequest,
+  RegisterDistrictRequest,
+  UpdateProfileRequest,
+} from '@/types/api';
 import {
   login as loginApi,
   register as registerApi,
+  registerDistrict as registerDistrictApi,
   getCurrentUser,
   updateProfile as updateProfileApi,
   completeOnboarding as completeOnboardingApi,
@@ -24,6 +31,7 @@ interface AuthContextType {
   mfaPendingToken: string | null;
   login: (data: LoginRequest) => Promise<LoginResult>;
   register: (data: RegisterRequest) => Promise<{ success: boolean; error?: string }>;
+  registerDistrict: (data: RegisterDistrictRequest) => Promise<{ success: boolean; error?: string }>;
   updateProfile: (data: UpdateProfileRequest) => Promise<{ success: boolean; error?: string }>;
   completeOnboarding: () => Promise<{ success: boolean; error?: string }>;
   completeMfaLogin: (token: string, user: User) => void;
@@ -82,6 +90,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
+  // Single source of truth for persisting an authenticated session
+  // (token + user) to storage and state. Reused by login, MFA completion,
+  // and district signup so storage logic lives in exactly one place.
+  const persistSession = useCallback((token: string, userData: User) => {
+    setToken(token);
+    setUser(userData);
+    setStoredUser(JSON.stringify(userData));
+  }, []);
+
   const login = async (data: LoginRequest): Promise<LoginResult> => {
     try {
       const response = await loginApi(data);
@@ -98,9 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Normal login (no MFA)
         if (response.data.token && response.data.user) {
-          setToken(response.data.token);
-          setUser(response.data.user);
-          setStoredUser(JSON.stringify(response.data.user));
+          persistSession(response.data.token, response.data.user);
           return { success: true };
         }
       }
@@ -111,10 +126,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const completeMfaLogin = (token: string, userData: User) => {
-    setToken(token);
-    setUser(userData);
-    setStoredUser(JSON.stringify(userData));
+    persistSession(token, userData);
     setMfaPendingToken(null);
+  };
+
+  const registerDistrict = async (data: RegisterDistrictRequest) => {
+    try {
+      const response = await registerDistrictApi(data);
+      // Backend returns the same shape as login (JWT + user); auto-login.
+      if (response.success && response.data?.token && response.data.user) {
+        persistSession(response.data.token, response.data.user);
+        return { success: true };
+      }
+      return { success: false, error: response.message || 'Registration failed' };
+    } catch {
+      return { success: false, error: 'An error occurred during registration' };
+    }
   };
 
   const register = async (data: RegisterRequest) => {
@@ -188,6 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         mfaPendingToken,
         login,
         register,
+        registerDistrict,
         updateProfile,
         completeOnboarding,
         completeMfaLogin,

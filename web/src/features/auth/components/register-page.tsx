@@ -1,139 +1,57 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../hooks/use-auth';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Notice } from '@/components/ui/notice';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ParentRegisterForm } from './parent-register-form';
+import { DistrictRegisterForm } from './district-register-form';
+import { RegisterPathCard } from './register-path-card';
+
+type RegisterPath = 'parent' | 'district';
 
 export function RegisterPage() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { register } = useAuth();
   const codeFromUrl = searchParams.get('code') ?? '';
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    firstName: '',
-    lastName: '',
-    inviteCode: codeFromUrl,
-  });
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const typeFromUrl = searchParams.get('type');
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  };
+  // Preselect a path from the URL: a beta invite (`?code=`) implies the parent
+  // path; `?type=district` lets marketing links jump straight to the district
+  // form. Otherwise the user chooses explicitly.
+  const initialPath: RegisterPath | null = codeFromUrl
+    ? 'parent'
+    : typeFromUrl === 'district'
+      ? 'district'
+      : typeFromUrl === 'parent'
+        ? 'parent'
+        : null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters');
-      return;
-    }
-
-    setIsLoading(true);
-
-    const result = await register({
-      email: formData.email.trim(),
-      password: formData.password,
-      firstName: formData.firstName.trim(),
-      lastName: formData.lastName.trim(),
-      inviteCode: formData.inviteCode.trim(),
-    });
-
-    if (result.success) {
-      navigate('/login', { state: { message: 'Registration successful! Please sign in.' } });
-    } else {
-      setError(result.error || 'Registration failed');
-    }
-
-    setIsLoading(false);
-  };
+  const [path, setPath] = useState<RegisterPath | null>(initialPath);
 
   return (
     <div className="w-full">
-      <h2 className="text-2xl font-serif font-semibold text-center mb-6 text-brand-slate-800">Create Your Account</h2>
+      <h2 className="text-2xl font-serif font-semibold text-center mb-6 text-brand-slate-800">
+        Create Your Account
+      </h2>
 
-      {error && <div className="mb-4" data-testid="register-error"><Notice variant="error" title={error} /></div>}
-
-      <form onSubmit={handleSubmit} className="space-y-4" data-testid="register-form">
-        <Input
-          label="Invite Code"
-          name="inviteCode"
-          value={formData.inviteCode}
-          onChange={handleChange}
-          required
-          placeholder="Enter your invite code"
-          maxLength={20}
-          data-testid="register-invite-code"
-        />
-
-        <div className="grid grid-cols-2 gap-4">
-          <Input
-            label="First Name"
-            name="firstName"
-            value={formData.firstName}
-            onChange={handleChange}
-            required
-            maxLength={100}
-            data-testid="register-first-name"
+      <fieldset className="mb-6" data-testid="register-path-chooser">
+        <legend className="sr-only">Who are you signing up as?</legend>
+        <div role="radiogroup" aria-label="Account type" className="grid grid-cols-1 gap-3">
+          <RegisterPathCard
+            title="I'm a parent"
+            description="Understand and advocate around your child's IEP. Requires a beta invite code."
+            selected={path === 'parent'}
+            onSelect={() => setPath('parent')}
+            data-testid="register-path-parent"
           />
-          <Input
-            label="Last Name"
-            name="lastName"
-            value={formData.lastName}
-            onChange={handleChange}
-            required
-            maxLength={100}
-            data-testid="register-last-name"
+          <RegisterPathCard
+            title="I represent a school or district"
+            description="Set up your district to manage IEPs with your team."
+            selected={path === 'district'}
+            onSelect={() => setPath('district')}
+            data-testid="register-path-district"
           />
         </div>
+      </fieldset>
 
-        <Input
-          label="Email"
-          name="email"
-          type="email"
-          value={formData.email}
-          onChange={handleChange}
-          required
-          maxLength={256}
-          data-testid="register-email"
-        />
-
-        <Input
-          label="Password"
-          name="password"
-          type="password"
-          value={formData.password}
-          onChange={handleChange}
-          required
-          maxLength={128}
-          data-testid="register-password"
-        />
-
-        <Input
-          label="Confirm Password"
-          name="confirmPassword"
-          type="password"
-          value={formData.confirmPassword}
-          onChange={handleChange}
-          required
-          maxLength={128}
-          data-testid="register-confirm-password"
-        />
-
-        <Button type="submit" disabled={isLoading} className="w-full" data-testid="register-submit">
-          {isLoading ? 'Creating account...' : 'Create Account'}
-        </Button>
-      </form>
+      {path === 'parent' && <ParentRegisterForm initialInviteCode={codeFromUrl} />}
+      {path === 'district' && <DistrictRegisterForm />}
 
       <p className="mt-6 text-center text-sm text-brand-slate-400">
         Already have an account?{' '}
