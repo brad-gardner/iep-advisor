@@ -1,11 +1,10 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
+using IepAssistant.Services.Security;
 
 namespace IepAssistant.Services.Implementations;
 
@@ -83,8 +82,8 @@ public class ChildLinkService : IChildLinkService
         if (alreadyLinked)
             return ServiceResult<ChildLinkModel>.FailureResult("This student is already linked to that parent.");
 
-        var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        var tokenHash = HashToken(rawToken);
+        var rawToken = InviteTokenHelper.Generate();
+        var tokenHash = InviteTokenHelper.Hash(rawToken);
 
         var link = new ChildLink
         {
@@ -211,7 +210,7 @@ public class ChildLinkService : IChildLinkService
         // FindActiveInviteAsync and each create a duplicate ChildProfile. Only the request whose
         // conditional update matches an as-yet-unaccepted invite proceeds; the loser falls back to
         // the idempotent "already linked" resolution.
-        var tokenHash = HashToken(token);
+        var tokenHash = InviteTokenHelper.Hash(token);
         var claimed = await _context.ChildLinks
             .Where(l => l.Id == invite.Id && l.InviteToken == tokenHash && l.AcceptedAt == null && l.IsActive)
             .ExecuteUpdateAsync(s => s
@@ -394,7 +393,7 @@ public class ChildLinkService : IChildLinkService
         if (string.IsNullOrWhiteSpace(token))
             return null;
 
-        var tokenHash = HashToken(token);
+        var tokenHash = InviteTokenHelper.Hash(token);
         return await _context.ChildLinks
             .FirstOrDefaultAsync(l => l.InviteToken == tokenHash
                                    && l.IsActive
@@ -449,10 +448,4 @@ public class ChildLinkService : IChildLinkService
         InviteExpiresAt = link.InviteExpiresAt,
         CreatedAt = link.CreatedAt
     };
-
-    private static string HashToken(string token)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
-        return Convert.ToBase64String(bytes);
-    }
 }

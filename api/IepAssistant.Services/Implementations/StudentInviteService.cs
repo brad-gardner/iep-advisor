@@ -1,11 +1,10 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
+using IepAssistant.Services.Security;
 
 namespace IepAssistant.Services.Implementations;
 
@@ -68,14 +67,14 @@ public class StudentInviteService : IStudentInviteService
         if (existing != null)
             return ServiceResult<StudentInviteModel>.SuccessResult(MapToModel(existing), "A pending invite already exists.");
 
-        var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var rawToken = InviteTokenHelper.Generate();
         var invite = new StudentInvite
         {
             ChildProfileId = childProfileId,
             SchoolStudentId = null,
             InvitedByUserId = parentUserId,
             InviteEmail = studentEmail,
-            InviteToken = HashToken(rawToken),
+            InviteToken = InviteTokenHelper.Hash(rawToken),
             InviteExpiresAt = now.AddDays(InviteExpiryDays),
             IsActive = true,
             CreatedById = parentUserId,
@@ -125,14 +124,14 @@ public class StudentInviteService : IStudentInviteService
         if (existing != null)
             return ServiceResult<StudentInviteModel>.SuccessResult(MapToModel(existing), "A pending invite already exists.");
 
-        var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var rawToken = InviteTokenHelper.Generate();
         var invite = new StudentInvite
         {
             ChildProfileId = null,
             SchoolStudentId = schoolStudentId,
             InvitedByUserId = educatorUserId,
             InviteEmail = studentEmail,
-            InviteToken = HashToken(rawToken),
+            InviteToken = InviteTokenHelper.Hash(rawToken),
             InviteExpiresAt = now.AddDays(InviteExpiryDays),
             IsActive = true,
             CreatedById = educatorUserId,
@@ -271,7 +270,7 @@ public class StudentInviteService : IStudentInviteService
 
         // Atomically claim the token (single-use) BEFORE writing the links, so two concurrent accepts
         // of the same invite can't both proceed. Loser sees 0 rows → invalid/expired.
-        var tokenHash = HashToken(token);
+        var tokenHash = InviteTokenHelper.Hash(token);
         var claimed = await _context.StudentInvites
             .Where(i => i.Id == invite.Id && i.InviteToken == tokenHash && i.AcceptedAt == null && i.IsActive)
             .ExecuteUpdateAsync(s => s
@@ -339,7 +338,7 @@ public class StudentInviteService : IStudentInviteService
         if (string.IsNullOrWhiteSpace(token))
             return null;
 
-        var tokenHash = HashToken(token);
+        var tokenHash = InviteTokenHelper.Hash(token);
         return await _context.StudentInvites
             .FirstOrDefaultAsync(i => i.InviteToken == tokenHash
                                    && i.IsActive
@@ -372,10 +371,4 @@ public class StudentInviteService : IStudentInviteService
         InviteExpiresAt = invite.InviteExpiresAt,
         CreatedAt = invite.CreatedAt
     };
-
-    private static string HashToken(string token)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
-        return Convert.ToBase64String(bytes);
-    }
 }

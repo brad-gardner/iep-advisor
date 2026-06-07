@@ -63,6 +63,26 @@ builder.Host.UseSerilog();
 builder.Services.AddDomain(builder.Configuration);
 builder.Services.AddServices();
 
+// Email:ExposeLinksForTesting gate (e2e/testing convenience). Enabling it surfaces raw invite URLs in
+// API responses, so it is allowed ONLY in Development AND only when no real ACS connection string is set.
+// Startup is the one place IHostEnvironment is in scope, so any attempt to enable it outside Development
+// is logged and IGNORED here — making non-Development exposure impossible regardless of config.
+{
+    var exposeRequested = builder.Configuration.GetValue<bool>("Email:ExposeLinksForTesting");
+    var acsConnectionEmpty = string.IsNullOrEmpty(builder.Configuration["Email:ConnectionString"]);
+    var isDevelopment = builder.Environment.IsDevelopment();
+    var exposeEnabled = exposeRequested && acsConnectionEmpty && isDevelopment;
+
+    if (exposeRequested && !exposeEnabled)
+    {
+        Log.Warning(
+            "Email:ExposeLinksForTesting=true ignored — it requires Development environment (is={IsDev}) and an empty Email:ConnectionString (empty={AcsEmpty}).",
+            isDevelopment, acsConnectionEmpty);
+    }
+
+    builder.Services.AddSingleton(new IepAssistant.Services.Security.InviteLinkExposure(exposeEnabled));
+}
+
 // Named HttpClient for Claude API calls (avoids socket exhaustion from new HttpClient per request).
 // Timeout is generous because long-document (30+ page ETR/IEP) non-streaming responses with
 // large output token budgets can take several minutes. Consider switching to streaming if this

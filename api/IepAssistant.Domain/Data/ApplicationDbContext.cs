@@ -36,6 +36,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<School> Schools => Set<School>();
     public DbSet<OrgRole> OrgRoles => Set<OrgRole>();
     public DbSet<StaffProfile> StaffProfiles => Set<StaffProfile>();
+    public DbSet<StaffInvite> StaffInvites => Set<StaffInvite>();
     public DbSet<SchoolStudent> SchoolStudents => Set<SchoolStudent>();
     public DbSet<SchoolStudentAccess> SchoolStudentAccesses => Set<SchoolStudentAccess>();
     public DbSet<ChildLink> ChildLinks => Set<ChildLink>();
