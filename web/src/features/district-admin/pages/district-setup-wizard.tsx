@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Logo } from '@/components/ui/logo';
 import { ProgressDots } from '@/components/ui/progress-dots';
@@ -22,6 +22,12 @@ export function DistrictSetupWizard() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [createdSchool, setCreatedSchool] = useState<DistrictSchool | null>(null);
+
+  // District signup sets this so PublicRoute routes here after auto-login rather
+  // than to the default educator home; clear it now that we've arrived.
+  useEffect(() => {
+    sessionStorage.removeItem('post-auth-redirect');
+  }, []);
 
   if (isLoading) {
     return (

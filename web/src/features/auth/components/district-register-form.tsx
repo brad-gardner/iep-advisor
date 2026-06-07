@@ -61,8 +61,13 @@ export function DistrictRegisterForm() {
     });
 
     if (result.success) {
-      // New districts land in the first-run setup wizard.
-      navigate('/educator/setup');
+      // New districts land in the first-run setup wizard. The session is now
+      // persisted, so the enclosing PublicRoute re-renders and would otherwise
+      // bounce us to the role's default home (/educator), skipping the wizard.
+      // Record the intended post-auth destination so PublicRoute honors it
+      // regardless of which navigation React Router commits last.
+      sessionStorage.setItem('post-auth-redirect', '/educator/setup');
+      navigate('/educator/setup', { replace: true });
     } else {
       setError(result.error || 'Registration failed');
       setIsLoading(false);

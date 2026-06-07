@@ -7,6 +7,13 @@ export class RegisterPage {
     await this.page.goto('/register');
   }
 
+  // The /register screen now leads with a parent|district chooser. Parent fields
+  // only render after the parent path is selected. Each fillForm() picks it.
+  async chooseParent() {
+    await this.page.locator('[data-testid="register-path-parent"]').click();
+    await this.page.locator('[data-testid="register-form"]').waitFor({ state: 'visible' });
+  }
+
   async fillForm(data: {
     inviteCode: string;
     firstName: string;
@@ -14,6 +21,10 @@ export class RegisterPage {
     email: string;
     password: string;
   }) {
+    // Ensure the parent form is shown (idempotent — clicking again is harmless).
+    if (await this.page.locator('[data-testid="register-form"]').count() === 0) {
+      await this.chooseParent();
+    }
     await this.page.locator('[data-testid="register-invite-code"]').fill(data.inviteCode);
     await this.page.locator('[data-testid="register-first-name"]').fill(data.firstName);
     await this.page.locator('[data-testid="register-last-name"]').fill(data.lastName);

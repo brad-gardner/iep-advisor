@@ -85,7 +85,15 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (isAuthenticated && user) {
-    return <Navigate to={roleHome(user.role)} replace />;
+    // A page that auto-logs-in (e.g. district signup) can request a specific
+    // post-auth destination; otherwise fall back to the role's default home.
+    // Without this, persisting the session re-renders this guard and its
+    // <Navigate> can clobber the page's own navigate() (e.g. to the setup
+    // wizard) depending on commit order. Read-only here — the destination page
+    // clears the key once it has mounted, so repeated renders of this guard stay
+    // consistent.
+    const requested = sessionStorage.getItem('post-auth-redirect');
+    return <Navigate to={requested ?? roleHome(user.role)} replace />;
   }
 
   return <>{children}</>;
