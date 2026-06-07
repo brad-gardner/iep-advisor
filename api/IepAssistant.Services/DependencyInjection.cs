@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IProgressReportAnalysisService, ProgressReportAnalysisService>();
         services.AddScoped<IAnalysisRunService, AnalysisRunService>();
         services.AddScoped<IAnalysisRunBackfillService, AnalysisRunBackfillService>();
+        services.AddScoped<IOrgAccessService, OrgAccessService>();
         services.AddScoped<IEducatorService, EducatorService>();
         services.AddScoped<IChildLinkService, ChildLinkService>();
         services.AddScoped<IIepDraftService, IepDraftService>();

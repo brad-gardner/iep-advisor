@@ -36,10 +36,10 @@ public sealed class StudentInviteServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private StudentInviteService CreateService(ApplicationDbContext ctx, CapturingEmailService email)
-        => new(ctx, new AccessService(ctx), email, NullLogger<StudentInviteService>.Instance);
+        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), email, NullLogger<StudentInviteService>.Instance);
 
     private static EducatorService CreateEducator(ApplicationDbContext ctx)
-        => new(ctx, NullLogger<EducatorService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), NullLogger<EducatorService>.Instance);
 
     // ----------------------------------------------------------------- seed helpers
 

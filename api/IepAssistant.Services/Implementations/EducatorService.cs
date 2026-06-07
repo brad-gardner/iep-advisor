@@ -10,11 +10,13 @@ namespace IepAssistant.Services.Implementations;
 public class EducatorService : IEducatorService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IOrgAccessService _orgAccess;
     private readonly ILogger<EducatorService> _logger;
 
-    public EducatorService(ApplicationDbContext context, ILogger<EducatorService> logger)
+    public EducatorService(ApplicationDbContext context, IOrgAccessService orgAccess, ILogger<EducatorService> logger)
     {
         _context = context;
+        _orgAccess = orgAccess;
         _logger = logger;
     }
 
@@ -64,18 +66,23 @@ public class EducatorService : IEducatorService
             await _context.SaveChangesAsync(ct);
         }
 
-        // Idempotent: reuse an existing TeacherProfile for this user.
-        var profile = await _context.TeacherProfiles
+        // Idempotent: reuse an existing StaffProfile for this user.
+        var profile = await _context.StaffProfiles
             .FirstOrDefaultAsync(t => t.UserId == userId, ct);
         if (profile == null)
         {
-            profile = new TeacherProfile
+            // Interim stamping until self-onboard is removed (later phase): a self-onboarding educator
+            // becomes a Teacher in the resolved school, with DistrictId carried from that school.
+            profile = new StaffProfile
             {
                 UserId = userId,
+                DistrictId = district.Id,
                 SchoolId = school.Id,
+                OrgRoleId = OrgRoleIds.Teacher,
+                IsActive = true,
                 CreatedById = userId
             };
-            await _context.TeacherProfiles.AddAsync(profile, ct);
+            await _context.StaffProfiles.AddAsync(profile, ct);
         }
 
         // Flip the user's role to Educator (single-role model).
@@ -85,22 +92,22 @@ public class EducatorService : IEducatorService
         await _context.SaveChangesAsync(ct);
 
         return ServiceResult<EducatorProfileModel>.SuccessResult(
-            BuildProfileModel(profile, school, district));
+            BuildProfileModel(profile, district, school, orgRoleName: "Teacher"));
     }
 
     public async Task<ServiceResult<EducatorProfileModel>> GetMeAsync(int userId, CancellationToken ct = default)
     {
-        var profile = await _context.TeacherProfiles
+        var profile = await _context.StaffProfiles
             .AsNoTracking()
+            .Include(t => t.District)
             .Include(t => t.School)
-            .ThenInclude(s => s.District)
+            .Include(t => t.OrgRole)
             .FirstOrDefaultAsync(t => t.UserId == userId, ct);
 
         if (profile == null)
             return ServiceResult<EducatorProfileModel>.FailureResult("Educator profile not found.");
 
-        return ServiceResult<EducatorProfileModel>.SuccessResult(
-            BuildProfileModel(profile, profile.School, profile.School.District));
+        return ServiceResult<EducatorProfileModel>.SuccessResult(BuildProfileModel(profile));
     }
 
     public async Task<ServiceResult<SchoolStudentModel>> CreateStudentAsync(int userId, CreateSchoolStudentModel model, CancellationToken ct = default)
@@ -108,15 +115,17 @@ public class EducatorService : IEducatorService
         if (string.IsNullOrWhiteSpace(model.FirstName))
             return ServiceResult<SchoolStudentModel>.FailureResult("Student first name is required.");
 
-        var profile = await _context.TeacherProfiles
+        var profile = await _context.StaffProfiles
             .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.UserId == userId, ct);
+            .FirstOrDefaultAsync(t => t.UserId == userId && t.IsActive, ct);
         if (profile == null)
             return ServiceResult<SchoolStudentModel>.FailureResult("Educator profile not found.");
+        if (profile.SchoolId == null)
+            return ServiceResult<SchoolStudentModel>.FailureResult("A school is required to create a student.");
 
         var student = new SchoolStudent
         {
-            SchoolId = profile.SchoolId,
+            SchoolId = profile.SchoolId.Value,
             FirstName = model.FirstName.Trim(),
             LastName = string.IsNullOrWhiteSpace(model.LastName) ? null : model.LastName.Trim(),
             DateOfBirth = model.DateOfBirth,
@@ -144,16 +153,18 @@ public class EducatorService : IEducatorService
 
     public async Task<ServiceResult<List<SchoolStudentModel>>> GetStudentsAsync(int userId, CancellationToken ct = default)
     {
-        var profile = await _context.TeacherProfiles
+        var profile = await _context.StaffProfiles
             .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.UserId == userId, ct);
+            .FirstOrDefaultAsync(t => t.UserId == userId && t.IsActive, ct);
         if (profile == null)
             return ServiceResult<List<SchoolStudentModel>>.FailureResult("Educator profile not found.");
+        if (profile.SchoolId == null)
+            return ServiceResult<List<SchoolStudentModel>>.SuccessResult(new List<SchoolStudentModel>());
 
         // SchoolId-bound: only students in the educator's own school.
         var students = await _context.SchoolStudents
             .AsNoTracking()
-            .Where(s => s.SchoolId == profile.SchoolId && s.IsActive)
+            .Where(s => s.SchoolId == profile.SchoolId.Value && s.IsActive)
             .OrderBy(s => s.LastName)
             .ThenBy(s => s.FirstName)
             .ToListAsync(ct);
@@ -164,38 +175,49 @@ public class EducatorService : IEducatorService
 
     public async Task<ServiceResult<SchoolStudentModel>> GetStudentAsync(int userId, int studentId, CancellationToken ct = default)
     {
-        var profile = await _context.TeacherProfiles
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.UserId == userId, ct);
-        if (profile == null)
-            return ServiceResult<SchoolStudentModel>.FailureResult("Educator profile not found.");
+        // Org access (player-coach: admins pass within scope; teachers need an active SchoolStudentAccess).
+        if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
+            return ServiceResult<SchoolStudentModel>.FailureResult("You do not have permission to access this student.");
 
-        // Cross-school rejection guard: the student must belong to the educator's school
-        // AND the educator must have an active SchoolStudentAccess row.
         var student = await _context.SchoolStudents
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == studentId && s.SchoolId == profile.SchoolId, ct);
+            .FirstOrDefaultAsync(s => s.Id == studentId, ct);
         if (student == null)
             return ServiceResult<SchoolStudentModel>.FailureResult("Student not found.");
-
-        var hasAccess = await _context.SchoolStudentAccesses
-            .AsNoTracking()
-            .AnyAsync(a => a.SchoolStudentId == studentId && a.UserId == userId && a.IsActive, ct);
-        if (!hasAccess)
-            return ServiceResult<SchoolStudentModel>.FailureResult("You do not have permission to access this student.");
 
         return ServiceResult<SchoolStudentModel>.SuccessResult(MapStudent(student));
     }
 
-    private static EducatorProfileModel BuildProfileModel(TeacherProfile profile, School school, District district) => new()
+    /// <summary>Builds the profile model from a fully navigation-loaded StaffProfile (GetMe path).</summary>
+    private static EducatorProfileModel BuildProfileModel(StaffProfile profile) => new()
     {
-        TeacherProfileId = profile.Id,
+        StaffProfileId = profile.Id,
         UserId = profile.UserId,
-        SchoolId = school.Id,
-        SchoolName = school.Name,
+        OrgRoleId = profile.OrgRoleId,
+        OrgRoleName = profile.OrgRole?.Name ?? string.Empty,
+        DistrictId = profile.DistrictId,
+        DistrictName = profile.District?.Name ?? string.Empty,
+        SchoolId = profile.SchoolId,
+        SchoolName = profile.School?.Name,
+        IsActive = profile.IsActive,
+        StateCode = profile.School?.StateCode ?? profile.District?.StateCode,
+        Title = profile.Title,
+        Credentials = profile.Credentials
+    };
+
+    /// <summary>Builds the profile model from explicit org entities (Onboard path, navigations unloaded).</summary>
+    private static EducatorProfileModel BuildProfileModel(StaffProfile profile, District district, School? school, string orgRoleName) => new()
+    {
+        StaffProfileId = profile.Id,
+        UserId = profile.UserId,
+        OrgRoleId = profile.OrgRoleId,
+        OrgRoleName = orgRoleName,
         DistrictId = district.Id,
         DistrictName = district.Name,
-        StateCode = school.StateCode ?? district.StateCode,
+        SchoolId = school?.Id,
+        SchoolName = school?.Name,
+        IsActive = profile.IsActive,
+        StateCode = school?.StateCode ?? district.StateCode,
         Title = profile.Title,
         Credentials = profile.Credentials
     };

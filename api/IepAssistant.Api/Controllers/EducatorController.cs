@@ -207,12 +207,15 @@ public class EducatorController : ControllerBase
 
     private static EducatorProfileDto MapProfile(EducatorProfileModel m) => new()
     {
-        TeacherProfileId = m.TeacherProfileId,
+        StaffProfileId = m.StaffProfileId,
         UserId = m.UserId,
-        SchoolId = m.SchoolId,
-        SchoolName = m.SchoolName,
+        OrgRoleId = m.OrgRoleId,
+        OrgRoleName = m.OrgRoleName,
         DistrictId = m.DistrictId,
         DistrictName = m.DistrictName,
+        SchoolId = m.SchoolId,
+        SchoolName = m.SchoolName,
+        IsActive = m.IsActive,
         StateCode = m.StateCode,
         Title = m.Title,
         Credentials = m.Credentials

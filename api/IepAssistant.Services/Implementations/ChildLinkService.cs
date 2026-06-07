@@ -20,6 +20,7 @@ public class ChildLinkService : IChildLinkService
 
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _accessService;
+    private readonly IOrgAccessService _orgAccess;
     private readonly IEmailService _emailService;
     private readonly IAuditLogger _audit;
     private readonly ILogger<ChildLinkService> _logger;
@@ -27,12 +28,14 @@ public class ChildLinkService : IChildLinkService
     public ChildLinkService(
         ApplicationDbContext context,
         IAccessService accessService,
+        IOrgAccessService orgAccess,
         IEmailService emailService,
         IAuditLogger audit,
         ILogger<ChildLinkService> logger)
     {
         _context = context;
         _accessService = accessService;
+        _orgAccess = orgAccess;
         _emailService = emailService;
         _audit = audit;
         _logger = logger;
@@ -368,29 +371,22 @@ public class ChildLinkService : IChildLinkService
     // ----------------------------------------------------------------- Helpers
 
     /// <summary>
-    /// SchoolId-bound educator access check (replicates EducatorService.GetStudentAsync's guard): the
-    /// student must be in the educator's TeacherProfile.SchoolId AND an active SchoolStudentAccess must exist.
+    /// Org access check delegated to <see cref="IOrgAccessService"/> (player-coach: admins pass within
+    /// scope; teachers need an active SchoolStudentAccess). Loads the (tracked) student when permitted;
+    /// returns <c>(null, _)</c> otherwise. The <c>schoolId</c> tuple member is retained for signature
+    /// compatibility with existing callers (currently unused by them).
     /// </summary>
     private async Task<(SchoolStudent? student, int schoolId)> GetEducatorStudentAccessAsync(int educatorUserId, int studentId, CancellationToken ct)
     {
-        var schoolId = await _context.TeacherProfiles
-            .Where(t => t.UserId == educatorUserId)
-            .Select(t => (int?)t.SchoolId)
-            .FirstOrDefaultAsync(ct);
-        if (schoolId == null)
+        if (!await _orgAccess.CanActOnStudentAsync(educatorUserId, studentId, AccessRole.Viewer, ct))
             return (null, 0);
 
         var student = await _context.SchoolStudents
-            .FirstOrDefaultAsync(s => s.Id == studentId && s.SchoolId == schoolId.Value, ct);
+            .FirstOrDefaultAsync(s => s.Id == studentId, ct);
         if (student == null)
-            return (null, schoolId.Value);
+            return (null, 0);
 
-        var hasAccess = await _context.SchoolStudentAccesses
-            .AnyAsync(a => a.SchoolStudentId == studentId && a.UserId == educatorUserId && a.IsActive, ct);
-        if (!hasAccess)
-            return (null, schoolId.Value);
-
-        return (student, schoolId.Value);
+        return (student, student.SchoolId);
     }
 
     private async Task<ChildLink?> FindActiveInviteAsync(string token, CancellationToken ct)

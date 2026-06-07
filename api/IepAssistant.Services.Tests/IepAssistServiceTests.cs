@@ -36,7 +36,7 @@ public sealed class IepAssistServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private IepAssistService CreateService(ApplicationDbContext ctx)
-        => new(ctx, _claude, _audit, NullLogger<IepAssistService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), _claude, _audit, NullLogger<IepAssistService>.Instance);
 
     // ---------------------------------------------------------------- Fake Claude
 
@@ -72,7 +72,7 @@ public sealed class IepAssistServiceTests : IDisposable
         ctx.Schools.Add(school);
         ctx.SaveChanges();
 
-        ctx.TeacherProfiles.Add(new TeacherProfile { UserId = user.Id, SchoolId = school.Id });
+        ctx.StaffProfiles.Add(new StaffProfile { UserId = user.Id, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher });
         ctx.SaveChanges();
 
         var student = new SchoolStudent { SchoolId = school.Id, FirstName = "Sam", IsActive = true };
@@ -98,7 +98,8 @@ public sealed class IepAssistServiceTests : IDisposable
         ctx.Users.Add(user);
         ctx.SaveChanges();
 
-        ctx.TeacherProfiles.Add(new TeacherProfile { UserId = user.Id, SchoolId = schoolId });
+        var districtId = ctx.Schools.Where(s => s.Id == schoolId).Select(s => s.DistrictId).Single();
+        ctx.StaffProfiles.Add(new StaffProfile { UserId = user.Id, DistrictId = districtId, SchoolId = schoolId, OrgRoleId = OrgRoleIds.Teacher });
         ctx.SaveChanges();
 
         ctx.SchoolStudentAccesses.Add(new SchoolStudentAccess

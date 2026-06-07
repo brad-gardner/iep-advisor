@@ -88,9 +88,9 @@ public sealed class IepVersionServiceTests : IDisposable
 
     private ApplicationDbContext CreateContext() => new(_options);
     private IepVersionService CreateVersionService(ApplicationDbContext ctx, IBlobStorageService? blob = null)
-        => new(ctx, new AccessService(ctx), blob ?? new SuccessBlobStorageFake(), _audit, NullLogger<IepVersionService>.Instance);
+        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), blob ?? new SuccessBlobStorageFake(), _audit, NullLogger<IepVersionService>.Instance);
     private IepDraftService CreateDraftService(ApplicationDbContext ctx)
-        => new(ctx, _audit, NullLogger<IepDraftService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), _audit, NullLogger<IepDraftService>.Instance);
 
     // ---------------------------------------------------------------- Seed helpers
 
@@ -112,7 +112,7 @@ public sealed class IepVersionServiceTests : IDisposable
         ctx.Schools.Add(school);
         ctx.SaveChanges();
 
-        ctx.TeacherProfiles.Add(new TeacherProfile { UserId = user.Id, SchoolId = school.Id });
+        ctx.StaffProfiles.Add(new StaffProfile { UserId = user.Id, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher });
         ctx.SaveChanges();
 
         var student = new SchoolStudent { SchoolId = school.Id, FirstName = "Sam", IsActive = true };

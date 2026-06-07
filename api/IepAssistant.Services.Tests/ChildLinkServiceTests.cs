@@ -36,10 +36,10 @@ public sealed class ChildLinkServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private static ChildLinkService CreateService(ApplicationDbContext ctx, CapturingEmailService email)
-        => new(ctx, new AccessService(ctx), email, new CapturingAuditLogger(), NullLogger<ChildLinkService>.Instance);
+        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), email, new CapturingAuditLogger(), NullLogger<ChildLinkService>.Instance);
 
     private static EducatorService CreateEducator(ApplicationDbContext ctx)
-        => new(ctx, NullLogger<EducatorService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), NullLogger<EducatorService>.Instance);
 
     // ----------------------------------------------------------------- seed helpers
 

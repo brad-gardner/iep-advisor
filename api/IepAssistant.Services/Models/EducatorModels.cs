@@ -9,12 +9,15 @@ public class OnboardEducatorModel
 
 public class EducatorProfileModel
 {
-    public int TeacherProfileId { get; set; }
+    public int StaffProfileId { get; set; }
     public int UserId { get; set; }
-    public int SchoolId { get; set; }
-    public string SchoolName { get; set; } = string.Empty;
+    public int OrgRoleId { get; set; }
+    public string OrgRoleName { get; set; } = string.Empty;
     public int DistrictId { get; set; }
     public string DistrictName { get; set; } = string.Empty;
+    public int? SchoolId { get; set; }
+    public string? SchoolName { get; set; }
+    public bool IsActive { get; set; }
     public string? StateCode { get; set; }
     public string? Title { get; set; }
     public string? Credentials { get; set; }

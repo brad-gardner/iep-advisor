@@ -11,7 +11,7 @@ namespace IepAssistant.Services.Tests;
 
 /// <summary>
 /// P3b coverage: self-serve educator onboarding (find-or-create District/School, idempotent
-/// TeacherProfile, role flip), student creation under the educator's school with Owner access,
+/// StaffProfile, role flip), student creation under the educator's school with Owner access,
 /// and SchoolId-bound scoping that rejects cross-school student access. Uses a real SQLite
 /// in-memory engine (same pattern as <see cref="AnalysisRunTestFixture"/>).
 /// </summary>
@@ -35,7 +35,7 @@ public sealed class EducatorServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private EducatorService CreateService(ApplicationDbContext ctx)
-        => new(ctx, NullLogger<EducatorService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), NullLogger<EducatorService>.Instance);
 
     private int SeedUser(string email)
     {
@@ -76,7 +76,7 @@ public sealed class EducatorServiceTests : IDisposable
         {
             Assert.Single(ctx.Districts);
             Assert.Single(ctx.Schools);
-            Assert.Single(ctx.TeacherProfiles);
+            Assert.Single(ctx.StaffProfiles);
 
             var user = ctx.Users.Single(u => u.Id == userId);
             Assert.Equal(UserRole.Educator, user.Role);
@@ -109,10 +109,10 @@ public sealed class EducatorServiceTests : IDisposable
 
         using (var ctx = CreateContext())
         {
-            // No duplicate district, school, or teacher profile.
+            // No duplicate district, school, or staff profile.
             Assert.Single(ctx.Districts);
             Assert.Single(ctx.Schools);
-            Assert.Single(ctx.TeacherProfiles);
+            Assert.Single(ctx.StaffProfiles);
         }
     }
 
@@ -130,7 +130,7 @@ public sealed class EducatorServiceTests : IDisposable
                 SchoolName = "Pine Middle",
                 StateCode = "OH"
             });
-            schoolId = profile.Data!.SchoolId;
+            schoolId = profile.Data!.SchoolId!.Value;
         }
 
         int studentId;
@@ -158,7 +158,7 @@ public sealed class EducatorServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateStudent_WithoutTeacherProfile_Fails()
+    public async Task CreateStudent_WithoutStaffProfile_Fails()
     {
         var userId = SeedUser("notonboarded@example.com");
 

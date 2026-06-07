@@ -28,17 +28,20 @@ public class IepAssistService : IIepAssistService
     private const int ChatMaxTokens = 2048;
 
     private readonly ApplicationDbContext _context;
+    private readonly IOrgAccessService _orgAccess;
     private readonly IClaudeClient _claude;
     private readonly IAuditLogger _audit;
     private readonly ILogger<IepAssistService> _logger;
 
     public IepAssistService(
         ApplicationDbContext context,
+        IOrgAccessService orgAccess,
         IClaudeClient claude,
         IAuditLogger audit,
         ILogger<IepAssistService> logger)
     {
         _context = context;
+        _orgAccess = orgAccess;
         _claude = claude;
         _audit = audit;
         _logger = logger;
@@ -388,24 +391,9 @@ public class IepAssistService : IIepAssistService
         if (studentId == null)
             return ServiceResult.FailureResult(DraftNotFoundMessage);
 
-        var profile = await _context.TeacherProfiles
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.UserId == userId, ct);
-        if (profile == null)
-            return ServiceResult.FailureResult(PermissionMessage);
-
-        var student = await _context.SchoolStudents
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == studentId.Value && s.SchoolId == profile.SchoolId, ct);
-        if (student == null)
-            return ServiceResult.FailureResult(PermissionMessage);
-
-        var access = await _context.SchoolStudentAccesses
-            .AsNoTracking()
-            .FirstOrDefaultAsync(a => a.SchoolStudentId == studentId.Value && a.UserId == userId && a.IsActive, ct);
-        if (access == null || access.Role < AccessRole.Collaborator)
-            return ServiceResult.FailureResult(PermissionMessage);
-
-        return ServiceResult.SuccessResult();
+        // Org access (player-coach: admins pass within scope; teachers need active Collaborator+).
+        return await _orgAccess.CanActOnStudentAsync(userId, studentId.Value, AccessRole.Collaborator, ct)
+            ? ServiceResult.SuccessResult()
+            : ServiceResult.FailureResult(PermissionMessage);
     }
 }
