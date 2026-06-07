@@ -6,13 +6,26 @@ export interface OnboardEducatorRequest {
   stateCode?: string;
 }
 
+// Org role IDs are stable, seeded server-side (OrgRoleIds): 1=DistrictAdmin,
+// 2=SchoolAdmin, 3=Teacher.
+export const ORG_ROLE = {
+  DistrictAdmin: 1,
+  SchoolAdmin: 2,
+  Teacher: 3,
+} as const;
+
+export type OrgRoleId = (typeof ORG_ROLE)[keyof typeof ORG_ROLE];
+
 export interface EducatorProfile {
-  teacherProfileId: number;
+  staffProfileId: number;
   userId: number;
-  schoolId: number;
-  schoolName: string;
+  orgRoleId: number;
+  orgRoleName: string;
   districtId: number;
   districtName: string;
+  schoolId?: number | null;
+  schoolName?: string | null;
+  isActive: boolean;
   stateCode?: string | null;
   title?: string | null;
   credentials?: string | null;

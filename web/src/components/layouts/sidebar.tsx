@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { useFeatureFlag } from '@/hooks/use-feature-flags';
+import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
+import { ORG_ROLE } from '@/features/educator/types';
 
 // Common items shown to every role, after any role-specific section above.
 const commonNavItems = [
@@ -26,6 +28,12 @@ const educatorNavItems = [
 
 const studentNavItems = [
   { to: '/student', label: 'Home', Icon: Home },
+];
+
+// District-admin-only "Administration" group. P4 adds a Staff item here — keep
+// it a one-line addition.
+const districtAdminNavItems = [
+  { to: '/educator/admin/schools', label: 'Schools', Icon: School },
 ];
 
 interface SidebarProps {
@@ -53,6 +61,15 @@ export function Sidebar({ onLogout }: SidebarProps) {
       ? studentNavItems
       : parentNavItems;
   const navItems = [...roleNavItems, ...commonNavItems];
+
+  // Only Educators have an org role, so only fetch the profile for them. The
+  // shared module cache means this reuses any fetch the educator pages already
+  // triggered.
+  const { profile: educatorProfile } = useEducatorProfile({
+    enabled: user?.role === 'Educator',
+  });
+  const isDistrictAdmin =
+    showEducatorNav && educatorProfile?.orgRoleId === ORG_ROLE.DistrictAdmin;
 
   // Exact-match the section roots (/educator, /student) so they don't stay
   // highlighted while on a nested route.
@@ -99,6 +116,32 @@ export function Sidebar({ onLogout }: SidebarProps) {
           Support
         </a>
       </nav>
+
+      {isDistrictAdmin && (
+        <div className="px-3 mt-2" data-testid="district-admin-nav">
+          <div className="border-t border-brand-slate-700 pt-3 mb-2">
+            <span className="px-3 text-[10px] uppercase tracking-wider font-semibold text-brand-teal-400">
+              Administration
+            </span>
+          </div>
+          {districtAdminNavItems.map(({ to, label, Icon }) => (
+            <Link
+              key={to}
+              to={to}
+              data-testid={`nav-${to.slice(1)}`}
+              onClick={() => setMobileOpen(false)}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-button text-sm transition-colors ${
+                isActive(to)
+                  ? 'text-brand-teal-400 bg-brand-slate-700 border-l-2 border-brand-teal-500 -ml-px'
+                  : 'text-brand-slate-400 hover:text-brand-slate-200 hover:bg-brand-slate-700'
+              }`}
+            >
+              <Icon size={18} strokeWidth={1.8} />
+              {label}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {user?.role === 'Admin' && (
         <div className="px-3 mt-2">
