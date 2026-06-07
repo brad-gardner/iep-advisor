@@ -377,6 +377,135 @@ public sealed class StaffInviteServiceTests : IDisposable
         Assert.True(result.Success);
     }
 
+    // ================================================================= Filtered unique index (DB backstop)
+
+    /// <summary>
+    /// TOCTOU defense at the storage layer: bypass the service pre-check by inserting a second LIVE pending
+    /// StaffInvite for the same email directly via the context. The filtered unique index on Email
+    /// (IsActive=1 AND AcceptedAt IS NULL AND InviteToken IS NOT NULL) must reject it — proving SQLite
+    /// honors the bracket-free partial-index filter that EnsureCreated applied.
+    /// </summary>
+    [Fact]
+    public async Task FilteredUniqueIndex_RejectsSecondLivePendingInvite_ForSameEmail()
+    {
+        var districtId = SeedDistrict("Maple");
+        var schoolId = SeedSchool(districtId, "Elm");
+
+        StaffInvite NewLive() => new()
+        {
+            Email = "idx@x.com", DistrictId = districtId, SchoolId = schoolId, OrgRoleId = OrgRoleIds.Teacher,
+            InviteToken = InviteTokenHelper.Hash(InviteTokenHelper.Generate()),
+            InviteExpiresAt = DateTime.UtcNow.AddDays(14), IsActive = true, InvitedByUserId = 0
+        };
+
+        using (var ctx = CreateContext())
+        {
+            ctx.StaffInvites.Add(NewLive());
+            await ctx.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            ctx.StaffInvites.Add(NewLive());
+            await Assert.ThrowsAsync<DbUpdateException>(() => ctx.SaveChangesAsync());
+        }
+
+        using var ctx2 = CreateContext();
+        Assert.Single(ctx2.StaffInvites.Where(i => i.Email == "idx@x.com"));
+    }
+
+    /// <summary>Service-level: a second InviteAsync after a direct-context LIVE pending row still returns the
+    /// friendly "already invited" error (DbUpdateException from the index mapped to the same message even if
+    /// the pre-check were to race past).</summary>
+    [Fact]
+    public async Task Invite_AfterDirectPendingRow_ReturnsFriendlyAlreadyInvited()
+    {
+        var districtId = SeedDistrict("Maple");
+        var schoolId = SeedSchool(districtId, "Elm");
+        var (adminUserId, _) = SeedStaff("admin@x.com", districtId, null, OrgRoleIds.DistrictAdmin);
+        var email = new CapturingEmailService();
+
+        // Insert a LIVE pending invite straight to the DB (bypasses the service path entirely).
+        using (var ctx = CreateContext())
+        {
+            ctx.StaffInvites.Add(new StaffInvite
+            {
+                Email = "dup2@x.com", DistrictId = districtId, SchoolId = schoolId, OrgRoleId = OrgRoleIds.Teacher,
+                InviteToken = InviteTokenHelper.Hash(InviteTokenHelper.Generate()),
+                InviteExpiresAt = DateTime.UtcNow.AddDays(14), IsActive = true, InvitedByUserId = adminUserId
+            });
+            await ctx.SaveChangesAsync();
+        }
+
+        using var ctx2 = CreateContext();
+        var result = await CreateService(ctx2, email).InviteAsync(adminUserId, new CreateStaffInviteModel
+        {
+            Email = "dup2@x.com", OrgRoleId = OrgRoleIds.Teacher, SchoolId = schoolId
+        });
+        Assert.False(result.Success);
+        Assert.Contains("already been invited", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The filter excludes revoked rows (IsActive=0, token nulled), so a fresh invite to the same
+    /// email succeeds and does not trip the unique index.</summary>
+    [Fact]
+    public async Task FilteredUniqueIndex_RevokedRow_DoesNotBlockFreshInvite()
+    {
+        var districtId = SeedDistrict("Maple");
+        var schoolId = SeedSchool(districtId, "Elm");
+        var (adminUserId, _) = SeedStaff("admin@x.com", districtId, null, OrgRoleIds.DistrictAdmin);
+        var email = new CapturingEmailService();
+
+        // A previously-revoked invite for the email: IsActive=false + token nulled (Revoke's end state).
+        using (var ctx = CreateContext())
+        {
+            ctx.StaffInvites.Add(new StaffInvite
+            {
+                Email = "fresh@x.com", DistrictId = districtId, SchoolId = schoolId, OrgRoleId = OrgRoleIds.Teacher,
+                InviteToken = null, InviteExpiresAt = DateTime.UtcNow.AddDays(14),
+                IsActive = false, InvitedByUserId = adminUserId
+            });
+            await ctx.SaveChangesAsync();
+        }
+
+        using var ctx2 = CreateContext();
+        var result = await CreateService(ctx2, email).InviteAsync(adminUserId, new CreateStaffInviteModel
+        {
+            Email = "fresh@x.com", OrgRoleId = OrgRoleIds.Teacher, SchoolId = schoolId
+        });
+        Assert.True(result.Success);
+    }
+
+    /// <summary>The filter excludes accepted rows (AcceptedAt set, token nulled), so a fresh invite to the
+    /// same email succeeds and does not trip the unique index.</summary>
+    [Fact]
+    public async Task FilteredUniqueIndex_AcceptedRow_DoesNotBlockFreshInvite()
+    {
+        var districtId = SeedDistrict("Maple");
+        var schoolId = SeedSchool(districtId, "Elm");
+        var (adminUserId, _) = SeedStaff("admin@x.com", districtId, null, OrgRoleIds.DistrictAdmin);
+        var email = new CapturingEmailService();
+
+        // A previously-accepted invite for the email: AcceptedAt set + token nulled (Accept's end state).
+        using (var ctx = CreateContext())
+        {
+            ctx.StaffInvites.Add(new StaffInvite
+            {
+                Email = "accepted@x.com", DistrictId = districtId, SchoolId = schoolId, OrgRoleId = OrgRoleIds.Teacher,
+                InviteToken = null, InviteExpiresAt = DateTime.UtcNow.AddDays(14),
+                IsActive = true, AcceptedAt = DateTime.UtcNow, InvitedByUserId = adminUserId
+            });
+            await ctx.SaveChangesAsync();
+        }
+
+        using var ctx2 = CreateContext();
+        var result = await CreateService(ctx2, email).InviteAsync(adminUserId, new CreateStaffInviteModel
+        {
+            Email = "accepted@x.com", OrgRoleId = OrgRoleIds.Teacher, SchoolId = schoolId
+        });
+        Assert.True(result.Success);
+    }
+
     // ================================================================= Accept
 
     [Fact]

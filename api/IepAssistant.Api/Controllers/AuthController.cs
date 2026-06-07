@@ -108,7 +108,7 @@ public class AuthController : ControllerBase
     /// </summary>
     [AllowAnonymous]
     [HttpPost("register-district")]
-    [EnableRateLimiting("login")]
+    [EnableRateLimiting("register-district")]
     [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> RegisterDistrict([FromBody] RegisterDistrictRequest request, CancellationToken cancellationToken)

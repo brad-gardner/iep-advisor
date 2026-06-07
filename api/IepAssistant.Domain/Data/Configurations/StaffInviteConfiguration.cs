@@ -17,7 +17,16 @@ public class StaffInviteConfiguration : IEntityTypeConfiguration<StaffInvite>
         // Non-unique index per the existing StudentInvite/ChildLink pattern: tokens are nulled on accept
         // so a unique index would collide on multiple claimed (null) rows; the lookup is hash + active.
         builder.HasIndex(i => i.InviteToken);
-        builder.HasIndex(i => i.Email);
+
+        // Filtered UNIQUE index on Email — DB backstop for the "one live invite per email" rule (the
+        // service AnyAsync pre-check is TOCTOU and can't stop a concurrent insert). The filter scopes
+        // uniqueness to LIVE pending invites only (active, unaccepted, token still present), so revoked
+        // (IsActive=0 / token nulled) and accepted (AcceptedAt set / token nulled) rows free the slot and
+        // never collide. Filter is intentionally written WITHOUT bracket quoting so it is portable across
+        // SQL Server (partial index) AND SQLite (EnsureCreated carries the same string for the test DB).
+        builder.HasIndex(i => i.Email)
+            .IsUnique()
+            .HasFilter("IsActive = 1 AND AcceptedAt IS NULL AND InviteToken IS NOT NULL");
         builder.HasIndex(i => i.DistrictId);
         builder.HasIndex(i => i.SchoolId);
 

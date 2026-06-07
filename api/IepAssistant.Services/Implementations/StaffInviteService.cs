@@ -117,32 +117,64 @@ public class StaffInviteService : IStaffInviteService
                 "That email already has an account. Staff must be invited with an email that isn't already registered — please use your work email.");
 
         // Global duplicate-pending guard (single-role world): one live staff invite per email anywhere.
+        // A "live" row (IsActive && AcceptedAt == null && InviteToken != null) occupies the filtered unique
+        // index slot regardless of expiry, so we fetch it tracked and branch:
+        //   - still-valid (not expired)  → reject as a duplicate;
+        //   - expired                    → REFRESH that same row in place (new token/expiry/role/school),
+        //                                   which keeps the one-row-per-email invariant the index enforces.
         var now = DateTime.UtcNow;
-        var duplicatePending = await _context.StaffInvites.AsNoTracking()
-            .AnyAsync(i => i.Email.ToLower() == email.ToLower()
+        var existingLive = await _context.StaffInvites
+            .FirstOrDefaultAsync(i => i.Email.ToLower() == email.ToLower()
                         && i.IsActive
                         && i.AcceptedAt == null
-                        && i.InviteExpiresAt > now, ct);
-        if (duplicatePending)
+                        && i.InviteToken != null, ct);
+        if (existingLive != null && existingLive.InviteExpiresAt > now)
             return ServiceResult<StaffInviteModel>.FailureResult("That email has already been invited.");
 
-        // ------- Create + email -------
+        // ------- Create (or refresh an expired row) + email -------
         var rawToken = InviteTokenHelper.Generate();
-        var invite = new StaffInvite
+        StaffInvite invite;
+        if (existingLive != null)
         {
-            Email = email,
-            DistrictId = caller.DistrictId,
-            SchoolId = schoolId,
-            OrgRoleId = model.OrgRoleId,
-            InviteToken = InviteTokenHelper.Hash(rawToken),
-            InviteExpiresAt = now.AddDays(InviteExpiryDays),
-            InvitedByUserId = callerUserId,
-            IsActive = true,
-            CreatedById = callerUserId,
-            UpdatedById = callerUserId
-        };
-        await _context.StaffInvites.AddAsync(invite, ct);
-        await _context.SaveChangesAsync(ct);
+            // Reuse the expired live row so the filtered unique index is never tripped by a second insert.
+            invite = existingLive;
+            invite.DistrictId = caller.DistrictId;
+            invite.SchoolId = schoolId;
+            invite.OrgRoleId = model.OrgRoleId;
+            invite.InviteToken = InviteTokenHelper.Hash(rawToken);
+            invite.InviteExpiresAt = now.AddDays(InviteExpiryDays);
+            invite.InvitedByUserId = callerUserId;
+            invite.UpdatedById = callerUserId;
+        }
+        else
+        {
+            invite = new StaffInvite
+            {
+                Email = email,
+                DistrictId = caller.DistrictId,
+                SchoolId = schoolId,
+                OrgRoleId = model.OrgRoleId,
+                InviteToken = InviteTokenHelper.Hash(rawToken),
+                InviteExpiresAt = now.AddDays(InviteExpiryDays),
+                InvitedByUserId = callerUserId,
+                IsActive = true,
+                CreatedById = callerUserId,
+                UpdatedById = callerUserId
+            };
+            await _context.StaffInvites.AddAsync(invite, ct);
+        }
+        try
+        {
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            // DB backstop for the pre-check above: the filtered unique index on Email (live-pending only)
+            // rejected a concurrent duplicate that slipped past the check-then-insert window. Detach the
+            // unsaved entity and surface the SAME friendly message the pre-check does.
+            _context.Entry(invite).State = EntityState.Detached;
+            return ServiceResult<StaffInviteModel>.FailureResult("That email has already been invited.");
+        }
 
         var (districtName, schoolName, roleName) = await ResolveNamesAsync(invite.DistrictId, invite.SchoolId, invite.OrgRoleId, ct);
         await _emailService.SendStaffInviteEmailAsync(email, districtName, schoolName, roleName, rawToken, ct);
