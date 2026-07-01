@@ -116,6 +116,10 @@ builder.Services.AddHostedService<AnalysisRunBackfillHostedService>();
 builder.Services.AddSingleton<AuditLogger>();
 builder.Services.AddSingleton<IAuditLogger>(sp => sp.GetRequiredService<AuditLogger>());
 builder.Services.AddHostedService<AccessAuditLogWorker>();
+// Phase 3: warns the inviting admin ~3 days before a pending staff invite expires (daily timer; scoped
+// per-invite processing). All decision logic lives in IStaffInviteExpiryService; single-instance assumption
+// is documented on the worker.
+builder.Services.AddHostedService<StaffInviteExpiryWorker>();
 
 // Add controllers
 builder.Services.AddControllers()

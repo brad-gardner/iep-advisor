@@ -14,6 +14,11 @@ public class StaffInviteConfiguration : IEntityTypeConfiguration<StaffInvite>
         // Base64 SHA-256 digest is 44 chars; cap at 88 to match the existing invite-hash column sizing.
         builder.Property(i => i.InviteToken).HasMaxLength(88);
 
+        // Nullable UTC stamp of the one-time pre-expiry reminder to the inviting admin (Phase 3). No index:
+        // the expiry worker's candidate scan is bounded by InviteExpiresAt (small, daily), and this column is
+        // only read as a null/not-null idempotency flag per candidate row.
+        builder.Property(i => i.ExpiryReminderSentAt);
+
         // Non-unique index per the existing StudentInvite/ChildLink pattern: tokens are nulled on accept
         // so a unique index would collide on multiple claimed (null) rows; the lookup is hash + active.
         builder.HasIndex(i => i.InviteToken);
