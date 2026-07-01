@@ -24,5 +24,10 @@ public class AccessAuditLogConfiguration : IEntityTypeConfiguration<AccessAuditL
 
         // Secondary: "everything this user did."
         builder.HasIndex(a => a.ActorUserId);
+
+        // Audit-viewer read path (P2): the actor-scoped, CreatedAt-ordered query the district audit-log
+        // viewer runs. The bare (ActorUserId) index above doesn't cover the CreatedAt ordering. Keyset
+        // pagination orders by Id, but this index still serves the actor + date-range filter selection.
+        builder.HasIndex(a => new { a.ActorUserId, a.CreatedAt });
     }
 }
