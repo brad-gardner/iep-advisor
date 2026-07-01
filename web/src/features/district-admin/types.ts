@@ -69,3 +69,43 @@ export interface DistrictDashboard {
   studentsWithoutStaff: DashboardStudent[];
   studentsWithoutParent: DashboardNoParentStudent[];
 }
+
+// Audit-log viewer (Phase 2). Mirrors api/IepAssistant.Api/DTOs/District/AuditLogDto.cs.
+
+// The auditable actions, stored server-side as the enum's string name.
+export const AUDIT_ACTIONS = ['View', 'Edit', 'Share', 'Export', 'Finalize'] as const;
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+// One enriched audit row. Display fields (actorName, resourceDisplayName,
+// recipientName) always carry server-side fallbacks — render them verbatim.
+export interface AuditLogEntry {
+  id: number;
+  action: string;
+  actorUserId: number;
+  actorName: string;
+  resourceType: string;
+  resourceId: number;
+  resourceDisplayName: string;
+  recipientUserId?: number | null;
+  recipientName?: string | null;
+  createdAt: string;
+}
+
+// A keyset page: entries plus the cursor for the next page (null when exhausted).
+export interface AuditLogPage {
+  entries: AuditLogEntry[];
+  nextCursor: number | null;
+}
+
+// Query filters. Date bounds are UTC instants (the filters component converts
+// local-day boundaries; the upper bound is inclusive). cursor/pageSize drive
+// keyset pagination. Only defined fields are serialized into the query string.
+export interface AuditLogFilters {
+  staffUserId?: number;
+  studentId?: number;
+  action?: AuditAction;
+  fromUtc?: string;
+  toUtc?: string;
+  cursor?: number;
+  pageSize?: number;
+}

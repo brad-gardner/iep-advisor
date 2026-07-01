@@ -1,6 +1,8 @@
 import { apiClient } from '@/lib/api-client';
 import type { ApiResponse } from '@/types/api';
 import type {
+  AuditLogFilters,
+  AuditLogPage,
   DistrictDashboard,
   DistrictOverview,
   DistrictSchool,
@@ -15,6 +17,28 @@ export async function getDistrict(): Promise<ApiResponse<DistrictOverview>> {
 export async function getDistrictDashboard(): Promise<ApiResponse<DistrictDashboard>> {
   const response = await apiClient.get<ApiResponse<DistrictDashboard>>(
     '/api/district/dashboard'
+  );
+  return response.data;
+}
+
+// Fetches a keyset page of the district audit log. Only defined filter fields
+// are serialized into the query string so unset filters never send empty params
+// (which the backend would treat as present).
+export async function getAuditLog(
+  params: AuditLogFilters
+): Promise<ApiResponse<AuditLogPage>> {
+  const query: Record<string, string> = {};
+  if (params.staffUserId != null) query.staffUserId = String(params.staffUserId);
+  if (params.studentId != null) query.studentId = String(params.studentId);
+  if (params.action) query.action = params.action;
+  if (params.fromUtc) query.fromUtc = params.fromUtc;
+  if (params.toUtc) query.toUtc = params.toUtc;
+  if (params.cursor != null) query.cursor = String(params.cursor);
+  if (params.pageSize != null) query.pageSize = String(params.pageSize);
+
+  const response = await apiClient.get<ApiResponse<AuditLogPage>>(
+    '/api/district/audit-log',
+    { params: query }
   );
   return response.data;
 }
