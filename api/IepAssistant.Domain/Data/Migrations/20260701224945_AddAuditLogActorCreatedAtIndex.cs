@@ -11,16 +11,16 @@ namespace IepAssistant.Domain.Data.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateIndex(
-                name: "IX_AccessAuditLogs_ActorUserId_CreatedAt",
+                name: "IX_AccessAuditLogs_ActorUserId_Id",
                 table: "AccessAuditLogs",
-                columns: new[] { "ActorUserId", "CreatedAt" });
+                columns: new[] { "ActorUserId", "Id" });
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
-                name: "IX_AccessAuditLogs_ActorUserId_CreatedAt",
+                name: "IX_AccessAuditLogs_ActorUserId_Id",
                 table: "AccessAuditLogs");
         }
     }

@@ -66,6 +66,17 @@ public class AuditLogQueryService : IAuditLogQueryService
         // ------- Actor scope: StaffProfiles in the caller's district (INCLUDING deactivated staff).
         // SchoolAdmin is confined to own-school actors, which also drops district-admin actors
         // (SchoolId == null) from a SchoolAdmin's view. -------
+        //
+        // SECURITY INVARIANT: audit rows are scoped by the actor's CURRENT StaffProfile district/school —
+        // AccessAuditLog itself records no district/school of its own. This is safe TODAY only because:
+        //   (a) a user cannot hold StaffProfiles in two districts — StaffInviteService.AcceptAsync
+        //       rejects invites for any already-registered email, so an actor belongs to one district; and
+        //   (b) there is no school-reassignment feature, so a staff member's audit history never spans
+        //       schools (their current SchoolId matches every row they ever wrote).
+        // WARNING: if either invariant is relaxed (multi-district staff, or moving a StaffProfile between
+        // schools), this query would over-disclose another scope's student PII, because past rows would be
+        // re-scoped to the actor's NEW district/school. The fix is to stamp DistrictId/SchoolId onto
+        // AccessAuditLog at write time and scope reads by that stamped value instead of the live profile.
         var actorQuery = _context.StaffProfiles.AsNoTracking()
             .Where(p => p.DistrictId == ctx.DistrictId);
         if (!isDistrictAdmin)
@@ -95,8 +106,11 @@ public class AuditLogQueryService : IAuditLogQueryService
                 .Where(d => d.SchoolStudentId == studentId)
                 .Select(d => d.Id)
                 .ToListAsync(ct);
+            // Versions carry SchoolStudentId directly, so seek them off the existing
+            // (SchoolStudentId, VersionNumber) index rather than scanning the unindexed SourceDraftId
+            // via the draft-id set. Independent of draftIds by design.
             var versionIds = await _context.IepVersions.AsNoTracking()
-                .Where(v => draftIds.Contains(v.SourceDraftId))
+                .Where(v => v.SchoolStudentId == studentId)
                 .Select(v => v.Id)
                 .ToListAsync(ct);
 
