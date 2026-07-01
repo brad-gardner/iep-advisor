@@ -184,12 +184,12 @@ public sealed class AuthServiceTests : IDisposable
     // ----------------------------------------------------------------- transaction atomicity
 
     [Fact]
-    public async Task RegisterDistrict_FailureAfterUserInsert_RollsBack_NoOrphanDistrict()
+    public async Task RegisterDistrict_InactiveDuplicateEmail_FailsGracefully_NoOrphanDistrict()
     {
-        // Seed an INACTIVE user with the target email. GetByEmailAsync filters IsActive, so the
-        // pre-check returns null and the flow proceeds — but the User insert then violates the unique
-        // Email index INSIDE the transaction. This exercises the rollback path: no orphan District,
-        // no StaffProfile, and the original (inactive) user is untouched.
+        // Seed an INACTIVE user with the target email. The unique Email index covers inactive rows, so
+        // the registration pre-check must detect it regardless of IsActive and return a clean failure —
+        // NOT fall through to an insert that violates the index with a duplicate-key 500. No transaction
+        // begins, so there is no orphan District / StaffProfile and the original user is untouched.
         using (var ctx = CreateContext())
         {
             ctx.Users.Add(new User
@@ -202,8 +202,11 @@ public sealed class AuthServiceTests : IDisposable
 
         using (var ctx = CreateContext())
         {
-            await Assert.ThrowsAnyAsync<DbUpdateException>(() =>
-                CreateService(ctx).RegisterDistrictAsync(Model("ghost@district.org", "Orphan District")));
+            var result = await CreateService(ctx).RegisterDistrictAsync(Model("ghost@district.org", "Orphan District"));
+
+            Assert.False(result.Success);
+            Assert.Contains("already registered", result.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Null(result.AuthResult);
         }
 
         using (var ctx = CreateContext())
