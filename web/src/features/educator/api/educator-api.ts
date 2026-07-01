@@ -4,20 +4,11 @@ import type {
   ChildLink,
   CreateSchoolStudentRequest,
   EducatorProfile,
+  GrantStudentStaffAccessRequest,
   InviteParentRequest,
-  OnboardEducatorRequest,
   SchoolStudent,
+  StudentStaffAccess,
 } from '../types';
-
-export async function onboardEducator(
-  data: OnboardEducatorRequest
-): Promise<ApiResponse<EducatorProfile>> {
-  const response = await apiClient.post<ApiResponse<EducatorProfile>>(
-    '/api/educator/onboard',
-    data
-  );
-  return response.data;
-}
 
 export async function getEducatorProfile(): Promise<ApiResponse<EducatorProfile>> {
   const response = await apiClient.get<ApiResponse<EducatorProfile>>('/api/educator/me');
@@ -70,6 +61,36 @@ export async function revokeStudentLink(
 ): Promise<ApiResponse<null>> {
   const response = await apiClient.delete<ApiResponse<null>>(
     `/api/educator/students/${studentId}/links/${linkId}`
+  );
+  return response.data;
+}
+
+export async function getStudentStaffAccess(
+  studentId: number
+): Promise<ApiResponse<StudentStaffAccess[]>> {
+  const response = await apiClient.get<ApiResponse<StudentStaffAccess[]>>(
+    `/api/educator/students/${studentId}/staff-access`
+  );
+  return response.data;
+}
+
+export async function grantStudentStaffAccess(
+  studentId: number,
+  data: GrantStudentStaffAccessRequest
+): Promise<ApiResponse<StudentStaffAccess>> {
+  const response = await apiClient.post<ApiResponse<StudentStaffAccess>>(
+    `/api/educator/students/${studentId}/staff-access`,
+    data
+  );
+  return response.data;
+}
+
+export async function revokeStudentStaffAccess(
+  studentId: number,
+  accessId: number
+): Promise<ApiResponse<null>> {
+  const response = await apiClient.delete<ApiResponse<null>>(
+    `/api/educator/students/${studentId}/staff-access/${accessId}`
   );
   return response.data;
 }

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MessageSquareQuote } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { useFeatureFlag } from '@/hooks/use-feature-flags';
 import { getChildShareableEntries } from '@/features/student/api/shareable-entries-api';
 import { entryKindLabel } from '@/features/student/lib/entry-kinds';
 import type { StudentWorkspaceEntryDto } from '@/features/student/types';
@@ -12,15 +11,14 @@ interface StudentSharedEntriesProps {
 
 /**
  * Read-only "From your student" panel for parents in Meeting Prep. Lists the
- * entries the student chose to share. Gated on the StudentWorkspace flag and
- * renders nothing when off or when there are no shared entries.
+ * entries the student chose to share. Renders nothing when there are no shared
+ * entries (e.g. the child has no linked student account).
  */
 export function StudentSharedEntries({ childId }: StudentSharedEntriesProps) {
-  const enabled = useFeatureFlag('StudentWorkspace');
   const [entries, setEntries] = useState<StudentWorkspaceEntryDto[]>([]);
 
   useEffect(() => {
-    if (!enabled || !childId) return;
+    if (!childId) return;
     let active = true;
     getChildShareableEntries(childId)
       .then((res) => {
@@ -32,9 +30,9 @@ export function StudentSharedEntries({ childId }: StudentSharedEntriesProps) {
     return () => {
       active = false;
     };
-  }, [enabled, childId]);
+  }, [childId]);
 
-  if (!enabled || entries.length === 0) return null;
+  if (entries.length === 0) return null;
 
   return (
     <Card className="space-y-3" data-testid="student-shared-entries">

@@ -1,8 +1,5 @@
-import { Sparkles } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { useFeatureFlag } from '@/hooks/use-feature-flags';
 import { AiInterviewHelper } from '../components/ai-interview-helper';
 import { WorkspaceSection } from '../components/workspace-section';
 import { useStudentWorkspace } from '../hooks/use-student-workspace';
@@ -12,41 +9,8 @@ import type {
   StudentWorkspaceEntryKind,
 } from '../types';
 
-// Placeholder shown when the StudentWorkspace flag is off (matches the P7b
-// welcome). Keeps the student oriented without exposing the workspace.
-function WorkspaceComingSoon({ firstName }: { firstName?: string }) {
-  return (
-    <div className="space-y-6" data-testid="student-home">
-      <div>
-        <h1 className="font-serif">{firstName ? `Welcome, ${firstName}` : 'Your space'}</h1>
-        <p className="mt-1 text-sm text-brand-slate-400">
-          This is your space to understand and take part in your IEP.
-        </p>
-      </div>
-      <Card className="max-w-lg" data-testid="student-home-intro">
-        <div className="flex items-start gap-3">
-          <Sparkles
-            className="mt-0.5 h-5 w-5 shrink-0 text-brand-teal-500"
-            strokeWidth={1.8}
-            aria-hidden="true"
-          />
-          <div>
-            <h2 className="mb-1 font-serif text-lg">Your workspace is coming soon</h2>
-            <p className="text-sm text-brand-slate-600">
-              Tools to help you understand your goals, share your voice, and prepare
-              for meetings will appear here shortly. Your account is now active and
-              linked to your IEP team.
-            </p>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
-}
-
 export function StudentHomePage() {
   const { user } = useAuth();
-  const workspaceEnabled = useFeatureFlag('StudentWorkspace');
   const {
     entries,
     status,
@@ -56,10 +20,6 @@ export function StudentHomePage() {
     removeEntry,
     interview,
   } = useStudentWorkspace();
-
-  if (!workspaceEnabled) {
-    return <WorkspaceComingSoon firstName={user?.firstName} />;
-  }
 
   const entriesByKind = (kind: StudentWorkspaceEntryKind): StudentWorkspaceEntryDto[] =>
     entries

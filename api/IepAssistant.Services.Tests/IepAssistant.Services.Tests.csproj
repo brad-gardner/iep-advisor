@@ -19,5 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\IepAssistant.Services\IepAssistant.Services.csproj" />
+    <!-- For RegisterDistrictRequest data-annotation validation tests (P2). -->
+    <ProjectReference Include="..\IepAssistant.Api\IepAssistant.Api.csproj" />
   </ItemGroup>
 </Project>

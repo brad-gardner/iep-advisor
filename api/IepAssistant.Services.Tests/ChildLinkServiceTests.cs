@@ -36,10 +36,10 @@ public sealed class ChildLinkServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private static ChildLinkService CreateService(ApplicationDbContext ctx, CapturingEmailService email)
-        => new(ctx, new AccessService(ctx), email, new CapturingAuditLogger(), NullLogger<ChildLinkService>.Instance);
+        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), email, new CapturingAuditLogger(), NullLogger<ChildLinkService>.Instance);
 
     private static EducatorService CreateEducator(ApplicationDbContext ctx)
-        => new(ctx, NullLogger<EducatorService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), NullLogger<EducatorService>.Instance);
 
     // ----------------------------------------------------------------- seed helpers
 
@@ -52,19 +52,56 @@ public sealed class ChildLinkServiceTests : IDisposable
         return user.Id;
     }
 
-    /// <summary>Onboards an educator and creates a student under their school; returns (educatorUserId, studentId).</summary>
+    /// <summary>Provisions a Teacher (direct District/School/StaffProfile seed); returns the educator user id.</summary>
+    private int SeedEducator(string educatorEmail, string district, string school)
+    {
+        var educatorId = SeedUser(educatorEmail, UserRole.Educator);
+        using var ctx = CreateContext();
+        var districtEntity = new District { Name = district, StateCode = "OH" };
+        ctx.Districts.Add(districtEntity);
+        ctx.SaveChanges();
+        var schoolEntity = new School { DistrictId = districtEntity.Id, Name = school, StateCode = "OH", IsActive = true };
+        ctx.Schools.Add(schoolEntity);
+        ctx.SaveChanges();
+        ctx.StaffProfiles.Add(new StaffProfile
+        {
+            UserId = educatorId,
+            DistrictId = districtEntity.Id,
+            SchoolId = schoolEntity.Id,
+            OrgRoleId = OrgRoleIds.Teacher,
+            IsActive = true
+        });
+        ctx.SaveChanges();
+        return educatorId;
+    }
+
+    /// <summary>
+    /// Provisions a Teacher (direct District/School/StaffProfile seed) and creates a student under
+    /// their school; returns (educatorUserId, studentId).
+    /// </summary>
     private async Task<(int educatorId, int studentId)> SeedEducatorWithStudent(
         string educatorEmail, string district, string school, string studentFirst = "Sam", string studentLast = "Student")
     {
-        var educatorId = SeedUser(educatorEmail);
-        int studentId;
+        var educatorId = SeedUser(educatorEmail, UserRole.Educator);
         using (var ctx = CreateContext())
         {
-            await CreateEducator(ctx).OnboardAsync(educatorId, new OnboardEducatorModel
+            var districtEntity = new District { Name = district, StateCode = "OH" };
+            ctx.Districts.Add(districtEntity);
+            ctx.SaveChanges();
+            var schoolEntity = new School { DistrictId = districtEntity.Id, Name = school, StateCode = "OH", IsActive = true };
+            ctx.Schools.Add(schoolEntity);
+            ctx.SaveChanges();
+            ctx.StaffProfiles.Add(new StaffProfile
             {
-                DistrictName = district, SchoolName = school, StateCode = "OH"
+                UserId = educatorId,
+                DistrictId = districtEntity.Id,
+                SchoolId = schoolEntity.Id,
+                OrgRoleId = OrgRoleIds.Teacher,
+                IsActive = true
             });
+            ctx.SaveChanges();
         }
+        int studentId;
         using (var ctx = CreateContext())
         {
             var created = await CreateEducator(ctx).CreateStudentAsync(educatorId, new CreateSchoolStudentModel
@@ -365,12 +402,7 @@ public sealed class ChildLinkServiceTests : IDisposable
     public async Task Invite_FromEducatorInAnotherSchool_IsRejected()
     {
         var (educatorA, studentInA) = await SeedEducatorWithStudent("edA@x.com", "DistrictA", "SchoolA");
-        var educatorB = SeedUser("edB@x.com");
-        using (var ctx = CreateContext())
-            await CreateEducator(ctx).OnboardAsync(educatorB, new OnboardEducatorModel
-            {
-                DistrictName = "DistrictB", SchoolName = "SchoolB", StateCode = "OH"
-            });
+        var educatorB = SeedEducator("edB@x.com", "DistrictB", "SchoolB");
         var email = new CapturingEmailService();
 
         using (var ctx = CreateContext())
@@ -388,12 +420,7 @@ public sealed class ChildLinkServiceTests : IDisposable
     public async Task Revoke_FromEducatorInAnotherSchool_IsRejected()
     {
         var (educatorA, studentInA) = await SeedEducatorWithStudent("edA2@x.com", "DistrictA2", "SchoolA2");
-        var educatorB = SeedUser("edB2@x.com");
-        using (var ctx = CreateContext())
-            await CreateEducator(ctx).OnboardAsync(educatorB, new OnboardEducatorModel
-            {
-                DistrictName = "DistrictB2", SchoolName = "SchoolB2", StateCode = "OH"
-            });
+        var educatorB = SeedEducator("edB2@x.com", "DistrictB2", "SchoolB2");
         var email = new CapturingEmailService();
 
         int linkId;
@@ -476,6 +503,7 @@ public sealed class ChildLinkServiceTests : IDisposable
         public Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default) => Task.CompletedTask;
         public Task SendShareInviteEmailAsync(string toEmail, string inviterName, string childName, string role, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
         public Task SendStudentInviteEmailAsync(string toEmail, string inviterName, string context, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
+        public Task SendStaffInviteEmailAsync(string toEmail, string districtName, string? schoolName, string roleName, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
         public Task SendBetaInviteEmailAsync(string toEmail, string inviteCode, CancellationToken ct = default) => Task.CompletedTask;
     }
 }

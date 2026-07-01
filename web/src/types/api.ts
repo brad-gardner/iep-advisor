@@ -73,6 +73,15 @@ export interface RegisterRequest {
   inviteCode: string;
 }
 
+export interface RegisterDistrictRequest {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  districtName: string;
+  stateCode?: string;
+}
+
 export interface ChildProfile {
   id: number;
   firstName: string;

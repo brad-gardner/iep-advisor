@@ -10,8 +10,8 @@ using IepAssistant.Services.Models;
 namespace IepAssistant.Api.Controllers;
 
 /// <summary>
-/// Finalize + read endpoints for immutable IepVersion snapshots (P5a). Gated behind
-/// <c>Feature:SchoolSide</c>. Educators reach versions through the SchoolId-bound access pattern;
+/// Finalize + read endpoints for immutable IepVersion snapshots (P5a).
+/// Educators reach versions through the SchoolId-bound access pattern;
 /// linked parents reach them through an active accepted ChildLink + AccessService.
 /// </summary>
 [ApiController]
@@ -19,13 +19,11 @@ namespace IepAssistant.Api.Controllers;
 public class IepVersionController : ControllerBase
 {
     private readonly IIepVersionService _service;
-    private readonly IFeatureFlags _featureFlags;
     private readonly IepVersionPdfQueue _pdfQueue;
 
-    public IepVersionController(IIepVersionService service, IFeatureFlags featureFlags, IepVersionPdfQueue pdfQueue)
+    public IepVersionController(IIepVersionService service, IepVersionPdfQueue pdfQueue)
     {
         _service = service;
-        _featureFlags = featureFlags;
         _pdfQueue = pdfQueue;
     }
 
@@ -37,7 +35,6 @@ public class IepVersionController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Finalize(int draftId, [FromBody] FinalizeIepDraftRequest? request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
 
         var result = await _service.FinalizeAsync(User.GetUserId(), draftId, request?.EffectiveDate, ct);
         if (!result.Success) return MapFailure(result.Message);
@@ -57,7 +54,6 @@ public class IepVersionController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ListForStudent(int studentId, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
 
         var result = await _service.ListForStudentAsync(User.GetUserId(), studentId, ct);
         if (!result.Success) return MapFailure(result.Message);
@@ -72,7 +68,6 @@ public class IepVersionController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ListForChild(int childId, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
 
         var result = await _service.ListForChildAsync(User.GetUserId(), childId, ct);
         if (!result.Success) return MapFailure(result.Message);
@@ -88,7 +83,6 @@ public class IepVersionController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetVersion(int versionId, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
 
         var result = await _service.GetVersionAsync(User.GetUserId(), versionId, ct);
         if (!result.Success) return MapFailure(result.Message);
@@ -104,7 +98,6 @@ public class IepVersionController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> RetryPdf(int versionId, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
 
         var result = await _service.RequestPdfRetryAsync(User.GetUserId(), versionId, ct);
         if (!result.Success) return MapFailure(result.Message);
@@ -121,7 +114,6 @@ public class IepVersionController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPdf(int versionId, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
 
         var result = await _service.GetPdfStatusAsync(User.GetUserId(), versionId, ct);
         if (!result.Success) return MapFailure(result.Message);
@@ -138,8 +130,6 @@ public class IepVersionController : ControllerBase
     }
 
     // ---------------------------------------------------------------- Helpers
-
-    private bool Enabled => _featureFlags.IsEnabled(FeatureFlags.SchoolSide);
 
     private IActionResult MapFailure(string? message)
     {

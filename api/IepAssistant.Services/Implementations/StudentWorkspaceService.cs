@@ -25,17 +25,20 @@ public class StudentWorkspaceService : IStudentWorkspaceService
 
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _accessService;
+    private readonly IOrgAccessService _orgAccess;
     private readonly IClaudeClient _claude;
     private readonly ILogger<StudentWorkspaceService> _logger;
 
     public StudentWorkspaceService(
         ApplicationDbContext context,
         IAccessService accessService,
+        IOrgAccessService orgAccess,
         IClaudeClient claude,
         ILogger<StudentWorkspaceService> logger)
     {
         _context = context;
         _accessService = accessService;
+        _orgAccess = orgAccess;
         _claude = claude;
         _logger = logger;
     }
@@ -281,26 +284,11 @@ public class StudentWorkspaceService : IStudentWorkspaceService
     }
 
     /// <summary>
-    /// SchoolId-bound educator access check: the student must be in the educator's TeacherProfile.SchoolId
-    /// AND an active SchoolStudentAccess must exist (mirrors ChildLinkService.GetEducatorStudentAccessAsync).
+    /// Org access check delegated to <see cref="IOrgAccessService"/> (player-coach: admins pass within
+    /// scope; teachers need an active SchoolStudentAccess).
     /// </summary>
-    private async Task<bool> EducatorHasStudentAccessAsync(int educatorUserId, int schoolStudentId, CancellationToken ct)
-    {
-        var schoolId = await _context.TeacherProfiles
-            .Where(t => t.UserId == educatorUserId)
-            .Select(t => (int?)t.SchoolId)
-            .FirstOrDefaultAsync(ct);
-        if (schoolId == null)
-            return false;
-
-        var studentInSchool = await _context.SchoolStudents
-            .AnyAsync(s => s.Id == schoolStudentId && s.SchoolId == schoolId.Value, ct);
-        if (!studentInSchool)
-            return false;
-
-        return await _context.SchoolStudentAccesses
-            .AnyAsync(a => a.SchoolStudentId == schoolStudentId && a.UserId == educatorUserId && a.IsActive, ct);
-    }
+    private Task<bool> EducatorHasStudentAccessAsync(int educatorUserId, int schoolStudentId, CancellationToken ct)
+        => _orgAccess.CanActOnStudentAsync(educatorUserId, schoolStudentId, AccessRole.Viewer, ct);
 
     private static StudentWorkspaceEntryModel MapEntry(StudentWorkspaceEntry e) => new()
     {

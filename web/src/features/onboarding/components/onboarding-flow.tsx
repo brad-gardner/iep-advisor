@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Logo } from '@/components/ui/logo';
 import { Notice } from '@/components/ui/notice';
+import { ProgressDots } from '@/components/ui/progress-dots';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { WelcomeStep } from './welcome-step';
 import { StateStep } from './state-step';
@@ -10,29 +11,6 @@ import { NextSteps } from './next-steps';
 
 const TOTAL_STEPS = 4;
 const STEP_LABELS = ['Welcome', 'Set State', 'Add Child', 'Next Steps'];
-
-function ProgressDots({ current, total }: { current: number; total: number }) {
-  return (
-    <div
-      role="progressbar"
-      aria-valuenow={current + 1}
-      aria-valuemin={1}
-      aria-valuemax={total}
-      aria-label={`Step ${current + 1} of ${total}: ${STEP_LABELS[current]}`}
-      data-testid="onboarding-progress"
-      className="flex items-center justify-center gap-2"
-    >
-      {Array.from({ length: total }, (_, i) => (
-        <div
-          key={i}
-          className={`w-2 h-2 rounded-full transition-colors ${
-            i <= current ? 'bg-brand-teal-500' : 'bg-brand-slate-200'
-          }`}
-        />
-      ))}
-    </div>
-  );
-}
 
 export function OnboardingFlow() {
   const [step, setStep] = useState(0);
@@ -61,7 +39,12 @@ export function OnboardingFlow() {
 
       {/* Progress */}
       <div className="flex flex-col items-center gap-1.5 pb-6">
-        <ProgressDots current={step} total={TOTAL_STEPS} />
+        <ProgressDots
+          current={step}
+          total={TOTAL_STEPS}
+          labels={STEP_LABELS}
+          testId="onboarding-progress"
+        />
         <p className="text-xs text-brand-slate-400" aria-live="polite">
           Step {step + 1} of {TOTAL_STEPS}
         </p>

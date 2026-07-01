@@ -37,7 +37,7 @@ public sealed class StudentWorkspaceServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private StudentWorkspaceService CreateService(ApplicationDbContext ctx)
-        => new(ctx, new AccessService(ctx), _claude, NullLogger<StudentWorkspaceService>.Instance);
+        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), _claude, NullLogger<StudentWorkspaceService>.Instance);
 
     public void Dispose() => _connection.Dispose();
 
@@ -103,7 +103,7 @@ public sealed class StudentWorkspaceServiceTests : IDisposable
         ctx.Schools.Add(school);
         ctx.SaveChanges();
 
-        ctx.TeacherProfiles.Add(new TeacherProfile { UserId = educator.Id, SchoolId = school.Id });
+        ctx.StaffProfiles.Add(new StaffProfile { UserId = educator.Id, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher });
         ctx.SaveChanges();
 
         var student = new SchoolStudent { SchoolId = school.Id, FirstName = "Sam", IsActive = true };
@@ -386,7 +386,7 @@ public sealed class StudentWorkspaceServiceTests : IDisposable
         int draftId, sectionId;
         using (var ctx = CreateContext())
         {
-            var draftSvc = new IepDraftService(ctx, new CapturingAuditLogger(), NullLogger<IepDraftService>.Instance);
+            var draftSvc = new IepDraftService(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<IepDraftService>.Instance);
             draftId = (await draftSvc.CreateDraftAsync(school.EducatorUserId, school.SchoolStudentId, "Annual")).Data!.Id;
             var section = await draftSvc.AddSectionAsync(school.EducatorUserId, draftId, new UpsertIepDraftSectionModel
             {

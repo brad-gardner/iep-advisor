@@ -13,12 +13,10 @@ namespace IepAssistant.Api.Controllers;
 public class IepDraftController : ControllerBase
 {
     private readonly IIepDraftService _service;
-    private readonly IFeatureFlags _featureFlags;
 
-    public IepDraftController(IIepDraftService service, IFeatureFlags featureFlags)
+    public IepDraftController(IIepDraftService service)
     {
         _service = service;
-        _featureFlags = featureFlags;
     }
 
     // ---------------------------------------------------------------- Drafts
@@ -29,7 +27,6 @@ public class IepDraftController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CreateDraft(int studentId, [FromBody] CreateIepDraftRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.CreateDraftAsync(User.GetUserId(), studentId, request.Title, ct);
@@ -44,7 +41,6 @@ public class IepDraftController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ListDrafts(int studentId, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
 
         var result = await _service.ListDraftsAsync(User.GetUserId(), studentId, ct);
         if (!result.Success) return MapFailure(result.Message);
@@ -58,7 +54,6 @@ public class IepDraftController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetDraft(int draftId, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
 
         var result = await _service.GetDraftAsync(User.GetUserId(), draftId, ct);
         if (!result.Success) return MapFailure(result.Message);
@@ -71,7 +66,6 @@ public class IepDraftController : ControllerBase
     [HttpPost("api/iep-drafts/{draftId}/sections")]
     public async Task<IActionResult> AddSection(int draftId, [FromBody] UpsertSectionRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.AddSectionAsync(User.GetUserId(), draftId, new UpsertIepDraftSectionModel
@@ -87,7 +81,6 @@ public class IepDraftController : ControllerBase
     [HttpPut("api/iep-drafts/{draftId}/sections/{id}")]
     public async Task<IActionResult> UpdateSection(int draftId, int id, [FromBody] UpsertSectionRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.UpdateSectionAsync(User.GetUserId(), draftId, id, new UpsertIepDraftSectionModel
@@ -103,7 +96,6 @@ public class IepDraftController : ControllerBase
     [HttpDelete("api/iep-drafts/{draftId}/sections/{id}")]
     public async Task<IActionResult> DeleteSection(int draftId, int id, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         var result = await _service.DeleteSectionAsync(User.GetUserId(), draftId, id, ct);
         return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : MapFailure(result.Message);
     }
@@ -113,7 +105,6 @@ public class IepDraftController : ControllerBase
     [HttpPost("api/iep-drafts/{draftId}/goals")]
     public async Task<IActionResult> AddGoal(int draftId, [FromBody] UpsertGoalRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.AddGoalAsync(User.GetUserId(), draftId, MapGoalInput(request), ct);
@@ -125,7 +116,6 @@ public class IepDraftController : ControllerBase
     [HttpPut("api/iep-drafts/{draftId}/goals/{id}")]
     public async Task<IActionResult> UpdateGoal(int draftId, int id, [FromBody] UpsertGoalRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.UpdateGoalAsync(User.GetUserId(), draftId, id, MapGoalInput(request), ct);
@@ -137,7 +127,6 @@ public class IepDraftController : ControllerBase
     [HttpDelete("api/iep-drafts/{draftId}/goals/{id}")]
     public async Task<IActionResult> DeleteGoal(int draftId, int id, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         var result = await _service.DeleteGoalAsync(User.GetUserId(), draftId, id, ct);
         return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : MapFailure(result.Message);
     }
@@ -147,7 +136,6 @@ public class IepDraftController : ControllerBase
     [HttpPost("api/iep-drafts/{draftId}/service-lines")]
     public async Task<IActionResult> AddServiceLine(int draftId, [FromBody] UpsertServiceLineRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.AddServiceLineAsync(User.GetUserId(), draftId, MapServiceLineInput(request), ct);
@@ -159,7 +147,6 @@ public class IepDraftController : ControllerBase
     [HttpPut("api/iep-drafts/{draftId}/service-lines/{id}")]
     public async Task<IActionResult> UpdateServiceLine(int draftId, int id, [FromBody] UpsertServiceLineRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.UpdateServiceLineAsync(User.GetUserId(), draftId, id, MapServiceLineInput(request), ct);
@@ -171,7 +158,6 @@ public class IepDraftController : ControllerBase
     [HttpDelete("api/iep-drafts/{draftId}/service-lines/{id}")]
     public async Task<IActionResult> DeleteServiceLine(int draftId, int id, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         var result = await _service.DeleteServiceLineAsync(User.GetUserId(), draftId, id, ct);
         return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : MapFailure(result.Message);
     }
@@ -181,7 +167,6 @@ public class IepDraftController : ControllerBase
     [HttpPost("api/iep-drafts/{draftId}/accommodations")]
     public async Task<IActionResult> AddAccommodation(int draftId, [FromBody] UpsertAccommodationRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.AddAccommodationAsync(User.GetUserId(), draftId, new UpsertIepDraftAccommodationModel
@@ -197,7 +182,6 @@ public class IepDraftController : ControllerBase
     [HttpPut("api/iep-drafts/{draftId}/accommodations/{id}")]
     public async Task<IActionResult> UpdateAccommodation(int draftId, int id, [FromBody] UpsertAccommodationRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.UpdateAccommodationAsync(User.GetUserId(), draftId, id, new UpsertIepDraftAccommodationModel
@@ -213,7 +197,6 @@ public class IepDraftController : ControllerBase
     [HttpDelete("api/iep-drafts/{draftId}/accommodations/{id}")]
     public async Task<IActionResult> DeleteAccommodation(int draftId, int id, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         var result = await _service.DeleteAccommodationAsync(User.GetUserId(), draftId, id, ct);
         return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : MapFailure(result.Message);
     }
@@ -223,7 +206,6 @@ public class IepDraftController : ControllerBase
     [HttpPost("api/iep-drafts/{draftId}/transition-items")]
     public async Task<IActionResult> AddTransitionItem(int draftId, [FromBody] UpsertTransitionItemRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.AddTransitionItemAsync(User.GetUserId(), draftId, new UpsertIepDraftTransitionItemModel
@@ -239,7 +221,6 @@ public class IepDraftController : ControllerBase
     [HttpPut("api/iep-drafts/{draftId}/transition-items/{id}")]
     public async Task<IActionResult> UpdateTransitionItem(int draftId, int id, [FromBody] UpsertTransitionItemRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.UpdateTransitionItemAsync(User.GetUserId(), draftId, id, new UpsertIepDraftTransitionItemModel
@@ -255,14 +236,11 @@ public class IepDraftController : ControllerBase
     [HttpDelete("api/iep-drafts/{draftId}/transition-items/{id}")]
     public async Task<IActionResult> DeleteTransitionItem(int draftId, int id, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         var result = await _service.DeleteTransitionItemAsync(User.GetUserId(), draftId, id, ct);
         return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : MapFailure(result.Message);
     }
 
     // ---------------------------------------------------------------- Helpers
-
-    private bool Enabled => _featureFlags.IsEnabled(FeatureFlags.SchoolSide);
 
     private static UpsertIepDraftGoalModel MapGoalInput(UpsertGoalRequest r) => new()
     {

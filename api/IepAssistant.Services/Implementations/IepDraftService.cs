@@ -18,12 +18,14 @@ public class IepDraftService : IIepDraftService
     private const string DraftNotFoundMessage = "IEP draft not found.";
 
     private readonly ApplicationDbContext _context;
+    private readonly IOrgAccessService _orgAccess;
     private readonly IAuditLogger _audit;
     private readonly ILogger<IepDraftService> _logger;
 
-    public IepDraftService(ApplicationDbContext context, IAuditLogger audit, ILogger<IepDraftService> logger)
+    public IepDraftService(ApplicationDbContext context, IOrgAccessService orgAccess, IAuditLogger audit, ILogger<IepDraftService> logger)
     {
         _context = context;
+        _orgAccess = orgAccess;
         _audit = audit;
         _logger = logger;
     }
@@ -453,32 +455,15 @@ public class IepDraftService : IIepDraftService
     // ---------------------------------------------------------------- Access helpers
 
     /// <summary>
-    /// SchoolId-bound access check mirroring EducatorService: the student must belong to the
-    /// caller's TeacherProfile.SchoolId AND the caller must hold an active SchoolStudentAccess
-    /// row with Role &gt;= <paramref name="minimumRole"/>. Cross-school / insufficient role yields
-    /// a "permission" failure.
+    /// Org access check delegated to <see cref="IOrgAccessService"/> (player-coach: admins pass within
+    /// scope; teachers need an active SchoolStudentAccess with Role &gt;= <paramref name="minimumRole"/>).
+    /// Insufficient access yields a "permission" failure.
     /// </summary>
     private async Task<ServiceResult> CheckStudentAccessAsync(int userId, int studentId, AccessRole minimumRole, CancellationToken ct)
     {
-        var profile = await _context.TeacherProfiles
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.UserId == userId, ct);
-        if (profile == null)
-            return ServiceResult.FailureResult(PermissionMessage);
-
-        var student = await _context.SchoolStudents
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == studentId && s.SchoolId == profile.SchoolId, ct);
-        if (student == null)
-            return ServiceResult.FailureResult(PermissionMessage);
-
-        var access = await _context.SchoolStudentAccesses
-            .AsNoTracking()
-            .FirstOrDefaultAsync(a => a.SchoolStudentId == studentId && a.UserId == userId && a.IsActive, ct);
-        if (access == null || access.Role < minimumRole)
-            return ServiceResult.FailureResult(PermissionMessage);
-
-        return ServiceResult.SuccessResult();
+        return await _orgAccess.CanActOnStudentAsync(userId, studentId, minimumRole, ct)
+            ? ServiceResult.SuccessResult()
+            : ServiceResult.FailureResult(PermissionMessage);
     }
 
     /// <summary>

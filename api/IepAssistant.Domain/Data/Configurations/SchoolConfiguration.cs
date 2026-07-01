@@ -11,6 +11,7 @@ public class SchoolConfiguration : IEntityTypeConfiguration<School>
         builder.HasKey(s => s.Id);
         builder.Property(s => s.Name).HasMaxLength(200).IsRequired();
         builder.Property(s => s.StateCode).HasMaxLength(2);
+        builder.Property(s => s.IsActive).HasDefaultValue(true);
 
         builder.HasOne(s => s.District)
             .WithMany(d => d.Schools)
