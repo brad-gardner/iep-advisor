@@ -108,8 +108,9 @@ export function DistrictAuditLogPage() {
 
   if (profileLoading) {
     return (
-      <div className="flex justify-center py-12" data-testid="audit-log-page">
+      <div className="flex justify-center py-12" data-testid="audit-log-page" role="status">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <span className="sr-only">Loading…</span>
       </div>
     );
   }
@@ -137,8 +138,9 @@ export function DistrictAuditLogPage() {
       <AuditLogFilters onChange={applyFilters} />
 
       {isLoading ? (
-        <div className="flex justify-center py-12">
+        <div className="flex justify-center py-12" role="status">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+          <span className="sr-only">Loading activity…</span>
         </div>
       ) : loadFailed ? (
         <Notice variant="error" title="Couldn't load activity">

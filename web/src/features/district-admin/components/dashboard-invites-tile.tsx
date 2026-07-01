@@ -48,7 +48,7 @@ export function DashboardInvitesTile({ invites }: DashboardInvitesTileProps) {
                   {invite.orgRoleName}
                   {invite.schoolName ? ` · ${invite.schoolName}` : ' · District-wide'}
                   {' · '}
-                  {isExpired ? 'Expired' : 'Expires'} {formatExpiry(invite.inviteExpiresAt)}
+                  {isExpired ? 'Expired on' : 'Expires'} {formatExpiry(invite.inviteExpiresAt)}
                 </p>
               </li>
             );

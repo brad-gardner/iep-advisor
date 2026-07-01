@@ -93,8 +93,8 @@ export function DashboardAttentionTile({
           className="text-sm text-brand-slate-400"
           data-testid="dashboard-attention-tile-empty"
         >
-          Once students are added, anyone missing assigned staff or a linked
-          parent will show up here.
+          Once students are added, any student missing assigned staff or a
+          linked parent will appear here.
         </p>
       ) : (
         <div className="space-y-5">

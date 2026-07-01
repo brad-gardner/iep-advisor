@@ -18,7 +18,7 @@ export function DashboardSchoolsTile({ schools }: DashboardSchoolsTileProps) {
           className="text-sm text-brand-slate-400"
           data-testid="dashboard-schools-tile-empty"
         >
-          No schools yet — school-by-school student counts will appear here.
+          No schools yet — add a school to see its student counts here.
         </p>
       ) : (
         <ul className="space-y-2 text-sm">

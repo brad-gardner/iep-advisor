@@ -27,10 +27,12 @@ export function EducatorDashboard({ profile }: EducatorDashboardProps) {
           {profile.schoolName ?? profile.districtName}
         </h2>
         <dl className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-brand-slate-500">District</dt>
-            <dd className="text-brand-slate-800">{profile.districtName}</dd>
-          </div>
+          {profile.schoolName && (
+            <div className="flex justify-between">
+              <dt className="text-brand-slate-500">District</dt>
+              <dd className="text-brand-slate-800">{profile.districtName}</dd>
+            </div>
+          )}
           <div className="flex justify-between">
             <dt className="text-brand-slate-500">Role</dt>
             <dd className="text-brand-slate-800">{profile.orgRoleName}</dd>

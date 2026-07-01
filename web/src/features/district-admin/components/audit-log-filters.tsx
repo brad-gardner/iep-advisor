@@ -5,6 +5,16 @@ import type { StaffMember } from '@/features/staff-invites/types';
 import { AUDIT_ACTIONS } from '../types';
 import type { AuditAction, AuditLogFilters as AuditLogFiltersValue } from '../types';
 
+// Past-tense labels matching how the audit rows read ("Jane viewed …"), so the
+// filter's voice is consistent with the results it produces.
+const ACTION_LABELS: Record<AuditAction, string> = {
+  View: 'Viewed',
+  Edit: 'Edited',
+  Share: 'Shared',
+  Export: 'Exported',
+  Finalize: 'Finalized',
+};
+
 interface AuditLogFiltersProps {
   onChange: (filters: AuditLogFiltersValue) => void;
 }
@@ -108,7 +118,7 @@ export function AuditLogFilters({ onChange }: AuditLogFiltersProps) {
         <option value="">All actions</option>
         {AUDIT_ACTIONS.map((action) => (
           <option key={action} value={action}>
-            {action}
+            {ACTION_LABELS[action]}
           </option>
         ))}
       </Select>

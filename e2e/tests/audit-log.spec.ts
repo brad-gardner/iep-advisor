@@ -127,8 +127,10 @@ test.describe('District audit-log viewer', () => {
       page.locator('[data-testid="nav-educator/admin/activity"]')
     ).toHaveCount(0);
 
-    // Direct navigation is denied — the page self-guards to admin tiers.
+    // Direct navigation self-guards: the page renders an access-restricted
+    // notice (no filters, no rows) rather than the audit log itself.
     await page.goto('/educator/admin/activity');
-    await expect(page.locator('[data-testid="audit-log-page"]')).toHaveCount(0);
+    await expect(page.getByText('Access restricted')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="audit-log-staff-filter"]')).toHaveCount(0);
   });
 });

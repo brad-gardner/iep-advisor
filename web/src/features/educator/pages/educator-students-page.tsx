@@ -155,7 +155,7 @@ export function EducatorStudentsPage() {
           className="flex items-center justify-between gap-3 rounded-card border border-brand-amber-100 bg-brand-amber-50 px-4 py-2 text-sm"
           data-testid="attention-filter-indicator"
         >
-          <span className="text-brand-amber-500">
+          <span className="text-brand-amber-600">
             Showing students with {attentionLabel}
           </span>
           <button
@@ -170,8 +170,9 @@ export function EducatorStudentsPage() {
       )}
 
       {isLoading ? (
-        <div className="flex justify-center py-12">
+        <div className="flex justify-center py-12" role="status">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+          <span className="sr-only">Loading students…</span>
         </div>
       ) : (
         <StudentList
