@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { createStudent, getStudents } from '../api/educator-api';
-import { getDistrictSchools } from '@/features/district-admin/api/district-api';
+import { getDistrictSchools, getDistrictDashboard } from '@/features/district-admin/api/district-api';
 import type { DistrictSchool } from '@/features/district-admin/types';
 import type { CreateSchoolStudentRequest, SchoolStudent } from '../types';
 import { ORG_ROLE } from '../types';
@@ -12,14 +13,29 @@ import { SchoolFilter } from '../components/school-filter';
 const TEACHER_EMPTY =
   'No students assigned to you yet — your school admin can assign students, or create one.';
 
+// Dashboard "needs attention" tiles deep-link here with ?attention=<key>. The
+// roster payload carries no assigned-staff / linked-parent signal, so the ID
+// set is sourced from the dashboard aggregate (admins only).
+const ATTENTION_LABELS: Record<string, string> = {
+  'no-staff': 'no assigned staff',
+  'no-parent': 'no linked parent',
+};
+
 export function EducatorStudentsPage() {
   const { profile } = useEducatorProfile();
   const isDistrictAdmin = profile?.orgRoleId === ORG_ROLE.DistrictAdmin;
+  const isSchoolAdmin = profile?.orgRoleId === ORG_ROLE.SchoolAdmin;
+  const isAdmin = isDistrictAdmin || isSchoolAdmin;
   const isTeacher = profile?.orgRoleId === ORG_ROLE.Teacher;
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const attention = searchParams.get('attention');
+  const attentionLabel = attention ? ATTENTION_LABELS[attention] : undefined;
 
   const [students, setStudents] = useState<SchoolStudent[]>([]);
   const [schools, setSchools] = useState<DistrictSchool[]>([]);
   const [schoolFilter, setSchoolFilter] = useState('');
+  const [attentionIds, setAttentionIds] = useState<Set<number> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const reload = useCallback(async () => {
@@ -61,6 +77,38 @@ export function EducatorStudentsPage() {
     };
   }, [isDistrictAdmin]);
 
+  // Resolve the attention filter's ID set from the dashboard aggregate whenever
+  // an admin arrives with ?attention=<key>. A recognised key with no matching
+  // dashboard data yields an empty set (filters to nothing), not an unfiltered
+  // roster, so the deep-link never silently shows everyone. When the param is
+  // absent the memo below ignores any lingering set, so no reset is needed here.
+  useEffect(() => {
+    if (!isAdmin || !attentionLabel) return;
+    let active = true;
+    (async () => {
+      try {
+        const response = await getDistrictDashboard();
+        if (!active) return;
+        const data = response.success ? response.data : null;
+        const source =
+          attention === 'no-staff'
+            ? data?.studentsWithoutStaff
+            : data?.studentsWithoutParent;
+        setAttentionIds(new Set((source ?? []).map((s) => s.schoolStudentId)));
+      } catch {
+        if (active) setAttentionIds(new Set());
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [isAdmin, attention, attentionLabel]);
+
+  const clearAttention = () => {
+    searchParams.delete('attention');
+    setSearchParams(searchParams, { replace: true });
+  };
+
   const handleCreate = async (data: CreateSchoolStudentRequest) => {
     try {
       const response = await createStudent(data);
@@ -75,9 +123,15 @@ export function EducatorStudentsPage() {
   };
 
   const visibleStudents = useMemo(() => {
-    if (!isDistrictAdmin || !schoolFilter) return students;
-    return students.filter((s) => String(s.schoolId) === schoolFilter);
-  }, [students, isDistrictAdmin, schoolFilter]);
+    let result = students;
+    if (isDistrictAdmin && schoolFilter) {
+      result = result.filter((s) => String(s.schoolId) === schoolFilter);
+    }
+    if (attentionLabel && attentionIds) {
+      result = result.filter((s) => attentionIds.has(s.id));
+    }
+    return result;
+  }, [students, isDistrictAdmin, schoolFilter, attentionLabel, attentionIds]);
 
   return (
     <div className="space-y-6">
@@ -94,6 +148,25 @@ export function EducatorStudentsPage() {
           value={schoolFilter}
           onChange={setSchoolFilter}
         />
+      )}
+
+      {isAdmin && attentionLabel && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-card border border-brand-amber-100 bg-brand-amber-50 px-4 py-2 text-sm"
+          data-testid="attention-filter-indicator"
+        >
+          <span className="text-brand-amber-500">
+            Showing students with {attentionLabel}
+          </span>
+          <button
+            type="button"
+            onClick={clearAttention}
+            className="text-brand-teal-600 hover:underline"
+            data-testid="attention-filter-clear"
+          >
+            Clear
+          </button>
+        </div>
       )}
 
       {isLoading ? (

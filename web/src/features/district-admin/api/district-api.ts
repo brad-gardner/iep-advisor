@@ -1,9 +1,21 @@
 import { apiClient } from '@/lib/api-client';
 import type { ApiResponse } from '@/types/api';
-import type { DistrictOverview, DistrictSchool, SaveSchoolRequest } from '../types';
+import type {
+  DistrictDashboard,
+  DistrictOverview,
+  DistrictSchool,
+  SaveSchoolRequest,
+} from '../types';
 
 export async function getDistrict(): Promise<ApiResponse<DistrictOverview>> {
   const response = await apiClient.get<ApiResponse<DistrictOverview>>('/api/district');
+  return response.data;
+}
+
+export async function getDistrictDashboard(): Promise<ApiResponse<DistrictDashboard>> {
+  const response = await apiClient.get<ApiResponse<DistrictDashboard>>(
+    '/api/district/dashboard'
+  );
   return response.data;
 }
 
