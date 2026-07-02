@@ -142,15 +142,16 @@ export function DistrictAuditLogPage() {
         </div>
       ) : loadFailed ? (
         <Notice variant="error" title="Couldn't load activity">
-          Something went wrong loading the activity log.{' '}
-          <button
-            type="button"
+          <p>Something went wrong loading the activity log.</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-2 -ml-2"
             onClick={() => applyFilters({ ...filters })}
-            className="text-brand-teal-600 hover:underline"
             data-testid="audit-log-retry"
           >
             Try again
-          </button>
+          </Button>
         </Notice>
       ) : entries.length === 0 ? (
         <Card data-testid="audit-log-empty" className="p-0">
