@@ -307,6 +307,8 @@ public class StaffInviteService : IStaffInviteService
         var rawToken = InviteTokenHelper.Generate();
         invite.InviteToken = InviteTokenHelper.Hash(rawToken);
         invite.InviteExpiresAt = DateTime.UtcNow.AddDays(InviteExpiryDays);
+        // Re-arm the pre-expiry reminder: the extended window earns exactly one fresh warning (Phase 3).
+        invite.ExpiryReminderSentAt = null;
         invite.UpdatedById = callerUserId;
         await _context.SaveChangesAsync(ct);
 

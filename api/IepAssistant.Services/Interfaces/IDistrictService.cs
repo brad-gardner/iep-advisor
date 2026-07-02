@@ -13,6 +13,13 @@ public interface IDistrictService
     /// <summary>Overview of the caller's district. Any active staff in the district may read.</summary>
     Task<ServiceResult<DistrictOverviewModel>> GetOverviewAsync(int userId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Oversight dashboard aggregate for the caller's district. DistrictAdmin sees the whole district;
+    /// SchoolAdmin sees only their own school's slice; Teacher is denied. Inactive schools/students are
+    /// excluded from every count and list; an empty district returns a valid all-zero payload.
+    /// </summary>
+    Task<ServiceResult<DistrictDashboardModel>> GetDashboardAsync(int userId, CancellationToken ct = default);
+
     /// <summary>Active schools in the caller's district. Any active staff may read (school pickers).</summary>
     Task<ServiceResult<List<DistrictSchoolModel>>> GetSchoolsAsync(int userId, CancellationToken ct = default);
 

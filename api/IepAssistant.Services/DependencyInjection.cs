@@ -47,6 +47,8 @@ public static class DependencyInjection
         services.AddScoped<IStudentInviteService, StudentInviteService>();
         services.AddScoped<IStudentWorkspaceService, StudentWorkspaceService>();
         services.AddScoped<IStaffInviteService, StaffInviteService>();
+        services.AddScoped<IStaffInviteExpiryService, StaffInviteExpiryService>();
+        services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
 
         // Stateless JWT minting reused by create-and-sign-in flows (staff invite accept).
         services.AddScoped<JwtTokenFactory>();

@@ -42,6 +42,7 @@ import { EducatorHomePage } from '@/features/educator/pages/educator-home-page';
 import { EducatorStudentsPage } from '@/features/educator/pages/educator-students-page';
 import { EducatorStudentDetailPage } from '@/features/educator/pages/educator-student-detail-page';
 import { DistrictSchoolsPage } from '@/features/district-admin/pages/district-schools-page';
+import { DistrictAuditLogPage } from '@/features/district-admin/pages/district-audit-log-page';
 import { DistrictSetupWizard } from '@/features/district-admin/pages/district-setup-wizard';
 import { DistrictStaffPage } from '@/features/staff-invites/pages/district-staff-page';
 import { StaffAcceptInvitePage } from '@/features/staff-invites/pages/staff-accept-invite-page';
@@ -374,6 +375,18 @@ export function AppRouter() {
             <RoleRoute allow={['Educator']}>
               <MainLayout>
                 <DistrictStaffPage />
+              </MainLayout>
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/admin/activity"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allow={['Educator']}>
+              <MainLayout>
+                <DistrictAuditLogPage />
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>

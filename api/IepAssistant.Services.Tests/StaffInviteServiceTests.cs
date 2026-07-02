@@ -807,6 +807,39 @@ public sealed class StaffInviteServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Resend_NullsExpiryReminderSentAt_ToReArmWarning()
+    {
+        var districtId = SeedDistrict("Maple");
+        var schoolId = SeedSchool(districtId, "Elm");
+        var (adminUserId, _) = SeedStaff("admin@x.com", districtId, null, OrgRoleIds.DistrictAdmin);
+        var email = new CapturingEmailService();
+
+        int inviteId;
+        using (var ctx = CreateContext())
+        {
+            var r = await CreateService(ctx, email).InviteAsync(adminUserId, new CreateStaffInviteModel
+            {
+                Email = "rearm@x.com", OrgRoleId = OrgRoleIds.Teacher, SchoolId = schoolId
+            });
+            inviteId = r.Data!.Id;
+        }
+
+        // Simulate a prior reminder having been stamped.
+        using (var ctx = CreateContext())
+        {
+            var invite = ctx.StaffInvites.Single(i => i.Id == inviteId);
+            invite.ExpiryReminderSentAt = DateTime.UtcNow.AddHours(-1);
+            await ctx.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+            Assert.True((await CreateService(ctx, email).ResendAsync(adminUserId, inviteId)).Success);
+
+        using var ctx2 = CreateContext();
+        Assert.Null(ctx2.StaffInvites.Single(i => i.Id == inviteId).ExpiryReminderSentAt);
+    }
+
+    [Fact]
     public async Task Revoke_PendingInvite_DeactivatesAndKillsToken()
     {
         var districtId = SeedDistrict("Maple");
@@ -1157,6 +1190,7 @@ public sealed class StaffInviteServiceTests : IDisposable
         public Task SendShareInviteEmailAsync(string toEmail, string inviterName, string childName, string role, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
         public Task SendSchoolLinkInviteEmailAsync(string toEmail, string educatorName, string schoolName, string studentName, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
         public Task SendStudentInviteEmailAsync(string toEmail, string inviterName, string context, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
+        public Task SendStaffInviteExpiringEmailAsync(string toEmail, string inviteeEmail, string districtName, string? schoolName, DateTime expiresAt, CancellationToken ct = default) => Task.CompletedTask;
         public Task SendBetaInviteEmailAsync(string toEmail, string inviteCode, CancellationToken ct = default) => Task.CompletedTask;
     }
 }

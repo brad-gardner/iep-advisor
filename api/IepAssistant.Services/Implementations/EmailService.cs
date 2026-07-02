@@ -217,6 +217,54 @@ public class EmailService : IEmailService
         await SendEmailAsync(toEmail, subject, html, plainText, ct);
     }
 
+    public async Task SendStaffInviteExpiringEmailAsync(string toEmail, string inviteeEmail, string districtName, string? schoolName, DateTime expiresAt, CancellationToken ct = default)
+    {
+        // Deep-links the admin straight to the staff management page so they can resend in one click.
+        var staffUrl = $"{_frontendUrl}/educator/admin/staff";
+        var expiresDisplay = expiresAt.ToString("MMMM d, yyyy");
+
+        var orgLine = string.IsNullOrWhiteSpace(schoolName)
+            ? $"<strong>{districtName}</strong>"
+            : $"<strong>{schoolName}</strong> ({districtName})";
+        var orgLinePlain = string.IsNullOrWhiteSpace(schoolName)
+            ? districtName
+            : $"{schoolName} ({districtName})";
+
+        var subject = $"A staff invite for {inviteeEmail} is about to expire";
+        var html = $@"
+            <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
+                <div style=""text-align: center; margin-bottom: 24px;"">
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
+                </div>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">A Staff Invite Is About to Expire</h1>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
+                    The staff invite you sent to <strong>{inviteeEmail}</strong> to join {orgLine} on IEP Advisor
+                    expires on <strong>{expiresDisplay}</strong> and hasn't been accepted yet.
+                </p>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
+                    If they still need access, you can resend the invite to reset the clock. If not, no action is needed —
+                    the invite will simply expire.
+                </p>
+                <div style=""text-align: center; margin: 24px 0;"">
+                    <a href=""{staffUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                        Manage Staff Invites
+                    </a>
+                </div>
+                <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
+                    You're receiving this because you sent this invite. Only you are notified.
+                </p>
+                <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
+                <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
+                    IEP Advisor — Navigate with confidence
+                </p>
+            </div>";
+
+        var plainText = $"The staff invite you sent to {inviteeEmail} to join {orgLinePlain} on IEP Advisor expires on {expiresDisplay} and hasn't been accepted yet.\n\nIf they still need access, resend the invite to reset the clock: {staffUrl}\n\nIf not, no action is needed — the invite will simply expire. Only you are notified.";
+
+        await SendEmailAsync(toEmail, subject, html, plainText, ct);
+    }
+
     public async Task SendBetaInviteEmailAsync(string toEmail, string inviteCode, CancellationToken ct = default)
     {
         var signupUrl = $"{_frontendUrl}/register?code={Uri.EscapeDataString(inviteCode)}";

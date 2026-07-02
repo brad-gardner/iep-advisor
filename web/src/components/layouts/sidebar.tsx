@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home } from 'lucide-react';
+import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home, ScrollText } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { useAuth } from '@/features/auth/hooks/use-auth';
@@ -40,6 +40,7 @@ const adminNavItems: {
 }[] = [
   { to: '/educator/admin/schools', label: 'Schools', Icon: School, schoolAdmin: false },
   { to: '/educator/admin/staff', label: 'Staff', Icon: Users, schoolAdmin: true },
+  { to: '/educator/admin/activity', label: 'Activity log', Icon: ScrollText, schoolAdmin: true },
 ];
 
 interface SidebarProps {
