@@ -73,6 +73,18 @@ export default {
         card: '12px',
         modal: '16px',
       },
+      keyframes: {
+        // Subtle toast entrance: fade + a short rise. Gated behind
+        // `motion-safe:` at the call site so it never plays under
+        // `prefers-reduced-motion`.
+        'toast-in': {
+          '0%': { opacity: '0', transform: 'translateY(0.5rem)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'toast-in': 'toast-in 150ms ease-out',
+      },
     },
   },
   plugins: [],

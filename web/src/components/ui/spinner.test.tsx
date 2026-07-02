@@ -30,6 +30,15 @@ describe('Spinner', () => {
     expect(screen.getByRole('status')).toHaveClass('h-10', 'w-10');
   });
 
+  it('defaults to the brand tone and supports the current tone', () => {
+    const { rerender } = render(<Spinner />);
+    expect(screen.getByRole('status')).toHaveClass('border-brand-teal-500');
+    rerender(<Spinner tone="current" />);
+    const el = screen.getByRole('status');
+    expect(el).toHaveClass('border-current');
+    expect(el).not.toHaveClass('border-brand-teal-500');
+  });
+
   it('suppresses animation under reduced motion', () => {
     render(<Spinner />);
     expect(screen.getByRole('status')).toHaveClass('motion-reduce:animate-none');

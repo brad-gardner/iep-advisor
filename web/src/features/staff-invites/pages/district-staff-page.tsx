@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
+import { PageLayout } from '@/components/ui/page-layout';
+import { useToast } from '@/components/ui/toast';
 import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
 import { getDistrictSchools } from '@/features/district-admin/api/district-api';
 import type { DistrictSchool } from '@/features/district-admin/types';
@@ -26,6 +28,7 @@ const EMPTY_LIST: StaffListData = { members: [], pendingInvites: [] };
 
 export function DistrictStaffPage() {
   const { profile } = useEducatorProfile();
+  const { show: showToast } = useToast();
   const [staff, setStaff] = useState<StaffListData>(EMPTY_LIST);
   const [schools, setSchools] = useState<DistrictSchool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,6 +70,7 @@ export function DistrictStaffPage() {
       const response = await createStaffInvite(data);
       if (response.success && response.data) {
         await reloadStaff();
+        showToast({ message: `Invite sent to ${data.email}`, variant: 'success' });
         return { success: true, invite: response.data };
       }
       return { success: false, error: response.message || 'Failed to send invite' };
@@ -137,9 +141,7 @@ export function DistrictStaffPage() {
   };
 
   return (
-    <div className="space-y-6" data-testid="district-staff-page">
-      <h1 className="font-serif">Staff</h1>
-
+    <PageLayout title="Staff" data-testid="district-staff-page">
       {profile && (
         <Card className="max-w-lg">
           <h2 className="font-serif text-lg mb-4">Invite a staff member</h2>
@@ -183,6 +185,6 @@ export function DistrictStaffPage() {
           </section>
         </>
       )}
-    </div>
+    </PageLayout>
   );
 }
