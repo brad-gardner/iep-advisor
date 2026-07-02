@@ -95,31 +95,6 @@ describe('ToastProvider / useToast', () => {
     expect(screen.getAllByTestId('toast')).toHaveLength(1);
   });
 
-  it('resets the auto-dismiss dwell when an identical message is re-shown', async () => {
-    const { user } = setup();
-    await user.click(screen.getByRole('button', { name: 'show' }));
-    act(() => {
-      vi.advanceTimersByTime(3000);
-    });
-    expect(screen.getByTestId('toast')).toBeInTheDocument();
-
-    // Re-show the identical message: deduped to one card, but the dwell restarts.
-    await user.click(screen.getByRole('button', { name: 'show' }));
-    expect(screen.getAllByTestId('toast')).toHaveLength(1);
-
-    // 3s past the re-show (6s past the first) — still visible because it reset.
-    act(() => {
-      vi.advanceTimersByTime(3000);
-    });
-    expect(screen.getByTestId('toast')).toBeInTheDocument();
-
-    // Past the fresh 5s window from the re-show — now gone.
-    act(() => {
-      vi.advanceTimersByTime(2000);
-    });
-    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
-  });
-
   it('stacks distinct messages', async () => {
     const { user } = setup();
     await user.click(screen.getByRole('button', { name: 'show' }));

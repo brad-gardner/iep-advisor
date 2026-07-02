@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle, Info, XCircle, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { DEFAULT_TOAST_DURATION_MS } from './toast-provider';
 import type { ToastItem, ToastVariant } from './toast-types';
 
 const variantStyles: Record<ToastVariant, { bg: string; border: string; text: string; Icon: typeof Info }> = {
@@ -18,11 +19,9 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: num
 
   useEffect(() => {
     if (paused) return;
-    const timer = setTimeout(() => onDismiss(toast.id), toast.durationMs);
+    const timer = setTimeout(() => onDismiss(toast.id), DEFAULT_TOAST_DURATION_MS);
     return () => clearTimeout(timer);
-    // `toast.seq` bumps on a deduped re-show, re-arming the timer so the dwell
-    // restarts from the latest mention.
-  }, [paused, toast.id, toast.durationMs, toast.seq, onDismiss]);
+  }, [paused, toast.id, onDismiss]);
 
   return (
     <div

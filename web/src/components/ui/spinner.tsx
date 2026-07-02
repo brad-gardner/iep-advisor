@@ -40,6 +40,7 @@ export function Spinner({
 }: SpinnerProps) {
   return (
     <div
+      {...rest}
       role="status"
       className={cn(
         'inline-block animate-spin motion-reduce:animate-none rounded-full border-b-2',
@@ -47,7 +48,6 @@ export function Spinner({
         sizeStyles[size],
         className
       )}
-      {...rest}
     >
       <span className="sr-only">{label}</span>
     </div>

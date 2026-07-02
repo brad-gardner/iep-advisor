@@ -9,55 +9,33 @@ export const MAX_VISIBLE_TOASTS = 4;
 
 /**
  * Mounts once at the app root (above the router) and owns the toast queue.
- *
- * `toastsRef` is the source of truth read synchronously by `show`/`dismiss`
- * (both called from event handlers / timers), with `setToasts` mirroring it for
- * render. This lets `show` dedupe against the live list and return a correct id
- * without depending on async state flushes.
+ * `show`/`dismiss` drive the list through functional `setToasts` updaters, so
+ * dedupe and the stacking cap are computed against the latest state.
  */
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const toastsRef = useRef<ToastItem[]>([]);
   const idRef = useRef(0);
 
-  const commit = useCallback((next: ToastItem[]) => {
-    toastsRef.current = next;
-    setToasts(next);
+  const dismiss = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const dismiss = useCallback(
-    (id: number) => {
-      commit(toastsRef.current.filter((t) => t.id !== id));
-    },
-    [commit]
-  );
+  const show = useCallback((options: ToastOptions) => {
+    const variant = options.variant ?? 'info';
+    const { message } = options;
+    const id = (idRef.current += 1);
 
-  const show = useCallback(
-    (options: ToastOptions): number => {
-      const variant = options.variant ?? 'info';
-      const durationMs = options.durationMs ?? DEFAULT_TOAST_DURATION_MS;
-      const { message } = options;
-
-      // Dedupe identical concurrent messages (same text + variant). Rather than
-      // silently drop the re-trigger, bump the existing toast's `seq` so its
-      // card re-arms the auto-dismiss timer — the dwell tracks the latest
-      // mention (e.g. a second save) instead of expiring on the first.
-      const existing = toastsRef.current.find((t) => t.message === message && t.variant === variant);
-      if (existing) {
-        commit(
-          toastsRef.current.map((t) => (t.id === existing.id ? { ...t, seq: t.seq + 1 } : t))
-        );
-        return existing.id;
+    setToasts((prev) => {
+      // Dedupe identical concurrent toasts (same text + variant): if one is
+      // already visible, leave the list untouched rather than stacking a copy.
+      if (prev.some((t) => t.message === message && t.variant === variant)) {
+        return prev;
       }
-
-      const id = (idRef.current += 1);
-      const item: ToastItem = { id, message, variant, durationMs, seq: 0 };
-      const next = [...toastsRef.current, item];
-      commit(next.length > MAX_VISIBLE_TOASTS ? next.slice(next.length - MAX_VISIBLE_TOASTS) : next);
-      return id;
-    },
-    [commit]
-  );
+      const next = [...prev, { id, message, variant }];
+      // Cap the stack so a burst can't bury the screen; oldest drops first.
+      return next.length > MAX_VISIBLE_TOASTS ? next.slice(next.length - MAX_VISIBLE_TOASTS) : next;
+    });
+  }, []);
 
   const value = useMemo<ToastContextValue>(() => ({ show, dismiss }), [show, dismiss]);
 

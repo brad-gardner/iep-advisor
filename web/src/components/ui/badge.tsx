@@ -1,9 +1,9 @@
+import { cn } from '@/lib/cn';
+
 type BadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
 interface BadgeProps extends React.ComponentPropsWithoutRef<'span'> {
   variant?: BadgeVariant;
-  children: React.ReactNode;
-  className?: string;
 }
 
 const variantStyles: Record<BadgeVariant, string> = {
@@ -21,7 +21,11 @@ const variantStyles: Record<BadgeVariant, string> = {
 export function Badge({ variant = 'neutral', children, className = '', ...rest }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-badge text-xs font-medium border ${variantStyles[variant]} ${className}`}
+      className={cn(
+        'inline-flex items-center px-2 py-0.5 rounded-badge text-xs font-medium border',
+        variantStyles[variant],
+        className
+      )}
       {...rest}
     >
       {children}

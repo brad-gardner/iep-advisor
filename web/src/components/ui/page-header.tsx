@@ -13,25 +13,13 @@ interface PageHeaderProps {
   /** Rendered as the single page `<h1>`. */
   title: string;
   subtitle?: string;
-  /** Optional breadcrumb chain; long chains are collapsed (see below). */
+  /** Optional breadcrumb chain. */
   breadcrumb?: Breadcrumb[];
   /**
    * Optional top-right action slot. Compose the page's buttons here — place the
    * dominant (primary) action last so it reads as the emphasised control.
    */
   actions?: React.ReactNode;
-}
-
-// Beyond this length the middle of the chain collapses to a single ellipsis so
-// a deep hierarchy never wraps or crowds the title row.
-const MAX_CRUMBS = 4;
-
-type RenderedCrumb = Breadcrumb | { ellipsis: true };
-
-function collapseCrumbs(crumbs: Breadcrumb[]): RenderedCrumb[] {
-  if (crumbs.length <= MAX_CRUMBS) return crumbs;
-  // Keep the root for orientation and the last two for local context.
-  return [crumbs[0], { ellipsis: true }, crumbs[crumbs.length - 2], crumbs[crumbs.length - 1]];
 }
 
 function Crumb({ crumb, isLast }: { crumb: Breadcrumb; isLast: boolean }) {
@@ -59,40 +47,27 @@ function Crumb({ crumb, isLast }: { crumb: Breadcrumb; isLast: boolean }) {
  * `MainLayout`); it does not provide the page container itself.
  */
 export function PageHeader({ title, subtitle, breadcrumb, actions }: PageHeaderProps) {
-  const crumbs = breadcrumb && breadcrumb.length > 0 ? collapseCrumbs(breadcrumb) : null;
+  const crumbs = breadcrumb && breadcrumb.length > 0 ? breadcrumb : null;
 
   return (
     <header className="space-y-2">
       {crumbs && (
         <nav aria-label="Breadcrumb">
           <ol className="flex items-center gap-1.5 text-xs">
-            {crumbs.map((crumb, i) => {
-              const isLast = i === crumbs.length - 1;
-              return (
-                <Fragment key={i}>
-                  {i > 0 && (
-                    <ChevronRight
-                      className="w-3.5 h-3.5 text-brand-slate-300 shrink-0"
-                      strokeWidth={2}
-                      aria-hidden="true"
-                    />
-                  )}
-                  <li className="flex min-w-0 items-center">
-                    {'ellipsis' in crumb ? (
-                      <>
-                        <span className="text-brand-slate-400" aria-hidden="true">
-                          …
-                        </span>
-                        {/* Announce the gap so AT users know levels were collapsed. */}
-                        <span className="sr-only">Hidden levels</span>
-                      </>
-                    ) : (
-                      <Crumb crumb={crumb} isLast={isLast} />
-                    )}
-                  </li>
-                </Fragment>
-              );
-            })}
+            {crumbs.map((crumb, i) => (
+              <Fragment key={i}>
+                {i > 0 && (
+                  <ChevronRight
+                    className="w-3.5 h-3.5 text-brand-slate-300 shrink-0"
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  />
+                )}
+                <li className="flex min-w-0 items-center">
+                  <Crumb crumb={crumb} isLast={i === crumbs.length - 1} />
+                </li>
+              </Fragment>
+            ))}
           </ol>
         </nav>
       )}

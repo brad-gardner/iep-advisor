@@ -49,31 +49,6 @@ describe('PageHeader', () => {
     expect(current).toHaveAttribute('aria-current', 'page');
   });
 
-  it('collapses long breadcrumb chains to root + ellipsis + last two', () => {
-    renderHeader(
-      <PageHeader
-        title="Deep"
-        breadcrumb={[
-          { label: 'One', to: '/1' },
-          { label: 'Two', to: '/2' },
-          { label: 'Three', to: '/3' },
-          { label: 'Four', to: '/4' },
-          { label: 'Five', to: '/5' },
-          { label: 'Six' },
-        ]}
-      />
-    );
-    const nav = screen.getByRole('navigation', { name: 'Breadcrumb' });
-    expect(within(nav).getByText('…')).toBeInTheDocument();
-    // Root and the last two survive; the collapsed middle does not.
-    expect(within(nav).getByText('One')).toBeInTheDocument();
-    expect(within(nav).getByText('Five')).toBeInTheDocument();
-    expect(within(nav).getByText('Six')).toBeInTheDocument();
-    expect(within(nav).queryByText('Two')).not.toBeInTheDocument();
-    expect(within(nav).queryByText('Three')).not.toBeInTheDocument();
-    expect(within(nav).queryByText('Four')).not.toBeInTheDocument();
-  });
-
   it('renders the actions slot when provided', () => {
     renderHeader(
       <PageHeader

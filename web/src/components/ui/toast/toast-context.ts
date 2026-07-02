@@ -2,8 +2,8 @@ import { createContext } from 'react';
 import type { ToastOptions } from './toast-types';
 
 export interface ToastContextValue {
-  /** Enqueue a toast; returns its id (or the id of the deduped existing one). */
-  show: (options: ToastOptions) => number;
+  /** Enqueue a toast (identical concurrent toasts are deduped). */
+  show: (options: ToastOptions) => void;
   /** Remove a toast early (also used by the close button). */
   dismiss: (id: number) => void;
 }
