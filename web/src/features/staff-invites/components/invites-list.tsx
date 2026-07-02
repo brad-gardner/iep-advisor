@@ -1,3 +1,5 @@
+import { MailPlus } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { InviteRow } from './invite-row';
 import type { StaffPendingInvite } from '../types';
 
@@ -12,9 +14,12 @@ interface InvitesListProps {
 export function InvitesList({ invites, onRevoke, onResend }: InvitesListProps) {
   if (invites.length === 0) {
     return (
-      <p className="text-brand-slate-400 text-sm" data-testid="staff-invites-empty">
-        No pending invites.
-      </p>
+      <EmptyState
+        data-testid="staff-invites-empty"
+        icon={MailPlus}
+        title="No pending invites"
+        description="Invites you send will appear here until they're accepted."
+      />
     );
   }
 

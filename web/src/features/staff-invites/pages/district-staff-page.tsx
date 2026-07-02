@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
 import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
 import { getDistrictSchools } from '@/features/district-admin/api/district-api';
 import type { DistrictSchool } from '@/features/district-admin/types';
@@ -153,7 +154,7 @@ export function DistrictStaffPage() {
 
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+          <Spinner />
         </div>
       ) : (
         <>
