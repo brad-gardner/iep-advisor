@@ -96,8 +96,7 @@ public class AuthService : IAuthService
         if (inviteCode == null)
             return ServiceResult.FailureResult("Invalid or expired invite code.");
 
-        var existingUser = await _userRepository.GetByEmailAsync(model.Email, cancellationToken);
-        if (existingUser != null)
+        if (await _userRepository.EmailExistsAsync(model.Email, cancellationToken))
             return ServiceResult.FailureResult("Email is already registered.");
 
         var user = new User
@@ -130,8 +129,7 @@ public class AuthService : IAuthService
         // Email-already-registered short-circuit (same shape/message as RegisterAsync). The unique index
         // on Email is the real backstop — if a collision slips past this check the transaction below
         // rolls back, so no partial District/StaffProfile is ever persisted.
-        var existingUser = await _userRepository.GetByEmailAsync(model.Email, cancellationToken);
-        if (existingUser != null)
+        if (await _userRepository.EmailExistsAsync(model.Email, cancellationToken))
             return RegisterDistrictResult.Failure("Email is already registered.");
 
         // One atomic transaction: User + (ALWAYS NEW) District + StaffProfile(DistrictAdmin). The District

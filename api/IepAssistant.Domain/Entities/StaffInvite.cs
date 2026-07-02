@@ -34,6 +34,14 @@ public class StaffInvite : BaseEntity, IAuditableEntity
     public int InvitedByUserId { get; set; }
     public bool IsActive { get; set; } = true;
 
+    /// <summary>
+    /// UTC timestamp of the one-time "invite expiring soon" reminder emailed to the inviting admin
+    /// (P-pilot Phase 3). <c>null</c> = no reminder sent yet. Set by <c>StaffInviteExpiryWorker</c> once a
+    /// pending invite enters the 3-day pre-expiry window, and nulled by <c>ResendAsync</c> so an extended
+    /// invite re-arms exactly one fresh warning. Idempotency for the reminder is this timestamp alone.
+    /// </summary>
+    public DateTime? ExpiryReminderSentAt { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public int? CreatedById { get; set; }

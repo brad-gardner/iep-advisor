@@ -43,8 +43,10 @@ public class GlobalExceptionMiddleware
             EntityNotFoundException => (HttpStatusCode.NotFound, exception.Message),
             DomainException => (HttpStatusCode.BadRequest, exception.Message),
             UnauthorizedAccessException => (HttpStatusCode.Unauthorized, "Unauthorized"),
+            // In dev, flatten the whole exception chain — the actionable cause (e.g. a SqlException
+            // duplicate-key) lives in the InnerException, not the generic top-level message.
             _ => (HttpStatusCode.InternalServerError,
-                _env.IsDevelopment() ? exception.Message : "An internal error occurred")
+                _env.IsDevelopment() ? Flatten(exception) : "An internal error occurred")
         };
 
         context.Response.StatusCode = (int)statusCode;
@@ -53,5 +55,13 @@ public class GlobalExceptionMiddleware
 
         var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
         await context.Response.WriteAsync(JsonSerializer.Serialize(response, options));
+    }
+
+    private static string Flatten(Exception exception)
+    {
+        var messages = new List<string>();
+        for (var ex = exception; ex != null; ex = ex.InnerException)
+            messages.Add($"{ex.GetType().Name}: {ex.Message}");
+        return string.Join(" -> ", messages);
     }
 }
