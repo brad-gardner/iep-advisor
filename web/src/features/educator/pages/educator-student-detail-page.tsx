@@ -3,6 +3,10 @@ import { Link, useParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageLayout } from '@/components/ui/page-layout';
+import { useToast } from '@/components/ui/toast';
 import {
   getStudent,
   getStudentLinks,
@@ -21,6 +25,7 @@ import { InviteStudentForm } from '@/features/student/components/invite-student-
 import { inviteStudentFromEducator } from '@/features/student/api/student-invite-api';
 
 export function EducatorStudentDetailPage() {
+  const { show: showToast } = useToast();
   const { studentId: studentIdParam } = useParams<{ studentId: string }>();
   const studentId = Number(studentIdParam);
 
@@ -78,6 +83,7 @@ export function EducatorStudentDetailPage() {
       const response = await inviteParent(studentId, { parentEmail: email });
       if (response.success) {
         await reloadLinks();
+        showToast({ message: 'Parent invited', variant: 'success' });
         return { success: true, message: response.message };
       }
       return { success: false, message: response.message };
@@ -107,39 +113,32 @@ export function EducatorStudentDetailPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading student…" />
       </div>
     );
   }
 
   if (!student) {
     return (
-      <div className="text-center py-12">
-        <p className="text-brand-slate-400">Student not found.</p>
-        <Link
-          to="/educator/students"
-          className="text-brand-teal-500 hover:underline mt-2 inline-block"
-        >
-          Back to students
-        </Link>
-      </div>
+      <EmptyState
+        title="Student not found"
+        description="This student may have been removed, or you may not have access to their record."
+        action={
+          <Link to="/educator/students">
+            <Button variant="secondary">Back to students</Button>
+          </Link>
+        }
+      />
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          to="/educator/students"
-          className="text-sm text-brand-teal-500 hover:underline"
-        >
-          ← Back to students
-        </Link>
-        <h1 className="font-serif mt-2">
-          {student.firstName} {student.lastName ?? ''}
-        </h1>
-      </div>
+  const studentName = `${student.firstName} ${student.lastName ?? ''}`.trim() || 'Student';
 
+  return (
+    <PageLayout
+      title={studentName}
+      breadcrumb={[{ label: 'Students', to: '/educator/students' }, { label: studentName }]}
+    >
       <Card className="max-w-lg" data-testid="student-info">
         <dl className="space-y-2 text-sm">
           {student.gradeLevel && (
@@ -201,6 +200,6 @@ export function EducatorStudentDetailPage() {
         {revokeNote && <Notice variant="info" title="Link revoked">{revokeNote}</Notice>}
         <StudentLinksList links={links} revokingId={revokingId} onRevoke={handleRevoke} />
       </section>
-    </div>
+    </PageLayout>
   );
 }

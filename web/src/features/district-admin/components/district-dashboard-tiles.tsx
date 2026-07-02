@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { getDistrictDashboard } from '../api/district-api';
 import type { DistrictDashboard } from '../types';
 import { DashboardSchoolsTile } from './dashboard-schools-tile';
@@ -55,9 +56,8 @@ export function DistrictDashboardTiles() {
   if (isLoading) {
     return (
       <Card data-testid="district-dashboard-tiles-loading">
-        <div className="flex justify-center py-6" role="status">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-teal-500" />
-          <span className="sr-only">Loading dashboard…</span>
+        <div className="flex justify-center py-6">
+          <Spinner label="Loading dashboard…" />
         </div>
       </Card>
     );

@@ -1,3 +1,5 @@
+import { School } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { SchoolRow } from './school-row';
 import type { DistrictSchool, SaveSchoolRequest } from '../types';
 
@@ -13,9 +15,12 @@ interface SchoolsListProps {
 export function SchoolsList({ schools, onUpdate, onDeactivate }: SchoolsListProps) {
   if (schools.length === 0) {
     return (
-      <p className="text-brand-slate-400 text-sm" data-testid="district-schools-empty">
-        No schools yet. Add your first school to get started.
-      </p>
+      <EmptyState
+        data-testid="district-schools-empty"
+        icon={School}
+        title="No schools yet"
+        description="Add your first school using the form above to start building out your district."
+      />
     );
   }
 

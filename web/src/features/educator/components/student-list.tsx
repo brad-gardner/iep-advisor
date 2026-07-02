@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
+import { GraduationCap } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { SchoolStudent } from '../types';
 
 interface StudentListProps {
@@ -19,9 +21,12 @@ export function StudentList({
 }: StudentListProps) {
   if (students.length === 0) {
     return (
-      <p className="text-brand-slate-400 text-sm" data-testid="student-list-empty">
-        {emptyMessage}
-      </p>
+      <EmptyState
+        data-testid="student-list-empty"
+        icon={GraduationCap}
+        title="No students yet"
+        description={emptyMessage}
+      />
     );
   }
 

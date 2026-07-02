@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { DistrictOverviewCard } from '@/features/district-admin/components/district-overview-card';
 import { DistrictDashboardTiles } from '@/features/district-admin/components/district-dashboard-tiles';
 import { SetupChecklistCard } from '@/features/district-admin/components/setup-checklist-card';
+import { orgRoleLabel } from '@/lib/org-role-label';
 import { ORG_ROLE } from '../types';
 import type { EducatorProfile } from '../types';
 
@@ -35,7 +36,7 @@ export function EducatorDashboard({ profile }: EducatorDashboardProps) {
           )}
           <div className="flex justify-between">
             <dt className="text-brand-slate-500">Role</dt>
-            <dd className="text-brand-slate-800">{profile.orgRoleName}</dd>
+            <dd className="text-brand-slate-800">{orgRoleLabel(profile.orgRoleName)}</dd>
           </div>
           {profile.stateCode && (
             <div className="flex justify-between">

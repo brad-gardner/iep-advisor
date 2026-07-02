@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Notice } from '@/components/ui/notice';
 import { InviteUrlField } from './invite-url-field';
+import { orgRoleLabel } from '@/lib/org-role-label';
 import type { StaffPendingInvite } from '../types';
 
 interface InviteRowProps {
@@ -66,7 +67,7 @@ export function InviteRow({ invite, onRevoke, onResend }: InviteRowProps) {
               {isExpired && <Badge variant="error">Expired</Badge>}
             </div>
             <p className="text-xs text-brand-slate-400">
-              {invite.orgRoleName}
+              {orgRoleLabel(invite.orgRoleName)}
               {invite.schoolName ? ` · ${invite.schoolName}` : ' · District-wide'}
               {' · '}
               {isExpired ? 'Expired' : 'Expires'} {formatExpiry(invite.inviteExpiresAt)}

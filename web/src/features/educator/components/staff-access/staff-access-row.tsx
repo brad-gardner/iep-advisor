@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Notice } from '@/components/ui/notice';
+import { orgRoleLabel } from '@/lib/org-role-label';
 import type { StudentStaffAccess } from '../../types';
 
 interface StaffAccessRowProps {
@@ -43,7 +44,7 @@ export function StaffAccessRow({ grant, canManage, onRevoke }: StaffAccessRowPro
             <Badge variant="info">{grant.accessRole}</Badge>
           </div>
           <p className="text-sm text-brand-slate-500">{grant.email}</p>
-          <p className="text-xs text-brand-slate-400">{grant.orgRoleName}</p>
+          <p className="text-xs text-brand-slate-400">{orgRoleLabel(grant.orgRoleName)}</p>
           {error && (
             <div className="pt-2">
               <Notice variant="error" title={error} />

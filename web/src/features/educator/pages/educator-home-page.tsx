@@ -1,4 +1,6 @@
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
+import { PageLayout } from '@/components/ui/page-layout';
 import { useEducatorProfile } from '../hooks/use-educator-profile';
 import { EducatorDashboard } from '../components/educator-dashboard';
 import { DeactivatedAccessNotice } from '../components/deactivated-access-notice';
@@ -9,7 +11,7 @@ export function EducatorHomePage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner />
       </div>
     );
   }
@@ -21,8 +23,7 @@ export function EducatorHomePage() {
   const isDeactivated = profile != null && !profile.isActive;
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-serif">Educator</h1>
+    <PageLayout title="Educator">
       {profile == null ? (
         <div data-testid="educator-no-profile">
           <Notice variant="warning" title="No staff profile found">
@@ -35,6 +36,6 @@ export function EducatorHomePage() {
       ) : (
         <EducatorDashboard profile={profile} />
       )}
-    </div>
+    </PageLayout>
   );
 }

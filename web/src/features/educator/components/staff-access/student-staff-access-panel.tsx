@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+import { useToast } from '@/components/ui/toast';
 import {
   getStudentStaffAccess,
   grantStudentStaffAccess,
@@ -26,6 +28,7 @@ export function StudentStaffAccessPanel({
   studentSchoolId,
   canManage,
 }: StudentStaffAccessPanelProps) {
+  const { show: showToast } = useToast();
   const [grants, setGrants] = useState<StudentStaffAccess[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,6 +72,7 @@ export function StudentStaffAccessPanel({
       const response = await grantStudentStaffAccess(studentId, data);
       if (response.success) {
         await reloadGrants();
+        showToast({ message: 'Access granted', variant: 'success' });
         return { success: true };
       }
       return { success: false, error: response.message || 'Could not assign staff' };
@@ -82,6 +86,7 @@ export function StudentStaffAccessPanel({
       const response = await revokeStudentStaffAccess(studentId, accessId);
       if (response.success) {
         await reloadGrants();
+        showToast({ message: 'Access revoked', variant: 'success' });
         return { success: true };
       }
       return { success: false, error: response.message || 'Could not revoke access' };
@@ -105,7 +110,7 @@ export function StudentStaffAccessPanel({
     <Card className="max-w-lg" data-testid="student-staff-access-panel">
       {isLoading ? (
         <div className="flex justify-center py-6">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-teal-500" />
+          <Spinner label="Loading assigned staff…" />
         </div>
       ) : (
         <div className="space-y-4">

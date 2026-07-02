@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageLayout } from '@/components/ui/page-layout';
 import { ORG_ROLE } from '@/features/educator/types';
 import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
 import { getAuditLog } from '../api/district-api';
@@ -108,39 +112,33 @@ export function DistrictAuditLogPage() {
 
   if (profileLoading) {
     return (
-      <div className="flex justify-center py-12" data-testid="audit-log-page" role="status">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
-        <span className="sr-only">Loading…</span>
+      <div className="flex justify-center py-12" data-testid="audit-log-page">
+        <Spinner />
       </div>
     );
   }
 
   if (!isAdmin) {
     return (
-      <div className="space-y-6" data-testid="audit-log-page">
-        <h1 className="font-serif">Activity log</h1>
+      <PageLayout title="Activity log" data-testid="audit-log-page">
         <Notice variant="warning" title="Access restricted">
           The activity log is available to district and school administrators only.
         </Notice>
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="space-y-6" data-testid="audit-log-page">
-      <div>
-        <h1 className="font-serif">Activity log</h1>
-        <p className="mt-1 text-sm text-brand-slate-500">
-          Who accessed which student records, and when.
-        </p>
-      </div>
-
+    <PageLayout
+      title="Activity log"
+      subtitle="Who accessed which student records, and when."
+      data-testid="audit-log-page"
+    >
       <AuditLogFilters onChange={applyFilters} />
 
       {isLoading ? (
-        <div className="flex justify-center py-12" role="status">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
-          <span className="sr-only">Loading activity…</span>
+        <div className="flex justify-center py-12">
+          <Spinner label="Loading activity…" />
         </div>
       ) : loadFailed ? (
         <Notice variant="error" title="Couldn't load activity">
@@ -155,12 +153,16 @@ export function DistrictAuditLogPage() {
           </button>
         </Notice>
       ) : entries.length === 0 ? (
-        <Card data-testid="audit-log-empty">
-          <p className="text-center text-sm text-brand-slate-500">
-            {hasFilters
-              ? 'No activity matches these filters.'
-              : 'No activity recorded yet.'}
-          </p>
+        <Card data-testid="audit-log-empty" className="p-0">
+          <EmptyState
+            icon={ClipboardList}
+            title={hasFilters ? 'No matching activity' : 'No activity yet'}
+            description={
+              hasFilters
+                ? 'No records were accessed under these filters. Try widening the date range or clearing a filter.'
+                : 'Once staff start opening student records, their access will show up here.'
+            }
+          />
         </Card>
       ) : (
         <>
@@ -184,6 +186,6 @@ export function DistrictAuditLogPage() {
           )}
         </>
       )}
-    </div>
+    </PageLayout>
   );
 }

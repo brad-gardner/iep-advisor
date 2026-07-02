@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Spinner } from '@/components/ui/spinner';
+import { Button } from '@/components/ui/button';
+import { PageLayout } from '@/components/ui/page-layout';
+import { useToast } from '@/components/ui/toast';
 import { createStudent, getStudents } from '../api/educator-api';
 import { getDistrictSchools, getDistrictDashboard } from '@/features/district-admin/api/district-api';
 import type { DistrictSchool } from '@/features/district-admin/types';
@@ -22,6 +26,7 @@ const ATTENTION_LABELS: Record<string, string> = {
 };
 
 export function EducatorStudentsPage() {
+  const { show: showToast } = useToast();
   const { profile } = useEducatorProfile();
   const isDistrictAdmin = profile?.orgRoleId === ORG_ROLE.DistrictAdmin;
   const isSchoolAdmin = profile?.orgRoleId === ORG_ROLE.SchoolAdmin;
@@ -114,6 +119,7 @@ export function EducatorStudentsPage() {
       const response = await createStudent(data);
       if (response.success) {
         await reload();
+        showToast({ message: 'Student added', variant: 'success' });
         return { success: true };
       }
       return { success: false, error: response.message || 'Failed to add student' };
@@ -134,9 +140,7 @@ export function EducatorStudentsPage() {
   }, [students, isDistrictAdmin, schoolFilter, attentionLabel, attentionIds]);
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-serif">Students</h1>
-
+    <PageLayout title="Students" data-testid="educator-students-page">
       <CreateStudentForm
         onSubmit={handleCreate}
         schools={isDistrictAdmin ? schools : undefined}
@@ -158,21 +162,20 @@ export function EducatorStudentsPage() {
           <span className="text-brand-amber-600">
             Showing students with {attentionLabel}
           </span>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={clearAttention}
-            className="text-brand-teal-600 hover:underline"
             data-testid="attention-filter-clear"
           >
             Clear
-          </button>
+          </Button>
         </div>
       )}
 
       {isLoading ? (
-        <div className="flex justify-center py-12" role="status">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
-          <span className="sr-only">Loading students…</span>
+        <div className="flex justify-center py-12">
+          <Spinner label="Loading students…" />
         </div>
       ) : (
         <StudentList
@@ -181,6 +184,6 @@ export function EducatorStudentsPage() {
           emptyMessage={isTeacher ? TEACHER_EMPTY : undefined}
         />
       )}
-    </div>
+    </PageLayout>
   );
 }

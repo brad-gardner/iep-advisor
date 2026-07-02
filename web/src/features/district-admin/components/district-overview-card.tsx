@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { getDistrict } from '../api/district-api';
 import type { DistrictOverview } from '../types';
 
@@ -35,7 +36,7 @@ export function DistrictOverviewCard() {
     return (
       <Card className="max-w-lg" data-testid="district-overview-card">
         <div className="flex justify-center py-6">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-teal-500" />
+          <Spinner />
         </div>
       </Card>
     );
