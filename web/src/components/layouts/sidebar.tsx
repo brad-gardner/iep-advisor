@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home, ScrollText } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
 import { ORG_ROLE } from '@/features/educator/types';
@@ -21,7 +22,7 @@ const parentNavItems = [
 ];
 
 const educatorNavItems = [
-  { to: '/educator', label: 'Dashboard', Icon: LayoutDashboard },
+  { to: '/educator', label: 'Home', Icon: Home },
   { to: '/educator/students', label: 'Students', Icon: School },
 ];
 
@@ -70,13 +71,16 @@ export function Sidebar({ onLogout }: SidebarProps) {
   // Only Educators have an org role, so only fetch the profile for them. The
   // shared module cache means this reuses any fetch the educator pages already
   // triggered.
-  const { profile: educatorProfile } = useEducatorProfile({
-    enabled: user?.role === 'Educator',
-  });
+  const { profile: educatorProfile, isLoading: educatorProfileLoading } =
+    useEducatorProfile({ enabled: user?.role === 'Educator' });
   const isDistrictAdmin =
     showEducatorNav && educatorProfile?.orgRoleId === ORG_ROLE.DistrictAdmin;
   const isSchoolAdmin =
     showEducatorNav && educatorProfile?.orgRoleId === ORG_ROLE.SchoolAdmin;
+  // Until the educator profile resolves we don't yet know the admin scope, so
+  // reserve the Administration group with a skeleton instead of flashing the
+  // wrong nav (showing then hiding admin items, or jumping the layout).
+  const adminGroupPending = showEducatorNav && educatorProfileLoading;
   // The Administration group appears for any admin scope; items inside are
   // gated individually (Schools is DistrictAdmin-only).
   const showAdminGroup = isDistrictAdmin || isSchoolAdmin;
@@ -130,7 +134,19 @@ export function Sidebar({ onLogout }: SidebarProps) {
         </a>
       </nav>
 
-      {showAdminGroup && (
+      {adminGroupPending && (
+        <div className="px-3 mt-2" aria-hidden="true" data-testid="district-admin-nav-loading">
+          <div className="border-t border-brand-slate-700 pt-3 mb-2">
+            <Skeleton className="mx-3 h-2.5 w-24 bg-brand-slate-700" />
+          </div>
+          <div className="space-y-1">
+            <Skeleton className="mx-3 h-9 bg-brand-slate-700" />
+            <Skeleton className="mx-3 h-9 bg-brand-slate-700" />
+          </div>
+        </div>
+      )}
+
+      {!adminGroupPending && showAdminGroup && (
         <div className="px-3 mt-2" data-testid="district-admin-nav">
           <div className="border-t border-brand-slate-700 pt-3 mb-2">
             <span className="px-3 text-[10px] uppercase tracking-wider font-semibold text-brand-teal-400">
