@@ -19,7 +19,6 @@ import { ChildEtrsTab } from '@/features/children/components/child-etrs-tab';
 import { ChildGoalsTab } from '@/features/children/components/child-goals-tab';
 import { ChildAnalysisTab } from '@/features/analysis/components/child-analysis-tab';
 import { ChildMeetingPrepTab } from '@/features/meeting-prep/components/child-meeting-prep-tab';
-import { useFeatureFlagStatus } from '@/hooks/use-feature-flags';
 import { IepViewerPage } from '@/features/iep-documents/components/iep-viewer-page';
 import { IepRouteRedirect } from '@/features/iep-documents/components/iep-route-redirect';
 import { ProgressReportViewerPage } from '@/features/progress-reports/components/progress-report-viewer-page';
@@ -42,6 +41,10 @@ import { AdminUserDetail } from '@/features/admin/components/admin-user-detail';
 import { EducatorHomePage } from '@/features/educator/pages/educator-home-page';
 import { EducatorStudentsPage } from '@/features/educator/pages/educator-students-page';
 import { EducatorStudentDetailPage } from '@/features/educator/pages/educator-student-detail-page';
+import { DistrictSchoolsPage } from '@/features/district-admin/pages/district-schools-page';
+import { DistrictSetupWizard } from '@/features/district-admin/pages/district-setup-wizard';
+import { DistrictStaffPage } from '@/features/staff-invites/pages/district-staff-page';
+import { StaffAcceptInvitePage } from '@/features/staff-invites/pages/staff-accept-invite-page';
 import { IepDraftListPage } from '@/features/iep-authoring/pages/iep-draft-list-page';
 import { IepAuthoringWorkspacePage } from '@/features/iep-authoring/pages/iep-authoring-workspace-page';
 import { AcceptLinkPage } from '@/features/child-links/components/accept-link-page';
@@ -49,7 +52,7 @@ import { EducatorVersionDetailPage } from '@/features/iep-versions/components/ed
 import { StudentHomePage } from '@/features/student/pages/student-home-page';
 import { StudentAcceptInvitePage } from '@/features/student/components/student-accept-invite-page';
 import { ParentVersionDetailPage } from '@/features/iep-versions/components/parent-version-detail-page';
-import { RoleHome } from '@/app/role-routing';
+import { RoleHome, RoleRoute } from '@/app/role-routing';
 import { roleHome } from '@/app/role-home';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -70,34 +73,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Gates a route element behind a feature flag. Waits for /api/config to load
-// before deciding, so a flag-off feature can't be reached by direct URL.
-function FeatureRoute({
-  flag,
-  redirectTo = '../overview',
-  children,
-}: {
-  flag: string;
-  redirectTo?: string;
-  children: React.ReactNode;
-}) {
-  const { enabled, loaded } = useFeatureFlagStatus(flag);
-
-  if (!loaded) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
-      </div>
-    );
-  }
-
-  if (!enabled) {
-    return <Navigate to={redirectTo} replace />;
-  }
-
-  return <>{children}</>;
-}
-
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuth();
 
@@ -110,7 +85,15 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (isAuthenticated && user) {
-    return <Navigate to={roleHome(user.role)} replace />;
+    // A page that auto-logs-in (e.g. district signup) can request a specific
+    // post-auth destination; otherwise fall back to the role's default home.
+    // Without this, persisting the session re-renders this guard and its
+    // <Navigate> can clobber the page's own navigate() (e.g. to the setup
+    // wizard) depending on commit order. Read-only here — the destination page
+    // clears the key once it has mounted, so repeated renders of this guard stay
+    // consistent.
+    const requested = sessionStorage.getItem('post-auth-redirect');
+    return <Navigate to={requested ?? roleHome(user.role)} replace />;
   }
 
   return <>{children}</>;
@@ -157,6 +140,16 @@ export function AppRouter() {
               <ResetPasswordPage />
             </AuthLayout>
           </PublicRoute>
+        }
+      />
+      {/* Bare route (no PublicRoute): an authenticated user is NOT bounced —
+          they get a "sign out to continue" prompt on the accept page. */}
+      <Route
+        path="/staff/accept-invite"
+        element={
+          <AuthLayout>
+            <StaffAcceptInvitePage />
+          </AuthLayout>
         }
       />
       <Route path="/mfa-verify" element={<MfaVerifyPage />} />
@@ -213,22 +206,8 @@ export function AppRouter() {
         <Route path="ieps" element={<ChildIepsTab />} />
         <Route path="etrs" element={<ChildEtrsTab />} />
         <Route path="goals" element={<ChildGoalsTab />} />
-        <Route
-          path="analysis"
-          element={
-            <FeatureRoute flag="AnalysisRun">
-              <ChildAnalysisTab />
-            </FeatureRoute>
-          }
-        />
-        <Route
-          path="meeting-prep"
-          element={
-            <FeatureRoute flag="MeetingPrepStandalone">
-              <ChildMeetingPrepTab />
-            </FeatureRoute>
-          }
-        />
+        <Route path="analysis" element={<ChildAnalysisTab />} />
+        <Route path="meeting-prep" element={<ChildMeetingPrepTab />} />
       </Route>
       <Route
         path="/children/:childId/ieps/:id"
@@ -350,15 +329,53 @@ export function AppRouter() {
           </ProtectedRoute>
         }
       />
+      {/* Educator shell — Educator-only. Parents/Students are bounced to their
+          own home by RoleRoute (onboarding-via-/educator was removed in P5). */}
       <Route
         path="/educator"
         element={
           <ProtectedRoute>
-            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
+            <RoleRoute allow={['Educator']}>
               <MainLayout>
                 <EducatorHomePage />
               </MainLayout>
-            </FeatureRoute>
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      {/* Full-screen first-run wizard (own chrome, no MainLayout) — like
+          /onboarding. The page itself guards to DistrictAdmin. */}
+      <Route
+        path="/educator/setup"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allow={['Educator']}>
+              <DistrictSetupWizard />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/admin/schools"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allow={['Educator']}>
+              <MainLayout>
+                <DistrictSchoolsPage />
+              </MainLayout>
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/admin/staff"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allow={['Educator']}>
+              <MainLayout>
+                <DistrictStaffPage />
+              </MainLayout>
+            </RoleRoute>
           </ProtectedRoute>
         }
       />
@@ -366,11 +383,11 @@ export function AppRouter() {
         path="/educator/students"
         element={
           <ProtectedRoute>
-            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
+            <RoleRoute allow={['Educator']}>
               <MainLayout>
                 <EducatorStudentsPage />
               </MainLayout>
-            </FeatureRoute>
+            </RoleRoute>
           </ProtectedRoute>
         }
       />
@@ -378,11 +395,11 @@ export function AppRouter() {
         path="/educator/students/:studentId"
         element={
           <ProtectedRoute>
-            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
+            <RoleRoute allow={['Educator']}>
               <MainLayout>
                 <EducatorStudentDetailPage />
               </MainLayout>
-            </FeatureRoute>
+            </RoleRoute>
           </ProtectedRoute>
         }
       />
@@ -390,11 +407,11 @@ export function AppRouter() {
         path="/educator/students/:studentId/iep-drafts"
         element={
           <ProtectedRoute>
-            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
+            <RoleRoute allow={['Educator']}>
               <MainLayout>
                 <IepDraftListPage />
               </MainLayout>
-            </FeatureRoute>
+            </RoleRoute>
           </ProtectedRoute>
         }
       />
@@ -402,11 +419,11 @@ export function AppRouter() {
         path="/educator/students/:studentId/iep-drafts/:draftId"
         element={
           <ProtectedRoute>
-            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
+            <RoleRoute allow={['Educator']}>
               <MainLayout>
                 <IepAuthoringWorkspacePage />
               </MainLayout>
-            </FeatureRoute>
+            </RoleRoute>
           </ProtectedRoute>
         }
       />
@@ -414,59 +431,61 @@ export function AppRouter() {
         path="/educator/students/:studentId/iep-versions/:versionId"
         element={
           <ProtectedRoute>
-            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
+            <RoleRoute allow={['Educator']}>
               <MainLayout>
                 <EducatorVersionDetailPage />
               </MainLayout>
-            </FeatureRoute>
+            </RoleRoute>
           </ProtectedRoute>
         }
       />
+      {/* Parent surface (unconditional now) — finalized version the school
+          shared for this child. */}
       <Route
         path="/children/:childId/iep-versions/:versionId"
         element={
           <ProtectedRoute>
-            <FeatureRoute flag="SchoolSide" redirectTo="/children">
-              <MainLayout>
-                <ParentVersionDetailPage />
-              </MainLayout>
-            </FeatureRoute>
+            <MainLayout>
+              <ParentVersionDetailPage />
+            </MainLayout>
           </ProtectedRoute>
         }
       />
+      {/* Student shell — Student-only. */}
       <Route
         path="/student"
         element={
           <ProtectedRoute>
-            <FeatureRoute flag="StudentWorkspace" redirectTo="/dashboard">
+            <RoleRoute allow={['Student']}>
               <MainLayout>
                 <StudentHomePage />
               </MainLayout>
-            </FeatureRoute>
+            </RoleRoute>
           </ProtectedRoute>
         }
       />
+      {/* Accepting a student invite flips the user to the Student role, so the
+          invitee is typically a Parent (or freshly-converted user) when they
+          land here — NO Student RoleRoute, or they'd be bounced before they can
+          accept. Auth is still required (ProtectedRoute). */}
       <Route
         path="/student/accept-invite"
         element={
           <ProtectedRoute>
-            <FeatureRoute flag="StudentWorkspace" redirectTo="/dashboard">
-              <MainLayout>
-                <StudentAcceptInvitePage />
-              </MainLayout>
-            </FeatureRoute>
+            <MainLayout>
+              <StudentAcceptInvitePage />
+            </MainLayout>
           </ProtectedRoute>
         }
       />
+      {/* Parent accepting a school link — auth required, any role; no role gate. */}
       <Route
         path="/accept-link"
         element={
           <ProtectedRoute>
-            <FeatureRoute flag="SchoolSide" redirectTo="/dashboard">
-              <MainLayout>
-                <AcceptLinkPage />
-              </MainLayout>
-            </FeatureRoute>
+            <MainLayout>
+              <AcceptLinkPage />
+            </MainLayout>
           </ProtectedRoute>
         }
       />

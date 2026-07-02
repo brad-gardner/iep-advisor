@@ -9,21 +9,18 @@ using IepAssistant.Services.Models;
 namespace IepAssistant.Api.Controllers;
 
 /// <summary>
-/// P7a student role + invite + consent. Every action is gated on <see cref="FeatureFlags.StudentWorkspace"/>
-/// (flag off → NotFound). Covers parent-initiated and educator-initiated invites plus the invited student's
-/// preview + consent-gated accept.
+/// P7a student role + invite + consent. Covers parent-initiated and educator-initiated invites plus
+/// the invited student's preview + consent-gated accept.
 /// </summary>
 [ApiController]
 [Authorize]
 public class StudentInviteController : ControllerBase
 {
     private readonly IStudentInviteService _service;
-    private readonly IFeatureFlags _featureFlags;
 
-    public StudentInviteController(IStudentInviteService service, IFeatureFlags featureFlags)
+    public StudentInviteController(IStudentInviteService service)
     {
         _service = service;
-        _featureFlags = featureFlags;
     }
 
     // ----------------------------------------------------------------- Parent: invite student
@@ -34,9 +31,6 @@ public class StudentInviteController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> InviteFromParent(int childId, [FromBody] InviteStudentRequest request, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.StudentWorkspace))
-            return NotFound();
-
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
@@ -54,9 +48,6 @@ public class StudentInviteController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> InviteFromEducator(int studentId, [FromBody] InviteStudentRequest request, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.StudentWorkspace))
-            return NotFound();
-
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
@@ -73,9 +64,6 @@ public class StudentInviteController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Preview([FromQuery] string token, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.StudentWorkspace))
-            return NotFound();
-
         if (string.IsNullOrWhiteSpace(token))
             return BadRequest(ApiResponse<object>.Error("Token is required."));
 
@@ -101,9 +89,6 @@ public class StudentInviteController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Accept([FromBody] AcceptStudentInviteRequest request, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.StudentWorkspace))
-            return NotFound();
-
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Error("Invalid request"));
 

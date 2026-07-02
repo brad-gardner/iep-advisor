@@ -29,14 +29,16 @@ public class IepVersionService : IIepVersionService
 
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _accessService;
+    private readonly IOrgAccessService _orgAccess;
     private readonly IBlobStorageService _blob;
     private readonly IAuditLogger _audit;
     private readonly ILogger<IepVersionService> _logger;
 
-    public IepVersionService(ApplicationDbContext context, IAccessService accessService, IBlobStorageService blob, IAuditLogger audit, ILogger<IepVersionService> logger)
+    public IepVersionService(ApplicationDbContext context, IAccessService accessService, IOrgAccessService orgAccess, IBlobStorageService blob, IAuditLogger audit, ILogger<IepVersionService> logger)
     {
         _context = context;
         _accessService = accessService;
+        _orgAccess = orgAccess;
         _blob = blob;
         _audit = audit;
         _logger = logger;
@@ -343,31 +345,14 @@ public class IepVersionService : IIepVersionService
 
     // ---------------------------------------------------------------- Access helpers
 
-    /// <summary>SchoolId-bound + role check, mirroring IepDraftService.CheckStudentAccessAsync.</summary>
+    /// <summary>
+    /// Org access check delegated to <see cref="IOrgAccessService"/> (player-coach: admins pass within
+    /// scope; teachers need an active SchoolStudentAccess with Role &gt;= <paramref name="minimumRole"/>).
+    /// The enum-rank-vs-string comparison subtlety is handled centrally inside the org access service.
+    /// </summary>
     private async Task<ServiceResult> CheckStudentAccessAsync(int userId, int studentId, AccessRole minimumRole, CancellationToken ct)
     {
-        var profile = await _context.TeacherProfiles
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.UserId == userId, ct);
-        if (profile == null)
-            return ServiceResult.FailureResult(PermissionMessage);
-
-        var student = await _context.SchoolStudents
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == studentId && s.SchoolId == profile.SchoolId, ct);
-        if (student == null)
-            return ServiceResult.FailureResult(PermissionMessage);
-
-        // Role is stored as a string (HasConversion<string>), so a `>= minimumRole` predicate would
-        // translate to an *alphabetical* SQL comparison ("Collaborator" < "Viewer"), not an enum-rank
-        // comparison. Fetch the role and compare in memory, matching IepDraftService.
-        var role = await _context.SchoolStudentAccesses
-            .AsNoTracking()
-            .Where(a => a.SchoolStudentId == studentId && a.UserId == userId && a.IsActive)
-            .Select(a => (AccessRole?)a.Role)
-            .FirstOrDefaultAsync(ct);
-
-        return role != null && role.Value >= minimumRole
+        return await _orgAccess.CanActOnStudentAsync(userId, studentId, minimumRole, ct)
             ? ServiceResult.SuccessResult()
             : ServiceResult.FailureResult(PermissionMessage);
     }

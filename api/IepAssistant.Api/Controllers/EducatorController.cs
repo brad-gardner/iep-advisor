@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Educator;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -15,37 +16,11 @@ public class EducatorController : ControllerBase
 {
     private readonly IEducatorService _educatorService;
     private readonly IChildLinkService _childLinkService;
-    private readonly IFeatureFlags _featureFlags;
 
-    public EducatorController(IEducatorService educatorService, IChildLinkService childLinkService, IFeatureFlags featureFlags)
+    public EducatorController(IEducatorService educatorService, IChildLinkService childLinkService)
     {
         _educatorService = educatorService;
         _childLinkService = childLinkService;
-        _featureFlags = featureFlags;
-    }
-
-    [HttpPost("onboard")]
-    [ProducesResponseType(typeof(ApiResponse<EducatorProfileDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Onboard([FromBody] OnboardEducatorRequest request, CancellationToken ct)
-    {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
-        if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
-
-        var result = await _educatorService.OnboardAsync(User.GetUserId(), new OnboardEducatorModel
-        {
-            DistrictName = request.DistrictName,
-            SchoolName = request.SchoolName,
-            StateCode = request.StateCode
-        }, ct);
-
-        if (!result.Success)
-            return MapFailure<EducatorProfileDto>(result.Message);
-
-        return Ok(ApiResponse<EducatorProfileDto>.SuccessResponse(MapProfile(result.Data!)));
     }
 
     [HttpGet("me")]
@@ -53,9 +28,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetMe(CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         var result = await _educatorService.GetMeAsync(User.GetUserId(), ct);
 
         if (!result.Success)
@@ -68,9 +40,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<SchoolStudentDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStudents(CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         var result = await _educatorService.GetStudentsAsync(User.GetUserId(), ct);
 
         if (!result.Success)
@@ -84,9 +53,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateStudent([FromBody] CreateSchoolStudentRequest request, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
@@ -97,7 +63,8 @@ public class EducatorController : ControllerBase
             DateOfBirth = request.DateOfBirth,
             StateCode = request.StateCode,
             GradeLevel = request.GradeLevel,
-            DisabilityCategory = request.DisabilityCategory
+            DisabilityCategory = request.DisabilityCategory,
+            SchoolId = request.SchoolId
         }, ct);
 
         if (!result.Success)
@@ -114,9 +81,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStudent(int studentId, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         var result = await _educatorService.GetStudentAsync(User.GetUserId(), studentId, ct);
 
         if (!result.Success)
@@ -131,9 +95,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> InviteParent(int studentId, [FromBody] InviteParentRequest request, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         if (!ModelState.IsValid)
             return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
@@ -150,9 +111,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetLinks(int studentId, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         var result = await _childLinkService.GetLinksForStudentAsync(User.GetUserId(), studentId, ct);
 
         if (!result.Success)
@@ -167,9 +125,6 @@ public class EducatorController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RevokeLink(int studentId, int linkId, CancellationToken ct)
     {
-        if (!_featureFlags.IsEnabled(FeatureFlags.SchoolSide))
-            return NotFound();
-
         var result = await _childLinkService.RevokeLinkAsync(User.GetUserId(), studentId, linkId, ct);
 
         if (!result.Success)
@@ -177,6 +132,68 @@ public class EducatorController : ControllerBase
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
+
+    // ----------------------------------------------------------------- Staff assignment
+
+    [HttpGet("students/{studentId}/staff-access")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<StudentStaffAccessDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetStaffAccess(int studentId, CancellationToken ct)
+    {
+        var result = await _educatorService.GetStudentStaffAccessAsync(User.GetUserId(), studentId, ct);
+        if (!result.Success)
+            return MapFailure<IEnumerable<StudentStaffAccessDto>>(result.Message);
+
+        return Ok(ApiResponse<IEnumerable<StudentStaffAccessDto>>.SuccessResponse(result.Data!.Select(MapStaffAccess)));
+    }
+
+    [HttpPost("students/{studentId}/staff-access")]
+    [ProducesResponseType(typeof(ApiResponse<StudentStaffAccessDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GrantStaffAccess(int studentId, [FromBody] GrantStudentStaffAccessRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        AccessRole accessRole = AccessRole.Collaborator;
+        if (!string.IsNullOrWhiteSpace(request.AccessRole) &&
+            !Enum.TryParse(request.AccessRole, ignoreCase: true, out accessRole))
+            return BadRequest(ApiResponse<object>.Error("Invalid access role."));
+
+        var result = await _educatorService.GrantStudentStaffAccessAsync(User.GetUserId(), studentId,
+            new GrantStudentStaffAccessModel { StaffProfileId = request.StaffProfileId, AccessRole = accessRole }, ct);
+        if (!result.Success)
+            return MapFailure<StudentStaffAccessDto>(result.Message);
+
+        return Ok(ApiResponse<StudentStaffAccessDto>.SuccessResponse(MapStaffAccess(result.Data!)));
+    }
+
+    [HttpDelete("students/{studentId}/staff-access/{accessId}")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RevokeStaffAccess(int studentId, int accessId, CancellationToken ct)
+    {
+        var result = await _educatorService.RevokeStudentStaffAccessAsync(User.GetUserId(), studentId, accessId, ct);
+        if (!result.Success)
+            return MapFailure<object>(result.Message);
+
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
+    }
+
+    private static StudentStaffAccessDto MapStaffAccess(StudentStaffAccessModel m) => new()
+    {
+        AccessId = m.AccessId,
+        StaffProfileId = m.StaffProfileId,
+        UserId = m.UserId,
+        FirstName = m.FirstName,
+        LastName = m.LastName,
+        Email = m.Email,
+        OrgRoleName = m.OrgRoleName,
+        AccessRole = m.AccessRole.ToString(),
+        GrantedAt = m.GrantedAt
+    };
 
     private static ChildLinkDto MapLink(ChildLinkModel m) => new()
     {
@@ -207,12 +224,15 @@ public class EducatorController : ControllerBase
 
     private static EducatorProfileDto MapProfile(EducatorProfileModel m) => new()
     {
-        TeacherProfileId = m.TeacherProfileId,
+        StaffProfileId = m.StaffProfileId,
         UserId = m.UserId,
-        SchoolId = m.SchoolId,
-        SchoolName = m.SchoolName,
+        OrgRoleId = m.OrgRoleId,
+        OrgRoleName = m.OrgRoleName,
         DistrictId = m.DistrictId,
         DistrictName = m.DistrictName,
+        SchoolId = m.SchoolId,
+        SchoolName = m.SchoolName,
+        IsActive = m.IsActive,
         StateCode = m.StateCode,
         Title = m.Title,
         Credentials = m.Credentials
@@ -222,6 +242,7 @@ public class EducatorController : ControllerBase
     {
         Id = m.Id,
         SchoolId = m.SchoolId,
+        SchoolName = m.SchoolName,
         FirstName = m.FirstName,
         LastName = m.LastName,
         DateOfBirth = m.DateOfBirth,

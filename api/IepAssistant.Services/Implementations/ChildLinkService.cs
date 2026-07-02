@@ -1,11 +1,10 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
+using IepAssistant.Services.Security;
 
 namespace IepAssistant.Services.Implementations;
 
@@ -20,6 +19,7 @@ public class ChildLinkService : IChildLinkService
 
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _accessService;
+    private readonly IOrgAccessService _orgAccess;
     private readonly IEmailService _emailService;
     private readonly IAuditLogger _audit;
     private readonly ILogger<ChildLinkService> _logger;
@@ -27,12 +27,14 @@ public class ChildLinkService : IChildLinkService
     public ChildLinkService(
         ApplicationDbContext context,
         IAccessService accessService,
+        IOrgAccessService orgAccess,
         IEmailService emailService,
         IAuditLogger audit,
         ILogger<ChildLinkService> logger)
     {
         _context = context;
         _accessService = accessService;
+        _orgAccess = orgAccess;
         _emailService = emailService;
         _audit = audit;
         _logger = logger;
@@ -80,8 +82,8 @@ public class ChildLinkService : IChildLinkService
         if (alreadyLinked)
             return ServiceResult<ChildLinkModel>.FailureResult("This student is already linked to that parent.");
 
-        var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        var tokenHash = HashToken(rawToken);
+        var rawToken = InviteTokenHelper.Generate();
+        var tokenHash = InviteTokenHelper.Hash(rawToken);
 
         var link = new ChildLink
         {
@@ -208,7 +210,7 @@ public class ChildLinkService : IChildLinkService
         // FindActiveInviteAsync and each create a duplicate ChildProfile. Only the request whose
         // conditional update matches an as-yet-unaccepted invite proceeds; the loser falls back to
         // the idempotent "already linked" resolution.
-        var tokenHash = HashToken(token);
+        var tokenHash = InviteTokenHelper.Hash(token);
         var claimed = await _context.ChildLinks
             .Where(l => l.Id == invite.Id && l.InviteToken == tokenHash && l.AcceptedAt == null && l.IsActive)
             .ExecuteUpdateAsync(s => s
@@ -368,29 +370,22 @@ public class ChildLinkService : IChildLinkService
     // ----------------------------------------------------------------- Helpers
 
     /// <summary>
-    /// SchoolId-bound educator access check (replicates EducatorService.GetStudentAsync's guard): the
-    /// student must be in the educator's TeacherProfile.SchoolId AND an active SchoolStudentAccess must exist.
+    /// Org access check delegated to <see cref="IOrgAccessService"/> (player-coach: admins pass within
+    /// scope; teachers need an active SchoolStudentAccess). Loads the (tracked) student when permitted;
+    /// returns <c>(null, _)</c> otherwise. The <c>schoolId</c> tuple member is retained for signature
+    /// compatibility with existing callers (currently unused by them).
     /// </summary>
     private async Task<(SchoolStudent? student, int schoolId)> GetEducatorStudentAccessAsync(int educatorUserId, int studentId, CancellationToken ct)
     {
-        var schoolId = await _context.TeacherProfiles
-            .Where(t => t.UserId == educatorUserId)
-            .Select(t => (int?)t.SchoolId)
-            .FirstOrDefaultAsync(ct);
-        if (schoolId == null)
+        if (!await _orgAccess.CanActOnStudentAsync(educatorUserId, studentId, AccessRole.Viewer, ct))
             return (null, 0);
 
         var student = await _context.SchoolStudents
-            .FirstOrDefaultAsync(s => s.Id == studentId && s.SchoolId == schoolId.Value, ct);
+            .FirstOrDefaultAsync(s => s.Id == studentId, ct);
         if (student == null)
-            return (null, schoolId.Value);
+            return (null, 0);
 
-        var hasAccess = await _context.SchoolStudentAccesses
-            .AnyAsync(a => a.SchoolStudentId == studentId && a.UserId == educatorUserId && a.IsActive, ct);
-        if (!hasAccess)
-            return (null, schoolId.Value);
-
-        return (student, schoolId.Value);
+        return (student, student.SchoolId);
     }
 
     private async Task<ChildLink?> FindActiveInviteAsync(string token, CancellationToken ct)
@@ -398,7 +393,7 @@ public class ChildLinkService : IChildLinkService
         if (string.IsNullOrWhiteSpace(token))
             return null;
 
-        var tokenHash = HashToken(token);
+        var tokenHash = InviteTokenHelper.Hash(token);
         return await _context.ChildLinks
             .FirstOrDefaultAsync(l => l.InviteToken == tokenHash
                                    && l.IsActive
@@ -453,10 +448,4 @@ public class ChildLinkService : IChildLinkService
         InviteExpiresAt = link.InviteExpiresAt,
         CreatedAt = link.CreatedAt
     };
-
-    private static string HashToken(string token)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
-        return Convert.ToBase64String(bytes);
-    }
 }

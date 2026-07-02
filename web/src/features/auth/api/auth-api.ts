@@ -5,6 +5,7 @@ import type {
   LoginResponse,
   MfaSetupResponse,
   MfaVerifySetupResponse,
+  RegisterDistrictRequest,
   RegisterRequest,
   UpdateProfileRequest,
   User,
@@ -17,6 +18,14 @@ export async function login(data: LoginRequest): Promise<ApiResponse<LoginRespon
 
 export async function register(data: RegisterRequest): Promise<ApiResponse<null>> {
   const response = await apiClient.post<ApiResponse<null>>('/api/auth/register', data);
+  return response.data;
+}
+
+// District self-serve signup. Returns the same shape as login (JWT + user).
+export async function registerDistrict(
+  data: RegisterDistrictRequest
+): Promise<ApiResponse<LoginResponse>> {
+  const response = await apiClient.post<ApiResponse<LoginResponse>>('/api/auth/register-district', data);
   return response.data;
 }
 

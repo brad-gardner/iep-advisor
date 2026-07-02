@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Security;
 
 namespace IepAssistant.Services;
 
@@ -9,7 +10,6 @@ public static class DependencyInjection
     public static IServiceCollection AddServices(this IServiceCollection services)
     {
         services.AddScoped<IClaudeClient, ClaudeClient>();
-        services.AddScoped<IFeatureFlags, ConfigurationFeatureFlags>();
         services.AddSingleton<MfaSecretProtector>();
         services.AddScoped<ITotpService, TotpService>();
         services.AddScoped<IMfaService, MfaService>();
@@ -36,6 +36,8 @@ public static class DependencyInjection
         services.AddScoped<IProgressReportAnalysisService, ProgressReportAnalysisService>();
         services.AddScoped<IAnalysisRunService, AnalysisRunService>();
         services.AddScoped<IAnalysisRunBackfillService, AnalysisRunBackfillService>();
+        services.AddScoped<IOrgAccessService, OrgAccessService>();
+        services.AddScoped<IDistrictService, DistrictService>();
         services.AddScoped<IEducatorService, EducatorService>();
         services.AddScoped<IChildLinkService, ChildLinkService>();
         services.AddScoped<IIepDraftService, IepDraftService>();
@@ -44,6 +46,10 @@ public static class DependencyInjection
         services.AddScoped<IIepAssistService, IepAssistService>();
         services.AddScoped<IStudentInviteService, StudentInviteService>();
         services.AddScoped<IStudentWorkspaceService, StudentWorkspaceService>();
+        services.AddScoped<IStaffInviteService, StaffInviteService>();
+
+        // Stateless JWT minting reused by create-and-sign-in flows (staff invite accept).
+        services.AddScoped<JwtTokenFactory>();
 
         return services;
     }

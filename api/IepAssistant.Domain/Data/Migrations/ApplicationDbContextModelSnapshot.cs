@@ -1629,6 +1629,41 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.ToTable("MeetingPrepChecklists");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.OrgRole", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("OrgRoles");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "DistrictAdmin"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "SchoolAdmin"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Teacher"
+                        });
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.ParentAdvocacyGoal", b =>
                 {
                     b.Property<int>("Id")
@@ -1858,6 +1893,11 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Property<int>("DistrictId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1979,6 +2019,132 @@ namespace IepAssistant.Domain.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("SchoolStudentAccesses");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.StaffInvite", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AcceptedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("AcceptedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DistrictId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("InviteExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("InviteToken")
+                        .HasMaxLength(88)
+                        .HasColumnType("nvarchar(88)");
+
+                    b.Property<int>("InvitedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("OrgRoleId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DistrictId");
+
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasFilter("IsActive = 1 AND AcceptedAt IS NULL AND InviteToken IS NOT NULL");
+
+                    b.HasIndex("InviteToken");
+
+                    b.HasIndex("OrgRoleId");
+
+                    b.HasIndex("SchoolId");
+
+                    b.ToTable("StaffInvites");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.StaffProfile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Credentials")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("DistrictId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("OrgRoleId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DistrictId");
+
+                    b.HasIndex("OrgRoleId");
+
+                    b.HasIndex("SchoolId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("StaffProfiles");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.StudentInvite", b =>
@@ -2172,49 +2338,6 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasIndex("StudentWorkspaceId");
 
                     b.ToTable("StudentWorkspaceEntries");
-                });
-
-            modelBuilder.Entity("IepAssistant.Domain.Entities.TeacherProfile", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedById")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Credentials")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int>("SchoolId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedById")
-                        .HasColumnType("int");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SchoolId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("TeacherProfiles");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.UsageRecord", b =>
@@ -2820,6 +2943,66 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.StaffInvite", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.District", "District")
+                        .WithMany()
+                        .HasForeignKey("DistrictId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.OrgRole", "OrgRole")
+                        .WithMany()
+                        .HasForeignKey("OrgRoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.School", "School")
+                        .WithMany()
+                        .HasForeignKey("SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("District");
+
+                    b.Navigation("OrgRole");
+
+                    b.Navigation("School");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.StaffProfile", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.District", "District")
+                        .WithMany()
+                        .HasForeignKey("DistrictId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.OrgRole", "OrgRole")
+                        .WithMany("StaffProfiles")
+                        .HasForeignKey("OrgRoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.School", "School")
+                        .WithMany()
+                        .HasForeignKey("SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("IepAssistant.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("District");
+
+                    b.Navigation("OrgRole");
+
+                    b.Navigation("School");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.StudentInvite", b =>
                 {
                     b.HasOne("IepAssistant.Domain.Entities.ChildProfile", "ChildProfile")
@@ -2878,25 +3061,6 @@ namespace IepAssistant.Domain.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("StudentWorkspace");
-                });
-
-            modelBuilder.Entity("IepAssistant.Domain.Entities.TeacherProfile", b =>
-                {
-                    b.HasOne("IepAssistant.Domain.Entities.School", "School")
-                        .WithMany()
-                        .HasForeignKey("SchoolId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("IepAssistant.Domain.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("School");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.UsageRecord", b =>
@@ -2972,6 +3136,11 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Navigation("ServiceLines");
 
                     b.Navigation("TransitionItems");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.OrgRole", b =>
+                {
+                    b.Navigation("StaffProfiles");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.School", b =>

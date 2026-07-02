@@ -10,8 +10,8 @@ using IepAssistant.Services.Models;
 namespace IepAssistant.Api.Controllers;
 
 /// <summary>
-/// P8a student self-advocacy workspace behind Feature:StudentWorkspace — every action returns 404 when the
-/// flag is off. The student owns CRUD over their own entries (private until shared) plus a suggest-only AI
+/// P8a student self-advocacy workspace. The student owns CRUD over their own entries (private until
+/// shared) plus a suggest-only AI
 /// interview. Educators and parents may read SHAREABLE entries only. Failures map permission→403,
 /// not-found→404, "temporarily unavailable"→503, else 400.
 /// </summary>
@@ -20,15 +20,11 @@ namespace IepAssistant.Api.Controllers;
 public class StudentWorkspaceController : ControllerBase
 {
     private readonly IStudentWorkspaceService _service;
-    private readonly IFeatureFlags _featureFlags;
 
-    public StudentWorkspaceController(IStudentWorkspaceService service, IFeatureFlags featureFlags)
+    public StudentWorkspaceController(IStudentWorkspaceService service)
     {
         _service = service;
-        _featureFlags = featureFlags;
     }
-
-    private bool Enabled => _featureFlags.IsEnabled(FeatureFlags.StudentWorkspace);
 
     // ---------------------------------------------------------------- Student: my workspace
 
@@ -37,7 +33,6 @@ public class StudentWorkspaceController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetMyWorkspace(CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
 
         var result = await _service.GetMyWorkspaceAsync(User.GetUserId(), ct);
         if (!result.Success) return MapFailure(result.Message);
@@ -53,7 +48,6 @@ public class StudentWorkspaceController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> AddEntry([FromBody] CreateWorkspaceEntryRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
         if (!TryParseKind(request.EntryKind, out var kind))
             return BadRequest(ApiResponse<object>.Error("Invalid entry kind."));
@@ -73,7 +67,6 @@ public class StudentWorkspaceController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateEntry(int id, [FromBody] UpdateWorkspaceEntryRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.UpdateEntryAsync(User.GetUserId(), id, request.Content, request.IsShareable, ct);
@@ -90,7 +83,6 @@ public class StudentWorkspaceController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteEntry(int id, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
 
         var result = await _service.DeleteEntryAsync(User.GetUserId(), id, ct);
         if (!result.Success) return MapFailure(result.Message);
@@ -107,7 +99,6 @@ public class StudentWorkspaceController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> Interview([FromBody] StudentInterviewRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.InterviewSuggestAsync(User.GetUserId(), request.Prompt, ct);
@@ -124,7 +115,6 @@ public class StudentWorkspaceController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetEducatorShareableEntries(int studentId, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
 
         var result = await _service.GetShareableEntriesForSchoolStudentAsync(User.GetUserId(), studentId, ct);
         if (!result.Success) return MapFailure(result.Message);
@@ -139,7 +129,6 @@ public class StudentWorkspaceController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetChildShareableEntries(int childId, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
 
         var result = await _service.GetShareableEntriesForChildAsync(User.GetUserId(), childId, ct);
         if (!result.Success) return MapFailure(result.Message);

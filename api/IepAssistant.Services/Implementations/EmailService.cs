@@ -171,6 +171,52 @@ public class EmailService : IEmailService
         await SendEmailAsync(toEmail, subject, html, plainText, ct);
     }
 
+    public async Task SendStaffInviteEmailAsync(string toEmail, string districtName, string? schoolName, string roleName, string inviteToken, CancellationToken ct = default)
+    {
+        // Escape the base64 token (may contain +, /, =) so it survives the URL intact.
+        var inviteUrl = $"{_frontendUrl}/staff/accept-invite?token={Uri.EscapeDataString(inviteToken)}";
+
+        var orgLine = string.IsNullOrWhiteSpace(schoolName)
+            ? $"<strong>{districtName}</strong>"
+            : $"<strong>{schoolName}</strong> ({districtName})";
+        var orgLinePlain = string.IsNullOrWhiteSpace(schoolName)
+            ? districtName
+            : $"{schoolName} ({districtName})";
+
+        var subject = $"You've been invited to join {districtName} on IEP Advisor";
+        var html = $@"
+            <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
+                <div style=""text-align: center; margin-bottom: 24px;"">
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
+                </div>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">You've Been Invited to Join</h1>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
+                    You've been invited to join {orgLine} on IEP Advisor as a <strong>{roleName}</strong>.
+                </p>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
+                    IEP Advisor helps school teams author, manage, and collaborate on IEPs. Accept the invitation
+                    below to create your account and get started.
+                </p>
+                <div style=""text-align: center; margin: 24px 0;"">
+                    <a href=""{inviteUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                        Accept Invitation
+                    </a>
+                </div>
+                <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
+                    This invitation expires in 14 days and is tied to this email address.
+                </p>
+                <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
+                <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
+                    IEP Advisor — Navigate with confidence
+                </p>
+            </div>";
+
+        var plainText = $"You've been invited to join {orgLinePlain} on IEP Advisor as a {roleName}.\n\nAccept the invitation: {inviteUrl}\n\nThis invitation expires in 14 days and is tied to this email address.";
+
+        await SendEmailAsync(toEmail, subject, html, plainText, ct);
+    }
+
     public async Task SendBetaInviteEmailAsync(string toEmail, string inviteCode, CancellationToken ct = default)
     {
         var signupUrl = $"{_frontendUrl}/register?code={Uri.EscapeDataString(inviteCode)}";

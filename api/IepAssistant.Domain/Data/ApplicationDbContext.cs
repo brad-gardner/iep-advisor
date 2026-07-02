@@ -34,7 +34,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<ProgressReportAnalysis> ProgressReportAnalyses => Set<ProgressReportAnalysis>();
     public DbSet<District> Districts => Set<District>();
     public DbSet<School> Schools => Set<School>();
-    public DbSet<TeacherProfile> TeacherProfiles => Set<TeacherProfile>();
+    public DbSet<OrgRole> OrgRoles => Set<OrgRole>();
+    public DbSet<StaffProfile> StaffProfiles => Set<StaffProfile>();
+    public DbSet<StaffInvite> StaffInvites => Set<StaffInvite>();
     public DbSet<SchoolStudent> SchoolStudents => Set<SchoolStudent>();
     public DbSet<SchoolStudentAccess> SchoolStudentAccesses => Set<SchoolStudentAccess>();
     public DbSet<ChildLink> ChildLinks => Set<ChildLink>();

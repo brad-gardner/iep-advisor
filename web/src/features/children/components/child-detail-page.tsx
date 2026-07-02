@@ -9,7 +9,6 @@ import { getChildSchoolLinks } from "@/features/child-links/api/child-links-api"
 import type { ChildSchoolLink } from "@/features/child-links/types";
 import { Button } from "@/components/ui/button";
 import { TabsNav, TabLink } from "@/components/ui/tabs";
-import { useFeatureFlag } from "@/hooks/use-feature-flags";
 
 export function ChildDetailPage() {
   const { childId: childIdParam } = useParams<{ childId: string }>();
@@ -19,9 +18,6 @@ export function ChildDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const analysisEnabled = useFeatureFlag("AnalysisRun");
-  const meetingPrepStandalone = useFeatureFlag("MeetingPrepStandalone");
-  const schoolSideEnabled = useFeatureFlag("SchoolSide");
   const [schoolLinks, setSchoolLinks] = useState<ChildSchoolLink[]>([]);
 
   const reloadChild = async () => {
@@ -46,7 +42,7 @@ export function ChildDetailPage() {
   }, [childId]);
 
   useEffect(() => {
-    if (!schoolSideEnabled || !childId) return;
+    if (!childId) return;
     let active = true;
     getChildSchoolLinks(childId)
       .then((res) => {
@@ -60,7 +56,7 @@ export function ChildDetailPage() {
     return () => {
       active = false;
     };
-  }, [childId, schoolSideEnabled]);
+  }, [childId]);
 
   const handleUpdate = async (data: CreateChildProfileRequest) => {
     try {
@@ -152,7 +148,7 @@ export function ChildDetailPage() {
             {child.firstName} {child.lastName}
           </h1>
           {!isOwner && <SharedBadge role={child.role} />}
-          {schoolSideEnabled && <SchoolLinkBadge links={schoolLinks} />}
+          <SchoolLinkBadge links={schoolLinks} />
         </div>
         <div className="flex gap-2">
           {isOwner && (
@@ -184,16 +180,12 @@ export function ChildDetailPage() {
         <TabLink to={`${base}/goals`} testId="tab-goals">
           Goals
         </TabLink>
-        {analysisEnabled && (
-          <TabLink to={`${base}/analysis`} testId="tab-analysis">
-            Analysis
-          </TabLink>
-        )}
-        {meetingPrepStandalone && (
-          <TabLink to={`${base}/meeting-prep`} testId="tab-meeting-prep">
-            Meeting Prep
-          </TabLink>
-        )}
+        <TabLink to={`${base}/analysis`} testId="tab-analysis">
+          Analysis
+        </TabLink>
+        <TabLink to={`${base}/meeting-prep`} testId="tab-meeting-prep">
+          Meeting Prep
+        </TabLink>
         <TabLink to={`${base}/ieps`} testId="tab-ieps">
           IEPs
         </TabLink>

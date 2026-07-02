@@ -3,7 +3,7 @@ using IepAssistant.Services.Models;
 namespace IepAssistant.Services.Interfaces;
 
 /// <summary>
-/// Educator AI assist (P6b) behind Feature:SchoolSide. Inline single-field assists and an
+/// Educator AI assist (P6b). Inline single-field assists and an
 /// ephemeral IEP-scoped chat, both backed by <see cref="IClaudeClient"/>. Every entry point
 /// requires Collaborator+ SchoolStudentAccess on the draft's student (SchoolId-bound), mirroring
 /// <c>IepDraftService</c>/<c>IepVersionService</c>. Assists return suggestion text only — they

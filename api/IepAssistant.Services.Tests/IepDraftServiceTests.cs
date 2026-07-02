@@ -37,14 +37,14 @@ public sealed class IepDraftServiceTests : IDisposable
     private readonly CapturingAuditLogger _audit = new();
 
     private IepDraftService CreateService(ApplicationDbContext ctx)
-        => new(ctx, _audit, NullLogger<IepDraftService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), _audit, NullLogger<IepDraftService>.Instance);
 
     // ---------------------------------------------------------------- Seed helpers
 
     private sealed record SchoolScenario(int SchoolId, int CollaboratorUserId, int StudentId);
 
     /// <summary>
-    /// Seeds a district/school, a TeacherProfile for an educator user, a student in that school,
+    /// Seeds a district/school, a StaffProfile for an educator user, a student in that school,
     /// and an active SchoolStudentAccess with the given role for that educator.
     /// </summary>
     private SchoolScenario SeedSchoolWithStudent(string emailPrefix, AccessRole role = AccessRole.Collaborator)
@@ -63,7 +63,7 @@ public sealed class IepDraftServiceTests : IDisposable
         ctx.Schools.Add(school);
         ctx.SaveChanges();
 
-        ctx.TeacherProfiles.Add(new TeacherProfile { UserId = user.Id, SchoolId = school.Id });
+        ctx.StaffProfiles.Add(new StaffProfile { UserId = user.Id, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher });
         ctx.SaveChanges();
 
         var student = new SchoolStudent { SchoolId = school.Id, FirstName = "Sam", IsActive = true };
@@ -90,7 +90,8 @@ public sealed class IepDraftServiceTests : IDisposable
         ctx.Users.Add(user);
         ctx.SaveChanges();
 
-        ctx.TeacherProfiles.Add(new TeacherProfile { UserId = user.Id, SchoolId = schoolId });
+        var districtId = ctx.Schools.Where(s => s.Id == schoolId).Select(s => s.DistrictId).Single();
+        ctx.StaffProfiles.Add(new StaffProfile { UserId = user.Id, DistrictId = districtId, SchoolId = schoolId, OrgRoleId = OrgRoleIds.Teacher });
         ctx.SaveChanges();
 
         ctx.SchoolStudentAccesses.Add(new SchoolStudentAccess

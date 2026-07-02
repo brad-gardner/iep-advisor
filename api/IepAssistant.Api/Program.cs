@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
@@ -62,6 +63,26 @@ builder.Host.UseSerilog();
 // Add layers via extension methods
 builder.Services.AddDomain(builder.Configuration);
 builder.Services.AddServices();
+
+// Email:ExposeLinksForTesting gate (e2e/testing convenience). Enabling it surfaces raw invite URLs in
+// API responses, so it is allowed ONLY in Development AND only when no real ACS connection string is set.
+// Startup is the one place IHostEnvironment is in scope, so any attempt to enable it outside Development
+// is logged and IGNORED here — making non-Development exposure impossible regardless of config.
+{
+    var exposeRequested = builder.Configuration.GetValue<bool>("Email:ExposeLinksForTesting");
+    var acsConnectionEmpty = string.IsNullOrEmpty(builder.Configuration["Email:ConnectionString"]);
+    var isDevelopment = builder.Environment.IsDevelopment();
+    var exposeEnabled = exposeRequested && acsConnectionEmpty && isDevelopment;
+
+    if (exposeRequested && !exposeEnabled)
+    {
+        Log.Warning(
+            "Email:ExposeLinksForTesting=true ignored — it requires Development environment (is={IsDev}) and an empty Email:ConnectionString (empty={AcsEmpty}).",
+            isDevelopment, acsConnectionEmpty);
+    }
+
+    builder.Services.AddSingleton(new IepAssistant.Services.Security.InviteLinkExposure(exposeEnabled));
+}
 
 // Named HttpClient for Claude API calls (avoids socket exhaustion from new HttpClient per request).
 // Timeout is generous because long-document (30+ page ETR/IEP) non-streaming responses with
@@ -163,6 +184,20 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
+// Forwarded headers — required so the rate limiter partitions on the real client IP rather than the
+// Azure App Service front-end proxy. Trust model: the App Service platform front end OVERWRITES any
+// client-supplied X-Forwarded-For with the observed remote IP (client spoofing is stripped), so we
+// clear the default KnownNetworks/KnownProxies allow-lists (which would otherwise reject the platform
+// hop and leave RemoteIpAddress as the proxy) and set ForwardLimit = 1 to honor ONLY the closest
+// (platform-appended) hop. Configured here, applied EARLY in the pipeline via UseForwardedHeaders.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 // Rate limiting — disabled in Development via appsettings
 var disableRateLimiting = builder.Configuration.GetValue<bool>("RateLimiting:Disabled");
 builder.Services.AddRateLimiter(options =>
@@ -204,6 +239,20 @@ builder.Services.AddRateLimiter(options =>
                     Window = TimeSpan.FromHours(1),
                     SegmentsPerWindow = 6
                 }));
+
+    // Unauthenticated district self-serve signup — very tight per-IP cap (3 / hour, fixed window) since
+    // each success provisions a brand-new District + DistrictAdmin. Depends on UseForwardedHeaders to see
+    // the real client IP behind the App Service front end.
+    options.AddPolicy("register-district", context =>
+        disableRateLimiting
+            ? RateLimitPartition.GetNoLimiter<string>("")
+            : RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 3,
+                    Window = TimeSpan.FromHours(1)
+                }));
 });
 
 // Configure CORS
@@ -233,6 +282,10 @@ if (app.Environment.IsDevelopment())
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     DbInitializer.Initialize(context);
 }
+
+// Forwarded headers FIRST — rewrites RemoteIpAddress/scheme from the App Service front-end proxy's
+// X-Forwarded-* headers before any IP-sensitive middleware (rate limiting) or logging runs.
+app.UseForwardedHeaders();
 
 // Global exception handling
 app.UseMiddleware<GlobalExceptionMiddleware>();

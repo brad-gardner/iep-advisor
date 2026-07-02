@@ -9,8 +9,8 @@ using IepAssistant.Services.Models;
 namespace IepAssistant.Api.Controllers;
 
 /// <summary>
-/// Educator AI assist (P6b) behind Feature:SchoolSide. Every action returns 404 when the flag is off.
-/// Inline assists return a suggestion (never auto-applied); chat returns an ephemeral reply. Access is
+/// Educator AI assist (P6b). Inline assists return a suggestion (never auto-applied); chat returns
+/// an ephemeral reply. Access is
 /// enforced in the service (Collaborator+ SchoolStudentAccess); failures map permission→403,
 /// not-found→404, "temporarily unavailable"→503, else 400.
 /// </summary>
@@ -19,12 +19,10 @@ namespace IepAssistant.Api.Controllers;
 public class IepAssistController : ControllerBase
 {
     private readonly IIepAssistService _service;
-    private readonly IFeatureFlags _featureFlags;
 
-    public IepAssistController(IIepAssistService service, IFeatureFlags featureFlags)
+    public IepAssistController(IIepAssistService service)
     {
         _service = service;
-        _featureFlags = featureFlags;
     }
 
     [HttpPost("api/iep-drafts/{draftId}/goals/{goalId}/assist")]
@@ -34,7 +32,6 @@ public class IepAssistController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AssistGoal(int draftId, int goalId, [FromBody] AssistRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!TryParseKind(request.Kind, out var kind)) return BadRequest(ApiResponse<object>.Error("Invalid kind."));
 
         var result = await _service.AssistGoalAsync(User.GetUserId(), draftId, goalId, kind, ct);
@@ -48,7 +45,6 @@ public class IepAssistController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AssistSection(int draftId, int sectionId, [FromBody] AssistRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!TryParseKind(request.Kind, out var kind)) return BadRequest(ApiResponse<object>.Error("Invalid kind."));
 
         var result = await _service.AssistSectionAsync(User.GetUserId(), draftId, sectionId, kind, ct);
@@ -62,7 +58,6 @@ public class IepAssistController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AssistServiceLine(int draftId, int serviceLineId, [FromBody] AssistRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!TryParseKind(request.Kind, out var kind)) return BadRequest(ApiResponse<object>.Error("Invalid kind."));
 
         var result = await _service.AssistServiceLineAsync(User.GetUserId(), draftId, serviceLineId, kind, ct);
@@ -76,7 +71,6 @@ public class IepAssistController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Chat(int draftId, [FromBody] ChatRequest request, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var messages = (request.Messages ?? new List<ChatMessageDto>())
@@ -90,8 +84,6 @@ public class IepAssistController : ControllerBase
     }
 
     // ---------------------------------------------------------------- Helpers
-
-    private bool Enabled => _featureFlags.IsEnabled(FeatureFlags.SchoolSide);
 
     private static bool TryParseKind(string? value, out AssistKind kind)
         => Enum.TryParse(value, ignoreCase: true, out kind) && Enum.IsDefined(kind);

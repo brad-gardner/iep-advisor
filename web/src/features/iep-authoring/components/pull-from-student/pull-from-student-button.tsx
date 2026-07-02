@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { UserRoundCheck } from 'lucide-react';
-import { useFeatureFlag } from '@/hooks/use-feature-flags';
 import { useEditorContext } from '../../hooks/use-editor-context';
 import { useStudentShareableEntries } from '../../hooks/use-student-shareable-entries';
 import { StudentEntryPicker } from './student-entry-picker';
@@ -14,19 +13,15 @@ interface PullFromStudentButtonProps {
 }
 
 // Educator affordance: open a picker of the student's shareable workspace
-// entries and copy one into the current field. Gated on the StudentWorkspace
-// flag — renders nothing when off.
+// entries and copy one into the current field.
 export function PullFromStudentButton({
   onPick,
   testIdPrefix,
 }: PullFromStudentButtonProps) {
-  const enabled = useFeatureFlag('StudentWorkspace');
   const { studentId } = useEditorContext();
   const { entries, isLoading, isError, ensureLoaded } =
     useStudentShareableEntries(studentId);
   const [open, setOpen] = useState(false);
-
-  if (!enabled) return null;
 
   const handleToggle = () => {
     setOpen((prev) => {

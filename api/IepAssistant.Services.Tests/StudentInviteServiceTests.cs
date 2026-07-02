@@ -36,10 +36,10 @@ public sealed class StudentInviteServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private StudentInviteService CreateService(ApplicationDbContext ctx, CapturingEmailService email)
-        => new(ctx, new AccessService(ctx), email, NullLogger<StudentInviteService>.Instance);
+        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), email, NullLogger<StudentInviteService>.Instance);
 
     private static EducatorService CreateEducator(ApplicationDbContext ctx)
-        => new(ctx, NullLogger<EducatorService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), NullLogger<EducatorService>.Instance);
 
     // ----------------------------------------------------------------- seed helpers
 
@@ -67,16 +67,34 @@ public sealed class StudentInviteServiceTests : IDisposable
         return child.Id;
     }
 
+    /// <summary>Provisions a Teacher (direct District/School/StaffProfile seed); returns the educator user id.</summary>
+    private int SeedEducator(string educatorEmail, string district, string school)
+    {
+        var educatorId = SeedUser(educatorEmail, UserRole.Educator);
+        using var ctx = CreateContext();
+        var districtEntity = new District { Name = district, StateCode = "OH" };
+        ctx.Districts.Add(districtEntity);
+        ctx.SaveChanges();
+        var schoolEntity = new School { DistrictId = districtEntity.Id, Name = school, StateCode = "OH", IsActive = true };
+        ctx.Schools.Add(schoolEntity);
+        ctx.SaveChanges();
+        ctx.StaffProfiles.Add(new StaffProfile
+        {
+            UserId = educatorId,
+            DistrictId = districtEntity.Id,
+            SchoolId = schoolEntity.Id,
+            OrgRoleId = OrgRoleIds.Teacher,
+            IsActive = true
+        });
+        ctx.SaveChanges();
+        return educatorId;
+    }
+
     private async Task<(int educatorId, int studentId)> SeedEducatorWithStudent(
         string educatorEmail, string district, string school, string studentFirst = "Sam", string studentLast = "Student")
     {
-        var educatorId = SeedUser(educatorEmail);
+        var educatorId = SeedEducator(educatorEmail, district, school);
         int studentId;
-        using (var ctx = CreateContext())
-            await CreateEducator(ctx).OnboardAsync(educatorId, new OnboardEducatorModel
-            {
-                DistrictName = district, SchoolName = school, StateCode = "OH"
-            });
         using (var ctx = CreateContext())
         {
             var created = await CreateEducator(ctx).CreateStudentAsync(educatorId, new CreateSchoolStudentModel
@@ -352,12 +370,7 @@ public sealed class StudentInviteServiceTests : IDisposable
     public async Task EducatorInvite_FromAnotherSchool_IsRejected()
     {
         var (_, studentInA) = await SeedEducatorWithStudent("edAa@x.com", "DistrictAa", "SchoolAa");
-        var educatorB = SeedUser("edBb@x.com");
-        using (var ctx = CreateContext())
-            await CreateEducator(ctx).OnboardAsync(educatorB, new OnboardEducatorModel
-            {
-                DistrictName = "DistrictBb", SchoolName = "SchoolBb", StateCode = "OH"
-            });
+        var educatorB = SeedEducator("edBb@x.com", "DistrictBb", "SchoolBb");
         var email = new CapturingEmailService();
 
         using (var ctx = CreateContext())
@@ -429,6 +442,7 @@ public sealed class StudentInviteServiceTests : IDisposable
         public Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default) => Task.CompletedTask;
         public Task SendShareInviteEmailAsync(string toEmail, string inviterName, string childName, string role, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
         public Task SendSchoolLinkInviteEmailAsync(string toEmail, string educatorName, string schoolName, string studentName, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
+        public Task SendStaffInviteEmailAsync(string toEmail, string districtName, string? schoolName, string roleName, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
         public Task SendBetaInviteEmailAsync(string toEmail, string inviteCode, CancellationToken ct = default) => Task.CompletedTask;
     }
 }
