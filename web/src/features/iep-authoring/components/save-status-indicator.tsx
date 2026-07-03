@@ -1,4 +1,5 @@
-import { Check, CloudOff, Loader2 } from 'lucide-react';
+import { Check, CloudOff } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import type { AutosaveStatus } from '../hooks/use-autosave';
 
 interface SaveStatusIndicatorProps {
@@ -10,9 +11,9 @@ const config: Record<
   { label: string; className: string; Icon: typeof Check | null }
 > = {
   idle: { label: 'All changes saved', className: 'text-brand-slate-400', Icon: null },
-  saving: { label: 'Saving…', className: 'text-brand-slate-500', Icon: Loader2 },
+  saving: { label: 'Saving…', className: 'text-brand-slate-500', Icon: null },
   saved: { label: 'Saved', className: 'text-brand-teal-600', Icon: Check },
-  error: { label: 'Could not save — keep typing to retry', className: 'text-brand-red', Icon: CloudOff },
+  error: { label: 'Could not save — keep typing to retry', className: 'text-brand-danger-700', Icon: CloudOff },
 };
 
 export function SaveStatusIndicator({ status }: SaveStatusIndicatorProps) {
@@ -24,13 +25,10 @@ export function SaveStatusIndicator({ status }: SaveStatusIndicatorProps) {
       aria-live="polite"
       data-testid="save-status"
     >
-      {Icon && (
-        <Icon
-          className={`w-3.5 h-3.5 ${status === 'saving' ? 'animate-spin' : ''}`}
-          strokeWidth={2}
-          aria-hidden="true"
-        />
+      {status === 'saving' && (
+        <Spinner size="sm" tone="current" aria-hidden="true" />
       )}
+      {Icon && <Icon className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />}
       {label}
     </p>
   );

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { MessageSquare } from 'lucide-react';
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { ActivePanel } from '../components/active-panel';
 import { ChatPanel } from '../components/chat/chat-panel';
@@ -34,7 +35,7 @@ export function IepAuthoringWorkspacePage() {
   if (draftApi.isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading IEP draft…" />
       </div>
     );
   }

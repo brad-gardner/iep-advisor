@@ -31,7 +31,7 @@ export function StudentEntryPicker({
       )}
 
       {!isLoading && error && (
-        <p className="px-3 py-2 text-sm text-brand-red" data-testid={`${testIdPrefix}-error`}>
+        <p className="px-3 py-2 text-sm text-brand-danger-700" data-testid={`${testIdPrefix}-error`}>
           Could not load shared entries.
         </p>
       )}

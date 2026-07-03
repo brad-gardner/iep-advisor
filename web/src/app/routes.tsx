@@ -55,6 +55,7 @@ import { StudentAcceptInvitePage } from '@/features/student/components/student-a
 import { ParentVersionDetailPage } from '@/features/iep-versions/components/parent-version-detail-page';
 import { RoleHome, RoleRoute } from '@/app/role-routing';
 import { roleHome } from '@/app/role-home';
+import { Spinner } from '@/components/ui/spinner';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -62,7 +63,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+        <Spinner tone="current" className="text-white" />
       </div>
     );
   }
@@ -80,7 +81,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+        <Spinner tone="current" className="text-white" />
       </div>
     );
   }

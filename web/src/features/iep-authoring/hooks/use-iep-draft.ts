@@ -36,11 +36,13 @@ interface UseIepDraftResult {
   saveTransitionItem: (id: number) => Promise<void>;
   saveSection: (id: number) => Promise<void>;
 
-  removeGoal: (id: number) => Promise<void>;
-  removeServiceLine: (id: number) => Promise<void>;
-  removeAccommodation: (id: number) => Promise<void>;
-  removeTransitionItem: (id: number) => Promise<void>;
-  removeSection: (id: number) => Promise<void>;
+  // Resolve true when the server confirms the delete (so callers can surface a
+  // success toast); false when it failed and the row was kept for retry.
+  removeGoal: (id: number) => Promise<boolean>;
+  removeServiceLine: (id: number) => Promise<boolean>;
+  removeAccommodation: (id: number) => Promise<boolean>;
+  removeTransitionItem: (id: number) => Promise<boolean>;
+  removeSection: (id: number) => Promise<boolean>;
 }
 
 // Maps each editable child collection key to its element type. Lets the generic
@@ -253,15 +255,17 @@ export function useIepDraft(draftId: number): UseIepDraftResult {
       key: K,
       id: number,
       call: (id: number) => Promise<{ success: boolean }>
-    ) => {
+    ): Promise<boolean> => {
       try {
         const res = await call(id);
         if (res.success) {
           mutateList(key, (list) => list.filter((row) => row.id !== id));
+          return true;
         }
       } catch {
         /* swallow — row stays so the user can retry */
       }
+      return false;
     },
     [mutateList]
   );

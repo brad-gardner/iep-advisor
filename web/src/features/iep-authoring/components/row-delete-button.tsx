@@ -11,7 +11,7 @@ export function RowDeleteButton({ onDelete, label, testId }: RowDeleteButtonProp
     <button
       type="button"
       onClick={onDelete}
-      className="inline-flex items-center gap-1 text-xs text-brand-red hover:underline"
+      className="inline-flex items-center gap-1 text-xs text-brand-danger-700 hover:underline"
       data-testid={testId}
       aria-label={label}
     >

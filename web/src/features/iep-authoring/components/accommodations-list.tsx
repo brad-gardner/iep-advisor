@@ -1,3 +1,4 @@
+import { useToast } from '@/components/ui/toast';
 import { useEditorContext } from '../hooks/use-editor-context';
 import { AccommodationRow } from './accommodation-row';
 import { AddRowButton } from './add-row-button';
@@ -5,11 +6,13 @@ import { EmptyHint } from './empty-hint';
 
 export function AccommodationsList() {
   const { draftApi } = useEditorContext();
+  const { show } = useToast();
   const accommodations = draftApi.draft?.accommodations ?? [];
 
-  const handleDelete = (id: number) => {
-    if (confirm('Delete this accommodation? This cannot be undone.')) {
-      void draftApi.removeAccommodation(id);
+  const handleDelete = async (id: number) => {
+    if (!confirm('Delete this accommodation? This cannot be undone.')) return;
+    if (await draftApi.removeAccommodation(id)) {
+      show({ message: 'Accommodation deleted', variant: 'success' });
     }
   };
 
