@@ -1,28 +1,29 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Notice } from '@/components/ui/notice';
-import { Spinner } from '@/components/ui/spinner';
-import { EmptyState } from '@/components/ui/empty-state';
-import { PageLayout } from '@/components/ui/page-layout';
-import { useToast } from '@/components/ui/toast';
+import { useCallback, useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
+import { Spinner } from "@/components/ui/spinner";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageLayout } from "@/components/ui/page-layout";
+import { DetailLayout } from "@/components/ui/detail-layout";
+import { useToast } from "@/components/ui/toast";
 import {
   getStudent,
   getStudentLinks,
   inviteParent,
   revokeStudentLink,
-} from '../api/educator-api';
-import type { ChildLink, SchoolStudent } from '../types';
-import { ORG_ROLE } from '../types';
-import { useEducatorProfile } from '../hooks/use-educator-profile';
-import { InviteParentForm } from '../components/invite-parent-form';
-import { StudentLinksList } from '../components/student-links-list';
-import { StudentStaffAccessPanel } from '../components/staff-access/student-staff-access-panel';
-import { VersionHistoryList } from '@/features/iep-versions/components/version-history-list';
-import { useStudentVersions } from '@/features/iep-versions/hooks/use-version-list';
-import { InviteStudentForm } from '@/features/student/components/invite-student-form';
-import { inviteStudentFromEducator } from '@/features/student/api/student-invite-api';
+} from "../api/educator-api";
+import type { ChildLink, SchoolStudent } from "../types";
+import { ORG_ROLE } from "../types";
+import { useEducatorProfile } from "../hooks/use-educator-profile";
+import { InviteParentForm } from "../components/invite-parent-form";
+import { StudentLinksList } from "../components/student-links-list";
+import { StudentStaffAccessPanel } from "../components/staff-access/student-staff-access-panel";
+import { VersionHistoryList } from "@/features/iep-versions/components/version-history-list";
+import { useStudentVersions } from "@/features/iep-versions/hooks/use-version-list";
+import { InviteStudentForm } from "@/features/student/components/invite-student-form";
+import { inviteStudentFromEducator } from "@/features/student/api/student-invite-api";
 
 export function EducatorStudentDetailPage() {
   const { show: showToast } = useToast();
@@ -34,7 +35,8 @@ export function EducatorStudentDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [revokingId, setRevokingId] = useState<number | null>(null);
   const [revokeNote, setRevokeNote] = useState<string | null>(null);
-  const { versions, isLoading: versionsLoading } = useStudentVersions(studentId);
+  const { versions, isLoading: versionsLoading } =
+    useStudentVersions(studentId);
   const { profile } = useEducatorProfile();
   const canManageStaffAccess =
     profile?.orgRoleId === ORG_ROLE.DistrictAdmin ||
@@ -45,7 +47,10 @@ export function EducatorStudentDetailPage() {
       const response = await inviteStudentFromEducator(studentId, email);
       return { success: response.success, message: response.message };
     } catch {
-      return { success: false, message: 'An error occurred sending the invitation' };
+      return {
+        success: false,
+        message: "An error occurred sending the invitation",
+      };
     }
   };
 
@@ -83,17 +88,24 @@ export function EducatorStudentDetailPage() {
       const response = await inviteParent(studentId, { parentEmail: email });
       if (response.success) {
         await reloadLinks();
-        showToast({ message: 'Parent invited', variant: 'success' });
+        showToast({ message: "Parent invited", variant: "success" });
         return { success: true, message: response.message };
       }
       return { success: false, message: response.message };
     } catch {
-      return { success: false, message: 'An error occurred sending the invitation' };
+      return {
+        success: false,
+        message: "An error occurred sending the invitation",
+      };
     }
   };
 
   const handleRevoke = async (link: ChildLink) => {
-    if (!confirm('Revoke this parent link? This cannot be undone, and the parent keeps any data already shared.')) {
+    if (
+      !confirm(
+        "Revoke this parent link? This cannot be undone, and the parent keeps any data already shared.",
+      )
+    ) {
       return;
     }
     setRevokingId(link.id);
@@ -102,7 +114,10 @@ export function EducatorStudentDetailPage() {
       const response = await revokeStudentLink(studentId, link.id);
       if (response.success) {
         // Surface the forward-only note from the server (revoke is not retroactive).
-        setRevokeNote(response.message || 'Link revoked. This does not remove access already granted.');
+        setRevokeNote(
+          response.message ||
+            "Link revoked. This does not remove access already granted.",
+        );
         await reloadLinks();
       }
     } finally {
@@ -132,74 +147,103 @@ export function EducatorStudentDetailPage() {
     );
   }
 
-  const studentName = `${student.firstName} ${student.lastName ?? ''}`.trim() || 'Student';
+  const studentName =
+    `${student.firstName} ${student.lastName ?? ""}`.trim() || "Student";
 
   return (
     <PageLayout
       title={studentName}
-      breadcrumb={[{ label: 'Students', to: '/educator/students' }, { label: studentName }]}
+      breadcrumb={[
+        { label: "Students", to: "/educator/students" },
+        { label: studentName },
+      ]}
     >
-      <Card className="max-w-lg" data-testid="student-info">
-        <dl className="space-y-2 text-sm">
-          {student.gradeLevel && (
-            <div className="flex justify-between">
-              <dt className="text-brand-slate-500">Grade</dt>
-              <dd className="text-brand-slate-800">{student.gradeLevel}</dd>
-            </div>
-          )}
-          {student.disabilityCategory && (
-            <div className="flex justify-between">
-              <dt className="text-brand-slate-500">Disability Category</dt>
-              <dd className="text-brand-slate-800">{student.disabilityCategory}</dd>
-            </div>
-          )}
-        </dl>
-      </Card>
+      <DetailLayout
+        main={
+          <div className="space-y-6">
+            <section className="space-y-3">
+              <h2 className="font-serif text-lg">IEP versions</h2>
+              <Card data-testid="iep-versions-section">
+                <VersionHistoryList
+                  versions={versions}
+                  isLoading={versionsLoading}
+                  linkBase={`/educator/students/${studentId}/iep-versions`}
+                />
+              </Card>
+            </section>
 
-      <section className="space-y-3">
-        <h2 className="font-serif text-lg">IEPs</h2>
-        <Card className="max-w-lg flex items-center justify-between gap-4">
-          <p className="text-sm text-brand-slate-600">
-            Build and edit IEP drafts for this student.
-          </p>
-          <Link to={`/educator/students/${studentId}/iep-drafts`} data-testid="build-ieps">
-            <Button variant="secondary">Build / view IEPs</Button>
-          </Link>
-        </Card>
-      </section>
+            <section className="space-y-3">
+              <h2 className="font-serif text-lg">Assigned staff</h2>
+              <StudentStaffAccessPanel
+                studentId={studentId}
+                studentSchoolId={student.schoolId}
+                canManage={canManageStaffAccess}
+              />
+            </section>
 
-      <section className="space-y-3">
-        <h2 className="font-serif text-lg">IEP versions</h2>
-        <Card className="max-w-lg" data-testid="iep-versions-section">
-          <VersionHistoryList
-            versions={versions}
-            isLoading={versionsLoading}
-            linkBase={`/educator/students/${studentId}/iep-versions`}
-          />
-        </Card>
-      </section>
+            <InviteParentForm onInvite={handleInvite} />
 
-      <section className="space-y-3">
-        <h2 className="font-serif text-lg">Assigned staff</h2>
-        <StudentStaffAccessPanel
-          studentId={studentId}
-          studentSchoolId={student.schoolId}
-          canManage={canManageStaffAccess}
-        />
-      </section>
+            <InviteStudentForm
+              onInvite={handleInviteStudent}
+              description={`Invite ${student.firstName} to activate their own account and take part in their IEP process.`}
+            />
 
-      <InviteParentForm onInvite={handleInvite} />
+            <section className="space-y-3">
+              <h2 className="font-serif text-lg">Parent links</h2>
+              {revokeNote && (
+                <Notice variant="info" title="Link revoked">
+                  {revokeNote}
+                </Notice>
+              )}
+              <StudentLinksList
+                links={links}
+                revokingId={revokingId}
+                onRevoke={handleRevoke}
+              />
+            </section>
+          </div>
+        }
+        sidebar={
+          <>
+            <Card data-testid="student-info">
+              <h2 className="mb-3 font-serif text-base text-brand-slate-800">
+                Details
+              </h2>
+              <dl className="space-y-2 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-brand-slate-500">Grade</dt>
+                  <dd className="text-brand-slate-800">
+                    {student.gradeLevel || "—"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-brand-slate-500">Disability</dt>
+                  <dd className="text-right text-brand-slate-800">
+                    {student.disabilityCategory || "—"}
+                  </dd>
+                </div>
+              </dl>
+            </Card>
 
-      <InviteStudentForm
-        onInvite={handleInviteStudent}
-        description={`Invite ${student.firstName} to activate their own account and take part in their IEP process.`}
+            <Card>
+              <h2 className="mb-2 font-serif text-base text-brand-slate-800">
+                IEPs
+              </h2>
+              <p className="mb-3 text-sm text-brand-slate-600">
+                Build and edit IEP drafts for this student.
+              </p>
+              <Link
+                to={`/educator/students/${studentId}/iep-drafts`}
+                data-testid="build-ieps"
+              >
+                <Button variant="secondary" className="w-full">
+                  Build / view IEPs
+                </Button>
+              </Link>
+            </Card>
+          </>
+        }
       />
-
-      <section className="space-y-3">
-        <h2 className="font-serif text-lg">Parent links</h2>
-        {revokeNote && <Notice variant="info" title="Link revoked">{revokeNote}</Notice>}
-        <StudentLinksList links={links} revokingId={revokingId} onRevoke={handleRevoke} />
-      </section>
     </PageLayout>
   );
 }

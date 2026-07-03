@@ -69,7 +69,7 @@ export function DashboardPage() {
         <h2 className="font-serif mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Link
-            to="/children/new"
+            to="/children"
             className="flex items-center gap-3 p-4 rounded-card border-[0.5px] border-brand-slate-200 hover:bg-brand-teal-50 hover:border-brand-teal-100 transition-colors"
           >
             <Users

@@ -8,7 +8,11 @@ export class ChildrenPage {
   }
 
   async gotoNew() {
-    await this.page.goto('/children/new');
+    // The standalone /children/new page was retired — the create form now
+    // lives in a Drawer opened from the children list.
+    await this.page.goto('/children');
+    await this.page.locator('[data-testid="add-child-button"]').click();
+    await this.page.locator('[data-testid="child-first-name"]').waitFor({ state: 'visible' });
   }
 
   async gotoChild(childId: number) {

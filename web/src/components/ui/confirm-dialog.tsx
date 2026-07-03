@@ -1,6 +1,7 @@
-import { useId } from 'react';
-import { Button } from './button';
-import { Modal } from './modal';
+import { useId } from "react";
+import { Button } from "./button";
+import { Modal } from "./modal";
+import { Notice } from "./notice";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -15,11 +16,13 @@ interface ConfirmDialogProps {
   confirmLabel: string;
   cancelLabel?: string;
   /** Confirm styling — destructive actions use `danger` (the default). */
-  confirmVariant?: 'danger' | 'primary';
+  confirmVariant?: "danger" | "primary";
   loading?: boolean;
+  /** Server-side failure to keep rendered inside the open dialog. */
+  error?: string | null;
   onConfirm: () => void;
   onCancel: () => void;
-  'data-testid'?: string;
+  "data-testid"?: string;
 }
 
 /**
@@ -33,12 +36,13 @@ export function ConfirmDialog({
   title,
   message,
   confirmLabel,
-  cancelLabel = 'Cancel',
-  confirmVariant = 'danger',
+  cancelLabel = "Cancel",
+  confirmVariant = "danger",
   loading = false,
+  error,
   onConfirm,
   onCancel,
-  'data-testid': testId,
+  "data-testid": testId,
 }: ConfirmDialogProps) {
   const messageId = useId();
 
@@ -74,9 +78,12 @@ export function ConfirmDialog({
         </>
       }
     >
-      <p id={messageId} className="text-sm text-brand-slate-600">
-        {message}
-      </p>
+      <div className="space-y-3">
+        <p id={messageId} className="text-sm text-brand-slate-600">
+          {message}
+        </p>
+        {error && <Notice variant="error" title={error} />}
+      </div>
     </Modal>
   );
 }

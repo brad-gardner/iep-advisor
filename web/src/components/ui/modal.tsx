@@ -1,9 +1,9 @@
-import { useEffect, useId, useRef } from 'react';
-import { X } from 'lucide-react';
-import { cn } from '@/lib/cn';
-import { lockBodyScroll, unlockBodyScroll } from '@/lib/scroll-lock';
+import { useId } from "react";
+import { X } from "lucide-react";
+import { cn } from "@/lib/cn";
+import { useDialogElement } from "./use-dialog-element";
 
-export type ModalSize = 'sm' | 'md' | 'lg';
+export type ModalSize = "sm" | "md" | "lg";
 
 interface ModalProps {
   /** Controlled visibility. Children are unmounted while `false`. */
@@ -21,19 +21,19 @@ interface ModalProps {
   /** Footer action row (typically the form's submit/cancel buttons). */
   footer?: React.ReactNode;
   /** `alertdialog` for destructive confirmations; defaults to `dialog`. */
-  role?: 'dialog' | 'alertdialog';
+  role?: "dialog" | "alertdialog";
   /** Id of the element describing the consequence, wired via `aria-describedby`. */
   describedById?: string;
   /** Hide the header close (X) — used by confirmations that focus Cancel. */
   hideCloseButton?: boolean;
   children: React.ReactNode;
-  'data-testid'?: string;
+  "data-testid"?: string;
 }
 
 const sizeStyles: Record<ModalSize, string> = {
-  sm: 'max-w-md',
-  md: 'max-w-lg',
-  lg: 'max-w-2xl',
+  sm: "max-w-md",
+  md: "max-w-lg",
+  lg: "max-w-2xl",
 };
 
 /**
@@ -49,53 +49,19 @@ export function Modal({
   open,
   onClose,
   title,
-  size = 'md',
+  size = "md",
   footer,
-  role = 'dialog',
+  role = "dialog",
   describedById,
   hideCloseButton = false,
   children,
-  'data-testid': testId,
+  "data-testid": testId,
 }: ModalProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const { dialogRef, handleCancel, handleBackdropClick } = useDialogElement(
+    open,
+    onClose,
+  );
   const titleId = useId();
-
-  // Drive the native dialog from the controlled `open` prop.
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (open) {
-      if (dialog.open) return;
-      // Prefer the real modal path; fall back to the reflected `open` attribute
-      // where `showModal` is unavailable (jsdom) so the element still renders.
-      if (typeof dialog.showModal === 'function') dialog.showModal();
-      else dialog.setAttribute('open', '');
-    } else if (dialog.open) {
-      if (typeof dialog.close === 'function') dialog.close();
-      else dialog.removeAttribute('open');
-    }
-  }, [open]);
-
-  // Body scroll-lock, ref-counted so nested dialogs stay locked until the last
-  // one closes.
-  useEffect(() => {
-    if (!open) return;
-    lockBodyScroll();
-    return unlockBodyScroll;
-  }, [open]);
-
-  // Esc fires the native `cancel` event. We preventDefault so the dialog does
-  // not self-close (the parent owns `open`) and forward a single close request.
-  const handleCancel = (event: React.SyntheticEvent<HTMLDialogElement>) => {
-    event.preventDefault();
-    onClose();
-  };
-
-  // Close only on a true backdrop click — the <dialog> itself is the event
-  // target when the backdrop (not its content) is clicked.
-  const handleClick = (event: React.MouseEvent<HTMLDialogElement>) => {
-    if (event.target === dialogRef.current) onClose();
-  };
 
   return (
     <dialog
@@ -106,17 +72,20 @@ export function Modal({
       aria-describedby={describedById}
       data-testid={testId}
       onCancel={handleCancel}
-      onClick={handleClick}
+      onClick={handleBackdropClick}
       className={cn(
-        'w-[calc(100vw-2rem)] bg-transparent p-0',
-        'backdrop:bg-brand-slate-800/50 backdrop:motion-safe:animate-overlay-in',
+        "w-[calc(100vw-2rem)] bg-transparent p-0",
+        "backdrop:bg-brand-slate-800/50 backdrop:motion-safe:animate-overlay-in",
         sizeStyles[size],
       )}
     >
       {open && (
         <div className="motion-safe:animate-modal-in overflow-hidden rounded-modal border border-brand-slate-200 bg-white shadow-xl">
           <div className="flex items-start justify-between gap-4 border-b border-brand-slate-100 px-6 py-4">
-            <h2 id={titleId} className="font-serif text-lg text-brand-slate-800">
+            <h2
+              id={titleId}
+              className="font-serif text-lg text-brand-slate-800"
+            >
               {title}
             </h2>
             {!hideCloseButton && (

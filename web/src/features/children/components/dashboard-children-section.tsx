@@ -61,7 +61,7 @@ export function DashboardChildrenSection() {
             icon={Users}
             title="No child profiles yet"
             action={
-              <Link to="/children/new">
+              <Link to="/children">
                 <Button>Add your first child profile</Button>
               </Link>
             }
@@ -80,7 +80,7 @@ export function DashboardChildrenSection() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-serif text-lg text-brand-slate-800">My Children</h2>
         <Link
-          to="/children/new"
+          to="/children"
           className="flex items-center gap-1 text-sm text-brand-teal-500 hover:text-brand-teal-400"
         >
           <Plus className="h-4 w-4" strokeWidth={1.8} />
