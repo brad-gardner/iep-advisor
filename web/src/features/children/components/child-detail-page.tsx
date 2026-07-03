@@ -11,6 +11,8 @@ import type { ChildSchoolLink } from "@/features/child-links/types";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Modal } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageLayout } from "@/components/ui/page-layout";
 import { useToast } from "@/components/ui/toast";
 import { TabsNav, TabLink } from "@/components/ui/tabs";
@@ -23,6 +25,7 @@ export function ChildDetailPage() {
   const [child, setChild] = useState<ChildProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [schoolLinks, setSchoolLinks] = useState<ChildSchoolLink[]>([]);
 
@@ -83,7 +86,6 @@ export function ChildDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to remove this child profile?")) return;
     setIsDeleting(true);
     try {
       const response = await deleteChild(childId);
@@ -120,32 +122,6 @@ export function ChildDetailPage() {
     );
   }
 
-  if (isEditing) {
-    return (
-      <PageLayout
-        title={`Edit ${child.firstName}`}
-        actions={
-          <Button variant="ghost" onClick={() => setIsEditing(false)}>
-            Cancel
-          </Button>
-        }
-      >
-        <ChildForm
-          initialValues={{
-            firstName: child.firstName,
-            lastName: child.lastName ?? "",
-            dateOfBirth: child.dateOfBirth?.split("T")[0] ?? "",
-            gradeLevel: child.gradeLevel ?? "",
-            disabilityCategory: child.disabilityCategory ?? "",
-            schoolDistrict: child.schoolDistrict ?? "",
-          }}
-          onSubmit={handleUpdate}
-          submitLabel="Save Changes"
-        />
-      </PageLayout>
-    );
-  }
-
   const isOwner = child.role === "owner";
   const base = `/children/${childId}`;
 
@@ -168,8 +144,7 @@ export function ChildDetailPage() {
             </Button>
             <Button
               variant="danger"
-              onClick={handleDelete}
-              loading={isDeleting}
+              onClick={() => setIsConfirmingRemove(true)}
               data-testid="child-remove-button"
             >
               Remove
@@ -208,6 +183,38 @@ export function ChildDetailPage() {
 
       <Outlet
         context={{ child, childId, reloadChild } satisfies ChildOutletContext}
+      />
+
+      <Modal
+        open={isEditing}
+        onClose={() => setIsEditing(false)}
+        title={`Edit ${child.firstName}`}
+        data-testid="child-edit-modal"
+      >
+        <ChildForm
+          embedded
+          initialValues={{
+            firstName: child.firstName,
+            lastName: child.lastName ?? "",
+            dateOfBirth: child.dateOfBirth?.split("T")[0] ?? "",
+            gradeLevel: child.gradeLevel ?? "",
+            disabilityCategory: child.disabilityCategory ?? "",
+            schoolDistrict: child.schoolDistrict ?? "",
+          }}
+          onSubmit={handleUpdate}
+          submitLabel="Save Changes"
+        />
+      </Modal>
+
+      <ConfirmDialog
+        open={isConfirmingRemove}
+        title="Remove child profile"
+        message={`Remove ${child.firstName}'s profile? This cannot be undone.`}
+        confirmLabel="Remove profile"
+        loading={isDeleting}
+        onConfirm={handleDelete}
+        onCancel={() => setIsConfirmingRemove(false)}
+        data-testid="child-remove-dialog"
       />
     </PageLayout>
   );

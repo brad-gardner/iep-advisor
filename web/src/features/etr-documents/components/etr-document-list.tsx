@@ -4,6 +4,7 @@ import { Trash2, Eye, FileSearch } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
@@ -36,6 +37,7 @@ function formatDate(value: string | null): string {
 export function EtrDocumentList({ etrs, isLoading, onDeleted }: EtrDocumentListProps) {
   const { show: showToast } = useToast();
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   if (isLoading) {
     return (
@@ -49,13 +51,15 @@ export function EtrDocumentList({ etrs, isLoading, onDeleted }: EtrDocumentListP
     return <EmptyState icon={FileSearch} title="No ETR documents yet." />;
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Delete this ETR document?')) return;
+  const confirmDelete = async () => {
+    if (pendingDeleteId === null) return;
+    const id = pendingDeleteId;
     setDeletingId(id);
     try {
       const response = await removeEtr(id);
       if (response.success) {
         showToast({ message: 'ETR deleted', variant: 'success' });
+        setPendingDeleteId(null);
         onDeleted();
       }
     } catch {
@@ -117,7 +121,7 @@ export function EtrDocumentList({ etrs, isLoading, onDeleted }: EtrDocumentListP
                 <Button
                   variant="danger"
                   size="sm"
-                  onClick={() => handleDelete(etr.id)}
+                  onClick={() => setPendingDeleteId(etr.id)}
                   loading={deletingId === etr.id}
                   data-testid="etr-delete-button"
                 >
@@ -129,6 +133,17 @@ export function EtrDocumentList({ etrs, isLoading, onDeleted }: EtrDocumentListP
           </Card>
         );
       })}
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Delete ETR document"
+        message="Delete this ETR document? This cannot be undone."
+        confirmLabel="Delete ETR"
+        loading={deletingId !== null}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDeleteId(null)}
+        data-testid="etr-delete-dialog"
+      />
     </div>
   );
 }

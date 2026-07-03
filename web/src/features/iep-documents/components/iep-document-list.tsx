@@ -8,6 +8,7 @@ import { IepUpload } from './iep-upload';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
@@ -58,6 +59,7 @@ export function IepDocumentList({
 }: IepDocumentListProps) {
   const { show: showToast } = useToast();
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<IepDocument | null>(null);
   const [settingCurrentId, setSettingCurrentId] = useState<number | null>(null);
 
   const handleSetCurrent = async (doc: IepDocument) => {
@@ -91,13 +93,15 @@ export function IepDocumentList({
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Delete this IEP document?')) return;
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const id = pendingDelete.id;
     setDeletingId(id);
     try {
       const response = await deleteIepDocument(id);
       if (response.success) {
         showToast({ message: 'IEP deleted', variant: 'success' });
+        setPendingDelete(null);
         onDeleted();
       }
     } catch {
@@ -170,7 +174,7 @@ export function IepDocumentList({
               <Button
                 variant="danger"
                 size="sm"
-                onClick={() => handleDelete(doc.id)}
+                onClick={() => setPendingDelete(doc)}
                 loading={deletingId === doc.id}
               >
                 <Trash2 className="w-3.5 h-3.5 mr-1" strokeWidth={1.8} aria-hidden="true" />
@@ -186,6 +190,17 @@ export function IepDocumentList({
           )}
         </Card>
       ))}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete IEP document"
+        message="Delete this IEP document? This cannot be undone."
+        confirmLabel="Delete IEP"
+        loading={deletingId !== null}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+        data-testid="iep-delete-dialog"
+      />
     </div>
   );
 }

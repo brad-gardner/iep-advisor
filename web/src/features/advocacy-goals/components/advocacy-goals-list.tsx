@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { AdvocacyGoal } from '@/types/api';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
+import { Modal } from '@/components/ui/modal';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast';
 import {
   createAdvocacyGoal,
@@ -30,16 +32,28 @@ export function AdvocacyGoalsList({
   onReload,
   readOnly = false,
 }: AdvocacyGoalsListProps) {
-  const [isAdding, setIsAdding] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  // `formOpen` with a null `editingGoal` = add mode; a set goal = edit mode.
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<AdvocacyGoal | null>(null);
+  const [deletingGoal, setDeletingGoal] = useState<AdvocacyGoal | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { show } = useToast();
+
+  const openAdd = () => {
+    setEditingGoal(null);
+    setFormOpen(true);
+  };
+  const openEdit = (goal: AdvocacyGoal) => {
+    setEditingGoal(goal);
+    setFormOpen(true);
+  };
 
   const handleCreate = async (data: { goalText: string; category?: string }) => {
     try {
       const response = await createAdvocacyGoal(childId, data);
       if (response.success) {
         onReload();
-        setIsAdding(false);
+        setFormOpen(false);
         show({ message: 'Goal added', variant: 'success' });
         return { success: true };
       }
@@ -57,7 +71,7 @@ export function AdvocacyGoalsList({
       });
       if (response.success) {
         onReload();
-        setEditingId(null);
+        setFormOpen(false);
         show({ message: 'Goal updated', variant: 'success' });
         return { success: true };
       }
@@ -67,16 +81,20 @@ export function AdvocacyGoalsList({
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to remove this advocacy goal?')) return;
+  const confirmDelete = async () => {
+    if (!deletingGoal) return;
+    setIsDeleting(true);
     try {
-      const response = await deleteAdvocacyGoal(id);
+      const response = await deleteAdvocacyGoal(deletingGoal.id);
       if (response.success) {
         onReload();
+        setDeletingGoal(null);
         show({ message: 'Goal removed', variant: 'success' });
       }
     } catch {
       // handled by interceptor
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -100,6 +118,28 @@ export function AdvocacyGoalsList({
     }
   };
 
+  const goalFormModal = (
+    <Modal
+      open={formOpen}
+      onClose={() => setFormOpen(false)}
+      title={editingGoal ? 'Edit goal' : 'Add advocacy goal'}
+      data-testid="goal-form-modal"
+    >
+      <AdvocacyGoalForm
+        initialValues={
+          editingGoal
+            ? { goalText: editingGoal.goalText, category: editingGoal.category || '' }
+            : undefined
+        }
+        onSubmit={
+          editingGoal ? (data) => handleUpdate(editingGoal.id, data) : handleCreate
+        }
+        onCancel={() => setFormOpen(false)}
+        submitLabel={editingGoal ? 'Save Changes' : 'Add Goal'}
+      />
+    </Modal>
+  );
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-6">
@@ -108,7 +148,7 @@ export function AdvocacyGoalsList({
     );
   }
 
-  if (goals.length === 0 && !isAdding) {
+  if (goals.length === 0) {
     if (readOnly) {
       return (
         <p className="text-sm text-brand-slate-400 py-4 text-center">
@@ -116,7 +156,12 @@ export function AdvocacyGoalsList({
         </p>
       );
     }
-    return <AdvocacyGoalsEmptyState childName={childName} onAdd={() => setIsAdding(true)} />;
+    return (
+      <>
+        <AdvocacyGoalsEmptyState childName={childName} onAdd={openAdd} />
+        {goalFormModal}
+      </>
+    );
   }
 
   return (
@@ -126,11 +171,11 @@ export function AdvocacyGoalsList({
           {goals.length}/10 goals
           {goals.length >= 10 && ' — Focused goals produce better analysis. Consider consolidating.'}
         </p>
-        {!readOnly && !isAdding && goals.length < 10 && (
+        {!readOnly && goals.length < 10 && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setIsAdding(true)}
+            onClick={openAdd}
             className="text-brand-teal-500 hover:bg-brand-teal-50"
             data-testid="add-goal-button"
           >
@@ -139,39 +184,31 @@ export function AdvocacyGoalsList({
         )}
       </div>
 
-      {!readOnly && isAdding && (
-        <div className="bg-white rounded-card p-4 border-[0.5px] border-brand-teal-200">
-          <AdvocacyGoalForm
-            onSubmit={handleCreate}
-            onCancel={() => setIsAdding(false)}
-            submitLabel="Add Goal"
-          />
-        </div>
-      )}
+      {goals.map((goal, index) => (
+        <AdvocacyGoalCard
+          key={goal.id}
+          goal={goal}
+          isFirst={index === 0}
+          isLast={index === goals.length - 1}
+          onMoveUp={readOnly ? undefined : () => handleReorder(goal.id, 'up')}
+          onMoveDown={readOnly ? undefined : () => handleReorder(goal.id, 'down')}
+          onEdit={readOnly ? undefined : () => openEdit(goal)}
+          onDelete={readOnly ? undefined : () => setDeletingGoal(goal)}
+        />
+      ))}
 
-      {goals.map((goal, index) =>
-        !readOnly && editingId === goal.id ? (
-          <div key={goal.id} className="bg-white rounded-card p-4 border-[0.5px] border-brand-teal-200">
-            <AdvocacyGoalForm
-              initialValues={{ goalText: goal.goalText, category: goal.category || '' }}
-              onSubmit={(data) => handleUpdate(goal.id, data)}
-              onCancel={() => setEditingId(null)}
-              submitLabel="Save Changes"
-            />
-          </div>
-        ) : (
-          <AdvocacyGoalCard
-            key={goal.id}
-            goal={goal}
-            isFirst={index === 0}
-            isLast={index === goals.length - 1}
-            onMoveUp={readOnly ? undefined : () => handleReorder(goal.id, 'up')}
-            onMoveDown={readOnly ? undefined : () => handleReorder(goal.id, 'down')}
-            onEdit={readOnly ? undefined : () => setEditingId(goal.id)}
-            onDelete={readOnly ? undefined : () => handleDelete(goal.id)}
-          />
-        )
-      )}
+      {goalFormModal}
+
+      <ConfirmDialog
+        open={deletingGoal !== null}
+        title="Remove advocacy goal"
+        message="Are you sure you want to remove this advocacy goal?"
+        confirmLabel="Remove goal"
+        loading={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletingGoal(null)}
+        data-testid="goal-delete-dialog"
+      />
     </div>
   );
 }

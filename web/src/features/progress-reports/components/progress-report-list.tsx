@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Trash2, Eye, Download } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { remove, getDownloadUrl } from "../api/progress-reports-api";
@@ -56,6 +57,7 @@ export function ProgressReportList({
   onChanged,
 }: ProgressReportListProps) {
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const { show } = useToast();
 
   const handleDownload = async (id: number) => {
@@ -63,13 +65,15 @@ export function ProgressReportList({
     if (res.success && res.data) window.open(res.data.url, "_blank");
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Delete this progress report?")) return;
+  const confirmDelete = async () => {
+    if (pendingDeleteId === null) return;
+    const id = pendingDeleteId;
     setDeletingId(id);
     try {
       const res = await remove(id);
       if (res.success) {
         show({ message: "Progress report deleted", variant: "success" });
+        setPendingDeleteId(null);
         onChanged();
       }
     } catch {
@@ -157,7 +161,7 @@ export function ProgressReportList({
               )}
               {canEdit && (
                 <button
-                  onClick={() => handleDelete(r.id)}
+                  onClick={() => setPendingDeleteId(r.id)}
                   disabled={deletingId === r.id}
                   className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-danger-700 hover:text-brand-danger-800 disabled:opacity-50 transition-colors"
                 >
@@ -182,6 +186,17 @@ export function ProgressReportList({
           )}
         </Card>
       ))}
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Delete progress report"
+        message="Delete this progress report? This cannot be undone."
+        confirmLabel="Delete report"
+        loading={deletingId !== null}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDeleteId(null)}
+        data-testid="progress-report-delete-dialog"
+      />
     </div>
   );
 }

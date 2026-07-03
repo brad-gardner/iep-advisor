@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/drawer";
 import { useEtrDocuments } from "@/features/etr-documents/hooks/use-etr-documents";
 import { CreateEtrForm } from "@/features/etr-documents/components/create-etr-form";
 import { EtrDocumentList } from "@/features/etr-documents/components/etr-document-list";
@@ -21,7 +22,7 @@ export function ChildEtrsTab() {
     <Card data-testid="etr-documents-section">
       <div className="flex justify-between items-center mb-4">
         <h2 className="font-serif">ETRs</h2>
-        {!isViewer && !showCreateEtr && (
+        {!isViewer && (
           <Button
             variant="secondary"
             onClick={() => setShowCreateEtr(true)}
@@ -31,23 +32,28 @@ export function ChildEtrsTab() {
           </Button>
         )}
       </div>
-      {!isViewer && showCreateEtr && (
-        <div className="mb-4">
-          <CreateEtrForm
-            childId={childId}
-            onCreated={() => {
-              setShowCreateEtr(false);
-              reloadEtrs();
-            }}
-            onCancel={() => setShowCreateEtr(false)}
-          />
-        </div>
-      )}
       <EtrDocumentList
         etrs={etrs}
         isLoading={etrsLoading}
         onDeleted={reloadEtrs}
       />
+
+      <Drawer
+        open={showCreateEtr}
+        onClose={() => setShowCreateEtr(false)}
+        title="New ETR"
+        size="lg"
+        data-testid="new-etr-drawer"
+      >
+        <CreateEtrForm
+          childId={childId}
+          onCreated={() => {
+            setShowCreateEtr(false);
+            reloadEtrs();
+          }}
+          onCancel={() => setShowCreateEtr(false)}
+        />
+      </Drawer>
     </Card>
   );
 }

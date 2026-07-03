@@ -71,8 +71,9 @@ export class ChildrenPage {
   }
 
   async clickRemove() {
-    this.page.on('dialog', (dialog) => dialog.accept());
+    // The native confirm() was replaced by a ConfirmDialog overlay.
     await this.page.locator('[data-testid="child-remove-button"]').click();
+    await this.page.locator('[data-testid="child-remove-dialog-confirm"]').click();
   }
 
   async expectChildVisible(name: string) {

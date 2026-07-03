@@ -19,8 +19,9 @@ export class AdvocacyGoalsPage {
   }
 
   async deleteGoal() {
-    this.page.on('dialog', (dialog) => dialog.accept());
+    // The native confirm() was replaced by a ConfirmDialog overlay.
     await this.page.locator('[data-testid="goal-delete"]').first().click();
+    await this.page.locator('[data-testid="goal-delete-dialog-confirm"]').click();
     await this.page.waitForTimeout(500);
   }
 
