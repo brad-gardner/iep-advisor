@@ -1,6 +1,6 @@
 # Design system — usage guide
 
-The shared UI vocabulary for IEP Advisor. **Use these primitives; don't hand-roll their patterns.** A CI guard (`npm run guard:ux`) enforces this on the migrated pilot surface (district-admin / educator / staff-invites); the rest of the app migrates in the fast-follow plan.
+The shared UI vocabulary for IEP Advisor. **Use these primitives; don't hand-roll their patterns.** The whole authenticated app is migrated onto them. A CI guard (`npm run guard:ux`) enforces **zero raw spinners and zero raw `red-*`** app-wide (raw `<button>` is allowed only for native tabs/menus/switches/radios/disclosure-triggers/inline-links that have no `Button` equivalent).
 
 ## Primitives
 
