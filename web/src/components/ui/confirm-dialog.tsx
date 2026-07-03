@@ -82,7 +82,11 @@ export function ConfirmDialog({
         <p id={messageId} className="text-sm text-brand-slate-600">
           {message}
         </p>
-        {error && <Notice variant="error" title={error} />}
+        {error && (
+          <div role="alert">
+            <Notice variant="error" title={error} />
+          </div>
+        )}
       </div>
     </Modal>
   );

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -27,8 +28,12 @@ interface MenuProps {
  * Menu-button (WAI-ARIA APG). The trigger exposes `aria-haspopup="menu"` +
  * `aria-expanded`; the popover is a `role="menu"` of `role="menuitem"`s with
  * arrow / Home / End navigation, Esc-to-close with return-focus, and
- * click-outside dismissal. Replaces the app's hand-rolled dropdowns and backs
- * the Table row kebab.
+ * click-outside dismissal.
+ *
+ * The popover is **portaled to `<body>` and `position: fixed`** so it is never
+ * clipped by an ancestor's `overflow` (e.g. a Table's horizontal-scroll region)
+ * and can rise above the app's stacking contexts. It closes on scroll to avoid
+ * drifting away from its trigger.
  */
 export function Menu({
   label,
@@ -38,9 +43,25 @@ export function Menu({
   'data-testid': testId,
 }: MenuProps) {
   const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const positionFromTrigger = () => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setCoords({
+      top: rect.bottom + 4,
+      left: align === 'right' ? rect.right : rect.left,
+    });
+  };
+
+  const openMenu = () => {
+    positionFromTrigger();
+    setOpen(true);
+  };
 
   const close = (returnFocus = true) => {
     setOpen(false);
@@ -71,15 +92,23 @@ export function Menu({
     if (open) focusItemAt(0, 1);
   }, [open, focusItemAt]);
 
-  // Dismiss on any pointer press outside the menu (no focus return — the user
-  // is interacting elsewhere).
+  // Dismiss on any pointer press outside the trigger or the (portaled) menu, and
+  // on scroll (a fixed popover would otherwise drift from its trigger).
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (!containerRef.current?.contains(target) && !menuRef.current?.contains(target)) {
+        setOpen(false);
+      }
     };
+    const onScroll = () => setOpen(false);
     document.addEventListener('pointerdown', onPointerDown);
-    return () => document.removeEventListener('pointerdown', onPointerDown);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('scroll', onScroll, true);
+    };
   }, [open]);
 
   const currentIndex = () =>
@@ -117,7 +146,7 @@ export function Menu({
   const handleTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      setOpen(true);
+      openMenu();
     }
   };
 
@@ -136,49 +165,58 @@ export function Menu({
         aria-haspopup="menu"
         aria-expanded={open}
         data-testid={testId}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? close(false) : openMenu())}
         onKeyDown={handleTriggerKeyDown}
         className="flex h-9 w-9 items-center justify-center rounded-button text-brand-slate-400 transition-colors hover:bg-brand-slate-50 hover:text-brand-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
       >
         {trigger ?? <MoreVertical className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />}
       </button>
 
-      {open && (
-        <div
-          role="menu"
-          aria-label={label}
-          onKeyDown={handleMenuKeyDown}
-          className={cn(
-            'absolute z-20 mt-1 min-w-44 overflow-hidden rounded-card border border-brand-slate-200 bg-white py-1 shadow-lg',
-            align === 'right' ? 'right-0' : 'left-0',
-            'motion-safe:animate-overlay-in',
-          )}
-        >
-          {items.map((item, index) => (
-            <button
-              key={item.label}
-              ref={(el) => {
-                itemRefs.current[index] = el;
-              }}
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              disabled={item.disabled}
-              data-testid={item['data-testid']}
-              onClick={() => select(item)}
-              className={cn(
-                'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-50',
-                item.variant === 'danger'
-                  ? 'text-brand-danger-600 hover:bg-brand-danger-50 focus-visible:bg-brand-danger-50'
-                  : 'text-brand-slate-700 hover:bg-brand-slate-50 focus-visible:bg-brand-slate-50',
-              )}
-            >
-              {item.icon && <span className="shrink-0" aria-hidden="true">{item.icon}</span>}
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            aria-label={label}
+            onKeyDown={handleMenuKeyDown}
+            style={{
+              position: 'fixed',
+              top: coords?.top ?? 0,
+              left: coords?.left ?? 0,
+              transform: align === 'right' ? 'translateX(-100%)' : undefined,
+            }}
+            className="z-50 min-w-44 overflow-hidden rounded-card border border-brand-slate-200 bg-white py-1 shadow-lg motion-safe:animate-overlay-in"
+          >
+            {items.map((item, index) => (
+              <button
+                key={item.label}
+                ref={(el) => {
+                  itemRefs.current[index] = el;
+                }}
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                disabled={item.disabled}
+                data-testid={item['data-testid']}
+                onClick={() => select(item)}
+                className={cn(
+                  'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+                  item.variant === 'danger'
+                    ? 'text-brand-danger-600 hover:bg-brand-danger-50 focus-visible:bg-brand-danger-50'
+                    : 'text-brand-slate-700 hover:bg-brand-slate-50 focus-visible:bg-brand-slate-50',
+                )}
+              >
+                {item.icon && (
+                  <span className="shrink-0" aria-hidden="true">
+                    {item.icon}
+                  </span>
+                )}
+                {item.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

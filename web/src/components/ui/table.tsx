@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Menu, type MenuItem } from "./menu";
@@ -29,10 +30,15 @@ interface TableProps<T> {
   columns: TableColumn<T>[];
   rows: T[];
   rowKey: (row: T) => string | number;
-  /** Initial sort; also the fallback the header toggle returns through. */
+  /** Initial sort. */
   defaultSort?: { key: string; direction: SortDirection };
-  /** Whole-row navigation. The actions kebab cell stops propagation. */
-  onRowClick?: (row: T) => void;
+  /**
+   * Row navigation target. Renders the **first column** as a real `<Link>`
+   * (keyboard- and screen-reader-navigable) whose hit area is stretched over
+   * the whole row, so a mouse click anywhere navigates while the kebab and
+   * other interactive cells (which sit above it) keep working.
+   */
+  rowHref?: (row: T) => string;
   /** Per-row actions rendered as a trailing kebab `Menu`. */
   rowActions?: (row: T) => MenuItem[];
   /** Accessible label for a row's kebab, e.g. `(row) => row.name`. */
@@ -73,7 +79,7 @@ export function Table<T>({
   rows,
   rowKey,
   defaultSort,
-  onRowClick,
+  rowHref,
   rowActions,
   rowActionLabel,
   loading = false,
@@ -132,7 +138,7 @@ export function Table<T>({
       <table className="w-full border-collapse text-sm" aria-label={label}>
         <thead>
           <tr className="border-b border-brand-slate-200 bg-brand-slate-50">
-            {columns.map((col, colIndex) => {
+            {columns.map((col) => {
               const isActive = sort?.key === col.key;
               const sortable = Boolean(col.sortValue);
               return (
@@ -150,8 +156,6 @@ export function Table<T>({
                     "whitespace-nowrap px-4 py-2.5 text-xs font-medium text-brand-slate-500",
                     alignClass(col.align),
                     hideClass(col.hideBelow),
-                    // Freeze the first column when the region scrolls horizontally.
-                    colIndex === 0 && "sticky left-0 z-10 bg-brand-slate-50",
                     col.className,
                   )}
                 >
@@ -208,14 +212,10 @@ export function Table<T>({
           {loading ? (
             Array.from({ length: loadingRows }).map((_, rowIndex) => (
               <tr key={`skeleton-${rowIndex}`}>
-                {columns.map((col, colIndex) => (
+                {columns.map((col) => (
                   <td
                     key={col.key}
-                    className={cn(
-                      "px-4 py-3",
-                      hideClass(col.hideBelow),
-                      colIndex === 0 && "sticky left-0 bg-white",
-                    )}
+                    className={cn("px-4 py-3", hideClass(col.hideBelow))}
                   >
                     <Skeleton className="h-4 w-24" />
                   </td>
@@ -226,19 +226,23 @@ export function Table<T>({
           ) : sortedRows.length === 0 ? (
             <tr>
               <td colSpan={totalCols} className="px-4 py-10">
-                {empty}
+                {empty ?? (
+                  <p className="text-center text-sm text-brand-slate-400">
+                    Nothing to show yet.
+                  </p>
+                )}
               </td>
             </tr>
           ) : (
             sortedRows.map((row) => {
               const actions = rowActions?.(row);
+              const href = rowHref?.(row);
               return (
                 <tr
                   key={rowKey(row)}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
                   className={cn(
-                    "bg-white transition-colors",
-                    onRowClick && "cursor-pointer hover:bg-brand-slate-50",
+                    "relative bg-white transition-colors",
+                    href && "hover:bg-brand-slate-50",
                   )}
                 >
                   {columns.map((col, colIndex) => (
@@ -248,28 +252,36 @@ export function Table<T>({
                         "px-4 py-3 text-brand-slate-700",
                         alignClass(col.align),
                         hideClass(col.hideBelow),
-                        colIndex === 0 && "sticky left-0 bg-white",
                         col.className,
                       )}
                     >
-                      {col.cell(row)}
+                      {href && colIndex === 0 ? (
+                        // Real link = keyboard/SR-navigable; the stretched
+                        // `before` overlay makes the whole row mouse-clickable.
+                        <Link
+                          to={href}
+                          className="font-medium text-brand-slate-800 before:absolute before:inset-0 hover:underline focus:outline-none focus-visible:underline"
+                        >
+                          {col.cell(row)}
+                        </Link>
+                      ) : (
+                        col.cell(row)
+                      )}
                     </td>
                   ))}
                   {hasActions && (
-                    <td className="px-2 py-3 text-right">
+                    // `relative z-10` lifts the kebab above the row's stretched
+                    // link overlay so it stays clickable and never navigates.
+                    <td className="relative z-10 px-2 py-3 text-right">
                       {actions && actions.length > 0 && (
-                        // Keep the kebab out of the row's click target so
-                        // opening the menu never triggers row navigation.
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <Menu
-                            label={
-                              rowActionLabel
-                                ? `Actions for ${rowActionLabel(row)}`
-                                : "Row actions"
-                            }
-                            items={actions}
-                          />
-                        </div>
+                        <Menu
+                          label={
+                            rowActionLabel
+                              ? `Actions for ${rowActionLabel(row)}`
+                              : "Row actions"
+                          }
+                          items={actions}
+                        />
                       )}
                     </td>
                   )}

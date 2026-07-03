@@ -1,6 +1,11 @@
 import { render, screen, fireEvent, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 import { Table, type TableColumn } from './table';
+
+function renderInRouter(ui: React.ReactElement) {
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
+}
 
 interface Row {
   id: number;
@@ -34,7 +39,7 @@ function names() {
 
 describe('Table', () => {
   it('marks only the active column with aria-sort and orders by it', () => {
-    render(
+    renderInRouter(
       <Table
         label="Schools"
         columns={columns}
@@ -51,7 +56,7 @@ describe('Table', () => {
   });
 
   it('toggles sort direction and moves aria-sort between columns', () => {
-    render(
+    renderInRouter(
       <Table
         label="Schools"
         columns={columns}
@@ -79,67 +84,66 @@ describe('Table', () => {
   });
 
   it('renders skeleton rows while loading and the empty slot when empty', () => {
-    const { rerender } = render(
+    const { rerender } = renderInRouter(
       <Table label="Schools" columns={columns} rows={[]} rowKey={(r) => r.id} loading loadingRows={3} />,
     );
     // 3 skeleton rows + header.
     expect(screen.getAllByRole('row')).toHaveLength(4);
 
     rerender(
-      <Table
-        label="Schools"
-        columns={columns}
-        rows={[]}
-        rowKey={(r) => r.id}
-        empty={<span data-testid="no-schools">No schools yet</span>}
-      />,
+      <MemoryRouter>
+        <Table
+          label="Schools"
+          columns={columns}
+          rows={[]}
+          rowKey={(r) => r.id}
+          empty={<span data-testid="no-schools">No schools yet</span>}
+        />
+      </MemoryRouter>,
     );
     expect(screen.getByTestId('no-schools')).toBeInTheDocument();
   });
 
   it('exposes the scroll container as a labelled region', () => {
-    render(<Table label="Schools" columns={columns} rows={rows} rowKey={(r) => r.id} />);
+    renderInRouter(<Table label="Schools" columns={columns} rows={rows} rowKey={(r) => r.id} />);
     expect(screen.getByRole('region', { name: 'Schools' })).toBeInTheDocument();
   });
 
-  it('kebab actions do not trigger row-click navigation', () => {
-    const onRowClick = vi.fn();
-    const onEdit = vi.fn();
-    render(
+  it('renders the first column as a keyboard-navigable row link', () => {
+    renderInRouter(
       <Table
         label="Schools"
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}
-        onRowClick={onRowClick}
+        rowHref={(r) => `/schools/${r.id}`}
+        defaultSort={{ key: 'name', direction: 'asc' }}
+      />,
+    );
+    const link = screen.getByRole('link', { name: 'Adams' });
+    expect(link).toHaveAttribute('href', '/schools/2');
+  });
+
+  it('keeps the kebab out of the row link so actions never navigate', () => {
+    const onEdit = vi.fn();
+    renderInRouter(
+      <Table
+        label="Schools"
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        rowHref={(r) => `/schools/${r.id}`}
         rowActionLabel={(r) => r.name}
         rowActions={(r) => [
           { label: 'Edit', onSelect: () => onEdit(r.id), 'data-testid': `edit-${r.id}` },
         ]}
       />,
     );
-    // Open the first row's kebab — row navigation must not fire.
-    fireEvent.click(screen.getAllByRole('button', { name: /Actions for/ })[0]);
-    expect(onRowClick).not.toHaveBeenCalled();
-    // Selecting an action runs it, still without navigating.
+    // The kebab lives in its own cell, not inside the row's <Link>.
+    const kebab = screen.getAllByRole('button', { name: /Actions for/ })[0];
+    expect(kebab.closest('a')).toBeNull();
+    fireEvent.click(kebab);
     fireEvent.click(screen.getAllByTestId(/^edit-/)[0]);
     expect(onEdit).toHaveBeenCalledTimes(1);
-    expect(onRowClick).not.toHaveBeenCalled();
-  });
-
-  it('navigates on a row-body click', () => {
-    const onRowClick = vi.fn();
-    render(
-      <Table
-        label="Schools"
-        columns={columns}
-        rows={rows}
-        rowKey={(r) => r.id}
-        onRowClick={onRowClick}
-        defaultSort={{ key: 'name', direction: 'asc' }}
-      />,
-    );
-    fireEvent.click(screen.getByText('Adams'));
-    expect(onRowClick).toHaveBeenCalledWith(rows[1]);
   });
 });
