@@ -1,3 +1,5 @@
+import { Users } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { StaffRow } from './staff-row';
 import type { StaffMember } from '../types';
 
@@ -10,9 +12,12 @@ interface StaffListProps {
 export function StaffList({ members, onDeactivate, onReactivate }: StaffListProps) {
   if (members.length === 0) {
     return (
-      <p className="text-brand-slate-400 text-sm" data-testid="district-staff-empty">
-        No staff yet. Invite someone to get started.
-      </p>
+      <EmptyState
+        data-testid="district-staff-empty"
+        icon={Users}
+        title="No staff yet"
+        description="Invite someone to get started."
+      />
     );
   }
 

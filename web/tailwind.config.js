@@ -40,6 +40,26 @@ export default {
             800: '#1E2A2A',
           },
           red: '#B91C1C',
+          // Full error/destructive scale shaped like the slate/teal ramps.
+          // Anchored so #B91C1C lands at 700 (the legacy flat `red`); 50/100
+          // are light backgrounds. Not yet consumed — the raw `red-*`/`brand-red`
+          // error surfaces (Notice/Badge/Button) migrate onto this scale in a
+          // later phase. Verified WCAG pairs for the intended error treatment:
+          //   text danger-700 (#B91C1C) on bg danger-50 (#FEF2F2) = 5.91:1 (AA body)
+          //   text danger-600 (#C42A26) on bg danger-50            = 5.18:1 (AA body)
+          //   text danger-700 on white                             = 6.47:1
+          // border danger-200 (#F7C4C4) is a light, non-text hairline.
+          danger: {
+            50: '#FEF2F2',
+            100: '#FCE0E0',
+            200: '#F7C4C4',
+            300: '#EF9A9A',
+            400: '#E26A6A',
+            500: '#D2413F',
+            600: '#C42A26',
+            700: '#B91C1C',
+            800: '#8E1515',
+          },
         },
       },
       fontFamily: {
@@ -52,6 +72,18 @@ export default {
         button: '8px',
         card: '12px',
         modal: '16px',
+      },
+      keyframes: {
+        // Subtle toast entrance: fade + a short rise. Gated behind
+        // `motion-safe:` at the call site so it never plays under
+        // `prefers-reduced-motion`.
+        'toast-in': {
+          '0%': { opacity: '0', transform: 'translateY(0.5rem)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'toast-in': 'toast-in 150ms ease-out',
       },
     },
   },

@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Notice } from '@/components/ui/notice';
+import { orgRoleLabel } from '@/lib/org-role-label';
 import type { StaffMember } from '../types';
 
 interface StaffRowProps {
@@ -56,7 +57,7 @@ export function StaffRow({ member, onDeactivate, onReactivate }: StaffRowProps) 
           </div>
           <p className="text-sm text-brand-slate-500">{member.email}</p>
           <p className="text-xs text-brand-slate-400">
-            {member.orgRoleName}
+            {orgRoleLabel(member.orgRoleName)}
             {member.schoolName ? ` · ${member.schoolName}` : ' · District-wide'}
           </p>
           {error && (

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Logo } from '@/components/ui/logo';
 import { ProgressDots } from '@/components/ui/progress-dots';
+import { Spinner } from '@/components/ui/spinner';
 import { ORG_ROLE } from '@/features/educator/types';
 import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
 import { SetupWelcomeStep } from '../components/setup/setup-welcome-step';
@@ -32,7 +33,7 @@ export function DistrictSetupWizard() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner />
       </div>
     );
   }

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
+import { orgRoleLabel } from '@/lib/org-role-label';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { acceptStaffInvite, previewStaffInvite } from '../api/staff-invites-api';
 import { AcceptInviteForm } from '../components/accept-invite-form';
@@ -87,7 +89,7 @@ export function StaffAcceptInvitePage() {
 
       {phase === 'loading' && !isMissingToken && (
         <div className="flex justify-center py-6">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+          <Spinner label="Loading invite…" />
         </div>
       )}
 
@@ -120,7 +122,7 @@ export function StaffAcceptInvitePage() {
           <p className="text-sm text-brand-slate-600">
             <span className="font-medium text-brand-slate-800">{preview.districtName}</span>
             {preview.schoolName ? ` · ${preview.schoolName}` : ''} invited you to join as{' '}
-            <span className="font-medium text-brand-slate-800">{preview.roleName}</span>.
+            <span className="font-medium text-brand-slate-800">{orgRoleLabel(preview.roleName)}</span>.
           </p>
 
           {user ? (

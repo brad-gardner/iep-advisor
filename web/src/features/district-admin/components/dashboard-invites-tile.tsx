@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { orgRoleLabel } from '@/lib/org-role-label';
 import type { DashboardInvite } from '../types';
 
 interface DashboardInvitesTileProps {
@@ -45,7 +46,7 @@ export function DashboardInvitesTile({ invites }: DashboardInvitesTileProps) {
                   {isExpired && <Badge variant="error">Expired</Badge>}
                 </div>
                 <p className="text-xs text-brand-slate-400">
-                  {invite.orgRoleName}
+                  {orgRoleLabel(invite.orgRoleName)}
                   {invite.schoolName ? ` · ${invite.schoolName}` : ' · District-wide'}
                   {' · '}
                   {isExpired ? 'Expired on' : 'Expires'} {formatExpiry(invite.inviteExpiresAt)}

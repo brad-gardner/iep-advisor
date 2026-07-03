@@ -3,6 +3,7 @@ import { Select } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import type { StaffMember } from '@/features/staff-invites/types';
+import { orgRoleLabel } from '@/lib/org-role-label';
 import { ACCESS_ROLES, type AccessRole, type GrantStudentStaffAccessRequest } from '../../types';
 
 interface StaffAccessAssignFormProps {
@@ -75,7 +76,7 @@ export function StaffAccessAssignForm({ eligibleStaff, onAssign }: StaffAccessAs
         {eligibleStaff.map((member) => (
           <option key={member.staffProfileId} value={member.staffProfileId}>
             {`${member.firstName} ${member.lastName}`.trim() || member.email} ·{' '}
-            {member.orgRoleName}
+            {orgRoleLabel(member.orgRoleName)}
           </option>
         ))}
       </Select>

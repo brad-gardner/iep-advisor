@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+import { PageLayout } from '@/components/ui/page-layout';
+import { useToast } from '@/components/ui/toast';
 import { reloadEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
 import {
   createSchool,
@@ -12,6 +15,7 @@ import { SchoolsList } from '../components/schools-list';
 import type { DistrictSchool, SaveSchoolRequest } from '../types';
 
 export function DistrictSchoolsPage() {
+  const { show: showToast } = useToast();
   const [schools, setSchools] = useState<DistrictSchool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -37,6 +41,7 @@ export function DistrictSchoolsPage() {
         await reload();
         // School counts in the district overview are now stale.
         void reloadEducatorProfile();
+        showToast({ message: 'School created', variant: 'success' });
         return { success: true };
       }
       return { success: false, error: response.message || 'Failed to add school' };
@@ -50,6 +55,7 @@ export function DistrictSchoolsPage() {
       const response = await updateSchool(schoolId, data);
       if (response.success) {
         await reload();
+        showToast({ message: 'School updated', variant: 'success' });
         return { success: true };
       }
       return { success: false, error: response.message || 'Failed to update school' };
@@ -64,6 +70,7 @@ export function DistrictSchoolsPage() {
       if (response.success) {
         await reload();
         void reloadEducatorProfile();
+        showToast({ message: 'School deactivated', variant: 'success' });
         return { success: true };
       }
       // The backend returns an explicit message when a school still has active
@@ -78,9 +85,7 @@ export function DistrictSchoolsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-serif">Schools</h1>
-
+    <PageLayout title="Schools" data-testid="district-schools-page">
       <Card className="max-w-lg">
         <h2 className="font-serif text-lg mb-4">Add a school</h2>
         <SchoolForm
@@ -93,7 +98,7 @@ export function DistrictSchoolsPage() {
 
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+          <Spinner />
         </div>
       ) : (
         <SchoolsList
@@ -102,6 +107,6 @@ export function DistrictSchoolsPage() {
           onDeactivate={handleDeactivate}
         />
       )}
-    </div>
+    </PageLayout>
   );
 }
