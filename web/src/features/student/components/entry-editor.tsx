@@ -65,10 +65,11 @@ export function EntryEditor({
       <div className="flex items-center gap-2">
         <Button
           onClick={() => void handleSubmit()}
-          disabled={!trimmed || saving}
+          disabled={!trimmed}
+          loading={saving}
           data-testid={`${testIdPrefix}-save`}
         >
-          {saving ? 'Saving…' : submitLabel}
+          {submitLabel}
         </Button>
         <Button variant="ghost" onClick={onCancel} data-testid={`${testIdPrefix}-cancel`}>
           Cancel

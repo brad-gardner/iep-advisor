@@ -1,4 +1,6 @@
 import { Eye, Lock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 import type { StudentWorkspaceEntryDto } from '../types';
 
 interface ShareToggleProps {
@@ -7,21 +9,19 @@ interface ShareToggleProps {
   testIdPrefix: string;
 }
 
-// A clear private/shared switch. Uses a button with aria-pressed so the state is
+// A clear private/shared switch. Uses a Button with aria-pressed so the state is
 // announced and keyboard-operable. The label spells out the consequence.
 export function ShareToggle({ entry, onToggle, testIdPrefix }: ShareToggleProps) {
   const { isShareable } = entry;
 
   return (
-    <button
+    <Button
       type="button"
+      variant={isShareable ? 'secondary' : 'ghost'}
+      size="sm"
       onClick={() => onToggle(entry.id, !isShareable)}
       aria-pressed={isShareable}
-      className={`inline-flex items-center gap-1.5 rounded-button border px-2.5 py-1 text-[13px] font-medium transition-colors ${
-        isShareable
-          ? 'border-brand-teal-200 bg-brand-teal-50 text-brand-teal-600 hover:bg-brand-teal-100'
-          : 'border-brand-slate-200 bg-white text-brand-slate-500 hover:bg-brand-slate-100'
-      }`}
+      className={cn('gap-1.5', !isShareable && 'border border-brand-slate-200 bg-white')}
       data-testid={`${testIdPrefix}-share-toggle`}
     >
       {isShareable ? (
@@ -35,6 +35,6 @@ export function ShareToggle({ entry, onToggle, testIdPrefix }: ShareToggleProps)
           Only you can see this
         </>
       )}
-    </button>
+    </Button>
   );
 }

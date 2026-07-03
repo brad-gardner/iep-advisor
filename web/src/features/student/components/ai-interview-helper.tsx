@@ -87,10 +87,11 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
       />
       <Button
         onClick={() => void handleAsk()}
-        disabled={!trimmed || phase === 'loading'}
+        disabled={!trimmed}
+        loading={phase === 'loading'}
         data-testid="ai-interview-ask"
       >
-        {phase === 'loading' ? 'Thinking…' : 'Ask the assistant'}
+        Ask the assistant
       </Button>
 
       {phase === 'error' && (
@@ -112,7 +113,7 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
           <div className="flex flex-wrap items-center gap-2">
             <Button
               onClick={() => void handleSave('MeetingStatement')}
-              disabled={saving}
+              loading={saving}
               data-testid="ai-interview-save-statement"
             >
               Save as meeting statement

@@ -1,11 +1,10 @@
 import { Link } from 'react-router-dom';
+import { PageLayout } from '@/components/ui/page-layout';
 import { SubscriptionStatusCard } from './subscription-status';
 
 export function SubscriptionPage() {
   return (
-    <div className="space-y-6">
-      <h1 className="font-serif">Subscription</h1>
-
+    <PageLayout title="Subscription">
       <div className="max-w-lg">
         <SubscriptionStatusCard />
       </div>
@@ -16,6 +15,6 @@ export function SubscriptionPage() {
           Redeem it here
         </Link>
       </p>
-    </div>
+    </PageLayout>
   );
 }
