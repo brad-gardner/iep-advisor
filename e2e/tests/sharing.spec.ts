@@ -79,9 +79,11 @@ test.describe('Sharing & Access', () => {
     await expect(page.locator('[data-testid="revoke-access"]').first()).toBeVisible({ timeout: 5000 });
     const countBefore = await page.locator('[data-testid="revoke-access"]').count();
 
-    // Revoke the first non-owner access
-    page.on('dialog', (dialog) => dialog.accept());
+    // Revoke the first non-owner access. The native confirm() was replaced by
+    // a ConfirmDialog overlay — click the revoke button to open it, then
+    // confirm via its action button.
     await page.locator('[data-testid="revoke-access"]').first().click();
+    await page.locator('[data-testid="revoke-access-dialog-confirm"]').click();
     await page.waitForTimeout(1500);
 
     // Should have one fewer revoke button

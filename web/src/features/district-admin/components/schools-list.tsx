@@ -19,7 +19,7 @@ export function SchoolsList({ schools, onUpdate, onDeactivate }: SchoolsListProp
         data-testid="district-schools-empty"
         icon={School}
         title="No schools yet"
-        description="Add your first school using the form above to start building out your district."
+        description="Add your first school using the Add school button to start building out your district."
       />
     );
   }

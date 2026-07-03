@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Card } from '@/components/ui/card';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Modal } from '@/components/ui/modal';
 import { Spinner } from '@/components/ui/spinner';
 import { PageLayout } from '@/components/ui/page-layout';
 import { useToast } from '@/components/ui/toast';
@@ -18,6 +20,7 @@ export function DistrictSchoolsPage() {
   const { show: showToast } = useToast();
   const [schools, setSchools] = useState<DistrictSchool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAddOpen, setIsAddOpen] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -41,6 +44,9 @@ export function DistrictSchoolsPage() {
         await reload();
         // School counts in the district overview are now stale.
         void reloadEducatorProfile();
+        // Close the host modal only on resolved success; errors stay rendered
+        // inside the open dialog.
+        setIsAddOpen(false);
         showToast({ message: 'School created', variant: 'success' });
         return { success: true };
       }
@@ -85,17 +91,19 @@ export function DistrictSchoolsPage() {
   };
 
   return (
-    <PageLayout title="Schools" data-testid="district-schools-page">
-      <Card className="max-w-lg">
-        <h2 className="font-serif text-lg mb-4">Add a school</h2>
-        <SchoolForm
-          mode="create"
-          submitLabel="Add school"
-          onSubmit={handleCreate}
-          testIdPrefix="district-schools-create"
-        />
-      </Card>
-
+    <PageLayout
+      title="Schools"
+      data-testid="district-schools-page"
+      actions={
+        <Button
+          onClick={() => setIsAddOpen(true)}
+          data-testid="district-schools-add"
+        >
+          <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+          Add school
+        </Button>
+      }
+    >
       {isLoading ? (
         <div className="flex justify-center py-12">
           <Spinner />
@@ -107,6 +115,21 @@ export function DistrictSchoolsPage() {
           onDeactivate={handleDeactivate}
         />
       )}
+
+      <Modal
+        open={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        title="Add a school"
+        data-testid="district-schools-add-modal"
+      >
+        <SchoolForm
+          mode="create"
+          submitLabel="Add school"
+          onSubmit={handleCreate}
+          onCancel={() => setIsAddOpen(false)}
+          testIdPrefix="district-schools-create"
+        />
+      </Modal>
     </PageLayout>
   );
 }

@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Pencil, Ban } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Menu } from '@/components/ui/menu';
 import { Notice } from '@/components/ui/notice';
 import { SchoolForm } from './school-form';
 import type { DistrictSchool, SaveSchoolRequest } from '../types';
@@ -34,8 +36,10 @@ export function SchoolRow({ school, onUpdate, onDeactivate }: SchoolRowProps) {
     const result = await onDeactivate(school.id);
     if (!result.success) {
       setDeactivateError(result.error ?? 'Could not deactivate this school');
-      setIsConfirmingDeactivate(false);
     }
+    // Collapse the inline confirm on both paths — on success the row/state is
+    // resolved; on failure the error Notice takes over.
+    setIsConfirmingDeactivate(false);
     setIsDeactivating(false);
   };
 
@@ -104,26 +108,31 @@ export function SchoolRow({ school, onUpdate, onDeactivate }: SchoolRowProps) {
           </div>
         ) : (
           <div className="flex shrink-0 items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setDeactivateError(null);
-                setIsEditing(true);
-              }}
-              data-testid={`district-school-edit-${school.id}`}
-            >
-              Edit
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                setDeactivateError(null);
-                setIsConfirmingDeactivate(true);
-              }}
-              data-testid={`district-school-deactivate-${school.id}`}
-            >
-              Deactivate
-            </Button>
+            <Menu
+              label={`Actions for ${school.name}`}
+              data-testid={`district-school-actions-${school.id}`}
+              items={[
+                {
+                  label: 'Edit',
+                  icon: <Pencil className="h-3.5 w-3.5" strokeWidth={1.8} />,
+                  onSelect: () => {
+                    setDeactivateError(null);
+                    setIsEditing(true);
+                  },
+                  'data-testid': `district-school-edit-${school.id}`,
+                },
+                {
+                  label: 'Deactivate',
+                  icon: <Ban className="h-3.5 w-3.5" strokeWidth={1.8} />,
+                  variant: 'danger',
+                  onSelect: () => {
+                    setDeactivateError(null);
+                    setIsConfirmingDeactivate(true);
+                  },
+                  'data-testid': `district-school-deactivate-${school.id}`,
+                },
+              ]}
+            />
           </div>
         )}
       </Card>
