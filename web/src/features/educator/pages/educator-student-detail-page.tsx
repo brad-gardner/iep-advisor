@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Modal } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageLayout } from "@/components/ui/page-layout";
 import { DetailLayout } from "@/components/ui/detail-layout";
 import { useToast } from "@/components/ui/toast";
@@ -34,7 +36,10 @@ export function EducatorStudentDetailPage() {
   const [links, setLinks] = useState<ChildLink[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [revokingId, setRevokingId] = useState<number | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<ChildLink | null>(null);
   const [revokeNote, setRevokeNote] = useState<string | null>(null);
+  const [isInviteParentOpen, setIsInviteParentOpen] = useState(false);
+  const [isInviteStudentOpen, setIsInviteStudentOpen] = useState(false);
   const { versions, isLoading: versionsLoading } =
     useStudentVersions(studentId);
   const { profile } = useEducatorProfile();
@@ -100,18 +105,12 @@ export function EducatorStudentDetailPage() {
     }
   };
 
-  const handleRevoke = async (link: ChildLink) => {
-    if (
-      !confirm(
-        "Revoke this parent link? This cannot be undone, and the parent keeps any data already shared.",
-      )
-    ) {
-      return;
-    }
-    setRevokingId(link.id);
+  const confirmRevoke = async () => {
+    if (!revokeTarget) return;
+    setRevokingId(revokeTarget.id);
     setRevokeNote(null);
     try {
-      const response = await revokeStudentLink(studentId, link.id);
+      const response = await revokeStudentLink(studentId, revokeTarget.id);
       if (response.success) {
         // Surface the forward-only note from the server (revoke is not retroactive).
         setRevokeNote(
@@ -119,6 +118,7 @@ export function EducatorStudentDetailPage() {
             "Link revoked. This does not remove access already granted.",
         );
         await reloadLinks();
+        setRevokeTarget(null);
       }
     } finally {
       setRevokingId(null);
@@ -181,15 +181,18 @@ export function EducatorStudentDetailPage() {
               />
             </section>
 
-            <InviteParentForm onInvite={handleInvite} />
-
-            <InviteStudentForm
-              onInvite={handleInviteStudent}
-              description={`Invite ${student.firstName} to activate their own account and take part in their IEP process.`}
-            />
-
             <section className="space-y-3">
-              <h2 className="font-serif text-lg">Parent links</h2>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-serif text-lg">Parent links</h2>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setIsInviteParentOpen(true)}
+                  data-testid="invite-parent-open"
+                >
+                  Invite parent
+                </Button>
+              </div>
               {revokeNote && (
                 <Notice variant="info" title="Link revoked">
                   {revokeNote}
@@ -198,7 +201,7 @@ export function EducatorStudentDetailPage() {
               <StudentLinksList
                 links={links}
                 revokingId={revokingId}
-                onRevoke={handleRevoke}
+                onRevoke={setRevokeTarget}
               />
             </section>
           </div>
@@ -241,8 +244,69 @@ export function EducatorStudentDetailPage() {
                 </Button>
               </Link>
             </Card>
+
+            <Card>
+              <h2 className="mb-2 font-serif text-base text-brand-slate-800">
+                Student account
+              </h2>
+              <p className="mb-3 text-sm text-brand-slate-600">
+                Invite {student.firstName} to take part in their IEP process.
+              </p>
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={() => setIsInviteStudentOpen(true)}
+                data-testid="invite-student-open"
+              >
+                Invite student
+              </Button>
+            </Card>
           </>
         }
+      />
+
+      <Modal
+        open={isInviteParentOpen}
+        onClose={() => setIsInviteParentOpen(false)}
+        title="Invite a parent"
+        data-testid="invite-parent-modal"
+      >
+        <InviteParentForm
+          embedded
+          onInvite={async (email) => {
+            const result = await handleInvite(email);
+            if (result.success) setIsInviteParentOpen(false);
+            return result;
+          }}
+        />
+      </Modal>
+
+      <Modal
+        open={isInviteStudentOpen}
+        onClose={() => setIsInviteStudentOpen(false)}
+        title="Invite student"
+        data-testid="invite-student-modal"
+      >
+        <InviteStudentForm
+          embedded
+          onInvite={async (email) => {
+            const result = await handleInviteStudent(email);
+            if (result.success) setIsInviteStudentOpen(false);
+            return result;
+          }}
+          description={`Invite ${student.firstName} to activate their own account and take part in their IEP process.`}
+        />
+      </Modal>
+
+      <ConfirmDialog
+        open={revokeTarget !== null}
+        title="Revoke parent link"
+        message="This cannot be undone. The parent keeps any data already shared with them."
+        confirmLabel="Revoke link"
+        loading={revokingId !== null}
+        onConfirm={confirmRevoke}
+        onCancel={() => setRevokeTarget(null)}
+        data-testid="student-link-revoke-dialog"
       />
     </PageLayout>
   );
