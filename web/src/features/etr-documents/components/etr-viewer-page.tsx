@@ -242,7 +242,9 @@ function OverviewTab({ etrId, etr, onUploaded }: OverviewTabProps) {
   };
 
   return (
-    <div className="space-y-4">
+    // Document viewer: cap at a comfortable reading width rather than filling
+    // the widened (max-w-7xl) app shell.
+    <div className="space-y-4 max-w-5xl">
       <Card data-testid="etr-overview-card">
         <h2 className="font-serif text-[22px] font-semibold mb-4 text-brand-slate-800">
           Overview

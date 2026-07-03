@@ -11,7 +11,6 @@ import { MfaSetupPage } from '@/features/auth/components/mfa-setup-page';
 import { ForgotPasswordPage } from '@/features/auth/components/forgot-password-page';
 import { ResetPasswordPage } from '@/features/auth/components/reset-password-page';
 import { ChildrenListPage } from '@/features/children/components/children-list-page';
-import { CreateChildPage } from '@/features/children/components/create-child-page';
 import { ChildDetailPage } from '@/features/children/components/child-detail-page';
 import { ChildOverviewTab } from '@/features/children/components/child-overview-tab';
 import { ChildIepsTab } from '@/features/children/components/child-ieps-tab';
@@ -179,16 +178,6 @@ export function AppRouter() {
           <ProtectedRoute>
             <MainLayout>
               <ChildrenListPage />
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/children/new"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <CreateChildPage />
             </MainLayout>
           </ProtectedRoute>
         }

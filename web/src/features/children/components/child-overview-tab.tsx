@@ -3,6 +3,7 @@ import { useOutletContext } from "react-router-dom";
 import { Share2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { ShareChildDialog } from "@/features/sharing/components/share-child-dialog";
 import { AccessList } from "@/features/sharing/components/access-list";
 import { SchoolIepsCard } from "@/features/iep-versions/components/school-ieps-card";
@@ -13,6 +14,7 @@ import type { ChildOutletContext } from "./child-detail-page";
 export function ChildOverviewTab() {
   const { child, childId } = useOutletContext<ChildOutletContext>();
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showInviteStudent, setShowInviteStudent] = useState(false);
   const [accessListKey, setAccessListKey] = useState(0);
   const isOwner = child.role === "owner";
 
@@ -21,7 +23,10 @@ export function ChildOverviewTab() {
       const response = await inviteStudentFromParent(childId, email);
       return { success: response.success, message: response.message };
     } catch {
-      return { success: false, message: "An error occurred sending the invitation" };
+      return {
+        success: false,
+        message: "An error occurred sending the invitation",
+      };
     }
   };
 
@@ -61,7 +66,7 @@ export function ChildOverviewTab() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-serif">Sharing & Access</h2>
             <Button
-              onClick={() => setShowShareDialog(!showShareDialog)}
+              onClick={() => setShowShareDialog(true)}
               data-testid="share-invite-button"
             >
               <Share2
@@ -77,32 +82,64 @@ export function ChildOverviewTab() {
             advocate, or attorney. They'll get their own login and can view or
             collaborate depending on the role you assign.
           </p>
-          {showShareDialog && (
-            <div className="mb-4">
-              <ShareChildDialog
-                childId={childId}
-                onInvited={() => {
-                  setAccessListKey((k) => k + 1);
-                  setShowShareDialog(false);
-                }}
-                onCancel={() => setShowShareDialog(false)}
-              />
-            </div>
-          )}
-          <AccessList
-            key={accessListKey}
-            childId={childId}
-            isOwner={isOwner}
-          />
+          <AccessList key={accessListKey} childId={childId} isOwner={isOwner} />
+
+          <Modal
+            open={showShareDialog}
+            onClose={() => setShowShareDialog(false)}
+            title={`Invite someone to ${child.firstName}'s profile`}
+            data-testid="share-child-modal"
+          >
+            <ShareChildDialog
+              childId={childId}
+              onInvited={() => {
+                setAccessListKey((k) => k + 1);
+                setShowShareDialog(false);
+              }}
+              onCancel={() => setShowShareDialog(false)}
+            />
+          </Modal>
         </Card>
       )}
 
       {isOwner && (
+        <Card>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="font-serif">Student account</h2>
+              <p className="mt-1 max-w-prose text-sm text-brand-slate-400">
+                Invite {child.firstName} to activate their own account and take
+                part in their IEP process.
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              className="shrink-0"
+              onClick={() => setShowInviteStudent(true)}
+              data-testid="invite-student-open"
+            >
+              Invite student
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      <Modal
+        open={showInviteStudent}
+        onClose={() => setShowInviteStudent(false)}
+        title="Invite student"
+        data-testid="invite-student-modal"
+      >
         <InviteStudentForm
-          onInvite={handleInviteStudent}
+          embedded
+          onInvite={async (email) => {
+            const result = await handleInviteStudent(email);
+            if (result.success) setShowInviteStudent(false);
+            return result;
+          }}
           description={`Invite ${child.firstName} to activate their own account and take part in their IEP process.`}
         />
-      )}
+      </Modal>
     </div>
   );
 }

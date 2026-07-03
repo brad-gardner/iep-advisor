@@ -63,6 +63,7 @@ export function ComparisonView({
   return (
     <PageLayout
       title="IEP Comparison"
+      className="max-w-5xl"
       breadcrumb={[
         { label: 'Back to child', to: `/children/${childId}` },
         { label: 'Comparison' },

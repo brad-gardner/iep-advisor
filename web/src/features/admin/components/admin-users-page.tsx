@@ -1,43 +1,43 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Users, Send } from 'lucide-react';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Notice } from '@/components/ui/notice';
-import { Spinner } from '@/components/ui/spinner';
-import { EmptyState } from '@/components/ui/empty-state';
-import { PageLayout } from '@/components/ui/page-layout';
-import { useToast } from '@/components/ui/toast';
-import { useUsers } from '../hooks/use-users';
-import { inviteBetaUser } from '../api/admin-api';
+import { useState } from "react";
+import { Search, Users, Send } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
+import { Notice } from "@/components/ui/notice";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageLayout } from "@/components/ui/page-layout";
+import { Table, type TableColumn } from "@/components/ui/table";
+import { useToast } from "@/components/ui/toast";
+import { useUsers } from "../hooks/use-users";
+import { inviteBetaUser } from "../api/admin-api";
+
+type AdminUser = ReturnType<typeof useUsers>["users"][number];
 
 export function AdminUsersPage() {
   const { users, isLoading, error, reload } = useUsers();
   const { show: showToast } = useToast();
-  const [search, setSearch] = useState('');
-  const [inviteEmail, setInviteEmail] = useState('');
+  const [search, setSearch] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
   const [showInvite, setShowInvite] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [isInviting, setIsInviting] = useState(false);
-  const navigate = useNavigate();
 
   const handleInvite = async () => {
     const trimmed = inviteEmail.trim();
-    if (!trimmed || !trimmed.includes('@')) {
-      setInviteError('Please enter a valid email address');
+    if (!trimmed || !trimmed.includes("@")) {
+      setInviteError("Please enter a valid email address");
       return;
     }
     setIsInviting(true);
     setInviteError(null);
     try {
       await inviteBetaUser(trimmed);
-      showToast({ message: `Invite sent to ${trimmed}`, variant: 'success' });
-      setInviteEmail('');
+      showToast({ message: `Invite sent to ${trimmed}`, variant: "success" });
+      setInviteEmail("");
       setShowInvite(false);
     } catch {
-      setInviteError('Failed to send invite');
+      setInviteError("Failed to send invite");
     } finally {
       setIsInviting(false);
     }
@@ -52,55 +52,69 @@ export function AdminUsersPage() {
     );
   });
 
+  const columns: TableColumn<AdminUser>[] = [
+    {
+      key: "name",
+      header: "Name",
+      cell: (u) => `${u.firstName} ${u.lastName}`.trim(),
+      sortValue: (u) => `${u.firstName} ${u.lastName}`.toLowerCase(),
+    },
+    {
+      key: "email",
+      header: "Email",
+      hideBelow: "md",
+      cell: (u) => u.email,
+      sortValue: (u) => u.email,
+    },
+    {
+      key: "role",
+      header: "Role",
+      cell: (u) => (
+        <Badge variant={u.role === "Admin" ? "success" : "neutral"}>
+          {u.role}
+        </Badge>
+      ),
+      sortValue: (u) => u.role,
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (u) => (
+        <Badge variant={u.isActive ? "success" : "error"}>
+          {u.isActive ? "Active" : "Inactive"}
+        </Badge>
+      ),
+      sortValue: (u) => (u.isActive ? 0 : 1),
+    },
+    {
+      key: "created",
+      header: "Joined",
+      align: "right",
+      hideBelow: "lg",
+      cell: (u) => new Date(u.createdAt).toLocaleDateString(),
+      sortValue: (u) => u.createdAt,
+    },
+  ];
+
   return (
     <PageLayout
       title="User Management"
+      subtitle={`${filtered.length} user${filtered.length !== 1 ? "s" : ""}`}
       actions={
-        <>
-          <span className="text-sm text-brand-slate-500">
-            {filtered.length} user{filtered.length !== 1 ? 's' : ''}
-          </span>
-          <Button
-            onClick={() => setShowInvite(!showInvite)}
-            data-testid="admin-invite-button"
-            aria-expanded={showInvite}
-            aria-controls="admin-invite-panel"
-          >
-            <Send size={14} strokeWidth={1.8} className="mr-1.5" aria-hidden="true" />
-            Invite Beta User
-          </Button>
-        </>
+        <Button
+          onClick={() => setShowInvite(true)}
+          data-testid="admin-invite-button"
+        >
+          <Send
+            size={14}
+            strokeWidth={1.8}
+            className="mr-1.5"
+            aria-hidden="true"
+          />
+          Invite Beta User
+        </Button>
       }
     >
-      {inviteError && <Notice variant="error" title={inviteError} />}
-
-      {showInvite && (
-        <Card id="admin-invite-panel">
-          <h3 className="font-serif text-brand-slate-800 mb-3">Invite Beta User</h3>
-          <p className="text-sm text-brand-slate-400 mb-3">
-            Enter their email. They'll receive a signup link with a beta code that auto-fills on the registration page.
-          </p>
-          <div className="flex gap-3">
-            <Input
-              placeholder="email@example.com"
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              className="flex-1"
-              data-testid="admin-invite-email"
-            />
-            <Button
-              onClick={handleInvite}
-              loading={isInviting}
-              disabled={!inviteEmail}
-              data-testid="admin-send-invite"
-            >
-              Send Invite
-            </Button>
-          </div>
-        </Card>
-      )}
-
       <div className="relative">
         <Search
           size={16}
@@ -118,73 +132,61 @@ export function AdminUsersPage() {
 
       {error && (
         <Notice variant="error" title={error}>
-          <Button variant="secondary" size="sm" onClick={reload} className="mt-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={reload}
+            className="mt-3"
+          >
             Retry
           </Button>
         </Notice>
       )}
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Spinner label="Loading users…" />
+      <Table
+        label="Users"
+        data-testid="admin-users-table"
+        columns={columns}
+        rows={filtered}
+        rowKey={(u) => u.id}
+        rowHref={(u) => `/admin/users/${u.id}`}
+        loading={isLoading}
+        defaultSort={{ key: "name", direction: "asc" }}
+        empty={<EmptyState icon={Users} title="No users found." />}
+      />
+
+      <Modal
+        open={showInvite}
+        onClose={() => setShowInvite(false)}
+        title="Invite Beta User"
+        data-testid="admin-invite-modal"
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-brand-slate-500">
+            Enter their email. They'll receive a signup link with a beta code
+            that auto-fills on the registration page.
+          </p>
+          {inviteError && <Notice variant="error" title={inviteError} />}
+          <Input
+            placeholder="email@example.com"
+            type="email"
+            label="Email"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            data-testid="admin-invite-email"
+          />
+          <div className="flex justify-end">
+            <Button
+              onClick={handleInvite}
+              loading={isInviting}
+              disabled={!inviteEmail}
+              data-testid="admin-send-invite"
+            >
+              Send Invite
+            </Button>
+          </div>
         </div>
-      ) : filtered.length === 0 ? (
-        <EmptyState icon={Users} title="No users found." />
-      ) : (
-        <div className="divide-y divide-brand-slate-100 overflow-hidden rounded-card border border-brand-slate-200 bg-white">
-          {filtered.map((u) => (
-            <UserRow
-              key={u.id}
-              user={u}
-              onClick={() => navigate(`/admin/users/${u.id}`)}
-            />
-          ))}
-        </div>
-      )}
+      </Modal>
     </PageLayout>
-  );
-}
-
-interface UserRowProps {
-  user: {
-    id: number;
-    firstName: string;
-    lastName: string;
-    email: string;
-    role: string;
-    isActive: boolean;
-    createdAt: string;
-  };
-  onClick: () => void;
-}
-
-function UserRow({ user, onClick }: UserRowProps) {
-  return (
-    <Button
-      variant="ghost"
-      onClick={onClick}
-      className="w-full rounded-card border border-brand-slate-200 bg-white px-6 py-4 hover:bg-brand-teal-50"
-    >
-      <span className="w-full flex items-center justify-between gap-4 text-left">
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium text-brand-slate-800 truncate">
-            {user.firstName} {user.lastName}
-          </span>
-          <span className="block text-xs text-brand-slate-500 truncate">{user.email}</span>
-        </span>
-
-        <span className="flex items-center gap-2 shrink-0">
-          <Badge variant={user.role === 'Admin' ? 'success' : 'neutral'}>
-            {user.role}
-          </Badge>
-          <Badge variant={user.isActive ? 'success' : 'error'}>
-            {user.isActive ? 'Active' : 'Inactive'}
-          </Badge>
-          <span className="text-xs text-brand-slate-400 hidden sm:inline">
-            {new Date(user.createdAt).toLocaleDateString()}
-          </span>
-        </span>
-      </span>
-    </Button>
   );
 }

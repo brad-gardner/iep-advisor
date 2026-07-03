@@ -81,9 +81,26 @@ export default {
           '0%': { opacity: '0', transform: 'translateY(0.5rem)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        // Overlay entrances. All gated behind `motion-safe:` at the call
+        // site so none play under `prefers-reduced-motion`.
+        'overlay-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        'modal-in': {
+          '0%': { opacity: '0', transform: 'translateY(0.5rem) scale(0.98)' },
+          '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        'drawer-in': {
+          '0%': { transform: 'translateX(100%)' },
+          '100%': { transform: 'translateX(0)' },
+        },
       },
       animation: {
         'toast-in': 'toast-in 150ms ease-out',
+        'overlay-in': 'overlay-in 150ms ease-out',
+        'modal-in': 'modal-in 160ms ease-out',
+        'drawer-in': 'drawer-in 200ms ease-out',
       },
     },
   },

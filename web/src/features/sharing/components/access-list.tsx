@@ -4,6 +4,7 @@ import type { ChildAccessEntry } from '@/types/api';
 import { getAccessList, revokeAccess } from '../api/sharing-api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/components/ui/toast';
 
@@ -15,6 +16,8 @@ interface AccessListProps {
 export function AccessList({ childId, isOwner }: AccessListProps) {
   const [entries, setEntries] = useState<ChildAccessEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [revokingId, setRevokingId] = useState<number | null>(null);
+  const [isRevoking, setIsRevoking] = useState(false);
   const { show } = useToast();
 
   const load = useCallback(async () => {
@@ -34,16 +37,20 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
     load();
   }, [load]);
 
-  const handleRevoke = async (accessId: number) => {
-    if (!confirm('Are you sure you want to revoke this access?')) return;
+  const confirmRevoke = async () => {
+    if (revokingId === null) return;
+    setIsRevoking(true);
     try {
-      const response = await revokeAccess(childId, accessId);
+      const response = await revokeAccess(childId, revokingId);
       if (response.success) {
-        load();
+        setRevokingId(null);
+        await load();
         show({ message: 'Access revoked', variant: 'success' });
       }
     } catch {
       // handled by interceptor
+    } finally {
+      setIsRevoking(false);
     }
   };
 
@@ -101,7 +108,8 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
                 <Button
                   variant="danger"
                   className="!px-2 !py-1"
-                  onClick={() => handleRevoke(entry.id)}
+                  onClick={() => setRevokingId(entry.id)}
+                  aria-label={`Revoke access for ${displayName}`}
                   data-testid="revoke-access"
                 >
                   <Trash2 className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
@@ -111,6 +119,17 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
           </div>
         );
       })}
+
+      <ConfirmDialog
+        open={revokingId !== null}
+        title="Revoke access"
+        message="They will immediately lose access to this child's profile. You can re-invite them later."
+        confirmLabel="Revoke access"
+        loading={isRevoking}
+        onConfirm={confirmRevoke}
+        onCancel={() => setRevokingId(null)}
+        data-testid="revoke-access-dialog"
+      />
     </div>
   );
 }

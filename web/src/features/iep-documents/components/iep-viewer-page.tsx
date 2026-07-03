@@ -206,7 +206,9 @@ export function IepViewerPage() {
       : `IEP #${document.id}`);
 
   return (
-    <div className="space-y-4">
+    // Document viewer: cap at a comfortable reading width rather than filling
+    // the widened (max-w-7xl) app shell.
+    <div className="space-y-4 max-w-5xl">
       <Link
         to={`/children/${document.childProfileId}`}
         className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"

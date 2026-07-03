@@ -8,7 +8,11 @@ export class ChildrenPage {
   }
 
   async gotoNew() {
-    await this.page.goto('/children/new');
+    // The standalone /children/new page was retired — the create form now
+    // lives in a Drawer opened from the children list.
+    await this.page.goto('/children');
+    await this.page.locator('[data-testid="add-child-button"]').click();
+    await this.page.locator('[data-testid="child-first-name"]').waitFor({ state: 'visible' });
   }
 
   async gotoChild(childId: number) {
@@ -67,8 +71,9 @@ export class ChildrenPage {
   }
 
   async clickRemove() {
-    this.page.on('dialog', (dialog) => dialog.accept());
+    // The native confirm() was replaced by a ConfirmDialog overlay.
     await this.page.locator('[data-testid="child-remove-button"]').click();
+    await this.page.locator('[data-testid="child-remove-dialog-confirm"]').click();
   }
 
   async expectChildVisible(name: string) {

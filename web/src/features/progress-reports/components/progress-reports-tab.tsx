@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { useProgressReports } from "../hooks/use-progress-reports";
 import { CreateProgressReportForm } from "./create-progress-report-form";
 import { ProgressReportList } from "./progress-report-list";
@@ -30,7 +31,7 @@ export function ProgressReportsTab({
             School-issued reports tracking progress against this IEP's goals.
           </p>
         </div>
-        {canEdit && !showCreate && (
+        {canEdit && (
           <Button
             variant="secondary"
             onClick={() => setShowCreate(true)}
@@ -41,19 +42,6 @@ export function ProgressReportsTab({
         )}
       </div>
 
-      {canEdit && showCreate && (
-        <div className="mb-4">
-          <CreateProgressReportForm
-            iepId={iepId}
-            onCreated={() => {
-              setShowCreate(false);
-              reload();
-            }}
-            onCancel={() => setShowCreate(false)}
-          />
-        </div>
-      )}
-
       <ProgressReportList
         reports={reports}
         isLoading={isLoading}
@@ -62,6 +50,22 @@ export function ProgressReportsTab({
         canEdit={canEdit}
         onChanged={reload}
       />
+
+      <Modal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        title="New progress report"
+        data-testid="new-progress-report-modal"
+      >
+        <CreateProgressReportForm
+          iepId={iepId}
+          onCreated={() => {
+            setShowCreate(false);
+            reload();
+          }}
+          onCancel={() => setShowCreate(false)}
+        />
+      </Modal>
     </Card>
   );
 }
