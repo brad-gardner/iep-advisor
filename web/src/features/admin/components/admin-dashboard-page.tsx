@@ -7,11 +7,14 @@ import {
   ClipboardCheck,
   Shield,
   TrendingUp,
-  LayoutDashboard,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageLayout } from '@/components/ui/page-layout';
 import { getDashboardStats, getRecentUsers } from '../api/admin-api';
 import type { AdminDashboardStats, AdminUser } from '@/types/api';
 import type { LucideIcon } from 'lucide-react';
@@ -21,45 +24,56 @@ export function AdminDashboardPage() {
   const [recentUsers, setRecentUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by the retry button to re-run the fetch effect. The effect body is an
+  // inline async IIFE that only setStates after an await, keeping it effect-safe.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    async function load() {
+    let active = true;
+    (async () => {
       try {
         const [s, u] = await Promise.all([getDashboardStats(), getRecentUsers(10)]);
+        if (!active) return;
         setStats(s);
         setRecentUsers(u);
+        setError(null);
       } catch {
-        setError('Failed to load dashboard stats.');
+        if (active) setError('Failed to load dashboard stats.');
       } finally {
-        setIsLoading(false);
+        if (active) setIsLoading(false);
       }
-    }
-    load();
-  }, []);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [reloadKey]);
+
+  const retry = () => {
+    setIsLoading(true);
+    setError(null);
+    setReloadKey((k) => k + 1);
+  };
 
   if (isLoading) {
     return (
       <div className="flex justify-center py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading dashboard…" />
       </div>
     );
   }
 
   if (error || !stats) {
     return (
-      <div className="max-w-5xl mx-auto">
-        <Notice variant="error" title={error ?? 'Unknown error'} />
-      </div>
+      <Notice variant="error" title={error ?? 'Unknown error'}>
+        <Button variant="secondary" size="sm" onClick={retry} className="mt-3">
+          Retry
+        </Button>
+      </Notice>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6" data-testid="admin-dashboard">
-      <div className="flex items-center gap-3 mb-2">
-        <LayoutDashboard size={22} strokeWidth={1.8} className="text-brand-teal-500" />
-        <h1 className="text-2xl font-serif text-brand-slate-800">Admin Dashboard</h1>
-      </div>
-
+    <PageLayout title="Admin Dashboard" data-testid="admin-dashboard">
       {/* Top row - Key metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -99,7 +113,7 @@ export function AdminDashboardPage() {
           items={[
             { label: 'Created', value: stats.documentsCreated, color: 'bg-brand-slate-300' },
             { label: 'Parsed', value: stats.documentsParsed, color: 'bg-brand-teal-500' },
-            { label: 'Error', value: stats.documentsError, color: 'bg-red-400' },
+            { label: 'Error', value: stats.documentsError, color: 'bg-brand-danger-500' },
           ]}
           total={stats.totalDocuments}
         />
@@ -109,7 +123,7 @@ export function AdminDashboardPage() {
           items={[
             { label: 'Completed', value: stats.analysesCompleted, color: 'bg-brand-teal-500' },
             { label: 'Pending', value: stats.totalAnalyses - stats.analysesCompleted - stats.analysesError, color: 'bg-brand-amber-400' },
-            { label: 'Error', value: stats.analysesError, color: 'bg-red-400' },
+            { label: 'Error', value: stats.analysesError, color: 'bg-brand-danger-500' },
           ]}
           total={stats.totalAnalyses}
         />
@@ -153,7 +167,7 @@ export function AdminDashboardPage() {
           />
         </div>
       </div>
-    </div>
+    </PageLayout>
   );
 }
 
@@ -294,6 +308,9 @@ function RecentUsersTable({ users }: RecentUsersTableProps) {
   return (
     <Card data-testid="admin-recent-users">
       <h3 className="text-sm font-medium text-brand-slate-700 mb-4">Recent Users</h3>
+      {users.length === 0 ? (
+        <EmptyState icon={Users} title="No users yet" />
+      ) : (
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -321,10 +338,8 @@ function RecentUsersTable({ users }: RecentUsersTableProps) {
             ))}
           </tbody>
         </table>
-        {users.length === 0 && (
-          <p className="text-xs text-brand-slate-400 text-center py-6">No users yet.</p>
-        )}
       </div>
+      )}
     </Card>
   );
 }
