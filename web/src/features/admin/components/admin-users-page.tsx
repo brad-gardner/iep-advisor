@@ -6,33 +6,38 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageLayout } from '@/components/ui/page-layout';
+import { useToast } from '@/components/ui/toast';
 import { useUsers } from '../hooks/use-users';
 import { inviteBetaUser } from '../api/admin-api';
 
 export function AdminUsersPage() {
-  const { users, isLoading, error } = useUsers();
+  const { users, isLoading, error, reload } = useUsers();
+  const { show: showToast } = useToast();
   const [search, setSearch] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [showInvite, setShowInvite] = useState(false);
-  const [inviteResult, setInviteResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [isInviting, setIsInviting] = useState(false);
   const navigate = useNavigate();
 
   const handleInvite = async () => {
     const trimmed = inviteEmail.trim();
     if (!trimmed || !trimmed.includes('@')) {
-      setInviteResult({ success: false, message: 'Please enter a valid email address' });
+      setInviteError('Please enter a valid email address');
       return;
     }
     setIsInviting(true);
-    setInviteResult(null);
+    setInviteError(null);
     try {
       await inviteBetaUser(trimmed);
-      setInviteResult({ success: true, message: `Invite sent to ${inviteEmail}` });
+      showToast({ message: `Invite sent to ${trimmed}`, variant: 'success' });
       setInviteEmail('');
       setShowInvite(false);
     } catch {
-      setInviteResult({ success: false, message: 'Failed to send invite' });
+      setInviteError('Failed to send invite');
     } finally {
       setIsInviting(false);
     }
@@ -48,28 +53,29 @@ export function AdminUsersPage() {
   });
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-serif text-brand-slate-800">User Management</h1>
-        <div className="flex items-center gap-3">
+    <PageLayout
+      title="User Management"
+      actions={
+        <>
           <span className="text-sm text-brand-slate-500">
             {filtered.length} user{filtered.length !== 1 ? 's' : ''}
           </span>
-          <Button onClick={() => setShowInvite(!showInvite)} data-testid="admin-invite-button">
+          <Button
+            onClick={() => setShowInvite(!showInvite)}
+            data-testid="admin-invite-button"
+            aria-expanded={showInvite}
+            aria-controls="admin-invite-panel"
+          >
             <Send size={14} strokeWidth={1.8} className="mr-1.5" aria-hidden="true" />
             Invite Beta User
           </Button>
-        </div>
-      </div>
-
-      {inviteResult && (
-        <div className="mb-4">
-          <Notice variant={inviteResult.success ? 'success' : 'error'} title={inviteResult.message} />
-        </div>
-      )}
+        </>
+      }
+    >
+      {inviteError && <Notice variant="error" title={inviteError} />}
 
       {showInvite && (
-        <Card className="mb-6">
+        <Card id="admin-invite-panel">
           <h3 className="font-serif text-brand-slate-800 mb-3">Invite Beta User</h3>
           <p className="text-sm text-brand-slate-400 mb-3">
             Enter their email. They'll receive a signup link with a beta code that auto-fills on the registration page.
@@ -83,14 +89,19 @@ export function AdminUsersPage() {
               className="flex-1"
               data-testid="admin-invite-email"
             />
-            <Button onClick={handleInvite} disabled={!inviteEmail || isInviting} data-testid="admin-send-invite">
-              {isInviting ? 'Sending...' : 'Send Invite'}
+            <Button
+              onClick={handleInvite}
+              loading={isInviting}
+              disabled={!inviteEmail}
+              data-testid="admin-send-invite"
+            >
+              Send Invite
             </Button>
           </div>
         </Card>
       )}
 
-      <div className="relative mb-6">
+      <div className="relative">
         <Search
           size={16}
           strokeWidth={1.8}
@@ -105,19 +116,22 @@ export function AdminUsersPage() {
         />
       </div>
 
-      {error && <Notice variant="error" title={error} />}
+      {error && (
+        <Notice variant="error" title={error}>
+          <Button variant="secondary" size="sm" onClick={reload} className="mt-3">
+            Retry
+          </Button>
+        </Notice>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+          <Spinner label="Loading users…" />
         </div>
       ) : filtered.length === 0 ? (
-        <Card className="text-center py-12">
-          <Users size={32} strokeWidth={1.8} className="mx-auto text-brand-slate-300 mb-3" />
-          <p className="text-sm text-brand-slate-500">No users found.</p>
-        </Card>
+        <EmptyState icon={Users} title="No users found." />
       ) : (
-        <div className="space-y-2">
+        <div className="divide-y divide-brand-slate-100 overflow-hidden rounded-card border border-brand-slate-200 bg-white">
           {filtered.map((u) => (
             <UserRow
               key={u.id}
@@ -127,7 +141,7 @@ export function AdminUsersPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageLayout>
   );
 }
 
@@ -146,22 +160,20 @@ interface UserRowProps {
 
 function UserRow({ user, onClick }: UserRowProps) {
   return (
-    <Card
-      className="cursor-pointer hover:border-brand-teal-200 transition-colors"
+    <Button
+      variant="ghost"
+      onClick={onClick}
+      className="w-full rounded-card border border-brand-slate-200 bg-white px-6 py-4 hover:bg-brand-teal-50"
     >
-      <button
-        type="button"
-        onClick={onClick}
-        className="w-full flex items-center justify-between gap-4 text-left"
-      >
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-brand-slate-800 truncate">
+      <span className="w-full flex items-center justify-between gap-4 text-left">
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium text-brand-slate-800 truncate">
             {user.firstName} {user.lastName}
-          </p>
-          <p className="text-xs text-brand-slate-500 truncate">{user.email}</p>
-        </div>
+          </span>
+          <span className="block text-xs text-brand-slate-500 truncate">{user.email}</span>
+        </span>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <span className="flex items-center gap-2 shrink-0">
           <Badge variant={user.role === 'Admin' ? 'success' : 'neutral'}>
             {user.role}
           </Badge>
@@ -171,8 +183,8 @@ function UserRow({ user, onClick }: UserRowProps) {
           <span className="text-xs text-brand-slate-400 hidden sm:inline">
             {new Date(user.createdAt).toLocaleDateString()}
           </span>
-        </div>
-      </button>
-    </Card>
+        </span>
+      </span>
+    </Button>
   );
 }

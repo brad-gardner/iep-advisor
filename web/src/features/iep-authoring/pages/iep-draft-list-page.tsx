@@ -1,40 +1,45 @@
-import { Plus } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { FileText, Plus } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Notice } from '@/components/ui/notice';
+import { PageLayout } from '@/components/ui/page-layout';
+import { Spinner } from '@/components/ui/spinner';
+import { useToast } from '@/components/ui/toast';
 import { DraftListItem } from '../components/draft-list-item';
-import { EmptyHint } from '../components/empty-hint';
 import { useIepDraftList } from '../hooks/use-iep-draft-list';
 
 export function IepDraftListPage() {
   const { studentId: studentIdParam } = useParams<{ studentId: string }>();
   const studentId = Number(studentIdParam);
   const navigate = useNavigate();
+  const { show } = useToast();
   const { drafts, isLoading, error, creating, create } = useIepDraftList(studentId);
 
   const handleCreate = async () => {
     const id = await create();
-    if (id) navigate(`/educator/students/${studentId}/iep-drafts/${id}`);
+    if (id) {
+      show({ message: 'IEP draft created', variant: 'success' });
+      navigate(`/educator/students/${studentId}/iep-drafts/${id}`);
+    }
   };
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          to={`/educator/students/${studentId}`}
-          className="text-sm text-brand-teal-500 hover:underline"
-        >
-          ← Back to student
-        </Link>
-        <div className="flex items-center justify-between gap-4 mt-2">
-          <h1 className="font-serif">IEP drafts</h1>
-          <Button onClick={handleCreate} disabled={creating} data-testid="new-draft">
-            <Plus className="w-4 h-4 mr-1" aria-hidden="true" />
-            {creating ? 'Creating…' : 'New IEP draft'}
-          </Button>
-        </div>
-      </div>
+  const newDraftButton = (testId: string) => (
+    <Button onClick={handleCreate} loading={creating} data-testid={testId}>
+      <Plus className="w-4 h-4 mr-1" aria-hidden="true" />
+      New IEP draft
+    </Button>
+  );
 
+  return (
+    <PageLayout
+      title="IEP drafts"
+      breadcrumb={[
+        { label: 'Student', to: `/educator/students/${studentId}` },
+        { label: 'IEP drafts' },
+      ]}
+      actions={newDraftButton('new-draft')}
+    >
       {error && (
         <Notice variant="error" title="Could not load IEP drafts">
           {error}
@@ -43,12 +48,18 @@ export function IepDraftListPage() {
 
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+          <Spinner label="Loading IEP drafts…" />
         </div>
       ) : (
         <div className="space-y-3">
           {drafts.length === 0 && !error && (
-            <EmptyHint>No IEP drafts yet. Create one to start building.</EmptyHint>
+            <EmptyState
+              icon={FileText}
+              title="No IEP drafts yet"
+              description="Create one to start building this student's IEP."
+              action={newDraftButton('new-draft-empty')}
+              data-testid="empty-hint"
+            />
           )}
           {drafts.map((draft) => (
             <DraftListItem
@@ -59,6 +70,6 @@ export function IepDraftListPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageLayout>
   );
 }

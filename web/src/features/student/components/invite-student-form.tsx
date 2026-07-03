@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
+import { useToast } from '@/components/ui/toast';
 
 interface InviteStudentFormProps {
   // Parameterized so the same form serves both the parent and educator flows.
@@ -11,21 +12,24 @@ interface InviteStudentFormProps {
 }
 
 export function InviteStudentForm({ onInvite, description }: InviteStudentFormProps) {
+  const { show } = useToast();
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
-    setSuccessMessage(null);
 
     const result = await onInvite(email.trim());
 
     if (result.success) {
-      setSuccessMessage(result.message || 'Invitation sent. The student has a pending invite.');
+      // Transient success → toast; the form resets for the next invite.
+      show({
+        message: result.message || 'Invitation sent. The student has a pending invite.',
+        variant: 'success',
+      });
       setEmail('');
     } else {
       setError(result.message ?? 'Failed to send invitation');
@@ -43,13 +47,9 @@ export function InviteStudentForm({ onInvite, description }: InviteStudentFormPr
       </p>
       <form onSubmit={handleSubmit} className="space-y-4" data-testid="invite-student-form">
         {error && <Notice variant="error" title={error} />}
-        {successMessage && (
-          <Notice variant="success" title="Invitation sent">
-            {successMessage}
-          </Notice>
-        )}
 
         <Input
+          id="invite-student-email"
           label="Student Email *"
           type="email"
           required
@@ -61,11 +61,11 @@ export function InviteStudentForm({ onInvite, description }: InviteStudentFormPr
 
         <Button
           type="submit"
-          disabled={isSubmitting}
+          loading={isSubmitting}
           className="w-full"
           data-testid="invite-student-submit"
         >
-          {isSubmitting ? 'Sending...' : 'Send Invite'}
+          Send Invite
         </Button>
       </form>
     </Card>

@@ -1,100 +1,122 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
 import { Select } from '@/components/ui/input';
+import { PageLayout } from '@/components/ui/page-layout';
+import { useToast } from '@/components/ui/toast';
 import type { AdminUser } from '@/types/api';
 import { getUser, updateUser } from '../api/admin-api';
 
 export function AdminUserDetail() {
   const { id } = useParams<{ id: string }>();
+  const { show: showToast } = useToast();
   const [user, setUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  // Which mutation is in flight, so only the pressed button shows its spinner
+  // while both stay disabled to prevent concurrent edits.
+  const [savingAction, setSavingAction] = useState<null | 'save' | 'toggle'>(null);
+  const saving = savingAction !== null;
 
   // Editable fields
   const [role, setRole] = useState('');
   const [isActive, setIsActive] = useState(true);
-
-  const load = useCallback(async () => {
-    if (!id) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await getUser(Number(id));
-      setUser(data);
-      setRole(data.role);
-      setIsActive(data.isActive);
-    } catch {
-      setError('Failed to load user.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [id]);
+  // Bumped by the retry button to re-run the fetch effect. The effect body is an
+  // inline async IIFE that only setStates after an await, keeping it effect-safe.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (!id) return;
+    let active = true;
+    (async () => {
+      try {
+        const data = await getUser(Number(id));
+        if (!active) return;
+        setUser(data);
+        setRole(data.role);
+        setIsActive(data.isActive);
+        setError(null);
+      } catch {
+        if (active) setError('Failed to load user.');
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [id, reloadKey]);
+
+  const retry = () => {
+    setIsLoading(true);
+    setError(null);
+    setReloadKey((k) => k + 1);
+  };
 
   const handleSave = async () => {
     if (!user) return;
-    setSaving(true);
+    setSavingAction('save');
     setError(null);
-    setSuccess(null);
     try {
       const updated = await updateUser(user.id, { role, isActive });
       setUser(updated);
       setRole(updated.role);
       setIsActive(updated.isActive);
-      setSuccess('User updated successfully.');
+      showToast({ message: 'User updated successfully.', variant: 'success' });
     } catch {
       setError('Failed to update user.');
     } finally {
-      setSaving(false);
+      setSavingAction(null);
     }
   };
 
   const handleToggleActive = async () => {
     if (!user) return;
-    setSaving(true);
+    setSavingAction('toggle');
     setError(null);
-    setSuccess(null);
     try {
       const newActive = !user.isActive;
       const updated = await updateUser(user.id, { isActive: newActive });
       setUser(updated);
       setRole(updated.role);
       setIsActive(updated.isActive);
-      setSuccess(newActive ? 'User reactivated.' : 'User deactivated.');
+      showToast({
+        message: newActive ? 'User reactivated.' : 'User deactivated.',
+        variant: 'success',
+      });
     } catch {
       setError('Failed to update user status.');
     } finally {
-      setSaving(false);
+      setSavingAction(null);
     }
   };
 
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading user…" />
       </div>
     );
   }
 
   if (error && !user) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <Notice variant="error" title={error} />
+      <div>
+        <Notice variant="error" title={error}>
+          <Button variant="secondary" size="sm" onClick={retry} className="mt-3">
+            Retry
+          </Button>
+        </Notice>
         <Link
           to="/admin/users"
           className="inline-flex items-center gap-1.5 text-sm text-brand-teal-500 hover:text-brand-teal-600 mt-4"
         >
-          <ArrowLeft size={14} strokeWidth={1.8} />
+          <ArrowLeft size={14} strokeWidth={1.8} aria-hidden="true" />
           Back to users
         </Link>
       </div>
@@ -104,23 +126,16 @@ export function AdminUserDetail() {
   if (!user) return null;
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <Link
-        to="/admin/users"
-        className="inline-flex items-center gap-1.5 text-sm text-brand-teal-500 hover:text-brand-teal-600 mb-6"
-      >
-        <ArrowLeft size={14} strokeWidth={1.8} />
-        Back to users
-      </Link>
+    <PageLayout
+      title={`${user.firstName} ${user.lastName}`}
+      breadcrumb={[
+        { label: 'Users', to: '/admin/users' },
+        { label: `${user.firstName} ${user.lastName}` },
+      ]}
+    >
+      {error && <Notice variant="error" title={error} />}
 
-      <h1 className="text-2xl font-serif text-brand-slate-800 mb-6">
-        {user.firstName} {user.lastName}
-      </h1>
-
-      {success && <div className="mb-4"><Notice variant="success" title={success} /></div>}
-      {error && <div className="mb-4"><Notice variant="error" title={error} /></div>}
-
-      <Card className="mb-6">
+      <Card>
         <div className="space-y-4">
           <InfoRow label="Email" value={user.email} />
           <InfoRow label="State" value={user.state ?? 'Not set'} />
@@ -139,7 +154,7 @@ export function AdminUserDetail() {
         </div>
       </Card>
 
-      <Card className="mb-6">
+      <Card>
         <h2 className="text-sm font-medium text-brand-slate-800 mb-4">Edit User</h2>
         <div className="space-y-4">
           <Select
@@ -153,11 +168,12 @@ export function AdminUserDetail() {
           </Select>
 
           <div className="flex items-center gap-3">
-            <label className="text-[13px] font-medium text-brand-slate-600">Active</label>
+            <span className="text-[13px] font-medium text-brand-slate-600">Active</span>
             <button
               type="button"
               role="switch"
               aria-checked={isActive}
+              aria-label="Active"
               onClick={() => setIsActive(!isActive)}
               data-testid="admin-user-active"
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
@@ -173,8 +189,13 @@ export function AdminUserDetail() {
           </div>
 
           <div className="pt-2">
-            <Button onClick={handleSave} disabled={saving} data-testid="admin-user-save">
-              {saving ? 'Saving...' : 'Save Changes'}
+            <Button
+              onClick={handleSave}
+              loading={savingAction === 'save'}
+              disabled={saving}
+              data-testid="admin-user-save"
+            >
+              Save Changes
             </Button>
           </div>
         </div>
@@ -183,16 +204,26 @@ export function AdminUserDetail() {
       <Card>
         <h2 className="text-sm font-medium text-brand-slate-800 mb-3">Actions</h2>
         {user.isActive ? (
-          <Button variant="danger" onClick={handleToggleActive} disabled={saving}>
+          <Button
+            variant="danger"
+            onClick={handleToggleActive}
+            loading={savingAction === 'toggle'}
+            disabled={saving}
+          >
             Deactivate User
           </Button>
         ) : (
-          <Button variant="secondary" onClick={handleToggleActive} disabled={saving}>
+          <Button
+            variant="secondary"
+            onClick={handleToggleActive}
+            loading={savingAction === 'toggle'}
+            disabled={saving}
+          >
             Reactivate User
           </Button>
         )}
       </Card>
-    </div>
+    </PageLayout>
   );
 }
 

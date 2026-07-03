@@ -2,6 +2,8 @@ import { useCallback, useState } from 'react';
 import { Upload } from 'lucide-react';
 import { uploadFile } from '../api/etr-documents-api';
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
+import { useToast } from '@/components/ui/toast';
 
 interface EtrUploadProps {
   etrId: number;
@@ -9,6 +11,7 @@ interface EtrUploadProps {
 }
 
 export function EtrUpload({ etrId, onUploaded }: EtrUploadProps) {
+  const { show: showToast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -33,6 +36,7 @@ export function EtrUpload({ etrId, onUploaded }: EtrUploadProps) {
       try {
         const response = await uploadFile(etrId, file, setProgress);
         if (response.success) {
+          showToast({ message: 'ETR uploaded', variant: 'success' });
           onUploaded();
         } else {
           setError(response.message || 'Upload failed');
@@ -43,7 +47,7 @@ export function EtrUpload({ etrId, onUploaded }: EtrUploadProps) {
         setIsUploading(false);
       }
     },
-    [etrId, onUploaded]
+    [etrId, onUploaded, showToast]
   );
 
   const handleDrop = useCallback(
@@ -97,7 +101,7 @@ export function EtrUpload({ etrId, onUploaded }: EtrUploadProps) {
         />
         {isUploading ? (
           <div className="flex flex-col items-center gap-2">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-teal-500" />
+            <Spinner size="sm" label="Uploading…" />
             <p className="text-brand-slate-500 text-sm">Uploading... {progress}%</p>
             <div className="w-full max-w-xs bg-brand-slate-100 rounded-full h-1.5 overflow-hidden">
               <div

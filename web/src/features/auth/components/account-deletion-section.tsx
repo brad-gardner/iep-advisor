@@ -58,8 +58,8 @@ export function AccountDeletionSection() {
   return (
     <div className="space-y-4">
       <div>
-        <Button variant="secondary" onClick={handleExport} disabled={isExporting} data-testid="export-data">
-          {isExporting ? 'Exporting...' : 'Export My Data'}
+        <Button variant="secondary" onClick={handleExport} loading={isExporting} data-testid="export-data">
+          Export My Data
         </Button>
         <p className="text-xs text-brand-slate-300 mt-1">
           Download all your data as a JSON file
@@ -73,7 +73,7 @@ export function AccountDeletionSection() {
           </Button>
         </div>
       ) : (
-        <div className="border border-red-200 rounded-card p-4 bg-red-50">
+        <div className="border border-brand-danger-200 rounded-card p-4 bg-brand-danger-50">
           <Notice variant="warning" title="This action has a 30-day grace period">
             <p className="mt-1">
               Your account will be scheduled for deletion. You can cancel within 30 days by logging back in.
@@ -111,8 +111,8 @@ export function AccountDeletionSection() {
             )}
 
             <div className="flex gap-3">
-              <Button variant="danger" type="submit" disabled={isDeleting} data-testid="confirm-delete-account">
-                {isDeleting ? 'Deleting...' : 'Confirm Deletion'}
+              <Button variant="danger" type="submit" loading={isDeleting} data-testid="confirm-delete-account">
+                Confirm Deletion
               </Button>
               <Button
                 variant="ghost"

@@ -56,8 +56,8 @@ export function StateStep({ onNext, onSkip }: StateStepProps) {
         <Button variant="ghost" onClick={onSkip} data-testid="onboarding-skip-state">
           Skip for now
         </Button>
-        <Button onClick={handleContinue} disabled={!state || isSaving} data-testid="onboarding-continue-state">
-          {isSaving ? 'Saving...' : 'Continue'}
+        <Button onClick={handleContinue} loading={isSaving} disabled={!state} data-testid="onboarding-continue-state">
+          Continue
         </Button>
       </div>
     </div>

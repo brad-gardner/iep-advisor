@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Trash2, Eye } from 'lucide-react';
+import { Trash2, Eye, FileSearch } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { EmptyState } from '@/components/ui/empty-state';
+import { useToast } from '@/components/ui/toast';
 import { remove as removeEtr } from '../api/etr-documents-api';
 import {
   DOCUMENT_STATE_LABELS,
@@ -30,18 +34,19 @@ function formatDate(value: string | null): string {
 }
 
 export function EtrDocumentList({ etrs, isLoading, onDeleted }: EtrDocumentListProps) {
+  const { show: showToast } = useToast();
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   if (isLoading) {
     return (
       <div className="flex justify-center py-4">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-teal-500" />
+        <Spinner size="sm" label="Loading ETR documents…" />
       </div>
     );
   }
 
   if (etrs.length === 0) {
-    return <p className="text-brand-slate-400 text-sm">No ETR documents yet.</p>;
+    return <EmptyState icon={FileSearch} title="No ETR documents yet." />;
   }
 
   const handleDelete = async (id: number) => {
@@ -49,7 +54,10 @@ export function EtrDocumentList({ etrs, isLoading, onDeleted }: EtrDocumentListP
     setDeletingId(id);
     try {
       const response = await removeEtr(id);
-      if (response.success) onDeleted();
+      if (response.success) {
+        showToast({ message: 'ETR deleted', variant: 'success' });
+        onDeleted();
+      }
     } catch {
       // handled by interceptor
     } finally {
@@ -106,15 +114,16 @@ export function EtrDocumentList({ etrs, isLoading, onDeleted }: EtrDocumentListP
                   <Eye className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
                   View
                 </Link>
-                <button
+                <Button
+                  variant="danger"
+                  size="sm"
                   onClick={() => handleDelete(etr.id)}
-                  disabled={deletingId === etr.id}
+                  loading={deletingId === etr.id}
                   data-testid="etr-delete-button"
-                  className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-red hover:text-red-800 disabled:opacity-50 transition-colors"
                 >
-                  <Trash2 className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
-                  {deletingId === etr.id ? '...' : 'Delete'}
-                </button>
+                  <Trash2 className="w-3.5 h-3.5 mr-1" strokeWidth={1.8} aria-hidden="true" />
+                  Delete
+                </Button>
               </div>
             </div>
           </Card>

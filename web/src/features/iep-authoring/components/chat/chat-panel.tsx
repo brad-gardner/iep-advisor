@@ -56,7 +56,7 @@ export function ChatPanel({ draftId, onClose }: ChatPanelProps) {
           </p>
         )}
         {error && (
-          <p className="text-[13px] text-brand-red" data-testid="chat-error">
+          <p className="text-[13px] text-brand-danger-700" data-testid="chat-error">
             {error}
           </p>
         )}

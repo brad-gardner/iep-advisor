@@ -76,8 +76,8 @@ export function RedFlagResolution({ resolution }: { resolution: RedFlagResolutio
           description="New concerns found"
           icon={XCircle}
           items={resolution.newFlags}
-          colorClass="text-brand-red"
-          borderClass="border-red-200 bg-red-50/50"
+          colorClass="text-brand-danger-700"
+          borderClass="border-brand-danger-200 bg-brand-danger-50/50"
         />
       </div>
     </Card>

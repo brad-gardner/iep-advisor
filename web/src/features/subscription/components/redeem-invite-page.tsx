@@ -4,39 +4,44 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
+import { PageLayout } from '@/components/ui/page-layout';
+import { useToast } from '@/components/ui/toast';
 import { redeemInvite } from '../api/subscription-api';
 
 export function RedeemInvitePage() {
+  const { show } = useToast();
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [result, setResult] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim()) return;
 
     setIsSubmitting(true);
-    setResult(null);
+    setError(null);
 
     try {
       const response = await redeemInvite(code.trim());
       if (response.success) {
-        setResult({ type: 'success', text: 'Invite code redeemed! Your subscription is now active.' });
+        // Transient success → toast; inline space stays for decisions/errors.
+        show({
+          message: 'Invite code redeemed! Your subscription is now active.',
+          variant: 'success',
+        });
         setCode('');
       } else {
-        setResult({ type: 'error', text: response.message || 'Invalid or expired invite code.' });
+        setError(response.message || 'Invalid or expired invite code.');
       }
     } catch {
-      setResult({ type: 'error', text: 'Invalid or expired invite code.' });
+      setError('Invalid or expired invite code.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-serif">Redeem Invite Code</h1>
-
+    <PageLayout title="Redeem Invite Code">
       <Card className="max-w-md">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-brand-teal-50 flex items-center justify-center">
@@ -47,12 +52,9 @@ export function RedeemInvitePage() {
           </p>
         </div>
 
-        {result && (
+        {error && (
           <div className="mb-4">
-            <Notice
-              variant={result.type === 'success' ? 'success' : 'error'}
-              title={result.text}
-            />
+            <Notice variant="error" title={error} />
           </div>
         )}
 
@@ -66,11 +68,17 @@ export function RedeemInvitePage() {
             required
             data-testid="redeem-code"
           />
-          <Button type="submit" disabled={isSubmitting || code.length < 8} className="w-full" data-testid="redeem-submit">
-            {isSubmitting ? 'Redeeming...' : 'Redeem'}
+          <Button
+            type="submit"
+            disabled={code.length < 8}
+            loading={isSubmitting}
+            className="w-full"
+            data-testid="redeem-submit"
+          >
+            Redeem
           </Button>
         </form>
       </Card>
-    </div>
+    </PageLayout>
   );
 }

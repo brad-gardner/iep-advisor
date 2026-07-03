@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, Trash2, Eye } from 'lucide-react';
+import { Download, Trash2, Eye, FileText } from 'lucide-react';
 import type { IepDocument } from '@/types/api';
 import { deleteIepDocument, getDownloadUrl } from '../api/iep-documents-api';
 import { setCurrentIep } from '@/features/children/api/children-api';
 import { IepUpload } from './iep-upload';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { EmptyState } from '@/components/ui/empty-state';
+import { useToast } from '@/components/ui/toast';
 
 interface IepDocumentListProps {
   documents: IepDocument[];
@@ -52,6 +56,7 @@ export function IepDocumentList({
   canSetCurrent,
   onCurrentChanged,
 }: IepDocumentListProps) {
+  const { show: showToast } = useToast();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [settingCurrentId, setSettingCurrentId] = useState<number | null>(null);
 
@@ -70,13 +75,13 @@ export function IepDocumentList({
   if (isLoading) {
     return (
       <div className="flex justify-center py-4">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-teal-500" />
+        <Spinner size="sm" label="Loading IEP documents…" />
       </div>
     );
   }
 
   if (documents.length === 0) {
-    return <p className="text-brand-slate-400 text-sm">No IEP documents yet.</p>;
+    return <EmptyState icon={FileText} title="No IEP documents yet." />;
   }
 
   const handleDownload = async (id: number) => {
@@ -91,7 +96,10 @@ export function IepDocumentList({
     setDeletingId(id);
     try {
       const response = await deleteIepDocument(id);
-      if (response.success) onDeleted();
+      if (response.success) {
+        showToast({ message: 'IEP deleted', variant: 'success' });
+        onDeleted();
+      }
     } catch {
       // handled by interceptor
     } finally {
@@ -134,14 +142,15 @@ export function IepDocumentList({
             </div>
             <div className="flex gap-2 ml-3 shrink-0">
               {canSetCurrent && currentIepId !== doc.id && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleSetCurrent(doc)}
-                  disabled={settingCurrentId === doc.id}
+                  loading={settingCurrentId === doc.id}
                   data-testid="set-current-iep-button"
-                  className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 disabled:opacity-50 transition-colors"
                 >
-                  {settingCurrentId === doc.id ? '...' : 'Set as current'}
-                </button>
+                  Set as current
+                </Button>
               )}
               {doc.status === 'parsed' && (
                 <Link
@@ -153,22 +162,20 @@ export function IepDocumentList({
                 </Link>
               )}
               {doc.fileSizeBytes > 0 && (
-                <button
-                  onClick={() => handleDownload(doc.id)}
-                  className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
+                <Button variant="ghost" size="sm" onClick={() => handleDownload(doc.id)}>
+                  <Download className="w-3.5 h-3.5 mr-1" strokeWidth={1.8} aria-hidden="true" />
                   Download
-                </button>
+                </Button>
               )}
-              <button
+              <Button
+                variant="danger"
+                size="sm"
                 onClick={() => handleDelete(doc.id)}
-                disabled={deletingId === doc.id}
-                className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-red hover:text-red-800 disabled:opacity-50 transition-colors"
+                loading={deletingId === doc.id}
               >
-                <Trash2 className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
-                {deletingId === doc.id ? '...' : 'Delete'}
-              </button>
+                <Trash2 className="w-3.5 h-3.5 mr-1" strokeWidth={1.8} aria-hidden="true" />
+                Delete
+              </Button>
             </div>
           </div>
 

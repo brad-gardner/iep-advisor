@@ -2,12 +2,11 @@ import { Link } from 'react-router-dom';
 import { CheckCircle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PageLayout } from '@/components/ui/page-layout';
 
 export function SubscriptionSuccessPage() {
   return (
-    <div className="space-y-6">
-      <h1 className="font-serif">Subscription</h1>
-
+    <PageLayout title="Subscription">
       <Card className="max-w-md">
         <div className="flex flex-col items-center text-center py-6">
           <div className="w-12 h-12 rounded-full bg-brand-teal-50 flex items-center justify-center mb-4">
@@ -24,6 +23,6 @@ export function SubscriptionSuccessPage() {
           </Link>
         </div>
       </Card>
-    </div>
+    </PageLayout>
   );
 }

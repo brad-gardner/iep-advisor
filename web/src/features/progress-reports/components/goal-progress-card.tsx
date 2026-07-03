@@ -55,7 +55,7 @@ export function GoalProgressCard({ finding }: GoalProgressCardProps) {
 
       {finding.redFlags.length > 0 && (
         <div>
-          <p className="text-[11px] text-brand-red uppercase tracking-wide font-semibold mb-1">
+          <p className="text-[11px] text-brand-danger-700 uppercase tracking-wide font-semibold mb-1">
             Concerns
           </p>
           <ul className="text-sm text-brand-slate-600 list-disc pl-5 space-y-1">

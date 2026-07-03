@@ -1,5 +1,6 @@
 import { ClipboardCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 
 interface MeetingPrepEmptyStateProps {
   onGenerate: () => void;
@@ -21,23 +22,17 @@ export function MeetingPrepEmptyState({
       ? "on your child's ETR."
       : "on your child's IEP.";
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-4">
-      <div className="w-12 h-12 rounded-full bg-brand-teal-50 flex items-center justify-center mb-4">
-        <ClipboardCheck className="w-6 h-6 text-brand-teal-500" strokeWidth={1.8} aria-hidden="true" />
-      </div>
-      <h3 className="font-serif text-[22px] font-semibold text-brand-slate-800 mb-2">
-        Prepare for Your Meeting
-      </h3>
-      <p className="text-brand-slate-400 text-sm text-center max-w-md mb-6">
-        Generate a personalized meeting prep checklist with questions to ask,
-        documents to bring, rights to reference, and potential red flags based
-        {' '}{sourceSentence}
-      </p>
-      {!hideCta && (
-        <Button onClick={onGenerate} disabled={isGenerating} data-testid="generate-meeting-prep">
-          {isGenerating ? 'Generating...' : 'Generate Meeting Prep'}
-        </Button>
-      )}
-    </div>
+    <EmptyState
+      icon={ClipboardCheck}
+      title="Prepare for Your Meeting"
+      description={`Generate a personalized meeting prep checklist with questions to ask, documents to bring, rights to reference, and potential red flags based ${sourceSentence}`}
+      action={
+        hideCta ? undefined : (
+          <Button onClick={onGenerate} loading={isGenerating} data-testid="generate-meeting-prep">
+            Generate Meeting Prep
+          </Button>
+        )
+      }
+    />
   );
 }

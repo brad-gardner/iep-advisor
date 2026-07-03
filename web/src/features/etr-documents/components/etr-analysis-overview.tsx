@@ -26,10 +26,10 @@ const TONE_CLASSES: Record<StatTileProps['tone'], { bg: string; border: string; 
     text: 'text-brand-amber-500',
   },
   red: {
-    bg: 'bg-red-50',
-    border: 'border-red-200',
-    icon: 'text-brand-red',
-    text: 'text-brand-red',
+    bg: 'bg-brand-danger-50',
+    border: 'border-brand-danger-200',
+    icon: 'text-brand-danger-700',
+    text: 'text-brand-danger-700',
   },
   slate: {
     bg: 'bg-brand-slate-50',
@@ -81,7 +81,7 @@ export function EtrAnalysisOverview({ parsed }: EtrAnalysisOverviewProps) {
             <span>
               {redFlags.length}
               {highFlagCount > 0 && (
-                <span className="text-[11px] font-normal text-brand-red ml-1.5">
+                <span className="text-[11px] font-normal text-brand-danger-700 ml-1.5">
                   ({highFlagCount} high)
                 </span>
               )}

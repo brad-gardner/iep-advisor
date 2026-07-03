@@ -1,77 +1,74 @@
 #!/usr/bin/env node
 /**
- * UX consistency guard — asserts the MIGRATED pilot surface has no raw patterns
- * that the design-system primitives replaced. Unmigrated surfaces (parent,
- * student, platform-admin) are intentionally NOT checked yet — they migrate in
- * the fast-follow plan; their app-wide counts are printed for reference only.
+ * UX consistency guard — the whole authenticated app has now been migrated onto
+ * the design-system primitives. This enforces the two invariants the primitives
+ * give FULL coverage for:
+ *   - no hand-rolled `animate-spin` (use <Spinner>/<Skeleton>)
+ *   - no raw Tailwind `red-*` / `brand-red` (use the `brand-danger` scale)
+ * across `src/features`, `src/app`, and `src/components/layouts`. The `ui/`
+ * primitives are excluded (the canonical Spinner legitimately animates; the
+ * danger scale is defined there).
  *
- * Run: `npm run guard:ux`  (exits 1 if any pilot-dir violation is found)
+ * Raw `<button>` is reported for INFORMATION only, not enforced: tab bars,
+ * menus, switches, radios, disclosure triggers, and inline text-links are
+ * legitimately native `<button>`s with no `Button`-primitive equivalent.
+ *
+ * Run: `npm run guard:ux`  (exits 1 only on a spinner/red violation)
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, extname } from 'node:path';
 
 const ROOT = new URL('../src', import.meta.url).pathname;
+const DIRS = ['features', 'app', 'components/layouts'];
 
-// Surfaces migrated onto the design system (Plan A). The `ui/` primitives are
-// excluded — the canonical Spinner lives there and legitimately uses animate-spin.
-const PILOT_DIRS = [
-  'features/district-admin',
-  'features/staff-invites',
-  'features/educator',
-];
-
-// Baseline counts recorded when the guard was written (app-wide, pre-migration
-// reference from the audit). The fast-follow plan drives these toward zero.
-const APP_WIDE_BASELINE = { spinners: 58, rawButtons: 55, reds: 60 };
-
-const CHECKS = [
-  { key: 'spinners', label: 'raw animate-spin (use <Spinner>)', re: /animate-spin/ },
-  { key: 'rawButtons', label: 'raw <button> (use <Button>)', re: /<button[\s>]/ },
+const ENFORCED = [
+  { key: 'spinners', label: 'raw animate-spin (use <Spinner>/<Skeleton>)', re: /animate-spin/ },
   {
     key: 'reds',
     label: 'raw red-*/brand-red (use brand-danger)',
-    re: /(?:bg|text|border|ring)-red-[0-9]|brand-red/,
+    re: /(?:bg|text|border|ring|from|to|via)-red-[0-9]|brand-red\b/,
   },
 ];
+const INFO = [{ key: 'rawButtons', label: 'raw <button> (native tabs/menus/switches/links — not enforced)', re: /<button[\s>\n]/ }];
 
 function walk(dir) {
   const out = [];
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
-    if (statSync(p).isDirectory()) out.push(...walk(p));
-    else if (['.tsx', '.ts'].includes(extname(p)) && !p.endsWith('.test.tsx') && !p.endsWith('.test.ts'))
+    if (statSync(p).isDirectory()) {
+      if (p.endsWith('/components/ui')) continue; // primitives live here
+      out.push(...walk(p));
+    } else if (['.tsx', '.ts'].includes(extname(p)) && !/\.test\.(ts|tsx)$/.test(p)) {
       out.push(p);
+    }
   }
   return out;
 }
 
+const files = DIRS.flatMap((d) => walk(join(ROOT, d)));
 let violations = 0;
-console.log('UX consistency guard — pilot surface\n');
+console.log('UX consistency guard — app-wide (design-system migration)\n');
 
-for (const { key, label, re } of CHECKS) {
+for (const { label, re } of ENFORCED) {
   const hits = [];
-  for (const rel of PILOT_DIRS) {
-    for (const file of walk(join(ROOT, rel))) {
-      const lines = readFileSync(file, 'utf8').split('\n');
-      lines.forEach((line, i) => {
-        if (re.test(line)) hits.push(`${file.replace(ROOT, 'src')}:${i + 1}`);
-      });
-    }
+  for (const f of files) {
+    readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
+      if (re.test(line)) hits.push(`${f.replace(ROOT, 'src')}:${i + 1}`);
+    });
   }
-  const status = hits.length === 0 ? '✓' : '✗';
-  console.log(`${status} ${label}: ${hits.length} in pilot dirs`);
+  console.log(`${hits.length === 0 ? '✓' : '✗'} ${label}: ${hits.length}`);
   hits.forEach((h) => console.log(`    ${h}`));
-  if (hits.length > 0) violations += hits.length;
+  violations += hits.length;
 }
 
-console.log(
-  `\nApp-wide baseline (reference, not enforced): ${APP_WIDE_BASELINE.spinners} spinners / ` +
-    `${APP_WIDE_BASELINE.rawButtons} raw buttons / ${APP_WIDE_BASELINE.reds} reds — ` +
-    `the fast-follow plan migrates the remaining surfaces.`
-);
+for (const { label, re } of INFO) {
+  let count = 0;
+  for (const f of files) count += (readFileSync(f, 'utf8').match(new RegExp(re, 'g')) || []).length;
+  console.log(`• ${label}: ${count}`);
+}
 
 if (violations > 0) {
-  console.error(`\n✗ ${violations} pilot-surface violation(s) — route through the design-system primitives.`);
+  console.error(`\n✗ ${violations} violation(s) — route through the design-system primitives.`);
   process.exit(1);
 }
-console.log('\n✓ Pilot surface is clean.');
+console.log('\n✓ No raw spinners or reds — design system holds.');

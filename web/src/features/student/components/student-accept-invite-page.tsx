@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
+import { PageLayout } from '@/components/ui/page-layout';
+import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { useAuth } from '@/features/auth/hooks/use-auth';
@@ -84,13 +86,11 @@ export function StudentAcceptInvitePage() {
     : '';
 
   return (
-    <div className="max-w-md mx-auto py-12">
-      <Card className="text-center" data-testid="student-accept-invite">
-        <h1 className="font-serif mb-4">Activate Your Student Account</h1>
-
+    <PageLayout data-testid="student-accept-invite" title="Activate Your Student Account">
+      <Card className="max-w-md text-center">
         {status === 'loading' && !isMissingToken && (
           <div className="flex justify-center py-6">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+            <Spinner label="Loading invite…" />
           </div>
         )}
 
@@ -114,7 +114,7 @@ export function StudentAcceptInvitePage() {
                 type="checkbox"
                 checked={consentAccepted}
                 onChange={(e) => setConsentAccepted(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-500"
+                className="mt-0.5 h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-400"
                 data-testid="student-consent-checkbox"
               />
               <span>{CONSENT_LABEL}</span>
@@ -122,11 +122,12 @@ export function StudentAcceptInvitePage() {
 
             <Button
               onClick={handleAccept}
-              disabled={!consentAccepted || status === 'submitting'}
+              disabled={!consentAccepted}
+              loading={status === 'submitting'}
               className="w-full"
               data-testid="student-accept-submit"
             >
-              {status === 'submitting' ? 'Activating...' : 'Accept & Activate'}
+              Accept &amp; Activate
             </Button>
           </div>
         )}
@@ -147,6 +148,6 @@ export function StudentAcceptInvitePage() {
           </div>
         )}
       </Card>
-    </div>
+    </PageLayout>
   );
 }

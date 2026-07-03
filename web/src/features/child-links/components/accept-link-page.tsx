@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
 import { acceptLink, previewLink } from '../api/child-links-api';
 import type { AcceptedChildLink, ChildLinkInvitePreview } from '../types';
 import { ChildLinkChoice, CREATE_NEW } from './child-link-choice';
@@ -88,7 +89,7 @@ export function AcceptLinkPage() {
 
         {status === 'loading' && !isMissingToken && (
           <div className="flex justify-center py-6">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+            <Spinner label="Loading link…" />
           </div>
         )}
 
@@ -114,11 +115,11 @@ export function AcceptLinkPage() {
 
             <Button
               onClick={handleAccept}
-              disabled={status === 'submitting'}
+              loading={status === 'submitting'}
               className="w-full"
               data-testid="accept-link-submit"
             >
-              {status === 'submitting' ? 'Linking...' : 'Accept & Link'}
+              Accept &amp; Link
             </Button>
           </div>
         )}

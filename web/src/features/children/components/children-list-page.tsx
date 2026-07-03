@@ -3,6 +3,9 @@ import { Users } from 'lucide-react';
 import { useChildren } from '../hooks/use-children';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageLayout } from '@/components/ui/page-layout';
 import { SharedBadge } from '@/features/sharing/components/shared-badge';
 
 export function ChildrenListPage() {
@@ -11,28 +14,31 @@ export function ChildrenListPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading children…" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="font-serif">Your Children</h1>
+    <PageLayout
+      title="Your Children"
+      actions={
         <Link to="/children/new">
           <Button data-testid="add-child-button">Add Child</Button>
         </Link>
-      </div>
-
+      }
+    >
       {children.length === 0 ? (
-        <Card className="text-center py-12" data-testid="children-empty-state">
-          <Users className="w-12 h-12 mx-auto text-brand-slate-300 mb-3" strokeWidth={1.8} aria-hidden="true" />
-          <p className="text-brand-slate-400 mb-4">No child profiles yet.</p>
-          <Link to="/children/new">
-            <Button>Add Your First Child</Button>
-          </Link>
-        </Card>
+        <EmptyState
+          icon={Users}
+          title="No child profiles yet."
+          action={
+            <Link to="/children/new">
+              <Button>Add Your First Child</Button>
+            </Link>
+          }
+          data-testid="children-empty-state"
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {children.map((child) => (
@@ -60,6 +66,6 @@ export function ChildrenListPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageLayout>
   );
 }

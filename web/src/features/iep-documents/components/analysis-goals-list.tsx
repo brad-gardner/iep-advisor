@@ -32,7 +32,7 @@ export function AnalysisGoalsList({ goalAnalyses }: AnalysisGoalsListProps) {
             <span className="text-brand-amber-500">{yellowCount} need improvement</span>
           )}
           {redCount > 0 && (
-            <span className="text-brand-red">{redCount} significant concerns</span>
+            <span className="text-brand-danger-700">{redCount} significant concerns</span>
           )}
         </div>
       </div>

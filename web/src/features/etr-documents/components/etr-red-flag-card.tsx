@@ -11,10 +11,10 @@ function severityConfig(severity: string) {
     case 'high':
       return {
         Icon: AlertOctagon,
-        iconClass: 'text-brand-red',
-        bg: 'bg-red-50',
-        border: 'border-red-200',
-        titleClass: 'text-brand-red',
+        iconClass: 'text-brand-danger-700',
+        bg: 'bg-brand-danger-50',
+        border: 'border-brand-danger-200',
+        titleClass: 'text-brand-danger-700',
         badgeVariant: 'error' as const,
       };
     case 'medium':

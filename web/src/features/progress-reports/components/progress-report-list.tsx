@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { Trash2, Eye, Download } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Spinner } from "@/components/ui/spinner";
+import { useToast } from "@/components/ui/toast";
 import { remove, getDownloadUrl } from "../api/progress-reports-api";
 import { ProgressReportUpload } from "./progress-report-upload";
 import type { ProgressReport } from "../types";
@@ -54,6 +56,7 @@ export function ProgressReportList({
   onChanged,
 }: ProgressReportListProps) {
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const { show } = useToast();
 
   const handleDownload = async (id: number) => {
     const res = await getDownloadUrl(id);
@@ -65,7 +68,10 @@ export function ProgressReportList({
     setDeletingId(id);
     try {
       const res = await remove(id);
-      if (res.success) onChanged();
+      if (res.success) {
+        show({ message: "Progress report deleted", variant: "success" });
+        onChanged();
+      }
     } catch {
       // handled by interceptor
     } finally {
@@ -76,7 +82,7 @@ export function ProgressReportList({
   if (isLoading) {
     return (
       <div className="flex justify-center py-4">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-teal-500" />
+        <Spinner size="sm" />
       </div>
     );
   }
@@ -153,7 +159,7 @@ export function ProgressReportList({
                 <button
                   onClick={() => handleDelete(r.id)}
                   disabled={deletingId === r.id}
-                  className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-red hover:text-red-800 disabled:opacity-50 transition-colors"
+                  className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-danger-700 hover:text-brand-danger-800 disabled:opacity-50 transition-colors"
                 >
                   <Trash2
                     className="w-3.5 h-3.5"

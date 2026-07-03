@@ -1,3 +1,4 @@
+import { useToast } from '@/components/ui/toast';
 import { useEditorContext } from '../hooks/use-editor-context';
 import { AddRowButton } from './add-row-button';
 import { EmptyHint } from './empty-hint';
@@ -5,11 +6,13 @@ import { ServiceLineRow } from './service-line-row';
 
 export function ServicesTable() {
   const { draftApi } = useEditorContext();
+  const { show } = useToast();
   const services = draftApi.draft?.serviceLines ?? [];
 
-  const handleDelete = (id: number) => {
-    if (confirm('Delete this service? This cannot be undone.')) {
-      void draftApi.removeServiceLine(id);
+  const handleDelete = async (id: number) => {
+    if (!confirm('Delete this service? This cannot be undone.')) return;
+    if (await draftApi.removeServiceLine(id)) {
+      show({ message: 'Service deleted', variant: 'success' });
     }
   };
 

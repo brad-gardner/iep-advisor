@@ -38,19 +38,19 @@ export function EtrErrorBanner({ etrId, onRetried }: EtrErrorBannerProps) {
             We couldn't finish analyzing your ETR. This can happen when the PDF is
             scanned or has unusual formatting. You can retry processing below.
           </p>
-          {retryError && <p className="text-brand-red">{retryError}</p>}
+          {retryError && <p className="text-brand-danger-700">{retryError}</p>}
           <Button
             variant="secondary"
             onClick={handleRetry}
-            disabled={isRetrying}
+            loading={isRetrying}
             data-testid="etr-retry-processing"
           >
             <RefreshCw
-              className={`w-4 h-4 mr-1.5 ${isRetrying ? 'animate-spin' : ''}`}
+              className="w-4 h-4 mr-1.5"
               strokeWidth={1.8}
               aria-hidden="true"
             />
-            {isRetrying ? 'Retrying...' : 'Retry processing'}
+            Retry processing
           </Button>
         </div>
       </Notice>

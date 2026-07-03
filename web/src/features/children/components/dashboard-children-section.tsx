@@ -3,6 +3,8 @@ import { Users, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
+import { Spinner } from "@/components/ui/spinner";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SharedBadge } from "@/features/sharing/components/shared-badge";
 import { useChildren } from "@/features/children/hooks/use-children";
 import type { ChildProfile } from "@/types/api";
@@ -27,7 +29,7 @@ export function DashboardChildrenSection() {
           My Children
         </h2>
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+          <Spinner label="Loading children…" />
         </div>
       </section>
     );
@@ -40,9 +42,9 @@ export function DashboardChildrenSection() {
           My Children
         </h2>
         <Notice variant="error" title="Couldn't load children">
-          <button onClick={reload} className="text-sm underline">
+          <Button variant="ghost" size="sm" onClick={reload} className="mt-1">
             Try again
-          </button>
+          </Button>
         </Notice>
       </section>
     );
@@ -54,18 +56,16 @@ export function DashboardChildrenSection() {
         <h2 className="font-serif text-lg text-brand-slate-800 mb-4">
           My Children
         </h2>
-        <Card className="text-center py-12">
-          <Users
-            className="mx-auto h-12 w-12 text-brand-slate-300"
-            strokeWidth={1.8}
-            aria-hidden="true"
+        <Card>
+          <EmptyState
+            icon={Users}
+            title="No child profiles yet"
+            action={
+              <Link to="/children/new">
+                <Button>Add your first child profile</Button>
+              </Link>
+            }
           />
-          <p className="mt-3 text-sm text-brand-slate-400">
-            No child profiles yet
-          </p>
-          <Link to="/children/new" className="mt-4 inline-block">
-            <Button>Add your first child profile</Button>
-          </Link>
         </Card>
       </section>
     );

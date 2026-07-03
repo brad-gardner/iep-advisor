@@ -4,6 +4,7 @@ import { acceptInvite } from '@/features/sharing/api/sharing-api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
 
 export function AcceptInvitePage() {
   const [searchParams] = useSearchParams();
@@ -43,7 +44,7 @@ export function AcceptInvitePage() {
 
         {status === 'loading' && (
           <div className="flex justify-center py-6">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+            <Spinner label="Accepting invite…" />
           </div>
         )}
 

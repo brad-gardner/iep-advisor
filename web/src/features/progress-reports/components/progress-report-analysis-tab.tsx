@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { Badge } from "@/components/ui/badge";
+import { Spinner } from "@/components/ui/spinner";
 import { AdvocacyGapAnalysisSection } from "@/features/iep-documents/components/advocacy-gap-analysis";
 import { useProgressReportAnalysis } from "../hooks/use-progress-report-analysis";
 import { GoalProgressCard } from "./goal-progress-card";
@@ -19,7 +20,7 @@ export function ProgressReportAnalysisTab({
   if (loading && !analysis) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading analysis…" />
       </div>
     );
   }
@@ -43,8 +44,8 @@ export function ProgressReportAnalysisTab({
           goals you've set. You'll get per-goal progress findings, red flags,
           and concrete questions to bring to the next meeting.
         </p>
-        <Button onClick={start} disabled={isTriggering}>
-          {isTriggering ? "Starting..." : "Run Analysis"}
+        <Button onClick={start} loading={isTriggering}>
+          Run Analysis
         </Button>
       </Card>
     );
@@ -53,7 +54,7 @@ export function ProgressReportAnalysisTab({
   if (status === "pending" || status === "analyzing") {
     return (
       <Card className="text-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500 mx-auto mb-4" />
+        <Spinner className="mx-auto mb-4" label="Analyzing progress report…" />
         <p className="text-sm text-brand-slate-500">
           Analyzing the progress report. This usually takes 1–3 minutes.
         </p>
@@ -69,8 +70,8 @@ export function ProgressReportAnalysisTab({
             "An error occurred while analyzing this report."}
         </Notice>
         <div className="mt-4">
-          <Button onClick={start} disabled={isTriggering}>
-            {isTriggering ? "Retrying..." : "Retry Analysis"}
+          <Button onClick={start} loading={isTriggering}>
+            Retry Analysis
           </Button>
         </div>
       </Card>

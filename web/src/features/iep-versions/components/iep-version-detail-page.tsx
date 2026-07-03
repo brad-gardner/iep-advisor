@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
+import { PageLayout } from '@/components/ui/page-layout';
 import { getVersion } from '../api/iep-versions-api';
 import type { IepVersionDto } from '../types';
 import { DownloadPdfButton } from './download-pdf-button';
@@ -45,7 +47,7 @@ export function IepVersionDetailPage({ canRetry, backTo, backLabel }: IepVersion
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading IEP version…" />
       </div>
     );
   }
@@ -63,33 +65,25 @@ export function IepVersionDetailPage({ canRetry, backTo, backLabel }: IepVersion
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <header className="space-y-3">
-        <Link to={backTo} className="text-sm text-brand-teal-500 hover:underline">
-          ← {backLabel}
-        </Link>
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="font-serif">
-              {version.title || 'IEP'}{' '}
-              <span className="text-brand-slate-400">v{version.versionNumber}</span>
-            </h1>
-            <p className="text-sm text-brand-slate-500">
-              Finalized {formatDate(version.finalizedAt)}
-              {version.effectiveDate && ` · Effective ${formatDate(version.effectiveDate)}`}
-            </p>
-          </div>
-          <DownloadPdfButton
-            versionId={version.id}
-            initialStatus={version.pdfRenderStatus}
-            canRetry={canRetry}
-          />
-        </div>
-      </header>
+  const subtitle =
+    `Finalized ${formatDate(version.finalizedAt)}` +
+    (version.effectiveDate ? ` · Effective ${formatDate(version.effectiveDate)}` : '');
 
+  return (
+    <PageLayout
+      title={`${version.title || 'IEP'} v${version.versionNumber}`}
+      subtitle={subtitle}
+      breadcrumb={[{ label: backLabel, to: backTo }]}
+      actions={
+        <DownloadPdfButton
+          versionId={version.id}
+          initialStatus={version.pdfRenderStatus}
+          canRetry={canRetry}
+        />
+      }
+    >
       <VersionSnapshot version={version} />
-    </div>
+    </PageLayout>
   );
 }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { UserRoundCheck } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
 import { useEditorContext } from '../../hooks/use-editor-context';
 import { useStudentShareableEntries } from '../../hooks/use-student-shareable-entries';
 import { StudentEntryPicker } from './student-entry-picker';
@@ -19,6 +20,7 @@ export function PullFromStudentButton({
   testIdPrefix,
 }: PullFromStudentButtonProps) {
   const { studentId } = useEditorContext();
+  const { show } = useToast();
   const { entries, isLoading, isError, ensureLoaded } =
     useStudentShareableEntries(studentId);
   const [open, setOpen] = useState(false);
@@ -34,6 +36,7 @@ export function PullFromStudentButton({
   const handlePick = (content: string) => {
     onPick(content);
     setOpen(false);
+    show({ message: 'Pulled from student', variant: 'success' });
   };
 
   return (

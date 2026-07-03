@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Notice } from '@/components/ui/notice';
+import { useToast } from '@/components/ui/toast';
 import { SubscribeButton } from './subscribe-button';
 import { createPortalSession } from '../api/subscription-api';
 import { useSubscription } from '../hooks/use-subscription';
@@ -46,6 +49,7 @@ function UsageBar({ usage }: { usage: ChildUsage }) {
 }
 
 function ManageButton() {
+  const { show } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleManage = async () => {
@@ -54,13 +58,15 @@ function ManageButton() {
       const { url } = await createPortalSession(window.location.href);
       window.location.href = url;
     } catch {
+      // Redirect failed — surface it instead of silently resetting.
+      show({ message: 'Could not open the billing portal. Please try again.', variant: 'error' });
       setIsLoading(false);
     }
   };
 
   return (
-    <Button variant="secondary" onClick={handleManage} disabled={isLoading}>
-      {isLoading ? 'Redirecting...' : 'Manage Subscription'}
+    <Button variant="secondary" onClick={handleManage} loading={isLoading}>
+      Manage Subscription
     </Button>
   );
 }
@@ -73,7 +79,7 @@ function StatusContent({ data }: { data: SubscriptionStatusType }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-serif text-lg font-semibold text-brand-slate-800">
-          Subscription
+          Your plan
         </h3>
         {statusBadge(data.status)}
       </div>
@@ -112,14 +118,14 @@ function StatusContent({ data }: { data: SubscriptionStatusType }) {
 }
 
 export function SubscriptionStatusCard() {
-  const { status, isLoading } = useSubscription();
+  const { status, isLoading, reload } = useSubscription();
 
   if (isLoading) {
     return (
       <Card>
-        <div className="animate-pulse space-y-3">
-          <div className="h-5 bg-brand-slate-100 rounded w-1/3" />
-          <div className="h-3 bg-brand-slate-100 rounded w-1/2" />
+        <div className="space-y-3">
+          <Skeleton className="h-5 w-1/3" />
+          <Skeleton className="h-3 w-1/2" />
         </div>
       </Card>
     );
@@ -128,14 +134,13 @@ export function SubscriptionStatusCard() {
   if (!status) {
     return (
       <Card>
-        <div className="space-y-4">
-          <h3 className="font-serif text-lg font-semibold text-brand-slate-800">
-            Subscription
-          </h3>
-          <p className="text-sm text-brand-slate-400">
-            Unable to load subscription status.
-          </p>
-        </div>
+        <Notice variant="error" title="Unable to load subscription status">
+          <div className="mt-3">
+            <Button variant="secondary" size="sm" onClick={() => reload()}>
+              Try again
+            </Button>
+          </div>
+        </Notice>
       </Card>
     );
   }

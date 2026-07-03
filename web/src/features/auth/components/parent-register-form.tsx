@@ -135,8 +135,8 @@ export function ParentRegisterForm({ initialInviteCode = '' }: ParentRegisterFor
           data-testid="register-confirm-password"
         />
 
-        <Button type="submit" disabled={isLoading} className="w-full" data-testid="register-submit">
-          {isLoading ? 'Creating account...' : 'Create Account'}
+        <Button type="submit" loading={isLoading} className="w-full" data-testid="register-submit">
+          Create Account
         </Button>
       </form>
     </>

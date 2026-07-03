@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Input, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
+import { useToast } from "@/components/ui/toast";
 import { create } from "../api/progress-reports-api";
 
 interface CreateProgressReportFormProps {
@@ -20,6 +21,7 @@ export function CreateProgressReportForm({
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { show } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +35,7 @@ export function CreateProgressReportForm({
         notes: notes.trim() || undefined,
       });
       if (response.success) {
+        show({ message: "Progress report created", variant: "success" });
         onCreated();
       } else {
         setError(response.message || "Failed to create progress report");
@@ -82,8 +85,8 @@ export function CreateProgressReportForm({
         <Button type="button" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isSubmitting} data-testid="pr-submit">
-          {isSubmitting ? "Creating..." : "Create"}
+        <Button type="submit" loading={isSubmitting} data-testid="pr-submit">
+          Create
         </Button>
       </div>
     </form>

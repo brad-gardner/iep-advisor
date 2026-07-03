@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
+import { useToast } from '@/components/ui/toast';
 import { finalizeDraft, listVersionsForStudent } from '../api/iep-versions-api';
 import type { IepVersionSummaryDto } from '../types';
 import { FinalizeDialog } from './finalize-dialog';
@@ -28,6 +29,7 @@ export function FinalizeSection({ draftId, studentId, flushBeforeFinalize }: Fin
   const [error, setError] = useState<string | null>(null);
   const [finalized, setFinalized] = useState<IepVersionSummaryDto | null>(null);
   const [nextVersionNumber, setNextVersionNumber] = useState<number | undefined>(undefined);
+  const { show } = useToast();
 
   // Derive the next version number from existing versions (best-effort hint only).
   useEffect(() => {
@@ -56,6 +58,7 @@ export function FinalizeSection({ draftId, studentId, flushBeforeFinalize }: Fin
       if (res.success && res.data) {
         setFinalized(res.data);
         setIsOpen(false);
+        show({ message: `Finalized v${res.data.versionNumber}`, variant: 'success' });
         // The draft stays editable — re-finalize creates the next version.
         setNextVersionNumber(res.data.versionNumber + 1);
       } else {

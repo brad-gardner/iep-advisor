@@ -161,11 +161,11 @@ export function DistrictRegisterForm() {
 
         <Button
           type="submit"
-          disabled={isLoading}
+          loading={isLoading}
           className="w-full"
           data-testid="register-district-submit"
         >
-          {isLoading ? 'Creating account...' : 'Create District Account'}
+          Create District Account
         </Button>
       </form>
     </>

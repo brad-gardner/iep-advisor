@@ -1,3 +1,5 @@
+import { Select } from '@/components/ui/input';
+
 const US_STATES = [
   { code: 'AL', name: 'Alabama' },
   { code: 'AK', name: 'Alaska' },
@@ -59,11 +61,10 @@ interface StateSelectorProps {
 
 export function StateSelector({ value, onChange }: StateSelectorProps) {
   return (
-    <select
+    <Select
       id="state"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2 bg-white rounded-input text-sm text-brand-slate-800 border border-brand-slate-200 focus:outline-none focus:border-brand-teal-400 focus:ring-[3px] focus:ring-brand-teal-50 transition-colors"
       data-testid="profile-state"
     >
       <option value="">Select a state...</option>
@@ -72,6 +73,6 @@ export function StateSelector({ value, onChange }: StateSelectorProps) {
           {s.name}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }

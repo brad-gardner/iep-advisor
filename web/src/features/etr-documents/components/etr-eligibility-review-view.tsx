@@ -20,7 +20,7 @@ function EvidenceList({
     tone === 'support'
       ? 'text-brand-teal-600'
       : tone === 'contra'
-        ? 'text-brand-red'
+        ? 'text-brand-danger-700'
         : 'text-brand-slate-600';
   return (
     <div>
@@ -73,7 +73,7 @@ export function EtrEligibilityReviewView({ data }: EtrEligibilityReviewViewProps
           className={`mt-4 rounded-card border p-4 flex items-start gap-3 ${
             supported
               ? 'bg-brand-teal-50 border-brand-teal-100'
-              : 'bg-red-50 border-red-200'
+              : 'bg-brand-danger-50 border-brand-danger-200'
           }`}
         >
           {supported ? (
@@ -84,7 +84,7 @@ export function EtrEligibilityReviewView({ data }: EtrEligibilityReviewViewProps
             />
           ) : (
             <XCircle
-              className="w-5 h-5 text-brand-red shrink-0 mt-0.5"
+              className="w-5 h-5 text-brand-danger-700 shrink-0 mt-0.5"
               strokeWidth={1.8}
               aria-hidden="true"
             />
@@ -93,7 +93,7 @@ export function EtrEligibilityReviewView({ data }: EtrEligibilityReviewViewProps
             <div className="flex items-center gap-2 flex-wrap">
               <p
                 className={`text-sm font-semibold ${
-                  supported ? 'text-brand-teal-600' : 'text-brand-red'
+                  supported ? 'text-brand-teal-600' : 'text-brand-danger-700'
                 }`}
               >
                 {supported

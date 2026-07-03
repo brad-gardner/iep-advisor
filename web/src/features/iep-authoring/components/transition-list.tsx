@@ -1,3 +1,4 @@
+import { useToast } from '@/components/ui/toast';
 import { useEditorContext } from '../hooks/use-editor-context';
 import { AddRowButton } from './add-row-button';
 import { EmptyHint } from './empty-hint';
@@ -5,11 +6,13 @@ import { TransitionRow } from './transition-row';
 
 export function TransitionList() {
   const { draftApi } = useEditorContext();
+  const { show } = useToast();
   const items = draftApi.draft?.transitionItems ?? [];
 
-  const handleDelete = (id: number) => {
-    if (confirm('Delete this transition item? This cannot be undone.')) {
-      void draftApi.removeTransitionItem(id);
+  const handleDelete = async (id: number) => {
+    if (!confirm('Delete this transition item? This cannot be undone.')) return;
+    if (await draftApi.removeTransitionItem(id)) {
+      show({ message: 'Transition item deleted', variant: 'success' });
     }
   };
 

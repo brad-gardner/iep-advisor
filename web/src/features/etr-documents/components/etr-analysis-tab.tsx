@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
 import { useEtrAnalysis } from '../hooks/use-etr-analysis';
 import { parseEtrAnalysis } from '../lib/parse-analysis';
 import { EtrAnalysisEmptyState } from './etr-analysis-empty-state';
@@ -48,7 +49,7 @@ export function EtrAnalysisTab({ etrId, childProfileId }: EtrAnalysisTabProps) {
   if (loading && !analysis) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading analysis…" />
       </div>
     );
   }
@@ -81,10 +82,10 @@ export function EtrAnalysisTab({ etrId, childProfileId }: EtrAnalysisTabProps) {
           <div className="mt-4">
             <Button
               onClick={start}
-              disabled={isTriggering}
+              loading={isTriggering}
               data-testid="etr-retry-analysis-button"
             >
-              {isTriggering ? 'Retrying...' : 'Retry Analysis'}
+              Retry Analysis
             </Button>
           </div>
         </Card>

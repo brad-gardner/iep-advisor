@@ -7,13 +7,13 @@ interface SmartCriteriaGridProps {
 const RATING_COLORS: Record<string, string> = {
   green: 'bg-brand-teal-500',
   yellow: 'bg-brand-amber-400',
-  red: 'bg-brand-red',
+  red: 'bg-brand-danger-500',
 };
 
 const RATING_TEXT_COLORS: Record<string, string> = {
   green: 'text-brand-teal-600',
   yellow: 'text-brand-amber-500',
-  red: 'text-brand-red',
+  red: 'text-brand-danger-700',
 };
 
 const CRITERIA_LABELS: { key: keyof SmartAnalysis; label: string }[] = [

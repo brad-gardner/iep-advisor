@@ -12,18 +12,18 @@ export function RedFlagCard({ redFlag }: RedFlagCardProps) {
     <div
       className={`rounded-card border p-4 ${
         isRed
-          ? 'bg-red-50 border-red-200'
+          ? 'bg-brand-danger-50 border-brand-danger-200'
           : 'bg-brand-amber-50 border-brand-amber-100'
       }`}
     >
       <div className="flex items-start gap-2">
         {isRed ? (
-          <AlertOctagon className="w-5 h-5 text-brand-red shrink-0 mt-0.5" strokeWidth={1.8} aria-hidden="true" />
+          <AlertOctagon className="w-5 h-5 text-brand-danger-700 shrink-0 mt-0.5" strokeWidth={1.8} aria-hidden="true" />
         ) : (
           <AlertTriangle className="w-5 h-5 text-brand-amber-500 shrink-0 mt-0.5" strokeWidth={1.8} aria-hidden="true" />
         )}
         <div className="flex-1">
-          <h4 className={`text-[13px] font-medium ${isRed ? 'text-brand-red' : 'text-brand-amber-500'}`}>
+          <h4 className={`text-[13px] font-medium ${isRed ? 'text-brand-danger-700' : 'text-brand-amber-500'}`}>
             {redFlag.title}
           </h4>
           <p className="text-sm text-brand-slate-600 mt-1">{redFlag.description}</p>

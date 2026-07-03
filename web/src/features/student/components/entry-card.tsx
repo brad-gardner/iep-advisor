@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import type { StudentWorkspaceEntryDto } from '../types';
 import { EntryEditor } from './entry-editor';
 import { ShareToggle } from './share-toggle';
@@ -49,24 +50,28 @@ export function EntryCard({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <ShareToggle entry={entry} onToggle={onSetShareable} testIdPrefix={testId} />
         <div className="flex items-center gap-1">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setEditing(true)}
-            className="inline-flex items-center gap-1.5 rounded-button px-2.5 py-1 text-[13px] font-medium text-brand-slate-500 transition-colors hover:bg-brand-slate-100"
+            className="gap-1.5"
             data-testid={`${testId}-edit`}
           >
             <Pencil className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
             Edit
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="danger"
+            size="sm"
             onClick={() => onDelete(entry.id)}
-            className="inline-flex items-center gap-1.5 rounded-button px-2.5 py-1 text-[13px] font-medium text-brand-red transition-colors hover:bg-red-50"
+            className="gap-1.5"
             data-testid={`${testId}-delete`}
           >
             <Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
             Delete
-          </button>
+          </Button>
         </div>
       </div>
     </Card>

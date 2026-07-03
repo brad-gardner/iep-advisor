@@ -12,7 +12,7 @@ function StatBox({
   const colorMap = {
     teal: 'bg-brand-teal-50 text-brand-teal-600 border-brand-teal-100',
     amber: 'bg-brand-amber-50 text-brand-amber-500 border-brand-amber-100',
-    red: 'bg-red-50 text-brand-red border-red-200',
+    red: 'bg-brand-danger-50 text-brand-danger-700 border-brand-danger-200',
     neutral: 'bg-brand-slate-50 text-brand-slate-600 border-brand-slate-200',
   };
 

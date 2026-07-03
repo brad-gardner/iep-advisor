@@ -1,3 +1,4 @@
+import { useToast } from '@/components/ui/toast';
 import { useEditorContext } from '../hooks/use-editor-context';
 import { AddRowButton } from './add-row-button';
 import { GoalEditorRow } from './goal-editor-row';
@@ -5,11 +6,13 @@ import { EmptyHint } from './empty-hint';
 
 export function GoalsPanel() {
   const { draftApi } = useEditorContext();
+  const { show } = useToast();
   const goals = draftApi.draft?.goals ?? [];
 
-  const handleDelete = (id: number) => {
-    if (confirm('Delete this goal? This cannot be undone.')) {
-      void draftApi.removeGoal(id);
+  const handleDelete = async (id: number) => {
+    if (!confirm('Delete this goal? This cannot be undone.')) return;
+    if (await draftApi.removeGoal(id)) {
+      show({ message: 'Goal deleted', variant: 'success' });
     }
   };
 

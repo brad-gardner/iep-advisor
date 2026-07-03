@@ -30,7 +30,7 @@ function AddedGoalCard({ goal }: { goal: GoalDiff }) {
 
 function RemovedGoalCard({ goal }: { goal: GoalDiff }) {
   return (
-    <Card className="border-l-4 border-l-brand-red">
+    <Card className="border-l-4 border-l-brand-danger-700">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           {goal.domain && (

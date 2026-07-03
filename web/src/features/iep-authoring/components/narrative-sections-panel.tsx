@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/input';
+import { useToast } from '@/components/ui/toast';
 import { useEditorContext } from '../hooks/use-editor-context';
 import { SECTION_KINDS } from '../lib/section-kinds';
 import type { IepSectionKind } from '../types';
@@ -10,12 +11,14 @@ import { SectionEditor } from './section-editor';
 
 export function NarrativeSectionsPanel() {
   const { draftApi } = useEditorContext();
+  const { show } = useToast();
   const sections = draftApi.draft?.sections ?? [];
   const [kind, setKind] = useState<IepSectionKind>(SECTION_KINDS[0].value);
 
-  const handleDelete = (id: number) => {
-    if (confirm('Delete this section? This cannot be undone.')) {
-      void draftApi.removeSection(id);
+  const handleDelete = async (id: number) => {
+    if (!confirm('Delete this section? This cannot be undone.')) return;
+    if (await draftApi.removeSection(id)) {
+      show({ message: 'Section deleted', variant: 'success' });
     }
   };
 

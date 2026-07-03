@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/ui/notice";
+import { Spinner } from "@/components/ui/spinner";
+import { PageLayout } from "@/components/ui/page-layout";
 import { PdfViewer } from "@/components/ui/pdf-viewer";
 import { getById, getDownloadUrl } from "../api/progress-reports-api";
 import { ProgressReportAnalysisTab } from "./progress-report-analysis-tab";
@@ -64,7 +65,7 @@ export function ProgressReportViewerPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading progress report…" />
       </div>
     );
   }
@@ -83,29 +84,21 @@ export function ProgressReportViewerPage() {
     );
   }
 
+  const title =
+    report.fileName ||
+    formatPeriod(report.reportingPeriodStart, report.reportingPeriodEnd) ||
+    `Progress Report #${report.id}`;
+
   return (
-    <div className="space-y-4">
-      <div>
-        <Link
-          to={`/children/${childId}/ieps/${id}`}
-          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
-        >
-          <ArrowLeft
-            className="w-4 h-4"
-            strokeWidth={1.8}
-            aria-hidden="true"
-          />
-          Back to IEP
-        </Link>
-        <h1 className="font-serif text-[32px] font-semibold leading-tight mt-1 text-brand-slate-800">
-          {report.fileName ||
-            formatPeriod(
-              report.reportingPeriodStart,
-              report.reportingPeriodEnd
-            ) ||
-            `Progress Report #${report.id}`}
-        </h1>
-        <div className="flex items-center gap-3 mt-2 flex-wrap">
+    <PageLayout
+      title={title}
+      breadcrumb={[
+        { label: "Back to IEP", to: `/children/${childId}/ieps/${id}` },
+        { label: "Progress Report" },
+      ]}
+    >
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Badge variant={STATUS_VARIANTS[report.status] || "neutral"}>
             {report.status}
           </Badge>
@@ -117,7 +110,7 @@ export function ProgressReportViewerPage() {
           </span>
         </div>
         {report.notes && (
-          <p className="mt-3 text-sm text-brand-slate-600 whitespace-pre-wrap bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+          <p className="text-sm text-brand-slate-600 whitespace-pre-wrap bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
             {report.notes}
           </p>
         )}
@@ -178,6 +171,6 @@ export function ProgressReportViewerPage() {
           )}
         </>
       )}
-    </div>
+    </PageLayout>
   );
 }
