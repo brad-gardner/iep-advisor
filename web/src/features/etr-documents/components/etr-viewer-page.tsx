@@ -5,6 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageHeader } from '@/components/ui/page-header';
+import { FileX } from 'lucide-react';
 import { useEtrDocument } from '../hooks/use-etr-documents';
 import { useEtrProcessing } from '../hooks/use-etr-processing';
 import { useEtrSections } from '../hooks/use-etr-sections';
@@ -45,17 +49,13 @@ export function EtrViewerPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading evaluation…" />
       </div>
     );
   }
 
   if (!etr) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-brand-slate-400">ETR document not found.</p>
-      </div>
-    );
+    return <EmptyState icon={FileX} title="ETR document not found." />;
   }
 
   const headerTitle =
@@ -102,69 +102,66 @@ export function EtrViewerPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-start">
-        <div>
-          <Link
-            to={`/children/${etr.childProfileId}`}
-            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
+      <Link
+        to={`/children/${etr.childProfileId}`}
+        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />
+        Back to child
+      </Link>
+
+      <PageHeader title={headerTitle} subtitle="Evaluation Team Report" />
+
+      <div className="flex items-center gap-3 flex-wrap">
+        {etr.evaluationType && (
+          <Badge variant="neutral">
+            {EVALUATION_TYPE_LABELS[etr.evaluationType] || etr.evaluationType}
+          </Badge>
+        )}
+        {etr.documentState && (
+          <Badge variant={etr.documentState === 'final' ? 'success' : 'neutral'}>
+            {DOCUMENT_STATE_LABELS[etr.documentState] || etr.documentState}
+          </Badge>
+        )}
+        <Badge variant="neutral">{etr.status}</Badge>
+        {etr.evaluationDate && (
+          <span className="text-[13px] text-brand-slate-500">
+            Evaluated: {new Date(etr.evaluationDate).toLocaleDateString()}
+          </span>
+        )}
+        {isPolling && (
+          <span
+            className="inline-flex items-center gap-1 text-[11px] text-brand-amber-500"
+            data-testid="etr-polling-indicator"
           >
-            <ArrowLeft className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />
-            Back to child
-          </Link>
-          <h1 className="font-serif text-[32px] font-semibold leading-tight mt-1 text-brand-slate-800">
-            {headerTitle}
-          </h1>
-          <p className="text-[13px] text-brand-slate-500 mt-1">Evaluation Team Report</p>
-          <div className="flex items-center gap-3 mt-2 flex-wrap">
-            {etr.evaluationType && (
-              <Badge variant="neutral">
-                {EVALUATION_TYPE_LABELS[etr.evaluationType] || etr.evaluationType}
-              </Badge>
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-amber-500 animate-pulse" />
+            Refreshing...
+          </span>
+        )}
+      </div>
+
+      {etr.notes && (
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setNotesExpanded(!notesExpanded)}
+            data-testid="etr-notes-toggle"
+          >
+            {notesExpanded ? (
+              <ChevronUp className="w-3.5 h-3.5 mr-1" strokeWidth={1.8} aria-hidden="true" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5 mr-1" strokeWidth={1.8} aria-hidden="true" />
             )}
-            {etr.documentState && (
-              <Badge variant={etr.documentState === 'final' ? 'success' : 'neutral'}>
-                {DOCUMENT_STATE_LABELS[etr.documentState] || etr.documentState}
-              </Badge>
-            )}
-            <Badge variant="neutral">{etr.status}</Badge>
-            {etr.evaluationDate && (
-              <span className="text-[13px] text-brand-slate-500">
-                Evaluated: {new Date(etr.evaluationDate).toLocaleDateString()}
-              </span>
-            )}
-            {isPolling && (
-              <span
-                className="inline-flex items-center gap-1 text-[11px] text-brand-amber-500"
-                data-testid="etr-polling-indicator"
-              >
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-amber-500 animate-pulse" />
-                Refreshing...
-              </span>
-            )}
-          </div>
-          {etr.notes && (
-            <div className="mt-2">
-              <button
-                onClick={() => setNotesExpanded(!notesExpanded)}
-                className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors"
-                data-testid="etr-notes-toggle"
-              >
-                {notesExpanded ? (
-                  <ChevronUp className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
-                ) : (
-                  <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
-                )}
-                Notes
-              </button>
-              {notesExpanded && (
-                <p className="mt-1 text-sm text-brand-slate-600 whitespace-pre-wrap bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-                  {etr.notes}
-                </p>
-              )}
-            </div>
+            Notes
+          </Button>
+          {notesExpanded && (
+            <p className="mt-1 text-sm text-brand-slate-600 whitespace-pre-wrap bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+              {etr.notes}
+            </p>
           )}
         </div>
-      </div>
+      )}
 
       {IN_FLIGHT.has(etr.status) && <EtrProcessingBanner status={etr.status} />}
       {etr.status === 'error' && (

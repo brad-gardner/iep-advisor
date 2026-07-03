@@ -135,10 +135,11 @@ export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormPro
       <div className="flex gap-2">
         <Button
           type="submit"
-          disabled={isSubmitting || !evaluationDate || !evaluationType}
+          loading={isSubmitting}
+          disabled={!evaluationDate || !evaluationType}
           data-testid="etr-create-submit"
         >
-          {isSubmitting ? 'Creating...' : 'Create ETR'}
+          Create ETR
         </Button>
         <Button type="button" variant="ghost" onClick={onCancel} data-testid="etr-create-cancel">
           Cancel

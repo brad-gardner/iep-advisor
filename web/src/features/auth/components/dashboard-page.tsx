@@ -5,14 +5,13 @@ import { DashboardChildrenSection } from "@/features/children/components/dashboa
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { Button } from "@/components/ui/button";
+import { PageLayout } from "@/components/ui/page-layout";
 
 export function DashboardPage() {
   const { user } = useAuth();
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-serif">Welcome, {user?.firstName}</h1>
-
+    <PageLayout title={`Welcome, ${user?.firstName ?? ""}`.trim()}>
       {user && !user.onboardingCompleted && (
         <div data-testid="onboarding-banner">
           <Notice
@@ -128,6 +127,6 @@ export function DashboardPage() {
           </Link>
         </div>
       </Card>
-    </div>
+    </PageLayout>
   );
 }

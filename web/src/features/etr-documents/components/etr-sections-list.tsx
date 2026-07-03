@@ -1,3 +1,7 @@
+import { FileText } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
+import { Notice } from '@/components/ui/notice';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { EtrSection } from '../types';
 import { EtrSectionCard } from './etr-section-card';
 
@@ -11,24 +15,22 @@ export function EtrSectionsList({ sections, isLoading, error }: EtrSectionsListP
   if (isLoading) {
     return (
       <div className="flex justify-center py-8" data-testid="etr-sections-loading">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-teal-500" />
+        <Spinner size="sm" label="Loading sections…" />
       </div>
     );
   }
 
   if (error) {
-    return (
-      <p className="text-sm text-brand-red" data-testid="etr-sections-error">
-        {error}
-      </p>
-    );
+    return <Notice variant="error" title={error} data-testid="etr-sections-error" />;
   }
 
   if (sections.length === 0) {
     return (
-      <p className="text-sm text-brand-slate-400" data-testid="etr-sections-empty">
-        No sections parsed yet.
-      </p>
+      <EmptyState
+        icon={FileText}
+        title="No sections parsed yet."
+        data-testid="etr-sections-empty"
+      />
     );
   }
 

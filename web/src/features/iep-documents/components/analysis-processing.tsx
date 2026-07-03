@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 
 interface AnalysisProcessingProps {
   onReload: () => void;
@@ -7,7 +8,7 @@ interface AnalysisProcessingProps {
 export function AnalysisProcessing({ onReload }: AnalysisProcessingProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-teal-500 mb-4" />
+      <Spinner size="lg" label="Analyzing…" className="mb-4" />
       <h3 className="font-serif text-[22px] font-semibold text-brand-slate-800 mb-2">
         Analyzing Your IEP
       </h3>

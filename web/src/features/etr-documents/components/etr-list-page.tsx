@@ -1,8 +1,11 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { FileSearch, Users } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageLayout } from '@/components/ui/page-layout';
 import { useAllEtrs } from '../hooks/use-all-etrs';
 import type { EtrDocumentListItem } from '../types';
 import { EtrListGroup } from './etr-list-group';
@@ -37,49 +40,40 @@ export function EtrListPage() {
   const groups = useMemo(() => groupByChild(etrs), [etrs]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-serif">Evaluations (ETRs)</h1>
-        <p className="mt-1 text-sm text-brand-slate-400 max-w-2xl">
-          An Evaluation Team Report (ETR) is the school's written evaluation that
-          determines whether your child qualifies for special education and what
-          supports they need. Review past evaluations and prepare for upcoming
-          meetings here.
-        </p>
-      </div>
-
+    <PageLayout
+      title="Evaluations (ETRs)"
+      subtitle="An Evaluation Team Report (ETR) is the school's written evaluation that determines whether your child qualifies for special education and what supports they need. Review past evaluations and prepare for upcoming meetings here."
+    >
       {loading && (
         <div className="flex justify-center py-12" data-testid="etr-list-loading">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+          <Spinner label="Loading evaluations…" />
         </div>
       )}
 
       {!loading && error && (
-        <Card className="text-center py-8" data-testid="etr-list-error">
-          <p className="text-brand-red mb-3">{error}</p>
-          <Button onClick={refresh} variant="secondary">
+        <Notice variant="error" title="Couldn't load evaluations" data-testid="etr-list-error">
+          <p className="mb-3">{error}</p>
+          <Button onClick={refresh} variant="secondary" size="sm">
             Try again
           </Button>
-        </Card>
+        </Notice>
       )}
 
       {!loading && !error && groups.length === 0 && (
-        <Card className="text-center py-12" data-testid="etr-list-empty">
-          <FileSearch
-            className="w-12 h-12 mx-auto text-brand-slate-300 mb-3"
-            strokeWidth={1.8}
-            aria-hidden="true"
-          />
-          <p className="text-brand-slate-400 mb-4">
-            No evaluations yet. Open a child's profile to add or upload an ETR.
-          </p>
-          <Link to="/children">
-            <Button data-testid="etr-list-empty-children-link">
-              <Users className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
-              Go to My Children
-            </Button>
-          </Link>
-        </Card>
+        <EmptyState
+          icon={FileSearch}
+          title="No evaluations yet."
+          description="Open a child's profile to add or upload an ETR."
+          action={
+            <Link to="/children">
+              <Button data-testid="etr-list-empty-children-link">
+                <Users className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
+                Go to My Children
+              </Button>
+            </Link>
+          }
+          data-testid="etr-list-empty"
+        />
       )}
 
       {!loading && !error && groups.length > 0 && (
@@ -95,6 +89,6 @@ export function EtrListPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageLayout>
   );
 }

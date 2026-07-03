@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link, Outlet } from "react-router-dom";
+import { UserX } from "lucide-react";
 import type { ChildProfile, CreateChildProfileRequest } from "@/types/api";
 import { getChild, updateChild, deleteChild } from "../api/children-api";
 import { ChildForm } from "./child-form";
@@ -8,12 +9,17 @@ import { SchoolLinkBadge } from "@/features/child-links/components/school-link-b
 import { getChildSchoolLinks } from "@/features/child-links/api/child-links-api";
 import type { ChildSchoolLink } from "@/features/child-links/types";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageLayout } from "@/components/ui/page-layout";
+import { useToast } from "@/components/ui/toast";
 import { TabsNav, TabLink } from "@/components/ui/tabs";
 
 export function ChildDetailPage() {
   const { childId: childIdParam } = useParams<{ childId: string }>();
   const childId = Number(childIdParam);
   const navigate = useNavigate();
+  const { show: showToast } = useToast();
   const [child, setChild] = useState<ChildProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -67,6 +73,7 @@ export function ChildDetailPage() {
           setChild(refreshed.data);
         }
         setIsEditing(false);
+        showToast({ message: "Changes saved", variant: "success" });
         return { success: true };
       }
       return { success: false, error: response.message || "Update failed" };
@@ -81,6 +88,7 @@ export function ChildDetailPage() {
     try {
       const response = await deleteChild(childId);
       if (response.success) {
+        showToast({ message: "Child profile removed", variant: "success" });
         navigate("/children");
       }
     } catch {
@@ -93,34 +101,35 @@ export function ChildDetailPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading child…" />
       </div>
     );
   }
 
   if (!child) {
     return (
-      <div className="text-center py-12">
-        <p className="text-brand-slate-400">Child profile not found.</p>
-        <Link
-          to="/children"
-          className="text-brand-teal-500 hover:underline mt-2 inline-block"
-        >
-          Back to children
-        </Link>
-      </div>
+      <EmptyState
+        icon={UserX}
+        title="Child profile not found."
+        action={
+          <Link to="/children">
+            <Button variant="secondary">Back to children</Button>
+          </Link>
+        }
+      />
     );
   }
 
   if (isEditing) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <h1 className="font-serif">Edit {child.firstName}</h1>
+      <PageLayout
+        title={`Edit ${child.firstName}`}
+        actions={
           <Button variant="ghost" onClick={() => setIsEditing(false)}>
             Cancel
           </Button>
-        </div>
+        }
+      >
         <ChildForm
           initialValues={{
             firstName: child.firstName,
@@ -133,7 +142,7 @@ export function ChildDetailPage() {
           onSubmit={handleUpdate}
           submitLabel="Save Changes"
         />
-      </div>
+      </PageLayout>
     );
   }
 
@@ -141,17 +150,15 @@ export function ChildDetailPage() {
   const base = `/children/${childId}`;
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <h1 className="font-serif">
-            {child.firstName} {child.lastName}
-          </h1>
-          {!isOwner && <SharedBadge role={child.role} />}
-          <SchoolLinkBadge links={schoolLinks} />
-        </div>
-        <div className="flex gap-2">
-          {isOwner && (
+    <PageLayout
+      title={`${child.firstName} ${child.lastName ?? ""}`.trim()}
+      breadcrumb={[
+        { label: "Children", to: "/children" },
+        { label: `${child.firstName} ${child.lastName ?? ""}`.trim() },
+      ]}
+      actions={
+        isOwner ? (
+          <>
             <Button
               variant="secondary"
               onClick={() => setIsEditing(true)}
@@ -159,19 +166,24 @@ export function ChildDetailPage() {
             >
               Edit
             </Button>
-          )}
-          {isOwner && (
             <Button
               variant="danger"
               onClick={handleDelete}
-              disabled={isDeleting}
+              loading={isDeleting}
               data-testid="child-remove-button"
             >
-              {isDeleting ? "Removing..." : "Remove"}
+              Remove
             </Button>
-          )}
+          </>
+        ) : undefined
+      }
+    >
+      {(child.role !== "owner" || schoolLinks.length > 0) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {!isOwner && <SharedBadge role={child.role} />}
+          <SchoolLinkBadge links={schoolLinks} />
         </div>
-      </div>
+      )}
 
       <TabsNav>
         <TabLink to={`${base}/overview`} testId="tab-overview">
@@ -197,7 +209,7 @@ export function ChildDetailPage() {
       <Outlet
         context={{ child, childId, reloadChild } satisfies ChildOutletContext}
       />
-    </div>
+    </PageLayout>
   );
 }
 

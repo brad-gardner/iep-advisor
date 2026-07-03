@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { getById } from "../api/etr-documents-api";
+import { Spinner } from "@/components/ui/spinner";
 
 export function EtrRouteRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -26,7 +27,7 @@ export function EtrRouteRedirect() {
   if (childId == null) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading evaluation…" />
       </div>
     );
   }

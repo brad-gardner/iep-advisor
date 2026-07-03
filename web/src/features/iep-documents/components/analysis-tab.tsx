@@ -10,6 +10,7 @@ import { StaleAnalysisBanner } from './stale-analysis-banner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
 
 interface AnalysisTabProps {
   analysis: IepAnalysis | null;
@@ -67,7 +68,7 @@ export function AnalysisTab({
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading analysis…" />
       </div>
     );
   }
@@ -87,8 +88,8 @@ export function AnalysisTab({
             {analysis.errorMessage || 'An error occurred during analysis.'}
           </Notice>
           <div className="mt-4">
-            <Button onClick={onTrigger} disabled={isTriggering}>
-              {isTriggering ? 'Retrying...' : 'Retry Analysis'}
+            <Button onClick={onTrigger} loading={isTriggering}>
+              Retry Analysis
             </Button>
           </div>
         </Card>

@@ -7,6 +7,7 @@ import {
   Download,
   Play,
   ArrowRightLeft,
+  FileX,
 } from "lucide-react";
 import type { IepDocument, IepSection } from "@/types/api";
 import {
@@ -24,6 +25,9 @@ import { useAdvocacyGoals } from "@/features/advocacy-goals/hooks/use-advocacy-g
 import { AnalysisTab } from "./analysis-tab";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
+import { Spinner } from "@/components/ui/spinner";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { PdfViewer } from "@/components/ui/pdf-viewer";
 import { ProgressReportsTab } from "@/features/progress-reports/components/progress-reports-tab";
 
@@ -186,171 +190,159 @@ export function IepViewerPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading document…" />
       </div>
     );
   }
 
   if (!document) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-brand-slate-400">Document not found.</p>
-      </div>
-    );
+    return <EmptyState icon={FileX} title="Document not found." />;
   }
+
+  const documentTitle =
+    document.fileName ||
+    (document.meetingType
+      ? MEETING_TYPE_LABELS[document.meetingType] || document.meetingType
+      : `IEP #${document.id}`);
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div>
-          <Link
-            to={`/children/${document.childProfileId}`}
-            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
-          >
-            <ArrowLeft
-              className="w-4 h-4"
-              strokeWidth={1.8}
-              aria-hidden="true"
-            />
-            Back to child
-          </Link>
-          <h1 className="font-serif text-[32px] font-semibold leading-tight mt-1 text-brand-slate-800">
-            {document.fileName ||
-              (document.meetingType
-                ? MEETING_TYPE_LABELS[document.meetingType] ||
-                  document.meetingType
-                : `IEP #${document.id}`)}
-          </h1>
-          <div className="flex items-center gap-3 mt-2 flex-wrap">
-            {document.meetingType && (
-              <Badge variant="neutral">
-                {MEETING_TYPE_LABELS[document.meetingType] ||
-                  document.meetingType}
-              </Badge>
-            )}
-            {childCurrentIepId === document.id && (
-              <Badge variant="success" data-testid="current-iep-badge">
-                Current IEP
-              </Badge>
-            )}
-            {childCurrentIepId !== document.id && childRole && childRole !== "viewer" && (
-              <button
-                onClick={handleMakeCurrent}
-                disabled={settingCurrent}
-                data-testid="make-current-iep-button"
-                className="text-[12px] font-medium text-brand-slate-400 hover:text-brand-teal-500 disabled:opacity-50 transition-colors"
-              >
-                {settingCurrent ? "Setting..." : "Make current"}
-              </button>
-            )}
-            {document.iepDate && (
-              <span className="text-[13px] text-brand-slate-500">
-                {new Date(document.iepDate).toLocaleDateString()}
-              </span>
-            )}
-            {document.attendees && (
-              <span className="text-[13px] text-brand-slate-500">
-                Attendees: {document.attendees}
-              </span>
-            )}
-          </div>
-          {document.notes && (
-            <div className="mt-2">
-              <button
-                onClick={() => setNotesExpanded(!notesExpanded)}
-                className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors"
-              >
-                {notesExpanded ? (
-                  <ChevronUp
-                    className="w-3.5 h-3.5"
+      <Link
+        to={`/children/${document.childProfileId}`}
+        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />
+        Back to child
+      </Link>
+
+      <PageHeader
+        title={documentTitle}
+        actions={
+          <>
+            {otherIeps.length > 0 && (
+              <div className="relative" ref={compareRef}>
+                <Button
+                  variant="secondary"
+                  onClick={() => setCompareOpen(!compareOpen)}
+                  data-testid="compare-button"
+                >
+                  <ArrowRightLeft
+                    className="w-4 h-4 mr-1.5"
                     strokeWidth={1.8}
                     aria-hidden="true"
                   />
-                ) : (
-                  <ChevronDown
-                    className="w-3.5 h-3.5"
-                    strokeWidth={1.8}
-                    aria-hidden="true"
-                  />
-                )}
-                Notes
-              </button>
-              {notesExpanded && (
-                <p className="mt-1 text-sm text-brand-slate-600 whitespace-pre-wrap bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-                  {document.notes}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="flex gap-2">
-          {otherIeps.length > 0 && (
-            <div className="relative" ref={compareRef}>
-              <Button
-                variant="secondary"
-                onClick={() => setCompareOpen(!compareOpen)}
-                data-testid="compare-button"
-              >
-                <ArrowRightLeft
-                  className="w-4 h-4 mr-1.5"
-                  strokeWidth={1.8}
-                  aria-hidden="true"
-                />
-                Compare
-              </Button>
-              {compareOpen && (
-                <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-card border border-brand-slate-200 shadow-lg z-20 py-1">
-                  <p className="px-3 py-1.5 text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
-                    Compare with...
-                  </p>
-                  {otherIeps.map((other) => (
-                    <button
-                      key={other.id}
-                      className="w-full text-left px-3 py-2 text-sm text-brand-slate-700 hover:bg-brand-slate-50 transition-colors"
-                      onClick={() => {
-                        setCompareOpen(false);
-                        navigate(
-                          `/children/${document.childProfileId}/compare/${documentId}/${other.id}`,
-                        );
-                      }}
-                    >
-                      <span className="font-medium">
-                        {other.iepDate
-                          ? new Date(other.iepDate).toLocaleDateString()
-                          : `IEP #${other.id}`}
-                      </span>
-                      {other.meetingType && (
-                        <span className="text-brand-slate-400 ml-2 text-[12px]">
-                          {MEETING_TYPE_LABELS[other.meetingType] ||
-                            other.meetingType}
+                  Compare
+                </Button>
+                {compareOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-card border border-brand-slate-200 shadow-lg z-20 py-1">
+                    <p className="px-3 py-1.5 text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
+                      Compare with...
+                    </p>
+                    {otherIeps.map((other) => (
+                      <button
+                        key={other.id}
+                        className="w-full text-left px-3 py-2 text-sm text-brand-slate-700 hover:bg-brand-slate-50 transition-colors"
+                        onClick={() => {
+                          setCompareOpen(false);
+                          navigate(
+                            `/children/${document.childProfileId}/compare/${documentId}/${other.id}`,
+                          );
+                        }}
+                      >
+                        <span className="font-medium">
+                          {other.iepDate
+                            ? new Date(other.iepDate).toLocaleDateString()
+                            : `IEP #${other.id}`}
                         </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          <Button variant="ghost" onClick={handleDownload}>
-            <Download
-              className="w-4 h-4 mr-1.5"
-              strokeWidth={1.8}
-              aria-hidden="true"
-            />
-            Download PDF
-          </Button>
-          {(document.status === "error" || document.status === "uploaded") && (
-            <Button onClick={handleReprocess}>
-              <Play
+                        {other.meetingType && (
+                          <span className="text-brand-slate-400 ml-2 text-[12px]">
+                            {MEETING_TYPE_LABELS[other.meetingType] ||
+                              other.meetingType}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <Button variant="ghost" onClick={handleDownload}>
+              <Download
                 className="w-4 h-4 mr-1.5"
                 strokeWidth={1.8}
                 aria-hidden="true"
               />
-              Process
+              Download PDF
             </Button>
+            {(document.status === "error" || document.status === "uploaded") && (
+              <Button onClick={handleReprocess}>
+                <Play
+                  className="w-4 h-4 mr-1.5"
+                  strokeWidth={1.8}
+                  aria-hidden="true"
+                />
+                Process
+              </Button>
+            )}
+          </>
+        }
+      />
+
+      <div className="flex items-center gap-3 flex-wrap">
+        {document.meetingType && (
+          <Badge variant="neutral">
+            {MEETING_TYPE_LABELS[document.meetingType] || document.meetingType}
+          </Badge>
+        )}
+        {childCurrentIepId === document.id && (
+          <Badge variant="success" data-testid="current-iep-badge">
+            Current IEP
+          </Badge>
+        )}
+        {childCurrentIepId !== document.id && childRole && childRole !== "viewer" && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleMakeCurrent}
+            loading={settingCurrent}
+            data-testid="make-current-iep-button"
+          >
+            Make current
+          </Button>
+        )}
+        {document.iepDate && (
+          <span className="text-[13px] text-brand-slate-500">
+            {new Date(document.iepDate).toLocaleDateString()}
+          </span>
+        )}
+        {document.attendees && (
+          <span className="text-[13px] text-brand-slate-500">
+            Attendees: {document.attendees}
+          </span>
+        )}
+      </div>
+
+      {document.notes && (
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setNotesExpanded(!notesExpanded)}
+          >
+            {notesExpanded ? (
+              <ChevronUp className="w-3.5 h-3.5 mr-1" strokeWidth={1.8} aria-hidden="true" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5 mr-1" strokeWidth={1.8} aria-hidden="true" />
+            )}
+            Notes
+          </Button>
+          {notesExpanded && (
+            <p className="mt-1 text-sm text-brand-slate-600 whitespace-pre-wrap bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+              {document.notes}
+            </p>
           )}
         </div>
-      </div>
+      )}
 
       {document.status === "processing" && (
         <Notice variant="warning" title="Processing">
