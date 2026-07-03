@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
  * UX consistency guard — the whole authenticated app has now been migrated onto
- * the design-system primitives. This enforces the two invariants the primitives
+ * the design-system primitives. This enforces the invariants the primitives
  * give FULL coverage for:
  *   - no hand-rolled `animate-spin` (use <Spinner>/<Skeleton>)
  *   - no raw Tailwind `red-*` / `brand-red` (use the `brand-danger` scale)
+ *   - no native `window.confirm()` (use <ConfirmDialog>)
  * across `src/features`, `src/app`, and `src/components/layouts`. The `ui/`
  * primitives are excluded (the canonical Spinner legitimately animates; the
  * danger scale is defined there).
@@ -27,6 +28,14 @@ const ENFORCED = [
     key: 'reds',
     label: 'raw red-*/brand-red (use brand-danger)',
     re: /(?:bg|text|border|ring|from|to|via)-red-[0-9]|brand-red\b/,
+  },
+  {
+    key: 'confirm',
+    // Native confirm()/window.confirm() — use <ConfirmDialog>. `\bconfirm\(`
+    // matches the bare/`window.` call but not ConfirmDialog, onConfirm,
+    // confirmLabel, confirmDelete, etc. (no word boundary inside those).
+    label: 'native window.confirm() (use <ConfirmDialog>)',
+    re: /\bconfirm\s*\(/,
   },
 ];
 const INFO = [{ key: 'rawButtons', label: 'raw <button> (native tabs/menus/switches/links — not enforced)', re: /<button[\s>\n]/ }];
