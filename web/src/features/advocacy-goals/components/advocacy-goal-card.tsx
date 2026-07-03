@@ -72,7 +72,7 @@ export function AdvocacyGoalCard({
           {onDelete && (
             <button
               onClick={onDelete}
-              className="p-1.5 text-brand-slate-300 hover:text-brand-red transition-colors"
+              className="p-1.5 text-brand-slate-300 hover:text-brand-danger-700 transition-colors"
               data-testid="goal-delete"
               aria-label="Delete goal"
             >

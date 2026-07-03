@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import type { AdvocacyGoal } from '@/types/api';
+import { Spinner } from '@/components/ui/spinner';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/toast';
 import {
   createAdvocacyGoal,
   updateAdvocacyGoal,
@@ -29,6 +32,7 @@ export function AdvocacyGoalsList({
 }: AdvocacyGoalsListProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const { show } = useToast();
 
   const handleCreate = async (data: { goalText: string; category?: string }) => {
     try {
@@ -36,6 +40,7 @@ export function AdvocacyGoalsList({
       if (response.success) {
         onReload();
         setIsAdding(false);
+        show({ message: 'Goal added', variant: 'success' });
         return { success: true };
       }
       return { success: false, error: response.message || 'Failed to create goal' };
@@ -53,6 +58,7 @@ export function AdvocacyGoalsList({
       if (response.success) {
         onReload();
         setEditingId(null);
+        show({ message: 'Goal updated', variant: 'success' });
         return { success: true };
       }
       return { success: false, error: response.message || 'Failed to update goal' };
@@ -67,6 +73,7 @@ export function AdvocacyGoalsList({
       const response = await deleteAdvocacyGoal(id);
       if (response.success) {
         onReload();
+        show({ message: 'Goal removed', variant: 'success' });
       }
     } catch {
       // handled by interceptor
@@ -96,7 +103,7 @@ export function AdvocacyGoalsList({
   if (isLoading) {
     return (
       <div className="flex justify-center py-6">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-teal-500" />
+        <Spinner size="sm" />
       </div>
     );
   }
@@ -120,13 +127,15 @@ export function AdvocacyGoalsList({
           {goals.length >= 10 && ' — Focused goals produce better analysis. Consider consolidating.'}
         </p>
         {!readOnly && !isAdding && goals.length < 10 && (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setIsAdding(true)}
-            className="text-sm text-brand-teal-500 hover:text-brand-teal-600 transition-colors"
+            className="text-brand-teal-500 hover:bg-brand-teal-50"
             data-testid="add-goal-button"
           >
             + Add Goal
-          </button>
+          </Button>
         )}
       </div>
 

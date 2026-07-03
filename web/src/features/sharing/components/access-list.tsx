@@ -4,6 +4,8 @@ import type { ChildAccessEntry } from '@/types/api';
 import { getAccessList, revokeAccess } from '../api/sharing-api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { useToast } from '@/components/ui/toast';
 
 interface AccessListProps {
   childId: number;
@@ -13,6 +15,7 @@ interface AccessListProps {
 export function AccessList({ childId, isOwner }: AccessListProps) {
   const [entries, setEntries] = useState<ChildAccessEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { show } = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -37,6 +40,7 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
       const response = await revokeAccess(childId, accessId);
       if (response.success) {
         load();
+        show({ message: 'Access revoked', variant: 'success' });
       }
     } catch {
       // handled by interceptor
@@ -46,7 +50,7 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
   if (isLoading) {
     return (
       <div className="flex justify-center py-4">
-        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-teal-500" />
+        <Spinner size="sm" />
       </div>
     );
   }

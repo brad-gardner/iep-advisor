@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { Notice } from "@/components/ui/notice";
+import { useToast } from "@/components/ui/toast";
 import type { ChildOutletContext } from "@/features/children/components/child-detail-page";
 import { useAnalysisRuns } from "../hooks/use-analysis-runs";
 import { createRun } from "../api/analysis-runs-api";
@@ -23,6 +24,7 @@ export function ChildAnalysisTab() {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const { show } = useToast();
 
   const isViewer = child.role === "viewer";
 
@@ -36,6 +38,7 @@ export function ChildAnalysisTab() {
         // A success message here is a non-blocking warning (e.g. duplicate sources).
         if (res.message) setWarning(res.message);
         setSelectedRunId(res.data.id);
+        show({ message: "Analysis started", variant: "success" });
         await reload();
       } else {
         setError(res.message || "Could not start analysis");

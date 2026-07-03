@@ -7,6 +7,8 @@ import { SectionDiff } from './section-diff';
 import { RedFlagResolution } from './red-flag-resolution';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
+import { Spinner } from '@/components/ui/spinner';
+import { PageLayout } from '@/components/ui/page-layout';
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', {
@@ -30,7 +32,7 @@ export function ComparisonView({
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading comparison…" />
       </div>
     );
   }
@@ -59,26 +61,18 @@ export function ComparisonView({
     goalChanges.modified.length > 0;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <Link
-          to={`/children/${childId}`}
-          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" strokeWidth={1.8} />
-          Back to child
-        </Link>
-
-        <h1 className="font-serif text-[32px] font-semibold leading-tight mt-1 text-brand-slate-800">
-          IEP Comparison
-        </h1>
-
-        <div className="flex items-center gap-2 mt-2 text-[15px] text-brand-slate-600">
-          <span className="font-medium">{formatDate(comparison.olderDate)}</span>
-          <ArrowRight className="w-4 h-4 text-brand-slate-400" strokeWidth={1.8} />
-          <span className="font-medium">{formatDate(comparison.newerDate)}</span>
-        </div>
+    <PageLayout
+      title="IEP Comparison"
+      breadcrumb={[
+        { label: 'Back to child', to: `/children/${childId}` },
+        { label: 'Comparison' },
+      ]}
+    >
+      {/* Date range */}
+      <div className="flex items-center gap-2 text-[15px] text-brand-slate-600">
+        <span className="font-medium">{formatDate(comparison.olderDate)}</span>
+        <ArrowRight className="w-4 h-4 text-brand-slate-400" strokeWidth={1.8} />
+        <span className="font-medium">{formatDate(comparison.newerDate)}</span>
       </div>
 
       {/* Summary stats */}
@@ -116,6 +110,6 @@ export function ComparisonView({
 
       {/* Red flag resolution */}
       <RedFlagResolution resolution={redFlagResolution} />
-    </div>
+    </PageLayout>
   );
 }

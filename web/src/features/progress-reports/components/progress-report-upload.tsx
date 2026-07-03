@@ -2,6 +2,8 @@ import { useCallback, useState } from "react";
 import { Upload } from "lucide-react";
 import { uploadFile } from "../api/progress-reports-api";
 import { Notice } from "@/components/ui/notice";
+import { Spinner } from "@/components/ui/spinner";
+import { useToast } from "@/components/ui/toast";
 
 interface ProgressReportUploadProps {
   progressReportId: number;
@@ -15,6 +17,7 @@ export function ProgressReportUpload({
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { show } = useToast();
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -34,6 +37,7 @@ export function ProgressReportUpload({
       try {
         const response = await uploadFile(progressReportId, file);
         if (response.success) {
+          show({ message: "File uploaded", variant: "success" });
           onUploaded();
         } else {
           setError(response.message || "Upload failed");
@@ -44,7 +48,7 @@ export function ProgressReportUpload({
         setIsUploading(false);
       }
     },
-    [progressReportId, onUploaded]
+    [progressReportId, onUploaded, show]
   );
 
   return (
@@ -88,7 +92,7 @@ export function ProgressReportUpload({
         />
         {isUploading ? (
           <div className="flex flex-col items-center gap-2">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand-teal-500" />
+            <Spinner size="sm" label="Uploading…" />
             <p className="text-brand-slate-400 text-sm">Uploading...</p>
           </div>
         ) : (

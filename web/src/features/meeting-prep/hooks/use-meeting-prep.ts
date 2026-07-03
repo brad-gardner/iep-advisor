@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MeetingPrepChecklist } from "@/types/api";
 import {
   getChecklistsByChild,
@@ -7,6 +7,7 @@ import {
   generateFromEtr as apiGenerateFromEtr,
 } from "../api/meeting-prep-api";
 import { usePolling } from "@/hooks/use-polling";
+import { useToast } from "@/components/ui/toast";
 
 export type MeetingPrepAnchor =
   | { type: "iep"; id: number }
@@ -35,6 +36,10 @@ export function useMeetingPrep(
   const [checklist, setChecklist] = useState<MeetingPrepChecklist | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const { show } = useToast();
+  // Tracks the last-seen status so we can fire a single success toast when a
+  // generating checklist transitions to completed (via the poll below).
+  const prevStatusRef = useRef<string | null>(null);
 
   // Depend on primitives, not the anchor object reference (callers commonly
   // pass a fresh object literal each render, which would loop effects).
@@ -67,11 +72,14 @@ export function useMeetingPrep(
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         );
         setChecklist(sorted[0] ?? null);
+        prevStatusRef.current = sorted[0]?.status ?? null;
       } else {
         setChecklist(null);
+        prevStatusRef.current = null;
       }
     } catch {
       setChecklist(null);
+      prevStatusRef.current = null;
     } finally {
       setIsLoading(false);
     }
@@ -109,6 +117,7 @@ export function useMeetingPrep(
         setChecklist((prev) =>
           prev ? { ...prev, status: "generating" } : makePlaceholder({}),
         );
+        prevStatusRef.current = "generating";
       } catch {
         // handled by caller
       } finally {
@@ -128,6 +137,7 @@ export function useMeetingPrep(
             ? { ...prev, status: "generating" }
             : makePlaceholder({ iepId }),
         );
+        prevStatusRef.current = "generating";
       } catch {
         // handled by caller
       } finally {
@@ -147,6 +157,7 @@ export function useMeetingPrep(
             ? { ...prev, status: "generating" }
             : makePlaceholder({ etrId }),
         );
+        prevStatusRef.current = "generating";
       } catch {
         // handled by caller
       } finally {
@@ -177,10 +188,19 @@ export function useMeetingPrep(
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
       if (sorted[0]) {
-        setChecklist(sorted[0]);
+        const next = sorted[0];
+        const prevStatus = prevStatusRef.current;
+        setChecklist(next);
+        if (
+          (prevStatus === "generating" || prevStatus === "pending") &&
+          next.status === "completed"
+        ) {
+          show({ message: "Meeting prep ready", variant: "success" });
+        }
+        prevStatusRef.current = next.status;
       }
     }
-  }, [childId, iepDocumentId, anchorType, anchorId]);
+  }, [childId, iepDocumentId, anchorType, anchorId, show]);
 
   const isInProgress =
     checklist?.status === "generating" || checklist?.status === "pending";

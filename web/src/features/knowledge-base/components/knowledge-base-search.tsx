@@ -1,4 +1,5 @@
 import { Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 interface KnowledgeBaseSearchProps {
   value: string;
@@ -9,18 +10,19 @@ export function KnowledgeBaseSearch({ value, onChange }: KnowledgeBaseSearchProp
   return (
     <div className="relative">
       <Search
-        className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-slate-300"
+        className="absolute left-3 top-1/2 -translate-y-1/2 z-10 text-brand-slate-300"
         size={18}
         strokeWidth={1.8}
         aria-hidden="true"
       />
-      <input
+      <Input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Search knowledge base..."
+        aria-label="Search knowledge base"
         data-testid="kb-search"
-        className="w-full pl-10 pr-3 py-2 bg-white rounded-input text-brand-slate-800 text-sm border border-brand-slate-200 focus:outline-none focus:border-brand-teal-400 focus:ring-[3px] focus:ring-brand-teal-50 transition-colors placeholder:text-brand-slate-300"
+        className="!pl-10"
       />
     </div>
   );

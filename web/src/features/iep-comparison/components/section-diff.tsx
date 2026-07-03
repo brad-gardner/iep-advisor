@@ -25,7 +25,7 @@ function SectionRow({
 }) {
   const indicatorStyles = {
     '+': 'text-brand-teal-600 bg-brand-teal-50',
-    '-': 'text-brand-red bg-red-50',
+    '-': 'text-brand-danger-700 bg-brand-danger-50',
     '=': 'text-brand-slate-400 bg-brand-slate-50',
   };
 

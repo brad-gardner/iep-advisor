@@ -4,6 +4,7 @@ import { createInvite } from '../api/sharing-api';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
+import { useToast } from '@/components/ui/toast';
 
 interface ShareChildDialogProps {
   childId: number;
@@ -16,7 +17,7 @@ export function ShareChildDialog({ childId, onInvited, onCancel }: ShareChildDia
   const [role, setRole] = useState('viewer');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const { show } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,13 +25,12 @@ export function ShareChildDialog({ childId, onInvited, onCancel }: ShareChildDia
 
     setIsSubmitting(true);
     setError(null);
-    setSuccess(false);
 
     try {
       const response = await createInvite(childId, { email: email.trim(), role });
       if (response.success) {
-        setSuccess(true);
         setEmail('');
+        show({ message: 'Invite sent successfully', variant: 'success' });
         onInvited();
       } else {
         setError(response.message || 'Failed to send invite');
@@ -49,12 +49,6 @@ export function ShareChildDialog({ childId, onInvited, onCancel }: ShareChildDia
       {error && (
         <div className="mb-3">
           <Notice variant="error" title={error} />
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-3">
-          <Notice variant="success" title="Invite sent successfully" />
         </div>
       )}
 
@@ -81,9 +75,14 @@ export function ShareChildDialog({ childId, onInvited, onCancel }: ShareChildDia
         </Select>
 
         <div className="flex gap-2 pt-1">
-          <Button type="submit" disabled={isSubmitting || !email.trim()} data-testid="share-submit">
+          <Button
+            type="submit"
+            loading={isSubmitting}
+            disabled={!email.trim()}
+            data-testid="share-submit"
+          >
             <Send className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
-            {isSubmitting ? 'Sending...' : 'Send Invite'}
+            Send Invite
           </Button>
           <Button variant="ghost" type="button" onClick={onCancel}>
             Cancel

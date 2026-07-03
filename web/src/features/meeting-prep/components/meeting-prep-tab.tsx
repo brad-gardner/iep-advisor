@@ -8,6 +8,7 @@ import type { MeetingPrepChecklist, CheckItemRequest } from "@/types/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
+import { Spinner } from "@/components/ui/spinner";
 import { ChecklistSection } from "./checklist-section";
 import { MeetingPrepEmptyState } from "./meeting-prep-empty-state";
 import { checkItem } from "../api/meeting-prep-api";
@@ -96,7 +97,7 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-teal-500" />
+        <Spinner label="Loading meeting prep…" />
       </div>
     );
   }
@@ -121,7 +122,7 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
   ) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-teal-500 mb-4" />
+        <Spinner size="lg" className="mb-4" label="Generating your checklist…" />
         <h3 className="font-serif text-[22px] font-semibold text-brand-slate-800 mb-2">
           Generating Your Checklist
         </h3>
@@ -142,8 +143,8 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
               "An error occurred while generating the checklist."}
           </Notice>
           <div className="mt-4">
-            <Button onClick={onGenerate} disabled={isGenerating}>
-              {isGenerating ? "Retrying..." : "Retry"}
+            <Button onClick={onGenerate} loading={isGenerating}>
+              Retry
             </Button>
           </div>
         </Card>
@@ -249,8 +250,8 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
             carried over.
           </p>
           <div className="flex gap-2">
-            <Button onClick={handleRegenerate} disabled={isGenerating}>
-              {isGenerating ? "Generating..." : "Regenerate"}
+            <Button onClick={handleRegenerate} loading={isGenerating}>
+              Regenerate
             </Button>
             <Button
               variant="ghost"

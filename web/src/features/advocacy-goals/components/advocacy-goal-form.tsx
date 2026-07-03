@@ -99,8 +99,13 @@ export function AdvocacyGoalForm({
               Cancel
             </Button>
           )}
-          <Button type="submit" disabled={isSubmitting || goalText.trim().length < 10} data-testid="goal-form-submit">
-            {isSubmitting ? 'Saving...' : submitLabel}
+          <Button
+            type="submit"
+            loading={isSubmitting}
+            disabled={goalText.trim().length < 10}
+            data-testid="goal-form-submit"
+          >
+            {submitLabel}
           </Button>
         </div>
       </div>

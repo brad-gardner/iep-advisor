@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRightLeft } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
 import { useIepTimeline } from '../hooks/use-iep-timeline';
 import type { TimelineEntry } from '@/types/api';
 
@@ -46,7 +47,7 @@ function TimelineEntryCard({ entry }: { entry: TimelineEntry }) {
           <span className="font-medium text-brand-slate-700">{entry.sectionCount}</span> sections
         </span>
         {entry.redFlagCount > 0 && (
-          <span className="text-brand-red">
+          <span className="text-brand-danger-700">
             <span className="font-medium">{entry.redFlagCount}</span> red flags
           </span>
         )}
@@ -83,7 +84,7 @@ export function IepTimeline({ childId }: { childId: number }) {
   if (isLoading) {
     return (
       <div className="flex justify-center py-6">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-teal-500" />
+        <Spinner size="sm" />
       </div>
     );
   }

@@ -125,10 +125,11 @@ export function SourcePicker({ childId, isRunning, onRun }: SourcePickerProps) {
       <div className="mt-5">
         <Button
           onClick={handleRun}
-          disabled={selected.size === 0 || isRunning}
+          loading={isRunning}
+          disabled={selected.size === 0}
           data-testid="run-analysis-button"
         >
-          {isRunning ? "Starting…" : "Run analysis"}
+          Run analysis
         </Button>
       </div>
     </Card>
