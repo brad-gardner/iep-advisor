@@ -69,8 +69,8 @@ export function ForgotPasswordPage() {
           data-testid="forgot-email"
         />
 
-        <Button type="submit" disabled={isLoading} className="w-full" data-testid="forgot-submit">
-          {isLoading ? 'Sending...' : 'Send Reset Link'}
+        <Button type="submit" loading={isLoading} className="w-full" data-testid="forgot-submit">
+          Send Reset Link
         </Button>
       </form>
 

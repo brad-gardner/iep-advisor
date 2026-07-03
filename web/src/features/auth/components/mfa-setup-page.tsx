@@ -83,8 +83,8 @@ export function MfaSetupPage() {
             </div>
           )}
           <div className="flex gap-3">
-            <Button onClick={handleSetup} disabled={isLoading}>
-              {isLoading ? 'Setting up...' : 'Get Started'}
+            <Button onClick={handleSetup} loading={isLoading}>
+              Get Started
             </Button>
             <Button variant="ghost" onClick={() => navigate('/profile')}>
               Cancel
@@ -154,8 +154,8 @@ export function MfaSetupPage() {
             />
 
             <div className="flex gap-3">
-              <Button type="submit" disabled={isLoading} className="flex-1">
-                {isLoading ? 'Verifying...' : 'Verify & Enable'}
+              <Button type="submit" loading={isLoading} className="flex-1">
+                Verify & Enable
               </Button>
               <Button variant="ghost" type="button" onClick={() => setStep('qr')}>
                 Back

@@ -112,8 +112,8 @@ export function MfaVerifyPage() {
               />
             )}
 
-            <Button type="submit" disabled={isLoading} className="w-full">
-              {isLoading ? 'Verifying...' : 'Verify'}
+            <Button type="submit" loading={isLoading} className="w-full">
+              Verify
             </Button>
           </form>
 

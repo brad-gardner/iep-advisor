@@ -74,8 +74,8 @@ export function LoginPage() {
           </div>
         </div>
 
-        <Button type="submit" disabled={isLoading} className="w-full" data-testid="login-submit">
-          {isLoading ? 'Signing in...' : 'Sign In'}
+        <Button type="submit" loading={isLoading} className="w-full" data-testid="login-submit">
+          Sign In
         </Button>
       </form>
 

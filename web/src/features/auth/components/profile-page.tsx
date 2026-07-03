@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Notice } from '@/components/ui/notice';
+import { PageLayout } from '@/components/ui/page-layout';
 
 function MfaSection() {
   const { user } = useAuth();
@@ -84,8 +85,8 @@ function MfaSection() {
                   maxLength={6}
                 />
                 <div className="flex gap-3">
-                  <Button type="submit" disabled={isLoading}>
-                    {isLoading ? 'Disabling...' : 'Confirm Disable'}
+                  <Button type="submit" loading={isLoading}>
+                    Confirm Disable
                   </Button>
                   <Button
                     variant="ghost"
@@ -147,9 +148,7 @@ export function ProfilePage() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-serif">Your Profile</h1>
-
+    <PageLayout title="Profile">
       <Card className="max-w-lg">
         <form onSubmit={handleSubmit} className="space-y-4">
           {message && (
@@ -194,8 +193,8 @@ export function ProfilePage() {
             </p>
           </div>
 
-          <Button type="submit" disabled={isSubmitting || !firstName.trim()} className="w-full" data-testid="profile-save">
-            {isSubmitting ? 'Saving...' : 'Save Changes'}
+          <Button type="submit" loading={isSubmitting} disabled={!firstName.trim()} className="w-full" data-testid="profile-save">
+            Save Changes
           </Button>
         </form>
       </Card>
@@ -223,6 +222,6 @@ export function ProfilePage() {
         </h2>
         <AccountDeletionSection />
       </Card>
-    </div>
+    </PageLayout>
   );
 }

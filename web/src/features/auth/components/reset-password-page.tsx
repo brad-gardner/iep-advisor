@@ -99,8 +99,8 @@ export function ResetPasswordPage() {
           data-testid="reset-confirm-password"
         />
 
-        <Button type="submit" disabled={isLoading} className="w-full" data-testid="reset-submit">
-          {isLoading ? 'Resetting...' : 'Reset Password'}
+        <Button type="submit" loading={isLoading} className="w-full" data-testid="reset-submit">
+          Reset Password
         </Button>
       </form>
 
