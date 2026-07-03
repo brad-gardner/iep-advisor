@@ -1,19 +1,26 @@
-import { useToast } from '@/components/ui/toast';
-import { useEditorContext } from '../hooks/use-editor-context';
-import { AccommodationRow } from './accommodation-row';
-import { AddRowButton } from './add-row-button';
-import { EmptyHint } from './empty-hint';
+import { useState } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/toast";
+import { useEditorContext } from "../hooks/use-editor-context";
+import { AccommodationRow } from "./accommodation-row";
+import { AddRowButton } from "./add-row-button";
+import { EmptyHint } from "./empty-hint";
 
 export function AccommodationsList() {
   const { draftApi } = useEditorContext();
   const { show } = useToast();
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const accommodations = draftApi.draft?.accommodations ?? [];
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Delete this accommodation? This cannot be undone.')) return;
-    if (await draftApi.removeAccommodation(id)) {
-      show({ message: 'Accommodation deleted', variant: 'success' });
+  const confirmDelete = async () => {
+    if (pendingDeleteId === null) return;
+    setIsDeleting(true);
+    if (await draftApi.removeAccommodation(pendingDeleteId)) {
+      show({ message: "Accommodation deleted", variant: "success" });
     }
+    setIsDeleting(false);
+    setPendingDeleteId(null);
   };
 
   return (
@@ -25,13 +32,24 @@ export function AccommodationsList() {
         <AccommodationRow
           key={accommodation.id}
           accommodation={accommodation}
-          onDelete={handleDelete}
+          onDelete={setPendingDeleteId}
         />
       ))}
       <AddRowButton
         onClick={() => void draftApi.addAccommodation()}
         label="Add accommodation"
         testId="add-accommodation"
+      />
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Delete accommodation"
+        message="Delete this accommodation? This cannot be undone."
+        confirmLabel="Delete accommodation"
+        loading={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDeleteId(null)}
+        data-testid="accommodation-delete-dialog"
       />
     </section>
   );

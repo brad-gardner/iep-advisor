@@ -9,7 +9,8 @@ import { IepDocumentList } from "@/features/iep-documents/components/iep-documen
 import type { ChildOutletContext } from "./child-detail-page";
 
 export function ChildIepsTab() {
-  const { child, childId, reloadChild } = useOutletContext<ChildOutletContext>();
+  const { child, childId, reloadChild } =
+    useOutletContext<ChildOutletContext>();
   const [showCreateIep, setShowCreateIep] = useState(false);
   const {
     documents,

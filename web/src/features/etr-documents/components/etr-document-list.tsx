@@ -1,19 +1,19 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Trash2, Eye, FileSearch } from 'lucide-react';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Spinner } from '@/components/ui/spinner';
-import { EmptyState } from '@/components/ui/empty-state';
-import { useToast } from '@/components/ui/toast';
-import { remove as removeEtr } from '../api/etr-documents-api';
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Trash2, Eye, FileSearch } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Spinner } from "@/components/ui/spinner";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useToast } from "@/components/ui/toast";
+import { remove as removeEtr } from "../api/etr-documents-api";
 import {
   DOCUMENT_STATE_LABELS,
   EVALUATION_TYPE_LABELS,
   type EtrDocument,
-} from '../types';
+} from "../types";
 
 interface EtrDocumentListProps {
   etrs: EtrDocument[];
@@ -21,20 +21,27 @@ interface EtrDocumentListProps {
   onDeleted: () => void;
 }
 
-const STATUS_VARIANTS: Record<string, 'neutral' | 'warning' | 'success' | 'error'> = {
-  created: 'neutral',
-  uploaded: 'neutral',
-  processing: 'warning',
-  parsed: 'success',
-  error: 'error',
+const STATUS_VARIANTS: Record<
+  string,
+  "neutral" | "warning" | "success" | "error"
+> = {
+  created: "neutral",
+  uploaded: "neutral",
+  processing: "warning",
+  parsed: "success",
+  error: "error",
 };
 
 function formatDate(value: string | null): string {
-  if (!value) return '';
+  if (!value) return "";
   return new Date(value).toLocaleDateString();
 }
 
-export function EtrDocumentList({ etrs, isLoading, onDeleted }: EtrDocumentListProps) {
+export function EtrDocumentList({
+  etrs,
+  isLoading,
+  onDeleted,
+}: EtrDocumentListProps) {
   const { show: showToast } = useToast();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
@@ -58,7 +65,7 @@ export function EtrDocumentList({ etrs, isLoading, onDeleted }: EtrDocumentListP
     try {
       const response = await removeEtr(id);
       if (response.success) {
-        showToast({ message: 'ETR deleted', variant: 'success' });
+        showToast({ message: "ETR deleted", variant: "success" });
         setPendingDeleteId(null);
         onDeleted();
       }
@@ -92,20 +99,28 @@ export function EtrDocumentList({ etrs, isLoading, onDeleted }: EtrDocumentListP
                   </Link>
                   {etr.evaluationType && (
                     <Badge variant="neutral">
-                      {EVALUATION_TYPE_LABELS[etr.evaluationType] || etr.evaluationType}
+                      {EVALUATION_TYPE_LABELS[etr.evaluationType] ||
+                        etr.evaluationType}
                     </Badge>
                   )}
                   {etr.documentState && (
-                    <Badge variant={etr.documentState === 'final' ? 'success' : 'neutral'}>
-                      {DOCUMENT_STATE_LABELS[etr.documentState] || etr.documentState}
+                    <Badge
+                      variant={
+                        etr.documentState === "final" ? "success" : "neutral"
+                      }
+                    >
+                      {DOCUMENT_STATE_LABELS[etr.documentState] ||
+                        etr.documentState}
                     </Badge>
                   )}
-                  <Badge variant={STATUS_VARIANTS[etr.status] || 'neutral'}>
+                  <Badge variant={STATUS_VARIANTS[etr.status] || "neutral"}>
                     {etr.status}
                   </Badge>
                 </div>
                 <div className="flex gap-3 text-[11px] text-brand-slate-400 mt-1">
-                  {etr.evaluationDate && <span>Evaluated: {formatDate(etr.evaluationDate)}</span>}
+                  {etr.evaluationDate && (
+                    <span>Evaluated: {formatDate(etr.evaluationDate)}</span>
+                  )}
                   <span>Created {formatDate(etr.createdAt)}</span>
                 </div>
               </div>
@@ -115,7 +130,11 @@ export function EtrDocumentList({ etrs, isLoading, onDeleted }: EtrDocumentListP
                   className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-teal-500 hover:text-brand-teal-600 transition-colors"
                   data-testid="etr-view-link"
                 >
-                  <Eye className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
+                  <Eye
+                    className="w-3.5 h-3.5"
+                    strokeWidth={1.8}
+                    aria-hidden="true"
+                  />
                   View
                 </Link>
                 <Button
@@ -125,7 +144,11 @@ export function EtrDocumentList({ etrs, isLoading, onDeleted }: EtrDocumentListP
                   loading={deletingId === etr.id}
                   data-testid="etr-delete-button"
                 >
-                  <Trash2 className="w-3.5 h-3.5 mr-1" strokeWidth={1.8} aria-hidden="true" />
+                  <Trash2
+                    className="w-3.5 h-3.5 mr-1"
+                    strokeWidth={1.8}
+                    aria-hidden="true"
+                  />
                   Delete
                 </Button>
               </div>

@@ -102,11 +102,7 @@ export function ProgressReportList({
   return (
     <div className="space-y-2">
       {reports.map((r) => (
-        <Card
-          key={r.id}
-          className="p-3"
-          data-testid="progress-report-card"
-        >
+        <Card key={r.id} className="p-3" data-testid="progress-report-card">
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
@@ -115,7 +111,10 @@ export function ProgressReportList({
                   className="text-[13px] font-medium truncate text-brand-slate-800 hover:text-brand-teal-500 transition-colors"
                 >
                   {r.fileName ||
-                    formatPeriod(r.reportingPeriodStart, r.reportingPeriodEnd) ||
+                    formatPeriod(
+                      r.reportingPeriodStart,
+                      r.reportingPeriodEnd,
+                    ) ||
                     `Progress Report #${r.id}`}
                 </Link>
                 <Badge variant={STATUS_VARIANTS[r.status] || "neutral"}>

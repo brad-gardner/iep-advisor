@@ -1,34 +1,46 @@
-import { useState } from 'react';
-import { Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/input';
-import { useToast } from '@/components/ui/toast';
-import { useEditorContext } from '../hooks/use-editor-context';
-import { SECTION_KINDS } from '../lib/section-kinds';
-import type { IepSectionKind } from '../types';
-import { EmptyHint } from './empty-hint';
-import { SectionEditor } from './section-editor';
+import { useState } from "react";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Select } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast";
+import { useEditorContext } from "../hooks/use-editor-context";
+import { SECTION_KINDS } from "../lib/section-kinds";
+import type { IepSectionKind } from "../types";
+import { EmptyHint } from "./empty-hint";
+import { SectionEditor } from "./section-editor";
 
 export function NarrativeSectionsPanel() {
   const { draftApi } = useEditorContext();
   const { show } = useToast();
   const sections = draftApi.draft?.sections ?? [];
   const [kind, setKind] = useState<IepSectionKind>(SECTION_KINDS[0].value);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Delete this section? This cannot be undone.')) return;
-    if (await draftApi.removeSection(id)) {
-      show({ message: 'Section deleted', variant: 'success' });
+  const confirmDelete = async () => {
+    if (pendingDeleteId === null) return;
+    setIsDeleting(true);
+    if (await draftApi.removeSection(pendingDeleteId)) {
+      show({ message: "Section deleted", variant: "success" });
     }
+    setIsDeleting(false);
+    setPendingDeleteId(null);
   };
 
   return (
     <section className="space-y-4" data-testid="narrative-sections-panel">
       {sections.length === 0 && (
-        <EmptyHint>No narrative sections yet. Pick a kind and add one.</EmptyHint>
+        <EmptyHint>
+          No narrative sections yet. Pick a kind and add one.
+        </EmptyHint>
       )}
       {sections.map((section) => (
-        <SectionEditor key={section.id} section={section} onDelete={handleDelete} />
+        <SectionEditor
+          key={section.id}
+          section={section}
+          onDelete={setPendingDeleteId}
+        />
       ))}
       <div className="flex items-end gap-2">
         <div className="w-56">
@@ -54,6 +66,17 @@ export function NarrativeSectionsPanel() {
           Add section
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Delete section"
+        message="Delete this section? This cannot be undone."
+        confirmLabel="Delete section"
+        loading={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDeleteId(null)}
+        data-testid="section-delete-dialog"
+      />
     </section>
   );
 }

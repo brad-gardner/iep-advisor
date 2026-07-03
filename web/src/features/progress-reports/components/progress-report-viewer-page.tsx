@@ -92,6 +92,7 @@ export function ProgressReportViewerPage() {
   return (
     <PageLayout
       title={title}
+      className="max-w-5xl"
       breadcrumb={[
         { label: "Back to IEP", to: `/children/${childId}/ieps/${id}` },
         { label: "Progress Report" },
