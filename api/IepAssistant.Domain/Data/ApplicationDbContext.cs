@@ -58,6 +58,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<StudentInvite> StudentInvites => Set<StudentInvite>();
     public DbSet<StudentWorkspace> StudentWorkspaces => Set<StudentWorkspace>();
     public DbSet<StudentWorkspaceEntry> StudentWorkspaceEntries => Set<StudentWorkspaceEntry>();
+    public DbSet<DocumentType> DocumentTypes => Set<DocumentType>();
+    public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
+    public DbSet<DocumentTemplateVersion> DocumentTemplateVersions => Set<DocumentTemplateVersion>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

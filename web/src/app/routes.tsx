@@ -37,6 +37,7 @@ import { AdminRouteGuard } from '@/features/admin/components/admin-route-guard';
 import { AdminDashboardPage } from '@/features/admin/components/admin-dashboard-page';
 import { AdminUsersPage } from '@/features/admin/components/admin-users-page';
 import { AdminUserDetail } from '@/features/admin/components/admin-user-detail';
+import { TemplateListPage } from '@/features/admin/templates/template-list-page';
 import { EducatorHomePage } from '@/features/educator/pages/educator-home-page';
 import { EducatorStudentsPage } from '@/features/educator/pages/educator-students-page';
 import { EducatorStudentDetailPage } from '@/features/educator/pages/educator-student-detail-page';
@@ -563,6 +564,18 @@ export function AppRouter() {
             <MainLayout>
               <AdminRouteGuard>
                 <AdminUserDetail />
+              </AdminRouteGuard>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/templates"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <AdminRouteGuard>
+                <TemplateListPage />
               </AdminRouteGuard>
             </MainLayout>
           </ProtectedRoute>

@@ -57,15 +57,23 @@ const US_STATES = [
 interface StateSelectorProps {
   value: string;
   onChange: (value: string) => void;
+  /** DOM id — override when more than one selector can share a page. */
+  id?: string;
+  'data-testid'?: string;
 }
 
-export function StateSelector({ value, onChange }: StateSelectorProps) {
+export function StateSelector({
+  value,
+  onChange,
+  id = 'state',
+  'data-testid': testId = 'profile-state',
+}: StateSelectorProps) {
   return (
     <Select
-      id="state"
+      id={id}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      data-testid="profile-state"
+      data-testid={testId}
     >
       <option value="">Select a state...</option>
       {US_STATES.map((s) => (
