@@ -63,6 +63,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<DocumentTemplateVersion> DocumentTemplateVersions => Set<DocumentTemplateVersion>();
     public DbSet<TemplateSection> TemplateSections => Set<TemplateSection>();
     public DbSet<TemplateField> TemplateFields => Set<TemplateField>();
+    public DbSet<DocumentInstance> DocumentInstances => Set<DocumentInstance>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
