@@ -65,3 +65,44 @@ export interface SaveValuesRequest {
   values: DocumentValuePatch;
   rowVersion?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 4 — finalize → immutable authored version → dynamic PDF
+// ---------------------------------------------------------------------------
+
+/** PDF render lifecycle for a finalized authored version. */
+export type PdfRenderStatus = 'Pending' | 'Rendered' | 'Error';
+
+/** An immutable finalized version of an authored document (summary row). */
+export interface AuthoredDocumentVersionSummaryDto {
+  id: number;
+  schoolStudentId: number;
+  documentTypeId: number;
+  documentTypeKey: string;
+  documentTypeDisplayName: string;
+  /** Per (student, documentType) — IEP and ETR number independently. */
+  versionNumber: number;
+  finalizedByUserId: number | null;
+  finalizedAt: string;
+  pdfRenderStatus: PdfRenderStatus | null;
+}
+
+/** Full frozen snapshot: the summary plus the pinned template tree + values. */
+export interface AuthoredDocumentVersionDetailDto extends AuthoredDocumentVersionSummaryDto {
+  documentTemplateVersionId: number;
+  /** Frozen value-document keyed by `FieldKey` (guid). See DocumentFieldValue. */
+  values: Record<string, unknown>;
+  pdfBlobUri: string | null;
+  pdfRenderedAt: string | null;
+  /** The immutable template version this snapshot was rendered against. */
+  templateVersion: TemplateVersionDetailDto;
+}
+
+/** PDF render status for a finalized version (url set only when Rendered). */
+export interface AuthoredDocumentPdfStatusDto {
+  versionId: number;
+  renderStatus: PdfRenderStatus;
+  url: string | null;
+  renderedAt: string | null;
+  errorMessage: string | null;
+}

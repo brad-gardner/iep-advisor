@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useAutosave } from '@/features/iep-authoring/hooks/use-autosave';
+import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { fieldElementId, type FieldRendererProps } from './types';
 
 /** Boolean checkbox. Stored as a `true`/`false` value. */
@@ -11,6 +12,7 @@ export function CheckboxField({ field, value, disabled, onSave }: FieldRendererP
     useCallback(async (v) => void (await onSave({ [field.fieldKey]: v })), [field.fieldKey, onSave]),
     { delay: 0 }
   );
+  useRegisterFlush(field.fieldKey, autosave.flush);
 
   const handleToggle = (next: boolean) => {
     setChecked(next);

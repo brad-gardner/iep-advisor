@@ -58,6 +58,9 @@ export function useDocumentInstance(instanceId: number) {
   }, []);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  // Mirrors the last settled save outcome so finalize can gate on fresh values
+  // (closure state would be stale right after an awaited flush).
+  const errorRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -100,9 +103,11 @@ export function useDocumentInstance(instanceId: number) {
 
   const settleStatus = useCallback((ok: boolean) => {
     pendingRef.current -= 1;
+    if (!ok) errorRef.current = true;
     if (pendingRef.current > 0) return; // more saves still queued → stay 'saving'
     if (!mountedRef.current) return;
     if (ok) {
+      errorRef.current = false;
       setSaveStatus('saved');
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
       savedTimerRef.current = setTimeout(() => {
@@ -112,6 +117,20 @@ export function useDocumentInstance(instanceId: number) {
       setSaveStatus('error');
     }
   }, []);
+
+  /**
+   * Fresh (ref-based) save snapshot for the finalize gate: whether the last
+   * settled save errored, whether a 409 is latched, and whether saves are still
+   * in flight. Read AFTER awaiting flushAll() to avoid snapshotting stale data.
+   */
+  const getSaveState = useCallback(
+    () => ({
+      hasError: errorRef.current,
+      conflict: conflictRef.current,
+      pending: pendingRef.current > 0,
+    }),
+    []
+  );
 
   /**
    * Serialized save of a field-value patch. Reads the current rowVersion at
@@ -162,6 +181,7 @@ export function useDocumentInstance(instanceId: number) {
     conflict,
     reloadKey,
     saveStatus,
+    getSaveState,
     readOnly: detail !== null && detail.status !== 'Draft',
     reload,
     saveValues,

@@ -12,8 +12,14 @@ import { useToast } from '@/components/ui/toast';
 import { relativeTime } from '@/features/iep-authoring/lib/relative-time';
 import { deleteDocument } from '../api/documents-api';
 import { useDocumentList } from '../hooks/use-document-list';
+import { useAuthoredVersions } from '../hooks/use-authored-versions';
 import { NewDocumentModal } from '../components/new-document-modal';
-import type { DocumentInstanceStatus, DocumentInstanceSummaryDto } from '../types';
+import { AuthoredPdfDownload } from '../components/authored-pdf-download';
+import type {
+  AuthoredDocumentVersionSummaryDto,
+  DocumentInstanceStatus,
+  DocumentInstanceSummaryDto,
+} from '../types';
 
 const statusVariant: Record<DocumentInstanceStatus, 'neutral' | 'warning' | 'success'> = {
   Draft: 'neutral',
@@ -27,6 +33,11 @@ export function DocumentListPage() {
   const navigate = useNavigate();
   const { show } = useToast();
   const { documents, isLoading, error, removeDocument } = useDocumentList(studentId);
+  const {
+    versions,
+    isLoading: versionsLoading,
+    error: versionsError,
+  } = useAuthoredVersions(studentId);
 
   const [isNewOpen, setIsNewOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DocumentInstanceSummaryDto | null>(null);
@@ -91,6 +102,41 @@ export function DocumentListPage() {
     },
   ];
 
+  const versionColumns: TableColumn<AuthoredDocumentVersionSummaryDto>[] = [
+    {
+      key: 'type',
+      header: 'Document',
+      cell: (v) => v.documentTypeDisplayName,
+      sortValue: (v) => v.documentTypeDisplayName,
+    },
+    {
+      key: 'version',
+      header: 'Version',
+      cell: (v) => `v${v.versionNumber}`,
+      align: 'right',
+    },
+    {
+      key: 'finalized',
+      header: 'Finalized',
+      cell: (v) => relativeTime(v.finalizedAt),
+      sortValue: (v) => v.finalizedAt,
+      hideBelow: 'md',
+    },
+    {
+      key: 'pdf',
+      header: 'PDF',
+      cell: (v) => (
+        <AuthoredPdfDownload
+          versionId={v.id}
+          initialStatus={v.pdfRenderStatus}
+          canRetry
+          compact
+        />
+      ),
+      align: 'right',
+    },
+  ];
+
   return (
     <PageLayout
       title="Documents"
@@ -135,6 +181,27 @@ export function DocumentListPage() {
           rowActionLabel={(d) => d.documentTypeDisplayName}
           data-testid="documents-table"
         />
+      )}
+
+      {versionsError ? (
+        <Notice variant="error" title="Could not load finalized versions">
+          {versionsError}
+        </Notice>
+      ) : (
+        (versionsLoading || versions.length > 0) && (
+          <div className="mt-8">
+            <h2 className="mb-3 font-serif text-lg text-brand-slate-800">Finalized versions</h2>
+            <Table
+              label="Finalized document versions"
+              columns={versionColumns}
+              rows={versions}
+              rowKey={(v) => v.id}
+              loading={versionsLoading}
+              rowHref={(v) => `/educator/students/${studentId}/authored-versions/${v.id}`}
+              data-testid="authored-versions-table"
+            />
+          </div>
+        )
       )}
 
       <NewDocumentModal

@@ -8,6 +8,7 @@ import {
   type TableColumn,
 } from '@/features/admin/templates/template-config';
 import type { TableCellValue, TableRowValue } from '../../types';
+import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { fieldElementId, type FieldRendererProps } from './types';
 
 /** Row wrapper carrying a stable client key so add/remove keeps React identity
@@ -54,6 +55,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
   const autosave = useAutosave<TableRowValue[]>(
     useCallback(async (v) => void (await onSave({ [field.fieldKey]: v })), [field.fieldKey, onSave])
   );
+  useRegisterFlush(field.fieldKey, autosave.flush);
 
   const commit = (next: KeyedRow[], immediate: boolean) => {
     setRows(next);

@@ -3,9 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { AutosaveIndicator } from '@/features/admin/templates/components/autosave-indicator';
+import { useFlushRegistry } from '@/features/iep-authoring/hooks/use-flush-registry';
 import type { DocumentInstance } from '../hooks/use-document-instance';
+import { DocumentFlushContext } from '../hooks/flush-registry-context';
 import type { DocumentInstanceDetailDto, DocumentInstanceStatus } from '../types';
 import { DocumentField } from './field-renderers/document-field';
+import { FinalizeDocumentSection } from './finalize-document-section';
 
 const statusVariant: Record<DocumentInstanceStatus, 'neutral' | 'warning' | 'success'> = {
   Draft: 'neutral',
@@ -15,7 +18,10 @@ const statusVariant: Record<DocumentInstanceStatus, 'neutral' | 'warning' | 'suc
 
 interface DocumentEditorProps {
   detail: DocumentInstanceDetailDto;
-  instance: Pick<DocumentInstance, 'saveStatus' | 'conflict' | 'reloadKey' | 'readOnly' | 'saveValues' | 'reload'>;
+  instance: Pick<
+    DocumentInstance,
+    'saveStatus' | 'conflict' | 'reloadKey' | 'readOnly' | 'saveValues' | 'reload' | 'getSaveState'
+  >;
 }
 
 /**
@@ -25,10 +31,15 @@ interface DocumentEditorProps {
  * local values can't overwrite fresher server state.
  */
 export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
-  const { saveStatus, conflict, reloadKey, readOnly, saveValues, reload } = instance;
+  const { saveStatus, conflict, reloadKey, readOnly, saveValues, reload, getSaveState } = instance;
   const sections = [...detail.templateVersion.sections].sort((a, b) => a.displayOrder - b.displayOrder);
 
+  // One registry per instance: each field registers its autosave flush so a
+  // finalize can drain every pending edit before snapshotting.
+  const flushRegistry = useFlushRegistry();
+
   return (
+    <DocumentFlushContext.Provider value={flushRegistry}>
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -94,8 +105,22 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
         })
       )}
 
-      {/* Finalize (Phase 4) will live here — omitted until the version/PDF
-          pipeline exists. */}
+      <Card>
+        <h2 className="mb-2 font-serif text-lg text-brand-slate-800">Finalize</h2>
+        <p className="mb-4 text-sm text-brand-slate-600">
+          Snapshot this draft into an immutable version and generate its PDF.
+        </p>
+        <FinalizeDocumentSection
+          instanceId={detail.id}
+          studentId={detail.schoolStudentId}
+          documentTypeId={detail.documentTypeId}
+          documentTypeDisplayName={detail.documentTypeDisplayName}
+          status={detail.status}
+          flushBeforeFinalize={flushRegistry.flushAll}
+          getSaveState={getSaveState}
+        />
+      </Card>
     </div>
+    </DocumentFlushContext.Provider>
   );
 }

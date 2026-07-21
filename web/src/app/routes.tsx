@@ -51,6 +51,7 @@ import { IepDraftListPage } from '@/features/iep-authoring/pages/iep-draft-list-
 import { IepAuthoringWorkspacePage } from '@/features/iep-authoring/pages/iep-authoring-workspace-page';
 import { DocumentListPage } from '@/features/document-authoring/pages/document-list-page';
 import { DocumentEditorPage } from '@/features/document-authoring/pages/document-editor-page';
+import { AuthoredVersionDetailPage } from '@/features/document-authoring/pages/authored-version-detail-page';
 import { AcceptLinkPage } from '@/features/child-links/components/accept-link-page';
 import { EducatorVersionDetailPage } from '@/features/iep-versions/components/educator-version-detail-page';
 import { StudentHomePage } from '@/features/student/pages/student-home-page';
@@ -453,6 +454,18 @@ export function AppRouter() {
             <RoleRoute allow={['Educator']}>
               <MainLayout>
                 <DocumentEditorPage />
+              </MainLayout>
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/students/:studentId/authored-versions/:versionId"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allow={['Educator']}>
+              <MainLayout>
+                <AuthoredVersionDetailPage />
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>

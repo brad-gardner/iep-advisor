@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Select } from '@/components/ui/input';
 import { useAutosave } from '@/features/iep-authoring/hooks/use-autosave';
 import { parseConfig } from '@/features/admin/templates/template-config';
+import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { FieldLabel } from './field-label';
 import { fieldElementId, type FieldRendererProps } from './types';
 
@@ -17,6 +18,7 @@ export function SelectField({ field, value, disabled, onSave }: FieldRendererPro
     useCallback(async (v) => void (await onSave({ [field.fieldKey]: v })), [field.fieldKey, onSave]),
     { delay: 0 }
   );
+  useRegisterFlush(field.fieldKey, autosave.flush);
 
   const handleChange = (next: string) => {
     setLocal(next);

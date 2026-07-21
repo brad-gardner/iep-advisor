@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Textarea } from '@/components/ui/input';
 import { useAutosave } from '@/features/iep-authoring/hooks/use-autosave';
+import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { FieldLabel } from './field-label';
 import { fieldElementId, type FieldRendererProps } from './types';
 
@@ -15,6 +16,7 @@ export function RichTextField({ field, value, disabled, onSave }: FieldRendererP
   const autosave = useAutosave<string>(
     useCallback(async (v) => void (await onSave({ [field.fieldKey]: v })), [field.fieldKey, onSave])
   );
+  useRegisterFlush(field.fieldKey, autosave.flush);
 
   const handleChange = (next: string) => {
     setLocal(next);
