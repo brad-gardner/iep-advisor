@@ -90,6 +90,7 @@ export function TemplateListPage() {
         columns={columns}
         rows={templates}
         rowKey={(t) => t.id}
+        rowHref={(t) => `/admin/templates/${t.id}`}
         loading={isLoading}
         defaultSort={{ key: 'state', direction: 'asc' }}
         empty={<EmptyState icon={FileText} title="No templates yet." />}
