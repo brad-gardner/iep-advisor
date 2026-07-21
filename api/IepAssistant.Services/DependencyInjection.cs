@@ -45,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<ITemplateAuthoringService, TemplateAuthoringService>();
         services.AddScoped<ITemplateResolutionService, TemplateResolutionService>();
         services.AddScoped<IDocumentInstanceService, DocumentInstanceService>();
+        services.AddScoped<IDefaultIepTemplateSeeder, DefaultIepTemplateSeeder>();
         services.AddScoped<IIepVersionService, IepVersionService>();
         services.AddScoped<IIepVersionPdfService, IepVersionPdfService>();
         services.AddScoped<IAuthoredDocumentVersionService, AuthoredDocumentVersionService>();

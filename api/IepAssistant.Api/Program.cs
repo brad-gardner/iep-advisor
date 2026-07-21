@@ -114,6 +114,9 @@ builder.Services.AddSingleton<AuthoredDocumentPdfQueue>();
 builder.Services.AddHostedService<AuthoredDocumentPdfWorker>();
 // One-off, idempotent legacy-analysis backfill (runs once at startup; skips already-migrated rows).
 builder.Services.AddHostedService<AnalysisRunBackfillHostedService>();
+// One-off, idempotent default IEP template seed (Phase 5): reproduces the legacy typed IEP structure so
+// new IEP drafts resolve through the generic template engine. Skips if the default already exists.
+builder.Services.AddHostedService<DefaultIepTemplateSeederHostedService>();
 // FERPA-aligned access logging (P6a): singleton fire-and-forget enqueue + hosted drain-and-insert.
 builder.Services.AddSingleton<AuditLogger>();
 builder.Services.AddSingleton<IAuditLogger>(sp => sp.GetRequiredService<AuditLogger>());
