@@ -15,6 +15,11 @@ namespace IepAssistant.Domain.Data;
 /// immutable). <see cref="IepVersionPdf"/> is deliberately NOT guarded; the PDF render worker (P5b)
 /// legitimately updates its RenderStatus/BlobUri/Checksum after rendering.</para>
 ///
+/// <para><b>AuthoredDocumentVersion (Phase 4):</b> the dynamic-template equivalent — a finalized
+/// <see cref="AuthoredDocumentVersion"/> (and its frozen ValuesJson) is guarded unconditionally by type.
+/// Its <see cref="AuthoredDocumentPdf"/> is deliberately NOT guarded; the authored-document render worker
+/// legitimately updates it after rendering (same split as IepVersion / IepVersionPdf).</para>
+///
 /// <para><b>Template family:</b> immutability is <em>state-dependent</em> — a Draft version and its
 /// sections/fields must stay editable, only a <b>Published</b> version freezes. The publish transition
 /// itself (Status Draft→Published) is allowed by checking the version's <em>original</em> status.
@@ -57,6 +62,9 @@ public sealed class ImmutableVersionInterceptor : SaveChangesInterceptor
 
             if (IsImmutableVersionEntity(entry.Entity))
                 throw new InvalidOperationException("IepVersion records are immutable.");
+
+            if (entry.Entity is AuthoredDocumentVersion)
+                throw new InvalidOperationException("AuthoredDocumentVersion records are immutable.");
 
             if (IsFrozenTemplateEntity(context, entry))
                 throw new InvalidOperationException("Published template versions are immutable.");

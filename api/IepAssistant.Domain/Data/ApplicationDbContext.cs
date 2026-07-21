@@ -64,6 +64,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<TemplateSection> TemplateSections => Set<TemplateSection>();
     public DbSet<TemplateField> TemplateFields => Set<TemplateField>();
     public DbSet<DocumentInstance> DocumentInstances => Set<DocumentInstance>();
+    public DbSet<AuthoredDocumentVersion> AuthoredDocumentVersions => Set<AuthoredDocumentVersion>();
+    public DbSet<AuthoredDocumentPdf> AuthoredDocumentPdfs => Set<AuthoredDocumentPdf>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

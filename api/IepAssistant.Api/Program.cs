@@ -110,6 +110,8 @@ builder.Services.AddSingleton<AnalysisRunQueue>();
 builder.Services.AddHostedService<AnalysisRunWorker>();
 builder.Services.AddSingleton<IepVersionPdfQueue>();
 builder.Services.AddHostedService<IepVersionPdfWorker>();
+builder.Services.AddSingleton<AuthoredDocumentPdfQueue>();
+builder.Services.AddHostedService<AuthoredDocumentPdfWorker>();
 // One-off, idempotent legacy-analysis backfill (runs once at startup; skips already-migrated rows).
 builder.Services.AddHostedService<AnalysisRunBackfillHostedService>();
 // FERPA-aligned access logging (P6a): singleton fire-and-forget enqueue + hosted drain-and-insert.
