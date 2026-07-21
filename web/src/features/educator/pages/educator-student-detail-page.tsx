@@ -247,6 +247,23 @@ export function EducatorStudentDetailPage() {
 
             <Card>
               <h2 className="mb-2 font-serif text-base text-brand-slate-800">
+                Documents
+              </h2>
+              <p className="mb-3 text-sm text-brand-slate-600">
+                Author state-specific documents (IEP, ETR, 504) from templates.
+              </p>
+              <Link
+                to={`/educator/students/${studentId}/documents`}
+                data-testid="build-documents"
+              >
+                <Button variant="secondary" className="w-full">
+                  Manage documents
+                </Button>
+              </Link>
+            </Card>
+
+            <Card>
+              <h2 className="mb-2 font-serif text-base text-brand-slate-800">
                 Student account
               </h2>
               <p className="mb-3 text-sm text-brand-slate-600">
