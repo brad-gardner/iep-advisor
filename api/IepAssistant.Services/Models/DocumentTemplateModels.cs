@@ -38,3 +38,41 @@ public class DocumentTemplateVersionSummaryModel
     public TemplateVersionStatus Status { get; set; }
     public DateTime? PublishedAt { get; set; }
 }
+
+// ---- Authoring / full-tree models (Phase 2) ----
+
+/// <summary>
+/// A template version with its full section/field tree — the form-schema PREVIEW returned by the
+/// authoring reads and after every mutation. <see cref="RowVersion"/> is the optimistic-concurrency
+/// token the client echoes back on the next edit.
+/// </summary>
+public class TemplateVersionDetailModel
+{
+    public int Id { get; set; }
+    public int DocumentTemplateId { get; set; }
+    public int VersionNumber { get; set; }
+    public TemplateVersionStatus Status { get; set; }
+    public DateTime? PublishedAt { get; set; }
+    public byte[]? RowVersion { get; set; }
+    public List<TemplateSectionModel> Sections { get; set; } = new();
+}
+
+public class TemplateSectionModel
+{
+    public int Id { get; set; }
+    public Guid SectionKey { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public int DisplayOrder { get; set; }
+    public List<TemplateFieldModel> Fields { get; set; } = new();
+}
+
+public class TemplateFieldModel
+{
+    public int Id { get; set; }
+    public Guid FieldKey { get; set; }
+    public FieldType FieldType { get; set; }
+    public string Label { get; set; } = string.Empty;
+    public bool Required { get; set; }
+    public string? ConfigJson { get; set; }
+    public int DisplayOrder { get; set; }
+}

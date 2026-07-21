@@ -29,4 +29,31 @@ internal static class DocumentTemplateMappers
             PublishedAt = m.LatestVersion.PublishedAt
         }
     };
+
+    public static TemplateVersionDetailDto MapVersionDetail(TemplateVersionDetailModel m) => new()
+    {
+        Id = m.Id,
+        DocumentTemplateId = m.DocumentTemplateId,
+        VersionNumber = m.VersionNumber,
+        Status = m.Status.ToString(),
+        PublishedAt = m.PublishedAt,
+        RowVersion = m.RowVersion is null ? null : Convert.ToBase64String(m.RowVersion),
+        Sections = m.Sections.Select(s => new TemplateSectionDto
+        {
+            Id = s.Id,
+            SectionKey = s.SectionKey,
+            Title = s.Title,
+            DisplayOrder = s.DisplayOrder,
+            Fields = s.Fields.Select(f => new TemplateFieldDto
+            {
+                Id = f.Id,
+                FieldKey = f.FieldKey,
+                FieldType = f.FieldType.ToString(),
+                Label = f.Label,
+                Required = f.Required,
+                ConfigJson = f.ConfigJson,
+                DisplayOrder = f.DisplayOrder
+            }).ToList()
+        }).ToList()
+    };
 }
