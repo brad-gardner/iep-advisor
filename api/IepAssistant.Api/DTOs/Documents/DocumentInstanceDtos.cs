@@ -54,6 +54,19 @@ public class DocumentInstanceDetailDto
     public TemplateVersionDetailDto TemplateVersion { get; set; } = new();
 }
 
+/// <summary>
+/// Lightweight response to a value save: the normalized value-document + the rotated concurrency token.
+/// The pinned template tree is immutable and already held by the client, so it is not re-sent per save.
+/// </summary>
+public class DocumentInstanceValuesDto
+{
+    /// <summary>The value-document as a JSON object keyed by field FieldKey (after merge + normalization).</summary>
+    public JsonElement Values { get; set; }
+
+    /// <summary>Base64-encoded optimistic-concurrency token to echo on the next save.</summary>
+    public string? RowVersion { get; set; }
+}
+
 public class DocumentInstanceSummaryDto
 {
     public int Id { get; set; }

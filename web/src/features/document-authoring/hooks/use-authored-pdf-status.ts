@@ -5,7 +5,6 @@ import type { AuthoredDocumentPdfStatusDto, PdfRenderStatus } from '../types';
 
 interface UseAuthoredPdfStatusResult {
   status: PdfRenderStatus | null;
-  url: string | null;
   errorMessage: string | null;
   isLoading: boolean;
   // True once polling stopped while still Pending (~5-min cap reached).
@@ -33,11 +32,9 @@ export function useAuthoredPdfStatus(
   const [isRetrying, setIsRetrying] = useState(false);
 
   const status = pdf?.renderStatus ?? seeded;
-  // Keep polling while Pending/unknown AND while Rendered-but-url-not-yet-available
-  // (a transient where the row flipped to Rendered before the SAS URL was set) —
-  // otherwise the button would show "Generating" forever with no further fetch.
-  const renderedWithoutUrl = status === 'Rendered' && pdf != null && !pdf.url;
-  const isPending = status === 'Pending' || status === null || renderedWithoutUrl;
+  // Poll only while Pending/unknown. The download URL is fetched on demand from a
+  // separate endpoint, so there is no "Rendered-but-no-URL" transient to wait on.
+  const isPending = status === 'Pending' || status === null;
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -106,7 +103,6 @@ export function useAuthoredPdfStatus(
 
   return {
     status,
-    url: pdf?.url ?? null,
     errorMessage: pdf?.errorMessage ?? null,
     isLoading,
     timedOut,

@@ -79,6 +79,10 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         AuthoredDocumentVersionSummaryModel summary;
 
         // 2. Serializable transaction — atomic validate + snapshot capture.
+        // `transactionSettled` tracks whether the transaction has already been committed or rolled
+        // back, so the outer catch never rolls back a completed transaction a second time (a double
+        // RollbackAsync throws "This SqlTransaction has completed." and would mask the real fault).
+        var transactionSettled = false;
         await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         try
         {
@@ -165,11 +169,13 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             catch (DbUpdateException ex)
             {
                 await transaction.RollbackAsync(ct);
+                transactionSettled = true;
 
                 // The expected contention outcome is the unique (student, docType, VersionNumber) index
                 // rejecting the loser of a concurrent finalize. Confirm precisely — our computed number now
                 // exists because someone else took it — so a persistent fault (FK/check/etc.) is never
-                // masked behind a "try again" the caller can't recover from.
+                // masked behind a "try again" the caller can't recover from. (Rolled back first so this
+                // read sees committed data outside the aborted transaction.)
                 var lostTheNumberRace = await _context.AuthoredDocumentVersions
                     .AsNoTracking()
                     .AnyAsync(v => v.SchoolStudentId == instance.SchoolStudentId
@@ -194,6 +200,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
 
             // 9. Commit.
             await transaction.CommitAsync(ct);
+            transactionSettled = true;
 
             summary = new AuthoredDocumentVersionSummaryModel
             {
@@ -208,7 +215,10 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         }
         catch
         {
-            await transaction.RollbackAsync(ct);
+            // Only roll back if the transaction hasn't already been settled (the inner DbUpdateException
+            // handler rolls back + rethrows; rolling back again here would throw and mask the real fault).
+            if (!transactionSettled)
+                await transaction.RollbackAsync(ct);
             throw;
         }
 
@@ -348,17 +358,39 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             ErrorMessage = pdf?.ErrorMessage
         };
 
-        if (pdf?.RenderStatus == PdfRenderStatus.Rendered)
-        {
-            // Build a short-lived download URL from the deterministic blob path (SAS when supported).
-            var blobPath = IAuthoredDocumentPdfService.BlobPathFor(versionId, header.VersionNumber);
-            model.Url = await _blob.GetDownloadUrlAsync(blobPath);
-
-            // FERPA audit: a Rendered download URL is actually being handed out — log the export.
-            _audit.Record(AuditAction.Export, actingUserId, "AuthoredDocumentVersion", versionId);
-        }
-
+        // Side-effect-free: the client polls this endpoint, so it neither mints a download URL nor
+        // writes an audit entry. The SAS + FERPA Export audit live in GetPdfDownloadUrlAsync, invoked
+        // only when the user actually downloads.
         return ServiceResult<AuthoredDocumentPdfStatusModel>.SuccessResult(model);
+    }
+
+    public async Task<ServiceResult<string>> GetPdfDownloadUrlAsync(
+        int versionId, int actingUserId, CancellationToken ct = default)
+    {
+        var header = await LoadVersionHeaderAsync(versionId, ct);
+        if (header == null)
+            return ServiceResult<string>.FailureResult(VersionNotFoundMessage);
+
+        if (!await CanReadStudentAsync(actingUserId, header.SchoolStudentId, ct))
+            return ServiceResult<string>.FailureResult(VersionPermissionMessage);
+
+        var renderStatus = await _context.AuthoredDocumentPdfs
+            .AsNoTracking()
+            .Where(p => p.AuthoredDocumentVersionId == versionId)
+            .Select(p => (PdfRenderStatus?)p.RenderStatus)
+            .FirstOrDefaultAsync(ct);
+
+        if (renderStatus != PdfRenderStatus.Rendered)
+            return ServiceResult<string>.FailureResult("This version's PDF is not available for download yet.");
+
+        // Mint a short-lived download URL from the deterministic blob path (SAS when supported).
+        var blobPath = IAuthoredDocumentPdfService.BlobPathFor(versionId, header.VersionNumber);
+        var url = await _blob.GetDownloadUrlAsync(blobPath);
+
+        // FERPA audit: this is an actual export of the finalized document (unlike a status poll).
+        _audit.Record(AuditAction.Export, actingUserId, "AuthoredDocumentVersion", versionId);
+
+        return ServiceResult<string>.SuccessResult(url);
     }
 
     public async Task<ServiceResult<int>> RequestPdfRetryAsync(

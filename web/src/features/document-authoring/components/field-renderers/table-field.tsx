@@ -139,6 +139,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                         value={row.cells[col.columnKey]}
                         disabled={disabled}
                         onChange={(cell) => updateCell(rowIndex, col.columnKey, cell)}
+                        onBlur={() => void autosave.flush()}
                       />
                     </td>
                   ))}
@@ -186,6 +187,7 @@ function TableCell({
   value,
   disabled,
   onChange,
+  onBlur,
 }: {
   column: TableColumn;
   rowIndex: number;
@@ -193,6 +195,9 @@ function TableCell({
   value: TableCellValue | undefined;
   disabled?: boolean;
   onChange: (cell: TableCellValue) => void;
+  // Flush the field's pending debounced save when the cell loses focus, so an
+  // in-app navigation that blurs the cell persists the edit before unmount.
+  onBlur: () => void;
 }) {
   const ariaLabel = `${column.label || 'Column'}, row ${rowIndex + 1}`;
   const testId = `field-${fieldKey}-cell-${rowIndex}-${column.columnKey}`;
@@ -207,6 +212,7 @@ function TableCell({
           disabled={disabled}
           aria-label={ariaLabel}
           onChange={(e) => onChange(e.target.checked)}
+          onBlur={onBlur}
           className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-400"
           data-testid={testId}
         />
@@ -219,6 +225,7 @@ function TableCell({
           disabled={disabled}
           aria-label={ariaLabel}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
           className={cellInputClass}
           data-testid={testId}
         />
@@ -230,6 +237,7 @@ function TableCell({
           disabled={disabled}
           aria-label={ariaLabel}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
           className={cellInputClass}
           data-testid={testId}
         >
@@ -249,6 +257,7 @@ function TableCell({
           disabled={disabled}
           aria-label={ariaLabel}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
           className={cellInputClass}
           data-testid={testId}
         />

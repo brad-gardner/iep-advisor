@@ -41,7 +41,6 @@ internal static class AuthoredDocumentVersionMappers
     {
         VersionId = m.VersionId,
         RenderStatus = m.RenderStatus.ToString(),
-        Url = m.Url,
         RenderedAt = m.RenderedAt,
         ErrorMessage = m.ErrorMessage
     };

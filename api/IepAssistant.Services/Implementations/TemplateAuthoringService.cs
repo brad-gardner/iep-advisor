@@ -28,11 +28,13 @@ public class TemplateAuthoringService : ITemplateAuthoringService
     private const string ConcurrencyMessage = "This template was changed by someone else. Please reload and try again.";
 
     private readonly ApplicationDbContext _context;
+    private readonly IAuditLogger _audit;
     private readonly ILogger<TemplateAuthoringService> _logger;
 
-    public TemplateAuthoringService(ApplicationDbContext context, ILogger<TemplateAuthoringService> logger)
+    public TemplateAuthoringService(ApplicationDbContext context, IAuditLogger audit, ILogger<TemplateAuthoringService> logger)
     {
         _context = context;
+        _audit = audit;
         _logger = logger;
     }
 
@@ -295,6 +297,9 @@ public class TemplateAuthoringService : ITemplateAuthoringService
             return Fail(ConcurrencyMessage);
         }
 
+        // FERPA/governance audit: publish is what makes a template version the pinned schema for all
+        // future documents of this (state, type) — record it in the tamper-evident trail (G-e.4).
+        _audit.Record(AuditAction.Publish, userId, "DocumentTemplateVersion", version.Id);
         _logger.LogInformation(
             "Admin {UserId} published template {TemplateId} version {VersionId} (v{VersionNumber}).",
             userId, templateId, version.Id, version.VersionNumber);
@@ -383,6 +388,8 @@ public class TemplateAuthoringService : ITemplateAuthoringService
             return Fail("This template already has a Draft version. Publish or discard it before creating another.");
         }
 
+        // Audit the fork (new Draft created from a Published version) alongside the app log (G-e.4).
+        _audit.Record(AuditAction.Edit, userId, "DocumentTemplateVersion", draft.Id);
         _logger.LogInformation(
             "Admin {UserId} forked template {TemplateId} into new Draft version {VersionId} (v{VersionNumber}) from published v{SourceVersion}.",
             userId, templateId, draft.Id, draft.VersionNumber, source.VersionNumber);

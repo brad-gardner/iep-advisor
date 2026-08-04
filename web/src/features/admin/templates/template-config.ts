@@ -51,6 +51,19 @@ export type FieldConfig =
   | { kind: 'Checkbox' }
   | { kind: 'Table'; table: TableConfig };
 
+/**
+ * Compile-time exhaustiveness guard for `FieldType` switches that also degrades
+ * safely at runtime. In a `default:` arm `value` narrows to `never`, so adding a
+ * new `FieldType` without an explicit case fails type-check here; at runtime an
+ * out-of-contract type coming from the backend (client older than the API) hits
+ * this instead of falling through to `undefined`, which would white-screen any
+ * caller that reads `config.kind`.
+ */
+function unsupportedFieldType(value: never): FieldConfig {
+  void value;
+  return { kind: 'Text', text: {} };
+}
+
 function generateColumnKey(): string {
   // crypto.randomUUID is available in all evergreen browsers + jsdom (node 19+).
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -78,6 +91,8 @@ export function defaultConfig(fieldType: FieldType): FieldConfig {
       return { kind: 'Checkbox' };
     case 'Table':
       return { kind: 'Table', table: { columns: [newTableColumn()] } };
+    default:
+      return unsupportedFieldType(fieldType);
   }
 }
 
@@ -153,6 +168,8 @@ export function parseConfig(fieldType: FieldType, configJson: string | null): Fi
         },
       };
     }
+    default:
+      return unsupportedFieldType(fieldType);
   }
 }
 

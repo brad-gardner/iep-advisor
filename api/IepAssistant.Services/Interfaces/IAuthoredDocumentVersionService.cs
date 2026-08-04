@@ -32,8 +32,18 @@ public interface IAuthoredDocumentVersionService
     /// <summary>Full version (frozen values + pinned template tree + PDF status). Educator-with-access OR linked-parent-with-access.</summary>
     Task<ServiceResult<AuthoredDocumentVersionDetailModel>> GetVersionAsync(int versionId, int actingUserId, CancellationToken ct = default);
 
-    /// <summary>PDF status + (when Rendered) a short-lived download URL. Same authorization as <see cref="GetVersionAsync"/>.</summary>
+    /// <summary>
+    /// PDF render status only (no URL). Same authorization as <see cref="GetVersionAsync"/>. Safe to poll:
+    /// side-effect-free (no SAS minted, no audit written). Use <see cref="GetPdfDownloadUrlAsync"/> for the URL.
+    /// </summary>
     Task<ServiceResult<AuthoredDocumentPdfStatusModel>> GetPdfStatusAsync(int versionId, int actingUserId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Mints a short-lived download URL for a Rendered version's PDF and records a FERPA <c>Export</c> audit
+    /// entry (this represents an actual download, unlike a status poll). Same authorization as
+    /// <see cref="GetVersionAsync"/>; fails if the PDF is not yet Rendered.
+    /// </summary>
+    Task<ServiceResult<string>> GetPdfDownloadUrlAsync(int versionId, int actingUserId, CancellationToken ct = default);
 
     /// <summary>
     /// Re-queue a version's PDF render (educator, Collaborator+). Allowed when the current RenderStatus

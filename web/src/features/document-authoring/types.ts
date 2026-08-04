@@ -66,6 +66,13 @@ export interface SaveValuesRequest {
   rowVersion?: string;
 }
 
+/** Lightweight save response: normalized values + rotated token (no template tree). */
+export interface DocumentValuesResponseDto {
+  /** Keyed by `FieldKey` (guid); normalized server-side (e.g. sanitized RichText). */
+  values: Record<string, unknown>;
+  rowVersion: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Phase 4 — finalize → immutable authored version → dynamic PDF
 // ---------------------------------------------------------------------------
@@ -98,11 +105,16 @@ export interface AuthoredDocumentVersionDetailDto extends AuthoredDocumentVersio
   templateVersion: TemplateVersionDetailDto;
 }
 
-/** PDF render status for a finalized version (url set only when Rendered). */
+/** PDF render status for a finalized version. No URL — poll this, then fetch the
+ *  download URL separately (that call is what records the FERPA Export audit). */
 export interface AuthoredDocumentPdfStatusDto {
   versionId: number;
   renderStatus: PdfRenderStatus;
-  url: string | null;
   renderedAt: string | null;
   errorMessage: string | null;
+}
+
+/** A freshly-minted short-lived download URL (from the download endpoint). */
+export interface AuthoredDocumentPdfDownloadDto {
+  url: string;
 }

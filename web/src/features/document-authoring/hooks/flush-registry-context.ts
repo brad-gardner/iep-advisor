@@ -14,6 +14,17 @@ export function useRegisterFlush(key: string, flush: () => Promise<void>): void 
   const registry = useContext(DocumentFlushContext);
   useEffect(() => {
     if (!registry) return;
-    return registry.register(key, flush);
+    const unregister = registry.register(key, flush);
+    return () => {
+      // Persist any pending edit before the field unmounts (e.g. user types then
+      // navigates away before the 700ms debounce fires). Without this the debounce
+      // timer is just cleared and the edit is silently lost — worst for Table cells,
+      // which have no onBlur backstop. Fire-and-forget: the in-flight promise/refs
+      // settle even though this component is gone, and all setState in the autosave
+      // is mountedRef-guarded, so no unmounted-update warning fires.
+      // Mirrors iep-authoring's use-row-autosave unmount cleanup.
+      void flush();
+      unregister();
+    };
   }, [registry, key, flush]);
 }

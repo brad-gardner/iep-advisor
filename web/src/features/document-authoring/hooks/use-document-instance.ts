@@ -24,8 +24,9 @@ const SAVED_LINGER_MS = 1500;
  * value-document, so two in-flight PUTs would race and 409 each other. Every
  * save runs through a single promise chain and reads the freshest rowVersion
  * from a ref at execution time (mirrors the admin template builder). Each save
- * response returns the refreshed detail + a fresh rowVersion, which simply
- * replaces both. A 409 sets `conflict`; the editor prompts a reload.
+ * response returns only the normalized values + a fresh rowVersion (the pinned
+ * template tree is immutable and already held here), which are merged into the
+ * loaded detail. A 409 sets `conflict`; the editor prompts a reload.
  *
  * `saveStatus` is an aggregate autosave pill for the header, derived from the
  * serialized runner (per-field debouncing lives in each field via use-autosave).
@@ -44,6 +45,15 @@ export function useDocumentInstance(instanceId: number) {
   const setDetailTree = useCallback((d: DocumentInstanceDetailDto) => {
     detailRef.current = d;
     setDetail(d);
+  }, []);
+  // Merge a lightweight save response (normalized values + rotated token) into the
+  // loaded detail, preserving the immutable pinned template tree reference.
+  const applySavedValues = useCallback((values: Record<string, unknown>, rowVersion: string | null) => {
+    const current = detailRef.current;
+    if (!current) return;
+    const next = { ...current, values, rowVersion };
+    detailRef.current = next;
+    setDetail(next);
   }, []);
 
   // Promise chain that serializes every save.
@@ -150,7 +160,7 @@ export function useDocumentInstance(instanceId: number) {
         try {
           const res = await saveValuesApi(instanceId, patch, current.rowVersion ?? undefined);
           if (res.success && res.data) {
-            setDetailTree(res.data);
+            applySavedValues(res.data.values, res.data.rowVersion);
             return OK;
           }
           return { ok: false, errors: res.errors, message: res.message };
@@ -171,7 +181,7 @@ export function useDocumentInstance(instanceId: number) {
       void run.then((r) => settleStatus(r.ok)).catch(() => settleStatus(false));
       return run;
     },
-    [instanceId, setDetailTree, settleStatus, latchConflict]
+    [instanceId, applySavedValues, settleStatus, latchConflict]
   );
 
   return {

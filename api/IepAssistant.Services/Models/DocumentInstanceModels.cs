@@ -45,6 +45,21 @@ public class DocumentInstanceDetailModel
     public TemplateVersionDetailModel TemplateVersion { get; set; } = new();
 }
 
+/// <summary>
+/// Lightweight result of a value save. The pinned template tree is immutable for a Draft and already
+/// held by the client, so a save returns only the (possibly re-normalized) value-document + the rotated
+/// concurrency token — not the whole detail tree (which would re-query + re-ship the schema on every
+/// autosave tick).
+/// </summary>
+public class DocumentInstanceValuesModel
+{
+    /// <summary>The stored value-document JSON after the patch was merged + normalized.</summary>
+    public string ValuesJson { get; set; } = "{}";
+
+    /// <summary>The rotated optimistic-concurrency token to echo on the next save.</summary>
+    public byte[]? RowVersion { get; set; }
+}
+
 /// <summary>List-row view of a student's instances.</summary>
 public class DocumentInstanceSummaryModel
 {

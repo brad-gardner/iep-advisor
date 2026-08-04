@@ -25,6 +25,7 @@ public sealed class TemplateAuthoringServiceTests : IDisposable
 
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<ApplicationDbContext> _options;
+    private readonly CapturingAuditLogger _audit = new();
 
     public TemplateAuthoringServiceTests()
     {
@@ -41,9 +42,9 @@ public sealed class TemplateAuthoringServiceTests : IDisposable
 
     private ApplicationDbContext CreateContext() => new(_options);
     private TemplateAuthoringService CreateService(ApplicationDbContext ctx)
-        => new(ctx, NullLogger<TemplateAuthoringService>.Instance);
+        => new(ctx, _audit, NullLogger<TemplateAuthoringService>.Instance);
     private DocumentTemplateService CreateTemplateService(ApplicationDbContext ctx)
-        => new(ctx, NullLogger<DocumentTemplateService>.Instance);
+        => new(ctx, _audit, NullLogger<DocumentTemplateService>.Instance);
 
     // ---------------------------------------------------------------- Helpers
 
@@ -119,6 +120,65 @@ public sealed class TemplateAuthoringServiceTests : IDisposable
             Assert.Equal(1, result.Data.VersionNumber);
             Assert.Equal(6, result.Data.Sections.Single().Fields.Count);
         }
+    }
+
+    [Fact]
+    public async Task Publish_WritesPublishAudit()
+    {
+        var (templateId, versionId) = await SeedDraftTemplateAsync();
+        var sectionId = await AddSectionAsync(versionId, "Overview");
+        using (var ctx = CreateContext())
+            Assert.True((await CreateService(ctx).AddFieldAsync(AdminUserId, sectionId, FieldType.Text, "Name", true, null, null)).Success);
+
+        // Clear the seed/authoring audits so we assert only the publish event.
+        _audit.Entries.Clear();
+        using (var ctx = CreateContext())
+            Assert.True((await CreateService(ctx).PublishAsync(AdminUserId, templateId, null)).Success);
+
+        var entry = Assert.Single(_audit.Entries);
+        Assert.Equal(AuditAction.Publish, entry.Action);
+        Assert.Equal("DocumentTemplateVersion", entry.ResourceType);
+        Assert.Equal(versionId, entry.ResourceId);
+        Assert.Equal(AdminUserId, entry.ActorUserId);
+    }
+
+    [Fact]
+    public async Task Publish_WhenRejected_WritesNoAudit()
+    {
+        // A template with an empty Draft (no sections) cannot be published.
+        var (templateId, _) = await SeedDraftTemplateAsync();
+
+        _audit.Entries.Clear();
+        using (var ctx = CreateContext())
+            Assert.False((await CreateService(ctx).PublishAsync(AdminUserId, templateId, null)).Success);
+
+        Assert.Empty(_audit.Entries);
+    }
+
+    [Fact]
+    public async Task CreateDraftFromPublished_WritesEditAudit()
+    {
+        var (templateId, versionId) = await SeedDraftTemplateAsync();
+        var sectionId = await AddSectionAsync(versionId, "Overview");
+        using (var ctx = CreateContext())
+            Assert.True((await CreateService(ctx).AddFieldAsync(AdminUserId, sectionId, FieldType.Text, "Name", true, null, null)).Success);
+        using (var ctx = CreateContext())
+            Assert.True((await CreateService(ctx).PublishAsync(AdminUserId, templateId, null)).Success);
+
+        _audit.Entries.Clear();
+        int draftId;
+        using (var ctx = CreateContext())
+        {
+            var fork = await CreateService(ctx).CreateDraftFromPublishedAsync(AdminUserId, templateId);
+            Assert.True(fork.Success, fork.Message);
+            draftId = fork.Data!.Id;
+        }
+
+        var entry = Assert.Single(_audit.Entries);
+        Assert.Equal(AuditAction.Edit, entry.Action);
+        Assert.Equal("DocumentTemplateVersion", entry.ResourceType);
+        Assert.Equal(draftId, entry.ResourceId);
+        Assert.Equal(AdminUserId, entry.ActorUserId);
     }
 
     // ---------------------------------------------------------------- Publish gating

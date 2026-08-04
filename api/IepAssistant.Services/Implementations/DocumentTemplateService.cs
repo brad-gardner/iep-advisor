@@ -16,11 +16,13 @@ namespace IepAssistant.Services.Implementations;
 public class DocumentTemplateService : IDocumentTemplateService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IAuditLogger _audit;
     private readonly ILogger<DocumentTemplateService> _logger;
 
-    public DocumentTemplateService(ApplicationDbContext context, ILogger<DocumentTemplateService> logger)
+    public DocumentTemplateService(ApplicationDbContext context, IAuditLogger audit, ILogger<DocumentTemplateService> logger)
     {
         _context = context;
+        _audit = audit;
         _logger = logger;
     }
 
@@ -91,6 +93,8 @@ public class DocumentTemplateService : IDocumentTemplateService
                 $"A template for {documentType.DisplayName} in {scope} already exists.");
         }
 
+        // Audit template creation (its empty Draft v1) in the tamper-evident authoring trail (G-e.4).
+        _audit.Record(AuditAction.Edit, userId, "DocumentTemplate", template.Id);
         _logger.LogInformation(
             "Admin {UserId} created document template {TemplateId} ({DocumentTypeKey}, state {StateCode}).",
             userId, template.Id, documentType.Key, normalizedState ?? "default");

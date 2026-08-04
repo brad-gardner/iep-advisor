@@ -86,6 +86,13 @@ public static class RichTextSanitizer
             return false;
 
         var u = url.TrimStart();
+
+        // Reject protocol-relative URLs ("//evil.com", or "/\evil.com" which some browsers treat
+        // the same way): they resolve off-site under the current scheme, so they are link-injection
+        // vectors even though they start with "/". Same-origin relative paths ("/foo", "/") are fine.
+        if (u.StartsWith("//") || u.StartsWith("/\\"))
+            return false;
+
         return u.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
             || u.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
             || u.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase)

@@ -149,28 +149,28 @@ public class DocumentInstanceService : IDocumentInstanceService
 
     // ---------------------------------------------------------------- Save values
 
-    public async Task<ServiceResult<DocumentInstanceDetailModel>> SaveValuesAsync(
+    public async Task<ServiceResult<DocumentInstanceValuesModel>> SaveValuesAsync(
         int instanceId, IReadOnlyDictionary<string, JsonElement> valuesPatch, byte[]? rowVersion,
         int actingUserId, CancellationToken ct = default)
     {
         var header = await LoadHeaderAsync(instanceId, ct);
         if (header == null)
-            return Fail(InstanceNotFoundMessage);
+            return FailValues(InstanceNotFoundMessage);
 
         if (!await _orgAccess.CanActOnStudentAsync(actingUserId, header.SchoolStudentId, AccessRole.Collaborator, ct))
-            return Fail(PermissionMessage);
+            return FailValues(PermissionMessage);
 
         // Edits are blocked once the instance leaves Draft (Finalizing/Finalized).
         if (header.Status != DocumentInstanceStatus.Draft)
-            return Fail(NotDraftEditMessage);
+            return FailValues(NotDraftEditMessage);
 
         var instance = await _context.DocumentInstances.FirstOrDefaultAsync(i => i.Id == instanceId, ct);
         if (instance == null)
-            return Fail(InstanceNotFoundMessage);
+            return FailValues(InstanceNotFoundMessage);
 
         var concurrency = CheckConcurrency(instance.RowVersion, rowVersion);
         if (concurrency != null)
-            return Fail(concurrency);
+            return FailValues(concurrency);
 
         // Load the pinned version's fields (denormalized version FK) for schema validation.
         var fieldsByKey = await LoadFieldsByKeyAsync(instance.DocumentTemplateVersionId, ct);
@@ -178,11 +178,11 @@ public class DocumentInstanceService : IDocumentInstanceService
         var merged = ParseValues(instance.ValuesJson);
         var applyError = ApplyPatch(merged, valuesPatch, fieldsByKey);
         if (applyError != null)
-            return Fail(applyError);
+            return FailValues(applyError);
 
         var serialized = merged.ToJsonString();
         if (Encoding.UTF8.GetByteCount(serialized) > MaxValuesJsonBytes)
-            return Fail(TooLargeMessage);
+            return FailValues(TooLargeMessage);
 
         var now = DateTime.UtcNow;
         instance.ValuesJson = serialized;
@@ -197,11 +197,17 @@ public class DocumentInstanceService : IDocumentInstanceService
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Fail(ConcurrencyMessage);
+            return FailValues(ConcurrencyMessage);
         }
 
         _audit.Record(AuditAction.Edit, actingUserId, "DocumentInstance", instanceId);
-        return await BuildDetailResultAsync(instanceId, ct);
+
+        // Return only the normalized values + rotated token; the immutable pinned tree stays client-side.
+        return ServiceResult<DocumentInstanceValuesModel>.SuccessResult(new DocumentInstanceValuesModel
+        {
+            ValuesJson = instance.ValuesJson,
+            RowVersion = instance.RowVersion
+        });
     }
 
     // ---------------------------------------------------------------- Delete
@@ -482,4 +488,7 @@ public class DocumentInstanceService : IDocumentInstanceService
 
     private static ServiceResult<DocumentInstanceDetailModel> Fail(string message)
         => ServiceResult<DocumentInstanceDetailModel>.FailureResult(message);
+
+    private static ServiceResult<DocumentInstanceValuesModel> FailValues(string message)
+        => ServiceResult<DocumentInstanceValuesModel>.FailureResult(message);
 }

@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { AutosaveIndicator } from '@/features/admin/templates/components/autosave-indicator';
 import { useFlushRegistry } from '@/features/iep-authoring/hooks/use-flush-registry';
+import { useFlushOnNavigate } from '@/features/iep-authoring/hooks/use-flush-on-navigate';
 import type { DocumentInstance } from '../hooks/use-document-instance';
 import { DocumentFlushContext } from '../hooks/flush-registry-context';
 import type { DocumentInstanceDetailDto, DocumentInstanceStatus } from '../types';
@@ -37,6 +38,9 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
   // One registry per instance: each field registers its autosave flush so a
   // finalize can drain every pending edit before snapshotting.
   const flushRegistry = useFlushRegistry();
+  // Best-effort flush of pending edits on a hard unload (tab close / refresh).
+  // In-app navigation is covered by each field's unmount flush (useRegisterFlush).
+  useFlushOnNavigate(flushRegistry);
 
   return (
     <DocumentFlushContext.Provider value={flushRegistry}>

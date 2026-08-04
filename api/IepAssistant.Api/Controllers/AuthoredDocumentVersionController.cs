@@ -115,6 +115,21 @@ public class AuthoredDocumentVersionController : ControllerBase
             AuthoredDocumentVersionMappers.MapPdfStatus(result.Data!)));
     }
 
+    [HttpGet("api/authored-versions/{versionId:int}/pdf/download")]
+    [ProducesResponseType(typeof(ApiResponse<AuthoredDocumentPdfDownloadDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadPdf(int versionId, CancellationToken ct)
+    {
+        // Distinct from the status poll: this mints the SAS and records the FERPA Export audit, so it
+        // is called only when the user actually downloads.
+        var result = await _service.GetPdfDownloadUrlAsync(versionId, User.GetUserId(), ct);
+        if (!result.Success) return MapFailure(result.Message);
+
+        return Ok(ApiResponse<AuthoredDocumentPdfDownloadDto>.SuccessResponse(
+            new AuthoredDocumentPdfDownloadDto { Url = result.Data! }));
+    }
+
     [HttpPost("api/authored-versions/{versionId:int}/pdf/retry")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]

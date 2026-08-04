@@ -23,6 +23,12 @@ internal static class DocumentInstanceMappers
         TemplateVersion = DocumentTemplateMappers.MapVersionDetail(m.TemplateVersion)
     };
 
+    public static DocumentInstanceValuesDto MapValues(DocumentInstanceValuesModel m) => new()
+    {
+        Values = ParseValues(m.ValuesJson),
+        RowVersion = m.RowVersion is null ? null : Convert.ToBase64String(m.RowVersion)
+    };
+
     public static DocumentInstanceSummaryDto MapSummary(DocumentInstanceSummaryModel m) => new()
     {
         Id = m.Id,

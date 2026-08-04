@@ -255,7 +255,7 @@ public sealed class DefaultIepTemplateSeederTests : IDisposable
             ctx2,
             new OrgAccessService(ctx2),
             CreateResolution(ctx2),
-            new TemplateAuthoringService(ctx2, NullLogger<TemplateAuthoringService>.Instance),
+            new TemplateAuthoringService(ctx2, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance),
             new CapturingAuditLogger(),
             NullLogger<DocumentInstanceService>.Instance);
 

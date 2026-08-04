@@ -1,7 +1,10 @@
+using System.Reflection;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
@@ -55,13 +58,13 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
             ctx,
             new OrgAccessService(ctx),
             new AccessService(ctx),
-            new TemplateAuthoringService(ctx, NullLogger<TemplateAuthoringService>.Instance),
+            new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance),
             blob ?? new SuccessBlobStorageFake(),
             _audit,
             NullLogger<AuthoredDocumentVersionService>.Instance);
 
     private AuthoredDocumentPdfService CreatePdfService(ApplicationDbContext ctx, IBlobStorageService blob)
-        => new(ctx, new TemplateAuthoringService(ctx, NullLogger<TemplateAuthoringService>.Instance), blob, NullLogger<AuthoredDocumentPdfService>.Instance);
+        => new(ctx, new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance), blob, NullLogger<AuthoredDocumentPdfService>.Instance);
 
     // ---- Blob fakes ----
     private sealed class SuccessBlobStorageFake : IBlobStorageService
@@ -238,6 +241,71 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
       ]
     }
     """;
+
+    /// <summary>
+    /// Inserts a finalized <see cref="AuthoredDocumentVersion"/> directly (bypassing finalize validation)
+    /// with an optional <see cref="AuthoredDocumentPdf"/> in a chosen render state, so the read/PDF paths
+    /// can be exercised without driving a full finalize. The interceptor permits inserts.
+    /// </summary>
+    private int SeedFinalizedVersion(SchoolScenario s, TemplateKeys keys, int docTypeId, PdfRenderStatus? pdfStatus, int versionNumber = 1)
+    {
+        using var ctx = CreateContext();
+        var version = new AuthoredDocumentVersion
+        {
+            SchoolStudentId = s.StudentId,
+            DocumentTypeId = docTypeId,
+            DocumentTemplateVersionId = keys.VersionId,
+            VersionNumber = versionNumber,
+            ValuesJson = ValidValues(keys),
+            FinalizedByUserId = s.CollaboratorUserId,
+            FinalizedAt = new DateTime(2026, 7, 20, 0, 0, 0, DateTimeKind.Utc),
+            Pdf = pdfStatus is PdfRenderStatus status
+                ? new AuthoredDocumentPdf
+                {
+                    RenderStatus = status,
+                    RenderedAt = status == PdfRenderStatus.Rendered ? new DateTime(2026, 7, 20, 1, 0, 0, DateTimeKind.Utc) : null,
+                    ErrorMessage = status == PdfRenderStatus.Error ? "prior render failed" : null
+                }
+                : null
+        };
+        ctx.AuthoredDocumentVersions.Add(version);
+        ctx.SaveChanges();
+        return version.Id;
+    }
+
+    private sealed record ParentScenario(int ParentUserId, int ChildProfileId);
+
+    /// <summary>
+    /// Seeds a parent User with a ChildProfile they own (Owner ChildAccess) and a ChildLink to
+    /// <paramref name="schoolStudentId"/>. The link's active/accepted flags are parameterized so authz
+    /// denial paths can be exercised.
+    /// </summary>
+    private ParentScenario SeedLinkedParent(string prefix, int schoolStudentId, bool linkActive = true, bool linkAccepted = true)
+    {
+        using var ctx = CreateContext();
+
+        var parent = new User { Email = $"{prefix}-parent@example.com", PasswordHash = "x", FirstName = "P", LastName = "A", Role = UserRole.Parent };
+        ctx.Users.Add(parent);
+        ctx.SaveChanges();
+
+        var child = new ChildProfile { UserId = parent.Id, FirstName = "Kid", IsActive = true };
+        ctx.ChildProfiles.Add(child);
+        ctx.SaveChanges();
+
+        ctx.ChildAccesses.Add(new ChildAccess
+        {
+            ChildProfileId = child.Id, UserId = parent.Id, Role = AccessRole.Owner,
+            IsActive = true, AcceptedAt = DateTime.UtcNow
+        });
+        ctx.ChildLinks.Add(new ChildLink
+        {
+            ChildProfileId = child.Id, SchoolStudentId = schoolStudentId,
+            IsActive = linkActive, AcceptedAt = linkAccepted ? DateTime.UtcNow : null, LinkedAt = DateTime.UtcNow
+        });
+        ctx.SaveChanges();
+
+        return new ParentScenario(parent.Id, child.Id);
+    }
 
     // ---------------------------------------------------------------- Finalize validation
 
@@ -651,6 +719,330 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
         var error = Assert.Single(errors);
         Assert.Contains("Demographics", error);
         Assert.Contains("Legal Name", error);
+    }
+
+    // ---------------------------------------------------------------- PDF status (side-effect-free poll)
+
+    [Fact]
+    public async Task GetPdfStatus_ReturnsStatus_WithoutAudit()
+    {
+        var s = SeedSchoolWithStudent("status");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered);
+
+        _audit.Entries.Clear();
+        ServiceResult<AuthoredDocumentPdfStatusModel> result;
+        using (var ctx = CreateContext())
+            result = await CreateService(ctx).GetPdfStatusAsync(versionId, s.CollaboratorUserId);
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal(versionId, result.Data!.VersionId);
+        Assert.Equal(PdfRenderStatus.Rendered, result.Data.RenderStatus);
+        Assert.NotNull(result.Data.RenderedAt);
+        // A status poll is not an export: no SAS is minted and NO audit is written (both live in the
+        // download call). AuthoredDocumentPdfStatusModel carries no Url — enforced at compile time.
+        Assert.Empty(_audit.Entries);
+    }
+
+    [Fact]
+    public async Task GetPdfStatus_NoPdfRow_DefaultsToPending()
+    {
+        var s = SeedSchoolWithStudent("status-none");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, pdfStatus: null);
+
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).GetPdfStatusAsync(versionId, s.CollaboratorUserId);
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal(PdfRenderStatus.Pending, result.Data!.RenderStatus);
+        Assert.Null(result.Data.RenderedAt);
+    }
+
+    // ---------------------------------------------------------------- PDF download URL (audited export)
+
+    [Fact]
+    public async Task GetPdfDownloadUrl_Rendered_ReturnsUrl_AndWritesExactlyOneExportAudit()
+    {
+        var s = SeedSchoolWithStudent("dl-ok");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered);
+
+        _audit.Entries.Clear();
+        ServiceResult<string> result;
+        using (var ctx = CreateContext())
+            result = await CreateService(ctx).GetPdfDownloadUrlAsync(versionId, s.CollaboratorUserId);
+
+        Assert.True(result.Success, result.Message);
+        Assert.False(string.IsNullOrWhiteSpace(result.Data));
+        // The SAS is minted from the deterministic blob path for this version.
+        Assert.Contains($"authored-docs/{versionId}/doc-v1.pdf", result.Data!);
+
+        var entry = Assert.Single(_audit.Entries);
+        Assert.Equal(AuditAction.Export, entry.Action);
+        Assert.Equal("AuthoredDocumentVersion", entry.ResourceType);
+        Assert.Equal(versionId, entry.ResourceId);
+        Assert.Equal(s.CollaboratorUserId, entry.ActorUserId);
+    }
+
+    [Theory]
+    [InlineData(PdfRenderStatus.Pending)]
+    [InlineData(PdfRenderStatus.Error)]
+    public async Task GetPdfDownloadUrl_NotYetRendered_Fails_WithNoUrlOrAudit(PdfRenderStatus status)
+    {
+        var s = SeedSchoolWithStudent($"dl-{status}");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, status);
+
+        _audit.Entries.Clear();
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).GetPdfDownloadUrlAsync(versionId, s.CollaboratorUserId);
+
+        Assert.False(result.Success);
+        Assert.Null(result.Data);
+        Assert.Contains("not available", result.Message!, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(_audit.Entries);
+    }
+
+    [Fact]
+    public async Task GetPdfDownloadUrl_NonReader_IsDenied_WithNoAudit()
+    {
+        var s = SeedSchoolWithStudent("dl-authz");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered);
+        var stranger = SeedStranger("dl-stranger");
+
+        _audit.Entries.Clear();
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).GetPdfDownloadUrlAsync(versionId, stranger);
+
+        Assert.False(result.Success);
+        Assert.Null(result.Data);
+        Assert.Contains("permission", result.Message!, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(_audit.Entries);
+    }
+
+    // ---------------------------------------------------------------- PDF retry
+
+    [Fact]
+    public async Task RequestPdfRetry_NoPdfRow_IsRejected()
+    {
+        var s = SeedSchoolWithStudent("retry-none");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, pdfStatus: null);
+
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).RequestPdfRetryAsync(versionId, s.CollaboratorUserId);
+
+        Assert.False(result.Success);
+        Assert.Contains("no PDF record", result.Message!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RequestPdfRetry_AlreadyRendered_IsRejected_AndLeavesStatusUnchanged()
+    {
+        var s = SeedSchoolWithStudent("retry-rendered");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered);
+
+        using (var ctx = CreateContext())
+        {
+            var result = await CreateService(ctx).RequestPdfRetryAsync(versionId, s.CollaboratorUserId);
+            Assert.False(result.Success);
+            Assert.Contains("already rendered", result.Message!, StringComparison.OrdinalIgnoreCase);
+        }
+
+        using (var ctx = CreateContext())
+            Assert.Equal(PdfRenderStatus.Rendered, ctx.AuthoredDocumentPdfs.Single(p => p.AuthoredDocumentVersionId == versionId).RenderStatus);
+    }
+
+    [Fact]
+    public async Task RequestPdfRetry_Error_ResetsToPending_AndClearsError()
+    {
+        var s = SeedSchoolWithStudent("retry-error");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Error);
+
+        using (var ctx = CreateContext())
+        {
+            var result = await CreateService(ctx).RequestPdfRetryAsync(versionId, s.CollaboratorUserId);
+            Assert.True(result.Success, result.Message);
+            Assert.Equal(versionId, result.Data);
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var pdf = ctx.AuthoredDocumentPdfs.Single(p => p.AuthoredDocumentVersionId == versionId);
+            Assert.Equal(PdfRenderStatus.Pending, pdf.RenderStatus);
+            Assert.Null(pdf.ErrorMessage);
+        }
+    }
+
+    [Fact]
+    public async Task RequestPdfRetry_NonCollaborator_IsDenied_AndLeavesStatusUnchanged()
+    {
+        var s = SeedSchoolWithStudent("retry-authz");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Error);
+        var stranger = SeedStranger("retry-stranger");
+
+        using (var ctx = CreateContext())
+        {
+            var result = await CreateService(ctx).RequestPdfRetryAsync(versionId, stranger);
+            Assert.False(result.Success);
+            Assert.Contains("permission", result.Message!, StringComparison.OrdinalIgnoreCase);
+        }
+
+        using (var ctx = CreateContext())
+            Assert.Equal(PdfRenderStatus.Error, ctx.AuthoredDocumentPdfs.Single(p => p.AuthoredDocumentVersionId == versionId).RenderStatus);
+    }
+
+    // ---------------------------------------------------------------- Parent / child read authorization
+
+    [Fact]
+    public async Task ParentLinked_CanListForChild_AndGetVersion()
+    {
+        var s = SeedSchoolWithStudent("parent-ok");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered);
+        var parent = SeedLinkedParent("parent-ok", s.StudentId);
+
+        using (var ctx = CreateContext())
+        {
+            var list = await CreateService(ctx).ListForChildAsync(parent.ChildProfileId, parent.ParentUserId);
+            Assert.True(list.Success, list.Message);
+            var row = Assert.Single(list.Data!);
+            Assert.Equal(versionId, row.Id);
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var get = await CreateService(ctx).GetVersionAsync(versionId, parent.ParentUserId);
+            Assert.True(get.Success, get.Message);
+            Assert.Equal(versionId, get.Data!.Id);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, true)]  // inactive link
+    [InlineData(true, false)]  // unaccepted link
+    public async Task ParentWithInactiveOrUnacceptedLink_IsDenied(bool linkActive, bool linkAccepted)
+    {
+        var s = SeedSchoolWithStudent($"parent-badlink-{linkActive}-{linkAccepted}");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered);
+        var parent = SeedLinkedParent($"parent-badlink-{linkActive}-{linkAccepted}", s.StudentId, linkActive, linkAccepted);
+
+        using (var ctx = CreateContext())
+        {
+            var list = await CreateService(ctx).ListForChildAsync(parent.ChildProfileId, parent.ParentUserId);
+            Assert.True(list.Success);
+            Assert.Empty(list.Data!); // the student is not in the parent's active+accepted linked set
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var get = await CreateService(ctx).GetVersionAsync(versionId, parent.ParentUserId);
+            Assert.False(get.Success);
+            Assert.Contains("permission", get.Message!, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public async Task ParentOfDifferentStudent_IsDenied()
+    {
+        var s = SeedSchoolWithStudent("parent-other-a");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered);
+
+        // Parent is validly linked, but to a DIFFERENT student with no versions of their own.
+        var other = SeedSchoolWithStudent("parent-other-b");
+        var parent = SeedLinkedParent("parent-other", other.StudentId);
+
+        using (var ctx = CreateContext())
+        {
+            var get = await CreateService(ctx).GetVersionAsync(versionId, parent.ParentUserId);
+            Assert.False(get.Success);
+            Assert.Contains("permission", get.Message!, StringComparison.OrdinalIgnoreCase);
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var list = await CreateService(ctx).ListForChildAsync(parent.ChildProfileId, parent.ParentUserId);
+            Assert.True(list.Success);
+            Assert.Empty(list.Data!); // student A's version never appears for a parent of student B
+        }
+    }
+
+    // ---------------------------------------------------------------- PDF worker startup reconcile
+
+    [Fact]
+    public async Task ReconcilePendingRenders_EnqueuesExactlyThePendingVersionIds()
+    {
+        var s = SeedSchoolWithStudent("reconcile");
+        var keys = SeedTemplate(IepTypeId);
+        var pendingA = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Pending, versionNumber: 1);
+        var pendingB = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Pending, versionNumber: 2);
+        var rendered = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered, versionNumber: 3);
+
+        var queue = new AuthoredDocumentPdfQueue();
+        var worker = new AuthoredDocumentPdfWorker(queue, CreateScopeFactory(), NullLogger<AuthoredDocumentPdfWorker>.Instance);
+
+        await InvokeReconcileAsync(worker);
+
+        var drained = await DrainAsync(queue);
+        Assert.Equal(new[] { pendingA, pendingB }.OrderBy(x => x).ToList(), drained.OrderBy(x => x).ToList());
+        Assert.DoesNotContain(rendered, drained);
+    }
+
+    [Fact]
+    public async Task ReconcilePendingRenders_NoPending_IsNoOp()
+    {
+        var s = SeedSchoolWithStudent("reconcile-empty");
+        var keys = SeedTemplate(IepTypeId);
+        SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered, versionNumber: 1);
+
+        var queue = new AuthoredDocumentPdfQueue();
+        var worker = new AuthoredDocumentPdfWorker(queue, CreateScopeFactory(), NullLogger<AuthoredDocumentPdfWorker>.Instance);
+
+        await InvokeReconcileAsync(worker);
+
+        var drained = await DrainAsync(queue);
+        Assert.Empty(drained);
+    }
+
+    /// <summary>Real DI scope factory over the shared SQLite connection (the worker resolves ApplicationDbContext per scope).</summary>
+    private IServiceScopeFactory CreateScopeFactory()
+    {
+        var services = new ServiceCollection();
+        services.AddDbContext<ApplicationDbContext>(o => o.UseSqlite(_connection));
+        return services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
+    }
+
+    /// <summary>Invokes the worker's private startup sweep directly (no BackgroundService hosting/consumer loop).</summary>
+    private static async Task InvokeReconcileAsync(AuthoredDocumentPdfWorker worker)
+    {
+        var method = typeof(AuthoredDocumentPdfWorker)
+            .GetMethod("ReconcilePendingRendersAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        await (Task)method.Invoke(worker, new object[] { CancellationToken.None })!;
+    }
+
+    /// <summary>
+    /// Deterministically drains everything the reconcile enqueued: a sentinel is appended after the
+    /// (already-complete) reconcile, and the reader stops at it — no timing, no consumer loop.
+    /// </summary>
+    private static async Task<List<int>> DrainAsync(AuthoredDocumentPdfQueue queue)
+    {
+        const int sentinel = -1;
+        await queue.EnqueueAsync(sentinel);
+
+        var drained = new List<int>();
+        await foreach (var id in queue.DequeueAllAsync(CancellationToken.None))
+        {
+            if (id == sentinel) break;
+            drained.Add(id);
+        }
+        return drained;
     }
 
     public void Dispose() => _connection.Dispose();

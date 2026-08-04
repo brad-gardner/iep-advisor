@@ -46,12 +46,15 @@ public class AuthoredDocumentVersionDetailModel
     public TemplateVersionDetailModel TemplateVersion { get; set; } = new();
 }
 
-/// <summary>PDF availability for a finalized version. Url is set only when RenderStatus is Rendered.</summary>
+/// <summary>
+/// PDF render status for a finalized version. Side-effect-free (polled frequently), so it carries NO
+/// download URL — the SAS is minted only by <c>GetPdfDownloadUrlAsync</c>, which is where the FERPA
+/// Export audit is recorded (a poll is not an export).
+/// </summary>
 public class AuthoredDocumentPdfStatusModel
 {
     public int VersionId { get; set; }
     public PdfRenderStatus RenderStatus { get; set; }
-    public string? Url { get; set; }
     public DateTime? RenderedAt { get; set; }
     public string? ErrorMessage { get; set; }
 }

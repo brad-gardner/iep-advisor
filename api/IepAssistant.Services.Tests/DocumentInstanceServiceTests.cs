@@ -45,7 +45,7 @@ public sealed class DocumentInstanceServiceTests : IDisposable
             ctx,
             new OrgAccessService(ctx),
             new TemplateResolutionService(ctx, NullLogger<TemplateResolutionService>.Instance),
-            new TemplateAuthoringService(ctx, NullLogger<TemplateAuthoringService>.Instance),
+            new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance),
             _audit,
             NullLogger<DocumentInstanceService>.Instance);
 
@@ -478,6 +478,46 @@ public sealed class DocumentInstanceServiceTests : IDisposable
             Assert.DoesNotContain("onclick", stored, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("<p>Hello</p>", stored); // safe formatting preserved
             Assert.Contains("bold", stored);
+        }
+    }
+
+    // ---------------------------------------------------------------- SaveValues: size guard
+
+    [Fact]
+    public async Task SaveValues_OverSizeCap_IsRejected_AndLeavesPriorValuesUnchanged()
+    {
+        var s = SeedSchoolWithStudent("save-toobig");
+        var keys = SeedPublishedTemplate(null, IepTypeId);
+        var instanceId = await CreateInstanceAsync(s);
+
+        // First, persist a small legitimate value so we can prove the oversized save does not clobber it.
+        using (var ctx = CreateContext())
+        {
+            var patch = Patch($$"""
+            { "{{keys.TextKey}}": "keep me" }
+            """);
+            Assert.True((await CreateService(ctx).SaveValuesAsync(instanceId, patch, null, s.CollaboratorUserId)).Success);
+        }
+
+        // A Text field whose value alone exceeds the 1 MB serialized cap.
+        var huge = new string('a', DocumentInstanceService.MaxValuesJsonBytes + 1_000);
+        using (var ctx = CreateContext())
+        {
+            var patch = new Dictionary<string, JsonElement>
+            {
+                [keys.TextKey.ToString()] = JsonSerializer.SerializeToElement(huge)
+            };
+            var result = await CreateService(ctx).SaveValuesAsync(instanceId, patch, null, s.CollaboratorUserId);
+
+            Assert.False(result.Success);
+            Assert.Contains("too large", result.Message!, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // No partial write: the prior value is exactly what we stored, and the row was not touched.
+        using (var ctx = CreateContext())
+        {
+            var values = ReadValues(ctx, instanceId);
+            Assert.Equal("keep me", values.GetProperty(keys.TextKey.ToString()).GetString());
         }
     }
 

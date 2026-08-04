@@ -32,7 +32,9 @@ public interface IDocumentInstanceService
     /// stripped, values are type-checked per FieldType, RichText is sanitized. Required-ness,
     /// select-option membership and table row bounds are NOT enforced here (finalize-time, Phase 4).
     /// </summary>
-    Task<ServiceResult<DocumentInstanceDetailModel>> SaveValuesAsync(int instanceId, IReadOnlyDictionary<string, JsonElement> valuesPatch, byte[]? rowVersion, int actingUserId, CancellationToken ct = default);
+    /// <remarks>Returns a lightweight <see cref="DocumentInstanceValuesModel"/> (normalized values + the
+    /// rotated concurrency token), not the full tree — the pinned schema is immutable and already client-side.</remarks>
+    Task<ServiceResult<DocumentInstanceValuesModel>> SaveValuesAsync(int instanceId, IReadOnlyDictionary<string, JsonElement> valuesPatch, byte[]? rowVersion, int actingUserId, CancellationToken ct = default);
 
     /// <summary>Deletes the instance; permitted only while Status == Draft.</summary>
     Task<ServiceResult> DeleteAsync(int instanceId, int actingUserId, CancellationToken ct = default);

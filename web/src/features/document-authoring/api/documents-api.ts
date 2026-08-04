@@ -2,12 +2,14 @@ import { apiClient } from '@/lib/api-client';
 import type { ApiResponse } from '@/types/api';
 import type { DocumentTypeDto } from '@/features/admin/templates/types';
 import type {
+  AuthoredDocumentPdfDownloadDto,
   AuthoredDocumentPdfStatusDto,
   AuthoredDocumentVersionDetailDto,
   AuthoredDocumentVersionSummaryDto,
   DocumentInstanceDetailDto,
   DocumentInstanceSummaryDto,
   DocumentValuePatch,
+  DocumentValuesResponseDto,
 } from '../types';
 
 // Thin async wrappers over apiClient for the educator document-authoring
@@ -58,14 +60,15 @@ export async function getDocument(
 /**
  * Save a partial patch of field values. The pinned schema validates types;
  * unknown keys are ignored server-side. Threads `rowVersion` for optimistic
- * concurrency — a 409 rejects with the envelope in the body.
+ * concurrency — a 409 rejects with the envelope in the body. Returns only the
+ * normalized values + rotated token (the immutable template tree is not re-sent).
  */
 export async function saveValues(
   instanceId: number,
   values: DocumentValuePatch,
   rowVersion?: string
-): Promise<ApiResponse<DocumentInstanceDetailDto>> {
-  const res = await apiClient.put<ApiResponse<DocumentInstanceDetailDto>>(
+): Promise<ApiResponse<DocumentValuesResponseDto>> {
+  const res = await apiClient.put<ApiResponse<DocumentValuesResponseDto>>(
     `/api/documents/${instanceId}/values`,
     { values, rowVersion }
   );
@@ -118,12 +121,26 @@ export async function getAuthoredVersion(
   return res.data;
 }
 
-/** PDF render status for a finalized version (url set only when Rendered). */
+/** PDF render status for a finalized version (status only — no URL; safe to poll). */
 export async function getAuthoredPdfStatus(
   versionId: number
 ): Promise<ApiResponse<AuthoredDocumentPdfStatusDto>> {
   const res = await apiClient.get<ApiResponse<AuthoredDocumentPdfStatusDto>>(
     `/api/authored-versions/${versionId}/pdf`
+  );
+  return res.data;
+}
+
+/**
+ * Mint a short-lived download URL for a Rendered version's PDF. This is the call
+ * that records the FERPA Export audit, so it runs only on an actual download
+ * (not on the status poll). Fails if the PDF is not yet Rendered.
+ */
+export async function getAuthoredPdfDownloadUrl(
+  versionId: number
+): Promise<ApiResponse<AuthoredDocumentPdfDownloadDto>> {
+  const res = await apiClient.get<ApiResponse<AuthoredDocumentPdfDownloadDto>>(
+    `/api/authored-versions/${versionId}/pdf/download`
   );
   return res.data;
 }

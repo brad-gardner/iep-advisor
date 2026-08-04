@@ -64,7 +64,7 @@ public class DocumentInstanceController : ControllerBase
     }
 
     [HttpPut("api/documents/{instanceId:int}/values")]
-    [ProducesResponseType(typeof(ApiResponse<DocumentInstanceDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<DocumentInstanceValuesDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
@@ -77,7 +77,9 @@ public class DocumentInstanceController : ControllerBase
         var result = await _service.SaveValuesAsync(instanceId, request.Values, rowVersion, User.GetUserId(), ct);
         if (!result.Success) return MapFailure(result.Message);
 
-        return Ok(ApiResponse<DocumentInstanceDetailDto>.SuccessResponse(DocumentInstanceMappers.MapDetail(result.Data!)));
+        // Lightweight response: normalized values + rotated token only (the immutable pinned tree
+        // stays on the client — no full-tree re-query/re-ship per autosave tick).
+        return Ok(ApiResponse<DocumentInstanceValuesDto>.SuccessResponse(DocumentInstanceMappers.MapValues(result.Data!)));
     }
 
     [HttpDelete("api/documents/{instanceId:int}")]

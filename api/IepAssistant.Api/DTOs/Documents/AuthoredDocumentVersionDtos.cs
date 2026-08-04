@@ -45,13 +45,18 @@ public class AuthoredDocumentVersionDetailDto
     public TemplateVersionDetailDto TemplateVersion { get; set; } = new();
 }
 
-/// <summary>PDF render status + (when Rendered) a short-lived download URL.</summary>
+/// <summary>PDF render status (no URL — polled; the download URL comes from the download endpoint).</summary>
 public class AuthoredDocumentPdfStatusDto
 {
     public int VersionId { get; set; }
     /// <summary>Serialized as a string (Pending | Rendered | Error).</summary>
     public string RenderStatus { get; set; } = string.Empty;
-    public string? Url { get; set; }
     public DateTime? RenderedAt { get; set; }
     public string? ErrorMessage { get; set; }
+}
+
+/// <summary>A freshly-minted, short-lived download URL for a Rendered authored-document PDF.</summary>
+public class AuthoredDocumentPdfDownloadDto
+{
+    public string Url { get; set; } = string.Empty;
 }

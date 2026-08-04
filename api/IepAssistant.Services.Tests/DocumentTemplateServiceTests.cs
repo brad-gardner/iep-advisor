@@ -25,6 +25,7 @@ public sealed class DocumentTemplateServiceTests : IDisposable
 
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<ApplicationDbContext> _options;
+    private readonly CapturingAuditLogger _audit = new();
 
     public DocumentTemplateServiceTests()
     {
@@ -41,7 +42,7 @@ public sealed class DocumentTemplateServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private DocumentTemplateService CreateService(ApplicationDbContext ctx)
-        => new(ctx, NullLogger<DocumentTemplateService>.Instance);
+        => new(ctx, _audit, NullLogger<DocumentTemplateService>.Instance);
 
     // ---------------------------------------------------------------- Seed rows
 
@@ -110,6 +111,44 @@ public sealed class DocumentTemplateServiceTests : IDisposable
 
         Assert.True(result.Success, result.Message);
         Assert.Null(result.Data!.StateCode);
+    }
+
+    [Fact]
+    public async Task CreateTemplate_WritesEditAudit()
+    {
+        _audit.Entries.Clear();
+
+        int templateId;
+        using (var ctx = CreateContext())
+        {
+            var result = await CreateService(ctx).CreateTemplateAsync(AdminUserId, "OH", IepTypeId, "Ohio IEP");
+            Assert.True(result.Success, result.Message);
+            templateId = result.Data!.Id;
+        }
+
+        var entry = Assert.Single(_audit.Entries);
+        Assert.Equal(AuditAction.Edit, entry.Action);
+        Assert.Equal("DocumentTemplate", entry.ResourceType);
+        Assert.Equal(templateId, entry.ResourceId);
+        Assert.Equal(AdminUserId, entry.ActorUserId);
+    }
+
+    [Fact]
+    public async Task CreateTemplate_DuplicateRejected_WritesNoAudit()
+    {
+        using (var ctx = CreateContext())
+            Assert.True((await CreateService(ctx).CreateTemplateAsync(AdminUserId, "OH", IepTypeId, "Ohio IEP")).Success);
+
+        _audit.Entries.Clear();
+
+        using (var ctx = CreateContext())
+        {
+            var dup = await CreateService(ctx).CreateTemplateAsync(AdminUserId, "OH", IepTypeId, "Ohio IEP again");
+            Assert.False(dup.Success);
+        }
+
+        // A rejected create is not a governance event — nothing is recorded.
+        Assert.Empty(_audit.Entries);
     }
 
     // ---------------------------------------------------------------- Uniqueness
