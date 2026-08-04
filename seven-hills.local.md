@@ -1,6 +1,8 @@
 ---
-review_agents: [dotnet-reviewer, react-reviewer, react-async-reviewer, typescript-reviewer, code-simplicity-reviewer, security-agent-smith, performance-oracle]
+review_agents: [dotnet-reviewer, react-reviewer, react-async-reviewer, bruno-reviewer, typescript-reviewer, code-simplicity-reviewer, agent-smith, performance-oracle]
+worker_agents: [dotnet-worker, react-worker, bruno-worker]
 plan_review_agents: [architecture-strategist, code-simplicity-reviewer, performance-oracle]
+base_branch: main
 ---
 
 # Review Context
