@@ -50,6 +50,9 @@ export function useAutosave<T>(
   const mountedRef = useRef(true);
   // True while runSave's drain loop is executing — makes runSave non-reentrant.
   const isRunningRef = useRef(false);
+  // The in-flight drain promise, so a reentrant runSave (e.g. flush() called while
+  // a save is on the wire) can await the running drain instead of resolving early.
+  const runPromiseRef = useRef<Promise<void> | null>(null);
   // Set when a save() lands mid-flight so the drain loop runs one more pass.
   const rerunRef = useRef(false);
 
@@ -70,45 +73,53 @@ export function useAutosave<T>(
   const runSave = useCallback(async () => {
     clearTimer();
 
-    // Non-reentrant: if a drain loop is already running, just flag a rerun (when
-    // there is pending work) and return so flush() + the debounce never overlap.
+    // Non-reentrant: if a drain loop is already running, flag a rerun (when there
+    // is pending work) and await the in-flight drain so callers — notably flush()
+    // invoked while a save is on the wire — resolve only once that save (plus any
+    // reran pass) has settled, never on an unconfirmed state.
     if (isRunningRef.current) {
       if (pendingRef.current) rerunRef.current = true;
+      if (runPromiseRef.current) await runPromiseRef.current;
       return;
     }
     if (!pendingRef.current) return;
 
     isRunningRef.current = true;
-    try {
-      do {
-        rerunRef.current = false;
-        const pending: { value: T } | null = pendingRef.current;
-        if (!pending) break;
+    const drain = (async () => {
+      try {
+        do {
+          rerunRef.current = false;
+          const pending: { value: T } | null = pendingRef.current;
+          if (!pending) break;
 
-        clearSavedTimer();
-        setStatus('saving');
-        try {
-          await saveFnRef.current(pending.value);
-          // Compare by object identity, not value: a newer save() swaps in a
-          // fresh { value } object, so this only clears when nothing newer queued.
-          if (pendingRef.current === pending) {
-            pendingRef.current = null;
+          clearSavedTimer();
+          setStatus('saving');
+          try {
+            await saveFnRef.current(pending.value);
+            // Compare by object identity, not value: a newer save() swaps in a
+            // fresh { value } object, so this only clears when nothing newer queued.
+            if (pendingRef.current === pending) {
+              pendingRef.current = null;
+            }
+            if (mountedRef.current) {
+              setStatus('saved');
+              savedTimerRef.current = setTimeout(() => {
+                if (mountedRef.current) setStatus('idle');
+              }, SAVED_LINGER_MS);
+            }
+          } catch {
+            // Keep pendingRef so a subsequent save() (retry) re-sends the value.
+            if (mountedRef.current) setStatus('error');
+            break;
           }
-          if (mountedRef.current) {
-            setStatus('saved');
-            savedTimerRef.current = setTimeout(() => {
-              if (mountedRef.current) setStatus('idle');
-            }, SAVED_LINGER_MS);
-          }
-        } catch {
-          // Keep pendingRef so a subsequent save() (retry) re-sends the value.
-          if (mountedRef.current) setStatus('error');
-          break;
-        }
-      } while (rerunRef.current && pendingRef.current);
-    } finally {
-      isRunningRef.current = false;
-    }
+        } while (rerunRef.current && pendingRef.current);
+      } finally {
+        isRunningRef.current = false;
+        runPromiseRef.current = null;
+      }
+    })();
+    runPromiseRef.current = drain;
+    await drain;
   }, [clearTimer, clearSavedTimer]);
 
   const save = useCallback(

@@ -196,6 +196,110 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.ToTable("AnalysisRunSources");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.AuthoredDocumentPdf", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AuthoredDocumentVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("BlobUri")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Checksum")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("RenderStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("RenderedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthoredDocumentVersionId")
+                        .IsUnique();
+
+                    b.ToTable("AuthoredDocumentPdfs");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.AuthoredDocumentVersion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DocumentTemplateVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DocumentTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("FinalizedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FinalizedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SchoolStudentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ValuesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentTemplateVersionId");
+
+                    b.HasIndex("DocumentTypeId");
+
+                    b.HasIndex("SchoolStudentId", "DocumentTypeId", "VersionNumber")
+                        .IsUnique();
+
+                    b.ToTable("AuthoredDocumentVersions");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.BetaInviteCode", b =>
                 {
                     b.Property<int>("Id")
@@ -458,6 +562,224 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Districts");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.DocumentInstance", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DocumentTemplateVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DocumentTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("LastEditedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("LastEditedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<int>("SchoolStudentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ValuesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentTemplateVersionId");
+
+                    b.HasIndex("DocumentTypeId");
+
+                    b.HasIndex("SchoolStudentId");
+
+                    b.HasIndex("SchoolStudentId", "DocumentTypeId");
+
+                    b.ToTable("DocumentInstances");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.DocumentTemplate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DocumentTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("StateCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentTypeId");
+
+                    b.HasIndex("StateCode", "DocumentTypeId")
+                        .IsUnique();
+
+                    b.ToTable("DocumentTemplates");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.DocumentTemplateVersion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DocumentTemplateId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentTemplateId");
+
+                    b.HasIndex("DocumentTemplateId", "VersionNumber")
+                        .IsUnique();
+
+                    b.ToTable("DocumentTemplateVersions");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.DocumentType", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("DocumentTypes");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CreatedAt = new DateTime(2026, 7, 20, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DisplayName = "IEP",
+                            IsActive = true,
+                            Key = "IEP",
+                            UpdatedAt = new DateTime(2026, 7, 20, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 2,
+                            CreatedAt = new DateTime(2026, 7, 20, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DisplayName = "Section 504 Plan",
+                            IsActive = true,
+                            Key = "Section504",
+                            UpdatedAt = new DateTime(2026, 7, 20, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 3,
+                            CreatedAt = new DateTime(2026, 7, 20, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DisplayName = "ETR",
+                            IsActive = true,
+                            Key = "ETR",
+                            UpdatedAt = new DateTime(2026, 7, 20, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.EtrAnalysis", b =>
@@ -2345,6 +2667,110 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.ToTable("StudentWorkspaceEntries");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.TemplateField", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ConfigJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DocumentTemplateVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("FieldKey")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FieldType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<bool>("Required")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("TemplateSectionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentTemplateVersionId");
+
+                    b.HasIndex("TemplateSectionId");
+
+                    b.HasIndex("DocumentTemplateVersionId", "FieldKey")
+                        .IsUnique();
+
+                    b.ToTable("TemplateFields");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.TemplateSection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DocumentTemplateVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("SectionKey")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentTemplateVersionId");
+
+                    b.HasIndex("DocumentTemplateVersionId", "SectionKey")
+                        .IsUnique();
+
+                    b.ToTable("TemplateSections");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.UsageRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -2546,6 +2972,44 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Navigation("AnalysisRun");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.AuthoredDocumentPdf", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.AuthoredDocumentVersion", "AuthoredDocumentVersion")
+                        .WithOne("Pdf")
+                        .HasForeignKey("IepAssistant.Domain.Entities.AuthoredDocumentPdf", "AuthoredDocumentVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AuthoredDocumentVersion");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.AuthoredDocumentVersion", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.DocumentTemplateVersion", "DocumentTemplateVersion")
+                        .WithMany()
+                        .HasForeignKey("DocumentTemplateVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.DocumentType", "DocumentType")
+                        .WithMany()
+                        .HasForeignKey("DocumentTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.SchoolStudent", "SchoolStudent")
+                        .WithMany()
+                        .HasForeignKey("SchoolStudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DocumentTemplateVersion");
+
+                    b.Navigation("DocumentType");
+
+                    b.Navigation("SchoolStudent");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.BetaInviteCode", b =>
                 {
                     b.HasOne("IepAssistant.Domain.Entities.User", "RedeemedBy")
@@ -2608,6 +3072,55 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Navigation("CurrentIepDocument");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.DocumentInstance", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.DocumentTemplateVersion", "DocumentTemplateVersion")
+                        .WithMany()
+                        .HasForeignKey("DocumentTemplateVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.DocumentType", "DocumentType")
+                        .WithMany()
+                        .HasForeignKey("DocumentTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.SchoolStudent", "SchoolStudent")
+                        .WithMany()
+                        .HasForeignKey("SchoolStudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DocumentTemplateVersion");
+
+                    b.Navigation("DocumentType");
+
+                    b.Navigation("SchoolStudent");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.DocumentTemplate", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.DocumentType", "DocumentType")
+                        .WithMany("Templates")
+                        .HasForeignKey("DocumentTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DocumentType");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.DocumentTemplateVersion", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.DocumentTemplate", "DocumentTemplate")
+                        .WithMany("Versions")
+                        .HasForeignKey("DocumentTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DocumentTemplate");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.EtrAnalysis", b =>
@@ -3068,6 +3581,36 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Navigation("StudentWorkspace");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.TemplateField", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.DocumentTemplateVersion", "Version")
+                        .WithMany()
+                        .HasForeignKey("DocumentTemplateVersionId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.TemplateSection", "Section")
+                        .WithMany("Fields")
+                        .HasForeignKey("TemplateSectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Section");
+
+                    b.Navigation("Version");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.TemplateSection", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.DocumentTemplateVersion", "DocumentTemplateVersion")
+                        .WithMany("Sections")
+                        .HasForeignKey("DocumentTemplateVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DocumentTemplateVersion");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.UsageRecord", b =>
                 {
                     b.HasOne("IepAssistant.Domain.Entities.ChildProfile", "ChildProfile")
@@ -3105,9 +3648,29 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Navigation("Sources");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.AuthoredDocumentVersion", b =>
+                {
+                    b.Navigation("Pdf");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.District", b =>
                 {
                     b.Navigation("Schools");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.DocumentTemplate", b =>
+                {
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.DocumentTemplateVersion", b =>
+                {
+                    b.Navigation("Sections");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.DocumentType", b =>
+                {
+                    b.Navigation("Templates");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.IepDraft", b =>
@@ -3156,6 +3719,11 @@ namespace IepAssistant.Domain.Data.Migrations
             modelBuilder.Entity("IepAssistant.Domain.Entities.StudentWorkspace", b =>
                 {
                     b.Navigation("Entries");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.TemplateSection", b =>
+                {
+                    b.Navigation("Fields");
                 });
 #pragma warning restore 612, 618
         }

@@ -58,6 +58,14 @@ public class ApplicationDbContext : DbContext
     public DbSet<StudentInvite> StudentInvites => Set<StudentInvite>();
     public DbSet<StudentWorkspace> StudentWorkspaces => Set<StudentWorkspace>();
     public DbSet<StudentWorkspaceEntry> StudentWorkspaceEntries => Set<StudentWorkspaceEntry>();
+    public DbSet<DocumentType> DocumentTypes => Set<DocumentType>();
+    public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
+    public DbSet<DocumentTemplateVersion> DocumentTemplateVersions => Set<DocumentTemplateVersion>();
+    public DbSet<TemplateSection> TemplateSections => Set<TemplateSection>();
+    public DbSet<TemplateField> TemplateFields => Set<TemplateField>();
+    public DbSet<DocumentInstance> DocumentInstances => Set<DocumentInstance>();
+    public DbSet<AuthoredDocumentVersion> AuthoredDocumentVersions => Set<AuthoredDocumentVersion>();
+    public DbSet<AuthoredDocumentPdf> AuthoredDocumentPdfs => Set<AuthoredDocumentPdf>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

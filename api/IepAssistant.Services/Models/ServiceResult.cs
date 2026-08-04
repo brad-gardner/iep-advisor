@@ -25,4 +25,7 @@ public class ServiceResult<T> : ServiceResult
 
     public new static ServiceResult<T> FailureResult(string message)
         => new() { Success = false, Message = message };
+
+    public new static ServiceResult<T> FailureResult(List<string> errors)
+        => new() { Success = false, Errors = errors };
 }

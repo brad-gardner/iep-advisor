@@ -26,6 +26,7 @@ import { VersionHistoryList } from "@/features/iep-versions/components/version-h
 import { useStudentVersions } from "@/features/iep-versions/hooks/use-version-list";
 import { InviteStudentForm } from "@/features/student/components/invite-student-form";
 import { inviteStudentFromEducator } from "@/features/student/api/student-invite-api";
+import { IEP_AUTHORING_MODE } from "@/config/features";
 
 export function EducatorStudentDetailPage() {
   const { show: showToast } = useToast();
@@ -228,19 +229,40 @@ export function EducatorStudentDetailPage() {
               </dl>
             </Card>
 
+            {/* Legacy typed IEP editor — shown only when rolled back to
+                'typed' mode. The route stays registered in both modes. */}
+            {IEP_AUTHORING_MODE === "typed" && (
+              <Card>
+                <h2 className="mb-2 font-serif text-base text-brand-slate-800">
+                  IEPs (legacy)
+                </h2>
+                <p className="mb-3 text-sm text-brand-slate-600">
+                  Build and edit IEP drafts in the legacy editor.
+                </p>
+                <Link
+                  to={`/educator/students/${studentId}/iep-drafts`}
+                  data-testid="build-ieps"
+                >
+                  <Button variant="secondary" className="w-full">
+                    Build / view IEPs
+                  </Button>
+                </Link>
+              </Card>
+            )}
+
             <Card>
               <h2 className="mb-2 font-serif text-base text-brand-slate-800">
-                IEPs
+                Documents
               </h2>
               <p className="mb-3 text-sm text-brand-slate-600">
-                Build and edit IEP drafts for this student.
+                Author state-specific documents (IEP, ETR, 504) from templates.
               </p>
               <Link
-                to={`/educator/students/${studentId}/iep-drafts`}
-                data-testid="build-ieps"
+                to={`/educator/students/${studentId}/documents`}
+                data-testid="build-documents"
               >
                 <Button variant="secondary" className="w-full">
-                  Build / view IEPs
+                  Manage documents
                 </Button>
               </Link>
             </Card>

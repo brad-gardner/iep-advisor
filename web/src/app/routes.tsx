@@ -37,6 +37,8 @@ import { AdminRouteGuard } from '@/features/admin/components/admin-route-guard';
 import { AdminDashboardPage } from '@/features/admin/components/admin-dashboard-page';
 import { AdminUsersPage } from '@/features/admin/components/admin-users-page';
 import { AdminUserDetail } from '@/features/admin/components/admin-user-detail';
+import { TemplateListPage } from '@/features/admin/templates/template-list-page';
+import { TemplateBuilderPage } from '@/features/admin/templates/template-builder-page';
 import { EducatorHomePage } from '@/features/educator/pages/educator-home-page';
 import { EducatorStudentsPage } from '@/features/educator/pages/educator-students-page';
 import { EducatorStudentDetailPage } from '@/features/educator/pages/educator-student-detail-page';
@@ -47,6 +49,9 @@ import { DistrictStaffPage } from '@/features/staff-invites/pages/district-staff
 import { StaffAcceptInvitePage } from '@/features/staff-invites/pages/staff-accept-invite-page';
 import { IepDraftListPage } from '@/features/iep-authoring/pages/iep-draft-list-page';
 import { IepAuthoringWorkspacePage } from '@/features/iep-authoring/pages/iep-authoring-workspace-page';
+import { DocumentListPage } from '@/features/document-authoring/pages/document-list-page';
+import { DocumentEditorPage } from '@/features/document-authoring/pages/document-editor-page';
+import { AuthoredVersionDetailPage } from '@/features/document-authoring/pages/authored-version-detail-page';
 import { AcceptLinkPage } from '@/features/child-links/components/accept-link-page';
 import { EducatorVersionDetailPage } from '@/features/iep-versions/components/educator-version-detail-page';
 import { StudentHomePage } from '@/features/student/pages/student-home-page';
@@ -431,6 +436,42 @@ export function AppRouter() {
         }
       />
       <Route
+        path="/educator/students/:studentId/documents"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allow={['Educator']}>
+              <MainLayout>
+                <DocumentListPage />
+              </MainLayout>
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/documents/:instanceId"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allow={['Educator']}>
+              <MainLayout>
+                <DocumentEditorPage />
+              </MainLayout>
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/students/:studentId/authored-versions/:versionId"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allow={['Educator']}>
+              <MainLayout>
+                <AuthoredVersionDetailPage />
+              </MainLayout>
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/educator/students/:studentId/iep-versions/:versionId"
         element={
           <ProtectedRoute>
@@ -563,6 +604,30 @@ export function AppRouter() {
             <MainLayout>
               <AdminRouteGuard>
                 <AdminUserDetail />
+              </AdminRouteGuard>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/templates"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <AdminRouteGuard>
+                <TemplateListPage />
+              </AdminRouteGuard>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/templates/:templateId"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <AdminRouteGuard>
+                <TemplateBuilderPage />
               </AdminRouteGuard>
             </MainLayout>
           </ProtectedRoute>

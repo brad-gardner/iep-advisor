@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home, ScrollText } from 'lucide-react';
+import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home, ScrollText, FileText } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -204,6 +204,19 @@ export function Sidebar({ onLogout }: SidebarProps) {
           >
             <Shield size={18} strokeWidth={1.8} />
             Users
+          </Link>
+          <Link
+            to="/admin/templates"
+            data-testid="nav-admin-templates"
+            onClick={() => setMobileOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-button text-sm transition-colors ${
+              isActive('/admin/templates')
+                ? 'text-brand-teal-400 bg-brand-slate-700 border-l-2 border-brand-teal-500 -ml-px'
+                : 'text-brand-slate-400 hover:text-brand-slate-200 hover:bg-brand-slate-700'
+            }`}
+          >
+            <FileText size={18} strokeWidth={1.8} />
+            Templates
           </Link>
         </div>
       )}
