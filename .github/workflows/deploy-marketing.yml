@@ -1,7 +1,16 @@
 name: Deploy Marketing
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "marketing/**"
+      - ".github/workflows/deploy-marketing.yml"
   workflow_dispatch:
+
+concurrency:
+  group: deploy-marketing
+  cancel-in-progress: false
 
 jobs:
   build_and_deploy_job:

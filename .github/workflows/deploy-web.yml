@@ -1,7 +1,16 @@
 name: Deploy Web
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/deploy-web.yml"
   workflow_dispatch:
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
 
 env:
   VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
