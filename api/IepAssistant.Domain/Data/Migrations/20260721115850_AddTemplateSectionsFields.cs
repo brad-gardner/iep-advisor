@@ -11,15 +11,11 @@ namespace IepAssistant.Domain.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AlterColumn<byte[]>(
-                name: "RowVersion",
-                table: "DocumentTemplateVersions",
-                type: "varbinary(max)",
-                nullable: true,
-                oldClrType: typeof(byte[]),
-                oldType: "rowversion",
-                oldRowVersion: true,
-                oldNullable: true);
+            // NOTE: an AlterColumn converting DocumentTemplateVersions.RowVersion from `rowversion`
+            // to `varbinary(max)` was scaffolded here when the concurrency token moved off a
+            // store-generated rowversion (see DocumentTemplateVersionConfiguration). SQL Server
+            // rejects ALTER on a timestamp column (error 4928), so the preceding AddDocumentTemplates
+            // migration now creates the column as varbinary(max) directly and this alter is dropped.
 
             migrationBuilder.CreateTable(
                 name: "TemplateSections",
@@ -129,15 +125,8 @@ namespace IepAssistant.Domain.Data.Migrations
                 name: "IX_DocumentTemplateVersions_DocumentTemplateId_VersionNumber",
                 table: "DocumentTemplateVersions");
 
-            migrationBuilder.AlterColumn<byte[]>(
-                name: "RowVersion",
-                table: "DocumentTemplateVersions",
-                type: "rowversion",
-                rowVersion: true,
-                nullable: true,
-                oldClrType: typeof(byte[]),
-                oldType: "varbinary(max)",
-                oldNullable: true);
+            // Paired with the dropped AlterColumn in Up() — the column is created as
+            // varbinary(max) by AddDocumentTemplates, so there is nothing to revert here.
         }
     }
 }
