@@ -19,6 +19,7 @@ using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Services;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Models;
 
 // QuestPDF runs under the free Community license (org is under the $1M-revenue threshold). Set once
 // at startup before any rendering — the P5b PDF worker generates IepVersion PDFs headless.
@@ -83,6 +84,20 @@ builder.Services.AddServices();
 
     builder.Services.AddSingleton(new IepAssistant.Services.Security.InviteLinkExposure(exposeEnabled));
 }
+
+// Anthropic model/effort configuration. ValidateOnStart is deliberate for MODEL and EFFORT: a
+// blank model or a typo'd effort is exactly the class of defect that took analysis down, it is
+// unfixable at runtime, and a fail-fast boot error is far cheaper than a 404 found by the first
+// user to run an analysis.
+//
+// ApiKey is deliberately NOT validated here — see AnthropicOptions.ApiKey. Failing boot over a
+// missing key would take down login, billing, and uploads for a credential only the AI features
+// need, and this pipeline deploys straight to Production with no staging slot. ClaudeClient's
+// blank-key guard scopes that failure to the AI features instead.
+builder.Services.AddOptions<AnthropicOptions>()
+    .Bind(builder.Configuration.GetSection(AnthropicOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 // Named HttpClient for Claude API calls (avoids socket exhaustion from new HttpClient per request).
 // Timeout is generous because long-document (30+ page ETR/IEP) non-streaming responses with

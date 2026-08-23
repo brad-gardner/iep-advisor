@@ -48,9 +48,14 @@ public sealed class StudentWorkspaceServiceTests : IDisposable
         public string? CannedResponse { get; set; } = "  POLISHED FIRST-PERSON STATEMENT  ";
         public ClaudeCompletionRequest? LastRequest { get; private set; }
 
+        /// <summary>When set, CompleteAsync throws this kind instead of returning a response.</summary>
+        public ClaudeFailureKind? ThrowKind { get; set; }
+
         public Task<string?> CompleteAsync(ClaudeCompletionRequest request, CancellationToken cancellationToken = default)
         {
             LastRequest = request;
+            if (ThrowKind is { } kind)
+                throw new ClaudeApiException(kind);
             return Task.FromResult(CannedResponse);
         }
     }
@@ -465,5 +470,21 @@ public sealed class StudentWorkspaceServiceTests : IDisposable
         var result = await CreateService(ctx).InterviewSuggestAsync(studentUserId, "hello", default);
         Assert.False(result.Success);
         Assert.Contains("temporarily unavailable", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task InterviewSuggest_ClaudeFails_ReturnsUnavailable_NotAnException()
+    {
+        // This call site had NO try/catch. It was harmless only while the configured model was
+        // retired; against a live model an outage here would escape as an uncaught 500 and lose
+        // whatever the student had typed.
+        var studentUserId = SeedStudent("interview-fails");
+        _claude.ThrowKind = ClaudeFailureKind.RateLimited;
+
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).InterviewSuggestAsync(studentUserId, "I am good at art");
+
+        Assert.False(result.Success);
+        Assert.Equal("AI interview is temporarily unavailable.", result.Message);
     }
 }

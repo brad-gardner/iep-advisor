@@ -228,7 +228,6 @@ Rules:
             SystemPrompt = systemPrompt,
             UserText = "Parse this IEP document and return structured JSON. Extract every section completely, including all test scores, evaluation data, and assessment results.",
             PdfDocument = pdfBytes,
-            Model = "claude-sonnet-4-20250514",
             MaxTokens = 16384,
         }, cancellationToken);
 

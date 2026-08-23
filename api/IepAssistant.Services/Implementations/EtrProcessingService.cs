@@ -268,7 +268,6 @@ Rules:
             SystemPrompt = systemPrompt,
             UserText = "Parse this ETR document and return structured JSON per the system instructions. Extract every section present, preserve all assessment scores verbatim, and do not invent data.",
             PdfDocument = pdfBytes,
-            Model = "claude-sonnet-4-20250514",
             MaxTokens = 32000,
         }, cancellationToken);
 
