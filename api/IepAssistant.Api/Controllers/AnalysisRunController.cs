@@ -109,6 +109,7 @@ public class AnalysisRunController : ControllerBase
         AdvocacyGapAnalysis = model.AdvocacyGapAnalysis,
         ParentGoalsSnapshot = model.ParentGoalsSnapshot,
         ErrorMessage = model.ErrorMessage,
+        FailureKind = model.FailureKind,
         CreatedAt = model.CreatedAt,
         Sources = model.Sources.Select(s => new AnalysisRunSourceDto
         {

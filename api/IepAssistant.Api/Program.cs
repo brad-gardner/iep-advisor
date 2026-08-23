@@ -19,6 +19,7 @@ using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Services;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Models;
 
 // QuestPDF runs under the free Community license (org is under the $1M-revenue threshold). Set once
 // at startup before any rendering — the P5b PDF worker generates IepVersion PDFs headless.
@@ -83,6 +84,14 @@ builder.Services.AddServices();
 
     builder.Services.AddSingleton(new IepAssistant.Services.Security.InviteLinkExposure(exposeEnabled));
 }
+
+// Anthropic model/effort configuration. ValidateOnStart is deliberate: a blank model or a typo'd
+// effort is exactly the class of defect that took analysis down, and a fail-fast boot error is far
+// cheaper to diagnose than a 404 discovered by the first user who runs an analysis.
+builder.Services.AddOptions<AnthropicOptions>()
+    .Bind(builder.Configuration.GetSection(AnthropicOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 // Named HttpClient for Claude API calls (avoids socket exhaustion from new HttpClient per request).
 // Timeout is generous because long-document (30+ page ETR/IEP) non-streaming responses with

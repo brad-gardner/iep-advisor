@@ -63,7 +63,7 @@ public class AnalysisRunWorker : BackgroundService
                 {
                     using var failScope = _scopeFactory.CreateScope();
                     var failService = failScope.ServiceProvider.GetRequiredService<IAnalysisRunService>();
-                    await failService.FailRunAsync(runId, "Analysis was interrupted.", CancellationToken.None);
+                    await failService.FailRunAsync(runId, "Analysis was interrupted.", ct: CancellationToken.None);
                 }
                 catch (Exception failEx)
                 {
@@ -89,8 +89,12 @@ public class AnalysisRunWorker : BackgroundService
             if (orphanedIds.Count == 0)
                 return;
 
+            // The refund runs on CancellationToken.None even though the query above uses
+            // stoppingToken: a shutdown landing mid-sweep (fast restart, crash loop) would
+            // otherwise abort the loop and silently leak every remaining orphan's reserved unit —
+            // the catch below only logs.
             foreach (var runId in orphanedIds)
-                await service.FailRunAsync(runId, "Interrupted by restart", stoppingToken);
+                await service.FailRunAsync(runId, "Interrupted by restart", ct: CancellationToken.None);
 
             _logger.LogWarning("Swept {Count} orphaned analysis run(s) left from a previous process", orphanedIds.Count);
         }

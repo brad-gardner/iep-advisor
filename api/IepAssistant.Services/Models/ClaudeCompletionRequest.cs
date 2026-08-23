@@ -5,6 +5,10 @@ public sealed class ClaudeCompletionRequest
     public required string SystemPrompt { get; init; }
     public required string UserText { get; init; }
     public byte[]? PdfDocument { get; init; }   // optional PDF attachment (base64-encoded as DocumentContent when present)
-    public string Model { get; init; } = "claude-sonnet-4-20250514";
+    /// <summary>
+    /// Per-call model override. Null (the default) means "use the configured Anthropic:Model",
+    /// which is how every call site should leave it unless it deliberately needs a different model.
+    /// </summary>
+    public string? Model { get; init; }
     public int MaxTokens { get; init; } = 16384;
 }

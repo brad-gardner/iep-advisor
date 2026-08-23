@@ -23,6 +23,38 @@ public class AnalysisRunServiceTests
             => Task.FromResult(_response);
     }
 
+    // Simulates graceful shutdown landing mid-Claude-call: the host cancels the token while the
+    // request is in flight, and ClaudeClient propagates the cancellation rather than relabelling it
+    // a timeout. This is the only way to reach ExecuteRunAsync's broad catch with a cancelled token.
+    private sealed class CancellingClaudeClient : IClaudeClient
+    {
+        private readonly CancellationTokenSource _cts;
+        public CancellingClaudeClient(CancellationTokenSource cts) => _cts = cts;
+
+        public Task<string?> CompleteAsync(ClaudeCompletionRequest request, CancellationToken cancellationToken = default)
+        {
+            _cts.Cancel();
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<string?>(null);
+        }
+    }
+
+    // A fake that fails the way ClaudeClient now does. The returns-a-string/returns-null fakes
+    // above can never exercise the typed catch, which is the path that both classifies the failure
+    // and refunds the reserved quota unit.
+    private sealed class ThrowingClaudeClient : IClaudeClient
+    {
+        private readonly ClaudeFailureKind _kind;
+        public int CallCount { get; private set; }
+        public ThrowingClaudeClient(ClaudeFailureKind kind) => _kind = kind;
+
+        public Task<string?> CompleteAsync(ClaudeCompletionRequest request, CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            throw new ClaudeApiException(_kind);
+        }
+    }
+
     private AnalysisRunService BuildService(ApplicationDbContext context, IClaudeClient claudeClient)
     {
         var accessService = new AccessService(context);
@@ -238,6 +270,8 @@ public class AnalysisRunServiceTests
         using var verifyContext = _fixture.CreateContext();
         var run = verifyContext.AnalysisRuns.Find(runId)!;
         Assert.Equal(AnalysisRunStatus.Error, run.Status);
+        Assert.Equal(ClaudeFailureMessages.InvalidResponse, run.ErrorMessage);
+        Assert.Equal(nameof(ClaudeFailureKind.InvalidResponse), run.FailureKind);
 
         var usageAfter = verifyContext.UsageRecords.Count(u =>
             u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
@@ -373,7 +407,7 @@ public class AnalysisRunServiceTests
         using (var failContext = _fixture.CreateContext())
         {
             var failService = BuildService(failContext, new FakeClaudeClient(null));
-            await failService.FailRunAsync(runId, "should be ignored", CancellationToken.None);
+            await failService.FailRunAsync(runId, "should be ignored", ct: CancellationToken.None);
         }
 
         using var verifyContext = _fixture.CreateContext();
@@ -384,5 +418,208 @@ public class AnalysisRunServiceTests
         var usageAfter = verifyContext.UsageRecords.Count(u =>
             u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
         Assert.Equal(usageBefore, usageAfter); // no negative usage / no extra refund
+    }
+
+    [Fact]
+    public async Task ExecuteRunAsync_ClaudeApiException_PersistsKindAndRefundsExactlyOnce()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+
+        int usageBefore;
+        using (var preContext = _fixture.CreateContext())
+        {
+            usageBefore = preContext.UsageRecords.Count(u =>
+                u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
+        }
+
+        int runId;
+        int reservedUsageRecordId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef> { new(AnalysisSourceType.IepDocument, iepId) },
+                CancellationToken.None);
+            Assert.True(created.Success);
+            runId = created.Data!.Id;
+
+            // Capture the exact reserved row so the refund can be verified by id, not by count.
+            reservedUsageRecordId = createContext.AnalysisRuns.Find(runId)!.UsageRecordId!.Value;
+        }
+
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, new ThrowingClaudeClient(ClaudeFailureKind.Configuration));
+            await execService.ExecuteRunAsync(runId, CancellationToken.None);
+        }
+
+        using var verifyContext = _fixture.CreateContext();
+        var run = verifyContext.AnalysisRuns.Find(runId)!;
+
+        Assert.Equal(AnalysisRunStatus.Error, run.Status);
+        Assert.Equal(ClaudeFailureMessages.Configuration, run.ErrorMessage);
+        Assert.Equal(nameof(ClaudeFailureKind.Configuration), run.FailureKind);
+
+        // The reservation must be released, not merely detached: verify the actual usage row is
+        // gone and the pointer cleared so no later fail path can double-refund.
+        Assert.Null(run.UsageRecordId);
+        Assert.Null(verifyContext.UsageRecords.Find(reservedUsageRecordId));
+
+        var usageAfter = verifyContext.UsageRecords.Count(u =>
+            u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
+        Assert.Equal(usageBefore, usageAfter);
+    }
+
+    [Fact]
+    public async Task ExecuteRunAsync_ClaudeApiException_DoesNotLeakInternalDetailIntoErrorMessage()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef> { new(AnalysisSourceType.IepDocument, iepId) },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, new ThrowingClaudeClient(ClaudeFailureKind.RateLimited));
+            await execService.ExecuteRunAsync(runId, CancellationToken.None);
+        }
+
+        using var verifyContext = _fixture.CreateContext();
+        var run = verifyContext.AnalysisRuns.Find(runId)!;
+
+        // The persisted message is the canned constant verbatim — never the exception's own text,
+        // which for a real failure carries the model id and Anthropic request id.
+        Assert.Equal(ClaudeFailureMessages.RateLimited, run.ErrorMessage);
+        Assert.Equal(nameof(ClaudeFailureKind.RateLimited), run.FailureKind);
+        Assert.DoesNotContain("Claude call failed", run.ErrorMessage!);
+    }
+
+    [Fact]
+    public async Task ExecuteRunAsync_CancelledDuringClaudeCall_StillRefundsQuotaUnit()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+
+        int usageBefore;
+        using (var preContext = _fixture.CreateContext())
+        {
+            usageBefore = preContext.UsageRecords.Count(u =>
+                u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
+        }
+
+        int runId;
+        int reservedUsageRecordId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef> { new(AnalysisSourceType.IepDocument, iepId) },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+            reservedUsageRecordId = createContext.AnalysisRuns.Find(runId)!.UsageRecordId!.Value;
+        }
+
+        // Shutdown arrives while the Claude call is in flight. FailRunAsync must run on
+        // CancellationToken.None — handing it the cancelled ct makes the refund's SaveChangesAsync
+        // throw, and the unit is leaked with no path left to reclaim it.
+        using var cts = new CancellationTokenSource();
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, new CancellingClaudeClient(cts));
+            await execService.ExecuteRunAsync(runId, cts.Token);
+        }
+
+        using var verifyContext = _fixture.CreateContext();
+        var run = verifyContext.AnalysisRuns.Find(runId)!;
+        Assert.Equal(AnalysisRunStatus.Error, run.Status);
+        Assert.Null(run.UsageRecordId);
+        Assert.Null(verifyContext.UsageRecords.Find(reservedUsageRecordId));
+
+        // Shutdown is neither a timeout nor an unexpected error — both would be lies written onto
+        // an in-flight run by every deploy restart.
+        Assert.Equal("Analysis was interrupted.", run.ErrorMessage);
+        Assert.NotEqual(ClaudeFailureMessages.Timeout, run.ErrorMessage);
+        Assert.NotEqual(ClaudeFailureMessages.Unknown, run.ErrorMessage);
+
+        var usageAfter = verifyContext.UsageRecords.Count(u =>
+            u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
+        Assert.Equal(usageBefore, usageAfter);
+    }
+
+    [Fact]
+    public async Task ExecuteRunAsync_WithPreCancelledToken_LeavesRunRecoverableByWorker()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+
+        int usageBefore;
+        using (var preContext = _fixture.CreateContext())
+        {
+            usageBefore = preContext.UsageRecords.Count(u =>
+                u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
+        }
+
+        int runId;
+        int reservedUsageRecordId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef> { new(AnalysisSourceType.IepDocument, iepId) },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+            reservedUsageRecordId = createContext.AnalysisRuns.Find(runId)!.UsageRecordId!.Value;
+        }
+
+        // An already-cancelled token aborts on the very first query, before ExecuteRunAsync's try
+        // block exists — so the cancellation propagates rather than being swallowed, and the run is
+        // left untouched and still holding its reservation.
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, new FakeClaudeClient(null));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => execService.ExecuteRunAsync(runId, cts.Token));
+        }
+
+        using (var midContext = _fixture.CreateContext())
+        {
+            var stranded = midContext.AnalysisRuns.Find(runId)!;
+            Assert.Equal(AnalysisRunStatus.Pending, stranded.Status);
+            Assert.Equal(reservedUsageRecordId, stranded.UsageRecordId);
+        }
+
+        // AnalysisRunWorker's catch is what reclaims it, and it must succeed on a fresh scope with
+        // an uncancelled token.
+        using (var failContext = _fixture.CreateContext())
+        {
+            var failService = BuildService(failContext, new FakeClaudeClient(null));
+            await failService.FailRunAsync(runId, "Analysis was interrupted.", ct: CancellationToken.None);
+        }
+
+        using var verifyContext = _fixture.CreateContext();
+        var run = verifyContext.AnalysisRuns.Find(runId)!;
+        Assert.Equal(AnalysisRunStatus.Error, run.Status);
+        Assert.Null(run.UsageRecordId);
+        Assert.Null(verifyContext.UsageRecords.Find(reservedUsageRecordId));
+
+        var usageAfter = verifyContext.UsageRecords.Count(u =>
+            u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
+        Assert.Equal(usageBefore, usageAfter);
     }
 }

@@ -155,6 +155,11 @@ public class AnalysisRunService : IAnalysisRunService
         }
 
         run.Status = AnalysisRunStatus.Running;
+        // Clear any prior failure state as the run re-enters flight, so a run that ends Completed
+        // can never carry a stale ErrorMessage/FailureKind — which would make the UI suppress
+        // actions on a run that actually succeeded.
+        run.ErrorMessage = null;
+        run.FailureKind = null;
         run.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
 
@@ -171,14 +176,21 @@ public class AnalysisRunService : IAnalysisRunService
             {
                 SystemPrompt = systemPrompt,
                 UserText = userText,
-                Model = "claude-sonnet-4-20250514",
                 MaxTokens = 32000,
             }, ct);
 
             var result = ParseResponse(responseText);
             if (result == null)
             {
-                await FailRunAsync(runId, "Failed to generate analysis.", ct);
+                // Unparseable JSON from Claude is exactly ClaudeFailureKind.InvalidResponse, so
+                // record it as such and give Phase 4's kind-aware UI something to branch on.
+                // CancellationToken.None for the same reason as the catch blocks below: the refund
+                // inside FailRunAsync must not be abortable, or the reserved unit leaks.
+                await FailRunAsync(
+                    runId,
+                    ClaudeFailureMessages.InvalidResponse,
+                    ClaudeFailureKind.InvalidResponse,
+                    CancellationToken.None);
                 return;
             }
 
@@ -249,10 +261,28 @@ public class AnalysisRunService : IAnalysisRunService
 
             _logger.LogInformation("AnalysisRun {RunId} completed", runId);
         }
+        catch (ClaudeApiException ex)
+        {
+            _logger.LogError(ex, "AnalysisRun {RunId} failed: {Kind}", runId, ex.Kind);
+            // Must go through FailRunAsync: the quota refund lives there, and once the status is
+            // terminal neither the idempotency guard nor ReconcileOrphanedRunsAsync will repair a
+            // reservation leaked by setting Status/ErrorMessage inline.
+            await FailRunAsync(runId, ex.UserMessage, ex.Kind, CancellationToken.None);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Host shutdown. ClaudeClient already refuses to mislabel this a Timeout; without this
+            // arm the broad catch below would relabel it "An unexpected error occurred" with a null
+            // FailureKind, which is a different lie and leaves the Phase 4 UI nothing to branch on.
+            _logger.LogWarning("AnalysisRun {RunId} interrupted by host shutdown", runId);
+            await FailRunAsync(runId, "Analysis was interrupted.", ct: CancellationToken.None);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error executing AnalysisRun {RunId}", runId);
-            await FailRunAsync(runId, "An unexpected error occurred during analysis.", ct);
+            // CancellationToken.None, not ct: on shutdown ct is already cancelled, and the refund's
+            // SaveChangesAsync(ct) inside FailRunAsync would throw, leaking the reserved unit.
+            await FailRunAsync(runId, "An unexpected error occurred during analysis.", ct: CancellationToken.None);
         }
     }
 
@@ -585,8 +615,16 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
         }
     }
 
-    public async Task FailRunAsync(int runId, string message, CancellationToken ct = default)
+    public async Task FailRunAsync(int runId, string message, ClaudeFailureKind? failureKind = null, CancellationToken ct = default)
     {
+        // Drop any uncommitted state from the work that just failed. This context is shared with
+        // ExecuteRunAsync, so without this the save below would flush partial results (summary,
+        // red flags, half the sections) onto a run being marked Error — and if the original failure
+        // was a DbUpdateException, the same bad data would still be tracked and this save would
+        // throw too, taking the quota refund down with it. Every caller re-queries the run, so
+        // clearing is safe.
+        _context.ChangeTracker.Clear();
+
         var run = await _context.AnalysisRuns.FirstOrDefaultAsync(r => r.Id == runId, ct);
         if (run == null)
         {
@@ -600,6 +638,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
 
         run.Status = AnalysisRunStatus.Error;
         run.ErrorMessage = message;
+        run.FailureKind = failureKind?.ToString();
         run.UpdatedAt = DateTime.UtcNow;
 
         // Refund this run's exact reserved quota unit and clear the id in the same save so a
@@ -627,6 +666,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
             AdvocacyGapAnalysis = DeserializeOrNull<AdvocacyGapAnalysisResponse>(run.AdvocacyGapAnalysis),
             ParentGoalsSnapshot = DeserializeOrEmpty<List<ParentGoalSnapshot>>(run.ParentGoalsSnapshot),
             ErrorMessage = run.ErrorMessage,
+            FailureKind = run.FailureKind,
             CreatedAt = run.CreatedAt,
             Sources = run.Sources.Select(s => new AnalysisRunSourceModel
             {
