@@ -129,8 +129,8 @@ public class ClaudeClientTests
     private static ClaudeClient BuildClient(HttpMessageHandler handler, IOptions<AnthropicOptions>? options = null) =>
         new(new StubHttpClientFactory(handler), options ?? BuildOptions(), NullLogger<ClaudeClient>.Instance);
 
-    private static ClaudeCompletionRequest Request(string? model = null, int maxTokens = 1024) =>
-        new() { SystemPrompt = "system", UserText = "hello", Model = model, MaxTokens = maxTokens };
+    private static ClaudeCompletionRequest Request(int maxTokens = 1024) =>
+        new() { SystemPrompt = "system", UserText = "hello", MaxTokens = maxTokens };
 
     // --- Happy path and request building ---
 
@@ -173,28 +173,17 @@ public class ClaudeClientTests
     }
 
     [Fact]
-    public async Task CompleteAsync_UsesConfiguredModel_WhenRequestModelIsNull()
+    public async Task CompleteAsync_AlwaysUsesConfiguredModel()
     {
+        // There is no per-call override any more: the configured model is the only source, which is
+        // what puts all nine Claude-calling services on one config-driven model.
         var handler = new StubHandler(CannedResponse);
         var client = BuildClient(handler, BuildOptions(model: "claude-configured-default"));
 
-        await client.CompleteAsync(Request(model: null));
+        await client.CompleteAsync(Request());
 
         Assert.NotNull(handler.LastRequestBody);
         Assert.Contains("claude-configured-default", handler.LastRequestBody);
-    }
-
-    [Fact]
-    public async Task CompleteAsync_RequestModelOverride_WinsOverConfiguredModel()
-    {
-        var handler = new StubHandler(CannedResponse);
-        var client = BuildClient(handler, BuildOptions(model: "claude-configured-default"));
-
-        await client.CompleteAsync(Request(model: "claude-per-call-override"));
-
-        Assert.NotNull(handler.LastRequestBody);
-        Assert.Contains("claude-per-call-override", handler.LastRequestBody);
-        Assert.DoesNotContain("claude-configured-default", handler.LastRequestBody);
     }
 
     [Fact]
@@ -261,9 +250,12 @@ public class ClaudeClientTests
     [Fact]
     public async Task CompleteAsync_Throws_Configuration_OnNotFoundError()
     {
-        // The exact production failure: the configured model was retired.
+        // Mirrors the 2026-08-22 production failure, where the configured model had been retired.
+        // The model id here is a deliberate stand-in for the real retired one, so that grepping
+        // the tree for that retired id stays a clean, CI-enforceable invariant. The assertion below
+        // only needs SOME model id present in the error body to prove it does not leak.
         var handler = new StubHandler(
-            ErrorBody("not_found_error", "model: claude-sonnet-4-20250514"), HttpStatusCode.NotFound);
+            ErrorBody("not_found_error", "model: retired-model-id-from-error-body"), HttpStatusCode.NotFound);
         var client = BuildClient(handler);
 
         var ex = await Assert.ThrowsAsync<ClaudeApiException>(() => client.CompleteAsync(Request()));
@@ -271,7 +263,7 @@ public class ClaudeClientTests
         Assert.Equal(ClaudeFailureKind.Configuration, ex.Kind);
         Assert.Equal(ClaudeFailureMessages.Configuration, ex.UserMessage);
         // The error body names the model and a request id; neither may reach a parent-visible field.
-        Assert.DoesNotContain("claude-sonnet-4-20250514", ex.UserMessage);
+        Assert.DoesNotContain("retired-model-id-from-error-body", ex.UserMessage);
         Assert.DoesNotContain("req_", ex.UserMessage);
     }
 

@@ -683,7 +683,6 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         {
             SystemPrompt = systemPrompt,
             UserText = userPrompt,
-            Model = "claude-sonnet-4-20250514",
             MaxTokens = 8192,
         }, ct);
 

@@ -218,7 +218,6 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
             SystemPrompt = systemPrompt,
             UserText = userText,
             PdfDocument = pdfBytes,
-            Model = "claude-sonnet-4-20250514",
             MaxTokens = 16384,
         }, cancellationToken);
 

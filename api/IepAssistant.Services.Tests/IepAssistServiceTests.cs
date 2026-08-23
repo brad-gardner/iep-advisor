@@ -45,9 +45,14 @@ public sealed class IepAssistServiceTests : IDisposable
         public string? CannedResponse { get; set; } = "  CANNED SUGGESTION  ";
         public ClaudeCompletionRequest? LastRequest { get; private set; }
 
+        /// <summary>When set, CompleteAsync throws this kind instead of returning a response.</summary>
+        public ClaudeFailureKind? ThrowKind { get; set; }
+
         public Task<string?> CompleteAsync(ClaudeCompletionRequest request, CancellationToken cancellationToken = default)
         {
             LastRequest = request;
+            if (ThrowKind is { } kind)
+                throw new ClaudeApiException(kind);
             return Task.FromResult(CannedResponse);
         }
     }
@@ -150,7 +155,7 @@ public sealed class IepAssistServiceTests : IDisposable
         Assert.Contains("Read 80 words per minute", req.UserText);          // prompt includes the goal text
         Assert.Contains("measurable", req.SystemPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("IEP", req.SystemPrompt, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal("claude-sonnet-4-20250514", req.Model);
+        Assert.Equal(1024, req.MaxTokens); // call sites choose the token budget, never the model
     }
 
     [Fact]
@@ -278,4 +283,42 @@ public sealed class IepAssistServiceTests : IDisposable
     }
 
     public void Dispose() => _connection.Dispose();
+
+    // ---------------------------------------------------------------- Claude failure handling
+
+    [Fact]
+    public async Task AssistGoal_ClaudeFails_ReturnsUnavailable_NotAnException()
+    {
+        // This call site had NO try/catch. That was harmless only while the configured model was
+        // retired and the feature unreachable; now that it points at a live model, an outage here
+        // would otherwise escape as an uncaught 500.
+        var s = SeedSchoolWithStudent("assist-fails");
+        var draftId = CreateDraft(s);
+        var goalId = AddGoal(draftId, "Read 80 words per minute");
+        _claude.ThrowKind = ClaudeFailureKind.Transient;
+
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).AssistGoalAsync(s.CollaboratorUserId, draftId, goalId, AssistKind.Rewrite);
+
+        Assert.False(result.Success);
+        Assert.Equal("AI assist is temporarily unavailable.", result.Message);
+    }
+
+    [Fact]
+    public async Task Chat_ClaudeFails_ReturnsUnavailable_NotAnException()
+    {
+        var s = SeedSchoolWithStudent("chat-fails");
+        var draftId = CreateDraft(s);
+        _claude.ThrowKind = ClaudeFailureKind.Configuration;
+
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).ChatAsync(
+            s.CollaboratorUserId,
+            draftId,
+            new List<ChatMessage> { new() { Role = "user", Content = "How do I word this goal?" } },
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("AI assist is temporarily unavailable.", result.Message);
+    }
 }

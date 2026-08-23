@@ -22,8 +22,7 @@ public class IepAssistService : IIepAssistService
     private const string DraftNotFoundMessage = "IEP draft not found.";
     private const string UnavailableMessage = "AI assist is temporarily unavailable.";
 
-    // Default model + token budgets (match the existing services' defaults).
-    private const string Model = "claude-sonnet-4-20250514";
+    // Token budgets. The model itself comes from Anthropic:Model — no call site names one.
     private const int AssistMaxTokens = 1024;
     private const int ChatMaxTokens = 2048;
 
@@ -134,13 +133,24 @@ public class IepAssistService : IIepAssistService
         var systemPrompt = BuildChatSystemPrompt(draft);
         var userText = BuildChatUserText(messages);
 
-        var reply = await _claude.CompleteAsync(new ClaudeCompletionRequest
+        string? reply;
+        try
         {
-            SystemPrompt = systemPrompt,
-            UserText = userText,
-            Model = Model,
-            MaxTokens = ChatMaxTokens
-        }, ct);
+            reply = await _claude.CompleteAsync(new ClaudeCompletionRequest
+            {
+                SystemPrompt = systemPrompt,
+                UserText = userText,
+                MaxTokens = ChatMaxTokens
+            }, ct);
+        }
+        catch (ClaudeApiException ex)
+        {
+            // Previously latent: this call had no handler, so a Claude failure surfaced as an
+            // uncaught 500. That only stayed hidden while the model was dead and the feature
+            // unreachable; pointing it at a live model makes the gap real.
+            _logger.LogError(ex, "IEP chat for draft {DraftId} failed with {Kind}", draftId, ex.Kind);
+            return ServiceResult<ChatReplyModel>.FailureResult(UnavailableMessage);
+        }
 
         if (string.IsNullOrWhiteSpace(reply))
         {
@@ -155,13 +165,21 @@ public class IepAssistService : IIepAssistService
 
     private async Task<ServiceResult<AssistResultModel>> CompleteAssistAsync(string systemPrompt, string userText, CancellationToken ct)
     {
-        var suggestion = await _claude.CompleteAsync(new ClaudeCompletionRequest
+        string? suggestion;
+        try
         {
-            SystemPrompt = systemPrompt,
-            UserText = userText,
-            Model = Model,
-            MaxTokens = AssistMaxTokens
-        }, ct);
+            suggestion = await _claude.CompleteAsync(new ClaudeCompletionRequest
+            {
+                SystemPrompt = systemPrompt,
+                UserText = userText,
+                MaxTokens = AssistMaxTokens
+            }, ct);
+        }
+        catch (ClaudeApiException ex)
+        {
+            _logger.LogError(ex, "IEP assist failed with {Kind}", ex.Kind);
+            return ServiceResult<AssistResultModel>.FailureResult(UnavailableMessage);
+        }
 
         if (string.IsNullOrWhiteSpace(suggestion))
         {

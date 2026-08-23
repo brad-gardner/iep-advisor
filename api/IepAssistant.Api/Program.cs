@@ -85,9 +85,15 @@ builder.Services.AddServices();
     builder.Services.AddSingleton(new IepAssistant.Services.Security.InviteLinkExposure(exposeEnabled));
 }
 
-// Anthropic model/effort configuration. ValidateOnStart is deliberate: a blank model or a typo'd
-// effort is exactly the class of defect that took analysis down, and a fail-fast boot error is far
-// cheaper to diagnose than a 404 discovered by the first user who runs an analysis.
+// Anthropic model/effort configuration. ValidateOnStart is deliberate for MODEL and EFFORT: a
+// blank model or a typo'd effort is exactly the class of defect that took analysis down, it is
+// unfixable at runtime, and a fail-fast boot error is far cheaper than a 404 found by the first
+// user to run an analysis.
+//
+// ApiKey is deliberately NOT validated here — see AnthropicOptions.ApiKey. Failing boot over a
+// missing key would take down login, billing, and uploads for a credential only the AI features
+// need, and this pipeline deploys straight to Production with no staging slot. ClaudeClient's
+// blank-key guard scopes that failure to the AI features instead.
 builder.Services.AddOptions<AnthropicOptions>()
     .Bind(builder.Configuration.GetSection(AnthropicOptions.SectionName))
     .ValidateDataAnnotations()

@@ -35,7 +35,7 @@ public class ClaudeClient : IClaudeClient
             throw new ClaudeApiException(ClaudeFailureKind.Configuration);
         }
 
-        var model = string.IsNullOrWhiteSpace(request.Model) ? _options.Model : request.Model;
+        var model = _options.Model;
 
         var httpClient = _httpClientFactory.CreateClient("Claude");
         var client = new AnthropicClient(apiKey, httpClient);

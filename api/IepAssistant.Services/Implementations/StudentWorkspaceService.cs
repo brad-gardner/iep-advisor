@@ -20,7 +20,7 @@ public class StudentWorkspaceService : IStudentWorkspaceService
     private const string EntryNotFoundMessage = "Workspace entry not found.";
     private const string UnavailableMessage = "AI interview is temporarily unavailable.";
 
-    private const string Model = "claude-sonnet-4-20250514";
+    // The model comes from Anthropic:Model — no call site names one.
     private const int InterviewMaxTokens = 1024;
 
     private readonly ApplicationDbContext _context;
@@ -202,13 +202,23 @@ public class StudentWorkspaceService : IStudentWorkspaceService
         if (!isStudent)
             return ServiceResult<StudentInterviewSuggestionModel>.FailureResult(PermissionMessage);
 
-        var suggestion = await _claude.CompleteAsync(new ClaudeCompletionRequest
+        string? suggestion;
+        try
         {
-            SystemPrompt = InterviewSystemPrompt,
-            UserText = BuildInterviewUserText(prompt),
-            Model = Model,
-            MaxTokens = InterviewMaxTokens
-        }, ct);
+            suggestion = await _claude.CompleteAsync(new ClaudeCompletionRequest
+            {
+                SystemPrompt = InterviewSystemPrompt,
+                UserText = BuildInterviewUserText(prompt),
+                MaxTokens = InterviewMaxTokens
+            }, ct);
+        }
+        catch (ClaudeApiException ex)
+        {
+            // The student's typed prompt is not persisted here, so a failure must return a clean
+            // message rather than a 500 — the client keeps the input and the student can retry.
+            _logger.LogError(ex, "Student interview for user {UserId} failed with {Kind}", studentUserId, ex.Kind);
+            return ServiceResult<StudentInterviewSuggestionModel>.FailureResult(UnavailableMessage);
+        }
 
         if (string.IsNullOrWhiteSpace(suggestion))
         {

@@ -75,8 +75,14 @@ public class AnthropicOptionsTests
     }
 
     [Fact]
-    public void RejectsBlankApiKey()
+    public void AcceptsBlankApiKey_SoAMissingSecretCannotFailBoot()
     {
-        Assert.Throws<OptionsValidationException>(() => Resolve(Settings(apiKey: "")));
+        // Deliberate: a missing Anthropic:ApiKey must NOT take down login, billing, and uploads.
+        // ClaudeClient's blank-key guard scopes that failure to the AI features instead — see
+        // ClaudeClientTests.CompleteAsync_Throws_Configuration_WhenApiKeyMissing.
+        var options = Resolve(Settings(apiKey: ""));
+
+        Assert.NotNull(options);
+        Assert.Equal(string.Empty, options!.ApiKey);
     }
 }
