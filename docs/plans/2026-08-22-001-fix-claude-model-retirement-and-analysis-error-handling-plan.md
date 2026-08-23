@@ -360,7 +360,7 @@ Two parallel analysis surfaces exist: `AnalysisRun*` (PascalCase enum) and the l
 
 ### Functional Requirements
 
-- [ ] No `claude-sonnet-4-20250514` literal remains in `api/` production code
+- [x] No `claude-sonnet-4-20250514` literal remains in `api/` production code *(done in review follow-up `b820546` — the `Model` override was deleted, moving all nine services onto the configured model at once)*
 - [x] Model resolves from `Anthropic:Model`, defaulting to `claude-opus-5`
 - [x] `ClaudeCompletionRequest.Model` is a nullable per-call override
 - [x] `output_config.effort` is sent as `medium`; invalid values fail at startup via `ValidateOnStart`
@@ -371,7 +371,7 @@ Two parallel analysis surfaces exist: `AnalysisRun*` (PascalCase enum) and the l
 - [x] Shutdown cancellation is not classified as `Timeout`
 - [ ] **Every typed catch calls the service's fail-and-refund helper with `CancellationToken.None`; none sets status inline**
 - [ ] All nine Claude-calling services catch `ClaudeApiException` ahead of their broad catch
-- [ ] `IepAssistService` and `StudentWorkspaceService` return 503, not 500 or 400
+- [~] `IepAssistService` and `StudentWorkspaceService` no longer surface a 500 — they catch `ClaudeApiException` and return their existing "temporarily unavailable" constants. Mapping that to a 503 rather than the default 400 remains Phase 3.
 - [ ] `IepAnalysisService` uses reserve/release; a failure refunds its unit
 - [ ] `IepDocument` and `EtrDocument` have an `ErrorMessage` column and the processing services populate it
 - [ ] `GET /api/health/claude` returns 200 for a valid model, 503 with a `kind` for an invalid one, and no model detail to anonymous callers
