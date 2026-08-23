@@ -144,7 +144,9 @@ Three corrections the plan got wrong, found by execution rather than by reading:
 
 The no-sampling-parameters regression guard **passed**: the wire body is `{"max_tokens":…,"stream":false,"thinking":{"type":"adaptive"},"output_config":{"effort":"medium"},"model":"claude-opus-5",…}` with no `temperature`, `top_p`, `top_k`, or `budget_tokens`.
 
-**Blocking deploy — see Dependencies & Prerequisites.** Production applies migrations by hand and is demonstrably behind: the `ExpiryReminderSentAt` migration authored 2026-07-01 was still throwing `Invalid column name` in production through 2026-08-04 (75 log entries). `Program.cs` has no `Migrate()` and `deploy-api.yml` has no migration step. `FailureKind` is a mapped property, so EF emits it in every `SELECT` against `AnalysisRuns` — deploying this code before applying the migration breaks all analysis reads, which is worse than the current outage.
+**Resolved: Phase 1 now has zero schema dependency.** `FailureKind` persistence was removed (commit `7bb86b7`); the Domain project is byte-identical to `c2f4da3`. The classification still reaches operators — the kind is logged in structured form at all three failure sites (`ClaudeClient.cs:116`, `AnalysisRunService.cs:188`, `:268`), so triage is a Kibana query on `{Kind}`. The column and DTO field return in **Phase 4**, alongside the frontend that consumes them, `HasMaxLength(32)`, and a deliberate migration plan.
+
+**Why it was removed.** Production applies migrations by hand and is demonstrably behind: the `ExpiryReminderSentAt` migration authored 2026-07-01 was still throwing `Invalid column name` in production through 2026-08-04 (75 log entries). `Program.cs` has no `Migrate()` and `deploy-api.yml` has no migration step. `FailureKind` is a mapped property, so EF emits it in every `SELECT` against `AnalysisRuns` — deploying this code before applying the migration breaks all analysis reads, which is worse than the current outage.
 
 ### Implementation Phases
 
@@ -374,7 +376,7 @@ Two parallel analysis surfaces exist: `AnalysisRun*` (PascalCase enum) and the l
 - [ ] `IepDocument` and `EtrDocument` have an `ErrorMessage` column and the processing services populate it
 - [ ] `GET /api/health/claude` returns 200 for a valid model, 503 with a `kind` for an invalid one, and no model detail to anonymous callers
 - [ ] `POST .../analysis-runs/{runId}/retry` replays the stored snapshot and rejects non-retryable kinds
-- [x] `AnalysisRunDto` exposes `failureKind`
+- [ ] `AnalysisRunDto` exposes `failureKind` *(deferred to Phase 4 — see Implementation Status)*
 - [ ] `run-detail.tsx` uses `||`, offers a kind-aware action, hides retry from viewers, and announces via `role="alert"`
 - [ ] Analysis completes in production for the IEP that failed on 2026-08-22
 
@@ -461,3 +463,30 @@ Once `ClaudeFailureKind` exists, retry-with-backoff becomes a small addition: `R
 ### External References
 
 - Model IDs, retirement replacements, and Opus 5 breaking changes: bundled `claude-api` skill (`shared/model-migration.md`, `csharp/claude-api/README.md`), cached 2026-06-24
+
+
+## Post-Deploy Monitoring & Validation
+
+**Prerequisites before deploy**
+- Confirm `Anthropic:ApiKey` is set in Azure App Service. `[Required]` + `ValidateOnStart` means a blank value now **fails app boot**, taking down auth, billing, and documents — not just AI features.
+- Optionally set `Anthropic:Model` / `Anthropic:Effort`. Absent, the `appsettings.json` defaults (`claude-opus-5`, `medium`) apply.
+- No migration required for this branch.
+
+**Log queries** (index `app-logs-iepadvisor-api-production`)
+- Regression watch: `"not_found_error"` — must return **zero** results after deploy
+- Failure triage: `message:"Claude call failed for model"` — inspect the `{Kind}` field
+- Boot check: `message:"Analysis Run Worker started"` confirms a clean start
+- Config failure: any `ClaudeFailureKind` of `Configuration` is a page-worthy signal, not a user error
+
+**Expected healthy signals**
+- Analysis runs reach `Completed`; `AnalysisRun {RunId} completed` appears in logs
+- No `Invalid column name` errors (would indicate an unrelated migration gap)
+
+**Failure signals / rollback trigger**
+- Any `not_found_error`, or `invalid_request_error` mentioning `output_config` / `effort` / `thinking` → the request shape is wrong for Opus 5; roll back and re-check the SDK serialization
+- App fails to boot → almost certainly the missing `Anthropic:ApiKey` app setting
+- Repeated `InvalidResponse` on multi-document runs → thinking is consuming the 32000 `max_tokens` budget; lower `Anthropic:Effort` to `low` (a config change, no redeploy)
+
+**Validation window:** first hour after deploy, then a 24-hour check. **Owner:** Brad Gardner.
+
+**Manual acceptance test:** log in, run analysis over the IEP that failed on 2026-08-22, confirm it completes.
