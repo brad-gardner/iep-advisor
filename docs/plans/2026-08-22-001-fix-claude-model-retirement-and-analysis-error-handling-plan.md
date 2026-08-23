@@ -132,6 +132,20 @@ catch (ClaudeApiException ex)
 
 Setting `run.Status`/`run.ErrorMessage` inline instead would **leak the quota unit** — the refund lives inside `FailRunAsync`, and once the status is terminal neither the idempotency guard nor `ReconcileOrphanedRunsAsync` will repair it. This is an acceptance criterion, not a style preference.
 
+### Implementation Status
+
+**Phase 1 complete** — committed as `8da62c8` on `fix/claude-model-retirement`. Build clean, 483 tests pass, 0 fail.
+
+Three corrections the plan got wrong, found by execution rather than by reading:
+
+1. **`ThinkingParameters.Effort` is `[JsonIgnore]` in Anthropic.SDK 5.10.0.** The XML doc's "maps to output_config.effort" applies only to the `Microsoft.Extensions.AI` ChatOptions path. Setting it on `MessageParameters.Thinking` sent nothing to the wire. Effort is set via `MessageParameters.OutputConfig` instead. Caught by the regression test, not by inspection.
+2. **`ThinkingEffort` has no `xhigh`** — only `low`/`medium`/`high`/`max`. `AnthropicOptions.Effort` is constrained to those four so an unrepresentable value fails at boot rather than silently degrading.
+3. **The SDK throws `AuthenticationException`, not `HttpRequestException`, on 401**, with the full API body in the message. Without a dedicated catch arm a bad key escaped unclassified — and that body is exactly what must never surface.
+
+The no-sampling-parameters regression guard **passed**: the wire body is `{"max_tokens":…,"stream":false,"thinking":{"type":"adaptive"},"output_config":{"effort":"medium"},"model":"claude-opus-5",…}` with no `temperature`, `top_p`, `top_k`, or `budget_tokens`.
+
+**Blocking deploy — see Dependencies & Prerequisites.** Production applies migrations by hand and is demonstrably behind: the `ExpiryReminderSentAt` migration authored 2026-07-01 was still throwing `Invalid column name` in production through 2026-08-04 (75 log entries). `Program.cs` has no `Migrate()` and `deploy-api.yml` has no migration step. `FailureKind` is a mapped property, so EF emits it in every `SELECT` against `AnalysisRuns` — deploying this code before applying the migration breaks all analysis reads, which is worse than the current outage.
+
 ### Implementation Phases
 
 Vertical slices. Each cuts through config, client, service, and test together; each ends with a checkpoint that proves something works end to end.
@@ -152,7 +166,7 @@ public sealed class AnthropicOptions
 
     [Required] public string ApiKey { get; set; } = string.Empty;
     [Required] public string Model { get; set; } = "claude-opus-5";
-    [RegularExpression("^(low|medium|high|xhigh|max)$")]
+    [RegularExpression("^(low|medium|high|max)$")]
     public string Effort { get; set; } = "medium";
 }
 ```
@@ -345,14 +359,14 @@ Two parallel analysis surfaces exist: `AnalysisRun*` (PascalCase enum) and the l
 ### Functional Requirements
 
 - [ ] No `claude-sonnet-4-20250514` literal remains in `api/` production code
-- [ ] Model resolves from `Anthropic:Model`, defaulting to `claude-opus-5`
-- [ ] `ClaudeCompletionRequest.Model` is a nullable per-call override
-- [ ] `output_config.effort` is sent as `medium`; invalid values fail at startup via `ValidateOnStart`
-- [ ] Text extraction returns content when the response begins with a `thinking` block
-- [ ] A response with no text block raises `InvalidResponse`, never a silent null
-- [ ] All seven `ClaudeFailureKind` values map to distinct canned messages
-- [ ] `UserMessage` is never derived from `inner.Message`; no request id, model id, or key material is ever persisted or returned
-- [ ] Shutdown cancellation is not classified as `Timeout`
+- [x] Model resolves from `Anthropic:Model`, defaulting to `claude-opus-5`
+- [x] `ClaudeCompletionRequest.Model` is a nullable per-call override
+- [x] `output_config.effort` is sent as `medium`; invalid values fail at startup via `ValidateOnStart`
+- [x] Text extraction returns content when the response begins with a `thinking` block
+- [x] A response with no text block raises `InvalidResponse`, never a silent null
+- [x] All seven `ClaudeFailureKind` values map to distinct canned messages
+- [x] `UserMessage` is never derived from `inner.Message`; no request id, model id, or key material is ever persisted or returned
+- [x] Shutdown cancellation is not classified as `Timeout`
 - [ ] **Every typed catch calls the service's fail-and-refund helper with `CancellationToken.None`; none sets status inline**
 - [ ] All nine Claude-calling services catch `ClaudeApiException` ahead of their broad catch
 - [ ] `IepAssistService` and `StudentWorkspaceService` return 503, not 500 or 400
@@ -360,7 +374,7 @@ Two parallel analysis surfaces exist: `AnalysisRun*` (PascalCase enum) and the l
 - [ ] `IepDocument` and `EtrDocument` have an `ErrorMessage` column and the processing services populate it
 - [ ] `GET /api/health/claude` returns 200 for a valid model, 503 with a `kind` for an invalid one, and no model detail to anonymous callers
 - [ ] `POST .../analysis-runs/{runId}/retry` replays the stored snapshot and rejects non-retryable kinds
-- [ ] `AnalysisRunDto` exposes `failureKind`
+- [x] `AnalysisRunDto` exposes `failureKind`
 - [ ] `run-detail.tsx` uses `||`, offers a kind-aware action, hides retry from viewers, and announces via `role="alert"`
 - [ ] Analysis completes in production for the IEP that failed on 2026-08-22
 
