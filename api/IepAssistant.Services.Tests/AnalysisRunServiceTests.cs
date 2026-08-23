@@ -271,7 +271,6 @@ public class AnalysisRunServiceTests
         var run = verifyContext.AnalysisRuns.Find(runId)!;
         Assert.Equal(AnalysisRunStatus.Error, run.Status);
         Assert.Equal(ClaudeFailureMessages.InvalidResponse, run.ErrorMessage);
-        Assert.Equal(nameof(ClaudeFailureKind.InvalidResponse), run.FailureKind);
 
         var usageAfter = verifyContext.UsageRecords.Count(u =>
             u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
@@ -421,7 +420,7 @@ public class AnalysisRunServiceTests
     }
 
     [Fact]
-    public async Task ExecuteRunAsync_ClaudeApiException_PersistsKindAndRefundsExactlyOnce()
+    public async Task ExecuteRunAsync_ClaudeApiException_FailsRunAndRefundsExactlyOnce()
     {
         using var _fixture = new AnalysisRunTestFixture();
         var iepId = _fixture.SeedIepDocument();
@@ -460,7 +459,6 @@ public class AnalysisRunServiceTests
 
         Assert.Equal(AnalysisRunStatus.Error, run.Status);
         Assert.Equal(ClaudeFailureMessages.Configuration, run.ErrorMessage);
-        Assert.Equal(nameof(ClaudeFailureKind.Configuration), run.FailureKind);
 
         // The reservation must be released, not merely detached: verify the actual usage row is
         // gone and the pointer cleared so no later fail path can double-refund.
@@ -501,7 +499,6 @@ public class AnalysisRunServiceTests
         // The persisted message is the canned constant verbatim — never the exception's own text,
         // which for a real failure carries the model id and Anthropic request id.
         Assert.Equal(ClaudeFailureMessages.RateLimited, run.ErrorMessage);
-        Assert.Equal(nameof(ClaudeFailureKind.RateLimited), run.FailureKind);
         Assert.DoesNotContain("Claude call failed", run.ErrorMessage!);
     }
 

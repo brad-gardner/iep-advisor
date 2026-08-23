@@ -11,9 +11,6 @@ public class AnalysisRun : BaseEntity, IAuditableEntity
     public string? AdvocacyGapAnalysis { get; set; } // JSON
     public string? ParentGoalsSnapshot { get; set; } // JSON
     public string? ErrorMessage { get; set; }
-    // Classified cause of the failure (ClaudeFailureKind name, e.g. "Configuration"), so the UI
-    // can vary its affordance instead of offering Retry for a deterministic failure. Null unless failed.
-    public string? FailureKind { get; set; }
     // Idempotency marker for the legacy-analysis backfill, e.g. "IepAnalysis:42" / "EtrAnalysis:7".
     // Null for runs created through the normal flow; unique (filtered) when present.
     public string? BackfillSourceKey { get; set; }

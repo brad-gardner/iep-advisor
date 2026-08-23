@@ -156,10 +156,9 @@ public class AnalysisRunService : IAnalysisRunService
 
         run.Status = AnalysisRunStatus.Running;
         // Clear any prior failure state as the run re-enters flight, so a run that ends Completed
-        // can never carry a stale ErrorMessage/FailureKind — which would make the UI suppress
-        // actions on a run that actually succeeded.
+        // can never carry a stale ErrorMessage — which would make the UI suppress actions on a run
+        // that actually succeeded.
         run.ErrorMessage = null;
-        run.FailureKind = null;
         run.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
 
@@ -182,15 +181,16 @@ public class AnalysisRunService : IAnalysisRunService
             var result = ParseResponse(responseText);
             if (result == null)
             {
-                // Unparseable JSON from Claude is exactly ClaudeFailureKind.InvalidResponse, so
-                // record it as such and give Phase 4's kind-aware UI something to branch on.
+                // Unparseable JSON from Claude is exactly ClaudeFailureKind.InvalidResponse.
+                // The kind is not persisted (no schema dependency in this phase) but it is logged
+                // structurally so triage stays a log query.
+                _logger.LogError(
+                    "AnalysisRun {RunId} failed with {Kind}: Claude response could not be parsed",
+                    runId, ClaudeFailureKind.InvalidResponse);
                 // CancellationToken.None for the same reason as the catch blocks below: the refund
                 // inside FailRunAsync must not be abortable, or the reserved unit leaks.
                 await FailRunAsync(
-                    runId,
-                    ClaudeFailureMessages.InvalidResponse,
-                    ClaudeFailureKind.InvalidResponse,
-                    CancellationToken.None);
+                    runId, ClaudeFailureMessages.InvalidResponse, ct: CancellationToken.None);
                 return;
             }
 
@@ -263,11 +263,13 @@ public class AnalysisRunService : IAnalysisRunService
         }
         catch (ClaudeApiException ex)
         {
-            _logger.LogError(ex, "AnalysisRun {RunId} failed: {Kind}", runId, ex.Kind);
+            // The kind is not persisted in this phase, so this structured log line is the ONLY
+            // record of it — it is what makes triage a Kibana query rather than a code read.
+            _logger.LogError(ex, "AnalysisRun {RunId} failed with {Kind}", runId, ex.Kind);
             // Must go through FailRunAsync: the quota refund lives there, and once the status is
             // terminal neither the idempotency guard nor ReconcileOrphanedRunsAsync will repair a
             // reservation leaked by setting Status/ErrorMessage inline.
-            await FailRunAsync(runId, ex.UserMessage, ex.Kind, CancellationToken.None);
+            await FailRunAsync(runId, ex.UserMessage, ct: CancellationToken.None);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -615,7 +617,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
         }
     }
 
-    public async Task FailRunAsync(int runId, string message, ClaudeFailureKind? failureKind = null, CancellationToken ct = default)
+    public async Task FailRunAsync(int runId, string message, CancellationToken ct = default)
     {
         // Drop any uncommitted state from the work that just failed. This context is shared with
         // ExecuteRunAsync, so without this the save below would flush partial results (summary,
@@ -638,7 +640,6 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
 
         run.Status = AnalysisRunStatus.Error;
         run.ErrorMessage = message;
-        run.FailureKind = failureKind?.ToString();
         run.UpdatedAt = DateTime.UtcNow;
 
         // Refund this run's exact reserved quota unit and clear the id in the same save so a
@@ -666,7 +667,6 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
             AdvocacyGapAnalysis = DeserializeOrNull<AdvocacyGapAnalysisResponse>(run.AdvocacyGapAnalysis),
             ParentGoalsSnapshot = DeserializeOrEmpty<List<ParentGoalSnapshot>>(run.ParentGoalsSnapshot),
             ErrorMessage = run.ErrorMessage,
-            FailureKind = run.FailureKind,
             CreatedAt = run.CreatedAt,
             Sources = run.Sources.Select(s => new AnalysisRunSourceModel
             {

@@ -88,7 +88,6 @@ public class AnalysisRunModel
     public List<AnalysisRunSourceModel> Sources { get; set; } = [];
     public List<AnalysisRunSectionModel> Sections { get; set; } = [];
     public string? ErrorMessage { get; set; }
-    public string? FailureKind { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

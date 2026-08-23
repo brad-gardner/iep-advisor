@@ -15,7 +15,6 @@ public class AnalysisRunDto
     public List<AnalysisRunSourceDto> Sources { get; set; } = [];
     public List<AnalysisRunSectionDto> Sections { get; set; } = [];
     public string? ErrorMessage { get; set; }
-    public string? FailureKind { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

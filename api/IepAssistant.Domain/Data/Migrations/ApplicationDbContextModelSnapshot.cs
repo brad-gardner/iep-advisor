@@ -94,10 +94,6 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
-                    b.Property<string>("FailureKind")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
                     b.Property<string>("OverallRedFlags")
                         .HasColumnType("nvarchar(max)");
 
