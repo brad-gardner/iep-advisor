@@ -101,5 +101,13 @@ public static class RowMetaKeys
     /// services and accommodations across saves, finalizes and carried-forward documents.</summary>
     public const string RowId = "_rowId";
 
-    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { RowId };
+    /// <summary>Provenance of a row prefilled from a prior finalized version:
+    /// <c>{ "versionId": int, "rowId": guid, "label": string, "date": iso }</c>.</summary>
+    public const string CarriedFrom = "_carriedFrom";
+
+    /// <summary>True once the author has explicitly kept (or edited) a carried row; until then the
+    /// editor treats the row as stale carry-forward.</summary>
+    public const string Confirmed = "_confirmed";
+
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { RowId, CarriedFrom, Confirmed };
 }

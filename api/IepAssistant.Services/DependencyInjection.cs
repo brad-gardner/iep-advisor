@@ -49,6 +49,8 @@ public static class DependencyInjection
         services.AddScoped<ITemplateCatalogSeeder, TemplateCatalogSeeder>();
         services.AddScoped<IDocumentAssistService, DocumentAssistService>();
         services.AddScoped<IParentContributionService, ParentContributionService>();
+        services.AddScoped<IStudentEvidenceService, StudentEvidenceService>();
+        services.AddScoped<IDocumentPrefillService, DocumentPrefillService>();
         services.AddScoped<IIepVersionService, IepVersionService>();
         services.AddScoped<IIepVersionPdfService, IepVersionPdfService>();
         services.AddScoped<IAuthoredDocumentVersionService, AuthoredDocumentVersionService>();

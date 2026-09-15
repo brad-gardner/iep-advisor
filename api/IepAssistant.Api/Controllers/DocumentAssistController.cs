@@ -39,7 +39,14 @@ public class DocumentAssistController : ControllerBase
 
         var result = await _service.AssistAsync(User.GetUserId(), instanceId, fieldKey, request.RowId, kind, ct);
         if (!result.Success) return MapFailure(result.Message);
-        return Ok(ApiResponse<AssistResponse>.SuccessResponse(new AssistResponse { Suggestion = result.Data!.Suggestion }));
+        var data = result.Data!;
+        return Ok(ApiResponse<AssistResponse>.SuccessResponse(new AssistResponse
+        {
+            Suggestion = data.Suggestion,
+            Rationale = data.Rationale,
+            MissingBaseline = data.MissingBaseline,
+            Citations = data.Citations.Select(c => new AssistCitationDto { EvidenceId = c.EvidenceId, SourceLabel = c.SourceLabel, Excerpt = c.Excerpt }).ToList()
+        }));
     }
 
     [HttpPost("api/documents/{instanceId:int}/chat")]

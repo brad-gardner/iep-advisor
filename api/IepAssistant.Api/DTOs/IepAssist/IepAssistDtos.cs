@@ -34,6 +34,16 @@ public class ChatMessageDto
 public class AssistResponse
 {
     public string Suggestion { get; set; } = string.Empty;
+    public string? Rationale { get; set; }
+    public List<AssistCitationDto> Citations { get; set; } = new();
+    public bool MissingBaseline { get; set; }
+}
+
+public class AssistCitationDto
+{
+    public string EvidenceId { get; set; } = string.Empty;
+    public string SourceLabel { get; set; } = string.Empty;
+    public string Excerpt { get; set; } = string.Empty;
 }
 
 public class ChatResponse
