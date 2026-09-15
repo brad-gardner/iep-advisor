@@ -1,7 +1,7 @@
 ---
 title: "feat: Student roster lifecycle, safe repeatable XLSX import, and IEP teams with functional roles"
 type: feat
-status: active
+status: completed
 date: 2026-09-15
 origin: docs/gap/combined-findings.md
 slicing_approach: vertical
@@ -58,12 +58,24 @@ series: school-sale-readiness 3/8
 
 ## Acceptance Criteria
 
-- [ ] Student has external ID, DOB, enum grade/disability, language, lifecycle status, timeline dates, case manager; all editable with authz; exit/archive/transfer preserve history.
-- [ ] Roster supports search, filters, pagination, bulk case-manager assignment.
-- [ ] IEP team panel: one lead, typed roles, add/remove, permission badge distinct from role; provider role can span buildings.
-- [ ] XLSX template downloadable with live allowed values; preview shows new/updated/unchanged/error; commit is idempotent; batch history and error report available; formulas/macros never executed.
-- [ ] Staff import creates invites for new emails and updates role/school for existing staff.
-- [ ] All checks pass.
+- [x] Student has external ID, DOB, enum grade/disability, language, lifecycle status, timeline dates, case manager; all editable with authz; exit/archive/transfer preserve history. *(Live: PUT updated Jordan's external id/timeline; a Teacher's exit attempt → 403.)*
+- [x] Roster supports search, filters, pagination, bulk case-manager assignment. *(Live: `?query=000452` returned 4 paged rows.)*
+- [x] IEP team panel: one lead, typed roles, add/remove, permission badge distinct from role; provider role can span buildings. *(Live: CaseManager → lead/Owner, gen-ed → Collaborator, removing the lead refused; evidence bundle lists "Steph Case — Case Manager (lead)".)*
+- [x] XLSX template downloadable with live allowed values; preview shows new/updated/unchanged/error; commit is idempotent; batch history and error report available; formulas/macros never executed. *(Live: 4-row file → 3 new/1 updated; re-upload → 4 unchanged; second commit refused; `.xlsm` rejected; leading zeros kept.)*
+- [x] Staff import creates invites for new emails and updates role/school for existing staff. *(Live: 2 invites created and accepted; RelatedServiceProvider row without a home school → row error.)*
+- [x] All checks pass: `dotnet test` 567, vitest 168, tsc + test:types, build, guard:ux; lint 36 (baseline 37).
+
+## Implementation notes (2026-09-15)
+
+- Migration `AddRosterLifecycleTeamsAndImports` applied to QA; existing free-text grades/disabilities mapped (QA: "7" → `G7`, "Specific Learning Disability" → enum). `SchoolStudents.IsActive` column dropped — `Status` is the single source of truth (entity keeps an unmapped `IsActive` mirror).
+- A staff import row for `RelatedServiceProvider` still needs a home `SchoolName` (StaffProfile.SchoolId is the home building); cross-building access is granted per student.
+- Legacy `staff-access` API routes remain; the web `staff-access/*` components were removed in favour of the team panel.
+
+## Operational validation notes (for ship)
+
+- **Runtime impact:** roster list is now paged/filtered server-side; document/assist paths unchanged. Import preview parses ≤5 MB / ≤5,000 rows in-process with ClosedXML. Watch: `ImportBatches` growth, "Import preview failed" warnings, 403s on `/students/{id}/team` (authz tightening for teachers).
+- **Healthy signal:** roster loads with status=Active by default; dashboard "No case manager" tile reflects lead assignments.
+- **Failure/mitigation:** if the grade/disability mapping produced surprising `Other` + `LegacyDisabilityText` rows, fix via the edit drawer or a re-import; the migration `Down` restores `IsActive`. Owner: Brad; window: first admin session after deploy.
 
 ## System-Wide Impact
 
