@@ -1,5 +1,6 @@
 import type { TemplateFieldDto } from '@/features/admin/templates/types';
 import type { DocumentValuePatch } from '../../types';
+import type { SaveResult } from '../../hooks/use-document-instance';
 
 /** Shared props for every per-`FieldType` renderer. Each reads its value from
  *  the instance's values map (by `fieldKey`) and debounces a patch save. */
@@ -9,7 +10,7 @@ export interface FieldRendererProps {
   value: unknown;
   disabled?: boolean;
   /** Persist a value patch — the instance hook serializes + threads rowVersion. */
-  onSave: (patch: DocumentValuePatch) => Promise<unknown>;
+  onSave: (patch: DocumentValuePatch) => Promise<SaveResult>;
 }
 
 /** Stable DOM id for a field's control (label association / test hooks). */

@@ -5,6 +5,7 @@
 // config and the builder can show inline hints.
 
 import type { FieldType } from './types';
+import { isColumnSemantic, isFieldSemantic, type ColumnSemantic, type FieldSemantic } from './document-semantics';
 
 /** Column types allowed inside a Table field (no nested Table / RichText). */
 export type TableColumnType = 'Text' | 'Date' | 'Select' | 'Checkbox';
@@ -22,6 +23,8 @@ export interface TableColumn {
   required: boolean;
   /** For Select columns: stringified `{ options }`. */
   configJson?: string;
+  /** Optional semantic tag naming what the column holds (e.g. `baseline`). */
+  semantic?: ColumnSemantic;
 }
 
 export interface TextConfig {
@@ -42,14 +45,19 @@ export interface TableConfig {
   maxRows?: number;
 }
 
+/** Optional semantic tag carried by every config kind. */
+interface WithSemantic {
+  semantic?: FieldSemantic;
+}
+
 /** Discriminated view of a field's config keyed by its `FieldType`. */
 export type FieldConfig =
-  | { kind: 'Text'; text: TextConfig }
-  | { kind: 'RichText' }
-  | { kind: 'Date'; date: DateConfig }
-  | { kind: 'Select'; select: SelectConfig }
-  | { kind: 'Checkbox' }
-  | { kind: 'Table'; table: TableConfig };
+  | ({ kind: 'Text'; text: TextConfig } & WithSemantic)
+  | ({ kind: 'RichText' } & WithSemantic)
+  | ({ kind: 'Date'; date: DateConfig } & WithSemantic)
+  | ({ kind: 'Select'; select: SelectConfig } & WithSemantic)
+  | ({ kind: 'Checkbox' } & WithSemantic)
+  | ({ kind: 'Table'; table: TableConfig } & WithSemantic);
 
 /**
  * Compile-time exhaustiveness guard for `FieldType` switches that also degrades
@@ -134,8 +142,14 @@ function parseTableColumns(raw: unknown): TableColumn[] {
       label: typeof rec.label === 'string' ? rec.label : '',
       required: rec.required === true,
       configJson: typeof rec.configJson === 'string' ? rec.configJson : undefined,
+      semantic: isColumnSemantic(rec.semantic) ? rec.semantic : undefined,
     };
   });
+}
+
+/** Attach the optional field-level semantic read from a raw config record. */
+function withSemantic<T extends FieldConfig>(config: T, rec: Record<string, unknown>): T {
+  return isFieldSemantic(rec.semantic) ? { ...config, semantic: rec.semantic } : config;
 }
 
 /** Parse a stored `configJson` string into the typed model for `fieldType`. */
@@ -143,30 +157,36 @@ export function parseConfig(fieldType: FieldType, configJson: string | null): Fi
   const rec = asRecord(configJson);
   switch (fieldType) {
     case 'Text':
-      return { kind: 'Text', text: { maxLength: toNumberOrUndefined(rec.maxLength) } };
+      return withSemantic({ kind: 'Text', text: { maxLength: toNumberOrUndefined(rec.maxLength) } }, rec);
     case 'RichText':
-      return { kind: 'RichText' };
+      return withSemantic({ kind: 'RichText' }, rec);
     case 'Date':
-      return {
-        kind: 'Date',
-        date: { format: typeof rec.format === 'string' ? rec.format : undefined },
-      };
+      return withSemantic(
+        { kind: 'Date', date: { format: typeof rec.format === 'string' ? rec.format : undefined } },
+        rec
+      );
     case 'Select': {
       const options = parseSelectOptions(rec.options);
-      return { kind: 'Select', select: { options: options.length ? options : [{ value: '' }] } };
+      return withSemantic(
+        { kind: 'Select', select: { options: options.length ? options : [{ value: '' }] } },
+        rec
+      );
     }
     case 'Checkbox':
-      return { kind: 'Checkbox' };
+      return withSemantic({ kind: 'Checkbox' }, rec);
     case 'Table': {
       const columns = parseTableColumns(rec.columns);
-      return {
-        kind: 'Table',
-        table: {
-          columns: columns.length ? columns : [newTableColumn()],
-          minRows: toNumberOrUndefined(rec.minRows),
-          maxRows: toNumberOrUndefined(rec.maxRows),
+      return withSemantic(
+        {
+          kind: 'Table',
+          table: {
+            columns: columns.length ? columns : [newTableColumn()],
+            minRows: toNumberOrUndefined(rec.minRows),
+            maxRows: toNumberOrUndefined(rec.maxRows),
+          },
         },
-      };
+        rec
+      );
     }
     default:
       return unsupportedFieldType(fieldType);
@@ -199,17 +219,23 @@ function serializeSelectOptions(options: SelectOption[]): string {
  * empty optional scalar config, so we don't persist noise like `{}`.
  */
 export function serializeConfig(config: FieldConfig): string | undefined {
+  const sem = config.semantic ? { semantic: config.semantic } : {};
+  const hasSem = config.semantic != null;
   switch (config.kind) {
     case 'Text':
-      return config.text.maxLength != null ? JSON.stringify({ maxLength: config.text.maxLength }) : undefined;
+      return config.text.maxLength != null || hasSem
+        ? JSON.stringify({ ...(config.text.maxLength != null ? { maxLength: config.text.maxLength } : {}), ...sem })
+        : undefined;
     case 'RichText':
-      return undefined;
+      return hasSem ? JSON.stringify(sem) : undefined;
     case 'Date':
-      return config.date.format ? JSON.stringify({ format: config.date.format }) : undefined;
+      return config.date.format || hasSem
+        ? JSON.stringify({ ...(config.date.format ? { format: config.date.format } : {}), ...sem })
+        : undefined;
     case 'Select':
-      return serializeSelectOptions(config.select.options);
+      return JSON.stringify({ ...JSON.parse(serializeSelectOptions(config.select.options)), ...sem });
     case 'Checkbox':
-      return undefined;
+      return hasSem ? JSON.stringify(sem) : undefined;
     case 'Table':
       return JSON.stringify({
         columns: config.table.columns.map((c) => {
@@ -220,10 +246,12 @@ export function serializeConfig(config: FieldConfig): string | undefined {
             required: c.required,
           };
           if (c.type === 'Select' && c.configJson) base.configJson = c.configJson;
+          if (c.semantic) base.semantic = c.semantic;
           return base;
         }),
         ...(config.table.minRows != null ? { minRows: config.table.minRows } : {}),
         ...(config.table.maxRows != null ? { maxRows: config.table.maxRows } : {}),
+        ...sem,
       });
   }
 }
@@ -255,6 +283,8 @@ export function validateConfig(config: FieldConfig): string | null {
       const { columns, minRows, maxRows } = config.table;
       if (columns.length === 0) return 'Add at least one column.';
       if (columns.some((c) => c.label.trim() === '')) return 'Every column needs a label.';
+      const sems = columns.map((c) => c.semantic).filter((s): s is ColumnSemantic => s != null);
+      if (new Set(sems).size !== sems.length) return 'Column semantics must be unique within the table.';
       for (const col of columns) {
         if (col.type === 'Select') {
           const opts = parseSelectOptions(asRecord(col.configJson).options);

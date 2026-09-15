@@ -1,7 +1,7 @@
 ---
 title: "feat: Authoring spine — semantic template blocks, AI assist + student input in the template editor, OH IEP/ETR/504 templates, parent access to authored versions"
 type: feat
-status: active
+status: completed
 date: 2026-09-15
 origin: docs/gap/combined-findings.md
 slicing_approach: vertical
@@ -87,15 +87,29 @@ series: school-sale-readiness 1/8
 
 ## Acceptance Criteria
 
-- [ ] Creating IEP, ETR and Section 504 documents succeeds for an OH district and for a state-less district (default fallback), with no "No document template" error.
-- [ ] Every Table row saved through `PUT /api/documents/{id}/values` carries a stable `_rowId` that survives edits, reorders and finalize.
-- [ ] Template fields/columns can declare `semantic`; seeded templates declare them; the admin builder can set them.
-- [ ] In the template editor a case manager can request Rewrite / Improve / SuggestMeasurement on a goal row, a service row, and a narrative section; accept applies the suggestion; the assistant chat answers using the document's content; pull-from-student inserts a shared entry. All gated by Collaborator access and audited.
-- [ ] Editor has a section navigator and an advisory completeness panel; finalize is never blocked by advisory items.
-- [ ] Parent child-overview lists finalized template documents; parent can open a version page and download its PDF; unrelated/revoked parent gets 403/404.
-- [ ] `IEP_AUTHORING_MODE` and the legacy typed editor routes/components are gone; existing legacy finalized versions remain viewable.
-- [ ] Vite proxy/launch settings use 7200; CI runs backend and web tests before deploy.
-- [ ] `dotnet test`, `npm run type-check`, `npm test`, `npm run build`, `npm run guard:ux` pass.
+- [x] Creating IEP, ETR and Section 504 documents succeeds for an OH district and for a state-less district (default fallback), with no "No document template" error. *(Live: OH ETR created for a student with no explicit state — resolution now falls back school → district.)*
+- [x] Every Table row saved through `PUT /api/documents/{id}/values` carries a stable `_rowId` that survives edits, reorders and finalize.
+- [x] Template fields/columns can declare `semantic`; seeded templates declare them; the admin builder can set them.
+- [x] In the template editor a case manager can request Rewrite / Improve / SuggestMeasurement on a goal row, a service row, and a narrative section; accept applies the suggestion; the assistant chat answers using the document's content; pull-from-student inserts a shared entry. All gated by Collaborator access and audited. *(Live: Rewrite on a goal row returned a measurable goal grounded in the 42 wpm baseline; Accept persisted it.)*
+- [x] Editor has a section navigator and an advisory completeness panel; finalize is never blocked by advisory items.
+- [x] Parent child-overview lists finalized template documents; parent can open a version page and download its PDF; unrelated/revoked parent gets 403/404. *(Access rules verified by `AuthoredDocumentVersionServiceTests`; UI error state verified live for an unrelated parent.)*
+- [x] `IEP_AUTHORING_MODE` and the legacy typed editor routes/components are gone; existing legacy finalized versions remain viewable.
+- [x] Vite proxy/launch settings use 7200; CI runs backend and web tests before deploy.
+- [x] `dotnet test` (504), `npm run type-check`, `npm test` (105), `npm run build`, `npm run guard:ux` pass. `npm run lint`: 37 pre-existing `react-hooks/set-state-in-effect` errors remain (was 38 on main; none introduced).
+
+## Implementation notes (2026-09-15)
+
+- Semantic row blocks (goals/services/accommodations/transition/participants/evaluator reports) render as **cards** with labelled inputs rather than a grid — a six-column goal table did not fit the editor column and trapped the suggestion panel inside the horizontal scroller.
+- Row identity: the client adopts server-assigned `_rowId`s by position after each save (`adoptRowIds`) so subsequent saves echo the same id instead of minting a new one.
+- QA database: startup seeder published Default IEP **v2** (semantic) and created OH IEP (v3), OH ETR (v4), Default 504 (v5) template versions. No EF migration was needed for this plan.
+- Legacy backend (`IepDraft*`, `IepAssistController`, `IepVersionController` finalize) remains for data compatibility; only the web surface was removed.
+
+## Operational validation notes (for ship)
+
+- **Runtime impact:** new endpoints `POST /api/documents/{id}/assist|chat` call Claude (1–2k max tokens). Watch `DocumentAssistService` error logs ("Document assist … failed with {Kind}") and 503 rates on those routes for the first day.
+- **Healthy signal:** startup log lines "Default IEP template seed finished: AlreadySeeded" and "Template catalog seed finished: created [], skipped [3 names]" after the first boot.
+- **Failure signal / mitigation:** a burst of `RateLimited`/`Configuration` assist failures → check `Anthropic:ApiKey`/model config; the UI degrades to "AI help is unavailable right now" and never blocks saving. Rollback: revert the web deploy (API is additive).
+- **Validation window:** first educator session after deploy — create an OH IEP, run one assist, finalize, open as linked parent. Owner: Brad.
 
 ## System-Wide Impact
 

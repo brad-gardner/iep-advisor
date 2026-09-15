@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect } from 'react';
-import type { FlushRegistry } from '@/features/iep-authoring/hooks/use-flush-registry';
+import type { FlushRegistry } from '@/hooks/use-flush-registry';
 
 // Distributes a FlushRegistry from the editor down to each field renderer so
 // finalize can flush every pending per-field autosave before snapshotting.

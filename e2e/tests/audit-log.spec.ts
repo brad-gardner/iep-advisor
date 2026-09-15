@@ -65,18 +65,18 @@ test.describe('District audit-log viewer', () => {
     });
     const studentId = student.student!.id;
 
-    // Give the teacher access, then have the teacher create and VIEW an IEP
-    // draft — the GET writes an AccessAuditLog "View" row with the teacher as
-    // actor, which the admin should then see in the audit log.
+    // Give the teacher access, then have the teacher create and VIEW a template
+    // document (IEP) — the GET writes an AccessAuditLog "View" row with the
+    // teacher as actor, which the admin should then see in the audit log.
     await grantStaffAccessViaApi(admin.token, studentId, teacher.staffProfileId);
-    const draft = await apiPost(
-      `/api/educator/students/${studentId}/iep-drafts`,
-      teacher.token,
-      { title: 'Audit Trail Draft' }
+    const document = await apiPost(
+      `/api/educator/students/${studentId}/documents`,
+      { documentTypeId: 1 },
+      teacher.token
     );
-    const draftId = draft.data?.id;
-    expect(draftId, 'draft should be created').toBeTruthy();
-    await apiGet(`/api/iep-drafts/${draftId}`, teacher.token);
+    const instanceId = document.data?.id;
+    expect(instanceId, 'document should be created').toBeTruthy();
+    await apiGet(`/api/documents/${instanceId}`, teacher.token);
   });
 
   test.afterAll(async () => {

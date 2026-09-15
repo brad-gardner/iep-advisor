@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { useAutosave } from '@/features/iep-authoring/hooks/use-autosave';
+import { useAutosave } from '@/hooks/use-autosave';
 import { parseConfig } from '@/features/admin/templates/template-config';
 import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { FieldLabel } from './field-label';
 import { fieldElementId, type FieldRendererProps } from './types';
+import { FieldAssistBar } from './field-assist-bar';
 
 /** Single-line Text field. Honors the config `maxLength`. */
 export function TextField({ field, value, disabled, onSave }: FieldRendererProps) {
@@ -35,6 +36,17 @@ export function TextField({ field, value, disabled, onSave }: FieldRendererProps
         onChange={(e) => handleChange(e.target.value)}
         onBlur={() => void autosave.flush()}
         data-testid={`field-${field.fieldKey}`}
+      />
+      <FieldAssistBar
+        fieldKey={field.fieldKey}
+        kinds={['Rewrite', 'Improve']}
+        onApply={(text) => {
+          handleChange(maxLength != null ? text.slice(0, maxLength) : text);
+          void autosave.flush();
+        }}
+        beforeRequest={autosave.flush}
+        disabled={disabled}
+        testIdPrefix={`field-${field.fieldKey}`}
       />
     </div>
   );

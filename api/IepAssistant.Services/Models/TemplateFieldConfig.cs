@@ -17,18 +17,34 @@ public static class TemplateFieldConfigShapes
 public sealed record TextFieldConfig
 {
     public int? MaxLength { get; init; }
+    /// <summary>Optional semantic tag (see <see cref="FieldSemantics"/>).</summary>
+    public string? Semantic { get; init; }
+}
+
+/// <summary>RichText field config. Only carries the optional semantic tag.</summary>
+public sealed record RichTextFieldConfig
+{
+    public string? Semantic { get; init; }
+}
+
+/// <summary>Checkbox field config. Only carries the optional semantic tag.</summary>
+public sealed record CheckboxFieldConfig
+{
+    public string? Semantic { get; init; }
 }
 
 /// <summary>Date field config. <see cref="Format"/> is an optional .NET date format string; when present it must be valid.</summary>
 public sealed record DateFieldConfig
 {
     public string? Format { get; init; }
+    public string? Semantic { get; init; }
 }
 
 /// <summary>Select field config. Requires at least one option; option <see cref="SelectOption.Value"/>s must be non-empty and unique.</summary>
 public sealed record SelectFieldConfig
 {
     public List<SelectOption> Options { get; init; } = new();
+    public string? Semantic { get; init; }
 }
 
 public sealed record SelectOption
@@ -48,6 +64,8 @@ public sealed record TableFieldConfig
     public List<TableColumn> Columns { get; init; } = new();
     public int? MinRows { get; init; }
     public int? MaxRows { get; init; }
+    /// <summary>Optional semantic tag naming the block this table represents (e.g. "goals").</summary>
+    public string? Semantic { get; init; }
 }
 
 /// <summary>
@@ -63,4 +81,6 @@ public sealed record TableColumn
     public string Label { get; init; } = string.Empty;
     public bool Required { get; init; }
     public string? ConfigJson { get; init; }
+    /// <summary>Optional semantic tag naming what this column holds (see <see cref="ColumnSemantics"/>).</summary>
+    public string? Semantic { get; init; }
 }

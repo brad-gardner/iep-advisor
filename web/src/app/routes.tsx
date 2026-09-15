@@ -47,8 +47,6 @@ import { DistrictAuditLogPage } from '@/features/district-admin/pages/district-a
 import { DistrictSetupWizard } from '@/features/district-admin/pages/district-setup-wizard';
 import { DistrictStaffPage } from '@/features/staff-invites/pages/district-staff-page';
 import { StaffAcceptInvitePage } from '@/features/staff-invites/pages/staff-accept-invite-page';
-import { IepDraftListPage } from '@/features/iep-authoring/pages/iep-draft-list-page';
-import { IepAuthoringWorkspacePage } from '@/features/iep-authoring/pages/iep-authoring-workspace-page';
 import { DocumentListPage } from '@/features/document-authoring/pages/document-list-page';
 import { DocumentEditorPage } from '@/features/document-authoring/pages/document-editor-page';
 import { AuthoredVersionDetailPage } from '@/features/document-authoring/pages/authored-version-detail-page';
@@ -57,6 +55,7 @@ import { EducatorVersionDetailPage } from '@/features/iep-versions/components/ed
 import { StudentHomePage } from '@/features/student/pages/student-home-page';
 import { StudentAcceptInvitePage } from '@/features/student/components/student-accept-invite-page';
 import { ParentVersionDetailPage } from '@/features/iep-versions/components/parent-version-detail-page';
+import { ParentAuthoredVersionPage } from '@/features/document-authoring/pages/parent-authored-version-page';
 import { RoleHome, RoleRoute } from '@/app/role-routing';
 import { roleHome } from '@/app/role-home';
 import { Spinner } from '@/components/ui/spinner';
@@ -412,30 +411,6 @@ export function AppRouter() {
         }
       />
       <Route
-        path="/educator/students/:studentId/iep-drafts"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allow={['Educator']}>
-              <MainLayout>
-                <IepDraftListPage />
-              </MainLayout>
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/educator/students/:studentId/iep-drafts/:draftId"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allow={['Educator']}>
-              <MainLayout>
-                <IepAuthoringWorkspacePage />
-              </MainLayout>
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
         path="/educator/students/:studentId/documents"
         element={
           <ProtectedRoute>
@@ -483,14 +458,25 @@ export function AppRouter() {
           </ProtectedRoute>
         }
       />
-      {/* Parent surface (unconditional now) — finalized version the school
-          shared for this child. */}
+      {/* Parent surface — finalized documents the school shared for this child.
+          Legacy typed IEP versions and template-authored versions both stay
+          readable; new finalizes only produce the latter. */}
       <Route
         path="/children/:childId/iep-versions/:versionId"
         element={
           <ProtectedRoute>
             <MainLayout>
               <ParentVersionDetailPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/children/:childId/authored-versions/:versionId"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <ParentAuthoredVersionPage />
             </MainLayout>
           </ProtectedRoute>
         }

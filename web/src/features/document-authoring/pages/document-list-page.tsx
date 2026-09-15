@@ -9,7 +9,7 @@ import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Table, type TableColumn } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
-import { relativeTime } from '@/features/iep-authoring/lib/relative-time';
+import { relativeTime } from '@/lib/relative-time';
 import { deleteDocument } from '../api/documents-api';
 import { useDocumentList } from '../hooks/use-document-list';
 import { useAuthoredVersions } from '../hooks/use-authored-versions';

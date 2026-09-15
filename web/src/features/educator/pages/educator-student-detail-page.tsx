@@ -24,9 +24,9 @@ import { StudentLinksList } from "../components/student-links-list";
 import { StudentStaffAccessPanel } from "../components/staff-access/student-staff-access-panel";
 import { VersionHistoryList } from "@/features/iep-versions/components/version-history-list";
 import { useStudentVersions } from "@/features/iep-versions/hooks/use-version-list";
+import { StudentDocumentsSummary } from "@/features/document-authoring/components/student-documents-summary";
 import { InviteStudentForm } from "@/features/student/components/invite-student-form";
 import { inviteStudentFromEducator } from "@/features/student/api/student-invite-api";
-import { IEP_AUTHORING_MODE } from "@/config/features";
 
 export function EducatorStudentDetailPage() {
   const { show: showToast } = useToast();
@@ -163,14 +163,33 @@ export function EducatorStudentDetailPage() {
         main={
           <div className="space-y-6">
             <section className="space-y-3">
-              <h2 className="font-serif text-lg">IEP versions</h2>
-              <Card data-testid="iep-versions-section">
-                <VersionHistoryList
-                  versions={versions}
-                  isLoading={versionsLoading}
-                  linkBase={`/educator/students/${studentId}/iep-versions`}
-                />
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-serif text-lg">Documents</h2>
+                <Link to={`/educator/students/${studentId}/documents`} data-testid="manage-documents">
+                  <Button variant="secondary" size="sm">
+                    Manage documents
+                  </Button>
+                </Link>
+              </div>
+              <Card data-testid="documents-section">
+                <StudentDocumentsSummary studentId={studentId} />
               </Card>
+              {/* Legacy typed IEP versions stay readable for students who had
+                  them; the section is hidden entirely for everyone else. */}
+              {!versionsLoading && versions.length > 0 && (
+                <details data-testid="legacy-iep-versions">
+                  <summary className="cursor-pointer text-sm text-brand-slate-500">
+                    Legacy IEP versions ({versions.length})
+                  </summary>
+                  <Card className="mt-2">
+                    <VersionHistoryList
+                      versions={versions}
+                      isLoading={versionsLoading}
+                      linkBase={`/educator/students/${studentId}/iep-versions`}
+                    />
+                  </Card>
+                </details>
+              )}
             </section>
 
             <section className="space-y-3">
@@ -227,44 +246,6 @@ export function EducatorStudentDetailPage() {
                   </dd>
                 </div>
               </dl>
-            </Card>
-
-            {/* Legacy typed IEP editor — shown only when rolled back to
-                'typed' mode. The route stays registered in both modes. */}
-            {IEP_AUTHORING_MODE === "typed" && (
-              <Card>
-                <h2 className="mb-2 font-serif text-base text-brand-slate-800">
-                  IEPs (legacy)
-                </h2>
-                <p className="mb-3 text-sm text-brand-slate-600">
-                  Build and edit IEP drafts in the legacy editor.
-                </p>
-                <Link
-                  to={`/educator/students/${studentId}/iep-drafts`}
-                  data-testid="build-ieps"
-                >
-                  <Button variant="secondary" className="w-full">
-                    Build / view IEPs
-                  </Button>
-                </Link>
-              </Card>
-            )}
-
-            <Card>
-              <h2 className="mb-2 font-serif text-base text-brand-slate-800">
-                Documents
-              </h2>
-              <p className="mb-3 text-sm text-brand-slate-600">
-                Author state-specific documents (IEP, ETR, 504) from templates.
-              </p>
-              <Link
-                to={`/educator/students/${studentId}/documents`}
-                data-testid="build-documents"
-              >
-                <Button variant="secondary" className="w-full">
-                  Manage documents
-                </Button>
-              </Link>
             </Card>
 
             <Card>

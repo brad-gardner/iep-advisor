@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AxiosError } from 'axios';
 import type { ApiResponse } from '@/types/api';
-import type { AutosaveStatus } from '@/features/iep-authoring/hooks/use-autosave';
+import type { AutosaveStatus } from '@/hooks/use-autosave';
 import { getDocument, saveValues as saveValuesApi } from '../api/documents-api';
 import type { DocumentInstanceDetailDto, DocumentValuePatch } from '../types';
 
@@ -11,9 +11,10 @@ export interface SaveResult {
   conflict?: boolean;
   errors?: string[];
   message?: string;
+  /** Server-normalized values after a successful save (e.g. Table rows now carry
+   *  their `_rowId`). Fields that keep local state read their own key back. */
+  values?: Record<string, unknown>;
 }
-
-const OK: SaveResult = { ok: true };
 const SAVED_LINGER_MS = 1500;
 
 /**
@@ -161,7 +162,7 @@ export function useDocumentInstance(instanceId: number) {
           const res = await saveValuesApi(instanceId, patch, current.rowVersion ?? undefined);
           if (res.success && res.data) {
             applySavedValues(res.data.values, res.data.rowVersion);
-            return OK;
+            return { ok: true, values: res.data.values };
           }
           return { ok: false, errors: res.errors, message: res.message };
         } catch (err) {

@@ -111,6 +111,16 @@ export async function listAuthoredVersions(
   return res.data;
 }
 
+/** Parent: finalized authored versions the school shared for a linked child (newest first). */
+export async function listAuthoredVersionsForChild(
+  childId: number
+): Promise<ApiResponse<AuthoredDocumentVersionSummaryDto[]>> {
+  const res = await apiClient.get<ApiResponse<AuthoredDocumentVersionSummaryDto[]>>(
+    `/api/children/${childId}/authored-versions`
+  );
+  return res.data;
+}
+
 /** Full frozen snapshot of one authored version (pinned template + values). */
 export async function getAuthoredVersion(
   versionId: number

@@ -1,41 +1,19 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAutosave } from '@/features/iep-authoring/hooks/use-autosave';
+import { useAutosave } from '@/hooks/use-autosave';
 import {
   parseConfig,
   readColumnOptions,
   type TableColumn,
 } from '@/features/admin/templates/template-config';
-import type { TableCellValue, TableRowValue } from '../../types';
+import type { TableCellValue } from '../../types';
 import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { fieldElementId, type FieldRendererProps } from './types';
-
-/** Row wrapper carrying a stable client key so add/remove keeps React identity
- *  (and focus/pending edits) pinned to the logical row, not its position. */
-interface KeyedRow {
-  key: string;
-  cells: TableRowValue;
-}
-
-let rowSeq = 0;
-function nextKey(): string {
-  rowSeq += 1;
-  return `row-${rowSeq}`;
-}
-
-function coerceRows(value: unknown): KeyedRow[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter((r): r is TableRowValue => typeof r === 'object' && r !== null)
-    .map((cells) => ({ key: nextKey(), cells }));
-}
-
-function emptyCells(columns: TableColumn[]): TableRowValue {
-  const row: TableRowValue = {};
-  for (const col of columns) row[col.columnKey] = col.type === 'Checkbox' ? false : '';
-  return row;
-}
+import { ROW_BLOCK_SEMANTICS, type ColumnSemantic, type FieldSemantic } from '@/features/admin/templates/document-semantics';
+import type { AssistKind } from '../../api/assist-types';
+import { FieldAssistBar } from './field-assist-bar';
+import { adoptRowIds, coerceRows, emptyCells, nextRowKey, rowId, type KeyedRow } from '../../lib/table-rows';
 
 /**
  * Repeating-group Table field: one row per array entry, one cell input per
@@ -51,33 +29,186 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
   const { columns, minRows, maxRows } = table;
   const labelId = `${fieldElementId(field.id)}-label`;
 
+  // `rowsRef` is the single source of truth and is written synchronously by
+  // every mutation, so a save always sends the LATEST rows (including any
+  // `_rowId`s adopted since the edit was queued) and no update is derived from
+  // a stale closure. `rows` state mirrors it for rendering.
   const [rows, setRows] = useState<KeyedRow[]>(() => coerceRows(value));
-  const autosave = useAutosave<TableRowValue[]>(
-    useCallback(async (v) => void (await onSave({ [field.fieldKey]: v })), [field.fieldKey, onSave])
+  const rowsRef = useRef<KeyedRow[]>(rows);
+  const mutate = useCallback((updater: (current: KeyedRow[]) => KeyedRow[]) => {
+    const next = updater(rowsRef.current);
+    rowsRef.current = next;
+    setRows(next);
+  }, []);
+
+  // The queued autosave value is only a trigger: the payload is read from
+  // rowsRef at send time, and ids come back matched to the rows that were sent.
+  const autosave = useAutosave<number>(
+    useCallback(async () => {
+      const sent = rowsRef.current;
+      const result = await onSave({ [field.fieldKey]: sent.map((r) => r.cells) });
+      const saved = result.values?.[field.fieldKey];
+      if (saved !== undefined) mutate((current) => adoptRowIds(current, sent, saved));
+    }, [field.fieldKey, onSave, mutate])
   );
   useRegisterFlush(field.fieldKey, autosave.flush);
 
-  const commit = (next: KeyedRow[], immediate: boolean) => {
-    setRows(next);
-    autosave.save(next.map((r) => r.cells));
+  const saveSeq = useRef(0);
+  const commit = (updater: (current: KeyedRow[]) => KeyedRow[], immediate: boolean) => {
+    mutate(updater);
+    saveSeq.current += 1;
+    autosave.save(saveSeq.current); // value is only a trigger; rowsRef is the payload
     if (immediate) void autosave.flush();
   };
 
-  const updateCell = (rowIndex: number, columnKey: string, cell: TableCellValue) => {
-    const next = rows.map((r, i) =>
-      i === rowIndex ? { ...r, cells: { ...r.cells, [columnKey]: cell } } : r
+  const updateCell = (rowKey: string, columnKey: string, cell: TableCellValue) =>
+    commit(
+      (current) => current.map((r) => (r.key === rowKey ? { ...r, cells: { ...r.cells, [columnKey]: cell } } : r)),
+      false
     );
-    commit(next, false);
-  };
 
-  const addRow = () => commit([...rows, { key: nextKey(), cells: emptyCells(columns) }], true);
-  const removeRow = (rowIndex: number) => commit(rows.filter((_, i) => i !== rowIndex), true);
+  const addRow = () => commit((current) => [...current, { key: nextRowKey(), cells: emptyCells(columns) }], true);
+  const removeRow = (rowKey: string) => commit((current) => current.filter((r) => r.key !== rowKey), true);
 
   const atMax = maxRows != null && rows.length >= maxRows;
   const atMin = minRows != null && rows.length <= minRows;
 
+  // AI help per row is offered for semantic row blocks (goals, services, …).
+  // The suggestion lands in the row's primary text column; goals also offer
+  // "Pull from student" and the measurement kind.
+  const blockSemantic = config.kind === 'Table' ? config.semantic : undefined;
+  const isRowBlock = blockSemantic != null && ROW_BLOCK_SEMANTICS.has(blockSemantic);
+  const primaryColumn =
+    columns.find((c) =>
+      blockSemantic === 'goals'
+        ? c.semantic === 'goalText'
+        : blockSemantic === 'services'
+          ? c.semantic === 'serviceType'
+          : blockSemantic === 'accommodations'
+            ? c.semantic === 'accommodation'
+            : blockSemantic === 'transition'
+              ? c.semantic === 'transitionServices'
+              : false
+    ) ?? columns.find((c) => c.type === 'Text');
+  const rowKinds: AssistKind[] = blockSemantic === 'goals' ? ['Rewrite', 'Improve', 'SuggestMeasurement'] : ['Rewrite', 'Improve'];
+
+  // Semantic row blocks (goals, services, accommodations, …) render as stacked
+  // cards with labelled inputs — a goal has six fields and does not fit a
+  // grid inside the editor column — with AI help and "pull from student" per
+  // row. Untagged tables keep the compact grid.
+  if (isRowBlock) {
+    const primaryKey = primaryColumn?.columnKey;
+    return (
+      <div id={fieldElementId(field.id)} tabIndex={-1} role="group" aria-labelledby={labelId} data-testid={`field-${field.fieldKey}`}>
+        <div id={labelId} className="mb-2 block text-[13px] font-medium text-brand-slate-600">
+          {field.label || 'Untitled field'}
+          {field.required && (
+            <>
+              <span className="ml-1 text-brand-danger-700" aria-hidden="true">
+                *
+              </span>
+              <span className="sr-only"> (required)</span>
+            </>
+          )}
+        </div>
+        {rows.length === 0 ? (
+          <p className="mb-2 text-sm text-brand-slate-400">No rows yet.</p>
+        ) : (
+          <ol className="space-y-3">
+            {rows.map((row, rowIndex) => {
+              const persistedId = rowId(row);
+              return (
+                <li
+                  key={row.key}
+                  className="rounded-card border border-brand-slate-200 bg-brand-slate-50/60 p-4"
+                  data-testid={`field-${field.fieldKey}-row-${rowIndex}`}
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <span className="text-[13px] font-medium text-brand-slate-500">
+                      {blockLabel(blockSemantic)} {rowIndex + 1}
+                    </span>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      disabled={disabled || atMin}
+                      onClick={() => removeRow(row.key)}
+                      aria-label={`Remove ${blockLabel(blockSemantic).toLowerCase()} ${rowIndex + 1}`}
+                      data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {columns.map((col) => {
+                      const wide = col.columnKey === primaryKey || col.type === 'Text' && isLongColumn(col.semantic);
+                      const cellId = `field-${field.fieldKey}-cell-${rowIndex}-${col.columnKey}`;
+                      return (
+                        <div key={col.columnKey} className={wide ? 'sm:col-span-2' : undefined}>
+                          <label htmlFor={cellId} className="mb-1 block text-[13px] font-medium text-brand-slate-600">
+                            {col.label || 'Column'}
+                            {col.required && (
+                              <span className="ml-1 text-brand-danger-700" aria-hidden="true">
+                                *
+                              </span>
+                            )}
+                          </label>
+                          <TableCell
+                            column={col}
+                            rowIndex={rowIndex}
+                            fieldKey={field.fieldKey}
+                            value={row.cells[col.columnKey]}
+                            disabled={disabled}
+                            multiline={wide}
+                            inputId={cellId}
+                            onChange={(cell) => updateCell(row.key, col.columnKey, cell)}
+                            onBlur={() => void autosave.flush()}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {primaryColumn && persistedId ? (
+                    <FieldAssistBar
+                      fieldKey={field.fieldKey}
+                      rowId={persistedId}
+                      kinds={rowKinds}
+                      allowPull={blockSemantic === 'goals'}
+                      onApply={(text) => {
+                        updateCell(row.key, primaryColumn.columnKey, text);
+                        void autosave.flush();
+                      }}
+                      beforeRequest={autosave.flush}
+                      disabled={disabled}
+                      testIdPrefix={`field-${field.fieldKey}-row-${rowIndex}`}
+                    />
+                  ) : (
+                    !disabled && (
+                      <p className="mt-2 text-xs text-brand-slate-400">AI help is available once this row has saved.</p>
+                    )
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        <div className="mt-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={disabled || atMax}
+            onClick={addRow}
+            data-testid={`field-${field.fieldKey}-add`}
+          >
+            <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
+            Add {blockLabel(blockSemantic).toLowerCase()}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div role="group" aria-labelledby={labelId}>
+    <div id={fieldElementId(field.id)} tabIndex={-1} role="group" aria-labelledby={labelId}>
       <div id={labelId} className="mb-1 block text-[13px] font-medium text-brand-slate-600">
         {field.label || 'Untitled field'}
         {field.required && (
@@ -138,7 +269,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                         fieldKey={field.fieldKey}
                         value={row.cells[col.columnKey]}
                         disabled={disabled}
-                        onChange={(cell) => updateCell(rowIndex, col.columnKey, cell)}
+                        onChange={(cell) => updateCell(row.key, col.columnKey, cell)}
                         onBlur={() => void autosave.flush()}
                       />
                     </td>
@@ -148,7 +279,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                       variant="danger"
                       size="sm"
                       disabled={disabled || atMin}
-                      onClick={() => removeRow(rowIndex)}
+                      onClick={() => removeRow(row.key)}
                       aria-label={`Remove row ${rowIndex + 1}`}
                       data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
                     >
@@ -180,12 +311,39 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
 const cellInputClass =
   'w-full px-2 py-1 bg-white rounded-input text-brand-slate-800 text-sm border border-brand-slate-200 focus:outline-none focus:border-brand-teal-400 focus:ring-[3px] focus:ring-brand-teal-50 transition-colors';
 
+/** Human label for one row of a semantic block ("Goal 2", "Service 1"). */
+function blockLabel(semantic: FieldSemantic | undefined): string {
+  switch (semantic) {
+    case 'goals':
+      return 'Goal';
+    case 'services':
+      return 'Service';
+    case 'accommodations':
+      return 'Accommodation';
+    case 'transition':
+      return 'Transition item';
+    case 'participants':
+      return 'Participant';
+    case 'evaluatorReports':
+      return 'Evaluator report';
+    default:
+      return 'Row';
+  }
+}
+
+/** Columns whose content is prose and deserves a full-width multiline input. */
+function isLongColumn(semantic: ColumnSemantic | undefined): boolean {
+  return semantic === 'goalText' || semantic === 'baseline' || semantic === 'targetCriteria' || semantic === 'findings' || semantic === 'transitionServices' || semantic === 'accommodation';
+}
+
 function TableCell({
   column,
   rowIndex,
   fieldKey,
   value,
   disabled,
+  multiline,
+  inputId,
   onChange,
   onBlur,
 }: {
@@ -194,19 +352,40 @@ function TableCell({
   fieldKey: string;
   value: TableCellValue | undefined;
   disabled?: boolean;
+  /** Block mode: render prose Text columns as a textarea. */
+  multiline?: boolean;
+  /** Block mode: explicit id so the visible label associates with the control. */
+  inputId?: string;
   onChange: (cell: TableCellValue) => void;
   // Flush the field's pending debounced save when the cell loses focus, so an
   // in-app navigation that blurs the cell persists the edit before unmount.
   onBlur: () => void;
 }) {
-  const ariaLabel = `${column.label || 'Column'}, row ${rowIndex + 1}`;
+  const ariaLabel = inputId ? undefined : `${column.label || 'Column'}, row ${rowIndex + 1}`;
   const testId = `field-${fieldKey}-cell-${rowIndex}-${column.columnKey}`;
   const strValue = typeof value === 'string' ? value : '';
+
+  if (multiline && column.type === 'Text') {
+    return (
+      <textarea
+        id={inputId}
+        rows={2}
+        value={strValue}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        className={cellInputClass}
+        data-testid={testId}
+      />
+    );
+  }
 
   switch (column.type) {
     case 'Checkbox':
       return (
         <input
+          id={inputId}
           type="checkbox"
           checked={value === true}
           disabled={disabled}
@@ -220,6 +399,7 @@ function TableCell({
     case 'Date':
       return (
         <input
+          id={inputId}
           type="date"
           value={strValue}
           disabled={disabled}
@@ -233,6 +413,7 @@ function TableCell({
     case 'Select':
       return (
         <select
+          id={inputId}
           value={strValue}
           disabled={disabled}
           aria-label={ariaLabel}
@@ -252,6 +433,7 @@ function TableCell({
     default:
       return (
         <input
+          id={inputId}
           type="text"
           value={strValue}
           disabled={disabled}
