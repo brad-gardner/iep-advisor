@@ -135,8 +135,8 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                   className="rounded-card border border-brand-slate-200 bg-brand-slate-50/60 p-4"
                   data-testid={`field-${field.fieldKey}-row-${rowIndex}`}
                 >
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <span className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-brand-slate-500">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <span className="flex min-w-0 flex-wrap items-center gap-2 text-[13px] font-medium text-brand-slate-500">
                       {blockLabel(blockSemantic)} {rowIndex + 1}
                       {carriedFrom(row) && (
                         <span
@@ -152,6 +152,8 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                           {row.cells[ROW_CONFIRMED_KEY] === true ? ' · reviewed' : ' · not yet reviewed'}
                         </span>
                       )}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1">
                       {carriedFrom(row) && row.cells[ROW_CONFIRMED_KEY] !== true && !disabled && (
                         <Button
                           variant="secondary"
@@ -162,17 +164,17 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                           Keep as-is
                         </Button>
                       )}
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={disabled || atMin}
+                        onClick={() => removeRow(row.key)}
+                        aria-label={`Remove ${blockLabel(blockSemantic).toLowerCase()} ${rowIndex + 1}`}
+                        data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </Button>
                     </span>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      disabled={disabled || atMin}
-                      onClick={() => removeRow(row.key)}
-                      aria-label={`Remove ${blockLabel(blockSemantic).toLowerCase()} ${rowIndex + 1}`}
-                      data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </Button>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {columns.map((col) => {

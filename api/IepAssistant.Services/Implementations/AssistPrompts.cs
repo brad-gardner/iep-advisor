@@ -61,7 +61,7 @@ public static class AssistPrompts
         "Base every specific claim (baselines, scores, dates, prior goals, family or student input) on a cited item. " +
         "If the evidence does not contain a baseline or number you need, say that plainly and ask for it — never invent one. " +
         "Respond with ONLY a JSON object: {\"suggestion\": \"<the requested output>\", \"rationale\": \"<one or two sentences>\", \"citations\": [\"E1\", \"E4\"]}. " +
-        "No markdown fences, no text outside the JSON.";
+        "Escape line breaks inside strings as \\n. No markdown fences, no text outside the JSON.";
 
     public const string CitationInstruction =
         "Reply as the JSON object described in GROUNDING, citing evidence ids you relied on.";

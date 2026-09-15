@@ -283,6 +283,30 @@ public sealed class DocumentAssistServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GroundedAssist_RepairsRawNewlinesInJson_AndResolvesInlineMarkersInProse()
+    {
+        var s = Seed("repair");
+        var ev = new FakeEvidence();
+        ev.Items.Add(Ev("E1", EvidenceKind.Identity, "Name: Jordan Ellis", "Student record"));
+        ev.Items.Add(Ev("E3", EvidenceKind.PriorGoal, "Read 70 wpm by May"));
+
+        // 1. JSON whose string literal contains a raw line break (what models actually emit).
+        _claude.CannedResponse = "{\"suggestion\": \"Line one\nLine two\", \"rationale\": \"ok\", \"citations\": [\"E3\"]}";
+        using var ctx = CreateContext();
+        var repaired = await CreateService(ctx, ev).AssistAsync(s.TeacherId, s.InstanceId, s.GoalsKey, s.RowId, AssistKind.Improve);
+        Assert.True(repaired.Success, repaired.Message);
+        Assert.Equal("Line one\nLine two", repaired.Data!.Suggestion);
+        Assert.Equal("E3", Assert.Single(repaired.Data.Citations).EvidenceId);
+
+        // 2. Prose with inline [E1][E3] markers and an unknown [E9].
+        _claude.CannedResponse = "Strong on condition and behavior [E3]. Add prosody data for Jordan [E1][E9].";
+        var prose = await CreateService(ctx, ev).AssistAsync(s.TeacherId, s.InstanceId, s.GoalsKey, s.RowId, AssistKind.Improve);
+        Assert.True(prose.Success);
+        Assert.StartsWith("Strong on condition", prose.Data!.Suggestion);
+        Assert.Equal(new[] { "E3", "E1" }, prose.Data.Citations.Select(c => c.EvidenceId).ToArray());
+    }
+
+    [Fact]
     public async Task Assist_WithoutEvidenceService_KeepsPlainContract()
     {
         var s = Seed("noev");

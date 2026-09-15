@@ -26,7 +26,7 @@ public sealed class DocumentAssistService : IDocumentAssistService
     private const string FieldNotFoundMessage = "Field not found on this document's template.";
     private const string RowNotFoundMessage = "Row not found.";
     private const string UnavailableMessage = "AI assist is temporarily unavailable.";
-    private const int AssistMaxTokens = 1024;
+    private const int AssistMaxTokens = 2048;
     private const int ChatMaxTokens = 2048;
     private const int ContextCharBudget = 12_000;
     private const int MaxChatTurns = 20;
@@ -208,7 +208,7 @@ public sealed class DocumentAssistService : IDocumentAssistService
         {
             try
             {
-                using var docJson = JsonDocument.Parse(text);
+                using var docJson = JsonDocument.Parse(RepairJsonStrings(text));
                 var root = docJson.RootElement;
                 if (root.TryGetProperty("suggestion", out var sug) && sug.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(sug.GetString()))
                 {
@@ -234,7 +234,39 @@ public sealed class DocumentAssistService : IDocumentAssistService
             }
             catch (JsonException) { /* fall through to plain text */ }
         }
-        return new AssistResultModel { Suggestion = raw.Trim(), MissingBaseline = missingBaseline };
+
+        // Prose with inline [E3] markers: keep the text, resolve the markers into citations.
+        var inline = InlineCitation.Matches(raw)
+            .Select(m => m.Groups[1].Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(id => evidence.FirstOrDefault(e => string.Equals(e.Id, id, StringComparison.OrdinalIgnoreCase)))
+            .Where(e => e != null)
+            .Select(e => new AssistCitation { EvidenceId = e!.Id, SourceLabel = e.SourceLabel, Excerpt = Truncate(e.Text, 200) })
+            .ToList();
+        return new AssistResultModel { Suggestion = raw.Trim(), Citations = inline, MissingBaseline = missingBaseline };
+    }
+
+    private static readonly Regex InlineCitation = new(@"\[(E\d+)\]", RegexOptions.Compiled);
+
+    /// <summary>Models often emit raw line breaks inside JSON string literals; escape control characters
+    /// that appear between quotes so the document parses. Leaves already-escaped sequences alone.</summary>
+    private static string RepairJsonStrings(string json)
+    {
+        var sb = new StringBuilder(json.Length + 16);
+        var inString = false;
+        for (var i = 0; i < json.Length; i++)
+        {
+            var c = json[i];
+            if (c == '"' && (i == 0 || json[i - 1] != '\\'))
+                inString = !inString;
+            if (inString && c is '\n' or '\r' or '\t')
+            {
+                sb.Append(c switch { '\n' => "\\n", '\r' => "\\r", _ => "\\t" });
+                continue;
+            }
+            sb.Append(c);
+        }
+        return sb.ToString();
     }
 
     // ---------------------------------------------------------------- Chat
