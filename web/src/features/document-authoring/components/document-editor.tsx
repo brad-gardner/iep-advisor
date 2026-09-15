@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpenCheck, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -97,11 +97,16 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
   // Shared, lazily-loaded cache for every "Pull from student" button.
   const shareableEntries = useStudentShareableEntries(detail.schoolStudentId);
   // The field that last had focus — the Evidence drawer inserts into it.
-  const [activeField, setActiveField] = useState<ActiveFieldTarget | null>(null);
+  const [activeField, setActiveFieldState] = useState<ActiveFieldTarget | null>(null);
+  const setActiveField = useCallback((target: ActiveFieldTarget) => setActiveFieldState(target), []);
+  const clearActiveField = useCallback(
+    (id: string) => setActiveFieldState((cur) => (cur && (cur.id === id || cur.id.startsWith(`${id}:`)) ? null : cur)),
+    []
+  );
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const editorContext = useMemo(
-    () => ({ instanceId: detail.id, studentId: detail.schoolStudentId, shareableEntries, setActiveField }),
-    [detail.id, detail.schoolStudentId, shareableEntries]
+    () => ({ instanceId: detail.id, studentId: detail.schoolStudentId, shareableEntries, setActiveField, clearActiveField }),
+    [detail.id, detail.schoolStudentId, shareableEntries, setActiveField, clearActiveField]
   );
 
   return (
@@ -240,7 +245,7 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
           open={evidenceOpen}
           onClose={() => setEvidenceOpen(false)}
           studentId={detail.schoolStudentId}
-          activeField={activeField}
+          activeField={readOnly || conflict ? null : activeField}
         />
 
         {!wide && (

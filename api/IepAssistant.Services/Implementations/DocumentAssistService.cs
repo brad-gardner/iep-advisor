@@ -175,7 +175,10 @@ public sealed class DocumentAssistService : IDocumentAssistService
         foreach (var item in evidence.OrderBy(e => Rank(e.Kind)))
         {
             var date = item.SourceDate is { } d ? $", {d:yyyy-MM-dd}" : string.Empty;
-            var line = $"[{item.Id}] ({item.Kind}; {item.SourceLabel}{date}; by {item.AuthorRole}) {Data(Truncate(item.Text, MaxEvidenceItemChars))}";
+            // One item per line, and the item body can never start a new line: family/student text
+            // containing "\n[E2] (...; by school)" would otherwise read as a forged school record.
+            var body = OneLine(Data(Truncate(item.Text, MaxEvidenceItemChars)));
+            var line = $"[{item.Id}] ({item.Kind}; {item.SourceLabel}{date}; by {item.AuthorRole}) {body}";
             if (used + line.Length > EvidenceCharBudget)
             {
                 sb.AppendLine("… (more evidence omitted for length)");
@@ -470,6 +473,8 @@ public sealed class DocumentAssistService : IDocumentAssistService
         var text = TagStripper.Replace(html.Replace("</p>", "\n").Replace("<br>", "\n").Replace("<br/>", "\n"), string.Empty);
         return System.Net.WebUtility.HtmlDecode(text).Trim();
     }
+
+    private static string OneLine(string value) => value.Replace("\r", " ").Replace("\n", " ");
 
     private static string Truncate(string? value, int max = 280)
     {

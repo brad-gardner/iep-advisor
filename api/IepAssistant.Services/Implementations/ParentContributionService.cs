@@ -14,12 +14,14 @@ public class ParentContributionService : IParentContributionService
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _access;
     private readonly IOrgAccessService _orgAccess;
+    private readonly IAuditLogger _audit;
 
-    public ParentContributionService(ApplicationDbContext context, IAccessService access, IOrgAccessService orgAccess)
+    public ParentContributionService(ApplicationDbContext context, IAccessService access, IOrgAccessService orgAccess, IAuditLogger audit)
     {
         _context = context;
         _access = access;
         _orgAccess = orgAccess;
+        _audit = audit;
     }
 
     public async Task<ServiceResult<List<ParentContributionModel>>> GetForChildAsync(int childId, int userId, CancellationToken ct = default)
@@ -56,6 +58,8 @@ public class ParentContributionService : IParentContributionService
         };
         _context.ParentContributions.Add(entity);
         await _context.SaveChangesAsync(ct);
+        if (entity.IsShared)
+            _audit.Record(AuditAction.Share, userId, "ParentContribution", entity.Id);
         return ServiceResult<ParentContributionModel>.SuccessResult(Map(entity));
     }
 
@@ -67,12 +71,15 @@ public class ParentContributionService : IParentContributionService
         var error = Validate(model);
         if (error != null) return ServiceResult<ParentContributionModel>.FailureResult(error);
 
+        var newlyShared = model.IsShared && !entity.IsShared;
         entity.Kind = model.Kind;
         entity.Text = model.Text.Trim();
         entity.IsShared = model.IsShared;
         entity.UpdatedAt = DateTime.UtcNow;
         entity.UpdatedById = userId;
         await _context.SaveChangesAsync(ct);
+        if (newlyShared)
+            _audit.Record(AuditAction.Share, userId, "ParentContribution", entity.Id);
         return ServiceResult<ParentContributionModel>.SuccessResult(Map(entity));
     }
 
@@ -103,6 +110,9 @@ public class ParentContributionService : IParentContributionService
             .Where(c => childIds.Contains(c.ChildProfileId) && c.IsShared)
             .OrderBy(c => c.Kind).ThenBy(c => c.CreatedAt)
             .ToListAsync(ct);
+        // Staff read of family-authored text: leave the same access trace as other student reads.
+        if (items.Count > 0)
+            _audit.Record(AuditAction.View, educatorUserId, "ParentContributions", schoolStudentId);
         return ServiceResult<List<ParentContributionModel>>.SuccessResult(items.Select(Map).ToList());
     }
 

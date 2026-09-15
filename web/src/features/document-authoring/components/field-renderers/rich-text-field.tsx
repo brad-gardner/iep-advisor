@@ -1,11 +1,11 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Textarea } from '@/components/ui/input';
 import { useAutosave } from '@/hooks/use-autosave';
 import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { FieldLabel } from './field-label';
 import { fieldElementId, type FieldRendererProps } from './types';
 import { FieldAssistBar } from './field-assist-bar';
-import { useDocumentEditorContext } from '../../hooks/document-editor-context';
+import { appendText, useDocumentEditorContext } from '../../hooks/document-editor-context';
 
 /**
  * RichText field. The backend sanitizes RichText to an allowlist on save; for
@@ -26,6 +26,22 @@ export function RichTextField({ field, value, disabled, onSave }: FieldRendererP
     autosave.save(next);
   };
 
+  const applyText = (text: string) => {
+    handleChange(text);
+    void autosave.flush();
+  };
+
+  // See TextField: the evidence-insert target outlives this render, so it
+  // reads through refs and is dropped on unmount.
+  const localRef = useRef(local);
+  const disabledRef = useRef(disabled);
+  useEffect(() => {
+    localRef.current = local;
+    disabledRef.current = disabled;
+  }, [local, disabled]);
+  const clear = editor?.clearActiveField;
+  useEffect(() => () => clear?.(field.fieldKey), [clear, field.fieldKey]);
+
   return (
     <div>
       <FieldLabel htmlFor={id} label={field.label} required={field.required} />
@@ -37,10 +53,11 @@ export function RichTextField({ field, value, disabled, onSave }: FieldRendererP
         onChange={(e) => handleChange(e.target.value)}
         onFocus={() =>
           editor?.setActiveField({
-            label: field.label || 'this field',
+            id: field.fieldKey,
+            label: () => field.label || 'this field',
             apply: (text) => {
-              handleChange(text);
-              void autosave.flush();
+              if (disabledRef.current) return;
+              applyText(appendText(localRef.current, text));
             },
           })
         }
@@ -49,10 +66,7 @@ export function RichTextField({ field, value, disabled, onSave }: FieldRendererP
       />
       <FieldAssistBar
         fieldKey={field.fieldKey}
-        onApply={(text) => {
-          handleChange(text);
-          void autosave.flush();
-        }}
+        onApply={applyText}
         allowPull
         beforeRequest={autosave.flush}
         disabled={disabled}

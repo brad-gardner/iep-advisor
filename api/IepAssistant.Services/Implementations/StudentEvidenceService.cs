@@ -27,17 +27,20 @@ public sealed class StudentEvidenceService : IStudentEvidenceService
     private readonly IOrgAccessService _orgAccess;
     private readonly IStudentWorkspaceService _workspace;
     private readonly IParentContributionService _contributions;
+    private readonly IAuditLogger _audit;
 
     public StudentEvidenceService(
         ApplicationDbContext context,
         IOrgAccessService orgAccess,
         IStudentWorkspaceService workspace,
-        IParentContributionService contributions)
+        IParentContributionService contributions,
+        IAuditLogger audit)
     {
         _context = context;
         _orgAccess = orgAccess;
         _workspace = workspace;
         _contributions = contributions;
+        _audit = audit;
     }
 
     public async Task<ServiceResult<StudentEvidenceBundle>> BuildForStaffAsync(int userId, int schoolStudentId, CancellationToken ct = default)
@@ -261,6 +264,12 @@ public sealed class StudentEvidenceService : IStudentEvidenceService
                 });
             }
         }
+
+        // Access trail (FERPA): the bundle is an aggregate read of the student record and of every
+        // finalized version whose content it carries — record it the same way the direct reads do.
+        _audit.Record(AuditAction.View, userId, "StudentEvidence", schoolStudentId);
+        foreach (var source in sources)
+            _audit.Record(AuditAction.View, userId, source.SourceType, source.SourceId);
 
         return ServiceResult<StudentEvidenceBundle>.SuccessResult(new StudentEvidenceBundle
         {

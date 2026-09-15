@@ -42,6 +42,10 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
   const [shared, setShared] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<ParentContributionDto | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  /** Id of the note whose share toggle is in flight — blocks a second overlapping PUT. */
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -84,22 +88,45 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
   };
 
   const toggleShared = async (item: ParentContributionDto) => {
-    const res = await updateContribution(item.id, { kind: item.kind, text: item.text, isShared: !item.isShared });
-    if (res.success && res.data) {
-      setItems((cur) => cur.map((c) => (c.id === item.id ? res.data! : c)));
-      show({ message: res.data.isShared ? 'Now visible to the school team' : 'Now private', variant: 'success' });
-    } else {
-      show({ message: res.message ?? 'Could not update', variant: 'error' });
+    if (togglingId !== null) return;
+    setTogglingId(item.id);
+    try {
+      const res = await updateContribution(item.id, { kind: item.kind, text: item.text, isShared: !item.isShared });
+      if (res.success && res.data) {
+        setItems((cur) => cur.map((c) => (c.id === item.id ? res.data! : c)));
+        show({ message: res.data.isShared ? 'Now visible to the school team' : 'Now private', variant: 'success' });
+      } else {
+        show({ message: res.message ?? 'Could not update', variant: 'error' });
+      }
+    } catch {
+      show({ message: 'Could not update', variant: 'error' });
+    } finally {
+      setTogglingId(null);
     }
   };
 
+  // Failures stay inside the open dialog (ConfirmDialog's `error`) so the user
+  // can retry or cancel; only a successful delete closes it.
   const remove = async () => {
-    if (!confirmDelete) return;
-    const res = await deleteContribution(confirmDelete.id);
-    if (res.success) setItems((cur) => cur.filter((c) => c.id !== confirmDelete.id));
-    else show({ message: res.message ?? 'Could not delete', variant: 'error' });
-    setConfirmDelete(null);
+    if (!confirmDelete || deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await deleteContribution(confirmDelete.id);
+      if (res.success) {
+        setItems((cur) => cur.filter((c) => c.id !== confirmDelete.id));
+        setConfirmDelete(null);
+      } else {
+        setDeleteError(res.message ?? 'Could not delete this note.');
+      }
+    } catch {
+      setDeleteError('Could not delete this note.');
+    } finally {
+      setDeleting(false);
+    }
   };
+
+  const excerpt = (t: string) => (t.length > 40 ? `${t.slice(0, 40)}…` : t);
 
   return (
     <Card data-testid="about-my-child-card">
@@ -188,10 +215,27 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
             </div>
             {canEdit && (
               <div className="flex shrink-0 items-center gap-1">
-                <Button variant="ghost" size="sm" onClick={() => void toggleShared(item)} data-testid={`contribution-${item.id}-toggle`}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  loading={togglingId === item.id}
+                  disabled={togglingId !== null && togglingId !== item.id}
+                  aria-label={`${item.isShared ? 'Make private' : 'Share'}: ${excerpt(item.text)}`}
+                  onClick={() => void toggleShared(item)}
+                  data-testid={`contribution-${item.id}-toggle`}
+                >
                   {item.isShared ? 'Make private' : 'Share'}
                 </Button>
-                <Button variant="ghost" size="sm" aria-label="Delete note" onClick={() => setConfirmDelete(item)} data-testid={`contribution-${item.id}-delete`}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Delete note: ${excerpt(item.text)}`}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setConfirmDelete(item);
+                  }}
+                  data-testid={`contribution-${item.id}-delete`}
+                >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
@@ -205,8 +249,14 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
         title="Delete note"
         message="Delete this note? If it was shared, the school team will no longer see it."
         confirmLabel="Delete"
+        loading={deleting}
+        error={deleteError}
         onConfirm={() => void remove()}
-        onCancel={() => setConfirmDelete(null)}
+        onCancel={() => {
+          if (deleting) return;
+          setConfirmDelete(null);
+          setDeleteError(null);
+        }}
       />
     </Card>
   );

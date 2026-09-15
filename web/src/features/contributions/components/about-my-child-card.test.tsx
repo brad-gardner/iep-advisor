@@ -58,3 +58,42 @@ describe('AboutMyChildCard', () => {
     expect(screen.queryByTestId('contribution-1-toggle')).not.toBeInTheDocument();
   });
 });
+
+describe('AboutMyChildCard failure handling', () => {
+  beforeEach(() => {
+    api.updateContribution.mockClear();
+    api.deleteContribution.mockClear();
+    api.listContributions.mockResolvedValue({ success: true, data: [note(1, true), note(2, false)] });
+  });
+
+  it('keeps the delete dialog open with the error when the request fails, and closes it on success', async () => {
+    api.deleteContribution.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce({ success: true });
+    render(<AboutMyChildCard childId={4} childName="Jordan" canEdit />);
+    await waitFor(() => expect(screen.getByTestId('contribution-1')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete note: note 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(screen.getByRole('alertdialog')).toHaveTextContent('Could not delete this note.'));
+    expect(screen.getByTestId('contribution-1')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(screen.queryByTestId('contribution-1')).not.toBeInTheDocument());
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
+  it('survives a rejected share toggle and blocks overlapping toggles', async () => {
+    let release!: () => void;
+    api.updateContribution.mockImplementationOnce(() => new Promise((_, reject) => (release = () => reject(new Error('network')))));
+    render(<AboutMyChildCard childId={4} childName="Jordan" canEdit />);
+    await waitFor(() => expect(screen.getByTestId('contribution-2')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('contribution-2-toggle'));
+    expect(screen.getByTestId('contribution-1-toggle')).toBeDisabled(); // another toggle is in flight
+    fireEvent.click(screen.getByTestId('contribution-2-toggle'));
+    expect(api.updateContribution).toHaveBeenCalledTimes(1);
+
+    release();
+    await waitFor(() => expect(screen.getByTestId('contribution-1-toggle')).toBeEnabled());
+    expect(screen.getByTestId('contribution-2-visibility')).toHaveTextContent('Private to your family');
+  });
+});

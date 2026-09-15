@@ -26,6 +26,7 @@ public sealed class StudentEvidenceAndPrefillTests : IDisposable
 
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<ApplicationDbContext> _options;
+    private readonly CapturingAuditLogger _audit = new();
 
     public StudentEvidenceAndPrefillTests()
     {
@@ -48,8 +49,8 @@ public sealed class StudentEvidenceAndPrefillTests : IDisposable
         var access = new AccessService(ctx);
         var org = new OrgAccessService(ctx);
         var workspace = new StudentWorkspaceService(ctx, access, org, new NoClaude(), NullLogger<StudentWorkspaceService>.Instance);
-        var contributions = new ParentContributionService(ctx, access, org);
-        var evidence = new StudentEvidenceService(ctx, org, workspace, contributions);
+        var contributions = new ParentContributionService(ctx, access, org, _audit);
+        var evidence = new StudentEvidenceService(ctx, org, workspace, contributions, _audit);
         var prefill = new DocumentPrefillService(ctx);
         var instances = new DocumentInstanceService(ctx, org,
             new TemplateResolutionService(ctx, NullLogger<TemplateResolutionService>.Instance),
@@ -164,8 +165,33 @@ public sealed class StudentEvidenceAndPrefillTests : IDisposable
         Assert.Equal(items.Count, items.Select(i => i.Id).Distinct().Count());
         Assert.Equal(2, result.Data.Sources.Count);
 
+        // The aggregate read leaves the same trail as reading each finalized version directly.
+        Assert.Contains(_audit.Entries, e => e.Action == AuditAction.View && e.ResourceType == "StudentEvidence" && e.ResourceId == s.StudentId && e.ActorUserId == s.TeacherId);
+        Assert.Contains(_audit.Entries, e => e.Action == AuditAction.View && e.ResourceType == "AuthoredDocumentVersion");
+        Assert.Contains(_audit.Entries, e => e.Action == AuditAction.View && e.ResourceType == "ParentContributions" && e.ResourceId == s.StudentId);
+
         var denied = await evidence.BuildForStaffAsync(s.StrangerId, s.StudentId);
         Assert.False(denied.Success);
+        Assert.DoesNotContain(_audit.Entries, e => e.ActorUserId == s.StrangerId);
+    }
+
+    [Fact]
+    public async Task OrgAccess_MemoizesStudentDecision_WithinOneScope()
+    {
+        var s = await SeedAsync(withHistory: false);
+        using var ctx = CreateContext();
+        var org = new OrgAccessService(ctx);
+        Assert.True(await org.CanActOnStudentAsync(s.TeacherId, s.StudentId, AccessRole.Viewer));
+        // Revoking access mid-scope is not observed by the same scoped instance (a request is atomic
+        // with respect to its own authz), but a fresh scope sees the change.
+        using (var mutate = CreateContext())
+        {
+            foreach (var a in mutate.SchoolStudentAccesses.Where(a => a.UserId == s.TeacherId)) a.IsActive = false;
+            mutate.SaveChanges();
+        }
+        Assert.True(await org.CanActOnStudentAsync(s.TeacherId, s.StudentId, AccessRole.Viewer));
+        using var fresh = CreateContext();
+        Assert.False(await new OrgAccessService(fresh).CanActOnStudentAsync(s.TeacherId, s.StudentId, AccessRole.Viewer));
     }
 
     [Fact]
@@ -273,6 +299,7 @@ public sealed class StudentEvidenceAndPrefillTests : IDisposable
 
         var created = await contributions.CreateAsync(s.ChildId, s.ParentId, new SaveParentContributionModel { Kind = ParentContributionKind.Priority, Text = "Keep him in gen-ed math", IsShared = true });
         Assert.True(created.Success, created.Message);
+        Assert.Single(_audit.Entries, e => e.Action == AuditAction.Share && e.ResourceType == "ParentContribution" && e.ResourceId == created.Data!.Id);
         var updated = await contributions.UpdateAsync(created.Data!.Id, s.ParentId, new SaveParentContributionModel { Kind = ParentContributionKind.Priority, Text = "Keep him in gen-ed math", IsShared = false });
         Assert.True(updated.Success);
 

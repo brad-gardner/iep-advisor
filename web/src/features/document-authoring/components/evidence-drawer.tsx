@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { Notice } from '@/components/ui/notice';
@@ -39,20 +39,25 @@ export function EvidenceDrawer({ open, onClose, studentId, activeField }: Eviden
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
+  const targetHintId = useId();
+  const targetLabel = activeField?.label() ?? null;
+
+  // Fetched once per editor mount; a failed load is retried the next time the
+  // drawer opens (the previous error stays visible until the retry answers).
   useEffect(() => {
     if (!open || loaded) return;
     let active = true;
     getStudentEvidence(studentId)
       .then((res) => {
         if (!active) return;
-        if (res.success && res.data) setBundle(res.data);
-        else setError(res.message ?? 'Could not load evidence.');
+        if (res.success && res.data) {
+          setBundle(res.data);
+          setError(null);
+          setLoaded(true);
+        } else setError(res.message ?? 'Could not load evidence.');
       })
       .catch(() => {
         if (active) setError('Could not load evidence.');
-      })
-      .finally(() => {
-        if (active) setLoaded(true);
       });
     return () => {
       active = false;
@@ -66,7 +71,21 @@ export function EvidenceDrawer({ open, onClose, studentId, activeField }: Eviden
           Only what the school, the student (shared entries) and the family (shared notes) have put on
           record. Private family notes and analyses never appear here.
         </p>
-        {!loaded && (
+        <p
+          id={targetHintId}
+          className="rounded-card border border-brand-slate-200 bg-brand-slate-50 px-3 py-2 text-[13px] text-brand-slate-600"
+          data-testid="evidence-target"
+        >
+          {targetLabel ? (
+            <>
+              Inserting into: <span className="font-medium text-brand-slate-800">{targetLabel}</span>. Inserted text is
+              added after what is already there.
+            </>
+          ) : (
+            'Close this panel and click into a field to choose where to insert.'
+          )}
+        </p>
+        {!loaded && !error && (
           <div className="space-y-2" role="status" aria-label="Loading evidence">
             <Skeleton className="h-5 w-3/4" />
             <Skeleton className="h-5 w-1/2" />
@@ -109,12 +128,14 @@ export function EvidenceDrawer({ open, onClose, studentId, activeField }: Eviden
                           <Button
                             variant="secondary"
                             size="sm"
-                            disabled={!activeField}
-                            title={activeField ? `Insert into ${activeField.label}` : 'Click into a field first'}
+                            aria-disabled={!activeField}
+                            aria-describedby={targetHintId}
+                            aria-label={targetLabel ? `Insert ${item.sourceLabel} into ${targetLabel}` : `Insert ${item.sourceLabel}`}
+                            className={activeField ? undefined : 'opacity-60'}
                             onClick={() => activeField?.apply(item.text)}
                             data-testid={`evidence-${item.id}-insert`}
                           >
-                            {activeField ? `Insert into ${activeField.label}` : 'Insert'}
+                            {targetLabel ? `Insert into ${targetLabel}` : 'Insert'}
                           </Button>
                         </div>
                       )}
