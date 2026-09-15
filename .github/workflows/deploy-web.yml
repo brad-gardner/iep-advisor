@@ -16,8 +16,34 @@ env:
   VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        run: npm ci
+        working-directory: web
+      - name: Type-check
+        run: npm run type-check
+        working-directory: web
+      - name: Unit tests
+        run: npm test
+        working-directory: web
+      - name: UX guard
+        run: npm run guard:ux
+        working-directory: web
+      - name: Build
+        run: npm run build
+        working-directory: web
+
   build_and_deploy_job:
     runs-on: ubuntu-latest
+    needs: test
     environment: prod
     name: Build and Deploy Job
     steps:

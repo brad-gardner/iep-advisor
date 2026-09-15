@@ -68,13 +68,19 @@ public class EducatorService : IEducatorService
             targetSchoolId = ctx.SchoolId.Value;
         }
 
+        var schoolStateCode = await _context.Schools.AsNoTracking()
+            .Where(s => s.Id == targetSchoolId)
+            .Select(s => s.StateCode ?? s.District.StateCode)
+            .FirstOrDefaultAsync(ct);
+
         var student = new SchoolStudent
         {
             SchoolId = targetSchoolId,
             FirstName = model.FirstName.Trim(),
             LastName = string.IsNullOrWhiteSpace(model.LastName) ? null : model.LastName.Trim(),
             DateOfBirth = model.DateOfBirth,
-            StateCode = string.IsNullOrWhiteSpace(model.StateCode) ? null : model.StateCode.Trim(),
+            // Default to the school's state so state-specific templates resolve for the student.
+            StateCode = string.IsNullOrWhiteSpace(model.StateCode) ? schoolStateCode : model.StateCode.Trim(),
             GradeLevel = string.IsNullOrWhiteSpace(model.GradeLevel) ? null : model.GradeLevel.Trim(),
             DisabilityCategory = string.IsNullOrWhiteSpace(model.DisabilityCategory) ? null : model.DisabilityCategory.Trim(),
             IsActive = true,

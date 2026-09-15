@@ -128,6 +128,120 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
     ) ?? columns.find((c) => c.type === 'Text');
   const rowKinds: AssistKind[] = blockSemantic === 'goals' ? ['Rewrite', 'Improve', 'SuggestMeasurement'] : ['Rewrite', 'Improve'];
 
+  // Semantic row blocks (goals, services, accommodations, …) render as stacked
+  // cards with labelled inputs — a goal has six fields and does not fit a
+  // grid inside the editor column — with AI help and "pull from student" per
+  // row. Untagged tables keep the compact grid.
+  if (isRowBlock) {
+    const primaryKey = primaryColumn?.columnKey;
+    return (
+      <div role="group" aria-labelledby={labelId} data-testid={`field-${field.fieldKey}`}>
+        <div id={labelId} className="mb-2 block text-[13px] font-medium text-brand-slate-600">
+          {field.label || 'Untitled field'}
+          {field.required && (
+            <>
+              <span className="ml-1 text-brand-danger-700" aria-hidden="true">
+                *
+              </span>
+              <span className="sr-only"> (required)</span>
+            </>
+          )}
+        </div>
+        {rows.length === 0 ? (
+          <p className="mb-2 text-sm text-brand-slate-400">No rows yet.</p>
+        ) : (
+          <ol className="space-y-3">
+            {rows.map((row, rowIndex) => {
+              const rowId = row.cells[ROW_ID_KEY];
+              return (
+                <li
+                  key={row.key}
+                  className="rounded-card border border-brand-slate-200 bg-brand-slate-50/60 p-4"
+                  data-testid={`field-${field.fieldKey}-row-${rowIndex}`}
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <span className="text-[13px] font-medium text-brand-slate-500">
+                      {blockLabel(blockSemantic)} {rowIndex + 1}
+                    </span>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      disabled={disabled || atMin}
+                      onClick={() => removeRow(rowIndex)}
+                      aria-label={`Remove ${blockLabel(blockSemantic).toLowerCase()} ${rowIndex + 1}`}
+                      data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {columns.map((col) => {
+                      const wide = col.columnKey === primaryKey || col.type === 'Text' && isLongColumn(col.semantic);
+                      const cellId = `field-${field.fieldKey}-cell-${rowIndex}-${col.columnKey}`;
+                      return (
+                        <div key={col.columnKey} className={wide ? 'sm:col-span-2' : undefined}>
+                          <label htmlFor={cellId} className="mb-1 block text-[13px] font-medium text-brand-slate-600">
+                            {col.label || 'Column'}
+                            {col.required && (
+                              <span className="ml-1 text-brand-danger-700" aria-hidden="true">
+                                *
+                              </span>
+                            )}
+                          </label>
+                          <TableCell
+                            column={col}
+                            rowIndex={rowIndex}
+                            fieldKey={field.fieldKey}
+                            value={row.cells[col.columnKey]}
+                            disabled={disabled}
+                            multiline={wide}
+                            inputId={cellId}
+                            onChange={(cell) => updateCell(rowIndex, col.columnKey, cell)}
+                            onBlur={() => void autosave.flush()}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {primaryColumn && typeof rowId === 'string' && rowId ? (
+                    <FieldAssistBar
+                      fieldKey={field.fieldKey}
+                      rowId={rowId}
+                      kinds={rowKinds}
+                      allowPull={blockSemantic === 'goals'}
+                      onApply={(text) => {
+                        updateCell(rowIndex, primaryColumn.columnKey, text);
+                        void autosave.flush();
+                      }}
+                      disabled={disabled}
+                      testIdPrefix={`field-${field.fieldKey}-row-${rowIndex}`}
+                    />
+                  ) : (
+                    !disabled && (
+                      <p className="mt-2 text-xs text-brand-slate-400">AI help is available once this row has saved.</p>
+                    )
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        <div className="mt-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={disabled || atMax}
+            onClick={addRow}
+            data-testid={`field-${field.fieldKey}-add`}
+          >
+            <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
+            Add {blockLabel(blockSemantic).toLowerCase()}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div role="group" aria-labelledby={labelId}>
       <div id={labelId} className="mb-1 block text-[13px] font-medium text-brand-slate-600">
@@ -208,30 +322,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                     </Button>
                   </td>
                 </tr>
-              )).flatMap((tr, rowIndex) => {
-                const row = rows[rowIndex];
-                const rowId = row.cells[ROW_ID_KEY];
-                if (!isRowBlock || !primaryColumn || typeof rowId !== 'string' || !rowId) return [tr];
-                return [
-                  tr,
-                  <tr key={`${row.key}-assist`} className="border-b border-brand-slate-100 last:border-0">
-                    <td colSpan={columns.length + 1} className="px-2 pb-2">
-                      <FieldAssistBar
-                        fieldKey={field.fieldKey}
-                        rowId={rowId}
-                        kinds={rowKinds}
-                        allowPull={blockSemantic === 'goals'}
-                        onApply={(text) => {
-                          updateCell(rowIndex, primaryColumn.columnKey, text);
-                          void autosave.flush();
-                        }}
-                        disabled={disabled}
-                        testIdPrefix={`field-${field.fieldKey}-row-${rowIndex}`}
-                      />
-                    </td>
-                  </tr>,
-                ];
-              })
+              ))
             )}
           </tbody>
         </table>
@@ -255,12 +346,39 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
 const cellInputClass =
   'w-full px-2 py-1 bg-white rounded-input text-brand-slate-800 text-sm border border-brand-slate-200 focus:outline-none focus:border-brand-teal-400 focus:ring-[3px] focus:ring-brand-teal-50 transition-colors';
 
+/** Human label for one row of a semantic block ("Goal 2", "Service 1"). */
+function blockLabel(semantic: string | undefined): string {
+  switch (semantic) {
+    case 'goals':
+      return 'Goal';
+    case 'services':
+      return 'Service';
+    case 'accommodations':
+      return 'Accommodation';
+    case 'transition':
+      return 'Transition item';
+    case 'participants':
+      return 'Participant';
+    case 'evaluatorReports':
+      return 'Evaluator report';
+    default:
+      return 'Row';
+  }
+}
+
+/** Columns whose content is prose and deserves a full-width multiline input. */
+function isLongColumn(semantic: string | undefined): boolean {
+  return semantic === 'goalText' || semantic === 'baseline' || semantic === 'targetCriteria' || semantic === 'findings' || semantic === 'transitionServices' || semantic === 'accommodation';
+}
+
 function TableCell({
   column,
   rowIndex,
   fieldKey,
   value,
   disabled,
+  multiline,
+  inputId,
   onChange,
   onBlur,
 }: {
@@ -269,19 +387,40 @@ function TableCell({
   fieldKey: string;
   value: TableCellValue | undefined;
   disabled?: boolean;
+  /** Block mode: render prose Text columns as a textarea. */
+  multiline?: boolean;
+  /** Block mode: explicit id so the visible label associates with the control. */
+  inputId?: string;
   onChange: (cell: TableCellValue) => void;
   // Flush the field's pending debounced save when the cell loses focus, so an
   // in-app navigation that blurs the cell persists the edit before unmount.
   onBlur: () => void;
 }) {
-  const ariaLabel = `${column.label || 'Column'}, row ${rowIndex + 1}`;
+  const ariaLabel = inputId ? undefined : `${column.label || 'Column'}, row ${rowIndex + 1}`;
   const testId = `field-${fieldKey}-cell-${rowIndex}-${column.columnKey}`;
   const strValue = typeof value === 'string' ? value : '';
+
+  if (multiline && column.type === 'Text') {
+    return (
+      <textarea
+        id={inputId}
+        rows={2}
+        value={strValue}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        className={cellInputClass}
+        data-testid={testId}
+      />
+    );
+  }
 
   switch (column.type) {
     case 'Checkbox':
       return (
         <input
+          id={inputId}
           type="checkbox"
           checked={value === true}
           disabled={disabled}
@@ -295,6 +434,7 @@ function TableCell({
     case 'Date':
       return (
         <input
+          id={inputId}
           type="date"
           value={strValue}
           disabled={disabled}
@@ -308,6 +448,7 @@ function TableCell({
     case 'Select':
       return (
         <select
+          id={inputId}
           value={strValue}
           disabled={disabled}
           aria-label={ariaLabel}
@@ -327,6 +468,7 @@ function TableCell({
     default:
       return (
         <input
+          id={inputId}
           type="text"
           value={strValue}
           disabled={disabled}

@@ -41,6 +41,12 @@ public class DefaultIepTemplateSeederHostedService : BackgroundService
             var result = await seeder.SeedAsync(stoppingToken);
 
             _logger.LogInformation("Default IEP template seed finished: {Outcome}", result.Outcome);
+
+            // Launch-state catalog (OH IEP / OH ETR / default 504) — same idempotency guarantees.
+            var catalog = scope.ServiceProvider.GetRequiredService<ITemplateCatalogSeeder>();
+            var catalogResult = await catalog.SeedAsync(stoppingToken);
+            _logger.LogInformation("Template catalog seed finished: created [{Created}], skipped [{Skipped}]",
+                string.Join(", ", catalogResult.Created), string.Join(", ", catalogResult.Skipped));
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {

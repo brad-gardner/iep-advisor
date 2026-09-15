@@ -286,6 +286,38 @@ public sealed class DocumentSemanticsAndRowIdentityTests : IDisposable
         Assert.Equal(allKeys.Count, allKeys.Distinct().Count());
     }
 
+    // ---------------------------------------------------------------- State inheritance on create
+
+    [Fact]
+    public async Task Create_ResolvesStateFromSchoolThenDistrict_WhenStudentHasNone()
+    {
+        // District OH, school with no state, student with no state → the OH ETR must resolve.
+        int studentId, userId;
+        using (var ctx = CreateContext())
+        {
+            var user = new User { Email = "inherit@example.com", PasswordHash = "x", FirstName = "E", LastName = "D", Role = UserRole.Educator };
+            ctx.Users.Add(user); ctx.SaveChanges();
+            var district = new District { Name = "OH district", StateCode = "OH" };
+            ctx.Districts.Add(district); ctx.SaveChanges();
+            var school = new School { DistrictId = district.Id, Name = "s", StateCode = null };
+            ctx.Schools.Add(school); ctx.SaveChanges();
+            ctx.StaffProfiles.Add(new StaffProfile { UserId = user.Id, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher });
+            var student = new SchoolStudent { SchoolId = school.Id, FirstName = "Kid", StateCode = null };
+            ctx.SchoolStudents.Add(student); ctx.SaveChanges();
+            ctx.SchoolStudentAccesses.Add(new SchoolStudentAccess { SchoolStudentId = student.Id, UserId = user.Id, Role = AccessRole.Collaborator, IsActive = true });
+            ctx.SaveChanges();
+            studentId = student.Id; userId = user.Id;
+            await new TemplateCatalogSeeder(ctx, NullLogger<TemplateCatalogSeeder>.Instance).SeedAsync();
+        }
+
+        using var verify = CreateContext();
+        var etr = await CreateInstanceService(verify).CreateAsync(studentId, EtrTypeId, userId);
+        Assert.True(etr.Success, etr.Message);
+        var pinned = verify.DocumentTemplateVersions.AsNoTracking().Include(v => v.DocumentTemplate)
+            .Single(v => v.Id == etr.Data!.DocumentTemplateVersionId);
+        Assert.Equal("OH", pinned.DocumentTemplate.StateCode);
+    }
+
     // ---------------------------------------------------------------- Default IEP semantic upgrade
 
     [Fact]

@@ -62,11 +62,14 @@ public class DocumentInstanceService : IDocumentInstanceService
         if (!await _orgAccess.CanActOnStudentAsync(actingUserId, schoolStudentId, AccessRole.Collaborator, ct))
             return Fail(PermissionMessage);
 
-        // Read the student's state (authz already confirmed the student exists + is in scope).
+        // Resolve the student's state (authz already confirmed the student exists + is in scope):
+        // an explicit student state wins, else the school's, else the district's. Students are almost
+        // never given a state directly — they inherit the building's — so without this chain every
+        // state-specific template would silently fall through to the default.
         var stateCode = await _context.SchoolStudents
             .AsNoTracking()
             .Where(s => s.Id == schoolStudentId)
-            .Select(s => s.StateCode)
+            .Select(s => s.StateCode ?? s.School.StateCode ?? s.School.District.StateCode)
             .FirstOrDefaultAsync(ct);
 
         // Resolve + pin a Published template version. A blocked resolution propagates its friendly message.
