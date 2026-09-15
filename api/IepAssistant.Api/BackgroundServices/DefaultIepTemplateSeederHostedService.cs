@@ -41,8 +41,23 @@ public class DefaultIepTemplateSeederHostedService : BackgroundService
             var result = await seeder.SeedAsync(stoppingToken);
 
             _logger.LogInformation("Default IEP template seed finished: {Outcome}", result.Outcome);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogInformation("Default IEP template seed canceled during shutdown");
+            return;
+        }
+        catch (Exception ex)
+        {
+            // Never let the seed take down host startup; it retries on next boot (idempotent).
+            _logger.LogError(ex, "Default IEP template seed failed; it will retry on next boot (idempotent)");
+        }
 
-            // Launch-state catalog (OH IEP / OH ETR / default 504) — same idempotency guarantees.
+        // Launch-state catalog (OH IEP / OH ETR / default 504) — same idempotency guarantees, and its
+        // own guard so one seeder's failure never suppresses the other.
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
             var catalog = scope.ServiceProvider.GetRequiredService<ITemplateCatalogSeeder>();
             var catalogResult = await catalog.SeedAsync(stoppingToken);
             _logger.LogInformation("Template catalog seed finished: created [{Created}], skipped [{Skipped}]",
@@ -50,12 +65,11 @@ public class DefaultIepTemplateSeederHostedService : BackgroundService
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            _logger.LogInformation("Default IEP template seed canceled during shutdown");
+            _logger.LogInformation("Template catalog seed canceled during shutdown");
         }
         catch (Exception ex)
         {
-            // Never let the seed take down host startup; it retries on next boot (idempotent).
-            _logger.LogError(ex, "Default IEP template seed failed; it will retry on next boot (idempotent)");
+            _logger.LogError(ex, "Template catalog seed failed; it will retry on next boot (idempotent)");
         }
     }
 }

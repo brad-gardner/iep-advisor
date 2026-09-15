@@ -5,8 +5,9 @@ namespace IepAssistant.Api.DTOs.IepAssist;
 /// <summary>Assist request for a template document field (and, for Table fields, one row).</summary>
 public class DocumentAssistRequest
 {
+    /// <summary>Nullable so a missing key fails model validation (400) instead of binding Guid.Empty.</summary>
     [Required]
-    public Guid FieldKey { get; set; }
+    public Guid? FieldKey { get; set; }
 
     /// <summary>Required for Table fields — the row's stable <c>_rowId</c>.</summary>
     public Guid? RowId { get; set; }

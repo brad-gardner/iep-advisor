@@ -29,6 +29,8 @@ public sealed class DocumentAssistService : IDocumentAssistService
     private const int AssistMaxTokens = 1024;
     private const int ChatMaxTokens = 2048;
     private const int ContextCharBudget = 12_000;
+    private const int MaxChatTurns = 20;
+    private const int MaxChatMessageChars = 4_000;
 
     private static readonly Regex TagStripper = new("<[^>]+>", RegexOptions.Compiled);
 
@@ -95,10 +97,10 @@ public sealed class DocumentAssistService : IDocumentAssistService
                 var cell = row[colKey.ToString()];
                 var cellText = cell is JsonValue v ? v.ToString() : cell?.ToJsonString();
                 var name = semanticByColumn.TryGetValue(colKey, out var colSem) ? PascalCase(colSem) : label;
-                user.AppendLine($"  {name}: <field>{cellText}</field>");
+                user.AppendLine($"  {name}: <field>{Data(cellText)}</field>");
             }
             user.AppendLine();
-            AppendDocumentContext(user, doc, excludeFieldKey: fieldKey, focus: semantic);
+            AppendDocumentContext(user, doc, excludeFieldKey: fieldKey);
             user.AppendLine(action);
         }
         else
@@ -107,9 +109,9 @@ public sealed class DocumentAssistService : IDocumentAssistService
             var text = ScalarText(doc.Values[fieldKey.ToString()], field.FieldType);
             user.AppendLine($"Section: {field.SectionTitle} — {field.Label}" + (semantic != null ? $" ({semantic})" : ""));
             user.AppendLine("Current narrative:");
-            user.AppendLine($"<section_text>{text}</section_text>");
+            user.AppendLine($"<section_text>{Data(text)}</section_text>");
             user.AppendLine();
-            AppendDocumentContext(user, doc, excludeFieldKey: fieldKey, focus: semantic);
+            AppendDocumentContext(user, doc, excludeFieldKey: fieldKey);
             user.AppendLine(AssistPrompts.SectionAction(kind));
         }
 
@@ -127,6 +129,9 @@ public sealed class DocumentAssistService : IDocumentAssistService
             return ServiceResult<ChatReplyModel>.FailureResult(loaded.Message!);
         if (messages == null || messages.Count == 0)
             return ServiceResult<ChatReplyModel>.FailureResult("At least one message is required.");
+        // Bound the prompt: keep only the most recent turns (the client resends the whole thread).
+        if (messages.Count > MaxChatTurns)
+            messages = messages.Skip(messages.Count - MaxChatTurns).ToList();
 
         var doc = loaded.Data!;
         _audit.Record(AuditAction.View, userId, "DocumentInstance", instanceId);
@@ -143,7 +148,7 @@ public sealed class DocumentAssistService : IDocumentAssistService
         foreach (var m in messages)
         {
             var role = string.Equals(m.Role, "assistant", StringComparison.OrdinalIgnoreCase) ? "assistant" : "user";
-            user.AppendLine($"[{role}]: {m.Content}");
+            user.AppendLine($"[{role}]: <turn>{Data(Truncate(m.Content, MaxChatMessageChars))}</turn>");
         }
         user.AppendLine();
         user.AppendLine("Respond to the latest user message, using the document as context.");
@@ -176,7 +181,7 @@ public sealed class DocumentAssistService : IDocumentAssistService
     // ---------------------------------------------------------------- Loading
 
     /// <summary>A template field with the section it lives in.</summary>
-    private sealed record LoadedField(Guid FieldKey, FieldType FieldType, string Label, string? ConfigJson, string SectionTitle, int SectionOrder, int FieldOrder);
+    private sealed record LoadedField(Guid FieldKey, FieldType FieldType, string Label, string? ConfigJson, string SectionTitle);
 
     private sealed record LoadedDocument(
         int InstanceId,
@@ -206,7 +211,7 @@ public sealed class DocumentAssistService : IDocumentAssistService
 
         var fields = sections
             .SelectMany(s => s.Fields.OrderBy(f => f.DisplayOrder)
-                .Select(f => new LoadedField(f.FieldKey, f.FieldType, f.Label, f.ConfigJson, s.Title, s.DisplayOrder, f.DisplayOrder)))
+                .Select(f => new LoadedField(f.FieldKey, f.FieldType, f.Label, f.ConfigJson, s.Title)))
             .ToList();
 
         JsonObject values;
@@ -232,9 +237,9 @@ public sealed class DocumentAssistService : IDocumentAssistService
 
     // ---------------------------------------------------------------- Rendering
 
-    /// <summary>Compact context block: student profile, present levels and the goals block (when the
-    /// target isn't the goals block), so goal/service coaching is grounded in the same document.</summary>
-    private static void AppendDocumentContext(StringBuilder sb, LoadedDocument doc, Guid? excludeFieldKey, string? focus)
+    /// <summary>Compact context block: the rest of the document (minus the target field), budgeted,
+    /// so goal/service coaching is grounded in the same document.</summary>
+    private static void AppendDocumentContext(StringBuilder sb, LoadedDocument doc, Guid? excludeFieldKey)
     {
         var rendered = RenderDocument(doc, excludeFieldKey, budget: ContextCharBudget / 2);
         if (string.IsNullOrWhiteSpace(rendered)) return;
@@ -271,20 +276,27 @@ public sealed class DocumentAssistService : IDocumentAssistService
                 if (node is not JsonArray rows || rows.Count == 0) continue;
                 var labels = TemplateSemanticsReader.ReadColumnLabels(field.ConfigJson);
                 sb.AppendLine($"{field.Label}{tag}:");
+                var rendered = 0;
                 foreach (var row in rows.OfType<JsonObject>())
                 {
+                    if (sb.Length > budget)
+                    {
+                        sb.AppendLine($"- … (+{rows.Count - rendered} more rows)");
+                        break;
+                    }
                     var cells = labels
                         .Select(kv => (Label: kv.Value, Value: row[kv.Key.ToString()]))
                         .Where(x => x.Value != null && !string.IsNullOrWhiteSpace(x.Value.ToString()))
-                        .Select(x => $"{x.Label}: {Truncate(x.Value!.ToString())}");
+                        .Select(x => $"{x.Label}: {Data(Truncate(x.Value!.ToString()))}");
                     sb.AppendLine("- " + string.Join(" | ", cells));
+                    rendered++;
                 }
             }
             else
             {
                 var text = ScalarText(node, field.FieldType);
                 if (string.IsNullOrWhiteSpace(text)) continue;
-                sb.AppendLine($"{field.Label}{tag}: {Truncate(text, 600)}");
+                sb.AppendLine($"{field.Label}{tag}: {Data(Truncate(text, 600))}");
             }
 
             if (sb.Length > budget)
@@ -315,6 +327,14 @@ public sealed class DocumentAssistService : IDocumentAssistService
         value = value.Trim();
         return value.Length <= max ? value : value[..max] + "…";
     }
+
+    /// <summary>
+    /// Every value that goes inside a data tag passes through here: the tag delimiters are
+    /// entity-encoded so document text can never close &lt;field&gt;/&lt;section_text&gt;/&lt;context&gt;/
+    /// &lt;document&gt; and escape the data-not-instructions guard. Content is otherwise preserved.
+    /// </summary>
+    private static string Data(string? value)
+        => value == null ? string.Empty : value.Replace("<", "&lt;").Replace(">", "&gt;");
 
     private static string PascalCase(string semantic)
         => string.IsNullOrEmpty(semantic) ? semantic : char.ToUpperInvariant(semantic[0]) + semantic[1..];

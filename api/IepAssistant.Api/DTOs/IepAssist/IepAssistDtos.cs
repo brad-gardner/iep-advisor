@@ -15,6 +15,7 @@ public class AssistRequest
 public class ChatRequest
 {
     [Required]
+    [MaxLength(40)]
     public List<ChatMessageDto> Messages { get; set; } = new();
 }
 
@@ -24,6 +25,7 @@ public class ChatMessageDto
     [Required]
     public string Role { get; set; } = string.Empty;
     [Required]
+    [MaxLength(8000)]
     public string Content { get; set; } = string.Empty;
 }
 

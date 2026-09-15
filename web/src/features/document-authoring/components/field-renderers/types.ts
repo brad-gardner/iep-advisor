@@ -10,7 +10,7 @@ export interface FieldRendererProps {
   value: unknown;
   disabled?: boolean;
   /** Persist a value patch — the instance hook serializes + threads rowVersion. */
-  onSave: (patch: DocumentValuePatch) => Promise<SaveResult | unknown>;
+  onSave: (patch: DocumentValuePatch) => Promise<SaveResult>;
 }
 
 /** Stable DOM id for a field's control (label association / test hooks). */

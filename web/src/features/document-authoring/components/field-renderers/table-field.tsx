@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAutosave } from '@/hooks/use-autosave';
@@ -7,61 +7,13 @@ import {
   readColumnOptions,
   type TableColumn,
 } from '@/features/admin/templates/template-config';
-import type { TableCellValue, TableRowValue } from '../../types';
+import type { TableCellValue } from '../../types';
 import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { fieldElementId, type FieldRendererProps } from './types';
-import { ROW_ID_KEY, ROW_BLOCK_SEMANTICS } from '@/features/admin/templates/document-semantics';
+import { ROW_BLOCK_SEMANTICS, type ColumnSemantic, type FieldSemantic } from '@/features/admin/templates/document-semantics';
 import type { AssistKind } from '../../api/assist-types';
 import { FieldAssistBar } from './field-assist-bar';
-import type { SaveResult } from '../../hooks/use-document-instance';
-
-/** Row wrapper carrying a stable client key so add/remove keeps React identity
- *  (and focus/pending edits) pinned to the logical row, not its position. */
-interface KeyedRow {
-  key: string;
-  cells: TableRowValue;
-}
-
-let rowSeq = 0;
-function nextKey(): string {
-  rowSeq += 1;
-  return `row-${rowSeq}`;
-}
-
-/** Rows persisted by the server carry a stable `_rowId`; use it as the React
- *  key so identity survives reloads. Client-only rows get a temporary key until
- *  the first save echoes their assigned id back. */
-function coerceRows(value: unknown): KeyedRow[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter((r): r is TableRowValue => typeof r === 'object' && r !== null)
-    .map((cells) => {
-      const id = cells[ROW_ID_KEY];
-      return { key: typeof id === 'string' && id ? id : nextKey(), cells };
-    });
-}
-
-/** Adopt server-assigned `_rowId`s (by position) into rows that don't have one
- *  yet, so the next save echoes the same identity instead of minting a new one. */
-function adoptRowIds(local: KeyedRow[], saved: unknown): KeyedRow[] {
-  if (!Array.isArray(saved)) return local;
-  let changed = false;
-  const next = local.map((row, i) => {
-    if (typeof row.cells[ROW_ID_KEY] === 'string' && row.cells[ROW_ID_KEY]) return row;
-    const savedRow = saved[i];
-    const id = savedRow && typeof savedRow === 'object' ? (savedRow as TableRowValue)[ROW_ID_KEY] : undefined;
-    if (typeof id !== 'string' || !id) return row;
-    changed = true;
-    return { key: id, cells: { ...row.cells, [ROW_ID_KEY]: id } };
-  });
-  return changed ? next : local;
-}
-
-function emptyCells(columns: TableColumn[]): TableRowValue {
-  const row: TableRowValue = {};
-  for (const col of columns) row[col.columnKey] = col.type === 'Checkbox' ? false : '';
-  return row;
-}
+import { adoptRowIds, coerceRows, emptyCells, nextRowKey, rowId, type KeyedRow } from '../../lib/table-rows';
 
 /**
  * Repeating-group Table field: one row per array entry, one cell input per
@@ -77,34 +29,46 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
   const { columns, minRows, maxRows } = table;
   const labelId = `${fieldElementId(field.id)}-label`;
 
+  // `rowsRef` is the single source of truth and is written synchronously by
+  // every mutation, so a save always sends the LATEST rows (including any
+  // `_rowId`s adopted since the edit was queued) and no update is derived from
+  // a stale closure. `rows` state mirrors it for rendering.
   const [rows, setRows] = useState<KeyedRow[]>(() => coerceRows(value));
-  const autosave = useAutosave<TableRowValue[]>(
-    useCallback(
-      async (v) => {
-        const result = (await onSave({ [field.fieldKey]: v })) as SaveResult | undefined;
-        const saved = result && typeof result === 'object' && 'values' in result ? result.values?.[field.fieldKey] : undefined;
-        if (saved !== undefined) setRows((current) => adoptRowIds(current, saved));
-      },
-      [field.fieldKey, onSave]
-    )
+  const rowsRef = useRef<KeyedRow[]>(rows);
+  const mutate = useCallback((updater: (current: KeyedRow[]) => KeyedRow[]) => {
+    const next = updater(rowsRef.current);
+    rowsRef.current = next;
+    setRows(next);
+  }, []);
+
+  // The queued autosave value is only a trigger: the payload is read from
+  // rowsRef at send time, and ids come back matched to the rows that were sent.
+  const autosave = useAutosave<number>(
+    useCallback(async () => {
+      const sent = rowsRef.current;
+      const result = await onSave({ [field.fieldKey]: sent.map((r) => r.cells) });
+      const saved = result.values?.[field.fieldKey];
+      if (saved !== undefined) mutate((current) => adoptRowIds(current, sent, saved));
+    }, [field.fieldKey, onSave, mutate])
   );
   useRegisterFlush(field.fieldKey, autosave.flush);
 
-  const commit = (next: KeyedRow[], immediate: boolean) => {
-    setRows(next);
-    autosave.save(next.map((r) => r.cells));
+  const saveSeq = useRef(0);
+  const commit = (updater: (current: KeyedRow[]) => KeyedRow[], immediate: boolean) => {
+    mutate(updater);
+    saveSeq.current += 1;
+    autosave.save(saveSeq.current); // value is only a trigger; rowsRef is the payload
     if (immediate) void autosave.flush();
   };
 
-  const updateCell = (rowIndex: number, columnKey: string, cell: TableCellValue) => {
-    const next = rows.map((r, i) =>
-      i === rowIndex ? { ...r, cells: { ...r.cells, [columnKey]: cell } } : r
+  const updateCell = (rowKey: string, columnKey: string, cell: TableCellValue) =>
+    commit(
+      (current) => current.map((r) => (r.key === rowKey ? { ...r, cells: { ...r.cells, [columnKey]: cell } } : r)),
+      false
     );
-    commit(next, false);
-  };
 
-  const addRow = () => commit([...rows, { key: nextKey(), cells: emptyCells(columns) }], true);
-  const removeRow = (rowIndex: number) => commit(rows.filter((_, i) => i !== rowIndex), true);
+  const addRow = () => commit((current) => [...current, { key: nextRowKey(), cells: emptyCells(columns) }], true);
+  const removeRow = (rowKey: string) => commit((current) => current.filter((r) => r.key !== rowKey), true);
 
   const atMax = maxRows != null && rows.length >= maxRows;
   const atMin = minRows != null && rows.length <= minRows;
@@ -135,7 +99,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
   if (isRowBlock) {
     const primaryKey = primaryColumn?.columnKey;
     return (
-      <div role="group" aria-labelledby={labelId} data-testid={`field-${field.fieldKey}`}>
+      <div id={fieldElementId(field.id)} tabIndex={-1} role="group" aria-labelledby={labelId} data-testid={`field-${field.fieldKey}`}>
         <div id={labelId} className="mb-2 block text-[13px] font-medium text-brand-slate-600">
           {field.label || 'Untitled field'}
           {field.required && (
@@ -152,7 +116,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
         ) : (
           <ol className="space-y-3">
             {rows.map((row, rowIndex) => {
-              const rowId = row.cells[ROW_ID_KEY];
+              const persistedId = rowId(row);
               return (
                 <li
                   key={row.key}
@@ -167,7 +131,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                       variant="danger"
                       size="sm"
                       disabled={disabled || atMin}
-                      onClick={() => removeRow(rowIndex)}
+                      onClick={() => removeRow(row.key)}
                       aria-label={`Remove ${blockLabel(blockSemantic).toLowerCase()} ${rowIndex + 1}`}
                       data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
                     >
@@ -196,23 +160,24 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                             disabled={disabled}
                             multiline={wide}
                             inputId={cellId}
-                            onChange={(cell) => updateCell(rowIndex, col.columnKey, cell)}
+                            onChange={(cell) => updateCell(row.key, col.columnKey, cell)}
                             onBlur={() => void autosave.flush()}
                           />
                         </div>
                       );
                     })}
                   </div>
-                  {primaryColumn && typeof rowId === 'string' && rowId ? (
+                  {primaryColumn && persistedId ? (
                     <FieldAssistBar
                       fieldKey={field.fieldKey}
-                      rowId={rowId}
+                      rowId={persistedId}
                       kinds={rowKinds}
                       allowPull={blockSemantic === 'goals'}
                       onApply={(text) => {
-                        updateCell(rowIndex, primaryColumn.columnKey, text);
+                        updateCell(row.key, primaryColumn.columnKey, text);
                         void autosave.flush();
                       }}
+                      beforeRequest={autosave.flush}
                       disabled={disabled}
                       testIdPrefix={`field-${field.fieldKey}-row-${rowIndex}`}
                     />
@@ -243,7 +208,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
   }
 
   return (
-    <div role="group" aria-labelledby={labelId}>
+    <div id={fieldElementId(field.id)} tabIndex={-1} role="group" aria-labelledby={labelId}>
       <div id={labelId} className="mb-1 block text-[13px] font-medium text-brand-slate-600">
         {field.label || 'Untitled field'}
         {field.required && (
@@ -304,7 +269,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                         fieldKey={field.fieldKey}
                         value={row.cells[col.columnKey]}
                         disabled={disabled}
-                        onChange={(cell) => updateCell(rowIndex, col.columnKey, cell)}
+                        onChange={(cell) => updateCell(row.key, col.columnKey, cell)}
                         onBlur={() => void autosave.flush()}
                       />
                     </td>
@@ -314,7 +279,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                       variant="danger"
                       size="sm"
                       disabled={disabled || atMin}
-                      onClick={() => removeRow(rowIndex)}
+                      onClick={() => removeRow(row.key)}
                       aria-label={`Remove row ${rowIndex + 1}`}
                       data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
                     >
@@ -347,7 +312,7 @@ const cellInputClass =
   'w-full px-2 py-1 bg-white rounded-input text-brand-slate-800 text-sm border border-brand-slate-200 focus:outline-none focus:border-brand-teal-400 focus:ring-[3px] focus:ring-brand-teal-50 transition-colors';
 
 /** Human label for one row of a semantic block ("Goal 2", "Service 1"). */
-function blockLabel(semantic: string | undefined): string {
+function blockLabel(semantic: FieldSemantic | undefined): string {
   switch (semantic) {
     case 'goals':
       return 'Goal';
@@ -367,7 +332,7 @@ function blockLabel(semantic: string | undefined): string {
 }
 
 /** Columns whose content is prose and deserves a full-width multiline input. */
-function isLongColumn(semantic: string | undefined): boolean {
+function isLongColumn(semantic: ColumnSemantic | undefined): boolean {
   return semantic === 'goalText' || semantic === 'baseline' || semantic === 'targetCriteria' || semantic === 'findings' || semantic === 'transitionServices' || semantic === 'accommodation';
 }
 

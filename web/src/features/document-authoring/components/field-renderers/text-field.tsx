@@ -44,6 +44,7 @@ export function TextField({ field, value, disabled, onSave }: FieldRendererProps
           handleChange(maxLength != null ? text.slice(0, maxLength) : text);
           void autosave.flush();
         }}
+        beforeRequest={autosave.flush}
         disabled={disabled}
         testIdPrefix={`field-${field.fieldKey}`}
       />

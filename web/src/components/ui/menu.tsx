@@ -21,6 +21,10 @@ interface MenuProps {
   trigger?: React.ReactNode;
   /** Alignment of the popover relative to the trigger. */
   align?: 'left' | 'right';
+  /** Replaces the default 36px icon-button styling of the trigger (a text
+   *  trigger such as "AI help" needs its own padding/border). Focus ring is
+   *  always kept. */
+  triggerClassName?: string;
   'data-testid'?: string;
 }
 
@@ -40,6 +44,7 @@ export function Menu({
   items,
   trigger,
   align = 'right',
+  triggerClassName,
   'data-testid': testId,
 }: MenuProps) {
   const [open, setOpen] = useState(false);
@@ -167,7 +172,11 @@ export function Menu({
         data-testid={testId}
         onClick={() => (open ? close(false) : openMenu())}
         onKeyDown={handleTriggerKeyDown}
-        className="flex h-9 w-9 items-center justify-center rounded-button text-brand-slate-400 transition-colors hover:bg-brand-slate-50 hover:text-brand-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+        className={cn(
+          triggerClassName ??
+            'flex h-9 w-9 items-center justify-center rounded-button text-brand-slate-400 transition-colors hover:bg-brand-slate-50 hover:text-brand-slate-600',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400'
+        )}
       >
         {trigger ?? <MoreVertical className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />}
       </button>

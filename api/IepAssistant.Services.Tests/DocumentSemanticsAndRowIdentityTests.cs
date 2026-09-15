@@ -320,26 +320,36 @@ public sealed class DocumentSemanticsAndRowIdentityTests : IDisposable
 
     // ---------------------------------------------------------------- Default IEP semantic upgrade
 
-    [Fact]
-    public async Task DefaultSeed_UpgradesPreSemanticTemplateToSemanticV2_LeavingV1Untouched()
+    /// <summary>Seeds a pre-semantics default IEP exactly as the old seeder did (same keys, no tags).</summary>
+    private (int TemplateId, int V1Id) SeedPristineLegacyDefault()
     {
-        // Simulate a database seeded before semantics existed: default IEP, published v1, no semantic tags.
-        int templateId, v1Id;
-        using (var ctx = CreateContext())
+        using var ctx = CreateContext();
+        var v1 = new DocumentTemplateVersion { VersionNumber = 1, Status = TemplateVersionStatus.Published, PublishedAt = DateTime.UtcNow };
+        var template = new DocumentTemplate { StateCode = null, DocumentTypeId = IepTypeId, Name = DefaultIepTemplateSeeder.DefaultTemplateName, Versions = { v1 } };
+        ctx.DocumentTemplates.Add(template);
+        ctx.SaveChanges();
+        var section = new TemplateSection { DocumentTemplateVersionId = v1.Id, SectionKey = Guid.NewGuid(), Title = "All", DisplayOrder = 0 };
+        var order = 0;
+        foreach (var key in DefaultIepTemplateSeeder.Keys.AllFieldKeys)
         {
-            var v1 = new DocumentTemplateVersion { VersionNumber = 1, Status = TemplateVersionStatus.Published, PublishedAt = DateTime.UtcNow };
-            var template = new DocumentTemplate { StateCode = null, DocumentTypeId = IepTypeId, Name = DefaultIepTemplateSeeder.DefaultTemplateName, Versions = { v1 } };
-            ctx.DocumentTemplates.Add(template);
-            ctx.SaveChanges();
-            ctx.TemplateSections.Add(new TemplateSection
+            var isTable = key == DefaultIepTemplateSeeder.Keys.GoalsTableField || key == DefaultIepTemplateSeeder.Keys.ServicesTableField
+                || key == DefaultIepTemplateSeeder.Keys.AccommodationsTableField || key == DefaultIepTemplateSeeder.Keys.TransitionTableField;
+            section.Fields.Add(new TemplateField
             {
-                DocumentTemplateVersionId = v1.Id, SectionKey = Guid.NewGuid(), Title = "Goals", DisplayOrder = 0,
-                Fields = { new TemplateField { DocumentTemplateVersionId = v1.Id, FieldKey = Guid.NewGuid(), FieldType = FieldType.Table, Label = "Goals", DisplayOrder = 0,
-                    ConfigJson = TemplateGraphBuilder.TableConfig(null, (Guid.NewGuid(), FieldType.Text, "Goal", null)) } }
+                DocumentTemplateVersionId = v1.Id, FieldKey = key, DisplayOrder = order++, Label = "f",
+                FieldType = isTable ? FieldType.Table : FieldType.RichText,
+                ConfigJson = isTable ? TemplateGraphBuilder.TableConfig(null, (Guid.NewGuid(), FieldType.Text, "Col", null)) : null
             });
-            ctx.SaveChanges();
-            templateId = template.Id; v1Id = v1.Id;
         }
+        ctx.TemplateSections.Add(section);
+        ctx.SaveChanges();
+        return (template.Id, v1.Id);
+    }
+
+    [Fact]
+    public async Task DefaultSeed_UpgradesPristinePreSemanticTemplateToSemanticV2_LeavingV1Untouched()
+    {
+        var (templateId, v1Id) = SeedPristineLegacyDefault();
 
         DefaultIepTemplateSeedResult first, second;
         using (var ctx = CreateContext())
@@ -361,6 +371,95 @@ public sealed class DocumentSemanticsAndRowIdentityTests : IDisposable
 
         var resolved = await new TemplateResolutionService(verify, NullLogger<TemplateResolutionService>.Instance).ResolveAsync(null, IepTypeId);
         Assert.Equal(versions[1].Id, resolved.Data!.DocumentTemplateVersionId); // new documents pick v2
+    }
+
+    [Fact]
+    public async Task DefaultSeed_NeverSupersedesAnAdminCustomizedDefault()
+    {
+        // Admin forked v1 into a customized Published v2 (different keys, no semantics) — the seeder must
+        // not publish a stock v3 over it, and must not touch a template that has an in-progress draft.
+        var (templateId, _) = SeedPristineLegacyDefault();
+        using (var ctx = CreateContext())
+        {
+            var v2 = new DocumentTemplateVersion { DocumentTemplateId = templateId, VersionNumber = 2, Status = TemplateVersionStatus.Published, PublishedAt = DateTime.UtcNow };
+            ctx.DocumentTemplateVersions.Add(v2);
+            ctx.SaveChanges();
+            ctx.TemplateSections.Add(new TemplateSection
+            {
+                DocumentTemplateVersionId = v2.Id, SectionKey = Guid.NewGuid(), Title = "District section", DisplayOrder = 0,
+                Fields = { new TemplateField { DocumentTemplateVersionId = v2.Id, FieldKey = Guid.NewGuid(), FieldType = FieldType.RichText, Label = "Custom", DisplayOrder = 0 } }
+            });
+            ctx.SaveChanges();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var result = await new DefaultIepTemplateSeeder(ctx, NullLogger<DefaultIepTemplateSeeder>.Instance).SeedAsync();
+            Assert.Equal(DefaultIepTemplateSeedOutcome.AlreadySeeded, result.Outcome);
+        }
+
+        using var verify = CreateContext();
+        Assert.Equal(2, verify.DocumentTemplateVersions.Count(v => v.DocumentTemplateId == templateId));
+        var resolved = await new TemplateResolutionService(verify, NullLogger<TemplateResolutionService>.Instance).ResolveAsync(null, IepTypeId);
+        Assert.Equal(2, resolved.Data!.VersionNumber); // admin's v2 still wins
+    }
+
+    [Fact]
+    public async Task DefaultSeed_LeavesPristineTemplateAlone_WhenAnAdminDraftExists()
+    {
+        var (templateId, _) = SeedPristineLegacyDefault();
+        using (var ctx = CreateContext())
+        {
+            ctx.DocumentTemplateVersions.Add(new DocumentTemplateVersion { DocumentTemplateId = templateId, VersionNumber = 2, Status = TemplateVersionStatus.Draft });
+            ctx.SaveChanges();
+        }
+        using (var ctx = CreateContext())
+            Assert.Equal(DefaultIepTemplateSeedOutcome.AlreadySeeded, (await new DefaultIepTemplateSeeder(ctx, NullLogger<DefaultIepTemplateSeeder>.Instance).SeedAsync()).Outcome);
+        using var verify = CreateContext();
+        Assert.Equal(2, verify.DocumentTemplateVersions.Count(v => v.DocumentTemplateId == templateId)); // nothing added
+    }
+
+    [Fact]
+    public async Task SaveValues_RowIds_FollowRowsThroughReorder_AndIgnoreNonStringOrSoleIds()
+    {
+        var s = SeedScenario("reorder");
+        int instanceId;
+        using (var ctx = CreateContext())
+        {
+            var created = await CreateInstanceService(ctx).CreateAsync(s.StudentId, IepTypeId, s.UserId);
+            instanceId = created.Data!.Id;
+            Assert.True((await CreateInstanceService(ctx).SaveValuesAsync(instanceId,
+                Patch($$"""
+                { "{{s.TableKey}}": [ { "{{s.GoalCol}}": "A" }, { "{{s.GoalCol}}": "B" } ] }
+                """), null, s.UserId)).Success);
+        }
+        string idA, idB;
+        using (var ctx = CreateContext())
+        {
+            var t = ReadTable(ctx, instanceId, s.TableKey);
+            idA = t[0].GetProperty(RowMetaKeys.RowId).GetString()!; idB = t[1].GetProperty(RowMetaKeys.RowId).GetString()!;
+        }
+        using (var ctx = CreateContext())
+        {
+            // Reorder B before A, send a numeric junk id and a row with only an id.
+            var r = await CreateInstanceService(ctx).SaveValuesAsync(instanceId,
+                Patch($$"""
+                { "{{s.TableKey}}": [
+                    { "_rowId": "{{idB}}", "{{s.GoalCol}}": "B" },
+                    { "_rowId": "{{idA}}", "{{s.GoalCol}}": "A" },
+                    { "_rowId": 12345, "{{s.GoalCol}}": "C" },
+                    { "_rowId": "{{Guid.NewGuid()}}" } ] }
+                """), null, s.UserId);
+            Assert.True(r.Success, r.Message);
+        }
+        using (var ctx = CreateContext())
+        {
+            var t = ReadTable(ctx, instanceId, s.TableKey);
+            Assert.Equal(3, t.GetArrayLength()); // sole-id row dropped
+            Assert.Equal(idB, t[0].GetProperty(RowMetaKeys.RowId).GetString()); // ids follow rows, not positions
+            Assert.Equal(idA, t[1].GetProperty(RowMetaKeys.RowId).GetString());
+            Assert.True(Guid.TryParse(t[2].GetProperty(RowMetaKeys.RowId).GetString(), out var fresh) && fresh != Guid.Empty); // numeric id replaced
+        }
     }
 
     public void Dispose() => _connection.Dispose();

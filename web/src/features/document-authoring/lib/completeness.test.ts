@@ -7,6 +7,9 @@ const plaafpKey = 'f2222222-2222-2222-2222-222222222222';
 const goalCol = 'c1111111-1111-1111-1111-111111111111';
 const baseCol = 'c2222222-2222-2222-2222-222222222222';
 const measCol = 'c3333333-3333-3333-3333-333333333333';
+const servicesKey = 'f3333333-3333-3333-3333-333333333333';
+const svcType = 'c4444444-4444-4444-4444-444444444444';
+const svcFreq = 'c5555555-5555-5555-5555-555555555555';
 
 const template = {
   id: 1,
@@ -47,7 +50,44 @@ const template = {
   ],
 } as unknown as TemplateVersionDetailDto;
 
+const servicesTemplate = {
+  ...template,
+  sections: [
+    {
+      id: 30,
+      title: 'Services',
+      displayOrder: 0,
+      fields: [
+        {
+          id: 300,
+          fieldKey: servicesKey,
+          fieldType: 'Table',
+          label: 'Services',
+          required: true,
+          displayOrder: 0,
+          configJson: JSON.stringify({
+            semantic: 'services',
+            columns: [
+              { columnKey: svcType, type: 'Text', label: 'Service', required: false, semantic: 'serviceType' },
+              { columnKey: svcFreq, type: 'Text', label: 'Frequency', required: false, semantic: 'frequency' },
+            ],
+          }),
+        },
+      ],
+    },
+  ],
+} as unknown as TemplateVersionDetailDto;
+
 describe('computeCompleteness', () => {
+  it('flags a required empty table and service rows missing frequency', () => {
+    const empty = computeCompleteness(servicesTemplate, { [servicesKey]: [] });
+    expect(empty.items.map((i) => `${i.severity}:${i.message}`)).toEqual(['required:Services is required']);
+
+    const partial = computeCompleteness(servicesTemplate, { [servicesKey]: [{ _rowId: 'r', [svcType]: 'Speech', [svcFreq]: '' }] });
+    expect(partial.items.map((i) => `${i.severity}:${i.message}`)).toEqual(['advisory:Service "Speech" has no frequency']);
+    expect(partial.items[0].fieldId).toBe(300);
+  });
+
   it('flags required blanks as required and semantic gaps as advisory', () => {
     const result = computeCompleteness(template, {
       [goalsKey]: [{ _rowId: 'r1', [goalCol]: 'Read 90 wpm', [baseCol]: '', [measCol]: 'CBM' }],

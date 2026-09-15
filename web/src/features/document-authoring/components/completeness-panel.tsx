@@ -1,7 +1,8 @@
 import { AlertCircle, CheckCircle2, Lightbulb } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import type { CompletenessSummary } from '../lib/completeness';
-import { sectionDomId } from '../lib/section-dom';
+import type { CompletenessItem, CompletenessSummary } from '../lib/completeness';
+import { jumpToField } from '../lib/section-dom';
+import { fieldElementId } from './field-renderers/types';
 
 interface CompletenessPanelProps {
   summary: CompletenessSummary;
@@ -16,15 +17,7 @@ export function CompletenessPanel({ summary }: CompletenessPanelProps) {
   const required = summary.items.filter((i) => i.severity === 'required');
   const advisory = summary.items.filter((i) => i.severity === 'advisory');
 
-  const jump = (sectionId: number, fieldKey: string) => {
-    const field = document.querySelector<HTMLElement>(`[data-testid="field-${fieldKey}"]`);
-    const target = field ?? document.getElementById(sectionDomId(sectionId));
-    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    if (field && 'focus' in field) {
-      const focusable = field.matches('input,textarea,select') ? field : field.querySelector<HTMLElement>('input,textarea,select');
-      focusable?.focus({ preventScroll: true });
-    }
-  };
+  const jump = (item: CompletenessItem) => jumpToField(fieldElementId(item.fieldId), item.sectionId);
 
   return (
     <aside className="lg:sticky lg:top-4 lg:self-start" aria-label="Completeness" data-testid="completeness-panel">
@@ -50,7 +43,7 @@ export function CompletenessPanel({ summary }: CompletenessPanelProps) {
               <li key={item.key}>
                 <button
                   type="button"
-                  onClick={() => jump(item.sectionId, item.fieldKey)}
+                  onClick={() => jump(item)}
                   className="flex w-full items-start gap-2 text-left text-brand-slate-700 hover:underline"
                 >
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-brand-danger-700" aria-hidden="true" />
@@ -62,10 +55,10 @@ export function CompletenessPanel({ summary }: CompletenessPanelProps) {
               <li key={item.key}>
                 <button
                   type="button"
-                  onClick={() => jump(item.sectionId, item.fieldKey)}
+                  onClick={() => jump(item)}
                   className="flex w-full items-start gap-2 text-left text-brand-slate-600 hover:underline"
                 >
-                  <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+                  <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-brand-amber-500" aria-hidden="true" />
                   <span>{item.message}</span>
                 </button>
               </li>

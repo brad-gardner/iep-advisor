@@ -11,8 +11,8 @@ interface UseChildAuthoredVersionsResult {
  *  child with no school link simply yields an empty list. */
 export function useChildAuthoredVersions(childId: number): UseChildAuthoredVersionsResult {
   const [versions, setVersions] = useState<AuthoredDocumentVersionSummaryDto[]>([]);
-  // Pending until the first fetch settles; the list is loaded once per child.
-  const [isLoading, setIsLoading] = useState(true);
+  // Pending until the first fetch settles; an invalid child id settles immediately.
+  const [isLoading, setIsLoading] = useState(Boolean(childId));
 
   useEffect(() => {
     if (!childId) return;

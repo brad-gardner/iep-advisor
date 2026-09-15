@@ -110,31 +110,46 @@ public sealed class DefaultIepTemplateSeeder : IDefaultIepTemplateSeeder
     }
 
     /// <summary>
-    /// Publishes a semantic-tagged v(N+1) of an existing default template when no published version
-    /// carries a goals-semantic table yet. Returns the new version id, or null when already current.
+    /// Publishes a semantic-tagged v(N+1) of an existing default template — but ONLY when the template
+    /// is provably the untouched seed: exactly one version, Published, whose FieldKey set equals the
+    /// seeder's keys and which carries no semantic tag anywhere. An admin who forked/customized the
+    /// default (extra versions, changed keys, or any tagging) keeps full control; we log and leave it.
+    /// Returns the new version id, or null when nothing was written.
     /// </summary>
     private async Task<int?> UpgradeToSemanticVersionIfNeededAsync(int templateId, CancellationToken ct)
     {
-        var published = await _context.DocumentTemplateVersions.AsNoTracking()
-            .Where(v => v.DocumentTemplateId == templateId && v.Status == TemplateVersionStatus.Published)
+        var versions = await _context.DocumentTemplateVersions.AsNoTracking()
+            .Where(v => v.DocumentTemplateId == templateId)
             .Include(v => v.Sections).ThenInclude(s => s.Fields)
+            .AsSplitQuery()
             .OrderByDescending(v => v.VersionNumber)
-            .FirstOrDefaultAsync(ct);
-        if (published == null)
-            return null; // no published version at all — leave to admins; never auto-publish a draft
+            .ToListAsync(ct);
 
-        if (TemplateSemanticsReader.Read(published.Sections).ContainsKey(FieldSemantics.Goals))
-            return null; // already semantic
+        var published = versions.FirstOrDefault(v => v.Status == TemplateVersionStatus.Published);
+        if (published == null)
+            return null; // no published version at all — never auto-publish a draft
+
+        var fields = published.Sections.SelectMany(s => s.Fields).ToList();
+        var anySemantic = fields.Any(f => TemplateSemanticsReader.ReadField(f.FieldType, f.ConfigJson).Semantic != null);
+        if (anySemantic)
+            return null; // already semantic (or admin-tagged) — nothing to do
+
+        var isPristineSeed = versions.Count == 1
+            && fields.Select(f => f.FieldKey).ToHashSet().SetEquals(Keys.AllFieldKeys);
+        if (!isPristineSeed)
+        {
+            _logger.LogWarning(
+                "Default IEP template {TemplateId} has been customized (versions={Count}, fields={Fields}); leaving semantic upgrade to administrators. " +
+                "Tag the goals/services/accommodations tables via the template builder to enable AI assist and prefill.",
+                templateId, versions.Count, fields.Count);
+            return null;
+        }
 
         var now = DateTime.UtcNow;
-        var maxVersion = await _context.DocumentTemplateVersions.AsNoTracking()
-            .Where(v => v.DocumentTemplateId == templateId)
-            .MaxAsync(v => (int?)v.VersionNumber, ct) ?? 0;
-
         var version = new DocumentTemplateVersion
         {
             DocumentTemplateId = templateId,
-            VersionNumber = maxVersion + 1,
+            VersionNumber = published.VersionNumber + 1,
             Status = TemplateVersionStatus.Published,
             PublishedAt = now,
             RowVersion = Guid.NewGuid().ToByteArray(),
@@ -145,7 +160,22 @@ public sealed class DefaultIepTemplateSeeder : IDefaultIepTemplateSeeder
             version.Sections.Add(section);
 
         _context.DocumentTemplateVersions.Add(version);
-        await _context.SaveChangesAsync(ct);
+        try
+        {
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            // Two instances booting against the same pre-semantic database both compute N+1; the loser
+            // hits the unique (DocumentTemplateId, VersionNumber) index. Confirm and treat as a no-op.
+            _context.ChangeTracker.Clear();
+            var upgradedByOther = await _context.DocumentTemplateVersions.AsNoTracking()
+                .AnyAsync(v => v.DocumentTemplateId == templateId && v.VersionNumber == version.VersionNumber, ct);
+            if (!upgradedByOther)
+                throw;
+            _logger.LogInformation(ex, "Default IEP template upgraded concurrently by another instance; treating as no-op.");
+            return null;
+        }
         _logger.LogInformation("Upgraded default IEP template to semantic version {VersionNumber} ({VersionId}).", version.VersionNumber, version.Id);
         return version.Id;
     }
@@ -293,7 +323,7 @@ public sealed class DefaultIepTemplateSeeder : IDefaultIepTemplateSeeder
         };
 
     /// <summary>Serializes a Table field's ConfigJson (semantic + columns; no row bounds so partial drafts save).</summary>
-    private static string TableConfig(string semantic, params (Guid ColumnKey, FieldType Type, string Label, string Semantic)[] columns)
+    private static string TableConfig(string semantic, params (Guid ColumnKey, FieldType Type, string Label, string? Semantic)[] columns)
         => TemplateGraphBuilder.TableConfig(semantic, columns);
 
     /// <summary>
@@ -301,7 +331,7 @@ public sealed class DefaultIepTemplateSeeder : IDefaultIepTemplateSeeder
     /// once and never change: instance values are keyed by FieldKey/ColumnKey, and version forks carry
     /// these keys verbatim, so re-seeding or re-publishing stays value-stable.
     /// </summary>
-    private static class Keys
+    public static class Keys
     {
         // Narrative sections + their single RichText fields.
         public static readonly Guid StudentProfileSection     = new("a1d00000-0000-0000-0000-000000000001");
@@ -325,6 +355,13 @@ public sealed class DefaultIepTemplateSeeder : IDefaultIepTemplateSeeder
         public static readonly Guid ServicesTableField       = new("b2f00000-0000-0000-0000-000000000008");
         public static readonly Guid AccommodationsTableField = new("b2f00000-0000-0000-0000-000000000009");
         public static readonly Guid TransitionTableField     = new("b2f00000-0000-0000-0000-00000000000a");
+
+        /// <summary>Every FieldKey the seed creates — used to recognize an untouched default template.</summary>
+        public static readonly IReadOnlySet<Guid> AllFieldKeys = new HashSet<Guid>
+        {
+            StudentProfileField, PresentLevelsField, EligibilityField, PlacementField, ProgressMonitoringField,
+            SpecialFactorsField, GoalsTableField, ServicesTableField, AccommodationsTableField, TransitionTableField
+        };
 
         // Goals table columns.
         public static readonly Guid GoalsDomainColumn         = new("c3a00000-0000-0000-0000-000000000001");

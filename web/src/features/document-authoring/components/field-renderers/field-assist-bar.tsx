@@ -15,6 +15,8 @@ interface FieldAssistBarProps {
   onApply: (text: string) => void;
   /** Offer "Pull from student" (narrative + goal targets only). */
   allowPull?: boolean;
+  /** Awaited before an AI request so the pending autosave is persisted first. */
+  beforeRequest?: () => Promise<void>;
   disabled?: boolean;
   testIdPrefix: string;
 }
@@ -30,6 +32,7 @@ export function FieldAssistBar({
   kinds,
   onApply,
   allowPull = false,
+  beforeRequest,
   disabled,
   testIdPrefix,
 }: FieldAssistBarProps) {
@@ -43,9 +46,15 @@ export function FieldAssistBar({
 
   return (
     <div className="mt-2 flex flex-wrap items-start gap-2" data-testid={`${testIdPrefix}-assist-bar`}>
-      <AssistPopover requestFn={requestFn} kinds={kinds} onApply={onApply} testIdPrefix={`${testIdPrefix}-assist`} />
+      <AssistPopover
+        requestFn={requestFn}
+        kinds={kinds}
+        onApply={onApply}
+        beforeRequest={beforeRequest}
+        testIdPrefix={`${testIdPrefix}-assist`}
+      />
       {allowPull && (
-        <PullFromStudentButton studentId={ctx.studentId} onPick={onApply} testIdPrefix={`${testIdPrefix}-pull`} />
+        <PullFromStudentButton source={ctx.shareableEntries} onPick={onApply} testIdPrefix={`${testIdPrefix}-pull`} />
       )}
     </div>
   );

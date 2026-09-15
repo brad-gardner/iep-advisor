@@ -34,7 +34,10 @@ public class DocumentAssistController : ControllerBase
         if (!Enum.TryParse<AssistKind>(request.Kind, ignoreCase: true, out var kind) || !Enum.IsDefined(kind))
             return BadRequest(ApiResponse<object>.Error("Invalid kind."));
 
-        var result = await _service.AssistAsync(User.GetUserId(), instanceId, request.FieldKey, request.RowId, kind, ct);
+        if (request.FieldKey is not { } fieldKey || fieldKey == Guid.Empty)
+            return BadRequest(ApiResponse<object>.Error("fieldKey is required."));
+
+        var result = await _service.AssistAsync(User.GetUserId(), instanceId, fieldKey, request.RowId, kind, ct);
         if (!result.Success) return MapFailure(result.Message);
         return Ok(ApiResponse<AssistResponse>.SuccessResponse(new AssistResponse { Suggestion = result.Data!.Suggestion }));
     }

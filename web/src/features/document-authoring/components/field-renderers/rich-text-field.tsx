@@ -43,6 +43,7 @@ export function RichTextField({ field, value, disabled, onSave }: FieldRendererP
           void autosave.flush();
         }}
         allowPull
+        beforeRequest={autosave.flush}
         disabled={disabled}
         testIdPrefix={`field-${field.fieldKey}`}
       />

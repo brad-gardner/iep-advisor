@@ -93,8 +93,8 @@ public static class TemplateFieldConfigValidator
     private static string? ValidateSelect(string? configJson)
     {
         if (IsBlank(configJson)) return "A dropdown must have at least one option.";
-        if (!TryParse<SelectFieldConfig>(configJson, out var cfg, out var error)) return error;
-        return ValidateSelectConfig(cfg!) ?? ValidateFieldSemantic(cfg.Semantic);
+        if (!TryParse<SelectFieldConfig>(configJson, out var cfg, out var error) || cfg == null) return error;
+        return ValidateSelectConfig(cfg) ?? ValidateFieldSemantic(cfg.Semantic);
     }
 
     private static string? ValidateSelectConfig(SelectFieldConfig cfg)

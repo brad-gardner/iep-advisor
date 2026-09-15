@@ -12,7 +12,11 @@ import type { DocumentInstance } from '../hooks/use-document-instance';
 import { DocumentFlushContext } from '../hooks/flush-registry-context';
 import { DocumentEditorContext } from '../hooks/document-editor-context';
 import { computeCompleteness } from '../lib/completeness';
-import { sectionDomId } from '../lib/section-dom';
+import { jumpToSection, sectionDomId } from '../lib/section-dom';
+import { stepSection, useActiveSection } from '../hooks/use-active-section';
+import { useDocumentChat } from '../hooks/use-document-chat';
+import { useStudentShareableEntries } from '../hooks/use-student-shareable-entries';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import type { DocumentInstanceDetailDto, DocumentInstanceStatus } from '../types';
 import { DocumentField } from './field-renderers/document-field';
 import { FinalizeDocumentSection } from './finalize-document-section';
@@ -49,6 +53,11 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
     [detail.templateVersion.sections]
   );
   const [chatOpen, setChatOpen] = useState(false);
+  // The thread is owned here (not by the panel) so it survives open/close.
+  const chat = useDocumentChat(detail.id);
+  // Wide screens get a non-modal side column so the educator can act on an
+  // answer while it stays visible; narrow screens use the Drawer.
+  const wide = useMediaQuery('(min-width: 1280px)');
 
   // One registry per instance: each field registers its autosave flush so a
   // finalize can drain every pending edit before snapshotting.
@@ -64,26 +73,31 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
     [detail.templateVersion, detail.values]
   );
 
-  // Keyboard: [ and ] jump between sections (Steph is keyboard-first).
+  // One owner for "which section am I in": the navigator highlights it and
+  // the [ / ] shortcut steps relative to it.
+  const sectionIds = useMemo(() => sections.map((s) => s.id), [sections]);
+  const { activeId, setActive } = useActiveSection(sectionIds);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
       if (e.key !== '[' && e.key !== ']') return;
-      const ids = sections.map((s) => sectionDomId(s.id));
-      const current = ids.findIndex((id) => {
-        const el = document.getElementById(id);
-        return el != null && el.getBoundingClientRect().top >= -8;
-      });
-      const next = e.key === ']' ? Math.min(ids.length - 1, Math.max(0, current) + 1) : Math.max(0, current - 1);
-      document.getElementById(ids[next])?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (e.metaKey || e.ctrlKey || e.altKey) return; // Cmd+[ / Cmd+] are browser back/forward
+      if (e.target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+      if (document.querySelector('dialog[open]')) return; // a modal owns the keyboard
+      const next = stepSection(sectionIds, activeId, e.key === ']' ? 1 : -1);
+      if (next == null) return;
+      e.preventDefault();
+      jumpToSection(next);
+      setActive(next);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sections]);
+  }, [sectionIds, activeId, setActive]);
 
+  // Shared, lazily-loaded cache for every "Pull from student" button.
+  const shareableEntries = useStudentShareableEntries(detail.schoolStudentId);
   const editorContext = useMemo(
-    () => ({ instanceId: detail.id, studentId: detail.schoolStudentId }),
-    [detail.id, detail.schoolStudentId]
+    () => ({ instanceId: detail.id, studentId: detail.schoolStudentId, shareableEntries }),
+    [detail.id, detail.schoolStudentId, shareableEntries]
   );
 
   return (
@@ -100,11 +114,12 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setChatOpen(true)}
+                onClick={() => setChatOpen((open) => !open)}
+                aria-pressed={chatOpen}
                 data-testid="document-chat-open"
               >
                 <MessageSquare className="mr-1 h-4 w-4" aria-hidden="true" />
-                Ask the assistant
+                {chatOpen && wide ? 'Hide assistant' : 'Ask the assistant'}
               </Button>
             </div>
           </div>
@@ -131,8 +146,14 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
             </Notice>
           )}
 
-          <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)_16rem]">
-            <SectionNavigator sections={sections} />
+          <div
+            className={
+              wide && chatOpen
+                ? 'grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)_16rem_22rem]'
+                : 'grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)_16rem]'
+            }
+          >
+            <SectionNavigator sections={sections} activeId={activeId} onJump={setActive} />
 
             <div className="min-w-0 space-y-6">
               {sections.length === 0 ? (
@@ -146,7 +167,8 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
                     <Card
                       key={section.id}
                       id={sectionDomId(section.id)}
-                      className="scroll-mt-4"
+                      tabIndex={-1}
+                      className="scroll-mt-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
                       data-testid={`section-${section.id}`}
                     >
                       <h2 className="mb-4 font-serif text-lg text-brand-slate-800">
@@ -192,14 +214,22 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
             </div>
 
             <CompletenessPanel summary={completeness} />
+
+            {wide && chatOpen && (
+              <div className="lg:sticky lg:top-4 lg:self-start lg:h-[calc(100vh-3rem)]">
+                <ChatPanel chat={chat} onClose={() => setChatOpen(false)} />
+              </div>
+            )}
           </div>
         </div>
 
-        <Drawer open={chatOpen} onClose={() => setChatOpen(false)} title="Assistant">
-          <div className="h-[70vh]">
-            <ChatPanel instanceId={detail.id} onClose={() => setChatOpen(false)} />
-          </div>
-        </Drawer>
+        {!wide && (
+          <Drawer open={chatOpen} onClose={() => setChatOpen(false)} title="Assistant">
+            <div className="h-[70vh]">
+              <ChatPanel chat={chat} />
+            </div>
+          </Drawer>
+        )}
       </DocumentFlushContext.Provider>
     </DocumentEditorContext.Provider>
   );

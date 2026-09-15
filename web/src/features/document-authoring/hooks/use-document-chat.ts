@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { chat } from '../api/document-assist-api';
 import type { ChatMessage } from '../api/assist-types';
 import { friendlyAssistError } from '../lib/assist-errors';
@@ -11,19 +11,21 @@ export interface UseDocumentChatResult {
   send: (text: string) => void;
 }
 
-// Holds an ephemeral, client-only chat thread scoped to one draft. Nothing is
-// persisted or polled: messages live only for the lifetime of the panel.
+// Holds an ephemeral, client-only chat thread scoped to one document. Nothing
+// is persisted or polled. The hook is owned by the editor (not the panel) so
+// the thread survives opening/closing the assistant.
 export function useDocumentChat(instanceId: number): UseDocumentChatResult {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Mirror messages + in-flight in refs so `send` reads the latest thread without
-  // depending on them — avoids a stale-closure thread if send fires rapidly.
+  // The ref is written synchronously with every change (never via an effect),
+  // so a send issued right after a reply lands always sees the full thread.
   const messagesRef = useRef(messages);
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
+  const commitMessages = useCallback((next: ChatMessage[]) => {
+    messagesRef.current = next;
+    setMessages(next);
+  }, []);
   const sendingRef = useRef(false);
 
   const send = useCallback(
@@ -33,7 +35,7 @@ export function useDocumentChat(instanceId: number): UseDocumentChatResult {
 
       const userMessage: ChatMessage = { role: 'user', content: trimmed };
       const thread = [...messagesRef.current, userMessage];
-      setMessages(thread);
+      commitMessages(thread);
       setError(null);
       sendingRef.current = true;
       setIsSending(true);
@@ -42,7 +44,7 @@ export function useDocumentChat(instanceId: number): UseDocumentChatResult {
         .then((res) => {
           if (res.success && res.data) {
             const { reply } = res.data;
-            setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
+            commitMessages([...messagesRef.current, { role: 'assistant', content: reply }]);
           } else {
             setError(res.message || 'The assistant could not respond. Please try again.');
           }
@@ -56,7 +58,7 @@ export function useDocumentChat(instanceId: number): UseDocumentChatResult {
           setIsSending(false);
         });
     },
-    [instanceId]
+    [instanceId, commitMessages]
   );
 
   return { messages, isSending, error, send };

@@ -38,7 +38,6 @@ public sealed class TemplateCatalogSeeder : ITemplateCatalogSeeder
 
     public async Task<TemplateCatalogSeedResult> SeedAsync(CancellationToken ct = default)
     {
-        _logger.LogInformation("Template catalog seed starting");
         var types = await _context.DocumentTypes.AsNoTracking()
             .ToDictionaryAsync(t => t.Key, t => t.Id, StringComparer.Ordinal, ct);
 

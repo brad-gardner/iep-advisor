@@ -1,5 +1,5 @@
 import { parseConfig } from '@/features/admin/templates/template-config';
-import { ROW_ID_KEY } from '@/features/admin/templates/document-semantics';
+import { ROW_ID_KEY, type ColumnSemantic } from '@/features/admin/templates/document-semantics';
 import type { TemplateFieldDto, TemplateVersionDetailDto } from '../types';
 
 export type CompletenessSeverity = 'required' | 'advisory';
@@ -11,6 +11,8 @@ export interface CompletenessItem {
   message: string;
   /** Field to scroll to when clicked. */
   fieldKey: string;
+  /** Numeric template field id (drives the control's DOM id). */
+  fieldId: number;
   sectionId: number;
 }
 
@@ -78,6 +80,7 @@ export function computeCompleteness(
           severity: 'required',
           message: `${field.label || 'Untitled field'} is required`,
           fieldKey: field.fieldKey,
+          fieldId: field.id,
           sectionId: section.id,
         });
       }
@@ -86,26 +89,26 @@ export function computeCompleteness(
       if (config.kind !== 'Table') continue;
       const semantic = config.semantic;
       const cols = config.table.columns;
-      const col = (s: string) => cols.find((c) => c.semantic === s)?.columnKey;
+      const col = (s: ColumnSemantic) => cols.find((c) => c.semantic === s)?.columnKey;
 
       const tableRows = rows(value);
       if (semantic === 'goals') {
         if (tableRows.length === 0) {
-          items.push({ key: `goals-none-${field.fieldKey}`, severity: 'advisory', message: 'No annual goals yet', fieldKey: field.fieldKey, sectionId: section.id });
+          items.push({ key: `goals-none-${field.fieldKey}`, severity: 'advisory', message: 'No annual goals yet', fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
         }
         tableRows.forEach((row, i) => {
           const label = rowLabel(row, col('goalText'), i);
-          if (cellBlank(row, col('goalText'))) items.push({ key: `g-text-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Goal ${label} has no goal text`, fieldKey: field.fieldKey, sectionId: section.id });
-          if (cellBlank(row, col('baseline'))) items.push({ key: `g-base-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Goal ${label} has no baseline`, fieldKey: field.fieldKey, sectionId: section.id });
-          if (cellBlank(row, col('measurementMethod'))) items.push({ key: `g-meas-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Goal ${label} has no measurement method`, fieldKey: field.fieldKey, sectionId: section.id });
-          if (cellBlank(row, col('targetCriteria'))) items.push({ key: `g-target-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Goal ${label} has no target criteria`, fieldKey: field.fieldKey, sectionId: section.id });
+          if (cellBlank(row, col('goalText'))) items.push({ key: `g-text-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Goal ${label} has no goal text`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
+          if (cellBlank(row, col('baseline'))) items.push({ key: `g-base-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Goal ${label} has no baseline`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
+          if (cellBlank(row, col('measurementMethod'))) items.push({ key: `g-meas-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Goal ${label} has no measurement method`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
+          if (cellBlank(row, col('targetCriteria'))) items.push({ key: `g-target-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Goal ${label} has no target criteria`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
         });
       } else if (semantic === 'services') {
         tableRows.forEach((row, i) => {
           const label = rowLabel(row, col('serviceType'), i);
-          if (cellBlank(row, col('frequency'))) items.push({ key: `s-freq-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Service ${label} has no frequency`, fieldKey: field.fieldKey, sectionId: section.id });
-          if (cellBlank(row, col('duration'))) items.push({ key: `s-dur-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Service ${label} has no duration`, fieldKey: field.fieldKey, sectionId: section.id });
-          if (cellBlank(row, col('providerRole'))) items.push({ key: `s-prov-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Service ${label} has no provider role`, fieldKey: field.fieldKey, sectionId: section.id });
+          if (cellBlank(row, col('frequency'))) items.push({ key: `s-freq-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Service ${label} has no frequency`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
+          if (cellBlank(row, col('duration'))) items.push({ key: `s-dur-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Service ${label} has no duration`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
+          if (cellBlank(row, col('providerRole'))) items.push({ key: `s-prov-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Service ${label} has no provider role`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
         });
       }
     }
