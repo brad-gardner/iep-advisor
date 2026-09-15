@@ -37,6 +37,8 @@ public class DocumentInstanceService : IDocumentInstanceService
     private readonly ITemplateAuthoringService _authoring;
     private readonly IAuditLogger _audit;
     private readonly ILogger<DocumentInstanceService> _logger;
+    private readonly IStudentEvidenceService? _evidence;
+    private readonly IDocumentPrefillService? _prefill;
 
     public DocumentInstanceService(
         ApplicationDbContext context,
@@ -44,7 +46,9 @@ public class DocumentInstanceService : IDocumentInstanceService
         ITemplateResolutionService resolution,
         ITemplateAuthoringService authoring,
         IAuditLogger audit,
-        ILogger<DocumentInstanceService> logger)
+        ILogger<DocumentInstanceService> logger,
+        IStudentEvidenceService? evidence = null,
+        IDocumentPrefillService? prefill = null)
     {
         _context = context;
         _orgAccess = orgAccess;
@@ -52,6 +56,8 @@ public class DocumentInstanceService : IDocumentInstanceService
         _authoring = authoring;
         _audit = audit;
         _logger = logger;
+        _evidence = evidence;
+        _prefill = prefill;
     }
 
     // ---------------------------------------------------------------- Create
@@ -77,6 +83,37 @@ public class DocumentInstanceService : IDocumentInstanceService
         if (!resolution.Success)
             return Fail(resolution.Message!);
 
+        // "Never blank": prefill from the student's evidence. Any failure degrades to an empty draft
+        // (logged) — prefill must never block creating a document.
+        var initialValues = "{}";
+        if (_evidence != null && _prefill != null)
+        {
+            try
+            {
+                var typeKey = await _context.DocumentTypes.AsNoTracking()
+                    .Where(t => t.Id == documentTypeId).Select(t => t.Key).FirstOrDefaultAsync(ct) ?? string.Empty;
+                var bundle = await _evidence.BuildForStaffAsync(actingUserId, schoolStudentId, ct);
+                if (bundle.Success && bundle.Data != null)
+                {
+                    var values = await _prefill.BuildInitialValuesAsync(resolution.Data!.DocumentTemplateVersionId, typeKey, bundle.Data, ct);
+                    // Route through the same coercion as a save so rows get ids and metadata is validated.
+                    var fields = await LoadFieldsByKeyAsync(resolution.Data.DocumentTemplateVersionId, ct);
+                    var patch = values.ToDictionary(kv => kv.Key, kv => JsonSerializer.SerializeToElement(kv.Value));
+                    var target = new JsonObject();
+                    var error = ApplyPatch(target, patch, fields);
+                    if (error == null)
+                        initialValues = target.ToJsonString();
+                    else
+                        _logger.LogWarning("Prefill for student {StudentId} produced invalid values ({Error}); creating an empty draft.", schoolStudentId, error);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Prefill failed for student {StudentId}; creating an empty draft.", schoolStudentId);
+                initialValues = "{}";
+            }
+        }
+
         var now = DateTime.UtcNow;
         var instance = new DocumentInstance
         {
@@ -84,7 +121,7 @@ public class DocumentInstanceService : IDocumentInstanceService
             DocumentTypeId = documentTypeId,
             DocumentTemplateVersionId = resolution.Data!.DocumentTemplateVersionId,
             Status = DocumentInstanceStatus.Draft,
-            ValuesJson = "{}",
+            ValuesJson = initialValues,
             RowVersion = Guid.NewGuid().ToByteArray(),
             LastEditedByUserId = actingUserId,
             LastEditedAt = now,
@@ -363,6 +400,8 @@ public class DocumentInstanceService : IDocumentInstanceService
 
             var row = new JsonObject();
             Guid? rowId = null;
+            JsonNode? carriedFrom = null;
+            bool? confirmed = null;
             foreach (var cell in rowElement.EnumerateObject())
             {
                 // Row identity is carried inside the row object, not as a column. Keep a valid GUID;
@@ -371,6 +410,18 @@ public class DocumentInstanceService : IDocumentInstanceService
                 {
                     if (cell.Value.ValueKind == JsonValueKind.String && Guid.TryParse(cell.Value.GetString(), out var parsed) && parsed != Guid.Empty)
                         rowId = parsed;
+                    continue;
+                }
+                // Provenance metadata for carried-forward rows: kept only in its well-formed shape.
+                if (cell.Name == RowMetaKeys.CarriedFrom)
+                {
+                    carriedFrom = CoerceCarriedFrom(cell.Value);
+                    continue;
+                }
+                if (cell.Name == RowMetaKeys.Confirmed)
+                {
+                    if (cell.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                        confirmed = cell.Value.GetBoolean();
                     continue;
                 }
 
@@ -395,11 +446,27 @@ public class DocumentInstanceService : IDocumentInstanceService
             var finalId = rowId ?? Guid.NewGuid();
             seenRowIds.Add(finalId);
             row[RowMetaKeys.RowId] = JsonValue.Create(finalId.ToString());
+            if (carriedFrom != null) row[RowMetaKeys.CarriedFrom] = carriedFrom;
+            if (confirmed != null) row[RowMetaKeys.Confirmed] = JsonValue.Create(confirmed.Value);
             rows.Add(row);
         }
 
         return (rows, null);
     }
+
+    /// <summary>Accepts <c>{ versionId: int, rowId: guid, label?: string, date?: string }</c>; anything else is dropped.</summary>
+    private static JsonNode? CoerceCarriedFrom(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Object) return null;
+        if (!value.TryGetProperty("versionId", out var v) || v.ValueKind != JsonValueKind.Number || !v.TryGetInt32(out var versionId)) return null;
+        if (!value.TryGetProperty("rowId", out var r) || r.ValueKind != JsonValueKind.String || !Guid.TryParse(r.GetString(), out var sourceRowId)) return null;
+        var node = new JsonObject { ["versionId"] = versionId, ["rowId"] = sourceRowId.ToString() };
+        if (value.TryGetProperty("label", out var l) && l.ValueKind == JsonValueKind.String) node["label"] = Truncate(l.GetString(), 120);
+        if (value.TryGetProperty("date", out var d) && d.ValueKind == JsonValueKind.String) node["date"] = Truncate(d.GetString(), 40);
+        return node;
+    }
+
+    private static string? Truncate(string? s, int max) => s == null ? null : (s.Length <= max ? s : s[..max]);
 
     /// <summary>Parses a Table field's ConfigJson into a columnKey → column FieldType map (empty on any parse issue).</summary>
     private static Dictionary<Guid, FieldType> ParseTableColumns(string? configJson)

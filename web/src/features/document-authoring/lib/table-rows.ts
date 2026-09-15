@@ -1,4 +1,4 @@
-import { ROW_ID_KEY } from '@/features/admin/templates/document-semantics';
+import { ROW_CARRIED_FROM_KEY, ROW_ID_KEY } from '@/features/admin/templates/document-semantics';
 import type { TableColumn } from '@/features/admin/templates/template-config';
 import type { TableRowValue } from '../types';
 
@@ -19,6 +19,31 @@ let rowSeq = 0;
 export function nextRowKey(): string {
   rowSeq += 1;
   return `row-${rowSeq}`;
+}
+
+export interface CarriedFrom {
+  versionId: number;
+  rowId: string;
+  label?: string;
+  date?: string;
+}
+
+/** Provenance stamped by prefill on rows carried from a prior finalized version. */
+export function carriedFrom(row: KeyedRow): CarriedFrom | undefined {
+  return readCarriedFrom(row.cells[ROW_CARRIED_FROM_KEY]);
+}
+
+/** Shape guard for a raw `_carriedFrom` cell value (shared with the completeness rules). */
+export function readCarriedFrom(raw: unknown): CarriedFrom | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.versionId !== 'number' || typeof r.rowId !== 'string') return undefined;
+  return {
+    versionId: r.versionId,
+    rowId: r.rowId,
+    label: typeof r.label === 'string' ? r.label : undefined,
+    date: typeof r.date === 'string' ? r.date : undefined,
+  };
 }
 
 export function rowId(row: KeyedRow): string | undefined {

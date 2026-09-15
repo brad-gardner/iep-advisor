@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { MessageSquare } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { BookOpenCheck, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -10,7 +10,8 @@ import { useFlushRegistry } from '@/hooks/use-flush-registry';
 import { useFlushOnNavigate } from '@/hooks/use-flush-on-navigate';
 import type { DocumentInstance } from '../hooks/use-document-instance';
 import { DocumentFlushContext } from '../hooks/flush-registry-context';
-import { DocumentEditorContext } from '../hooks/document-editor-context';
+import { DocumentEditorContext, type ActiveFieldTarget } from '../hooks/document-editor-context';
+import { EvidenceDrawer } from './evidence-drawer';
 import { computeCompleteness } from '../lib/completeness';
 import { jumpToSection, sectionDomId } from '../lib/section-dom';
 import { stepSection, useActiveSection } from '../hooks/use-active-section';
@@ -95,9 +96,17 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
 
   // Shared, lazily-loaded cache for every "Pull from student" button.
   const shareableEntries = useStudentShareableEntries(detail.schoolStudentId);
+  // The field that last had focus — the Evidence drawer inserts into it.
+  const [activeField, setActiveFieldState] = useState<ActiveFieldTarget | null>(null);
+  const setActiveField = useCallback((target: ActiveFieldTarget) => setActiveFieldState(target), []);
+  const clearActiveField = useCallback(
+    (id: string) => setActiveFieldState((cur) => (cur && (cur.id === id || cur.id.startsWith(`${id}:`)) ? null : cur)),
+    []
+  );
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
   const editorContext = useMemo(
-    () => ({ instanceId: detail.id, studentId: detail.schoolStudentId, shareableEntries }),
-    [detail.id, detail.schoolStudentId, shareableEntries]
+    () => ({ instanceId: detail.id, studentId: detail.schoolStudentId, shareableEntries, setActiveField, clearActiveField }),
+    [detail.id, detail.schoolStudentId, shareableEntries, setActiveField, clearActiveField]
   );
 
   return (
@@ -111,6 +120,15 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
             </div>
             <div className="flex items-center gap-3">
               <AutosaveIndicator status={saveStatus} />
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setEvidenceOpen(true)}
+                data-testid="document-evidence-open"
+              >
+                <BookOpenCheck className="mr-1 h-4 w-4" aria-hidden="true" />
+                Evidence
+              </Button>
               <Button
                 variant="secondary"
                 size="sm"
@@ -222,6 +240,13 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
             )}
           </div>
         </div>
+
+        <EvidenceDrawer
+          open={evidenceOpen}
+          onClose={() => setEvidenceOpen(false)}
+          studentId={detail.schoolStudentId}
+          activeField={readOnly || conflict ? null : activeField}
+        />
 
         {!wide && (
           <Drawer open={chatOpen} onClose={() => setChatOpen(false)} title="Assistant">

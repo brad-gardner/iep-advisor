@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import type { TemplateFieldDto } from '@/features/admin/templates/types';
 import { TableField } from './table-field';
+import { ToastProvider } from '@/components/ui/toast';
 import { DocumentFlushContext } from '../../hooks/flush-registry-context';
+import { DocumentEditorContext, type ActiveFieldTarget, type DocumentEditorContextValue } from '../../hooks/document-editor-context';
 import type { SaveResult } from '../../hooks/use-document-instance';
 
 const goalCol = 'c1111111-1111-1111-1111-111111111111';
@@ -78,6 +80,34 @@ describe('TableField (semantic row block)', () => {
     expect(screen.queryByText(/AI help is available once this row has saved/)).not.toBeInTheDocument(); // id adopted
   });
 
+  it('shows a carried-forward chip; Keep as-is and editing both mark the row reviewed', async () => {
+    const calls: unknown[] = [];
+    const onSave = vi.fn().mockImplementation((patch: Record<string, unknown>) => {
+      calls.push(patch[fieldKey]);
+      return Promise.resolve({ ok: true, values: {} });
+    });
+    renderField(
+      [
+        { _rowId: 'ID-1', _carriedFrom: { versionId: 3, rowId: 'ID-1', label: 'IEP v1', date: '2025-10-14' }, _confirmed: false, [goalCol]: 'Read 70 wpm', [baseCol]: '42' },
+        { _rowId: 'ID-2', _carriedFrom: { versionId: 3, rowId: 'ID-2', label: 'IEP v1' }, _confirmed: false, [goalCol]: 'Write a paragraph', [baseCol]: '' },
+      ],
+      onSave
+    );
+    const shownDate = new Date('2025-10-14T00:00:00').toLocaleDateString();
+    expect(screen.getByTestId(`field-${fieldKey}-row-0-carried`)).toHaveTextContent(`Carried from IEP v1 (${shownDate}) · not yet reviewed`);
+
+    fireEvent.click(screen.getByTestId(`field-${fieldKey}-row-0-keep`));
+    await act(async () => {});
+    expect(screen.getByTestId(`field-${fieldKey}-row-0-carried`)).toHaveTextContent('reviewed');
+    expect(screen.queryByTestId(`field-${fieldKey}-row-0-keep`)).not.toBeInTheDocument();
+    const sent = calls.at(-1) as Array<Record<string, unknown>>;
+    expect(sent[0]._confirmed).toBe(true);
+
+    const second = screen.getAllByRole('textbox', { name: /^Goal\s*\*?$/ })[1];
+    fireEvent.change(second, { target: { value: 'Write a full paragraph' } });
+    expect(screen.getByTestId(`field-${fieldKey}-row-1-carried`)).toHaveTextContent('· reviewed');
+  });
+
   it('sends the latest rows (including adopted ids) on the next save', async () => {
     const calls: unknown[] = [];
     let n = 0;
@@ -98,5 +128,68 @@ describe('TableField (semantic row block)', () => {
     const withId = calls.slice(1).flat() as Array<Record<string, unknown>>;
     expect(n).toBeGreaterThanOrEqual(2);
     expect(withId.some((r) => r._rowId === 'ID-A' && r[goalCol] === 'typed') || withId.length === 0).toBe(true);
+  });
+});
+
+describe('TableField evidence-insert target', () => {
+  function renderInEditor(value: unknown, onSave: (p: Record<string, unknown>) => Promise<SaveResult>) {
+    const targets: ActiveFieldTarget[] = [];
+    const cleared: string[] = [];
+    const editor = {
+      instanceId: 1,
+      studentId: 2,
+      shareableEntries: { entries: null, load: async () => {} },
+      setActiveField: (t: ActiveFieldTarget) => targets.push(t),
+      clearActiveField: (id: string) => cleared.push(id),
+    } as unknown as DocumentEditorContextValue;
+    const utils = render(
+      <ToastProvider>
+        <DocumentEditorContext.Provider value={editor}>
+          <DocumentFlushContext.Provider value={registry}>
+            <TableField field={goalsField} value={value} onSave={onSave} />
+          </DocumentFlushContext.Provider>
+        </DocumentEditorContext.Provider>
+      </ToastProvider>
+    );
+    return { targets, cleared, ...utils };
+  }
+
+  it('appends to the focused cell, labels it by its current row, and drops the target when the row goes', async () => {
+    const calls: unknown[] = [];
+    const onSave = vi.fn().mockImplementation((patch: Record<string, unknown>) => {
+      calls.push(patch[fieldKey]);
+      return Promise.resolve({ ok: true, values: {} });
+    });
+    const { targets, cleared, unmount } = renderInEditor(
+      [
+        { _rowId: 'ID-1', [goalCol]: 'Read 70 wpm', [baseCol]: '' },
+        { _rowId: 'ID-2', [goalCol]: 'Write a paragraph', [baseCol]: '' },
+      ],
+      onSave
+    );
+
+    const secondGoal = screen.getAllByRole('textbox', { name: /^Goal\s*\*?$/ })[1];
+    fireEvent.focus(secondGoal);
+    const target = targets.at(-1)!;
+    expect(target.label()).toBe('Goal 2 — Goal');
+
+    await act(async () => target.apply('Baseline: 42 wpm (ETR)'));
+    expect(secondGoal).toHaveValue('Write a paragraph\n\nBaseline: 42 wpm (ETR)');
+    const sent = calls.at(-1) as Array<Record<string, unknown>>;
+    expect(sent[1][goalCol]).toBe('Write a paragraph\n\nBaseline: 42 wpm (ETR)');
+
+    // Deleting the first row renumbers: the same target now reads as Goal 1.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove goal 1' }));
+    await act(async () => {});
+    expect(cleared.some((id) => target.id.startsWith(`${id}:`))).toBe(false); // a different row was removed
+    expect(target.label()).toBe('Goal 1 — Goal');
+
+    // Removing the row that owns the target clears it by prefix; unmount clears the field.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove goal 1' }));
+    expect(cleared.some((id) => target.id.startsWith(`${id}:`))).toBe(true);
+    await act(async () => target.apply('ignored'));
+    expect((calls.at(-1) as unknown[]).length).toBe(0);
+    unmount();
+    expect(cleared.at(-1)).toBe(fieldKey);
   });
 });

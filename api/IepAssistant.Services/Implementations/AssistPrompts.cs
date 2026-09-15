@@ -54,6 +54,18 @@ public static class AssistPrompts
         "measurability, IDEA compliance, and student-centeredness. Be concise and practical. Reference the " +
         "document content provided as context; never invent student data that is not in it.\n" + SecurityGuard;
 
+    /// <summary>Appended to the system prompt when evidence is supplied: every factual claim must be
+    /// traceable, and the reply is a JSON object so the UI can show sources.</summary>
+    public const string CitationContract =
+        "GROUNDING: An <evidence> block lists what is actually on record for this student, each item with an id like [E3]. " +
+        "Base every specific claim (baselines, scores, dates, prior goals, family or student input) on a cited item. " +
+        "If the evidence does not contain a baseline or number you need, say that plainly and ask for it — never invent one. " +
+        "Respond with ONLY a JSON object: {\"suggestion\": \"<the requested output>\", \"rationale\": \"<one or two sentences>\", \"citations\": [\"E1\", \"E4\"]}. " +
+        "Escape line breaks inside strings as \\n. No markdown fences, no text outside the JSON.";
+
+    public const string CitationInstruction =
+        "Reply as the JSON object described in GROUNDING, citing evidence ids you relied on.";
+
     public static string GoalAction(AssistKind kind) => kind switch
     {
         AssistKind.Rewrite => "Task: Rewrite this goal to be clearer and measurable. Return only the rewritten goal.",

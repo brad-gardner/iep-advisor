@@ -107,6 +107,17 @@ describe('computeCompleteness', () => {
     expect(result.percent).toBe(0);
   });
 
+  it('flags carried-forward rows until they are kept or edited', () => {
+    const stale = computeCompleteness(template, {
+      [plaafpKey]: '<p>x</p>',
+      [goalsKey]: [
+        { _rowId: 'r1', _carriedFrom: { versionId: 1, rowId: 'r1' }, _confirmed: false, [goalCol]: 'g', [baseCol]: 'b', [measCol]: 'm' },
+        { _rowId: 'r2', _carriedFrom: { versionId: 1, rowId: 'r2' }, _confirmed: true, [goalCol]: 'g', [baseCol]: 'b', [measCol]: 'm' },
+      ],
+    });
+    expect(stale.items.map((i) => i.message)).toContain('1 carried-forward row in Goals not yet reviewed');
+  });
+
   it('is clean when everything is filled', () => {
     const result = computeCompleteness(
       { ...template, sections: [template.sections[0]] } as TemplateVersionDetailDto,

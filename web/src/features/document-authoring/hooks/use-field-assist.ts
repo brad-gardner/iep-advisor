@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { ApiResponse } from '@/types/api';
-import type { AssistKind, AssistResponse } from '../api/assist-types';
+import type { AssistCitation, AssistKind, AssistResponse } from '../api/assist-types';
 import { friendlyAssistError } from '../lib/assist-errors';
 
 export type FieldAssistStatus = 'idle' | 'loading' | 'suggested' | 'applied' | 'error';
@@ -8,6 +8,9 @@ export type FieldAssistStatus = 'idle' | 'loading' | 'suggested' | 'applied' | '
 export interface UseFieldAssistResult {
   status: FieldAssistStatus;
   suggestion: string | null;
+  rationale: string | null;
+  citations: AssistCitation[];
+  missingBaseline: boolean;
   errorMessage: string | null;
   request: (kind: AssistKind) => void;
   // The hook stays ignorant of which field: the caller supplies how to apply
@@ -24,6 +27,9 @@ export function useFieldAssist(
 ): UseFieldAssistResult {
   const [status, setStatus] = useState<FieldAssistStatus>('idle');
   const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [rationale, setRationale] = useState<string | null>(null);
+  const [citations, setCitations] = useState<AssistCitation[]>([]);
+  const [missingBaseline, setMissingBaseline] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const request = useCallback(
@@ -31,10 +37,16 @@ export function useFieldAssist(
       setStatus('loading');
       setErrorMessage(null);
       setSuggestion(null);
+      setRationale(null);
+      setCitations([]);
+      setMissingBaseline(false);
       requestFn(kind)
         .then((res) => {
           if (res.success && res.data) {
             setSuggestion(res.data.suggestion);
+            setRationale(res.data.rationale ?? null);
+            setCitations(res.data.citations ?? []);
+            setMissingBaseline(res.data.missingBaseline === true);
             setStatus('suggested');
           } else {
             setErrorMessage(res.message || 'AI help is unavailable right now.');
@@ -63,8 +75,11 @@ export function useFieldAssist(
   const dismiss = useCallback(() => {
     setStatus('idle');
     setSuggestion(null);
+    setRationale(null);
+    setCitations([]);
+    setMissingBaseline(false);
     setErrorMessage(null);
   }, []);
 
-  return { status, suggestion, errorMessage, request, accept, dismiss };
+  return { status, suggestion, rationale, citations, missingBaseline, errorMessage, request, accept, dismiss };
 }

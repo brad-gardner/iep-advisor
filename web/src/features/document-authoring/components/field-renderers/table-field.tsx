@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAutosave } from '@/hooks/use-autosave';
@@ -13,7 +13,9 @@ import { fieldElementId, type FieldRendererProps } from './types';
 import { ROW_BLOCK_SEMANTICS, type ColumnSemantic, type FieldSemantic } from '@/features/admin/templates/document-semantics';
 import type { AssistKind } from '../../api/assist-types';
 import { FieldAssistBar } from './field-assist-bar';
-import { adoptRowIds, coerceRows, emptyCells, nextRowKey, rowId, type KeyedRow } from '../../lib/table-rows';
+import { adoptRowIds, carriedFrom, coerceRows, emptyCells, nextRowKey, rowId, type KeyedRow } from '../../lib/table-rows';
+import { ROW_CONFIRMED_KEY } from '@/features/admin/templates/document-semantics';
+import { appendText, useDocumentEditorContext } from '../../hooks/document-editor-context';
 
 /**
  * Repeating-group Table field: one row per array entry, one cell input per
@@ -28,6 +30,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
     config.kind === 'Table' ? config.table : { columns: [], minRows: undefined, maxRows: undefined };
   const { columns, minRows, maxRows } = table;
   const labelId = `${fieldElementId(field.id)}-label`;
+  const editor = useDocumentEditorContext();
 
   // `rowsRef` is the single source of truth and is written synchronously by
   // every mutation, so a save always sends the LATEST rows (including any
@@ -61,14 +64,52 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
     if (immediate) void autosave.flush();
   };
 
+  // Editing a carried-forward row counts as reviewing it: the stale flag clears.
   const updateCell = (rowKey: string, columnKey: string, cell: TableCellValue) =>
     commit(
-      (current) => current.map((r) => (r.key === rowKey ? { ...r, cells: { ...r.cells, [columnKey]: cell } } : r)),
+      (current) =>
+        current.map((r) =>
+          r.key === rowKey
+            ? { ...r, cells: { ...r.cells, [columnKey]: cell, ...(carriedFrom(r) && !r.cells[ROW_CONFIRMED_KEY] ? { [ROW_CONFIRMED_KEY]: true } : {}) } }
+            : r
+        ),
       false
     );
 
+  const keepRow = (rowKey: string) =>
+    commit((current) => current.map((r) => (r.key === rowKey ? { ...r, cells: { ...r.cells, [ROW_CONFIRMED_KEY]: true } } : r)), true);
+
   const addRow = () => commit((current) => [...current, { key: nextRowKey(), cells: emptyCells(columns) }], true);
-  const removeRow = (rowKey: string) => commit((current) => current.filter((r) => r.key !== rowKey), true);
+  const removeRow = (rowKey: string) => {
+    editor?.clearActiveField(`${field.fieldKey}:${rowKey}`);
+    commit((current) => current.filter((r) => r.key !== rowKey), true);
+  };
+
+  // Evidence insert into a cell: append to whatever the cell holds now (read
+  // from rowsRef so a target registered earlier never overwrites later typing)
+  // and persist at once. The label is resolved when read so it tracks the
+  // row's current position after deletions. Targets die with the field.
+  const disabledRef = useRef(disabled);
+  useEffect(() => {
+    disabledRef.current = disabled;
+  }, [disabled]);
+  const clear = editor?.clearActiveField;
+  useEffect(() => () => clear?.(field.fieldKey), [clear, field.fieldKey]);
+  const cellTarget = (rowKey: string, col: TableColumn) => ({
+    id: `${field.fieldKey}:${rowKey}:${col.columnKey}`,
+    label: () => {
+      const index = rowsRef.current.findIndex((r) => r.key === rowKey);
+      return `${blockLabel(blockSemantic)} ${index + 1} — ${col.label || 'field'}`;
+    },
+    apply: (text: string) => {
+      if (disabledRef.current) return;
+      const row = rowsRef.current.find((r) => r.key === rowKey);
+      if (!row) return;
+      const current = row.cells[col.columnKey];
+      updateCell(rowKey, col.columnKey, appendText(typeof current === 'string' ? current : '', text));
+      void autosave.flush();
+    },
+  });
 
   const atMax = maxRows != null && rows.length >= maxRows;
   const atMin = minRows != null && rows.length <= minRows;
@@ -117,26 +158,60 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
           <ol className="space-y-3">
             {rows.map((row, rowIndex) => {
               const persistedId = rowId(row);
+              const carried = carriedFrom(row);
+              const reviewed = row.cells[ROW_CONFIRMED_KEY] === true;
               return (
                 <li
                   key={row.key}
                   className="rounded-card border border-brand-slate-200 bg-brand-slate-50/60 p-4"
                   data-testid={`field-${field.fieldKey}-row-${rowIndex}`}
                 >
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <span className="text-[13px] font-medium text-brand-slate-500">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <span className="flex min-w-0 flex-wrap items-center gap-2 text-[13px] font-medium text-brand-slate-500">
                       {blockLabel(blockSemantic)} {rowIndex + 1}
+                      {carried && (
+                        <span
+                          className={
+                            reviewed
+                              ? 'rounded-full border border-brand-slate-200 px-2 py-0.5 text-[11px] font-normal text-brand-slate-500'
+                              : 'rounded-full border border-brand-amber-200 bg-brand-amber-50 px-2 py-0.5 text-[11px] font-normal text-brand-amber-700'
+                          }
+                          aria-live="polite"
+                          data-testid={`field-${field.fieldKey}-row-${rowIndex}-carried`}
+                        >
+                          Carried from {carried.label ?? 'prior version'}
+                          {carried.date ? ` (${formatCarriedDate(carried.date)})` : ''}
+                          {reviewed ? ' · reviewed' : ' · not yet reviewed'}
+                        </span>
+                      )}
                     </span>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      disabled={disabled || atMin}
-                      onClick={() => removeRow(row.key)}
-                      aria-label={`Remove ${blockLabel(blockSemantic).toLowerCase()} ${rowIndex + 1}`}
-                      data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </Button>
+                    <span className="flex shrink-0 items-center gap-1">
+                      {carried && !reviewed && !disabled && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => {
+                            // The button unmounts on click; hand focus to the row's first input.
+                            const first = e.currentTarget.closest('li')?.querySelector<HTMLElement>('input, textarea, select');
+                            keepRow(row.key);
+                            first?.focus();
+                          }}
+                          data-testid={`field-${field.fieldKey}-row-${rowIndex}-keep`}
+                        >
+                          Keep as-is
+                        </Button>
+                      )}
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={disabled || atMin}
+                        onClick={() => removeRow(row.key)}
+                        aria-label={`Remove ${blockLabel(blockSemantic).toLowerCase()} ${rowIndex + 1}`}
+                        data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    </span>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {columns.map((col) => {
@@ -161,6 +236,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                             multiline={wide}
                             inputId={cellId}
                             onChange={(cell) => updateCell(row.key, col.columnKey, cell)}
+                            onFocus={col.type === 'Text' ? () => editor?.setActiveField(cellTarget(row.key, col)) : undefined}
                             onBlur={() => void autosave.flush()}
                           />
                         </div>
@@ -332,6 +408,12 @@ function blockLabel(semantic: FieldSemantic | undefined): string {
 }
 
 /** Columns whose content is prose and deserves a full-width multiline input. */
+/** `_carriedFrom.date` is an ISO `yyyy-MM-dd`; show it the way the Evidence drawer does. */
+function formatCarriedDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString();
+}
+
 function isLongColumn(semantic: ColumnSemantic | undefined): boolean {
   return semantic === 'goalText' || semantic === 'baseline' || semantic === 'targetCriteria' || semantic === 'findings' || semantic === 'transitionServices' || semantic === 'accommodation';
 }
@@ -344,6 +426,7 @@ function TableCell({
   disabled,
   multiline,
   inputId,
+  onFocus,
   onChange,
   onBlur,
 }: {
@@ -356,6 +439,7 @@ function TableCell({
   multiline?: boolean;
   /** Block mode: explicit id so the visible label associates with the control. */
   inputId?: string;
+  onFocus?: () => void;
   onChange: (cell: TableCellValue) => void;
   // Flush the field's pending debounced save when the cell loses focus, so an
   // in-app navigation that blurs the cell persists the edit before unmount.
@@ -373,6 +457,7 @@ function TableCell({
         value={strValue}
         disabled={disabled}
         aria-label={ariaLabel}
+        onFocus={onFocus}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
         className={cellInputClass}
@@ -438,6 +523,7 @@ function TableCell({
           value={strValue}
           disabled={disabled}
           aria-label={ariaLabel}
+          onFocus={onFocus}
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}
           className={cellInputClass}

@@ -131,3 +131,7 @@ export function isColumnSemantic(v: unknown): v is ColumnSemantic {
 
 /** Reserved row-object key carrying the server-assigned stable row identity. */
 export const ROW_ID_KEY = '_rowId';
+/** Reserved row-object key: provenance of a row prefilled from a prior finalized version. */
+export const ROW_CARRIED_FROM_KEY = '_carriedFrom';
+/** Reserved row-object key: true once a carried row has been kept or edited. */
+export const ROW_CONFIRMED_KEY = '_confirmed';

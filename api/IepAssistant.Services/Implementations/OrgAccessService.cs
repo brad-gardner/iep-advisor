@@ -14,6 +14,10 @@ namespace IepAssistant.Services.Implementations;
 public class OrgAccessService : IOrgAccessService
 {
     private readonly ApplicationDbContext _context;
+    // Per-request memo (the service is scoped): document create / AI assist compose several services
+    // that each re-check the same (user, student, role), which is up to 3 queries apiece. A request is
+    // short-lived and access rows do not change under it, so the first answer is reused.
+    private readonly Dictionary<(int UserId, int SchoolStudentId, AccessRole MinRole), bool> _studentDecisions = new();
 
     public OrgAccessService(ApplicationDbContext context)
     {
@@ -49,6 +53,16 @@ public class OrgAccessService : IOrgAccessService
     }
 
     public async Task<bool> CanActOnStudentAsync(int userId, int schoolStudentId, AccessRole minRole, CancellationToken ct = default)
+    {
+        var key = (userId, schoolStudentId, minRole);
+        if (_studentDecisions.TryGetValue(key, out var memo))
+            return memo;
+        var decision = await ResolveStudentAccessAsync(userId, schoolStudentId, minRole, ct);
+        _studentDecisions[key] = decision;
+        return decision;
+    }
+
+    private async Task<bool> ResolveStudentAccessAsync(int userId, int schoolStudentId, AccessRole minRole, CancellationToken ct)
     {
         var ctx = await GetStaffContextAsync(userId, ct);
         if (ctx == null)

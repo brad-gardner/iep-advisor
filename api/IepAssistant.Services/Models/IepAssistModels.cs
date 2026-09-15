@@ -14,10 +14,23 @@ public enum AssistKind
     SuggestMeasurement
 }
 
-/// <summary>Result of a single-field assist call — the suggestion text only (never auto-applied).</summary>
+/// <summary>Result of a single-field assist call — the suggestion text (never auto-applied), plus,
+/// for evidence-grounded document assist, the model's rationale and the evidence it cited.</summary>
 public sealed class AssistResultModel
 {
     public required string Suggestion { get; init; }
+    public string? Rationale { get; init; }
+    public IReadOnlyList<AssistCitation> Citations { get; init; } = Array.Empty<AssistCitation>();
+    /// <summary>True when the target is a goal with no baseline and the evidence holds none either —
+    /// the UI asks for data instead of letting a number be invented.</summary>
+    public bool MissingBaseline { get; init; }
+}
+
+public sealed class AssistCitation
+{
+    public required string EvidenceId { get; init; }
+    public required string SourceLabel { get; init; }
+    public required string Excerpt { get; init; }
 }
 
 /// <summary>A single ephemeral chat turn. The client owns the thread and resends it each call.</summary>
