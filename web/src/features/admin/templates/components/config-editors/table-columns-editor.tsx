@@ -10,6 +10,7 @@ import {
   type TableConfig,
 } from '../../template-config';
 import { SelectOptionsEditor } from './select-options-editor';
+import { COLUMN_SEMANTICS, COLUMN_SEMANTIC_LABELS, isColumnSemantic } from '../../document-semantics';
 
 const COLUMN_TYPES: TableColumnType[] = ['Text', 'Date', 'Select', 'Checkbox'];
 
@@ -91,6 +92,25 @@ export function TableColumnsEditor({ config, onChange, disabled, idPrefix }: Tab
                 >
                   <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" />
                 </Button>
+              </div>
+
+              <div className="max-w-[18rem]">
+                <Select
+                  label="Semantic"
+                  id={`${colId}-semantic`}
+                  value={col.semantic ?? ''}
+                  onChange={(e) =>
+                    updateColumn(i, { semantic: isColumnSemantic(e.target.value) ? e.target.value : undefined })
+                  }
+                  data-testid={`${colId}-semantic`}
+                >
+                  <option value="">— none —</option>
+                  {COLUMN_SEMANTICS.map((s) => (
+                    <option key={s} value={s}>
+                      {COLUMN_SEMANTIC_LABELS[s]}
+                    </option>
+                  ))}
+                </Select>
               </div>
 
               <label className="flex items-center gap-2 text-[13px] font-medium text-brand-slate-600">

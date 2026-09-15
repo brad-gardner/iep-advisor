@@ -10,6 +10,8 @@ import {
 import type { TableCellValue, TableRowValue } from '../../types';
 import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { fieldElementId, type FieldRendererProps } from './types';
+import { ROW_ID_KEY } from '@/features/admin/templates/document-semantics';
+import type { SaveResult } from '../../hooks/use-document-instance';
 
 /** Row wrapper carrying a stable client key so add/remove keeps React identity
  *  (and focus/pending edits) pinned to the logical row, not its position. */
@@ -24,11 +26,33 @@ function nextKey(): string {
   return `row-${rowSeq}`;
 }
 
+/** Rows persisted by the server carry a stable `_rowId`; use it as the React
+ *  key so identity survives reloads. Client-only rows get a temporary key until
+ *  the first save echoes their assigned id back. */
 function coerceRows(value: unknown): KeyedRow[] {
   if (!Array.isArray(value)) return [];
   return value
     .filter((r): r is TableRowValue => typeof r === 'object' && r !== null)
-    .map((cells) => ({ key: nextKey(), cells }));
+    .map((cells) => {
+      const id = cells[ROW_ID_KEY];
+      return { key: typeof id === 'string' && id ? id : nextKey(), cells };
+    });
+}
+
+/** Adopt server-assigned `_rowId`s (by position) into rows that don't have one
+ *  yet, so the next save echoes the same identity instead of minting a new one. */
+function adoptRowIds(local: KeyedRow[], saved: unknown): KeyedRow[] {
+  if (!Array.isArray(saved)) return local;
+  let changed = false;
+  const next = local.map((row, i) => {
+    if (typeof row.cells[ROW_ID_KEY] === 'string' && row.cells[ROW_ID_KEY]) return row;
+    const savedRow = saved[i];
+    const id = savedRow && typeof savedRow === 'object' ? (savedRow as TableRowValue)[ROW_ID_KEY] : undefined;
+    if (typeof id !== 'string' || !id) return row;
+    changed = true;
+    return { key: id, cells: { ...row.cells, [ROW_ID_KEY]: id } };
+  });
+  return changed ? next : local;
 }
 
 function emptyCells(columns: TableColumn[]): TableRowValue {
@@ -53,7 +77,14 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
 
   const [rows, setRows] = useState<KeyedRow[]>(() => coerceRows(value));
   const autosave = useAutosave<TableRowValue[]>(
-    useCallback(async (v) => void (await onSave({ [field.fieldKey]: v })), [field.fieldKey, onSave])
+    useCallback(
+      async (v) => {
+        const result = (await onSave({ [field.fieldKey]: v })) as SaveResult | undefined;
+        const saved = result && typeof result === 'object' && 'values' in result ? result.values?.[field.fieldKey] : undefined;
+        if (saved !== undefined) setRows((current) => adoptRowIds(current, saved));
+      },
+      [field.fieldKey, onSave]
+    )
   );
   useRegisterFlush(field.fieldKey, autosave.flush);
 

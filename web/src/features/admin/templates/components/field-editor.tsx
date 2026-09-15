@@ -17,6 +17,7 @@ import { AutosaveIndicator } from './autosave-indicator';
 import { SelectOptionsEditor } from './config-editors/select-options-editor';
 import { TableColumnsEditor } from './config-editors/table-columns-editor';
 import { DateConfigEditor, TextConfigEditor } from './config-editors/scalar-config-editors';
+import { FIELD_SEMANTICS, FIELD_SEMANTIC_LABELS, isFieldSemantic } from '../document-semantics';
 
 const FIELD_TYPES: FieldType[] = ['Text', 'RichText', 'Date', 'Select', 'Checkbox', 'Table'];
 
@@ -167,6 +168,32 @@ export function FieldEditor({
             </option>
           ))}
         </Select>
+      </div>
+
+      <div className="mt-3 max-w-[22rem]">
+        <Select
+          label="Semantic (what this field means)"
+          id={`field-${field.id}-semantic`}
+          value={config.semantic ?? ''}
+          onChange={(e) =>
+            handleConfig({
+              ...config,
+              semantic: isFieldSemantic(e.target.value) ? e.target.value : undefined,
+            })
+          }
+          disabled={readOnly}
+          data-testid={`field-${field.id}-semantic`}
+        >
+          <option value="">— none —</option>
+          {FIELD_SEMANTICS.map((s) => (
+            <option key={s} value={s}>
+              {FIELD_SEMANTIC_LABELS[s]}
+            </option>
+          ))}
+        </Select>
+        <p className="mt-1 text-xs text-brand-slate-400">
+          Lets AI help, prefill and PDF layout recognise this field in any template.
+        </p>
       </div>
 
       <label className="mt-3 flex items-center gap-2 text-[13px] font-medium text-brand-slate-600">
