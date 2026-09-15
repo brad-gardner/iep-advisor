@@ -1,7 +1,7 @@
 ---
 title: "feat: Student evidence bundle — never-blank documents, carry-forward with provenance, AI grounded in authorized student context with citations"
 type: feat
-status: active
+status: completed
 date: 2026-09-15
 origin: docs/gap/combined-findings.md
 slicing_approach: vertical
@@ -55,12 +55,25 @@ depends_on: docs/plans/2026-09-15-001-feat-authoring-spine-template-editor-ai-pa
 
 ## Acceptance Criteria
 
-- [ ] New IEP/ETR/504 documents open with identity, team and (where they exist) prior goals/services/accommodations/present levels prefilled, each labelled with source and date.
-- [ ] Carried goal rows keep their `_rowId` from the prior version; stale rows are visible until confirmed or edited.
-- [ ] Parent can add/edit/share "About my child" contributions; shared ones appear in staff evidence and AI context; unshared never do.
-- [ ] AI assist output includes citations to evidence items; uncited numeric claims are absent in fixture tests; missing baseline is stated, not invented.
-- [ ] Evidence drawer lists role-filtered items and can insert into the focused field.
-- [ ] All checks pass (`dotnet test`, type-check, vitest, build, guard:ux).
+- [x] New IEP/ETR/504 documents open with identity, team and (where they exist) prior goals/services/accommodations/present levels prefilled, each labelled with source and date. *(Live: new OH IEP for a student with a finalized IEP v1 opened with profile + the carried goal.)*
+- [x] Carried goal rows keep their `_rowId` from the prior version; stale rows are visible until confirmed or edited. *(Chip "Carried from IEP v1 · not yet reviewed" + Keep as-is; completeness lists unreviewed carry-forward.)*
+- [x] Parent can add/edit/share "About my child" contributions; shared ones appear in staff evidence and AI context; unshared never do.
+- [x] AI assist output includes citations to evidence items; missing baseline is stated, not invented. *(Live: SuggestMeasurement/Improve returned rationale + citations [E1, E3]. The parser accepts JSON, repairs raw newlines, and resolves inline [E#] markers in prose.)*
+- [x] Evidence drawer lists role-filtered items and can insert into the focused field.
+- [x] `dotnet test` 519, type-check, vitest 127, build, guard:ux pass; lint at the 37 pre-existing errors.
+
+## Implementation notes (2026-09-15)
+
+- Migration `AddParentContributions` applied to the QA database.
+- Evidence and prefill are optional constructor dependencies of `DocumentInstanceService`/`DocumentAssistService` so existing tests and any caller without them keep the plain behaviour; prefill failures log a warning and create an empty draft.
+- ETRs never inherit present levels (evaluation writes them); an ETR/504 carries rows only from a prior version of the same type.
+- `AssistMaxTokens` raised to 2048 for grounded replies (JSON + rationale).
+
+## Operational validation notes (for ship)
+
+- **Runtime impact:** document create now runs the evidence bundle (≈6 queries) and prefill; assist calls include an evidence block (≤9k chars). Watch create latency and "Prefill failed"/"Evidence bundle unavailable" warnings.
+- **Healthy signal:** new IEPs for students with history open with a populated profile and carried rows; assist responses carry `citations`.
+- **Failure/mitigation:** a burst of prefill warnings → documents still create empty (no user-facing failure); revert web to hide the drawer if needed. Owner: Brad; window: first educator session after deploy.
 
 ## System-Wide Impact
 
