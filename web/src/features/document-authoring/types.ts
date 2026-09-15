@@ -15,8 +15,9 @@ import type { TemplateVersionDetailDto } from '@/features/admin/templates/types'
 
 export type DocumentInstanceStatus = 'Draft' | 'Finalizing' | 'Finalized';
 
-/** A single Table row: cells keyed by the field's Table `columnKey` (guid). */
-export type TableCellValue = string | boolean;
+/** A single Table row: cells keyed by the field's Table `columnKey` (guid), plus
+ *  reserved `_rowId` / `_carriedFrom` / `_confirmed` metadata entries. */
+export type TableCellValue = string | boolean | Record<string, unknown>;
 export type TableRowValue = Record<string, TableCellValue>;
 
 /** A value-document entry. Scalars for Text/RichText/Date/Select/Checkbox; an

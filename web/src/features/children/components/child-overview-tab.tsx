@@ -7,6 +7,7 @@ import { Modal } from "@/components/ui/modal";
 import { ShareChildDialog } from "@/features/sharing/components/share-child-dialog";
 import { AccessList } from "@/features/sharing/components/access-list";
 import { SchoolIepsCard } from "@/features/iep-versions/components/school-ieps-card";
+import { AboutMyChildCard } from "@/features/contributions/components/about-my-child-card";
 import { InviteStudentForm } from "@/features/student/components/invite-student-form";
 import { inviteStudentFromParent } from "@/features/student/api/student-invite-api";
 import type { ChildOutletContext } from "./child-detail-page";
@@ -60,6 +61,8 @@ export function ChildOverviewTab() {
       </Card>
 
       <SchoolIepsCard childId={childId} />
+
+      <AboutMyChildCard childId={childId} childName={child.firstName} canEdit={child.role === "owner" || child.role === "collaborator"} />
 
       {isOwner && (
         <Card data-testid="sharing-section">

@@ -69,6 +69,9 @@ export function AssistPopover({ requestFn, kinds = ALL_KINDS, onApply, beforeReq
         {assist.status === 'suggested' && assist.suggestion !== null && (
           <AssistSuggestionPanel
             suggestion={assist.suggestion}
+            rationale={assist.rationale}
+            citations={assist.citations}
+            missingBaseline={assist.missingBaseline}
             onAccept={onApply ? handleAccept : undefined}
             onDismiss={assist.dismiss}
             testIdPrefix={testIdPrefix}

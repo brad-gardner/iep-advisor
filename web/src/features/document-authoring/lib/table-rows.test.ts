@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adoptRowIds, coerceRows, rowId, type KeyedRow } from './table-rows';
+import { adoptRowIds, carriedFrom, coerceRows, rowId, type KeyedRow } from './table-rows';
 
 const C = 'c1111111-1111-1111-1111-111111111111';
 
@@ -54,5 +54,14 @@ describe('adoptRowIds', () => {
     const current: KeyedRow[] = [{ key: 'row-9', cells: { _rowId: 'X', [C]: 'v' } }];
     expect(adoptRowIds(current, current, saved)).toBe(current);
     expect(adoptRowIds(current, current, undefined)).toBe(current);
+  });
+});
+
+describe('carriedFrom', () => {
+  it('reads well-formed provenance and ignores anything else', () => {
+    const ok: KeyedRow = { key: 'a', cells: { _carriedFrom: { versionId: 7, rowId: 'R', label: 'IEP v1', date: '2025-10-14' } } };
+    expect(carriedFrom(ok)).toEqual({ versionId: 7, rowId: 'R', label: 'IEP v1', date: '2025-10-14' });
+    expect(carriedFrom({ key: 'b', cells: { _carriedFrom: 'junk' } })).toBeUndefined();
+    expect(carriedFrom({ key: 'c', cells: {} })).toBeUndefined();
   });
 });

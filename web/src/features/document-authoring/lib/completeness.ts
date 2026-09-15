@@ -1,5 +1,5 @@
 import { parseConfig } from '@/features/admin/templates/template-config';
-import { ROW_ID_KEY, type ColumnSemantic } from '@/features/admin/templates/document-semantics';
+import { ROW_CARRIED_FROM_KEY, ROW_CONFIRMED_KEY, ROW_ID_KEY, type ColumnSemantic } from '@/features/admin/templates/document-semantics';
 import type { TemplateFieldDto, TemplateVersionDetailDto } from '../types';
 
 export type CompletenessSeverity = 'required' | 'advisory';
@@ -92,6 +92,17 @@ export function computeCompleteness(
       const col = (s: ColumnSemantic) => cols.find((c) => c.semantic === s)?.columnKey;
 
       const tableRows = rows(value);
+      const stale = tableRows.filter((r) => r[ROW_CARRIED_FROM_KEY] != null && r[ROW_CONFIRMED_KEY] !== true).length;
+      if (stale > 0) {
+        items.push({
+          key: `stale-${field.fieldKey}`,
+          severity: 'advisory',
+          message: `${stale} carried-forward ${stale === 1 ? 'row' : 'rows'} in ${field.label || 'this table'} not yet reviewed`,
+          fieldKey: field.fieldKey,
+          fieldId: field.id,
+          sectionId: section.id,
+        });
+      }
       if (semantic === 'goals') {
         if (tableRows.length === 0) {
           items.push({ key: `goals-none-${field.fieldKey}`, severity: 'advisory', message: 'No annual goals yet', fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });

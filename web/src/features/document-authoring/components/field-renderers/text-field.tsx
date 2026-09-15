@@ -6,6 +6,7 @@ import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { FieldLabel } from './field-label';
 import { fieldElementId, type FieldRendererProps } from './types';
 import { FieldAssistBar } from './field-assist-bar';
+import { useDocumentEditorContext } from '../../hooks/document-editor-context';
 
 /** Single-line Text field. Honors the config `maxLength`. */
 export function TextField({ field, value, disabled, onSave }: FieldRendererProps) {
@@ -14,6 +15,7 @@ export function TextField({ field, value, disabled, onSave }: FieldRendererProps
   const id = fieldElementId(field.id);
 
   const [local, setLocal] = useState(typeof value === 'string' ? value : '');
+  const editor = useDocumentEditorContext();
   const autosave = useAutosave<string>(
     useCallback(async (v) => void (await onSave({ [field.fieldKey]: v })), [field.fieldKey, onSave])
   );
@@ -34,6 +36,15 @@ export function TextField({ field, value, disabled, onSave }: FieldRendererProps
         disabled={disabled}
         maxLength={maxLength}
         onChange={(e) => handleChange(e.target.value)}
+        onFocus={() =>
+          editor?.setActiveField({
+            label: field.label || 'this field',
+            apply: (text) => {
+              handleChange(text);
+              void autosave.flush();
+            },
+          })
+        }
         onBlur={() => void autosave.flush()}
         data-testid={`field-${field.fieldKey}`}
       />

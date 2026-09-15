@@ -78,6 +78,33 @@ describe('TableField (semantic row block)', () => {
     expect(screen.queryByText(/AI help is available once this row has saved/)).not.toBeInTheDocument(); // id adopted
   });
 
+  it('shows a carried-forward chip; Keep as-is and editing both mark the row reviewed', async () => {
+    const calls: unknown[] = [];
+    const onSave = vi.fn().mockImplementation((patch: Record<string, unknown>) => {
+      calls.push(patch[fieldKey]);
+      return Promise.resolve({ ok: true, values: {} });
+    });
+    renderField(
+      [
+        { _rowId: 'ID-1', _carriedFrom: { versionId: 3, rowId: 'ID-1', label: 'IEP v1', date: '2025-10-14' }, _confirmed: false, [goalCol]: 'Read 70 wpm', [baseCol]: '42' },
+        { _rowId: 'ID-2', _carriedFrom: { versionId: 3, rowId: 'ID-2', label: 'IEP v1' }, _confirmed: false, [goalCol]: 'Write a paragraph', [baseCol]: '' },
+      ],
+      onSave
+    );
+    expect(screen.getByTestId(`field-${fieldKey}-row-0-carried`)).toHaveTextContent('Carried from IEP v1 (2025-10-14) · not yet reviewed');
+
+    fireEvent.click(screen.getByTestId(`field-${fieldKey}-row-0-keep`));
+    await act(async () => {});
+    expect(screen.getByTestId(`field-${fieldKey}-row-0-carried`)).toHaveTextContent('reviewed');
+    expect(screen.queryByTestId(`field-${fieldKey}-row-0-keep`)).not.toBeInTheDocument();
+    const sent = calls.at(-1) as Array<Record<string, unknown>>;
+    expect(sent[0]._confirmed).toBe(true);
+
+    const second = screen.getAllByRole('textbox', { name: /^Goal\s*\*?$/ })[1];
+    fireEvent.change(second, { target: { value: 'Write a full paragraph' } });
+    expect(screen.getByTestId(`field-${fieldKey}-row-1-carried`)).toHaveTextContent('· reviewed');
+  });
+
   it('sends the latest rows (including adopted ids) on the next save', async () => {
     const calls: unknown[] = [];
     let n = 0;

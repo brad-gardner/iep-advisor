@@ -13,7 +13,9 @@ import { fieldElementId, type FieldRendererProps } from './types';
 import { ROW_BLOCK_SEMANTICS, type ColumnSemantic, type FieldSemantic } from '@/features/admin/templates/document-semantics';
 import type { AssistKind } from '../../api/assist-types';
 import { FieldAssistBar } from './field-assist-bar';
-import { adoptRowIds, coerceRows, emptyCells, nextRowKey, rowId, type KeyedRow } from '../../lib/table-rows';
+import { adoptRowIds, carriedFrom, coerceRows, emptyCells, nextRowKey, rowId, type KeyedRow } from '../../lib/table-rows';
+import { ROW_CONFIRMED_KEY } from '@/features/admin/templates/document-semantics';
+import { useDocumentEditorContext } from '../../hooks/document-editor-context';
 
 /**
  * Repeating-group Table field: one row per array entry, one cell input per
@@ -28,6 +30,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
     config.kind === 'Table' ? config.table : { columns: [], minRows: undefined, maxRows: undefined };
   const { columns, minRows, maxRows } = table;
   const labelId = `${fieldElementId(field.id)}-label`;
+  const editor = useDocumentEditorContext();
 
   // `rowsRef` is the single source of truth and is written synchronously by
   // every mutation, so a save always sends the LATEST rows (including any
@@ -61,11 +64,20 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
     if (immediate) void autosave.flush();
   };
 
+  // Editing a carried-forward row counts as reviewing it: the stale flag clears.
   const updateCell = (rowKey: string, columnKey: string, cell: TableCellValue) =>
     commit(
-      (current) => current.map((r) => (r.key === rowKey ? { ...r, cells: { ...r.cells, [columnKey]: cell } } : r)),
+      (current) =>
+        current.map((r) =>
+          r.key === rowKey
+            ? { ...r, cells: { ...r.cells, [columnKey]: cell, ...(carriedFrom(r) && !r.cells[ROW_CONFIRMED_KEY] ? { [ROW_CONFIRMED_KEY]: true } : {}) } }
+            : r
+        ),
       false
     );
+
+  const keepRow = (rowKey: string) =>
+    commit((current) => current.map((r) => (r.key === rowKey ? { ...r, cells: { ...r.cells, [ROW_CONFIRMED_KEY]: true } } : r)), true);
 
   const addRow = () => commit((current) => [...current, { key: nextRowKey(), cells: emptyCells(columns) }], true);
   const removeRow = (rowKey: string) => commit((current) => current.filter((r) => r.key !== rowKey), true);
@@ -123,9 +135,33 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                   className="rounded-card border border-brand-slate-200 bg-brand-slate-50/60 p-4"
                   data-testid={`field-${field.fieldKey}-row-${rowIndex}`}
                 >
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <span className="text-[13px] font-medium text-brand-slate-500">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <span className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-brand-slate-500">
                       {blockLabel(blockSemantic)} {rowIndex + 1}
+                      {carriedFrom(row) && (
+                        <span
+                          className={
+                            row.cells[ROW_CONFIRMED_KEY] === true
+                              ? 'rounded-full border border-brand-slate-200 px-2 py-0.5 text-[11px] font-normal text-brand-slate-500'
+                              : 'rounded-full border border-brand-amber-200 bg-brand-amber-50 px-2 py-0.5 text-[11px] font-normal text-brand-amber-700'
+                          }
+                          data-testid={`field-${field.fieldKey}-row-${rowIndex}-carried`}
+                        >
+                          Carried from {carriedFrom(row)!.label ?? 'prior version'}
+                          {carriedFrom(row)!.date ? ` (${carriedFrom(row)!.date})` : ''}
+                          {row.cells[ROW_CONFIRMED_KEY] === true ? ' · reviewed' : ' · not yet reviewed'}
+                        </span>
+                      )}
+                      {carriedFrom(row) && row.cells[ROW_CONFIRMED_KEY] !== true && !disabled && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => keepRow(row.key)}
+                          data-testid={`field-${field.fieldKey}-row-${rowIndex}-keep`}
+                        >
+                          Keep as-is
+                        </Button>
+                      )}
                     </span>
                     <Button
                       variant="danger"
@@ -161,6 +197,18 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                             multiline={wide}
                             inputId={cellId}
                             onChange={(cell) => updateCell(row.key, col.columnKey, cell)}
+                            onFocus={
+                              col.type === 'Text'
+                                ? () =>
+                                    editor?.setActiveField({
+                                      label: `${blockLabel(blockSemantic)} ${rowIndex + 1} — ${col.label || 'field'}`,
+                                      apply: (text) => {
+                                        updateCell(row.key, col.columnKey, text);
+                                        void autosave.flush();
+                                      },
+                                    })
+                                : undefined
+                            }
                             onBlur={() => void autosave.flush()}
                           />
                         </div>
@@ -344,6 +392,7 @@ function TableCell({
   disabled,
   multiline,
   inputId,
+  onFocus,
   onChange,
   onBlur,
 }: {
@@ -356,6 +405,7 @@ function TableCell({
   multiline?: boolean;
   /** Block mode: explicit id so the visible label associates with the control. */
   inputId?: string;
+  onFocus?: () => void;
   onChange: (cell: TableCellValue) => void;
   // Flush the field's pending debounced save when the cell loses focus, so an
   // in-app navigation that blurs the cell persists the edit before unmount.
@@ -373,6 +423,7 @@ function TableCell({
         value={strValue}
         disabled={disabled}
         aria-label={ariaLabel}
+        onFocus={onFocus}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
         className={cellInputClass}
@@ -438,6 +489,7 @@ function TableCell({
           value={strValue}
           disabled={disabled}
           aria-label={ariaLabel}
+          onFocus={onFocus}
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}
           className={cellInputClass}
