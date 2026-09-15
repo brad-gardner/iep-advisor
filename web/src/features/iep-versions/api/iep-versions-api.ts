@@ -1,23 +1,10 @@
 import { apiClient } from '@/lib/api-client';
 import type { ApiResponse } from '@/types/api';
 import type {
-  FinalizeIepDraftRequest,
   IepVersionDto,
   IepVersionPdfStatusDto,
   IepVersionSummaryDto,
 } from '../types';
-
-// Finalize a draft into an immutable version (educator). Returns the new summary.
-export async function finalizeDraft(
-  draftId: number,
-  data: FinalizeIepDraftRequest
-): Promise<ApiResponse<IepVersionSummaryDto>> {
-  const res = await apiClient.post<ApiResponse<IepVersionSummaryDto>>(
-    `/api/iep-drafts/${draftId}/finalize`,
-    data
-  );
-  return res.data;
-}
 
 // Educator: versions for a school student (newest version first).
 export async function listVersionsForStudent(

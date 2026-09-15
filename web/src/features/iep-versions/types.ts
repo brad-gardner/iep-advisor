@@ -5,10 +5,6 @@ export type PdfRenderStatus = 'Pending' | 'Rendered' | 'Error';
 
 // ---- Requests ----
 
-export interface FinalizeIepDraftRequest {
-  effectiveDate?: string | null; // ISO date (yyyy-MM-dd), optional
-}
-
 // ---- Responses ----
 
 export interface IepVersionSummaryDto {

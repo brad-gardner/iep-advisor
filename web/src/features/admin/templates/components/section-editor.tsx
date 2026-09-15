@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { useAutosave } from '@/features/iep-authoring/hooks/use-autosave';
+import { useAutosave } from '@/hooks/use-autosave';
 import type { TemplateSectionDto } from '../types';
 import type { TemplateBuilder } from '../hooks/use-template-builder';
 import { AutosaveIndicator } from './autosave-indicator';

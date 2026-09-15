@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAutosave } from '@/features/iep-authoring/hooks/use-autosave';
+import { useAutosave } from '@/hooks/use-autosave';
 import {
   parseConfig,
   readColumnOptions,
@@ -10,7 +10,9 @@ import {
 import type { TableCellValue, TableRowValue } from '../../types';
 import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { fieldElementId, type FieldRendererProps } from './types';
-import { ROW_ID_KEY } from '@/features/admin/templates/document-semantics';
+import { ROW_ID_KEY, ROW_BLOCK_SEMANTICS } from '@/features/admin/templates/document-semantics';
+import type { AssistKind } from '../../api/assist-types';
+import { FieldAssistBar } from './field-assist-bar';
 import type { SaveResult } from '../../hooks/use-document-instance';
 
 /** Row wrapper carrying a stable client key so add/remove keeps React identity
@@ -107,6 +109,25 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
   const atMax = maxRows != null && rows.length >= maxRows;
   const atMin = minRows != null && rows.length <= minRows;
 
+  // AI help per row is offered for semantic row blocks (goals, services, …).
+  // The suggestion lands in the row's primary text column; goals also offer
+  // "Pull from student" and the measurement kind.
+  const blockSemantic = config.kind === 'Table' ? config.semantic : undefined;
+  const isRowBlock = blockSemantic != null && ROW_BLOCK_SEMANTICS.has(blockSemantic);
+  const primaryColumn =
+    columns.find((c) =>
+      blockSemantic === 'goals'
+        ? c.semantic === 'goalText'
+        : blockSemantic === 'services'
+          ? c.semantic === 'serviceType'
+          : blockSemantic === 'accommodations'
+            ? c.semantic === 'accommodation'
+            : blockSemantic === 'transition'
+              ? c.semantic === 'transitionServices'
+              : false
+    ) ?? columns.find((c) => c.type === 'Text');
+  const rowKinds: AssistKind[] = blockSemantic === 'goals' ? ['Rewrite', 'Improve', 'SuggestMeasurement'] : ['Rewrite', 'Improve'];
+
   return (
     <div role="group" aria-labelledby={labelId}>
       <div id={labelId} className="mb-1 block text-[13px] font-medium text-brand-slate-600">
@@ -187,7 +208,30 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                     </Button>
                   </td>
                 </tr>
-              ))
+              )).flatMap((tr, rowIndex) => {
+                const row = rows[rowIndex];
+                const rowId = row.cells[ROW_ID_KEY];
+                if (!isRowBlock || !primaryColumn || typeof rowId !== 'string' || !rowId) return [tr];
+                return [
+                  tr,
+                  <tr key={`${row.key}-assist`} className="border-b border-brand-slate-100 last:border-0">
+                    <td colSpan={columns.length + 1} className="px-2 pb-2">
+                      <FieldAssistBar
+                        fieldKey={field.fieldKey}
+                        rowId={rowId}
+                        kinds={rowKinds}
+                        allowPull={blockSemantic === 'goals'}
+                        onApply={(text) => {
+                          updateCell(rowIndex, primaryColumn.columnKey, text);
+                          void autosave.flush();
+                        }}
+                        disabled={disabled}
+                        testIdPrefix={`field-${field.fieldKey}-row-${rowIndex}`}
+                      />
+                    </td>
+                  </tr>,
+                ];
+              })
             )}
           </tbody>
         </table>

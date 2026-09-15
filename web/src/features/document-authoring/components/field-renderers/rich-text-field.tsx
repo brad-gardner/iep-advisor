@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
 import { Textarea } from '@/components/ui/input';
-import { useAutosave } from '@/features/iep-authoring/hooks/use-autosave';
+import { useAutosave } from '@/hooks/use-autosave';
 import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { FieldLabel } from './field-label';
 import { fieldElementId, type FieldRendererProps } from './types';
+import { FieldAssistBar } from './field-assist-bar';
 
 /**
  * RichText field. The backend sanitizes RichText to an allowlist on save; for
@@ -34,6 +35,16 @@ export function RichTextField({ field, value, disabled, onSave }: FieldRendererP
         onChange={(e) => handleChange(e.target.value)}
         onBlur={() => void autosave.flush()}
         data-testid={`field-${field.fieldKey}`}
+      />
+      <FieldAssistBar
+        fieldKey={field.fieldKey}
+        onApply={(text) => {
+          handleChange(text);
+          void autosave.flush();
+        }}
+        allowPull
+        disabled={disabled}
+        testIdPrefix={`field-${field.fieldKey}`}
       />
     </div>
   );

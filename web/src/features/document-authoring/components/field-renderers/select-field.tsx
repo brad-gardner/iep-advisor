@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Select } from '@/components/ui/input';
-import { useAutosave } from '@/features/iep-authoring/hooks/use-autosave';
+import { useAutosave } from '@/hooks/use-autosave';
 import { parseConfig } from '@/features/admin/templates/template-config';
 import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { FieldLabel } from './field-label';

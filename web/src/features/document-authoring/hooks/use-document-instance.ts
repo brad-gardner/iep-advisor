@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AxiosError } from 'axios';
 import type { ApiResponse } from '@/types/api';
-import type { AutosaveStatus } from '@/features/iep-authoring/hooks/use-autosave';
+import type { AutosaveStatus } from '@/hooks/use-autosave';
 import { getDocument, saveValues as saveValuesApi } from '../api/documents-api';
 import type { DocumentInstanceDetailDto, DocumentValuePatch } from '../types';
 

@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { useAutosave } from '@/features/iep-authoring/hooks/use-autosave';
+import { useAutosave } from '@/hooks/use-autosave';
 import type { FieldType, TemplateFieldDto } from '../types';
 import {
   defaultConfig,

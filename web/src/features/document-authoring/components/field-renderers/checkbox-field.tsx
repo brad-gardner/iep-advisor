@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { useAutosave } from '@/features/iep-authoring/hooks/use-autosave';
+import { useAutosave } from '@/hooks/use-autosave';
 import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { fieldElementId, type FieldRendererProps } from './types';
 

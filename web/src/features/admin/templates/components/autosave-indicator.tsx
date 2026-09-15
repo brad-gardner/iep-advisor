@@ -1,6 +1,6 @@
 import { Check, CircleAlert } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
-import type { AutosaveStatus } from '@/features/iep-authoring/hooks/use-autosave';
+import type { AutosaveStatus } from '@/hooks/use-autosave';
 
 /** Compact save-state pill for a debounced autosave. Idle renders nothing. */
 export function AutosaveIndicator({ status }: { status: AutosaveStatus }) {
