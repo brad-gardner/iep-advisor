@@ -19,16 +19,18 @@ public interface IOrgAccessService
     Task<StaffContext?> GetStaffContextAsync(int userId, CancellationToken ct = default);
 
     /// <summary>
-    /// True if the caller may act on the given school. DistrictAdmin: the school must belong to their
-    /// district. SchoolAdmin/Teacher: the school must be their own <c>SchoolId</c>.
+    /// True if the caller may act on the given school. DistrictAdmin and RelatedServiceProvider: the
+    /// school must be an active school of their district. SchoolAdmin/Teacher/GeneralEducator: the school
+    /// must be their own <c>SchoolId</c>.
     /// </summary>
     Task<bool> CanActOnSchoolAsync(int userId, int schoolId, CancellationToken ct = default);
 
     /// <summary>
     /// True if the caller may act on the given student at or above <paramref name="minRole"/>.
     /// District/School admins pass within their scope regardless of <c>SchoolStudentAccess</c>
-    /// (player-coach superset); Teachers require an active <c>SchoolStudentAccess</c> row with
-    /// Role &gt;= <paramref name="minRole"/>.
+    /// (player-coach superset); Teacher-tier roles require an active <c>SchoolStudentAccess</c> row with
+    /// Role &gt;= <paramref name="minRole"/> (RelatedServiceProvider on any active school of the district,
+    /// Teacher/GeneralEducator on their own school only).
     /// </summary>
     Task<bool> CanActOnStudentAsync(int userId, int schoolStudentId, AccessRole minRole, CancellationToken ct = default);
 }

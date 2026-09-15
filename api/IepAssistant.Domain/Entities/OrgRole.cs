@@ -2,8 +2,9 @@ namespace IepAssistant.Domain.Entities;
 
 /// <summary>
 /// Org-role lookup table (user decision: a DB lookup table, not a code enum). Seeded with stable IDs
-/// 1=DistrictAdmin, 2=SchoolAdmin, 3=Teacher. Referenced by <see cref="StaffProfile.OrgRoleId"/>.
-/// Code-side constants live in <c>IepAssistant.Services.Models.OrgRoleIds</c>.
+/// 1=DistrictAdmin, 2=SchoolAdmin, 3=Teacher, 4=RelatedServiceProvider, 5=GeneralEducator. Referenced by
+/// <see cref="StaffProfile.OrgRoleId"/>. Code-side constants live in
+/// <c>IepAssistant.Services.Models.OrgRoleIds</c>.
 /// </summary>
 public class OrgRole
 {

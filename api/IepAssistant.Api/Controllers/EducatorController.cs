@@ -16,11 +16,13 @@ public class EducatorController : ControllerBase
 {
     private readonly IEducatorService _educatorService;
     private readonly IChildLinkService _childLinkService;
+    private readonly IStudentTeamService _teamService;
 
-    public EducatorController(IEducatorService educatorService, IChildLinkService childLinkService)
+    public EducatorController(IEducatorService educatorService, IChildLinkService childLinkService, IStudentTeamService teamService)
     {
         _educatorService = educatorService;
         _childLinkService = childLinkService;
+        _teamService = teamService;
     }
 
     [HttpGet("me")]
@@ -36,16 +38,53 @@ public class EducatorController : ControllerBase
         return Ok(ApiResponse<EducatorProfileDto>.SuccessResponse(MapProfile(result.Data!)));
     }
 
+    /// <summary>
+    /// Paged roster. <c>status</c> = Active (default) | Exited | Archived | All; <c>query</c> matches
+    /// first/last name or external student id; <c>schoolId</c>/<c>grade</c> narrow the role-scoped set.
+    /// </summary>
     [HttpGet("students")]
-    [ProducesResponseType(typeof(ApiResponse<IEnumerable<SchoolStudentDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetStudents(CancellationToken ct)
+    [ProducesResponseType(typeof(ApiResponse<PagedResultDto<SchoolStudentDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetStudents(
+        [FromQuery] string? query,
+        [FromQuery] int? schoolId,
+        [FromQuery] string? status,
+        [FromQuery] GradeLevel? grade,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken ct = default)
     {
-        var result = await _educatorService.GetStudentsAsync(User.GetUserId(), ct);
+        StudentStatus? statusFilter = StudentStatus.Active;
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (status.Equals("All", StringComparison.OrdinalIgnoreCase))
+                statusFilter = null;
+            else if (Enum.TryParse<StudentStatus>(status, ignoreCase: true, out var parsed))
+                statusFilter = parsed;
+            else
+                return BadRequest(ApiResponse<object>.Error("Invalid status filter."));
+        }
+
+        var result = await _educatorService.SearchStudentsAsync(User.GetUserId(), new StudentSearchQuery
+        {
+            Query = query,
+            SchoolId = schoolId,
+            Status = statusFilter,
+            Grade = grade,
+            Page = page,
+            PageSize = pageSize
+        }, ct);
 
         if (!result.Success)
-            return MapFailure<IEnumerable<SchoolStudentDto>>(result.Message);
+            return MapFailure<PagedResultDto<SchoolStudentDto>>(result.Message);
 
-        return Ok(ApiResponse<IEnumerable<SchoolStudentDto>>.SuccessResponse(result.Data!.Select(MapStudent)));
+        return Ok(ApiResponse<PagedResultDto<SchoolStudentDto>>.SuccessResponse(new PagedResultDto<SchoolStudentDto>
+        {
+            Items = result.Data!.Items.Select(MapStudent).ToList(),
+            Total = result.Data.Total,
+            Page = result.Data.Page,
+            PageSize = result.Data.PageSize
+        }));
     }
 
     [HttpPost("students")]
@@ -62,8 +101,14 @@ public class EducatorController : ControllerBase
             LastName = request.LastName,
             DateOfBirth = request.DateOfBirth,
             StateCode = request.StateCode,
+            ExternalStudentId = request.ExternalStudentId,
             GradeLevel = request.GradeLevel,
             DisabilityCategory = request.DisabilityCategory,
+            HomeLanguage = request.HomeLanguage,
+            IepDate = request.IepDate,
+            AnnualReviewDueDate = request.AnnualReviewDueDate,
+            EtrDate = request.EtrDate,
+            ReevaluationDueDate = request.ReevaluationDueDate,
             SchoolId = request.SchoolId
         }, ct);
 
@@ -87,6 +132,166 @@ public class EducatorController : ControllerBase
             return MapFailure<SchoolStudentDto>(result.Message);
 
         return Ok(ApiResponse<SchoolStudentDto>.SuccessResponse(MapStudent(result.Data!)));
+    }
+
+    // ----------------------------------------------------------------- Lifecycle
+
+    [HttpPut("students/{studentId}")]
+    [ProducesResponseType(typeof(ApiResponse<SchoolStudentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateStudent(int studentId, [FromBody] UpdateSchoolStudentRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var result = await _educatorService.UpdateStudentAsync(User.GetUserId(), studentId, new UpdateSchoolStudentModel
+        {
+            FirstName = request.FirstName,
+            LastName = request.LastName,
+            DateOfBirth = request.DateOfBirth,
+            StateCode = request.StateCode,
+            ExternalStudentId = request.ExternalStudentId,
+            GradeLevel = request.GradeLevel,
+            DisabilityCategory = request.DisabilityCategory,
+            HomeLanguage = request.HomeLanguage,
+            IepDate = request.IepDate,
+            AnnualReviewDueDate = request.AnnualReviewDueDate,
+            EtrDate = request.EtrDate,
+            ReevaluationDueDate = request.ReevaluationDueDate
+        }, ct);
+
+        return StudentResult(result);
+    }
+
+    [HttpPost("students/{studentId}/exit")]
+    [ProducesResponseType(typeof(ApiResponse<SchoolStudentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExitStudent(int studentId, [FromBody] ExitStudentRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var result = await _educatorService.ExitStudentAsync(User.GetUserId(), studentId,
+            new ExitStudentModel { ExitReason = request.ExitReason, ExitedAt = request.ExitedAt }, ct);
+        return StudentResult(result);
+    }
+
+    [HttpPost("students/{studentId}/reactivate")]
+    [ProducesResponseType(typeof(ApiResponse<SchoolStudentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ReactivateStudent(int studentId, CancellationToken ct)
+        => StudentResult(await _educatorService.ReactivateStudentAsync(User.GetUserId(), studentId, ct));
+
+    [HttpPost("students/{studentId}/archive")]
+    [ProducesResponseType(typeof(ApiResponse<SchoolStudentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ArchiveStudent(int studentId, CancellationToken ct)
+        => StudentResult(await _educatorService.ArchiveStudentAsync(User.GetUserId(), studentId, ct));
+
+    [HttpPost("students/{studentId}/transfer")]
+    [ProducesResponseType(typeof(ApiResponse<SchoolStudentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> TransferStudent(int studentId, [FromBody] TransferStudentRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        return StudentResult(await _educatorService.TransferStudentAsync(User.GetUserId(), studentId, request.NewSchoolId, ct));
+    }
+
+    [HttpPost("students/bulk/case-manager")]
+    [ProducesResponseType(typeof(ApiResponse<BulkAssignResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> AssignCaseManagerBulk([FromBody] BulkAssignCaseManagerRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var result = await _educatorService.AssignCaseManagerBulkAsync(User.GetUserId(),
+            new BulkAssignCaseManagerModel { StudentIds = request.StudentIds, UserId = request.UserId }, ct);
+        if (!result.Success)
+            return MapFailure<BulkAssignResultDto>(result.Message);
+
+        return Ok(ApiResponse<BulkAssignResultDto>.SuccessResponse(new BulkAssignResultDto { Updated = result.Data!.Updated }));
+    }
+
+    // ----------------------------------------------------------------- IEP team
+
+    [HttpGet("students/{studentId}/team")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<StudentTeamMemberDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetTeam(int studentId, CancellationToken ct)
+    {
+        var result = await _teamService.GetTeamAsync(User.GetUserId(), studentId, ct);
+        if (!result.Success)
+            return MapFailure<IEnumerable<StudentTeamMemberDto>>(result.Message);
+
+        return Ok(ApiResponse<IEnumerable<StudentTeamMemberDto>>.SuccessResponse(result.Data!.Select(MapTeamMember)));
+    }
+
+    [HttpPost("students/{studentId}/team")]
+    [ProducesResponseType(typeof(ApiResponse<StudentTeamMemberDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AddTeamMember(int studentId, [FromBody] AddTeamMemberRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var result = await _teamService.AddMemberAsync(User.GetUserId(), studentId, new AddTeamMemberModel
+        {
+            StaffProfileId = request.StaffProfileId,
+            TeamRole = request.TeamRole,
+            IsLead = request.IsLead,
+            AccessRole = request.AccessRole
+        }, ct);
+        return TeamMemberResult(result);
+    }
+
+    [HttpPut("students/{studentId}/team/{memberId}")]
+    [ProducesResponseType(typeof(ApiResponse<StudentTeamMemberDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateTeamMember(int studentId, int memberId, [FromBody] UpdateTeamMemberRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var result = await _teamService.UpdateMemberAsync(User.GetUserId(), studentId, memberId,
+            new UpdateTeamMemberModel { TeamRole = request.TeamRole, AccessRole = request.AccessRole }, ct);
+        return TeamMemberResult(result);
+    }
+
+    [HttpPost("students/{studentId}/team/{memberId}/lead")]
+    [ProducesResponseType(typeof(ApiResponse<StudentTeamMemberDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetTeamLead(int studentId, int memberId, CancellationToken ct)
+        => TeamMemberResult(await _teamService.SetLeadAsync(User.GetUserId(), studentId, memberId, ct));
+
+    [HttpDelete("students/{studentId}/team/{memberId}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveTeamMember(int studentId, int memberId, CancellationToken ct)
+    {
+        var result = await _teamService.RemoveMemberAsync(User.GetUserId(), studentId, memberId, ct);
+        if (!result.Success)
+            return MapFailure<object>(result.Message);
+
+        return NoContent();
     }
 
     [HttpPost("students/{studentId}/invite-parent")]
@@ -238,6 +443,36 @@ public class EducatorController : ControllerBase
         Credentials = m.Credentials
     };
 
+    private IActionResult StudentResult(ServiceResult<SchoolStudentModel> result)
+    {
+        if (!result.Success)
+            return MapFailure<SchoolStudentDto>(result.Message);
+        return Ok(ApiResponse<SchoolStudentDto>.SuccessResponse(MapStudent(result.Data!)));
+    }
+
+    private IActionResult TeamMemberResult(ServiceResult<StudentTeamMemberModel> result)
+    {
+        if (!result.Success)
+            return MapFailure<StudentTeamMemberDto>(result.Message);
+        return Ok(ApiResponse<StudentTeamMemberDto>.SuccessResponse(MapTeamMember(result.Data!)));
+    }
+
+    private static StudentTeamMemberDto MapTeamMember(StudentTeamMemberModel m) => new()
+    {
+        Id = m.Id,
+        UserId = m.UserId,
+        StaffProfileId = m.StaffProfileId,
+        FirstName = m.FirstName,
+        LastName = m.LastName,
+        Email = m.Email,
+        OrgRoleName = m.OrgRoleName,
+        TeamRole = m.TeamRole,
+        IsLead = m.IsLead,
+        AccessRole = m.AccessRole,
+        IsActive = m.IsActive,
+        AddedAt = m.AddedAt
+    };
+
     private static SchoolStudentDto MapStudent(SchoolStudentModel m) => new()
     {
         Id = m.Id,
@@ -247,8 +482,20 @@ public class EducatorController : ControllerBase
         LastName = m.LastName,
         DateOfBirth = m.DateOfBirth,
         StateCode = m.StateCode,
+        ExternalStudentId = m.ExternalStudentId,
         GradeLevel = m.GradeLevel,
         DisabilityCategory = m.DisabilityCategory,
+        LegacyDisabilityText = m.LegacyDisabilityText,
+        HomeLanguage = m.HomeLanguage,
+        Status = m.Status,
+        ExitedAt = m.ExitedAt,
+        ExitReason = m.ExitReason,
+        CaseManagerUserId = m.CaseManagerUserId,
+        CaseManagerName = m.CaseManagerName,
+        IepDate = m.IepDate,
+        AnnualReviewDueDate = m.AnnualReviewDueDate,
+        EtrDate = m.EtrDate,
+        ReevaluationDueDate = m.ReevaluationDueDate,
         IsActive = m.IsActive,
         CreatedAt = m.CreatedAt
     };

@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
@@ -9,14 +10,19 @@ namespace IepAssistant.Services.Implementations;
 
 public class EducatorService : IEducatorService
 {
+    private const string DuplicateExternalIdMessage = "Student ID already in use in this district.";
+    private const string StudentResource = "SchoolStudent";
+
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
+    private readonly IAuditLogger _audit;
     private readonly ILogger<EducatorService> _logger;
 
-    public EducatorService(ApplicationDbContext context, IOrgAccessService orgAccess, ILogger<EducatorService> logger)
+    public EducatorService(ApplicationDbContext context, IOrgAccessService orgAccess, IAuditLogger audit, ILogger<EducatorService> logger)
     {
         _context = context;
         _orgAccess = orgAccess;
+        _audit = audit;
         _logger = logger;
     }
 
@@ -34,6 +40,8 @@ public class EducatorService : IEducatorService
 
         return ServiceResult<EducatorProfileModel>.SuccessResult(BuildProfileModel(profile));
     }
+
+    // ----------------------------------------------------------------- Create / read
 
     public async Task<ServiceResult<SchoolStudentModel>> CreateStudentAsync(int userId, CreateSchoolStudentModel model, CancellationToken ct = default)
     {
@@ -60,7 +68,7 @@ public class EducatorService : IEducatorService
         }
         else
         {
-            // SchoolAdmin / Teacher: own school only. An explicit mismatched school is denied.
+            // SchoolAdmin / Teacher-tier: own school only. An explicit mismatched school is denied.
             if (ctx.SchoolId == null)
                 return ServiceResult<SchoolStudentModel>.FailureResult("A school is required to create a student.");
             if (model.SchoolId != null && model.SchoolId.Value != ctx.SchoolId.Value)
@@ -68,26 +76,46 @@ public class EducatorService : IEducatorService
             targetSchoolId = ctx.SchoolId.Value;
         }
 
-        var schoolStateCode = await _context.Schools.AsNoTracking()
+        var school = await _context.Schools.AsNoTracking()
             .Where(s => s.Id == targetSchoolId)
-            .Select(s => s.StateCode ?? s.District.StateCode)
-            .FirstOrDefaultAsync(ct);
+            .Select(s => new { s.DistrictId, s.Name, StateCode = s.StateCode ?? s.District.StateCode })
+            .FirstAsync(ct);
+
+        var externalId = NormalizeExternalId(model.ExternalStudentId);
+        if (externalId != null && await ExternalIdInUseAsync(school.DistrictId, externalId, excludeStudentId: null, ct))
+            return ServiceResult<SchoolStudentModel>.FailureResult(DuplicateExternalIdMessage);
 
         var student = new SchoolStudent
         {
             SchoolId = targetSchoolId,
+            DistrictId = school.DistrictId,
             FirstName = model.FirstName.Trim(),
-            LastName = string.IsNullOrWhiteSpace(model.LastName) ? null : model.LastName.Trim(),
+            LastName = NormalizeOptional(model.LastName),
             DateOfBirth = model.DateOfBirth,
             // Default to the school's state so state-specific templates resolve for the student.
-            StateCode = string.IsNullOrWhiteSpace(model.StateCode) ? schoolStateCode : model.StateCode.Trim(),
-            GradeLevel = string.IsNullOrWhiteSpace(model.GradeLevel) ? null : model.GradeLevel.Trim(),
-            DisabilityCategory = string.IsNullOrWhiteSpace(model.DisabilityCategory) ? null : model.DisabilityCategory.Trim(),
+            StateCode = string.IsNullOrWhiteSpace(model.StateCode) ? school.StateCode : model.StateCode.Trim(),
+            ExternalStudentId = externalId,
+            GradeLevel = model.GradeLevel,
+            DisabilityCategory = model.DisabilityCategory,
+            HomeLanguage = NormalizeOptional(model.HomeLanguage) ?? "en",
+            IepDate = model.IepDate?.Date,
+            AnnualReviewDueDate = model.AnnualReviewDueDate?.Date,
+            EtrDate = model.EtrDate?.Date,
+            ReevaluationDueDate = model.ReevaluationDueDate?.Date,
+            Status = StudentStatus.Active,
             IsActive = true,
             CreatedById = userId
         };
         await _context.SchoolStudents.AddAsync(student, ct);
-        await _context.SaveChangesAsync(ct);
+        try
+        {
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsExternalIdCollision(ex))
+        {
+            _context.Entry(student).State = EntityState.Detached;
+            return ServiceResult<SchoolStudentModel>.FailureResult(DuplicateExternalIdMessage);
+        }
 
         await _context.SchoolStudentAccesses.AddAsync(new SchoolStudentAccess
         {
@@ -99,9 +127,7 @@ public class EducatorService : IEducatorService
         }, ct);
         await _context.SaveChangesAsync(ct);
 
-        var schoolName = await _context.Schools.AsNoTracking()
-            .Where(s => s.Id == targetSchoolId).Select(s => s.Name).FirstOrDefaultAsync(ct);
-        return ServiceResult<SchoolStudentModel>.SuccessResult(MapStudent(student, schoolName));
+        return ServiceResult<SchoolStudentModel>.SuccessResult(await LoadStudentAsync(student.Id, ct));
     }
 
     public async Task<ServiceResult<List<SchoolStudentModel>>> GetStudentsAsync(int userId, CancellationToken ct = default)
@@ -110,57 +136,71 @@ public class EducatorService : IEducatorService
         if (ctx == null)
             return ServiceResult<List<SchoolStudentModel>>.FailureResult("Educator profile not found.");
 
-        // Base query: active students projected with their school name (so DistrictAdmin can group/filter).
-        // Role-branched so that the list authorization matches GetStudentAsync exactly (no
-        // "visible-but-not-openable"): teachers see only students they hold an active SchoolStudentAccess
-        // on; SchoolAdmin sees their whole school; DistrictAdmin sees all active students across the active
-        // schools in their district.
-        IQueryable<SchoolStudent> query;
-        if (ctx.OrgRoleId == OrgRoleIds.DistrictAdmin)
-        {
-            query = _context.SchoolStudents
-                .Where(s => s.IsActive
-                         && s.School.IsActive
-                         && s.School.DistrictId == ctx.DistrictId);
-        }
-        else if (ctx.OrgRoleId == OrgRoleIds.SchoolAdmin)
-        {
-            if (ctx.SchoolId == null)
-                return ServiceResult<List<SchoolStudentModel>>.SuccessResult(new List<SchoolStudentModel>());
-            query = _context.SchoolStudents
-                .Where(s => s.IsActive && s.SchoolId == ctx.SchoolId.Value);
-        }
-        else
-        {
-            // Teacher: only students with an active SchoolStudentAccess granted to this user (any role).
-            // This is the same gate CanActOnStudentAsync applies in detail, so list == detail.
-            query = _context.SchoolStudents
-                .Where(s => s.IsActive
-                         && _context.SchoolStudentAccesses.Any(a =>
-                                a.SchoolStudentId == s.Id && a.UserId == userId && a.IsActive));
-        }
+        var query = ScopedStudents(ctx, userId);
+        if (query == null)
+            return ServiceResult<List<SchoolStudentModel>>.SuccessResult(new List<SchoolStudentModel>());
 
         var students = await query
+            .Where(s => s.Status == StudentStatus.Active)
             .AsNoTracking()
             .OrderBy(s => s.LastName)
             .ThenBy(s => s.FirstName)
-            .Select(s => new SchoolStudentModel
-            {
-                Id = s.Id,
-                SchoolId = s.SchoolId,
-                SchoolName = s.School.Name,
-                FirstName = s.FirstName,
-                LastName = s.LastName,
-                DateOfBirth = s.DateOfBirth,
-                StateCode = s.StateCode,
-                GradeLevel = s.GradeLevel,
-                DisabilityCategory = s.DisabilityCategory,
-                IsActive = s.IsActive,
-                CreatedAt = s.CreatedAt
-            })
+            .Select(Projection)
             .ToListAsync(ct);
 
         return ServiceResult<List<SchoolStudentModel>>.SuccessResult(students);
+    }
+
+    public async Task<ServiceResult<PagedResult<SchoolStudentModel>>> SearchStudentsAsync(int userId, StudentSearchQuery search, CancellationToken ct = default)
+    {
+        var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
+        if (ctx == null)
+            return ServiceResult<PagedResult<SchoolStudentModel>>.FailureResult("Educator profile not found.");
+
+        var page = Math.Max(1, search.Page);
+        var pageSize = Math.Clamp(search.PageSize, 1, 200);
+
+        var query = ScopedStudents(ctx, userId);
+        if (query == null)
+            return ServiceResult<PagedResult<SchoolStudentModel>>.SuccessResult(new PagedResult<SchoolStudentModel> { Page = page, PageSize = pageSize });
+
+        // Filters only ever NARROW the role-scoped query — a client-supplied schoolId outside the
+        // caller's scope simply yields nothing.
+        if (search.Status != null)
+            query = query.Where(s => s.Status == search.Status.Value);
+        if (search.SchoolId != null)
+            query = query.Where(s => s.SchoolId == search.SchoolId.Value);
+        if (search.Grade != null)
+            query = query.Where(s => s.GradeLevel == search.Grade.Value);
+        if (!string.IsNullOrWhiteSpace(search.Query))
+        {
+            // LIKE is case-insensitive under SQL Server's default collation and for ASCII on SQLite;
+            // wildcards in the user's text are escaped so they match literally.
+            var pattern = "%" + EscapeLike(search.Query.Trim()) + "%";
+            query = query.Where(s =>
+                EF.Functions.Like(s.FirstName, pattern, "\\")
+                || (s.LastName != null && EF.Functions.Like(s.LastName, pattern, "\\"))
+                || (s.ExternalStudentId != null && EF.Functions.Like(s.ExternalStudentId, pattern, "\\")));
+        }
+
+        query = query.AsNoTracking();
+        var total = await query.CountAsync(ct);
+        var items = await query
+            .OrderBy(s => s.LastName)
+            .ThenBy(s => s.FirstName)
+            .ThenBy(s => s.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(Projection)
+            .ToListAsync(ct);
+
+        return ServiceResult<PagedResult<SchoolStudentModel>>.SuccessResult(new PagedResult<SchoolStudentModel>
+        {
+            Items = items,
+            Total = total,
+            Page = page,
+            PageSize = pageSize
+        });
     }
 
     public async Task<ServiceResult<SchoolStudentModel>> GetStudentAsync(int userId, int studentId, CancellationToken ct = default)
@@ -173,20 +213,7 @@ public class EducatorService : IEducatorService
         var model = await _context.SchoolStudents
             .AsNoTracking()
             .Where(s => s.Id == studentId)
-            .Select(s => new SchoolStudentModel
-            {
-                Id = s.Id,
-                SchoolId = s.SchoolId,
-                SchoolName = s.School.Name,
-                FirstName = s.FirstName,
-                LastName = s.LastName,
-                DateOfBirth = s.DateOfBirth,
-                StateCode = s.StateCode,
-                GradeLevel = s.GradeLevel,
-                DisabilityCategory = s.DisabilityCategory,
-                IsActive = s.IsActive,
-                CreatedAt = s.CreatedAt
-            })
+            .Select(Projection)
             .FirstOrDefaultAsync(ct);
         if (model == null)
             return ServiceResult<SchoolStudentModel>.FailureResult("Student not found.");
@@ -194,7 +221,251 @@ public class EducatorService : IEducatorService
         return ServiceResult<SchoolStudentModel>.SuccessResult(model);
     }
 
-    // ----------------------------------------------------------------- Staff assignment
+    // ----------------------------------------------------------------- Lifecycle
+
+    public async Task<ServiceResult<SchoolStudentModel>> UpdateStudentAsync(int userId, int studentId, UpdateSchoolStudentModel model, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(model.FirstName))
+            return ServiceResult<SchoolStudentModel>.FailureResult("Student first name is required.");
+
+        // Collaborator+ on the student (teacher-tier) or an admin in scope (player-coach superset).
+        if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Collaborator, ct))
+            return ServiceResult<SchoolStudentModel>.FailureResult("You do not have permission to edit this student.");
+
+        var student = await _context.SchoolStudents.FirstOrDefaultAsync(s => s.Id == studentId, ct);
+        if (student == null)
+            return ServiceResult<SchoolStudentModel>.FailureResult("Student not found.");
+
+        var externalId = NormalizeExternalId(model.ExternalStudentId);
+        if (externalId != null && externalId != student.ExternalStudentId
+            && await ExternalIdInUseAsync(student.DistrictId, externalId, student.Id, ct))
+            return ServiceResult<SchoolStudentModel>.FailureResult(DuplicateExternalIdMessage);
+
+        student.FirstName = model.FirstName.Trim();
+        student.LastName = NormalizeOptional(model.LastName);
+        student.DateOfBirth = model.DateOfBirth;
+        student.StateCode = NormalizeOptional(model.StateCode)?.ToUpperInvariant();
+        student.ExternalStudentId = externalId;
+        student.GradeLevel = model.GradeLevel;
+        student.DisabilityCategory = model.DisabilityCategory;
+        if (model.DisabilityCategory != null && model.DisabilityCategory != DisabilityCategory.Other)
+            student.LegacyDisabilityText = null; // a real category supersedes the preserved legacy text
+        student.HomeLanguage = NormalizeOptional(model.HomeLanguage);
+        student.IepDate = model.IepDate?.Date;
+        student.AnnualReviewDueDate = model.AnnualReviewDueDate?.Date;
+        student.EtrDate = model.EtrDate?.Date;
+        student.ReevaluationDueDate = model.ReevaluationDueDate?.Date;
+        student.UpdatedById = userId;
+
+        try
+        {
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsExternalIdCollision(ex))
+        {
+            return ServiceResult<SchoolStudentModel>.FailureResult(DuplicateExternalIdMessage);
+        }
+
+        _audit.Record(AuditAction.Edit, userId, StudentResource, studentId);
+        return ServiceResult<SchoolStudentModel>.SuccessResult(await LoadStudentAsync(studentId, ct));
+    }
+
+    public async Task<ServiceResult<SchoolStudentModel>> ExitStudentAsync(int userId, int studentId, ExitStudentModel model, CancellationToken ct = default)
+    {
+        var (student, denied) = await LoadForAdminMutationAsync(userId, studentId, ct);
+        if (denied != null)
+            return ServiceResult<SchoolStudentModel>.FailureResult(denied);
+
+        if (student!.Status == StudentStatus.Exited)
+            return ServiceResult<SchoolStudentModel>.FailureResult("Student has already been exited.");
+
+        student.Status = StudentStatus.Exited;
+        student.IsActive = false;
+        student.ExitedAt = model.ExitedAt ?? DateTime.UtcNow;
+        student.ExitReason = model.ExitReason;
+        student.UpdatedById = userId;
+        await _context.SaveChangesAsync(ct);
+
+        _audit.Record(AuditAction.Edit, userId, StudentResource, studentId);
+        _logger.LogInformation("Student {StudentId} exited ({Reason}) by user {CallerId}", studentId, model.ExitReason, userId);
+        return ServiceResult<SchoolStudentModel>.SuccessResult(await LoadStudentAsync(studentId, ct));
+    }
+
+    public async Task<ServiceResult<SchoolStudentModel>> ReactivateStudentAsync(int userId, int studentId, CancellationToken ct = default)
+    {
+        var (student, denied) = await LoadForAdminMutationAsync(userId, studentId, ct);
+        if (denied != null)
+            return ServiceResult<SchoolStudentModel>.FailureResult(denied);
+
+        if (student!.Status != StudentStatus.Active)
+        {
+            student.Status = StudentStatus.Active;
+            student.IsActive = true;
+            student.ExitedAt = null;
+            student.ExitReason = null;
+            student.UpdatedById = userId;
+            await _context.SaveChangesAsync(ct);
+
+            _audit.Record(AuditAction.Edit, userId, StudentResource, studentId);
+            _logger.LogInformation("Student {StudentId} reactivated by user {CallerId}", studentId, userId);
+        }
+
+        return ServiceResult<SchoolStudentModel>.SuccessResult(await LoadStudentAsync(studentId, ct));
+    }
+
+    public async Task<ServiceResult<SchoolStudentModel>> ArchiveStudentAsync(int userId, int studentId, CancellationToken ct = default)
+    {
+        var (student, denied) = await LoadForAdminMutationAsync(userId, studentId, ct);
+        if (denied != null)
+            return ServiceResult<SchoolStudentModel>.FailureResult(denied);
+
+        if (student!.Status != StudentStatus.Archived)
+        {
+            student.Status = StudentStatus.Archived;
+            student.IsActive = false;
+            student.UpdatedById = userId;
+            await _context.SaveChangesAsync(ct);
+
+            _audit.Record(AuditAction.Edit, userId, StudentResource, studentId);
+            _logger.LogInformation("Student {StudentId} archived by user {CallerId}", studentId, userId);
+        }
+
+        return ServiceResult<SchoolStudentModel>.SuccessResult(await LoadStudentAsync(studentId, ct));
+    }
+
+    public async Task<ServiceResult<SchoolStudentModel>> TransferStudentAsync(int userId, int studentId, int newSchoolId, CancellationToken ct = default)
+    {
+        var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
+        if (ctx == null)
+            return ServiceResult<SchoolStudentModel>.FailureResult("Educator profile not found.");
+        if (ctx.OrgRoleId != OrgRoleIds.DistrictAdmin)
+            return ServiceResult<SchoolStudentModel>.FailureResult("You do not have permission to transfer students.");
+        if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
+            return ServiceResult<SchoolStudentModel>.FailureResult("You do not have permission to transfer this student.");
+
+        var student = await _context.SchoolStudents
+            .Include(s => s.School).ThenInclude(s => s.District)
+            .FirstOrDefaultAsync(s => s.Id == studentId, ct);
+        if (student == null)
+            return ServiceResult<SchoolStudentModel>.FailureResult("Student not found.");
+
+        // Both schools must be active schools of the caller's district.
+        var newSchool = await _context.Schools.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == newSchoolId && s.DistrictId == ctx.DistrictId && s.IsActive, ct);
+        if (newSchool == null)
+            return ServiceResult<SchoolStudentModel>.FailureResult("School not found.");
+        if (newSchool.Id == student.SchoolId)
+            return ServiceResult<SchoolStudentModel>.FailureResult("The student is already at that school.");
+
+        var oldSchoolName = student.School.Name;
+        var oldSchoolState = student.School.StateCode ?? student.School.District.StateCode;
+
+        await using var tx = await _context.Database.BeginTransactionAsync(ct);
+
+        // State inherited from the old building (null or equal to it) follows the student to the new one.
+        if (student.StateCode == null || string.Equals(student.StateCode, oldSchoolState, StringComparison.OrdinalIgnoreCase))
+            student.StateCode = newSchool.StateCode ?? student.School.District.StateCode;
+        student.SchoolId = newSchool.Id;
+        student.DistrictId = newSchool.DistrictId;
+        student.UpdatedById = userId;
+
+        // Team + access rows for staff who cannot follow the student: anyone whose home school is not
+        // the new one, except multi-building providers and district admins (who act by scope).
+        var portableUserIds = await _context.StaffProfiles.AsNoTracking()
+            .Where(p => p.IsActive && p.DistrictId == newSchool.DistrictId
+                     && (p.SchoolId == newSchool.Id
+                         || p.OrgRoleId == OrgRoleIds.RelatedServiceProvider
+                         || p.OrgRoleId == OrgRoleIds.DistrictAdmin))
+            .Select(p => p.UserId)
+            .ToListAsync(ct);
+
+        var note = $"Deactivated on transfer to {newSchool.Name}";
+        var members = await _context.StudentTeamMembers
+            .Where(m => m.SchoolStudentId == studentId && m.IsActive && !portableUserIds.Contains(m.UserId))
+            .ToListAsync(ct);
+        foreach (var member in members)
+        {
+            if (member.IsLead && student.CaseManagerUserId == member.UserId)
+                student.CaseManagerUserId = null;
+            member.IsActive = false;
+            member.IsLead = false;
+            member.Note = note;
+            member.UpdatedById = userId;
+        }
+
+        var accesses = await _context.SchoolStudentAccesses
+            .Where(a => a.SchoolStudentId == studentId && a.IsActive && !portableUserIds.Contains(a.UserId))
+            .ToListAsync(ct);
+        foreach (var access in accesses)
+        {
+            access.IsActive = false;
+            access.UpdatedById = userId;
+        }
+
+        await _context.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+
+        _audit.Record(AuditAction.Edit, userId, StudentResource, studentId);
+        _logger.LogInformation("Student {StudentId} transferred from {OldSchool} to {NewSchool} by user {CallerId}; {Members} team member(s) and {Accesses} access row(s) deactivated",
+            studentId, oldSchoolName, newSchool.Name, userId, members.Count, accesses.Count);
+
+        return ServiceResult<SchoolStudentModel>.SuccessResult(await LoadStudentAsync(studentId, ct));
+    }
+
+    public async Task<ServiceResult<BulkAssignResultModel>> AssignCaseManagerBulkAsync(int userId, BulkAssignCaseManagerModel model, CancellationToken ct = default)
+    {
+        var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
+        if (ctx == null)
+            return ServiceResult<BulkAssignResultModel>.FailureResult("Educator profile not found.");
+        if (!OrgRoleIds.IsAdmin(ctx.OrgRoleId))
+            return ServiceResult<BulkAssignResultModel>.FailureResult("You do not have permission to assign case managers.");
+
+        var studentIds = model.StudentIds.Distinct().ToList();
+        if (studentIds.Count == 0)
+            return ServiceResult<BulkAssignResultModel>.FailureResult("Choose at least one student.");
+
+        var target = await _context.StaffProfiles.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == model.UserId && p.IsActive && p.DistrictId == ctx.DistrictId, ct);
+        if (target == null)
+            return ServiceResult<BulkAssignResultModel>.FailureResult("Staff member not found.");
+        if (target.OrgRoleId == OrgRoleIds.DistrictAdmin)
+            return ServiceResult<BulkAssignResultModel>.FailureResult("A District Admin does not need a per-student assignment.");
+
+        // Validate everything before writing anything: every student in scope, target allowed at each school.
+        foreach (var studentId in studentIds)
+        {
+            if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
+                return ServiceResult<BulkAssignResultModel>.FailureResult("You do not have permission to manage one or more of the selected students.");
+        }
+        var students = await _context.SchoolStudents
+            .Where(s => studentIds.Contains(s.Id))
+            .ToListAsync(ct);
+        foreach (var student in students)
+        {
+            var error = StudentTeamWriter.ValidateTeamCandidate(target, ctx.DistrictId, student.SchoolId);
+            if (error != null)
+                return ServiceResult<BulkAssignResultModel>.FailureResult($"{student.FirstName} {student.LastName}: {error}".Trim());
+        }
+
+        await using var tx = await _context.Database.BeginTransactionAsync(ct);
+        var updated = 0;
+        foreach (var student in students)
+        {
+            if (student.CaseManagerUserId == target.UserId)
+                continue;
+            await StudentTeamWriter.UpsertMemberAsync(_context, student, target.UserId, TeamRole.CaseManager,
+                makeLead: true, accessOverride: null, userId, ct);
+            _audit.Record(AuditAction.Edit, userId, StudentResource, student.Id);
+            updated++;
+        }
+        await _context.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+
+        _logger.LogInformation("Case manager user {TargetUserId} assigned to {Count} student(s) by user {CallerId}", target.UserId, updated, userId);
+        return ServiceResult<BulkAssignResultModel>.SuccessResult(new BulkAssignResultModel { Updated = updated });
+    }
+
+    // ----------------------------------------------------------------- Staff assignment (legacy access rows)
 
     public async Task<ServiceResult<List<StudentStaffAccessModel>>> GetStudentStaffAccessAsync(int userId, int studentId, CancellationToken ct = default)
     {
@@ -232,12 +503,12 @@ public class EducatorService : IEducatorService
             return ServiceResult<StudentStaffAccessModel>.FailureResult("Educator profile not found.");
 
         // ADMIN-only: teachers cannot assign staff.
-        if (caller.OrgRoleId is not (OrgRoleIds.DistrictAdmin or OrgRoleIds.SchoolAdmin))
+        if (!OrgRoleIds.IsAdmin(caller.OrgRoleId))
             return ServiceResult<StudentStaffAccessModel>.FailureResult("You do not have permission to assign staff to this student.");
 
         // The student must exist and fall within the caller's scope.
         var studentSchoolId = await _context.SchoolStudents.AsNoTracking()
-            .Where(s => s.Id == studentId && s.IsActive)
+            .Where(s => s.Id == studentId && s.Status == StudentStatus.Active)
             .Select(s => (int?)s.SchoolId)
             .FirstOrDefaultAsync(ct);
         if (studentSchoolId == null)
@@ -246,20 +517,18 @@ public class EducatorService : IEducatorService
             return ServiceResult<StudentStaffAccessModel>.FailureResult("You do not have permission to assign staff to this student.");
 
         // The target staff member must be active and bound to the student's school (a school-bound
-        // teacher/school-admin). District admins act by scope and don't need (or get) per-student grants.
+        // teacher/school-admin) or a multi-building provider. District admins act by scope and don't need
+        // (or get) per-student grants.
         var target = await _context.StaffProfiles.AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == model.StaffProfileId && p.IsActive, ct);
-        if (target == null)
-            return ServiceResult<StudentStaffAccessModel>.FailureResult("Staff member not found.");
-        if (target.OrgRoleId == OrgRoleIds.DistrictAdmin || target.SchoolId == null)
-            return ServiceResult<StudentStaffAccessModel>.FailureResult("A District Admin does not need a per-student assignment.");
-        if (target.SchoolId.Value != studentSchoolId.Value)
-            return ServiceResult<StudentStaffAccessModel>.FailureResult("That staff member is not at this student's school.");
+        var candidateError = StudentTeamWriter.ValidateTeamCandidate(target, caller.DistrictId, studentSchoolId.Value);
+        if (candidateError != null)
+            return ServiceResult<StudentStaffAccessModel>.FailureResult(candidateError);
 
         // Upsert against the unique (SchoolStudentId, UserId) row: reactivate / update role rather than
         // inserting a duplicate (the index would reject it anyway).
         var existing = await _context.SchoolStudentAccesses
-            .FirstOrDefaultAsync(a => a.SchoolStudentId == studentId && a.UserId == target.UserId, ct);
+            .FirstOrDefaultAsync(a => a.SchoolStudentId == studentId && a.UserId == target!.UserId, ct);
         if (existing != null)
         {
             existing.IsActive = true;
@@ -271,7 +540,7 @@ public class EducatorService : IEducatorService
             existing = new SchoolStudentAccess
             {
                 SchoolStudentId = studentId,
-                UserId = target.UserId,
+                UserId = target!.UserId,
                 Role = model.AccessRole,
                 IsActive = true,
                 CreatedById = userId,
@@ -282,7 +551,7 @@ public class EducatorService : IEducatorService
         await _context.SaveChangesAsync(ct);
 
         _logger.LogInformation("Staff profile {StaffProfileId} (user {TargetUserId}) granted {Role} access to student {StudentId} by user {CallerId}",
-            target.Id, target.UserId, model.AccessRole, studentId, userId);
+            target!.Id, target.UserId, model.AccessRole, studentId, userId);
 
         var result = await _context.SchoolStudentAccesses.AsNoTracking()
             .Where(a => a.Id == existing.Id)
@@ -311,7 +580,7 @@ public class EducatorService : IEducatorService
         if (caller == null)
             return ServiceResult.FailureResult("Educator profile not found.");
 
-        if (caller.OrgRoleId is not (OrgRoleIds.DistrictAdmin or OrgRoleIds.SchoolAdmin))
+        if (!OrgRoleIds.IsAdmin(caller.OrgRoleId))
             return ServiceResult.FailureResult("You do not have permission to manage staff for this student.");
 
         var studentSchoolId = await _context.SchoolStudents.AsNoTracking()
@@ -340,6 +609,103 @@ public class EducatorService : IEducatorService
         return ServiceResult.SuccessResult("Access revoked.");
     }
 
+    // ----------------------------------------------------------------- helpers
+
+    /// <summary>
+    /// Role-branched roster scope (no status filter) so list authz == detail authz
+    /// (<see cref="IOrgAccessService.CanActOnStudentAsync"/>): teacher-tier see only students they hold an
+    /// active SchoolStudentAccess on (Teacher/GeneralEducator within their school, RelatedServiceProvider
+    /// within the district's active schools); SchoolAdmin their whole school; DistrictAdmin every active
+    /// school in their district. Null = the caller can see nothing (unbound SchoolAdmin/Teacher).
+    /// </summary>
+    private IQueryable<SchoolStudent>? ScopedStudents(StaffContext ctx, int userId)
+    {
+        if (ctx.OrgRoleId == OrgRoleIds.DistrictAdmin)
+            return _context.SchoolStudents.Where(s => s.School.IsActive && s.School.DistrictId == ctx.DistrictId);
+
+        if (ctx.OrgRoleId == OrgRoleIds.SchoolAdmin)
+        {
+            if (ctx.SchoolId == null)
+                return null;
+            return _context.SchoolStudents.Where(s => s.SchoolId == ctx.SchoolId.Value);
+        }
+
+        if (ctx.OrgRoleId == OrgRoleIds.RelatedServiceProvider)
+        {
+            return _context.SchoolStudents.Where(s =>
+                s.School.IsActive && s.School.DistrictId == ctx.DistrictId
+                && _context.SchoolStudentAccesses.Any(a => a.SchoolStudentId == s.Id && a.UserId == userId && a.IsActive));
+        }
+
+        // Teacher / GeneralEducator: own school + an active access row (any role).
+        if (ctx.SchoolId == null)
+            return null;
+        return _context.SchoolStudents.Where(s =>
+            s.SchoolId == ctx.SchoolId.Value
+            && _context.SchoolStudentAccesses.Any(a => a.SchoolStudentId == s.Id && a.UserId == userId && a.IsActive));
+    }
+
+    /// <summary>Admin-only lifecycle gate: caller is DistrictAdmin/SchoolAdmin and the student is in their scope.</summary>
+    private async Task<(SchoolStudent? Student, string? Denied)> LoadForAdminMutationAsync(int userId, int studentId, CancellationToken ct)
+    {
+        var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
+        if (ctx == null)
+            return (null, "Educator profile not found.");
+        if (!OrgRoleIds.IsAdmin(ctx.OrgRoleId))
+            return (null, "You do not have permission to change this student's status.");
+        if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
+            return (null, "You do not have permission to change this student's status.");
+
+        var student = await _context.SchoolStudents.FirstOrDefaultAsync(s => s.Id == studentId, ct);
+        return student == null ? (null, "Student not found.") : (student, null);
+    }
+
+    private Task<SchoolStudentModel> LoadStudentAsync(int studentId, CancellationToken ct)
+        => _context.SchoolStudents.AsNoTracking().Where(s => s.Id == studentId).Select(Projection).FirstAsync(ct);
+
+    private async Task<bool> ExternalIdInUseAsync(int districtId, string externalId, int? excludeStudentId, CancellationToken ct)
+        => await _context.SchoolStudents.AsNoTracking()
+            .AnyAsync(s => s.DistrictId == districtId && s.ExternalStudentId == externalId && (excludeStudentId == null || s.Id != excludeStudentId.Value), ct);
+
+    private static bool IsExternalIdCollision(DbUpdateException ex)
+        => ex.InnerException?.Message.Contains("IX_SchoolStudents_DistrictId_ExternalStudentId", StringComparison.OrdinalIgnoreCase) == true
+           || ex.InnerException?.Message.Contains("SchoolStudents.DistrictId, SchoolStudents.ExternalStudentId", StringComparison.OrdinalIgnoreCase) == true;
+
+    internal static string? NormalizeExternalId(string? raw) => NormalizeOptional(raw);
+
+    private static string? NormalizeOptional(string? raw) => string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
+
+    private static string EscapeLike(string text)
+        => text.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_").Replace("[", "\\[");
+
+    /// <summary>Single query projection shared by every read so the DTO is populated identically everywhere.</summary>
+    internal static readonly Expression<Func<SchoolStudent, SchoolStudentModel>> Projection = s => new SchoolStudentModel
+    {
+        Id = s.Id,
+        SchoolId = s.SchoolId,
+        SchoolName = s.School.Name,
+        FirstName = s.FirstName,
+        LastName = s.LastName,
+        DateOfBirth = s.DateOfBirth,
+        StateCode = s.StateCode,
+        ExternalStudentId = s.ExternalStudentId,
+        GradeLevel = s.GradeLevel,
+        DisabilityCategory = s.DisabilityCategory,
+        LegacyDisabilityText = s.LegacyDisabilityText,
+        HomeLanguage = s.HomeLanguage,
+        Status = s.Status,
+        ExitedAt = s.ExitedAt,
+        ExitReason = s.ExitReason,
+        CaseManagerUserId = s.CaseManagerUserId,
+        CaseManagerName = s.CaseManager != null ? (s.CaseManager.FirstName + " " + s.CaseManager.LastName).Trim() : null,
+        IepDate = s.IepDate,
+        AnnualReviewDueDate = s.AnnualReviewDueDate,
+        EtrDate = s.EtrDate,
+        ReevaluationDueDate = s.ReevaluationDueDate,
+        IsActive = s.Status == StudentStatus.Active,
+        CreatedAt = s.CreatedAt
+    };
+
     /// <summary>Builds the profile model from a fully navigation-loaded StaffProfile (GetMe path).</summary>
     private static EducatorProfileModel BuildProfileModel(StaffProfile profile) => new()
     {
@@ -355,20 +721,5 @@ public class EducatorService : IEducatorService
         StateCode = profile.School?.StateCode ?? profile.District?.StateCode,
         Title = profile.Title,
         Credentials = profile.Credentials
-    };
-
-    private static SchoolStudentModel MapStudent(SchoolStudent s, string? schoolName = null) => new()
-    {
-        Id = s.Id,
-        SchoolId = s.SchoolId,
-        SchoolName = schoolName,
-        FirstName = s.FirstName,
-        LastName = s.LastName,
-        DateOfBirth = s.DateOfBirth,
-        StateCode = s.StateCode,
-        GradeLevel = s.GradeLevel,
-        DisabilityCategory = s.DisabilityCategory,
-        IsActive = s.IsActive,
-        CreatedAt = s.CreatedAt
     };
 }

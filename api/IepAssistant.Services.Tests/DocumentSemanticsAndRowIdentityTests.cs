@@ -145,7 +145,7 @@ public sealed class DocumentSemanticsAndRowIdentityTests : IDisposable
         var school = new School { DistrictId = district.Id, Name = $"{prefix}-s" };
         ctx.Schools.Add(school); ctx.SaveChanges();
         ctx.StaffProfiles.Add(new StaffProfile { UserId = user.Id, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher });
-        var student = new SchoolStudent { SchoolId = school.Id, FirstName = "Kid" };
+        var student = new SchoolStudent { SchoolId = school.Id, DistrictId = district.Id, FirstName = "Kid" };
         ctx.SchoolStudents.Add(student); ctx.SaveChanges();
         ctx.SchoolStudentAccesses.Add(new SchoolStudentAccess { SchoolStudentId = student.Id, UserId = user.Id, Role = AccessRole.Collaborator, IsActive = true });
 
@@ -302,7 +302,7 @@ public sealed class DocumentSemanticsAndRowIdentityTests : IDisposable
             var school = new School { DistrictId = district.Id, Name = "s", StateCode = null };
             ctx.Schools.Add(school); ctx.SaveChanges();
             ctx.StaffProfiles.Add(new StaffProfile { UserId = user.Id, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher });
-            var student = new SchoolStudent { SchoolId = school.Id, FirstName = "Kid", StateCode = null };
+            var student = new SchoolStudent { SchoolId = school.Id, DistrictId = district.Id, FirstName = "Kid", StateCode = null };
             ctx.SchoolStudents.Add(student); ctx.SaveChanges();
             ctx.SchoolStudentAccesses.Add(new SchoolStudentAccess { SchoolStudentId = student.Id, UserId = user.Id, Role = AccessRole.Collaborator, IsActive = true });
             ctx.SaveChanges();

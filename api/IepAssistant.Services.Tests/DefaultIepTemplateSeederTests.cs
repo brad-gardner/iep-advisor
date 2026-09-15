@@ -306,7 +306,7 @@ public sealed class DefaultIepTemplateSeederTests : IDisposable
         ctx.StaffProfiles.Add(new StaffProfile { UserId = user.Id, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher });
         ctx.SaveChanges();
 
-        var student = new SchoolStudent { SchoolId = school.Id, FirstName = "Sam", StateCode = studentState, IsActive = true };
+        var student = new SchoolStudent { SchoolId = school.Id, DistrictId = district.Id, FirstName = "Sam", StateCode = studentState, IsActive = true };
         ctx.SchoolStudents.Add(student);
         ctx.SaveChanges();
 

@@ -39,7 +39,7 @@ public sealed class ChildLinkServiceTests : IDisposable
         => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), email, new CapturingAuditLogger(), NullLogger<ChildLinkService>.Instance);
 
     private static EducatorService CreateEducator(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), NullLogger<EducatorService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<EducatorService>.Instance);
 
     // ----------------------------------------------------------------- seed helpers
 
@@ -106,7 +106,7 @@ public sealed class ChildLinkServiceTests : IDisposable
         {
             var created = await CreateEducator(ctx).CreateStudentAsync(educatorId, new CreateSchoolStudentModel
             {
-                FirstName = studentFirst, LastName = studentLast, GradeLevel = "5", DisabilityCategory = "SLD"
+                FirstName = studentFirst, LastName = studentLast, GradeLevel = GradeLevel.G5, DisabilityCategory = DisabilityCategory.SpecificLearningDisability
             });
             studentId = created.Data!.Id;
         }
@@ -254,7 +254,7 @@ public sealed class ChildLinkServiceTests : IDisposable
             Assert.Equal(parentId, child.UserId);
             Assert.Equal("Copy", child.FirstName);
             Assert.Equal("Kid", child.LastName);
-            Assert.Equal("SLD", child.DisabilityCategory);
+            Assert.Equal("Specific Learning Disability", child.DisabilityCategory);
 
             var access = ctx.ChildAccesses.Single(ca => ca.ChildProfileId == newChildId);
             Assert.Equal(parentId, access.UserId);

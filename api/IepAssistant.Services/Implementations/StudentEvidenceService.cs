@@ -58,7 +58,7 @@ public sealed class StudentEvidenceService : IStudentEvidenceService
             .Where(s => s.Id == schoolStudentId)
             .Select(s => new
             {
-                s.Id, s.FirstName, s.LastName, s.DateOfBirth, s.GradeLevel, s.DisabilityCategory,
+                s.Id, s.FirstName, s.LastName, s.DateOfBirth, s.GradeLevel, s.DisabilityCategory, s.LegacyDisabilityText,
                 SchoolName = s.School.Name, DistrictName = s.School.District.Name,
                 State = s.StateCode ?? s.School.StateCode ?? s.School.District.StateCode
             })
@@ -68,8 +68,12 @@ public sealed class StudentEvidenceService : IStudentEvidenceService
 
         var identity = new List<string> { $"Name: {student.FirstName} {student.LastName}".Trim() };
         if (student.DateOfBirth is { } dob) identity.Add($"Date of birth: {dob:yyyy-MM-dd} (age {Age(dob)})");
-        if (!string.IsNullOrWhiteSpace(student.GradeLevel)) identity.Add($"Grade: {student.GradeLevel}");
-        if (!string.IsNullOrWhiteSpace(student.DisabilityCategory)) identity.Add($"Disability category: {student.DisabilityCategory}");
+        var gradeText = student.GradeLevel?.ToDisplay() ?? "";
+        var disabilityText = student.DisabilityCategory == DisabilityCategory.Other && !string.IsNullOrWhiteSpace(student.LegacyDisabilityText)
+            ? student.LegacyDisabilityText
+            : student.DisabilityCategory?.ToDisplay() ?? "";
+        if (gradeText.Length > 0) identity.Add($"Grade: {gradeText}");
+        if (disabilityText.Length > 0) identity.Add($"Disability category: {disabilityText}");
         identity.Add($"School: {student.SchoolName} ({student.DistrictName}{(student.State != null ? ", " + student.State : "")})");
         items.Add(new EvidenceItem
         {
@@ -79,29 +83,51 @@ public sealed class StudentEvidenceService : IStudentEvidenceService
             {
                 ["name"] = $"{student.FirstName} {student.LastName}".Trim(),
                 ["dateOfBirth"] = student.DateOfBirth?.ToString("yyyy-MM-dd") ?? "",
-                ["grade"] = student.GradeLevel ?? "",
-                ["disabilityCategory"] = student.DisabilityCategory ?? "",
+                ["grade"] = gradeText,
+                ["disabilityCategory"] = disabilityText,
                 ["school"] = student.SchoolName,
                 ["district"] = student.DistrictName,
             }
         });
 
-        var team = await _context.SchoolStudentAccesses.AsNoTracking()
-            .Where(a => a.SchoolStudentId == schoolStudentId && a.IsActive)
-            .Select(a => new
-            {
-                a.Id, a.Role, a.User.FirstName, a.User.LastName,
-                Title = _context.StaffProfiles.Where(p => p.UserId == a.UserId && p.IsActive).Select(p => p.Title ?? p.OrgRole.Name).FirstOrDefault()
-            })
+        // Team: functional roles from the IEP team table (plan 3), lead first; older students with no
+        // team rows fall back to the access rows so the bundle never loses its "who is involved" items.
+        var team = await _context.StudentTeamMembers.AsNoTracking()
+            .Where(m => m.SchoolStudentId == schoolStudentId && m.IsActive)
+            .OrderByDescending(m => m.IsLead).ThenBy(m => m.User.LastName).ThenBy(m => m.User.FirstName)
+            .Select(m => new { m.Id, m.TeamRole, m.IsLead, m.User.FirstName, m.User.LastName })
             .ToListAsync(ct);
-        foreach (var m in team)
+        if (team.Count > 0)
         {
-            items.Add(new EvidenceItem
+            foreach (var m in team)
             {
-                Id = NextId(), Kind = EvidenceKind.TeamMember, SourceType = "SchoolStudentAccess", SourceId = m.Id,
-                SourceLabel = "IEP team", AuthorRole = "school",
-                Text = $"{m.FirstName} {m.LastName} — {m.Title ?? m.Role.ToString()}".Trim()
-            });
+                items.Add(new EvidenceItem
+                {
+                    Id = NextId(), Kind = EvidenceKind.TeamMember, SourceType = "StudentTeamMember", SourceId = m.Id,
+                    SourceLabel = "IEP team", AuthorRole = "school",
+                    Text = $"{m.FirstName} {m.LastName} — {m.TeamRole.ToDisplay()}{(m.IsLead ? " (lead)" : "")}".Trim()
+                });
+            }
+        }
+        else
+        {
+            var grants = await _context.SchoolStudentAccesses.AsNoTracking()
+                .Where(a => a.SchoolStudentId == schoolStudentId && a.IsActive)
+                .Select(a => new
+                {
+                    a.Id, a.Role, a.User.FirstName, a.User.LastName,
+                    Title = _context.StaffProfiles.Where(p => p.UserId == a.UserId && p.IsActive).Select(p => p.Title ?? p.OrgRole.Name).FirstOrDefault()
+                })
+                .ToListAsync(ct);
+            foreach (var m in grants)
+            {
+                items.Add(new EvidenceItem
+                {
+                    Id = NextId(), Kind = EvidenceKind.TeamMember, SourceType = "SchoolStudentAccess", SourceId = m.Id,
+                    SourceLabel = "IEP team", AuthorRole = "school",
+                    Text = $"{m.FirstName} {m.LastName} — {m.Title ?? m.Role.ToString()}".Trim()
+                });
+            }
         }
 
         // ---- Latest finalized authored version per document type

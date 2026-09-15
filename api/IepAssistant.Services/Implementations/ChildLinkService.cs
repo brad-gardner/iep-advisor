@@ -261,7 +261,7 @@ public class ChildLinkService : IChildLinkService
                 FirstName = student.FirstName,
                 LastName = student.LastName,
                 DateOfBirth = student.DateOfBirth,
-                DisabilityCategory = student.DisabilityCategory,
+                DisabilityCategory = student.DisabilityCategory != null ? student.DisabilityCategory.Value.ToDisplay() : student.LegacyDisabilityText,
                 IsActive = true,
                 CreatedById = parentUserId,
                 UpdatedById = parentUserId

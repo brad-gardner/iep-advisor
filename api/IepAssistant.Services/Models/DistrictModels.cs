@@ -31,8 +31,9 @@ public class DistrictDashboardModel
     /// <summary>Pending + expired invites (revoked/accepted excluded), expired-first triage order.</summary>
     public List<DashboardInviteModel> InvitesNeedingAttention { get; set; } = new();
 
-    /// <summary>Active students with zero active access rows whose grantee still has an ACTIVE
-    /// StaffProfile — a student whose only grantee was deactivated appears here.</summary>
+    /// <summary>Active students with no active LEAD case manager (team member) whose user still has an
+    /// ACTIVE StaffProfile — a student whose lead was deactivated appears here. (Name kept for
+    /// compatibility; plan 3 changed the semantics from "any staff access" to "lead case manager".)</summary>
     public List<DashboardStudentModel> StudentsWithoutStaff { get; set; } = new();
 
     /// <summary>Active students with no accepted, active <c>ChildLink</c> bound to a

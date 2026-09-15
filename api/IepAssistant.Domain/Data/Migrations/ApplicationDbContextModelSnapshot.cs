@@ -1821,6 +1821,118 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.ToTable("IepVersionTransitionItems");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.ImportBatch", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CommittedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DistrictId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ErrorCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<int>("NewCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<int>("TotalCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UnchangedCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UpdatedCount")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DistrictId", "CreatedAt");
+
+                    b.ToTable("ImportBatches");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.ImportRow", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BatchId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ChangesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("RowNumber")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BatchId", "RowNumber")
+                        .IsUnique();
+
+                    b.ToTable("ImportRows");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.KnowledgeBaseEntry", b =>
                 {
                     b.Property<int>("Id")
@@ -1985,6 +2097,16 @@ namespace IepAssistant.Domain.Data.Migrations
                         {
                             Id = 3,
                             Name = "Teacher"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "RelatedServiceProvider"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "GeneralEducator"
                         });
                 });
 
@@ -2295,6 +2417,12 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("AnnualReviewDueDate")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("CaseManagerUserId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -2305,8 +2433,25 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("DisabilityCategory")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("DistrictId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("EtrDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ExitReason")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime?>("ExitedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ExternalStudentId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -2314,15 +2459,28 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("GradeLevel")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
+                    b.Property<string>("HomeLanguage")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)")
+                        .HasDefaultValue("en");
+
+                    b.Property<DateTime?>("IepDate")
+                        .HasColumnType("date");
 
                     b.Property<string>("LastName")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("LegacyDisabilityText")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("ReevaluationDueDate")
+                        .HasColumnType("date");
 
                     b.Property<int>("SchoolId")
                         .HasColumnType("int");
@@ -2330,6 +2488,13 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Property<string>("StateCode")
                         .HasMaxLength(2)
                         .HasColumnType("nvarchar(2)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)")
+                        .HasDefaultValue("Active");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -2339,7 +2504,15 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CaseManagerUserId");
+
                     b.HasIndex("SchoolId");
+
+                    b.HasIndex("DistrictId", "ExternalStudentId")
+                        .IsUnique()
+                        .HasFilter("[ExternalStudentId] IS NOT NULL");
+
+                    b.HasIndex("DistrictId", "Status");
 
                     b.ToTable("SchoolStudents");
                 });
@@ -2630,6 +2803,62 @@ namespace IepAssistant.Domain.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("StudentProfiles");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.StudentTeamMember", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsLead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("SchoolStudentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TeamRole")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchoolStudentId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_StudentTeamMembers_SchoolStudentId_ActiveLead")
+                        .HasFilter("[IsLead] = 1 AND [IsActive] = 1");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("SchoolStudentId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("StudentTeamMembers");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.StudentWorkspace", b =>
@@ -3386,6 +3615,28 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Navigation("IepVersion");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.ImportBatch", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.District", "District")
+                        .WithMany()
+                        .HasForeignKey("DistrictId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("District");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.ImportRow", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.ImportBatch", "Batch")
+                        .WithMany("Rows")
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Batch");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.MeetingPrepChecklist", b =>
                 {
                     b.HasOne("IepAssistant.Domain.Entities.ChildProfile", "ChildProfile")
@@ -3487,11 +3738,26 @@ namespace IepAssistant.Domain.Data.Migrations
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.SchoolStudent", b =>
                 {
+                    b.HasOne("IepAssistant.Domain.Entities.User", "CaseManager")
+                        .WithMany()
+                        .HasForeignKey("CaseManagerUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("IepAssistant.Domain.Entities.District", "District")
+                        .WithMany()
+                        .HasForeignKey("DistrictId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("IepAssistant.Domain.Entities.School", "School")
                         .WithMany("Students")
                         .HasForeignKey("SchoolId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("CaseManager");
+
+                    b.Navigation("District");
 
                     b.Navigation("School");
                 });
@@ -3609,6 +3875,25 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.StudentTeamMember", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.SchoolStudent", "SchoolStudent")
+                        .WithMany()
+                        .HasForeignKey("SchoolStudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SchoolStudent");
 
                     b.Navigation("User");
                 });
@@ -3758,6 +4043,11 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Navigation("ServiceLines");
 
                     b.Navigation("TransitionItems");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.ImportBatch", b =>
+                {
+                    b.Navigation("Rows");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.OrgRole", b =>

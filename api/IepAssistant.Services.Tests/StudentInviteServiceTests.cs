@@ -39,7 +39,7 @@ public sealed class StudentInviteServiceTests : IDisposable
         => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), email, NullLogger<StudentInviteService>.Instance);
 
     private static EducatorService CreateEducator(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), NullLogger<EducatorService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<EducatorService>.Instance);
 
     // ----------------------------------------------------------------- seed helpers
 
@@ -99,7 +99,7 @@ public sealed class StudentInviteServiceTests : IDisposable
         {
             var created = await CreateEducator(ctx).CreateStudentAsync(educatorId, new CreateSchoolStudentModel
             {
-                FirstName = studentFirst, LastName = studentLast, GradeLevel = "9", DisabilityCategory = "SLD"
+                FirstName = studentFirst, LastName = studentLast, GradeLevel = GradeLevel.G9, DisabilityCategory = DisabilityCategory.SpecificLearningDisability
             });
             studentId = created.Data!.Id;
         }

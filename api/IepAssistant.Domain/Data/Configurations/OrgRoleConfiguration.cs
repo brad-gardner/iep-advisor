@@ -14,10 +14,13 @@ public class OrgRoleConfiguration : IEntityTypeConfiguration<OrgRole>
         builder.Property(r => r.Name).HasMaxLength(50).IsRequired();
         builder.HasIndex(r => r.Name).IsUnique();
 
-        // Seed the lookup table (mirrors OrgRoleIds: 1=DistrictAdmin, 2=SchoolAdmin, 3=Teacher).
+        // Seed the lookup table (mirrors OrgRoleIds: 1=DistrictAdmin, 2=SchoolAdmin, 3=Teacher,
+        // 4=RelatedServiceProvider, 5=GeneralEducator — the last two share Teacher's authz tier; plan 3).
         builder.HasData(
             new OrgRole { Id = 1, Name = "DistrictAdmin" },
             new OrgRole { Id = 2, Name = "SchoolAdmin" },
-            new OrgRole { Id = 3, Name = "Teacher" });
+            new OrgRole { Id = 3, Name = "Teacher" },
+            new OrgRole { Id = 4, Name = "RelatedServiceProvider" },
+            new OrgRole { Id = 5, Name = "GeneralEducator" });
     }
 }

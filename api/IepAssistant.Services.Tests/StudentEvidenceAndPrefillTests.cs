@@ -78,7 +78,7 @@ public sealed class StudentEvidenceAndPrefillTests : IDisposable
         var school = new School { DistrictId = district.Id, Name = "Maple Ridge" }; ctx.Schools.Add(school); ctx.SaveChanges();
         ctx.StaffProfiles.Add(new StaffProfile { UserId = teacher.Id, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher, Title = "Intervention Specialist" });
         ctx.StaffProfiles.Add(new StaffProfile { UserId = stranger.Id, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher });
-        var student = new SchoolStudent { SchoolId = school.Id, FirstName = "Jordan", LastName = "Ellis", GradeLevel = "7", DisabilityCategory = "Specific Learning Disability", DateOfBirth = new DateTime(2013, 4, 2) };
+        var student = new SchoolStudent { SchoolId = school.Id, DistrictId = district.Id, FirstName = "Jordan", LastName = "Ellis", GradeLevel = GradeLevel.G7, DisabilityCategory = DisabilityCategory.SpecificLearningDisability, DateOfBirth = new DateTime(2013, 4, 2) };
         ctx.SchoolStudents.Add(student); ctx.SaveChanges();
         ctx.SchoolStudentAccesses.Add(new SchoolStudentAccess { SchoolStudentId = student.Id, UserId = teacher.Id, Role = AccessRole.Collaborator, IsActive = true });
 
@@ -277,7 +277,7 @@ public sealed class StudentEvidenceAndPrefillTests : IDisposable
         var district = new District { Name = "d2", StateCode = "OH" }; ctx.Districts.Add(district); ctx.SaveChanges();
         var school = new School { DistrictId = district.Id, Name = "s2" }; ctx.Schools.Add(school); ctx.SaveChanges();
         ctx.StaffProfiles.Add(new StaffProfile { UserId = teacher.Id, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher });
-        var student = new SchoolStudent { SchoolId = school.Id, FirstName = "Fresh" }; ctx.SchoolStudents.Add(student); ctx.SaveChanges();
+        var student = new SchoolStudent { SchoolId = school.Id, DistrictId = district.Id, FirstName = "Fresh" }; ctx.SchoolStudents.Add(student); ctx.SaveChanges();
         ctx.SchoolStudentAccesses.Add(new SchoolStudentAccess { SchoolStudentId = student.Id, UserId = teacher.Id, Role = AccessRole.Collaborator, IsActive = true });
         ctx.SaveChanges();
         await Task.CompletedTask;

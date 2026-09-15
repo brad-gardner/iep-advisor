@@ -40,6 +40,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<StaffInvite> StaffInvites => Set<StaffInvite>();
     public DbSet<SchoolStudent> SchoolStudents => Set<SchoolStudent>();
     public DbSet<SchoolStudentAccess> SchoolStudentAccesses => Set<SchoolStudentAccess>();
+    public DbSet<StudentTeamMember> StudentTeamMembers => Set<StudentTeamMember>();
+    public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
+    public DbSet<ImportRow> ImportRows => Set<ImportRow>();
     public DbSet<ChildLink> ChildLinks => Set<ChildLink>();
     public DbSet<IepDraft> IepDrafts => Set<IepDraft>();
     public DbSet<IepDraftSection> IepDraftSections => Set<IepDraftSection>();

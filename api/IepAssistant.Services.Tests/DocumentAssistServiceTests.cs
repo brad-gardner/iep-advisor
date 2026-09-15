@@ -81,7 +81,7 @@ public sealed class DocumentAssistServiceTests : IDisposable
         var school = new School { DistrictId = district.Id, Name = prefix }; ctx.Schools.Add(school); ctx.SaveChanges();
         ctx.StaffProfiles.Add(new StaffProfile { UserId = teacher.Id, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher });
         ctx.StaffProfiles.Add(new StaffProfile { UserId = stranger.Id, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher });
-        var student = new SchoolStudent { SchoolId = school.Id, FirstName = "Jordan" }; ctx.SchoolStudents.Add(student); ctx.SaveChanges();
+        var student = new SchoolStudent { SchoolId = school.Id, DistrictId = district.Id, FirstName = "Jordan" }; ctx.SchoolStudents.Add(student); ctx.SaveChanges();
         ctx.SchoolStudentAccesses.Add(new SchoolStudentAccess { SchoolStudentId = student.Id, UserId = teacher.Id, Role = AccessRole.Collaborator, IsActive = true });
 
         var plaafp = Guid.NewGuid(); var goals = Guid.NewGuid(); var goalCol = Guid.NewGuid(); var baselineCol = Guid.NewGuid();
