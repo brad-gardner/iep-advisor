@@ -352,14 +352,25 @@ public class DocumentInstanceService : IDocumentInstanceService
         var columns = ParseTableColumns(field.ConfigJson);
 
         var rows = new JsonArray();
+        var seenRowIds = new HashSet<Guid>();
         foreach (var rowElement in value.EnumerateArray())
         {
             if (rowElement.ValueKind != JsonValueKind.Object)
                 return (null, $"'{field.Label}' has an invalid table row.");
 
             var row = new JsonObject();
+            Guid? rowId = null;
             foreach (var cell in rowElement.EnumerateObject())
             {
+                // Row identity is carried inside the row object, not as a column. Keep a valid GUID;
+                // anything else is replaced below so every persisted row has exactly one stable id.
+                if (cell.Name == RowMetaKeys.RowId)
+                {
+                    if (cell.Value.ValueKind == JsonValueKind.String && Guid.TryParse(cell.Value.GetString(), out var parsed) && parsed != Guid.Empty)
+                        rowId = parsed;
+                    continue;
+                }
+
                 // Strip unknown / non-guid column keys.
                 if (!Guid.TryParse(cell.Name, out var columnKey) || !columns.TryGetValue(columnKey, out var columnType))
                     continue;
@@ -372,9 +383,16 @@ public class DocumentInstanceService : IDocumentInstanceService
             }
 
             // Skip rows that reduced to nothing (all columns unknown/stripped) so the value-document
-            // does not accumulate junk empty-object rows.
-            if (row.Count > 0)
-                rows.Add(row);
+            // does not accumulate junk empty-object rows. A row with only an id is still "nothing".
+            if (row.Count == 0)
+                continue;
+
+            if (seenRowIds.Contains(rowId ?? Guid.Empty))
+                rowId = null; // duplicate ids (e.g. a client-side copy) get a fresh identity
+            var finalId = rowId ?? Guid.NewGuid();
+            seenRowIds.Add(finalId);
+            row[RowMetaKeys.RowId] = JsonValue.Create(finalId.ToString());
+            rows.Add(row);
         }
 
         return (rows, null);

@@ -73,7 +73,15 @@ public sealed class DefaultIepTemplateSeeder : IDefaultIepTemplateSeeder
             .FirstOrDefaultAsync(ct);
 
         if (existing != null)
-            return new DefaultIepTemplateSeedResult(DefaultIepTemplateSeedOutcome.AlreadySeeded);
+        {
+            // A pre-semantics database has the default template at v1 without `semantic` tags. Publish a
+            // v2 with the SAME keys plus semantics so new documents pick it up (highest published wins in
+            // TemplateResolutionService) while v1-pinned instances keep rendering unchanged.
+            var upgradedVersionId = await UpgradeToSemanticVersionIfNeededAsync(existing.Value, ct);
+            return upgradedVersionId == null
+                ? new DefaultIepTemplateSeedResult(DefaultIepTemplateSeedOutcome.AlreadySeeded)
+                : new DefaultIepTemplateSeedResult(DefaultIepTemplateSeedOutcome.Upgraded, upgradedVersionId);
+        }
 
         try
         {
@@ -99,6 +107,47 @@ public sealed class DefaultIepTemplateSeeder : IDefaultIepTemplateSeeder
                 "Default IEP template already seeded by a concurrent instance; treating as no-op.");
             return new DefaultIepTemplateSeedResult(DefaultIepTemplateSeedOutcome.AlreadySeeded);
         }
+    }
+
+    /// <summary>
+    /// Publishes a semantic-tagged v(N+1) of an existing default template when no published version
+    /// carries a goals-semantic table yet. Returns the new version id, or null when already current.
+    /// </summary>
+    private async Task<int?> UpgradeToSemanticVersionIfNeededAsync(int templateId, CancellationToken ct)
+    {
+        var published = await _context.DocumentTemplateVersions.AsNoTracking()
+            .Where(v => v.DocumentTemplateId == templateId && v.Status == TemplateVersionStatus.Published)
+            .Include(v => v.Sections).ThenInclude(s => s.Fields)
+            .OrderByDescending(v => v.VersionNumber)
+            .FirstOrDefaultAsync(ct);
+        if (published == null)
+            return null; // no published version at all — leave to admins; never auto-publish a draft
+
+        if (TemplateSemanticsReader.Read(published.Sections).ContainsKey(FieldSemantics.Goals))
+            return null; // already semantic
+
+        var now = DateTime.UtcNow;
+        var maxVersion = await _context.DocumentTemplateVersions.AsNoTracking()
+            .Where(v => v.DocumentTemplateId == templateId)
+            .MaxAsync(v => (int?)v.VersionNumber, ct) ?? 0;
+
+        var version = new DocumentTemplateVersion
+        {
+            DocumentTemplateId = templateId,
+            VersionNumber = maxVersion + 1,
+            Status = TemplateVersionStatus.Published,
+            PublishedAt = now,
+            RowVersion = Guid.NewGuid().ToByteArray(),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        foreach (var section in BuildSections(version, now))
+            version.Sections.Add(section);
+
+        _context.DocumentTemplateVersions.Add(version);
+        await _context.SaveChangesAsync(ct);
+        _logger.LogInformation("Upgraded default IEP template to semantic version {VersionNumber} ({VersionId}).", version.VersionNumber, version.Id);
+        return version.Id;
     }
 
     private async Task<int> CreateDefaultTemplateAsync(int iepTypeId, CancellationToken ct)
@@ -149,63 +198,63 @@ public sealed class DefaultIepTemplateSeeder : IDefaultIepTemplateSeeder
         // Narrative sections: one RichText field each, mirroring IepDraftSection.RichText per kind. The
         // field label matches the section title (each section has exactly one narrative field). Order
         // matches IepVersionPdfDocument (narrative first, then Goals/Services/Accommodations/Transition).
-        var narratives = new (Guid SectionKey, Guid FieldKey, string Title)[]
+        var narratives = new (Guid SectionKey, Guid FieldKey, string Title, string Semantic)[]
         {
-            (Keys.StudentProfileSection,    Keys.StudentProfileField,    "Student Profile"),
-            (Keys.PresentLevelsSection,     Keys.PresentLevelsField,     "Present Levels"),
-            (Keys.EligibilitySection,       Keys.EligibilityField,       "Eligibility"),
-            (Keys.PlacementSection,         Keys.PlacementField,         "Placement"),
-            (Keys.ProgressMonitoringSection,Keys.ProgressMonitoringField,"Progress Monitoring"),
-            (Keys.SpecialFactorsSection,    Keys.SpecialFactorsField,    "Special Factors"),
+            (Keys.StudentProfileSection,    Keys.StudentProfileField,    "Student Profile",     FieldSemantics.StudentProfile),
+            (Keys.PresentLevelsSection,     Keys.PresentLevelsField,     "Present Levels",      FieldSemantics.PresentLevels),
+            (Keys.EligibilitySection,       Keys.EligibilityField,       "Eligibility",         FieldSemantics.Eligibility),
+            (Keys.PlacementSection,         Keys.PlacementField,         "Placement",           FieldSemantics.Placement),
+            (Keys.ProgressMonitoringSection,Keys.ProgressMonitoringField,"Progress Monitoring", FieldSemantics.ProgressMonitoring),
+            (Keys.SpecialFactorsSection,    Keys.SpecialFactorsField,    "Special Factors",     FieldSemantics.SpecialFactors),
         };
 
         var order = 0;
-        foreach (var (sectionKey, fieldKey, title) in narratives)
+        foreach (var (sectionKey, fieldKey, title, semantic) in narratives)
         {
             sections.Add(Section(sectionKey, title, order, now,
-                Field(version, fieldKey, FieldType.RichText, title, order: 0, config: null, now)));
+                Field(version, fieldKey, FieldType.RichText, title, order: 0, config: TemplateGraphBuilder.RichTextConfig(semantic), now)));
             order++;
         }
 
         // Goals table.
         sections.Add(Section(Keys.GoalsSection, "Goals", order++, now,
             Field(version, Keys.GoalsTableField, FieldType.Table, "Goals", order: 0,
-                config: TableConfig(
-                    (Keys.GoalsDomainColumn,        FieldType.Text, "Domain"),
-                    (Keys.GoalsGoalColumn,          FieldType.Text, "Goal"),
-                    (Keys.GoalsBaselineColumn,      FieldType.Text, "Baseline"),
-                    (Keys.GoalsTargetCriteriaColumn,FieldType.Text, "Target Criteria"),
-                    (Keys.GoalsMeasurementColumn,   FieldType.Text, "Measurement Method"),
-                    (Keys.GoalsTimeframeColumn,     FieldType.Text, "Timeframe")),
+                config: TableConfig(FieldSemantics.Goals,
+                    (Keys.GoalsDomainColumn,        FieldType.Text, "Domain",             ColumnSemantics.Domain),
+                    (Keys.GoalsGoalColumn,          FieldType.Text, "Goal",               ColumnSemantics.GoalText),
+                    (Keys.GoalsBaselineColumn,      FieldType.Text, "Baseline",           ColumnSemantics.Baseline),
+                    (Keys.GoalsTargetCriteriaColumn,FieldType.Text, "Target Criteria",    ColumnSemantics.TargetCriteria),
+                    (Keys.GoalsMeasurementColumn,   FieldType.Text, "Measurement Method", ColumnSemantics.MeasurementMethod),
+                    (Keys.GoalsTimeframeColumn,     FieldType.Text, "Timeframe",          ColumnSemantics.Timeframe)),
                 now)));
 
         // Services table.
         sections.Add(Section(Keys.ServicesSection, "Services", order++, now,
             Field(version, Keys.ServicesTableField, FieldType.Table, "Service lines", order: 0,
-                config: TableConfig(
-                    (Keys.ServicesTypeColumn,      FieldType.Text, "Service Type"),
-                    (Keys.ServicesFrequencyColumn, FieldType.Text, "Frequency"),
-                    (Keys.ServicesDurationColumn,  FieldType.Text, "Duration"),
-                    (Keys.ServicesLocationColumn,  FieldType.Text, "Location"),
-                    (Keys.ServicesProviderColumn,  FieldType.Text, "Provider Role"),
-                    (Keys.ServicesStartDateColumn, FieldType.Date, "Start Date"),
-                    (Keys.ServicesEndDateColumn,   FieldType.Date, "End Date")),
+                config: TableConfig(FieldSemantics.Services,
+                    (Keys.ServicesTypeColumn,      FieldType.Text, "Service Type",  ColumnSemantics.ServiceType),
+                    (Keys.ServicesFrequencyColumn, FieldType.Text, "Frequency",     ColumnSemantics.Frequency),
+                    (Keys.ServicesDurationColumn,  FieldType.Text, "Duration",      ColumnSemantics.Duration),
+                    (Keys.ServicesLocationColumn,  FieldType.Text, "Location",      ColumnSemantics.Location),
+                    (Keys.ServicesProviderColumn,  FieldType.Text, "Provider Role", ColumnSemantics.ProviderRole),
+                    (Keys.ServicesStartDateColumn, FieldType.Date, "Start Date",    ColumnSemantics.StartDate),
+                    (Keys.ServicesEndDateColumn,   FieldType.Date, "End Date",      ColumnSemantics.EndDate)),
                 now)));
 
         // Accommodations table.
         sections.Add(Section(Keys.AccommodationsSection, "Accommodations", order++, now,
             Field(version, Keys.AccommodationsTableField, FieldType.Table, "Accommodations", order: 0,
-                config: TableConfig(
-                    (Keys.AccommodationsCategoryColumn, FieldType.Text, "Category"),
-                    (Keys.AccommodationsTextColumn,     FieldType.Text, "Accommodation")),
+                config: TableConfig(FieldSemantics.Accommodations,
+                    (Keys.AccommodationsCategoryColumn, FieldType.Text, "Category",      ColumnSemantics.Category),
+                    (Keys.AccommodationsTextColumn,     FieldType.Text, "Accommodation", ColumnSemantics.Accommodation)),
                 now)));
 
         // Transition table.
         sections.Add(Section(Keys.TransitionSection, "Transition", order, now,
             Field(version, Keys.TransitionTableField, FieldType.Table, "Transition", order: 0,
-                config: TableConfig(
-                    (Keys.TransitionGoalAreaColumn, FieldType.Text, "Postsecondary Goal Area"),
-                    (Keys.TransitionServicesColumn, FieldType.Text, "Services")),
+                config: TableConfig(FieldSemantics.Transition,
+                    (Keys.TransitionGoalAreaColumn, FieldType.Text, "Postsecondary Goal Area", ColumnSemantics.GoalArea),
+                    (Keys.TransitionServicesColumn, FieldType.Text, "Services",                ColumnSemantics.TransitionServices)),
                 now)));
 
         return sections;
@@ -243,17 +292,9 @@ public sealed class DefaultIepTemplateSeeder : IDefaultIepTemplateSeeder
             UpdatedAt = now
         };
 
-    /// <summary>Serializes a Table field's ConfigJson (columns only; no row bounds so partial drafts save).</summary>
-    private static string TableConfig(params (Guid ColumnKey, FieldType Type, string Label)[] columns)
-    {
-        var config = new TableFieldConfig
-        {
-            Columns = columns
-                .Select(c => new TableColumn { ColumnKey = c.ColumnKey, Type = c.Type, Label = c.Label, Required = false })
-                .ToList()
-        };
-        return JsonSerializer.Serialize(config, ConfigJsonOptions);
-    }
+    /// <summary>Serializes a Table field's ConfigJson (semantic + columns; no row bounds so partial drafts save).</summary>
+    private static string TableConfig(string semantic, params (Guid ColumnKey, FieldType Type, string Label, string Semantic)[] columns)
+        => TemplateGraphBuilder.TableConfig(semantic, columns);
 
     /// <summary>
     /// Stable GUIDs for the default IEP template's sections, fields and table columns. These are fixed

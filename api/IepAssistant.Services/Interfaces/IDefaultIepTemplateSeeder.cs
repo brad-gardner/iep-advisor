@@ -20,7 +20,9 @@ public enum DefaultIepTemplateSeedOutcome
     /// <summary>A default IEP template already existed; nothing was written.</summary>
     AlreadySeeded = 1,
     /// <summary>Could not seed because the IEP document-type lookup row is missing (migrations not applied yet).</summary>
-    SkippedNoDocumentType = 2
+    SkippedNoDocumentType = 2,
+    /// <summary>The default existed without semantic tags; a new Published version carrying semantics was added.</summary>
+    Upgraded = 3
 }
 
 public sealed record DefaultIepTemplateSeedResult(DefaultIepTemplateSeedOutcome Outcome, int? DocumentTemplateVersionId = null);

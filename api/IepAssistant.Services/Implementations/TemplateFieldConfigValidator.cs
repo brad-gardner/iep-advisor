@@ -33,26 +33,49 @@ public static class TemplateFieldConfigValidator
         FieldType.Date => ValidateDate(configJson),
         FieldType.Select => ValidateSelect(configJson),
         FieldType.Table => ValidateTable(configJson),
-        // No configuration required; any provided config is ignored.
-        FieldType.RichText or FieldType.Checkbox => null,
+        // No configuration required beyond the optional semantic tag.
+        FieldType.RichText => ValidateSemanticOnly<RichTextFieldConfig>(configJson, c => c.Semantic),
+        FieldType.Checkbox => ValidateSemanticOnly<CheckboxFieldConfig>(configJson, c => c.Semantic),
         _ => $"Unsupported field type '{type}'."
     };
+
+    /// <summary>Validates an optional field-level semantic tag against <see cref="FieldSemantics.All"/>.</summary>
+    private static string? ValidateFieldSemantic(string? semantic)
+    {
+        if (IsBlank(semantic)) return null;
+        return FieldSemantics.All.Contains(semantic!) ? null : $"'{semantic}' is not a recognized field semantic.";
+    }
+
+    /// <summary>Validates an optional column-level semantic tag against <see cref="ColumnSemantics.All"/>.</summary>
+    private static string? ValidateColumnSemantic(string? semantic)
+    {
+        if (IsBlank(semantic)) return null;
+        return ColumnSemantics.All.Contains(semantic!) ? null : $"'{semantic}' is not a recognized column semantic.";
+    }
+
+    private static string? ValidateSemanticOnly<T>(string? configJson, Func<T, string?> semantic)
+    {
+        if (IsBlank(configJson)) return null;
+        return TryParse<T>(configJson, out var cfg, out var error) ? ValidateFieldSemantic(semantic(cfg!)) : error;
+    }
 
     private static bool IsBlank(string? s) => string.IsNullOrWhiteSpace(s);
 
     private static string? ValidateText(string? configJson)
     {
         if (IsBlank(configJson)) return null; // config optional
-        return TryParse<TextFieldConfig>(configJson, out var cfg, out var error)
-            ? (cfg!.MaxLength is < 0 ? "Max length must be 0 or greater." : null)
-            : error;
+        if (!TryParse<TextFieldConfig>(configJson, out var cfg, out var error)) return error;
+        if (cfg!.MaxLength is < 0) return "Max length must be 0 or greater.";
+        return ValidateFieldSemantic(cfg.Semantic);
     }
 
     private static string? ValidateDate(string? configJson)
     {
         if (IsBlank(configJson)) return null; // config optional
         if (!TryParse<DateFieldConfig>(configJson, out var cfg, out var error)) return error;
-        if (IsBlank(cfg!.Format)) return null;
+        var semanticError = ValidateFieldSemantic(cfg!.Semantic);
+        if (semanticError != null) return semanticError;
+        if (IsBlank(cfg.Format)) return null;
 
         // A format string is valid if it round-trips a formatting call without throwing.
         try
@@ -71,7 +94,7 @@ public static class TemplateFieldConfigValidator
     {
         if (IsBlank(configJson)) return "A dropdown must have at least one option.";
         if (!TryParse<SelectFieldConfig>(configJson, out var cfg, out var error)) return error;
-        return ValidateSelectConfig(cfg!);
+        return ValidateSelectConfig(cfg!) ?? ValidateFieldSemantic(cfg.Semantic);
     }
 
     private static string? ValidateSelectConfig(SelectFieldConfig cfg)
@@ -96,6 +119,10 @@ public static class TemplateFieldConfigValidator
         if (cfg!.Columns.Count == 0)
             return "A table must have at least one column.";
 
+        var tableSemanticError = ValidateFieldSemantic(cfg.Semantic);
+        if (tableSemanticError != null)
+            return tableSemanticError;
+
         // ColumnKey is the stable identity table-row values are keyed by (like FieldKey for a field),
         // so it must be present and unique within the table.
         if (cfg.Columns.Any(c => c.ColumnKey == Guid.Empty))
@@ -116,11 +143,19 @@ public static class TemplateFieldConfigValidator
             if (!AllowedTableColumnTypes.Contains(column.Type))
                 return $"Table column '{column.Label}' has an unsupported type.";
 
+            var columnSemanticError = ValidateColumnSemantic(column.Semantic);
+            if (columnSemanticError != null)
+                return $"Table column '{column.Label}': {columnSemanticError}";
+
             // Recurse into the column's own config (e.g. a Select column needs options).
             var columnError = Validate(column.Type, column.ConfigJson);
             if (columnError != null)
                 return $"Table column '{column.Label}': {columnError}";
         }
+
+        var columnSemantics = cfg.Columns.Where(c => !IsBlank(c.Semantic)).Select(c => c.Semantic!).ToList();
+        if (columnSemantics.Count != columnSemantics.Distinct(StringComparer.Ordinal).Count())
+            return "Table column semantics must be unique within the table.";
 
         if (cfg.MinRows is < 0 || cfg.MaxRows is < 0)
             return "Table row counts must be 0 or greater.";
