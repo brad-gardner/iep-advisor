@@ -10,6 +10,7 @@ import { DetailLayout } from "@/components/ui/detail-layout";
 import { getDistrictSchools } from "@/features/district-admin/api/district-api";
 import type { DistrictSchool } from "@/features/district-admin/types";
 import { ORG_ROLE, isAdminOrgRole } from "../types";
+import type { StudentTeamMember } from "../types";
 import { useEducatorProfile } from "../hooks/use-educator-profile";
 import { useStudentRecord } from "../hooks/use-student-record";
 import { FamilyLinksSection } from "../components/family-links-section";
@@ -30,9 +31,14 @@ export function EducatorStudentDetailPage() {
   const [schools, setSchools] = useState<DistrictSchool[]>([]);
   const [isInviteStudentOpen, setIsInviteStudentOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<StudentTeamMember[] | null>(null);
   const { profile } = useEducatorProfile();
   const isAdmin = isAdminOrgRole(profile?.orgRoleId);
   const isDistrictAdmin = profile?.orgRoleId === ORG_ROLE.DistrictAdmin;
+  // PUT requires Collaborator+; a Viewer-level member (LEA rep / interpreter
+  // default) is not offered an Edit button it could only get a 403 from.
+  const currentMember = teamMembers?.find((m) => m.userId === profile?.userId) ?? null;
+  const canEdit = isAdmin || (currentMember !== null && currentMember.accessRole !== "Viewer");
 
   // DistrictAdmin needs the school list for Transfer.
   useEffect(() => {
@@ -119,6 +125,7 @@ export function EducatorStudentDetailPage() {
                 isAdmin={isAdmin}
                 currentUserId={profile?.userId}
                 onTeamChanged={record.reload}
+                onMembersChange={setTeamMembers}
                 family={<FamilyLinksSection studentId={studentId} />}
               />
             </section>
@@ -126,7 +133,10 @@ export function EducatorStudentDetailPage() {
         }
         sidebar={
           <>
-            <StudentDetailsCard student={student} onEdit={() => setIsEditOpen(true)} />
+            <StudentDetailsCard
+              student={student}
+              onEdit={canEdit ? () => setIsEditOpen(true) : undefined}
+            />
 
             <Card>
               <h2 className="mb-2 font-serif text-base text-brand-slate-800">

@@ -48,6 +48,38 @@ public sealed class StudentTeamServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetEligibleStaff_LeadTeacherCanCall_ListsSameSchoolAndProviders_MinusMembersAndDistrictAdmins_StrangerIsRefused()
+    {
+        var o = Org();
+        var (lead, _) = _db.Staff("lead@x.com", o.District, o.SchoolA, OrgRoleIds.Teacher, "Lee", "Lead");
+        var (memberUser, _) = _db.Staff("mem@x.com", o.District, o.SchoolA, OrgRoleIds.GeneralEducator, "Mia", "Member");
+        var (_, freeProfile) = _db.Staff("free@x.com", o.District, o.SchoolA, OrgRoleIds.Teacher, "Fay", "Free");
+        var (_, slpProfile) = _db.Staff("slp@x.com", o.District, o.SchoolB, OrgRoleIds.RelatedServiceProvider, "Sal", "Provider");
+        _db.Staff("tb@x.com", o.District, o.SchoolB, OrgRoleIds.Teacher, "Tom", "Other");
+        _db.Staff("sa@x.com", o.District, o.SchoolA, OrgRoleIds.SchoolAdmin, "Ann", "Admin");
+        _db.Staff("gone@x.com", o.District, o.SchoolA, OrgRoleIds.Teacher, "Gus", "Gone", isActive: false);
+        var (stranger, _) = _db.Staff("stranger@x.com", o.District, o.SchoolA, OrgRoleIds.Teacher, "Stu", "Stranger");
+        _db.TeamMember(o.Student, lead, TeamRole.CaseManager, isLead: true);
+        _db.TeamMember(o.Student, memberUser, TeamRole.GeneralEducationTeacher);
+
+        using var ctx = _db.Context();
+        var byLead = await Service(ctx).GetEligibleStaffAsync(lead, o.Student);
+        var byAdmin = await Service(ctx).GetEligibleStaffAsync(o.Admin, o.Student);
+        var byStranger = await Service(ctx).GetEligibleStaffAsync(stranger, o.Student);
+
+        Assert.True(byLead.Success, byLead.Message);
+        // Same-school non-DistrictAdmins (incl. the stranger, who may be added but not manage) + the
+        // other-building provider; minus current members, the other-building teacher, the inactive one.
+        Assert.Equal(new[] { "Ann Admin", "Fay Free", "Sal Provider", "Stu Stranger" }, byLead.Data!.Select(m => $"{m.FirstName} {m.LastName}"));
+        var provider = byLead.Data.Single(m => m.StaffProfileId == slpProfile);
+        Assert.Equal(("RelatedServiceProvider", o.SchoolB, "B"), (provider.OrgRoleName, provider.SchoolId, provider.SchoolName));
+        Assert.Contains(byLead.Data, m => m.StaffProfileId == freeProfile);
+        Assert.Equal(byLead.Data.Select(m => m.StaffProfileId), byAdmin.Data!.Select(m => m.StaffProfileId));
+        Assert.False(byStranger.Success);
+        Assert.Contains("permission", byStranger.Message);
+    }
+
+    [Fact]
     public async Task AddMember_WithIsLead_DemotesPreviousLead_ButKeepsThemOnTheTeam()
     {
         var o = Org();

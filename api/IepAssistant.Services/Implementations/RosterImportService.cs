@@ -13,9 +13,13 @@ namespace IepAssistant.Services.Implementations;
 /// <c>(DistrictId, StudentId)</c>; a blank cell keeps the stored value, the literal <c>CLEAR</c> clears a
 /// nullable field, and rows absent from the file never exit anyone. Preview evaluates every row against
 /// live reference data and stores the parsed cells; commit re-evaluates each stored row (so stale
-/// references become skipped errors rather than bad writes) and applies New/Updated rows in one
-/// transaction, exactly once per batch. Also serves batch history / detail / error workbook for both
-/// import kinds. Admin-only (DistrictAdmin: district; SchoolAdmin: own school rows only).
+/// references become skipped errors rather than bad writes) and applies New/Updated rows set-based —
+/// chunks of <see cref="CommitChunkSize"/> rows, a handful of queries and two saves per chunk — in one
+/// transaction, exactly once per batch (claimed via <see cref="ImportBatchClaim"/>). A row that moves a
+/// student between schools runs the same team/access deactivation as a transfer. Also serves batch
+/// history / detail / error workbook for both import kinds. Admin-only (DistrictAdmin: district;
+/// SchoolAdmin: own school rows only — students of other buildings are invisible to them, so a
+/// cross-school id reads as unknown and never discloses a name).
 /// </summary>
 public class RosterImportService : IRosterImportService
 {
@@ -31,6 +35,10 @@ public class RosterImportService : IRosterImportService
     };
 
     private const string PermissionMessage = "You do not have permission to import students.";
+    private const string AlreadyCommittedMessage = "This import has already been committed.";
+
+    /// <summary>Rows applied per unit of work at commit (bounds the change tracker; SaveChanges runs once or twice per chunk).</summary>
+    internal const int CommitChunkSize = 500;
 
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
@@ -124,7 +132,7 @@ public class RosterImportService : IRosterImportService
 
         var refs = await LoadReferenceDataAsync(ctx, ct);
         var keys = sheetRows.Select(r => r.Get("StudentId").Trim()).Where(k => k.Length > 0).Distinct().ToList();
-        var existing = await LoadExistingAsync(ctx.DistrictId, keys, ct);
+        var existing = await LoadExistingAsync(ctx, keys, ct);
 
         var rows = new List<ImportRow>(sheetRows.Count);
         foreach (var sheetRow in sheetRows)
@@ -147,7 +155,7 @@ public class RosterImportService : IRosterImportService
         {
             DistrictId = ctx.DistrictId,
             Kind = ImportKind.Students,
-            FileName = Path.GetFileName(upload.FileName),
+            FileName = ImportWorkbook.Truncate(Path.GetFileName(upload.FileName), 260),
             Status = ImportBatchStatus.Previewed,
             CreatedById = userId,
             UpdatedById = userId,
@@ -172,25 +180,57 @@ public class RosterImportService : IRosterImportService
             return ServiceResult<ImportResultModel>.FailureResult(denied);
         var ctx = ctxOrNull!;
 
-        var batch = await FindBatchAsync(ctx, batchId, ct);
+        var batch = await FindBatchAsync(ctx, batchId, ct, track: false);
         if (batch == null)
             return ServiceResult<ImportResultModel>.FailureResult("Import not found.");
         if (batch.Kind != ImportKind.Students)
             return ServiceResult<ImportResultModel>.FailureResult("This import is not a student roster.");
         if (batch.Status != ImportBatchStatus.Previewed)
-            return ServiceResult<ImportResultModel>.FailureResult("This import has already been committed.");
+            return ServiceResult<ImportResultModel>.FailureResult(AlreadyCommittedMessage);
         if (!commitValid && batch.ErrorCount > 0)
             return ServiceResult<ImportResultModel>.FailureResult("Fix the errors or choose to import valid rows only.");
 
-        var rows = await _context.ImportRows.Where(r => r.BatchId == batchId).OrderBy(r => r.RowNumber).ToListAsync(ct);
+        // Claim the batch (Previewed → Committing) before touching any row so an overlapping commit of
+        // the same batch is refused rather than racing this one on the external-id index.
+        if (!await ImportBatchClaim.TryClaimAsync(_context, batchId, ct))
+            return ServiceResult<ImportResultModel>.FailureResult(AlreadyCommittedMessage);
+
+        try
+        {
+            return await CommitClaimedAsync(ctx, userId, batchId, ct);
+        }
+        catch
+        {
+            await ImportBatchClaim.ReleaseAsync(_context, batchId);
+            throw;
+        }
+    }
+
+    /// <summary>One row to write at commit: its stored row, its evaluation, and the late error (if any).</summary>
+    private sealed class PendingRow
+    {
+        public PendingRow(ImportRow row, RowEvaluation eval) { Row = row; Eval = eval; }
+        public ImportRow Row { get; }
+        public RowEvaluation Eval { get; }
+        public SchoolStudent? Student { get; set; }
+        public string? Error { get; set; }
+    }
+
+    private async Task<ServiceResult<ImportResultModel>> CommitClaimedAsync(StaffContext ctx, int userId, int batchId, CancellationToken ct)
+    {
+        var rows = await _context.ImportRows.AsNoTracking().Where(r => r.BatchId == batchId).OrderBy(r => r.RowNumber).ToListAsync(ct);
         var refs = await LoadReferenceDataAsync(ctx, ct);
         var candidateKeys = rows.Where(r => r.Outcome != ImportRowOutcome.Error).Select(r => r.Key).Where(k => k.Length > 0).Distinct().ToList();
-        var existing = await LoadExistingAsync(ctx.DistrictId, candidateKeys, ct);
+        var existing = await LoadExistingAsync(ctx, candidateKeys, ct);
 
         var committed = new ImportCommittedCountsModel();
         var skipped = 0;
+        var pending = new List<PendingRow>();
+        var before = rows.ToDictionary(r => r.Id, r => (r.Outcome, r.Message, r.ChangesJson));
 
-        await using var tx = await _context.Database.BeginTransactionAsync(ct);
+        // Pass 1 (no writes): re-evaluate every row against live data — a school renamed or a student
+        // changed since preview must not be written blindly. Duplicate keys were flagged at preview, so
+        // no two applied rows share a student.
         foreach (var row in rows)
         {
             if (row.Outcome == ImportRowOutcome.Error)
@@ -198,38 +238,64 @@ public class RosterImportService : IRosterImportService
                 skipped++;
                 continue;
             }
-
-            // Re-evaluate against live data: a school renamed or a student changed since preview must not
-            // be written blindly.
-            var payload = ImportWorkbook.DeserializePayload(row.PayloadJson);
-            var eval = Evaluate(ctx, refs, existing, payload);
+            var eval = Evaluate(ctx, refs, existing, ImportWorkbook.DeserializePayload(row.PayloadJson));
             row.Message = eval.Message == null ? null : ImportWorkbook.Truncate(eval.Message, 1000);
             row.ChangesJson = ImportWorkbook.SerializeChanges(eval.Changes);
-            if (eval.Outcome == ImportRowOutcome.Error)
+            switch (eval.Outcome)
             {
-                row.Outcome = ImportRowOutcome.Error;
-                skipped++;
-                continue;
+                case ImportRowOutcome.Error:
+                    row.Outcome = ImportRowOutcome.Error;
+                    skipped++;
+                    break;
+                case ImportRowOutcome.Unchanged:
+                    row.Outcome = ImportRowOutcome.Unchanged;
+                    committed.Unchanged++;
+                    break;
+                default:
+                    pending.Add(new PendingRow(row, eval));
+                    break;
             }
-            if (eval.Outcome == ImportRowOutcome.Unchanged)
-            {
-                row.Outcome = ImportRowOutcome.Unchanged;
-                committed.Unchanged++;
-                continue;
-            }
-
-            var applyError = await ApplyAsync(ctx, userId, refs, existing, eval, ct);
-            if (applyError != null)
-            {
-                row.Outcome = ImportRowOutcome.Error;
-                row.Message = applyError;
-                skipped++;
-                continue;
-            }
-            row.Outcome = eval.Outcome;
-            if (eval.Outcome == ImportRowOutcome.New) committed.New++; else committed.Updated++;
         }
 
+        // Pass 2: apply in chunks. Each chunk pre-loads its students and their team/access rows, mutates
+        // in memory, saves once or twice (StudentTeamBatch), then the tracker is cleared.
+        var touchedStudentIds = new List<int>(pending.Count);
+        await using var tx = await _context.Database.BeginTransactionAsync(ct);
+        foreach (var chunk in pending.Chunk(CommitChunkSize))
+        {
+            await ApplyChunkAsync(ctx, userId, refs, chunk, ct);
+            foreach (var p in chunk)
+            {
+                if (p.Error != null)
+                {
+                    p.Row.Outcome = ImportRowOutcome.Error;
+                    p.Row.Message = p.Error;
+                    skipped++;
+                    continue;
+                }
+                p.Row.Outcome = p.Eval.Outcome;
+                touchedStudentIds.Add(p.Student!.Id);
+                if (p.Eval.Outcome == ImportRowOutcome.New) committed.New++; else committed.Updated++;
+            }
+            _context.ChangeTracker.Clear();
+        }
+
+        // Persist only the rows whose stored outcome/message/changes moved, as batched UPDATEs.
+        var dirty = rows.Where(r => before[r.Id] != (r.Outcome, r.Message, r.ChangesJson)).ToList();
+        foreach (var chunk in dirty.Chunk(CommitChunkSize))
+        {
+            foreach (var row in chunk)
+            {
+                var entry = _context.ImportRows.Attach(row);
+                entry.Property(r => r.Outcome).IsModified = true;
+                entry.Property(r => r.Message).IsModified = true;
+                entry.Property(r => r.ChangesJson).IsModified = true;
+            }
+            await _context.SaveChangesAsync(ct);
+            _context.ChangeTracker.Clear();
+        }
+
+        var batch = await _context.ImportBatches.FirstAsync(b => b.Id == batchId, ct);
         batch.Status = ImportBatchStatus.Committed;
         batch.CommittedAt = DateTime.UtcNow;
         batch.UpdatedById = userId;
@@ -237,7 +303,10 @@ public class RosterImportService : IRosterImportService
         await _context.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
+        // Audit only what is durable: the batch, then each student actually written.
         _audit.Record(AuditAction.Edit, userId, "ImportBatch", batch.Id);
+        foreach (var studentId in touchedStudentIds)
+            _audit.Record(AuditAction.Edit, userId, "SchoolStudent", studentId);
         _logger.LogInformation("Student import batch {BatchId} committed by user {UserId}: {New} new, {Updated} updated, {Unchanged} unchanged, {Skipped} skipped",
             batch.Id, userId, committed.New, committed.Updated, committed.Unchanged, skipped);
 
@@ -364,14 +433,56 @@ public class RosterImportService : IRosterImportService
 
         public RefStaff? FindStaff(string email)
             => Staff.FirstOrDefault(s => string.Equals(s.Email, email.Trim(), StringComparison.OrdinalIgnoreCase));
+
+        private readonly Dictionary<int, HashSet<int>> _portableBySchool = new();
+
+        /// <summary>Active staff who may stay on a team after a move to <paramref name="schoolId"/> (transfer rule, in memory).</summary>
+        public HashSet<int> PortableUserIds(int schoolId)
+        {
+            if (!_portableBySchool.TryGetValue(schoolId, out var set))
+                _portableBySchool[schoolId] = set = Staff
+                    .Where(st => StudentTeamWriter.IsPortable(st.OrgRoleId, st.SchoolId, schoolId))
+                    .Select(st => st.UserId)
+                    .ToHashSet();
+            return set;
+        }
+    }
+
+    /// <summary>Students already stored for the candidate keys (scope-filtered), plus their active team for the transfer preview line.</summary>
+    internal sealed class ExistingStudents
+    {
+        private readonly Dictionary<string, SchoolStudent> _byKey = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<int, List<int>> _activeTeamByStudentId = new();
+
+        public void Add(SchoolStudent student) => _byKey[student.ExternalStudentId!] = student;
+        public void AddTeamMember(int studentId, int userId)
+        {
+            if (!_activeTeamByStudentId.TryGetValue(studentId, out var list))
+                _activeTeamByStudentId[studentId] = list = new List<int>();
+            list.Add(userId);
+        }
+
+        public SchoolStudent? Find(string key) => _byKey.TryGetValue(key, out var s) ? s : null;
+        public IReadOnlyList<int> ActiveTeamUserIds(int studentId)
+            => _activeTeamByStudentId.TryGetValue(studentId, out var list) ? list : Array.Empty<int>();
     }
 
     /// <summary>The fully-resolved result of one row: what to write, or why not.</summary>
     internal sealed class RowEvaluation
     {
+        private readonly string _sheetDisplayName;
+
+        public RowEvaluation(string sheetDisplayName)
+        {
+            _sheetDisplayName = sheetDisplayName;
+            DisplayName = sheetDisplayName;
+        }
+
         public ImportRowOutcome Outcome { get; set; } = ImportRowOutcome.Unchanged;
         public string Key { get; set; } = string.Empty;
-        public string DisplayName { get; set; } = string.Empty;
+
+        /// <summary>Sheet-supplied name, or the stored name for a matched row — reset to the sheet's on <see cref="Fail"/>.</summary>
+        public string DisplayName { get; set; }
         public string? Message { get; set; }
         public List<string> Changes { get; } = new();
 
@@ -395,18 +506,18 @@ public class RosterImportService : IRosterImportService
             Outcome = ImportRowOutcome.Error;
             Message = message;
             Changes.Clear();
+            DisplayName = _sheetDisplayName; // an error row never echoes a stored name back
             return this;
         }
     }
 
-    internal static RowEvaluation Evaluate(StaffContext ctx, ReferenceData refs, Dictionary<string, SchoolStudent> existingByKey, Dictionary<string, string> cells)
+    internal static RowEvaluation Evaluate(StaffContext ctx, ReferenceData refs, ExistingStudents existingStudents, Dictionary<string, string> cells)
     {
         string Cell(string column) => cells.TryGetValue(column, out var v) ? v.Trim() : string.Empty;
 
-        var eval = new RowEvaluation { Key = Cell("StudentId") };
         var first = Cell("FirstName");
         var last = Cell("LastName");
-        eval.DisplayName = $"{first} {last}".Trim();
+        var eval = new RowEvaluation(sheetDisplayName: $"{first} {last}".Trim()) { Key = Cell("StudentId") };
 
         if (eval.Key.Length == 0)
             return eval.Fail("StudentId is required.");
@@ -415,7 +526,7 @@ public class RosterImportService : IRosterImportService
         if (ImportWorkbook.IsClear(eval.Key))
             return eval.Fail("StudentId cannot be cleared.");
 
-        existingByKey.TryGetValue(eval.Key, out var existing);
+        var existing = existingStudents.Find(eval.Key);
         eval.Existing = existing;
         var isNew = existing == null;
         if (eval.DisplayName.Length == 0 && existing != null)
@@ -505,6 +616,12 @@ public class RosterImportService : IRosterImportService
         else if (managerEmail.Length > 0)
         {
             var staff = refs.FindStaff(managerEmail);
+            // A SchoolAdmin sees one neutral refusal for any email outside their eligible pool (own
+            // building + RelatedServiceProviders) so the importer is not a staff-directory oracle.
+            if (ctx.OrgRoleId == OrgRoleIds.SchoolAdmin
+                && (staff == null || staff.OrgRoleId == OrgRoleIds.DistrictAdmin
+                    || (staff.OrgRoleId != OrgRoleIds.RelatedServiceProvider && staff.SchoolId != ctx.SchoolId)))
+                return eval.Fail($"Case manager '{managerEmail}' is not available for your school.");
             if (staff == null) return eval.Fail($"Case manager '{managerEmail}' is not an active staff member in this district.");
             if (staff.OrgRoleId == OrgRoleIds.DistrictAdmin) return eval.Fail($"Case manager '{managerEmail}' is a District Admin and cannot be assigned to a student.");
             var targetSchoolId = eval.School?.Id ?? existing?.SchoolId;
@@ -539,7 +656,14 @@ public class RosterImportService : IRosterImportService
         // ---- Diff against the stored record (blank = keep, so only SET values can differ)
         var s = existing!;
         if (eval.School != null && eval.School.Id != s.SchoolId)
+        {
             eval.Changes.Add($"School: {refs.Schools.FirstOrDefault(x => x.Id == s.SchoolId)?.Name ?? s.SchoolId.ToString()} → {eval.School.Name}");
+            var newSchoolId = eval.School.Id;
+            var portable = refs.PortableUserIds(newSchoolId);
+            var leaving = existingStudents.ActiveTeamUserIds(s.Id).Count(u => !portable.Contains(u));
+            if (leaving > 0)
+                eval.Changes.Add($"Team: {leaving} member(s) will be deactivated");
+        }
         if (eval.FirstName != null && eval.FirstName != s.FirstName)
             eval.Changes.Add($"First name: {s.FirstName} → {eval.FirstName}");
         if (eval.LastName != null && eval.LastName != (s.LastName ?? string.Empty))
@@ -584,104 +708,152 @@ public class RosterImportService : IRosterImportService
             eval.Changes.Add($"{label}: {ImportWorkbook.FormatDate(current)} → {ImportWorkbook.FormatDate(incoming.Value)}");
     }
 
-    /// <summary>Writes one New/Updated evaluation. Returns a row error message on a late failure.</summary>
-    private async Task<string?> ApplyAsync(StaffContext ctx, int userId, ReferenceData refs, Dictionary<string, SchoolStudent> existingByKey, RowEvaluation eval, CancellationToken ct)
+    /// <summary>
+    /// Applies one chunk of New/Updated evaluations. On an external-id collision (a student created
+    /// since preview) the chunk's statements are rolled back to EF's savepoint and re-applied one row
+    /// at a time so the duplicate lands on exactly its row; any other DbUpdateException propagates and
+    /// fails the whole commit (the batch stays Previewed).
+    /// </summary>
+    private async Task ApplyChunkAsync(StaffContext ctx, int userId, ReferenceData refs, IReadOnlyList<PendingRow> chunk, CancellationToken ct)
     {
-        SchoolStudent student;
-        if (eval.Existing == null)
+        try
         {
-            var school = eval.School!;
-            student = new SchoolStudent
+            await ApplyChunkCoreAsync(ctx, userId, refs, chunk, ct);
+        }
+        catch (DbUpdateException ex) when (EducatorService.IsExternalIdCollision(ex))
+        {
+            _context.ChangeTracker.Clear();
+            if (chunk.Count == 1)
             {
-                SchoolId = school.Id,
-                DistrictId = ctx.DistrictId,
-                ExternalStudentId = eval.Key,
-                FirstName = eval.FirstName!,
-                LastName = eval.LastName,
-                DateOfBirth = eval.DateOfBirth,
-                StateCode = school.StateCode ?? refs.DistrictStateCode,
-                GradeLevel = eval.Grade,
-                DisabilityCategory = eval.Disability.Set ? eval.Disability.Value : null,
-                HomeLanguage = eval.HomeLanguage.Set ? eval.HomeLanguage.Value : "en",
-                IepDate = eval.IepDate.Value,
-                AnnualReviewDueDate = eval.AnnualReviewDue.Value,
-                EtrDate = eval.EtrDate.Value,
-                ReevaluationDueDate = eval.ReevaluationDue.Value,
-                Status = eval.Status ?? StudentStatus.Active,
-                CreatedById = userId,
-                UpdatedById = userId
-            };
-            if (student.Status == StudentStatus.Exited)
+                chunk[0].Error = EducatorService.DuplicateExternalIdMessage;
+                chunk[0].Student = null;
+                return;
+            }
+            foreach (var one in chunk)
+            {
+                one.Error = null;
+                one.Student = null;
+                await ApplyChunkAsync(ctx, userId, refs, new[] { one }, ct);
+                _context.ChangeTracker.Clear();
+            }
+        }
+    }
+
+    private async Task ApplyChunkCoreAsync(StaffContext ctx, int userId, ReferenceData refs, IReadOnlyList<PendingRow> chunk, CancellationToken ct)
+    {
+        // The evaluation holds AsNoTracking copies; the writes go through tracked entities loaded here.
+        var existingIds = chunk.Where(p => p.Eval.Existing != null).Select(p => p.Eval.Existing!.Id).Distinct().ToList();
+        var tracked = existingIds.Count == 0
+            ? new Dictionary<int, SchoolStudent>()
+            : await _context.SchoolStudents.Where(st => existingIds.Contains(st.Id)).ToDictionaryAsync(st => st.Id, ct);
+
+        var schoolMoves = new List<(PendingRow Row, RefSchool NewSchool)>();
+        foreach (var p in chunk)
+        {
+            var eval = p.Eval;
+            if (eval.Existing == null)
+            {
+                p.Student = BuildNewStudent(ctx, userId, refs, eval);
+                _context.SchoolStudents.Add(p.Student);
+                continue;
+            }
+            if (!tracked.TryGetValue(eval.Existing.Id, out var student))
+            {
+                p.Error = "This student no longer exists.";
+                continue;
+            }
+            p.Student = student;
+            if (eval.School != null && eval.School.Id != student.SchoolId)
+                schoolMoves.Add((p, eval.School));
+            ApplyUpdate(userId, refs, eval, student);
+        }
+
+        var team = await StudentTeamBatch.LoadAsync(_context, tracked.Values.ToList(), userId, ct);
+        foreach (var (p, newSchool) in schoolMoves)
+            team.DeactivateNonPortable(p.Student!, refs.PortableUserIds(newSchool.Id), EducatorService.TransferNote(newSchool.Name));
+        foreach (var p in chunk)
+        {
+            if (p.Error != null || !p.Eval.CaseManager.Set)
+                continue;
+            var manager = p.Eval.CaseManager.Value;
+            if (manager == null)
+                team.ClearLead(p.Student!);
+            else if (p.Student!.CaseManagerUserId != manager.UserId)
+                team.AssignLead(p.Student, manager.UserId, TeamRole.CaseManager, accessOverride: null);
+        }
+        await team.SaveAsync(ct);
+    }
+
+    private static SchoolStudent BuildNewStudent(StaffContext ctx, int userId, ReferenceData refs, RowEvaluation eval)
+    {
+        var school = eval.School!;
+        var student = new SchoolStudent
+        {
+            SchoolId = school.Id,
+            DistrictId = ctx.DistrictId,
+            ExternalStudentId = eval.Key,
+            FirstName = eval.FirstName!,
+            LastName = eval.LastName,
+            DateOfBirth = eval.DateOfBirth,
+            StateCode = school.StateCode ?? refs.DistrictStateCode,
+            GradeLevel = eval.Grade,
+            DisabilityCategory = eval.Disability.Set ? eval.Disability.Value : null,
+            HomeLanguage = eval.HomeLanguage.Set ? eval.HomeLanguage.Value : "en",
+            IepDate = eval.IepDate.Value,
+            AnnualReviewDueDate = eval.AnnualReviewDue.Value,
+            EtrDate = eval.EtrDate.Value,
+            ReevaluationDueDate = eval.ReevaluationDue.Value,
+            Status = eval.Status ?? StudentStatus.Active,
+            CreatedById = userId,
+            UpdatedById = userId
+        };
+        if (student.Status == StudentStatus.Exited)
+        {
+            student.ExitedAt = DateTime.UtcNow;
+            student.ExitReason = ExitReason.Other;
+        }
+        return student;
+    }
+
+    private static void ApplyUpdate(int userId, ReferenceData refs, RowEvaluation eval, SchoolStudent student)
+    {
+        if (eval.School != null && eval.School.Id != student.SchoolId)
+        {
+            var oldSchool = refs.Schools.FirstOrDefault(x => x.Id == student.SchoolId);
+            var oldState = oldSchool?.StateCode ?? refs.DistrictStateCode;
+            if (student.StateCode == null || string.Equals(student.StateCode, oldState, StringComparison.OrdinalIgnoreCase))
+                student.StateCode = eval.School.StateCode ?? refs.DistrictStateCode;
+            student.SchoolId = eval.School.Id;
+        }
+        if (eval.FirstName != null) student.FirstName = eval.FirstName;
+        if (eval.LastName != null) student.LastName = eval.LastName;
+        if (eval.DateOfBirth != null) student.DateOfBirth = eval.DateOfBirth;
+        if (eval.Grade != null) student.GradeLevel = eval.Grade;
+        if (eval.Disability.Set)
+        {
+            student.DisabilityCategory = eval.Disability.Value;
+            if (eval.Disability.Value != DisabilityCategory.Other) student.LegacyDisabilityText = null;
+        }
+        if (eval.HomeLanguage.Set) student.HomeLanguage = eval.HomeLanguage.Value;
+        if (eval.IepDate.Set) student.IepDate = eval.IepDate.Value;
+        if (eval.AnnualReviewDue.Set) student.AnnualReviewDueDate = eval.AnnualReviewDue.Value;
+        if (eval.EtrDate.Set) student.EtrDate = eval.EtrDate.Value;
+        if (eval.ReevaluationDue.Set) student.ReevaluationDueDate = eval.ReevaluationDue.Value;
+        if (eval.Status != null && eval.Status != student.Status)
+        {
+            student.Status = eval.Status.Value;
+            if (eval.Status == StudentStatus.Exited)
             {
                 student.ExitedAt = DateTime.UtcNow;
                 student.ExitReason = ExitReason.Other;
             }
-            await _context.SchoolStudents.AddAsync(student, ct);
-            try
+            else if (eval.Status == StudentStatus.Active)
             {
-                await _context.SaveChangesAsync(ct);
+                student.ExitedAt = null;
+                student.ExitReason = null;
             }
-            catch (DbUpdateException)
-            {
-                _context.Entry(student).State = EntityState.Detached;
-                return "Student ID already in use in this district.";
-            }
-            existingByKey[eval.Key] = student;
         }
-        else
-        {
-            student = await _context.SchoolStudents.FirstAsync(s => s.Id == eval.Existing.Id, ct);
-            if (eval.School != null && eval.School.Id != student.SchoolId)
-            {
-                var oldSchool = refs.Schools.FirstOrDefault(x => x.Id == student.SchoolId);
-                var oldState = oldSchool?.StateCode ?? refs.DistrictStateCode;
-                if (student.StateCode == null || string.Equals(student.StateCode, oldState, StringComparison.OrdinalIgnoreCase))
-                    student.StateCode = eval.School.StateCode ?? refs.DistrictStateCode;
-                student.SchoolId = eval.School.Id;
-            }
-            if (eval.FirstName != null) student.FirstName = eval.FirstName;
-            if (eval.LastName != null) student.LastName = eval.LastName;
-            if (eval.DateOfBirth != null) student.DateOfBirth = eval.DateOfBirth;
-            if (eval.Grade != null) student.GradeLevel = eval.Grade;
-            if (eval.Disability.Set)
-            {
-                student.DisabilityCategory = eval.Disability.Value;
-                if (eval.Disability.Value != DisabilityCategory.Other) student.LegacyDisabilityText = null;
-            }
-            if (eval.HomeLanguage.Set) student.HomeLanguage = eval.HomeLanguage.Value;
-            if (eval.IepDate.Set) student.IepDate = eval.IepDate.Value;
-            if (eval.AnnualReviewDue.Set) student.AnnualReviewDueDate = eval.AnnualReviewDue.Value;
-            if (eval.EtrDate.Set) student.EtrDate = eval.EtrDate.Value;
-            if (eval.ReevaluationDue.Set) student.ReevaluationDueDate = eval.ReevaluationDue.Value;
-            if (eval.Status != null && eval.Status != student.Status)
-            {
-                student.Status = eval.Status.Value;
-                if (eval.Status == StudentStatus.Exited)
-                {
-                    student.ExitedAt = DateTime.UtcNow;
-                    student.ExitReason = ExitReason.Other;
-                }
-                else if (eval.Status == StudentStatus.Active)
-                {
-                    student.ExitedAt = null;
-                    student.ExitReason = null;
-                }
-            }
-            student.UpdatedById = userId;
-            await _context.SaveChangesAsync(ct);
-        }
-
-        if (eval.CaseManager.Set)
-        {
-            if (eval.CaseManager.Value == null)
-                await StudentTeamWriter.ClearLeadAsync(_context, student, userId, ct);
-            else if (student.CaseManagerUserId != eval.CaseManager.Value.UserId)
-                await StudentTeamWriter.UpsertMemberAsync(_context, student, eval.CaseManager.Value.UserId, TeamRole.CaseManager,
-                    makeLead: true, accessOverride: null, userId, ct);
-        }
-
-        _audit.Record(AuditAction.Edit, userId, "SchoolStudent", student.Id);
-        return null;
+        student.UpdatedById = userId;
     }
 
     // ================================================================= Data access helpers
@@ -738,17 +910,37 @@ public class RosterImportService : IRosterImportService
         return new ReferenceData { Schools = schools, Staff = staff, DistrictStateCode = districtState };
     }
 
-    /// <summary>Existing students of the district keyed by ExternalStudentId (any status), for the given keys.</summary>
-    private async Task<Dictionary<string, SchoolStudent>> LoadExistingAsync(int districtId, List<string> keys, CancellationToken ct)
+    /// <summary>
+    /// Existing students keyed by ExternalStudentId (any status) for the given keys, plus their active
+    /// team user ids. Scope: the district for a DistrictAdmin; ONLY the caller's school for a SchoolAdmin,
+    /// so a student of another building is indistinguishable from an unknown id (no name disclosure).
+    /// </summary>
+    private async Task<ExistingStudents> LoadExistingAsync(StaffContext ctx, List<string> keys, CancellationToken ct)
     {
-        var result = new Dictionary<string, SchoolStudent>(StringComparer.OrdinalIgnoreCase);
+        var result = new ExistingStudents();
+        var districtId = ctx.DistrictId;
         foreach (var chunk in keys.Chunk(500))
         {
-            var students = await _context.SchoolStudents.AsNoTracking()
-                .Where(s => s.DistrictId == districtId && s.ExternalStudentId != null && chunk.Contains(s.ExternalStudentId))
-                .ToListAsync(ct);
+            var query = _context.SchoolStudents.AsNoTracking()
+                .Where(s => s.DistrictId == districtId && s.ExternalStudentId != null && chunk.Contains(s.ExternalStudentId));
+            if (ctx.OrgRoleId == OrgRoleIds.SchoolAdmin)
+            {
+                var schoolId = ctx.SchoolId!.Value;
+                query = query.Where(s => s.SchoolId == schoolId);
+            }
+            var students = await query.ToListAsync(ct);
+            if (students.Count == 0)
+                continue;
             foreach (var s in students)
-                result[s.ExternalStudentId!] = s;
+                result.Add(s);
+
+            var ids = students.Select(s => s.Id).ToList();
+            var members = await _context.StudentTeamMembers.AsNoTracking()
+                .Where(m => ids.Contains(m.SchoolStudentId) && m.IsActive)
+                .Select(m => new { m.SchoolStudentId, m.UserId })
+                .ToListAsync(ct);
+            foreach (var m in members)
+                result.AddTeamMember(m.SchoolStudentId, m.UserId);
         }
         return result;
     }

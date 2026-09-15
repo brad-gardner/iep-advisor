@@ -11,7 +11,8 @@ namespace IepAssistant.Services.Implementations;
 /// invariants in one place: (1) a member always has a matching <c>SchoolStudentAccess</c> row, and (2) at
 /// most one ACTIVE member is the lead — mirrored to <c>SchoolStudent.CaseManagerUserId</c>. Callers wrap
 /// the call in a transaction: the lead swap is two saves (demote, then promote) so the filtered unique
-/// index on the active lead is never tripped mid-batch.
+/// index on the active lead is never tripped mid-batch. Multi-student callers use
+/// <see cref="StudentTeamBatch"/>, which applies the same rules set-based.
 /// </summary>
 internal static class StudentTeamWriter
 {
@@ -31,6 +32,30 @@ internal static class StudentTeamWriter
         if (target.SchoolId == null || target.SchoolId.Value != studentSchoolId)
             return "That staff member is not at this student's school.";
         return null;
+    }
+
+    /// <summary>
+    /// Transfer rule: a staff member "follows" a student to <paramref name="newSchoolId"/> when they are
+    /// based there, or serve every building (RelatedServiceProvider), or act by district scope
+    /// (DistrictAdmin). Everyone else is deactivated from the team. Keep in sync with
+    /// <see cref="LoadPortableUserIdsAsync"/>, its SQL-translated twin.
+    /// </summary>
+    public static bool IsPortable(int orgRoleId, int? schoolId, int newSchoolId)
+        => schoolId == newSchoolId
+           || orgRoleId == OrgRoleIds.RelatedServiceProvider
+           || orgRoleId == OrgRoleIds.DistrictAdmin;
+
+    /// <summary>User ids of the district's ACTIVE staff who may stay on a team after a move to <paramref name="newSchoolId"/>.</summary>
+    public static async Task<HashSet<int>> LoadPortableUserIdsAsync(ApplicationDbContext context, int districtId, int newSchoolId, CancellationToken ct)
+    {
+        var ids = await context.StaffProfiles.AsNoTracking()
+            .Where(p => p.IsActive && p.DistrictId == districtId
+                     && (p.SchoolId == newSchoolId
+                         || p.OrgRoleId == OrgRoleIds.RelatedServiceProvider
+                         || p.OrgRoleId == OrgRoleIds.DistrictAdmin))
+            .Select(p => p.UserId)
+            .ToListAsync(ct);
+        return ids.ToHashSet();
     }
 
     /// <summary>

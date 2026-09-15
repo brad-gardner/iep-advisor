@@ -68,8 +68,9 @@ public class UpdateSchoolStudentRequest
 
 public class ExitStudentRequest
 {
+    /// <summary>Nullable so [Required] actually rejects an omitted value (a non-nullable enum defaults silently).</summary>
     [Required]
-    public ExitReason ExitReason { get; set; }
+    public ExitReason? ExitReason { get; set; }
     public DateTime? ExitedAt { get; set; }
 }
 
@@ -81,8 +82,10 @@ public class TransferStudentRequest
 
 public class BulkAssignCaseManagerRequest
 {
+    /// <summary>1–500 ids (the service enforces the same cap).</summary>
     [Required]
     [MinLength(1)]
+    [MaxLength(500)]
     public List<int> StudentIds { get; set; } = new();
 
     [Required]
@@ -164,13 +167,28 @@ public class StudentTeamMemberDto
     public DateTime AddedAt { get; set; }
 }
 
+/// <summary>A staff member eligible to join a student's team (GET .../team/eligible).</summary>
+public class EligibleStaffDto
+{
+    public int StaffProfileId { get; set; }
+    public int UserId { get; set; }
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public int OrgRoleId { get; set; }
+    public string OrgRoleName { get; set; } = string.Empty;
+    public int? SchoolId { get; set; }
+    public string? SchoolName { get; set; }
+}
+
 public class AddTeamMemberRequest
 {
     [Required]
     public int StaffProfileId { get; set; }
 
+    /// <summary>Nullable so [Required] actually rejects an omitted value (a non-nullable enum defaults silently).</summary>
     [Required]
-    public TeamRole TeamRole { get; set; }
+    public TeamRole? TeamRole { get; set; }
 
     public bool? IsLead { get; set; }
     public AccessRole? AccessRole { get; set; }

@@ -4,6 +4,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
 import { useToast } from '@/components/ui/toast';
+import { apiErrorMessage } from '@/lib/api-error';
 import { getStudentLinks, inviteParent, revokeStudentLink } from '../api/educator-api';
 import type { ChildLink } from '../types';
 import { InviteParentForm } from './invite-parent-form';
@@ -19,6 +20,7 @@ export function FamilyLinksSection({ studentId }: { studentId: number }) {
   const [revokeTarget, setRevokeTarget] = useState<ChildLink | null>(null);
   const [revokingId, setRevokingId] = useState<number | null>(null);
   const [revokeNote, setRevokeNote] = useState<string | null>(null);
+  const [revokeError, setRevokeError] = useState<string | null>(null);
 
   const reloadLinks = useCallback(async () => {
     try {
@@ -63,6 +65,7 @@ export function FamilyLinksSection({ studentId }: { studentId: number }) {
     if (!revokeTarget) return;
     setRevokingId(revokeTarget.id);
     setRevokeNote(null);
+    setRevokeError(null);
     try {
       const response = await revokeStudentLink(studentId, revokeTarget.id);
       if (response.success) {
@@ -72,7 +75,12 @@ export function FamilyLinksSection({ studentId }: { studentId: number }) {
         );
         await reloadLinks();
         setRevokeTarget(null);
+      } else {
+        setRevokeError(response.message || 'Could not revoke this link');
       }
+    } catch (err) {
+      // Stays in the dialog so the user can retry or cancel.
+      setRevokeError(apiErrorMessage(err, 'Could not revoke this link'));
     } finally {
       setRevokingId(null);
     }
@@ -113,8 +121,12 @@ export function FamilyLinksSection({ studentId }: { studentId: number }) {
         message="This cannot be undone. The parent keeps any data already shared with them."
         confirmLabel="Revoke link"
         loading={revokingId !== null}
+        error={revokeError}
         onConfirm={confirmRevoke}
-        onCancel={() => setRevokeTarget(null)}
+        onCancel={() => {
+          setRevokeError(null);
+          setRevokeTarget(null);
+        }}
         data-testid="student-link-revoke-dialog"
       />
     </div>

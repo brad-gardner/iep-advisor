@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/components/ui/toast';
+import { apiErrorMessage } from '@/lib/api-error';
 import {
   archiveStudent,
   exitStudent,
@@ -77,8 +78,9 @@ export function useStudentRecord(studentId: number): UseStudentRecordResult {
           return { success: true };
         }
         return { success: false, error: response.message || fallback };
-      } catch {
-        return { success: false, error: 'An error occurred' };
+      } catch (err) {
+        // 400/403 refusals arrive as rejections carrying the envelope message.
+        return { success: false, error: apiErrorMessage(err, fallback) };
       }
     },
     [showToast]

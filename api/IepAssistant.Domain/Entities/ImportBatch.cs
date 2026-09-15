@@ -9,6 +9,9 @@ public enum ImportKind
 public enum ImportBatchStatus
 {
     Previewed,
+
+    /// <summary>Transient: a commit is in flight (claimed with a conditional update so a second commit is refused).</summary>
+    Committing,
     Committed,
     Discarded
 }

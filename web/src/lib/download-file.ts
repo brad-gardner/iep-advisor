@@ -1,7 +1,8 @@
 /**
  * Hand a fetched binary (e.g. an `.xlsx` from `apiClient.get(..., {
- * responseType: 'blob' })`) to the browser as a named download. Creates and
- * revokes the object URL in one go so nothing leaks.
+ * responseType: 'blob' })`) to the browser as a named download. The object
+ * URL is revoked on a later task: revoking in the same task as `click()` can
+ * abort the download in some browsers (Safari historically).
  */
 export function downloadBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
@@ -11,7 +12,7 @@ export function downloadBlob(blob: Blob, fileName: string): void {
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /**

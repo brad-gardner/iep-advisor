@@ -118,7 +118,7 @@ public class StaffImportService : IStaffImportService
         {
             DistrictId = ctx.DistrictId,
             Kind = ImportKind.Staff,
-            FileName = Path.GetFileName(upload.FileName),
+            FileName = ImportWorkbook.Truncate(Path.GetFileName(upload.FileName), 260),
             Status = ImportBatchStatus.Previewed,
             CreatedById = userId,
             UpdatedById = userId,
@@ -153,7 +153,24 @@ public class StaffImportService : IStaffImportService
             return ServiceResult<ImportResultModel>.FailureResult("This import has already been committed.");
         if (!commitValid && batch.ErrorCount > 0)
             return ServiceResult<ImportResultModel>.FailureResult("Fix the errors or choose to import valid rows only.");
+        if (!await ImportBatchClaim.TryClaimAsync(_context, batchId, ct))
+            return ServiceResult<ImportResultModel>.FailureResult("This import has already been committed.");
+        batch.Status = ImportBatchStatus.Committing; // mirror the claim on the tracked copy
 
+        try
+        {
+            return await CommitClaimedAsync(ctx, userId, batch, commitValid, ct);
+        }
+        catch
+        {
+            await ImportBatchClaim.ReleaseAsync(_context, batchId);
+            throw;
+        }
+    }
+
+    private async Task<ServiceResult<ImportResultModel>> CommitClaimedAsync(StaffContext ctx, int userId, ImportBatch batch, bool commitValid, CancellationToken ct)
+    {
+        var batchId = batch.Id;
         var rows = await _context.ImportRows.Where(r => r.BatchId == batchId).OrderBy(r => r.RowNumber).ToListAsync(ct);
         var payloads = rows.ToDictionary(r => r.Id, r => ImportWorkbook.DeserializePayload(r.PayloadJson));
         var refs = await LoadReferenceAsync(ctx, payloads.Values.Select(p => p.TryGetValue("Email", out var e) ? e : ""), ct);

@@ -10,8 +10,13 @@ namespace IepAssistant.Services.Implementations;
 
 public class EducatorService : IEducatorService
 {
-    private const string DuplicateExternalIdMessage = "Student ID already in use in this district.";
+    internal const string DuplicateExternalIdMessage = "Student ID already in use in this district.";
     private const string StudentResource = "SchoolStudent";
+
+    /// <summary>Server-side bound on a bulk case-manager selection (mirrored by the request DTO).</summary>
+    public const int MaxBulkStudents = 500;
+
+    internal static string TransferNote(string newSchoolName) => $"Deactivated on transfer to {newSchoolName}";
 
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
@@ -172,6 +177,20 @@ public class EducatorService : IEducatorService
             query = query.Where(s => s.SchoolId == search.SchoolId.Value);
         if (search.Grade != null)
             query = query.Where(s => s.GradeLevel == search.Grade.Value);
+        // Dashboard "needs attention" deep links: the same predicates DistrictService uses for its
+        // tiles, composed onto the role-scoped query so paging and the other filters still apply.
+        if (search.Attention == StudentAttention.NoCaseManager)
+        {
+            var districtId = ctx.DistrictId;
+            query = query.Where(s => !_context.StudentTeamMembers.Any(m =>
+                m.SchoolStudentId == s.Id && m.IsActive && m.IsLead
+                && _context.StaffProfiles.Any(p => p.UserId == m.UserId && p.IsActive && p.DistrictId == districtId)));
+        }
+        else if (search.Attention == StudentAttention.NoLinkedParent)
+        {
+            query = query.Where(s => !_context.ChildLinks.Any(l =>
+                l.SchoolStudentId == s.Id && l.IsActive && l.AcceptedAt != null && l.ChildProfileId != null));
+        }
         if (!string.IsNullOrWhiteSpace(search.Query))
         {
             // LIKE is case-insensitive under SQL Server's default collation and for ASCII on SQLite;
@@ -369,45 +388,17 @@ public class EducatorService : IEducatorService
         student.DistrictId = newSchool.DistrictId;
         student.UpdatedById = userId;
 
-        // Team + access rows for staff who cannot follow the student: anyone whose home school is not
-        // the new one, except multi-building providers and district admins (who act by scope).
-        var portableUserIds = await _context.StaffProfiles.AsNoTracking()
-            .Where(p => p.IsActive && p.DistrictId == newSchool.DistrictId
-                     && (p.SchoolId == newSchool.Id
-                         || p.OrgRoleId == OrgRoleIds.RelatedServiceProvider
-                         || p.OrgRoleId == OrgRoleIds.DistrictAdmin))
-            .Select(p => p.UserId)
-            .ToListAsync(ct);
-
-        var note = $"Deactivated on transfer to {newSchool.Name}";
-        var members = await _context.StudentTeamMembers
-            .Where(m => m.SchoolStudentId == studentId && m.IsActive && !portableUserIds.Contains(m.UserId))
-            .ToListAsync(ct);
-        foreach (var member in members)
-        {
-            if (member.IsLead && student.CaseManagerUserId == member.UserId)
-                student.CaseManagerUserId = null;
-            member.IsActive = false;
-            member.IsLead = false;
-            member.Note = note;
-            member.UpdatedById = userId;
-        }
-
-        var accesses = await _context.SchoolStudentAccesses
-            .Where(a => a.SchoolStudentId == studentId && a.IsActive && !portableUserIds.Contains(a.UserId))
-            .ToListAsync(ct);
-        foreach (var access in accesses)
-        {
-            access.IsActive = false;
-            access.UpdatedById = userId;
-        }
-
-        await _context.SaveChangesAsync(ct);
+        // Team + access rows for staff who cannot follow the student (StudentTeamWriter.IsPortable):
+        // same side effect the roster importer applies when a row moves a student.
+        var portableUserIds = await StudentTeamWriter.LoadPortableUserIdsAsync(_context, newSchool.DistrictId, newSchool.Id, ct);
+        var team = await StudentTeamBatch.LoadAsync(_context, new[] { student }, userId, ct);
+        var (members, accesses) = team.DeactivateNonPortable(student, portableUserIds, TransferNote(newSchool.Name));
+        await team.SaveAsync(ct);
         await tx.CommitAsync(ct);
 
         _audit.Record(AuditAction.Edit, userId, StudentResource, studentId);
         _logger.LogInformation("Student {StudentId} transferred from {OldSchool} to {NewSchool} by user {CallerId}; {Members} team member(s) and {Accesses} access row(s) deactivated",
-            studentId, oldSchoolName, newSchool.Name, userId, members.Count, accesses.Count);
+            studentId, oldSchoolName, newSchool.Name, userId, members, accesses);
 
         return ServiceResult<SchoolStudentModel>.SuccessResult(await LoadStudentAsync(studentId, ct));
     }
@@ -423,6 +414,8 @@ public class EducatorService : IEducatorService
         var studentIds = model.StudentIds.Distinct().ToList();
         if (studentIds.Count == 0)
             return ServiceResult<BulkAssignResultModel>.FailureResult("Choose at least one student.");
+        if (studentIds.Count > MaxBulkStudents)
+            return ServiceResult<BulkAssignResultModel>.FailureResult($"Choose at most {MaxBulkStudents} students at a time.");
 
         var target = await _context.StaffProfiles.AsNoTracking()
             .FirstOrDefaultAsync(p => p.UserId == model.UserId && p.IsActive && p.DistrictId == ctx.DistrictId, ct);
@@ -431,15 +424,14 @@ public class EducatorService : IEducatorService
         if (target.OrgRoleId == OrgRoleIds.DistrictAdmin)
             return ServiceResult<BulkAssignResultModel>.FailureResult("A District Admin does not need a per-student assignment.");
 
-        // Validate everything before writing anything: every student in scope, target allowed at each school.
-        foreach (var studentId in studentIds)
-        {
-            if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
-                return ServiceResult<BulkAssignResultModel>.FailureResult("You do not have permission to manage one or more of the selected students.");
-        }
-        var students = await _context.SchoolStudents
-            .Where(s => studentIds.Contains(s.Id))
-            .ToListAsync(ct);
+        // One scoped query authorizes the whole selection (ScopedStudents encodes the admin rule of
+        // CanActOnStudentAsync); any id outside the caller's scope — or unknown — fails the request.
+        var scoped = ScopedStudents(ctx, userId);
+        var students = scoped == null
+            ? new List<SchoolStudent>()
+            : await scoped.Where(s => studentIds.Contains(s.Id)).ToListAsync(ct);
+        if (students.Count != studentIds.Count)
+            return ServiceResult<BulkAssignResultModel>.FailureResult("You do not have permission to manage one or more of the selected students.");
         foreach (var student in students)
         {
             var error = StudentTeamWriter.ValidateTeamCandidate(target, ctx.DistrictId, student.SchoolId);
@@ -447,22 +439,22 @@ public class EducatorService : IEducatorService
                 return ServiceResult<BulkAssignResultModel>.FailureResult($"{student.FirstName} {student.LastName}: {error}".Trim());
         }
 
-        await using var tx = await _context.Database.BeginTransactionAsync(ct);
-        var updated = 0;
-        foreach (var student in students)
+        var toAssign = students.Where(s => s.CaseManagerUserId != target.UserId).ToList();
+        if (toAssign.Count > 0)
         {
-            if (student.CaseManagerUserId == target.UserId)
-                continue;
-            await StudentTeamWriter.UpsertMemberAsync(_context, student, target.UserId, TeamRole.CaseManager,
-                makeLead: true, accessOverride: null, userId, ct);
-            _audit.Record(AuditAction.Edit, userId, StudentResource, student.Id);
-            updated++;
-        }
-        await _context.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+            await using var tx = await _context.Database.BeginTransactionAsync(ct);
+            var team = await StudentTeamBatch.LoadAsync(_context, toAssign, userId, ct);
+            foreach (var student in toAssign)
+                team.AssignLead(student, target.UserId, TeamRole.CaseManager, accessOverride: null);
+            await team.SaveAsync(ct);
+            await tx.CommitAsync(ct);
 
-        _logger.LogInformation("Case manager user {TargetUserId} assigned to {Count} student(s) by user {CallerId}", target.UserId, updated, userId);
-        return ServiceResult<BulkAssignResultModel>.SuccessResult(new BulkAssignResultModel { Updated = updated });
+            foreach (var student in toAssign)
+                _audit.Record(AuditAction.Edit, userId, StudentResource, student.Id);
+        }
+
+        _logger.LogInformation("Case manager user {TargetUserId} assigned to {Count} student(s) by user {CallerId}", target.UserId, toAssign.Count, userId);
+        return ServiceResult<BulkAssignResultModel>.SuccessResult(new BulkAssignResultModel { Updated = toAssign.Count });
     }
 
     // ----------------------------------------------------------------- Staff assignment (legacy access rows)
@@ -667,7 +659,8 @@ public class EducatorService : IEducatorService
         => await _context.SchoolStudents.AsNoTracking()
             .AnyAsync(s => s.DistrictId == districtId && s.ExternalStudentId == externalId && (excludeStudentId == null || s.Id != excludeStudentId.Value), ct);
 
-    private static bool IsExternalIdCollision(DbUpdateException ex)
+    /// <summary>True when the failure is the per-district ExternalStudentId unique index (shared with the importer).</summary>
+    internal static bool IsExternalIdCollision(DbUpdateException ex)
         => ex.InnerException?.Message.Contains("IX_SchoolStudents_DistrictId_ExternalStudentId", StringComparison.OrdinalIgnoreCase) == true
            || ex.InnerException?.Message.Contains("SchoolStudents.DistrictId, SchoolStudents.ExternalStudentId", StringComparison.OrdinalIgnoreCase) == true;
 

@@ -21,12 +21,26 @@ internal sealed class ImportSheetRow
 /// cell contributes only its cached value. Text cells are read verbatim (leading zeros survive), numbers
 /// are rendered without scientific notation (or through their explicit number format, so "00123" stays
 /// "00123"), dates become ISO <c>yyyy-MM-dd</c>. Upload rejections (size, extension/content type incl.
-/// <c>.xlsm</c>, macro payload, row cap) live here so both importers apply identical rules.
+/// <c>.xlsm</c>, macro payload, decompression budget, row cap) live here so both importers apply identical rules.
 /// </summary>
 internal static class ImportWorkbook
 {
     public const long MaxBytes = 5 * 1024 * 1024;
     public const int MaxRows = 5000;
+
+    /// <summary>
+    /// Decompression budget checked BEFORE ClosedXML materializes the workbook: declared uncompressed
+    /// size of all zip entries, the entry count, and the size of any single sheet / shared-string part.
+    /// Deflate reaches ~1000:1 on repetitive XML, so the 5 MB transport cap alone does not bound memory.
+    /// </summary>
+    public const long MaxUncompressedBytes = 50L * 1024 * 1024;
+    public const int MaxZipEntries = 200;
+    public const long MaxPartBytes = 25L * 1024 * 1024;
+
+    /// <summary>Longest cell text kept (the rest is dropped) so a pathological cell cannot bloat PayloadJson.</summary>
+    public const int MaxCellLength = 1000;
+
+    private const string TooLargeToReadMessage = "The workbook is too large to import. Remove unused sheets, formatting or data and try again.";
     public const string ClearToken = "CLEAR";
     public const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -65,6 +79,8 @@ internal static class ImportWorkbook
                 return "Macro-enabled workbooks are not accepted. Save the file as .xlsx and try again.";
             if (!zip.Entries.Any(e => e.FullName.Equals("xl/workbook.xml", StringComparison.OrdinalIgnoreCase)))
                 return "The file could not be read as an Excel workbook (.xlsx).";
+            if (ExceedsDecompressionBudget(zip))
+                return TooLargeToReadMessage;
         }
         catch (InvalidDataException)
         {
@@ -72,6 +88,26 @@ internal static class ImportWorkbook
         }
 
         return null;
+    }
+
+    /// <summary>Declared (uncompressed) sizes are in the central directory, so this costs no inflation.</summary>
+    internal static bool ExceedsDecompressionBudget(ZipArchive zip)
+    {
+        if (zip.Entries.Count > MaxZipEntries)
+            return true;
+        long total = 0;
+        foreach (var entry in zip.Entries)
+        {
+            total += entry.Length;
+            if (total > MaxUncompressedBytes)
+                return true;
+            var name = entry.FullName;
+            var isBulkPart = name.Equals("xl/sharedStrings.xml", StringComparison.OrdinalIgnoreCase)
+                             || (name.StartsWith("xl/worksheets/", StringComparison.OrdinalIgnoreCase) && name.EndsWith(".xml", StringComparison.OrdinalIgnoreCase));
+            if (isBulkPart && entry.Length > MaxPartBytes)
+                return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -84,7 +120,7 @@ internal static class ImportWorkbook
         XLWorkbook workbook;
         try
         {
-            workbook = new XLWorkbook(new MemoryStream(content));
+            workbook = new XLWorkbook(new MemoryStream(content), new LoadOptions { RecalculateAllFormulas = false });
         }
         catch (Exception)
         {
@@ -136,7 +172,7 @@ internal static class ImportWorkbook
         }
     }
 
-    /// <summary>Cell → text without formula evaluation (see class remarks).</summary>
+    /// <summary>Cell → text without formula evaluation (see class remarks); text is capped at <see cref="MaxCellLength"/>.</summary>
     public static string CellText(IXLCell cell)
     {
         var value = cell.HasFormula ? cell.CachedValue : cell.Value;
@@ -145,7 +181,7 @@ internal static class ImportWorkbook
             case XLDataType.Blank:
                 return string.Empty;
             case XLDataType.Text:
-                return value.GetText().Trim();
+                return Truncate(value.GetText().Trim(), MaxCellLength);
             case XLDataType.Boolean:
                 return value.GetBoolean() ? "TRUE" : "FALSE";
             case XLDataType.DateTime:
@@ -171,7 +207,7 @@ internal static class ImportWorkbook
                 return number.ToString("0.############", CultureInfo.InvariantCulture);
             }
             default:
-                return value.ToString().Trim();
+                return Truncate(value.ToString().Trim(), MaxCellLength);
         }
     }
 

@@ -372,6 +372,53 @@ public sealed class StudentLifecycleTests : IDisposable
         Assert.Equal(new[] { inA, inB }, result.Data!.Items.Select(s => s.Id).OrderBy(id => id));
     }
 
+    [Fact]
+    public async Task SearchStudents_AttentionFilters_NarrowServerSide_AndPage()
+    {
+        var district = _db.District();
+        var school = _db.School(district, "A");
+        var (admin, _) = _db.Staff("da@x.com", district, null, OrgRoleIds.DistrictAdmin);
+        var (activeLead, _) = _db.Staff("lead@x.com", district, school, OrgRoleIds.Teacher);
+        var (goneLead, _) = _db.Staff("gone@x.com", district, school, OrgRoleIds.Teacher, isActive: false);
+        var withLead = _db.Student(school, "Has", "Lead");
+        var leadLeft = _db.Student(school, "Lead", "Left");
+        var noLead1 = _db.Student(school, "No", "Lead1");
+        var noLead2 = _db.Student(school, "No", "Lead2");
+        var exited = _db.Student(school, "Ex", "Ited", status: StudentStatus.Exited);
+        _db.TeamMember(withLead, activeLead, TeamRole.CaseManager, isLead: true);
+        _db.TeamMember(leadLeft, goneLead, TeamRole.CaseManager, isLead: true);
+        using (var seed = _db.Context())
+        {
+            var parent = new User { Email = "parent@x.com", PasswordHash = "x", FirstName = "Pat", LastName = "Parent", Role = UserRole.Parent };
+            seed.Users.Add(parent);
+            seed.SaveChanges();
+            var child = new ChildProfile { UserId = parent.Id, FirstName = "Kid" };
+            seed.ChildProfiles.Add(child);
+            seed.SaveChanges();
+            seed.ChildLinks.Add(new ChildLink { SchoolStudentId = withLead, IsActive = true, AcceptedAt = DateTime.UtcNow, ChildProfileId = child.Id });   // linked
+            seed.ChildLinks.Add(new ChildLink { SchoolStudentId = noLead1, IsActive = true, AcceptedAt = null, InviteEmail = "p@x.com" });                // pending only
+            seed.ChildLinks.Add(new ChildLink { SchoolStudentId = noLead2, IsActive = false, AcceptedAt = DateTime.UtcNow, ChildProfileId = child.Id }); // revoked
+            seed.SaveChanges();
+        }
+
+        using var ctx = _db.Context();
+        var svc = Service(ctx);
+        var noCaseManager = await svc.SearchStudentsAsync(admin, new StudentSearchQuery { Attention = StudentAttention.NoCaseManager });
+        var noCaseManagerPage2 = await svc.SearchStudentsAsync(admin, new StudentSearchQuery { Attention = StudentAttention.NoCaseManager, Page = 2, PageSize = 2 });
+        var noParent = await svc.SearchStudentsAsync(admin, new StudentSearchQuery { Attention = StudentAttention.NoLinkedParent });
+        var noParentSearch = await svc.SearchStudentsAsync(admin, new StudentSearchQuery { Attention = StudentAttention.NoLinkedParent, Query = "Lead1" });
+
+        // Active students without an active lead whose profile is still active (a deactivated lead counts as missing).
+        Assert.Equal(new[] { leadLeft, noLead1, noLead2 }, noCaseManager.Data!.Items.Select(s => s.Id).OrderBy(id => id));
+        Assert.Equal(3, noCaseManager.Data.Total);
+        Assert.Equal(3, noCaseManagerPage2.Data!.Total);
+        Assert.Equal(leadLeft, Assert.Single(noCaseManagerPage2.Data.Items).Id); // ordered by last name: Lead1, Lead2 | Left
+        // Active students without an accepted, active parent link (pending or revoked links do not count).
+        Assert.Equal(new[] { leadLeft, noLead1, noLead2 }, noParent.Data!.Items.Select(s => s.Id).OrderBy(id => id));
+        Assert.Equal(noLead1, Assert.Single(noParentSearch.Data!.Items).Id);
+        Assert.DoesNotContain(exited, noParent.Data.Items.Select(s => s.Id));
+    }
+
     // ----------------------------------------------------------------- Bulk case manager
 
     [Fact]
@@ -428,6 +475,38 @@ public sealed class StudentLifecycleTests : IDisposable
         Assert.Contains("permission", outOfScope.Message);
         Assert.Contains("not at this student's school", wrongSchool.Message);
         Assert.Empty(ctx.StudentTeamMembers);
+    }
+
+    [Fact]
+    public async Task AssignCaseManagerBulk_IsSetBased_ForManyStudents_AndCapsTheSelection()
+    {
+        var district = _db.District();
+        var school = _db.School(district, "Maple");
+        var (admin, _) = _db.Staff("da@x.com", district, null, OrgRoleIds.DistrictAdmin);
+        var (oldLead, _) = _db.Staff("old@x.com", district, school, OrgRoleIds.Teacher);
+        var (newLead, _) = _db.Staff("new@x.com", district, school, OrgRoleIds.Teacher);
+        var ids = Enumerable.Range(1, 60).Select(i => _db.Student(school, "Kid", "N" + i)).ToList();
+        foreach (var id in ids.Take(30))
+            _db.TeamMember(id, oldLead, TeamRole.CaseManager, isLead: true);
+        var counter = new DbActivityCounter();
+
+        using var ctx = _db.Context(counter);
+        var svc = Service(ctx);
+        var result = await svc.AssignCaseManagerBulkAsync(admin, new BulkAssignCaseManagerModel { StudentIds = ids, UserId = newLead });
+        var tooMany = await svc.AssignCaseManagerBulkAsync(admin, new BulkAssignCaseManagerModel { StudentIds = Enumerable.Range(1, 501).ToList(), UserId = newLead });
+        var unknownId = await svc.AssignCaseManagerBulkAsync(admin, new BulkAssignCaseManagerModel { StudentIds = new() { ids[0], 999_999 }, UserId = newLead });
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal(60, result.Data!.Updated);
+        Assert.True(counter.SaveChanges <= 2, $"SaveChanges = {counter.SaveChanges}"); // demotes, then deferred promotes
+        Assert.True(counter.Queries < 10, $"Queries = {counter.Queries}");            // one scoped authz query + preloads, not per student
+        Assert.Equal("Choose at most 500 students at a time.", tooMany.Message);
+        Assert.Contains("permission", unknownId.Message);
+        using var check = _db.Context();
+        Assert.Equal(60, check.StudentTeamMembers.Count(m => m.UserId == newLead && m.IsActive && m.IsLead));
+        Assert.Equal(30, check.StudentTeamMembers.Count(m => m.UserId == oldLead && m.IsActive && !m.IsLead));
+        Assert.Equal(60, check.SchoolStudents.Count(s => s.CaseManagerUserId == newLead));
+        Assert.Equal(60, _audit.Entries.Count(e => e.ResourceType == "SchoolStudent" && e.Action == AuditAction.Edit));
     }
 
     public void Dispose() => _db.Dispose();

@@ -1,5 +1,7 @@
+using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Models;
@@ -26,6 +28,10 @@ public sealed class RosterTestDb : IDisposable
     }
 
     public ApplicationDbContext Context() => new(_options);
+
+    /// <summary>A context whose SaveChanges calls and DB commands are counted (round-trip assertions).</summary>
+    public ApplicationDbContext Context(DbActivityCounter counter)
+        => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(_connection).AddInterceptors(counter).Options);
 
     public int District(string name = "District", string? stateCode = "OH")
     {
@@ -103,4 +109,73 @@ public sealed class RosterTestDb : IDisposable
     }
 
     public void Dispose() => _connection.Dispose();
+}
+
+/// <summary>
+/// Counts SaveChanges invocations, executed DB commands and SELECT queries so a test can bound a write
+/// path's cost. Note the SQLite provider sends one command per row on insert/update (SQL Server batches
+/// them), so <see cref="Queries"/> and <see cref="SaveChanges"/> are the provider-independent bounds.
+/// </summary>
+public class DbActivityCounter : DbCommandInterceptor, ISaveChangesInterceptor
+{
+    public int SaveChanges { get; private set; }
+    public int Commands { get; private set; }
+    public int Queries { get; private set; }
+
+    public void Reset() { SaveChanges = 0; Commands = 0; Queries = 0; }
+
+    private void Count(DbCommand command)
+    {
+        Commands++;
+        if (command.CommandText.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+            Queries++;
+    }
+
+    public InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
+    {
+        SaveChanges++;
+        return result;
+    }
+
+    public ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+    {
+        SaveChanges++;
+        return ValueTask.FromResult(result);
+    }
+
+    public override InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
+    {
+        Count(command);
+        return result;
+    }
+
+    public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+    {
+        Count(command);
+        return ValueTask.FromResult(result);
+    }
+
+    public override InterceptionResult<int> NonQueryExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
+    {
+        Count(command);
+        return result;
+    }
+
+    public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+    {
+        Count(command);
+        return ValueTask.FromResult(result);
+    }
+
+    public override InterceptionResult<object> ScalarExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<object> result)
+    {
+        Count(command);
+        return result;
+    }
+
+    public override ValueTask<InterceptionResult<object>> ScalarExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<object> result, CancellationToken cancellationToken = default)
+    {
+        Count(command);
+        return ValueTask.FromResult(result);
+    }
 }

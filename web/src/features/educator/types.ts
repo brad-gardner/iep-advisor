@@ -227,11 +227,22 @@ export interface PagedResult<T> {
 // `All` is a filter value only — never a stored status.
 export type StudentStatusFilter = StudentStatus | 'All';
 
+// Server-side "needs attention" narrowing (same predicates as the dashboard
+// tiles): no active lead case manager / no accepted parent link. Composes with
+// the other filters and normal paging.
+export const ATTENTION_FILTERS = ['NoCaseManager', 'NoLinkedParent'] as const;
+export type AttentionFilter = (typeof ATTENTION_FILTERS)[number];
+export const ATTENTION_FILTER_LABELS: Record<AttentionFilter, string> = {
+  NoCaseManager: 'no case manager',
+  NoLinkedParent: 'no linked parent',
+};
+
 export interface StudentSearchParams {
   query?: string;
   schoolId?: number;
   status?: StudentStatusFilter;
   grade?: GradeLevel;
+  attention?: AttentionFilter;
   page?: number;
   pageSize?: number;
 }
@@ -304,6 +315,22 @@ export interface StudentTeamMember {
   accessRole: AccessRole;
   isActive: boolean;
   addedAt: string;
+}
+
+// Mirrors EligibleStaffDto: active staff who may join this student's team
+// (same school, non-DistrictAdmin) plus RelatedServiceProviders anywhere in the
+// district, excluding current active members. Server-filtered, so the picker
+// never offers a row the API would reject.
+export interface EligibleStaff {
+  staffProfileId: number;
+  userId: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  orgRoleId: number;
+  orgRoleName: string;
+  schoolId?: number | null;
+  schoolName?: string | null;
 }
 
 export interface AddTeamMemberRequest {

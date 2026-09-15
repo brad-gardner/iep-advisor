@@ -7,8 +7,9 @@ interface RosterBulkBarProps {
   onClear: () => void;
 }
 
-// Appears above the roster once rows are selected (admins only). Announces the
-// selection count politely so keyboard/AT users hear it change.
+// Appears above the roster once rows are selected (admins only). The count is
+// announced by the page's persistent live region (this bar mounts with its
+// text, which AT would not read).
 export function RosterBulkBar({
   selectedCount,
   onAssignCaseManager,
@@ -22,7 +23,7 @@ export function RosterBulkBar({
       className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-brand-teal-100 bg-brand-teal-50 px-4 py-2 text-sm"
       data-testid="roster-bulk-bar"
     >
-      <span aria-live="polite" className="text-brand-teal-600">
+      <span className="text-brand-teal-600">
         {selectedCount} selected
       </span>
       <div className="flex items-center gap-2">

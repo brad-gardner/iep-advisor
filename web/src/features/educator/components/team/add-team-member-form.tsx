@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
-import type { StaffMember } from '@/features/staff-invites/types';
+import { Skeleton } from '@/components/ui/skeleton';
 import { orgRoleLabel } from '@/lib/org-role-label';
 import {
   ACCESS_ROLES,
@@ -10,27 +10,33 @@ import {
   TEAM_ROLE_LABELS,
   defaultAccessRoleForTeamRole,
 } from '../../types';
-import type { AccessRole, AddTeamMemberRequest, TeamRole } from '../../types';
+import type { AccessRole, AddTeamMemberRequest, EligibleStaff, TeamRole } from '../../types';
 import { eligibleTeamStaff } from './team-eligibility';
 
 const MAX_MATCHES = 50;
 
+// The eligible-staff directory: `null` while loading (or after a failure, with
+// `failed` set) so "nobody left to add" is never confused with "no directory".
+export interface StaffDirectory {
+  staff: EligibleStaff[] | null;
+  failed: boolean;
+}
+
 interface AddTeamMemberFormProps {
-  // Full staff directory; eligibility is filtered here.
-  staff: StaffMember[];
+  directory: StaffDirectory;
   studentSchoolId: number;
   // staffProfileIds already on the team (hidden from the picker).
   memberProfileIds: ReadonlySet<number>;
   onAdd: (data: AddTeamMemberRequest) => Promise<{ success: boolean; error?: string }>;
 }
 
-function matches(member: StaffMember, term: string): boolean {
+function matches(member: EligibleStaff, term: string): boolean {
   const haystack = `${member.firstName} ${member.lastName} ${member.email}`.toLowerCase();
   return haystack.includes(term);
 }
 
 export function AddTeamMemberForm({
-  staff,
+  directory,
   studentSchoolId,
   memberProfileIds,
   onAdd,
@@ -44,25 +50,30 @@ export function AddTeamMemberForm({
   const [error, setError] = useState<string | null>(null);
 
   const eligible = useMemo(
-    () => eligibleTeamStaff(staff, studentSchoolId, memberProfileIds),
-    [staff, studentSchoolId, memberProfileIds]
+    () => eligibleTeamStaff(directory.staff ?? [], memberProfileIds),
+    [directory.staff, memberProfileIds]
   );
   const term = search.trim().toLowerCase();
   const candidates = useMemo(
     () => (term ? eligible.filter((m) => matches(m, term)) : eligible).slice(0, MAX_MATCHES),
     [eligible, term]
   );
+  // A search that filters out the chosen person must not leave a hidden
+  // selection behind; the picker then reads "Select (n)" and submit refuses.
+  const selectedId = candidates.some((c) => String(c.staffProfileId) === staffProfileId)
+    ? staffProfileId
+    : '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!staffProfileId) {
+    if (!selectedId) {
       setError('Select a staff member to add');
       return;
     }
     setIsSubmitting(true);
     const result = await onAdd({
-      staffProfileId: Number(staffProfileId),
+      staffProfileId: Number(selectedId),
       teamRole,
       accessRole: accessRole || undefined,
     });
@@ -76,6 +87,23 @@ export function AddTeamMemberForm({
     setIsSubmitting(false);
   };
 
+  if (directory.failed) {
+    return (
+      <Notice variant="error" title="Staff directory unavailable" data-testid="team-add-unavailable">
+        The list of staff who can join this team could not be loaded. Reload the page to try again.
+      </Notice>
+    );
+  }
+
+  if (directory.staff === null) {
+    return (
+      <div className="space-y-2" data-testid="team-add-loading" aria-busy="true">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+    );
+  }
+
   if (eligible.length === 0) {
     return (
       <p className="text-sm text-brand-slate-400" data-testid="team-add-empty">
@@ -86,7 +114,11 @@ export function AddTeamMemberForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" data-testid="team-add-form">
-      {error && <Notice variant="error" title={error} />}
+      {error && (
+        <div role="alert">
+          <Notice variant="error" title={error} />
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Input
@@ -101,7 +133,7 @@ export function AddTeamMemberForm({
         <Select
           id="team-add-staff"
           label="Staff member *"
-          value={staffProfileId}
+          value={selectedId}
           onChange={(e) => setStaffProfileId(e.target.value)}
           data-testid="team-add-staff"
         >

@@ -1,25 +1,15 @@
-import type { StaffMember } from '@/features/staff-invites/types';
-import { ORG_ROLE } from '../../types';
-import type { StudentTeamMember } from '../../types';
+import type { EligibleStaff, StudentTeamMember } from '../../types';
 
 export function teamMemberName(member: StudentTeamMember): string {
   return `${member.firstName} ${member.lastName}`.trim() || member.email;
 }
 
-// Team members must be active staff at the student's school, or a related
-// service provider anywhere in the district; DistrictAdmins act by scope and
-// are never members. Mirrors the server rule so the picker never offers a
-// row the API would reject.
+// Eligibility (same school or a district-wide provider, active, non-admin) is
+// decided by the server (`GET .../team/eligible`); this only hides anyone who
+// joined the team since the directory was fetched.
 export function eligibleTeamStaff(
-  staff: StaffMember[],
-  studentSchoolId: number,
+  staff: EligibleStaff[],
   memberProfileIds: ReadonlySet<number>
-): StaffMember[] {
-  return staff.filter(
-    (m) =>
-      m.isActive &&
-      m.orgRoleId !== ORG_ROLE.DistrictAdmin &&
-      !memberProfileIds.has(m.staffProfileId) &&
-      (m.schoolId === studentSchoolId || m.orgRoleId === ORG_ROLE.RelatedServiceProvider)
-  );
+): EligibleStaff[] {
+  return staff.filter((m) => !memberProfileIds.has(m.staffProfileId));
 }

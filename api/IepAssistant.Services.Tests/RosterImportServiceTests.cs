@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -347,6 +348,7 @@ public sealed class RosterImportServiceTests : IDisposable
         Assert.Equal(ImportRowOutcome.New, result.Data!.Rows[0].Outcome);
         Assert.Equal(ImportRowOutcome.Error, result.Data.Rows[1].Outcome);
         Assert.Equal("You can only import students for Maple Elementary.", result.Data.Rows[1].Message);
+        Assert.Equal("Sam Student", result.Data.Rows[1].DisplayName); // sheet-supplied only
     }
 
     // ----------------------------------------------------------------- commit
@@ -414,6 +416,246 @@ public sealed class RosterImportServiceTests : IDisposable
         Assert.Equal("Lost", ws.Cell(2, 4).GetString());
         Assert.Equal("Unknown school 'Nowhere'.", ws.Cell(2, 16).GetString());
         Assert.True(ws.Cell(3, 1).IsEmpty());
+    }
+
+    [Fact]
+    public async Task Commit_1000NewRowsWithCaseManagers_IsSetBased_AndAuditsAfterCommit()
+    {
+        var o = Org();
+        var (cm, _) = _db.Staff("cm@x.com", o.District, o.SchoolA, OrgRoleIds.Teacher);
+        var content = StudentsWorkbook(Enumerable.Range(1, 1000)
+            .Select(i => StudentRow(i.ToString("D6"), "Maple Elementary", "Kid", "Number" + i, extra: ("CaseManagerEmail", "cm@x.com")))
+            .ToArray());
+        var counter = new DbActivityCounter();
+
+        using var ctx = _db.Context(counter);
+        var preview = await Roster(ctx).PreviewAsync(o.Admin, Upload(content));
+        Assert.Equal(1000, preview.Data!.Counts.New);
+        counter.Reset();
+        var commit = await Roster(ctx).CommitAsync(o.Admin, preview.Data.BatchId, commitValid: false);
+
+        Assert.True(commit.Success, commit.Message);
+        Assert.Equal(1000, commit.Data!.Committed.New);
+        // Linear, chunked cost: a handful of saves and lookups per 500-row chunk — not per row (the old
+        // path was ~3 saves and ~6 round trips per row; SQLite itself still sends one INSERT per row).
+        Assert.True(counter.SaveChanges < 50, $"SaveChanges = {counter.SaveChanges}");
+        Assert.True(counter.Queries < 40, $"Queries = {counter.Queries}");
+        using var check = _db.Context();
+        Assert.Equal(1000, check.SchoolStudents.Count(s => s.DistrictId == o.District && s.CaseManagerUserId == cm));
+        Assert.Equal(1000, check.StudentTeamMembers.Count(m => m.UserId == cm && m.IsLead && m.IsActive));
+        Assert.Equal(1000, check.SchoolStudentAccesses.Count(a => a.UserId == cm && a.IsActive && a.Role == AccessRole.Owner));
+        Assert.Equal(ImportBatchStatus.Committed, check.ImportBatches.Single().Status);
+        Assert.Equal(1000, _audit.Entries.Count(e => e.ResourceType == "SchoolStudent" && e.Action == AuditAction.Edit));
+    }
+
+    [Fact]
+    public async Task Commit_LeadSwapAcrossManyStudents_RespectsSingleActiveLeadIndex()
+    {
+        var o = Org();
+        var (oldLead, _) = _db.Staff("old@x.com", o.District, o.SchoolA, OrgRoleIds.Teacher);
+        var (newLead, _) = _db.Staff("new@x.com", o.District, o.SchoolA, OrgRoleIds.Teacher);
+        var ids = Enumerable.Range(1, 20).Select(i => _db.Student(o.SchoolA, "Kid", "N" + i, i.ToString("D6"))).ToList();
+        foreach (var id in ids)
+            _db.TeamMember(id, oldLead, TeamRole.CaseManager, isLead: true);
+        var content = StudentsWorkbook(Enumerable.Range(1, 20)
+            .Select(i => new Dictionary<string, object> { ["StudentId"] = i.ToString("D6"), ["CaseManagerEmail"] = "new@x.com" })
+            .ToArray());
+
+        using var ctx = _db.Context();
+        var preview = await Roster(ctx).PreviewAsync(o.Admin, Upload(content));
+        var commit = await Roster(ctx).CommitAsync(o.Admin, preview.Data!.BatchId, commitValid: false);
+
+        Assert.True(commit.Success, commit.Message);
+        Assert.Equal(20, commit.Data!.Committed.Updated);
+        using var check = _db.Context();
+        foreach (var id in ids)
+        {
+            var lead = Assert.Single(check.StudentTeamMembers.Where(m => m.SchoolStudentId == id && m.IsActive && m.IsLead));
+            Assert.Equal(newLead, lead.UserId);
+            Assert.True(check.StudentTeamMembers.Single(m => m.SchoolStudentId == id && m.UserId == oldLead).IsActive);
+            Assert.Equal(newLead, check.SchoolStudents.Single(s => s.Id == id).CaseManagerUserId);
+        }
+    }
+
+    [Fact]
+    public async Task Commit_SchoolChange_DeactivatesNonPortableTeam_AndPreviewAnnouncesIt()
+    {
+        var o = Org();
+        var (teacherA, _) = _db.Staff("ta@x.com", o.District, o.SchoolA, OrgRoleIds.Teacher);
+        var (slp, _) = _db.Staff("slp@x.com", o.District, o.SchoolA, OrgRoleIds.RelatedServiceProvider);
+        var (teacherB, _) = _db.Staff("tb@x.com", o.District, o.SchoolB, OrgRoleIds.Teacher);
+        var student = _db.Student(o.SchoolA, "Ann", "Zed", "000123", stateCode: "OH");
+        _db.TeamMember(student, teacherA, TeamRole.CaseManager, isLead: true);
+        _db.TeamMember(student, slp, TeamRole.SpeechLanguagePathologist);
+        var content = StudentsWorkbook(new Dictionary<string, object> { ["StudentId"] = "000123", ["SchoolName"] = "Oak Middle", ["CaseManagerEmail"] = "tb@x.com" });
+
+        using var ctx = _db.Context();
+        var preview = await Roster(ctx).PreviewAsync(o.Admin, Upload(content));
+        var commit = await Roster(ctx).CommitAsync(o.Admin, preview.Data!.BatchId, commitValid: false);
+
+        var row = Assert.Single(preview.Data.Rows);
+        Assert.Equal(ImportRowOutcome.Updated, row.Outcome);
+        Assert.Contains("School: Maple Elementary → Oak Middle", row.Changes);
+        Assert.Contains("Team: 1 member(s) will be deactivated", row.Changes);
+        Assert.Contains("Case manager: ta@x.com → tb@x.com", row.Changes);
+        Assert.True(commit.Success, commit.Message);
+        using var check = _db.Context();
+        var stored = check.SchoolStudents.Single(s => s.Id == student);
+        Assert.Equal(o.SchoolB, stored.SchoolId);
+        Assert.Equal(teacherB, stored.CaseManagerUserId);
+        var members = check.StudentTeamMembers.Where(m => m.SchoolStudentId == student).ToDictionary(m => m.UserId);
+        Assert.False(members[teacherA].IsActive);
+        Assert.False(members[teacherA].IsLead);
+        Assert.Contains("Oak Middle", members[teacherA].Note);
+        Assert.True(members[slp].IsActive);                 // provider spans buildings
+        Assert.True(members[teacherB].IsActive);
+        Assert.True(members[teacherB].IsLead);
+        var access = check.SchoolStudentAccesses.Where(a => a.SchoolStudentId == student).ToDictionary(a => a.UserId);
+        Assert.False(access[teacherA].IsActive);
+        Assert.True(access[slp].IsActive);
+        Assert.True(access[teacherB].IsActive);
+    }
+
+    [Fact]
+    public async Task Preview_SchoolAdmin_OtherSchoolStudentLooksUnknown_NoNameDisclosed_AndCommitFlagsOnlyThatRow()
+    {
+        var o = Org();
+        var (schoolAdmin, _) = _db.Staff("sa@x.com", o.District, o.SchoolA, OrgRoleIds.SchoolAdmin);
+        _db.Student(o.SchoolB, "Secret", "Person", "000555");
+        var content = StudentsWorkbook(
+            new Dictionary<string, object> { ["StudentId"] = "000555" },                       // ids only, like a probe
+            StudentRow("000555", "Maple Elementary", "Probe", "Name"),                          // full row (duplicate key → both flagged; separate batch below)
+            StudentRow("000777", "Maple Elementary", "Own", "Kid"));
+
+        using var ctx = _db.Context();
+        var probe = await Roster(ctx).PreviewAsync(schoolAdmin, Upload(StudentsWorkbook(new Dictionary<string, object> { ["StudentId"] = "000555" })));
+        var preview = await Roster(ctx).PreviewAsync(schoolAdmin, Upload(StudentsWorkbook(
+            StudentRow("000555", "Maple Elementary", "Probe", "Name"),
+            StudentRow("000777", "Maple Elementary", "Own", "Kid"))));
+        var commit = await Roster(ctx).CommitAsync(schoolAdmin, preview.Data!.BatchId, commitValid: true);
+
+        // The ids-only probe: no stored name, and a message that does not reveal the student exists.
+        var probeRow = Assert.Single(probe.Data!.Rows);
+        Assert.Equal(ImportRowOutcome.Error, probeRow.Outcome);
+        Assert.Equal(string.Empty, probeRow.DisplayName);
+        Assert.Equal("SchoolName (or SchoolCode) is required for a new student.", probeRow.Message);
+        Assert.DoesNotContain("Secret", ctx.ImportRows.AsNoTracking().Select(r => r.DisplayName).ToList());
+        // The full row previews as New (the other building's record is invisible) and only fails at commit.
+        Assert.Equal(new[] { ImportRowOutcome.New, ImportRowOutcome.New }, preview.Data.Rows.Select(r => r.Outcome));
+        Assert.True(commit.Success, commit.Message);
+        Assert.Equal((1, 1), (commit.Data!.Committed.New, commit.Data.Skipped));
+        using var check = _db.Context();
+        var rows = check.ImportRows.Where(r => r.BatchId == preview.Data.BatchId).OrderBy(r => r.RowNumber).ToList();
+        Assert.Equal(ImportRowOutcome.Error, rows[0].Outcome);
+        Assert.Equal("Student ID already in use in this district.", rows[0].Message);
+        Assert.Equal(ImportRowOutcome.New, rows[1].Outcome);
+        Assert.Equal("Own", check.SchoolStudents.Single(s => s.ExternalStudentId == "000777").FirstName);
+        Assert.Equal("Secret", check.SchoolStudents.Single(s => s.ExternalStudentId == "000555").FirstName);
+        Assert.Equal(ImportBatchStatus.Committed, check.ImportBatches.Single(b => b.Id == preview.Data.BatchId).Status);
+        _ = content;
+    }
+
+    [Fact]
+    public async Task Preview_SchoolAdmin_CaseManagerOutsideEligiblePool_GetsOneNeutralMessage()
+    {
+        var o = Org();
+        var (schoolAdmin, _) = _db.Staff("sa@x.com", o.District, o.SchoolA, OrgRoleIds.SchoolAdmin);
+        _db.Staff("tb@x.com", o.District, o.SchoolB, OrgRoleIds.Teacher);
+        _db.Staff("slp@x.com", o.District, o.SchoolB, OrgRoleIds.RelatedServiceProvider);
+        var content = StudentsWorkbook(
+            StudentRow("1", "Maple Elementary", extra: ("CaseManagerEmail", "tb@x.com")),      // exists, other building
+            StudentRow("2", "Maple Elementary", extra: ("CaseManagerEmail", "nobody@x.com")),  // does not exist
+            StudentRow("3", "Maple Elementary", extra: ("CaseManagerEmail", "da@x.com")),      // district admin
+            StudentRow("4", "Maple Elementary", extra: ("CaseManagerEmail", "slp@x.com")));    // provider: eligible
+
+        using var ctx = _db.Context();
+        var result = await Roster(ctx).PreviewAsync(schoolAdmin, Upload(content));
+
+        Assert.Equal("Case manager 'tb@x.com' is not available for your school.", result.Data!.Rows[0].Message);
+        Assert.Equal("Case manager 'nobody@x.com' is not available for your school.", result.Data.Rows[1].Message);
+        Assert.Equal("Case manager 'da@x.com' is not available for your school.", result.Data.Rows[2].Message);
+        Assert.Equal(ImportRowOutcome.New, result.Data.Rows[3].Outcome);
+    }
+
+    [Fact]
+    public async Task Preview_RejectsDecompressionBomb_ByDeclaredPartSize_AndCapsCellText()
+    {
+        var o = Org();
+        var longText = new string('x', 1500);
+        var content = StudentsWorkbook(StudentRow("1", "Maple Elementary", extra: ("HomeLanguage", longText)));
+        // Append a 26 MB worksheet part that deflates to a few KB: passes the 5 MB transport cap,
+        // fails the per-part decompression budget before ClosedXML ever inflates it.
+        byte[] bomb;
+        using (var ms = new MemoryStream())
+        {
+            ms.Write(content);
+            using (var zip = new ZipArchive(ms, ZipArchiveMode.Update, leaveOpen: true))
+            {
+                var entry = zip.CreateEntry("xl/worksheets/sheet9.xml", CompressionLevel.SmallestSize);
+                using var stream = entry.Open();
+                var block = new byte[1024 * 1024];
+                for (var i = 0; i < 26; i++) stream.Write(block);
+            }
+            bomb = ms.ToArray();
+        }
+        Assert.True(bomb.Length < 5 * 1024 * 1024);
+
+        using var ctx = _db.Context();
+        var rejected = await Roster(ctx).PreviewAsync(o.Admin, Upload(bomb));
+        var capped = await Roster(ctx).PreviewAsync(o.Admin, Upload(content));
+
+        Assert.False(rejected.Success);
+        Assert.Contains("too large to import", rejected.Message);
+        Assert.Equal("HomeLanguage must be 32 characters or fewer.", Assert.Single(capped.Data!.Rows).Message);
+        var payload = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(ctx.ImportRows.AsNoTracking().Single().PayloadJson)!;
+        Assert.Equal(1000, payload["HomeLanguage"].Length);
+    }
+
+    [Fact]
+    public async Task Commit_ClaimsTheBatch_SoAnInFlightCommitIsRefused_AndAFailedCommitReleasesIt()
+    {
+        var o = Org();
+        var content = StudentsWorkbook(StudentRow("000123", "Maple Elementary"));
+        var cts = new CancellationTokenSource();
+        var aborter = new AbortOnStudentInsert(cts);
+
+        using var ctx = _db.Context();
+        var preview = await Roster(ctx).PreviewAsync(o.Admin, Upload(content));
+        var batchId = preview.Data!.BatchId;
+        using (var abortCtx = _db.Context(aborter))
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Roster(abortCtx).CommitAsync(o.Admin, batchId, commitValid: false, cts.Token));
+        }
+        using (var check = _db.Context())
+        {
+            Assert.Equal(ImportBatchStatus.Previewed, check.ImportBatches.Single(b => b.Id == batchId).Status); // claim released
+            Assert.Empty(check.SchoolStudents);                                                                    // work rolled back
+            check.ImportBatches.Single(b => b.Id == batchId).Status = ImportBatchStatus.Committing;              // another commit in flight
+            check.SaveChanges();
+        }
+        var refused = await Roster(ctx).CommitAsync(o.Admin, batchId, commitValid: false);
+
+        Assert.False(refused.Success);
+        Assert.Equal("This import has already been committed.", refused.Message);
+    }
+
+    /// <summary>Cancels the token the moment the commit tries to insert a student — a mid-commit failure.</summary>
+    private sealed class AbortOnStudentInsert : DbActivityCounter
+    {
+        private readonly CancellationTokenSource _cts;
+        public AbortOnStudentInsert(CancellationTokenSource cts) => _cts = cts;
+
+        public override ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<System.Data.Common.DbDataReader>> ReaderExecutingAsync(
+            System.Data.Common.DbCommand command, Microsoft.EntityFrameworkCore.Diagnostics.CommandEventData eventData,
+            Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<System.Data.Common.DbDataReader> result, CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("INSERT INTO \"SchoolStudents\"", StringComparison.Ordinal))
+            {
+                _cts.Cancel();
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
     }
 
     // ----------------------------------------------------------------- staff import

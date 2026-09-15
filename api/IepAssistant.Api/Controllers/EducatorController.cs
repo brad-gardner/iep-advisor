@@ -40,7 +40,9 @@ public class EducatorController : ControllerBase
 
     /// <summary>
     /// Paged roster. <c>status</c> = Active (default) | Exited | Archived | All; <c>query</c> matches
-    /// first/last name or external student id; <c>schoolId</c>/<c>grade</c> narrow the role-scoped set.
+    /// first/last name or external student id; <c>schoolId</c>/<c>grade</c> narrow the role-scoped set;
+    /// <c>attention</c> = NoCaseManager | NoLinkedParent narrows to the dashboard's "needs attention" sets
+    /// (server-side, so paging stays exact).
     /// </summary>
     [HttpGet("students")]
     [ProducesResponseType(typeof(ApiResponse<PagedResultDto<SchoolStudentDto>>), StatusCodes.Status200OK)]
@@ -50,6 +52,7 @@ public class EducatorController : ControllerBase
         [FromQuery] int? schoolId,
         [FromQuery] string? status,
         [FromQuery] GradeLevel? grade,
+        [FromQuery] string? attention,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         CancellationToken ct = default)
@@ -65,12 +68,22 @@ public class EducatorController : ControllerBase
                 return BadRequest(ApiResponse<object>.Error("Invalid status filter."));
         }
 
+        StudentAttention? attentionFilter = null;
+        if (!string.IsNullOrWhiteSpace(attention))
+        {
+            if (Enum.TryParse<StudentAttention>(attention, ignoreCase: true, out var parsedAttention) && Enum.IsDefined(parsedAttention))
+                attentionFilter = parsedAttention;
+            else
+                return BadRequest(ApiResponse<object>.Error("Invalid attention filter."));
+        }
+
         var result = await _educatorService.SearchStudentsAsync(User.GetUserId(), new StudentSearchQuery
         {
             Query = query,
             SchoolId = schoolId,
             Status = statusFilter,
             Grade = grade,
+            Attention = attentionFilter,
             Page = page,
             PageSize = pageSize
         }, ct);
@@ -176,7 +189,7 @@ public class EducatorController : ControllerBase
             return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _educatorService.ExitStudentAsync(User.GetUserId(), studentId,
-            new ExitStudentModel { ExitReason = request.ExitReason, ExitedAt = request.ExitedAt }, ct);
+            new ExitStudentModel { ExitReason = request.ExitReason!.Value, ExitedAt = request.ExitedAt }, ct);
         return StudentResult(result);
     }
 
@@ -238,6 +251,31 @@ public class EducatorController : ControllerBase
         return Ok(ApiResponse<IEnumerable<StudentTeamMemberDto>>.SuccessResponse(result.Data!.Select(MapTeamMember)));
     }
 
+    /// <summary>Staff who can be added to this student's team (admin in scope or the current lead).</summary>
+    [HttpGet("students/{studentId}/team/eligible")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<EligibleStaffDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetEligibleTeamStaff(int studentId, CancellationToken ct)
+    {
+        var result = await _teamService.GetEligibleStaffAsync(User.GetUserId(), studentId, ct);
+        if (!result.Success)
+            return MapFailure<IEnumerable<EligibleStaffDto>>(result.Message);
+
+        return Ok(ApiResponse<IEnumerable<EligibleStaffDto>>.SuccessResponse(result.Data!.Select(m => new EligibleStaffDto
+        {
+            StaffProfileId = m.StaffProfileId,
+            UserId = m.UserId,
+            FirstName = m.FirstName,
+            LastName = m.LastName,
+            Email = m.Email,
+            OrgRoleId = m.OrgRoleId,
+            OrgRoleName = m.OrgRoleName,
+            SchoolId = m.SchoolId,
+            SchoolName = m.SchoolName
+        })));
+    }
+
     [HttpPost("students/{studentId}/team")]
     [ProducesResponseType(typeof(ApiResponse<StudentTeamMemberDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -251,7 +289,7 @@ public class EducatorController : ControllerBase
         var result = await _teamService.AddMemberAsync(User.GetUserId(), studentId, new AddTeamMemberModel
         {
             StaffProfileId = request.StaffProfileId,
-            TeamRole = request.TeamRole,
+            TeamRole = request.TeamRole!.Value,
             IsLead = request.IsLead,
             AccessRole = request.AccessRole
         }, ct);
@@ -280,8 +318,9 @@ public class EducatorController : ControllerBase
     public async Task<IActionResult> SetTeamLead(int studentId, int memberId, CancellationToken ct)
         => TeamMemberResult(await _teamService.SetLeadAsync(User.GetUserId(), studentId, memberId, ct));
 
+    /// <summary>Removes (deactivates) a member. Returns the standard envelope, like the sibling revoke routes, so clients can read <c>success</c>.</summary>
     [HttpDelete("students/{studentId}/team/{memberId}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -291,7 +330,7 @@ public class EducatorController : ControllerBase
         if (!result.Success)
             return MapFailure<object>(result.Message);
 
-        return NoContent();
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 
     [HttpPost("students/{studentId}/invite-parent")]

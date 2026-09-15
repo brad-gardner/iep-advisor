@@ -86,7 +86,11 @@ function AssignCaseManagerForm({
         current lead stays on the team without the lead role.
       </p>
 
-      {error && <Notice variant="error" title={error} />}
+      {error && (
+        <div role="alert">
+          <Notice variant="error" title={error} />
+        </div>
+      )}
 
       <Select
         id="roster-assign-case-manager-staff"

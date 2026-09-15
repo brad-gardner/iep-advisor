@@ -80,7 +80,11 @@ export function CreateStudentForm({
       className="space-y-4"
       data-testid="create-student-form"
     >
-      {error && <Notice variant="error" title={error} />}
+      {error && (
+        <div role="alert">
+          <Notice variant="error" title={error} />
+        </div>
+      )}
 
       {requiresSchool && (
         <Select

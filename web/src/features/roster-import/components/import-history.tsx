@@ -2,6 +2,7 @@ import { FileSpreadsheet } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, type TableColumn } from '@/components/ui/table';
+import { formatDate } from '@/lib/format-date';
 import type { ImportBatch, ImportBatchStatus } from '../types';
 import { countsSummary } from '../lib/import-file';
 
@@ -13,14 +14,9 @@ interface ImportHistoryProps {
 const STATUS_BADGE: Record<ImportBatchStatus, 'success' | 'warning' | 'neutral'> = {
   Committed: 'success',
   Previewed: 'warning',
+  Committing: 'warning',
   Discarded: 'neutral',
 };
-
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-}
 
 const columns: TableColumn<ImportBatch>[] = [
   { key: 'file', header: 'File', cell: (b) => b.fileName, sortValue: (b) => b.fileName },
@@ -36,7 +32,7 @@ const columns: TableColumn<ImportBatch>[] = [
     key: 'date',
     header: 'Date',
     align: 'right',
-    cell: (b) => formatDate(b.committedAt ?? b.createdAt),
+    cell: (b) => formatDate(b.committedAt ?? b.createdAt, ''),
     sortValue: (b) => b.committedAt ?? b.createdAt,
   },
   { key: 'by', header: 'By', hideBelow: 'lg', cell: (b) => b.createdByName, sortValue: (b) => b.createdByName },

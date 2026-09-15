@@ -8,18 +8,30 @@ interface ResultStepProps {
   kind: ImportKind;
   result: ImportResult;
   onImportAnother: () => void;
+  // The page focuses the step heading on each transition.
+  headingRef?: React.Ref<HTMLHeadingElement>;
 }
 
 // Step 5: what was written. Skipped = error rows left out of the commit.
-export function ResultStep({ kind, result, onImportAnother }: ResultStepProps) {
+export function ResultStep({ kind, result, onImportAnother, headingRef }: ResultStepProps) {
   const { committed, skipped } = result;
   const written = committed.new + committed.updated;
   return (
     <Card data-testid="import-result-step">
       <div className="space-y-4">
-        <Notice variant="success" title="Import complete" data-testid="import-result-notice">
-          {written} {written === 1 ? 'row' : 'rows'} written — {committed.new} new,{' '}
-          {committed.updated} updated, {committed.unchanged} unchanged
+        <h2
+          ref={headingRef}
+          tabIndex={-1}
+          className="font-serif text-lg text-brand-slate-800 focus:outline-none"
+        >
+          Import complete
+        </h2>
+        <Notice
+          variant="success"
+          title={`${written} ${written === 1 ? 'row' : 'rows'} written`}
+          data-testid="import-result-notice"
+        >
+          {committed.new} new, {committed.updated} updated, {committed.unchanged} unchanged
           {skipped > 0 ? `, ${skipped} skipped` : ''}.
         </Notice>
         <div className="flex flex-wrap gap-2">

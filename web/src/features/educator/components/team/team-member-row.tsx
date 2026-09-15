@@ -44,22 +44,29 @@ export function TeamMemberCell({ member }: { member: StudentTeamMember }) {
 interface TeamRoleCellProps {
   member: StudentTeamMember;
   canManage: boolean;
-  saving: boolean;
+  // The role chosen but not yet saved; shown in place of `member.teamRole`
+  // while the PUT is in flight.
+  pendingRole?: TeamRole;
   onChange: (teamRole: TeamRole) => void;
 }
 
-// Inline role edit for managers; plain label for everyone else.
-export function TeamRoleCell({ member, canManage, saving, onChange }: TeamRoleCellProps) {
+// Inline role edit for managers; plain label for everyone else. The select
+// stays enabled (aria-busy) while saving so keyboard focus is not dropped;
+// changes made mid-save are ignored.
+export function TeamRoleCell({ member, canManage, pendingRole, onChange }: TeamRoleCellProps) {
   if (!canManage) {
     return <span data-testid={`team-role-${member.id}`}>{TEAM_ROLE_LABELS[member.teamRole]}</span>;
   }
+  const saving = pendingRole !== undefined;
   return (
     <Select
       id={`team-role-${member.id}`}
       aria-label={`Team role for ${teamMemberName(member)}`}
-      value={member.teamRole}
-      disabled={saving}
-      onChange={(e) => onChange(e.target.value as TeamRole)}
+      value={pendingRole ?? member.teamRole}
+      aria-busy={saving || undefined}
+      onChange={(e) => {
+        if (!saving) onChange(e.target.value as TeamRole);
+      }}
       className="min-w-44"
       data-testid={`team-role-${member.id}`}
     >

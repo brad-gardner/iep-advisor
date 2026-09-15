@@ -2,7 +2,7 @@
 // Enums serialize as their string names.
 
 export type ImportKind = 'Students' | 'Staff';
-export type ImportBatchStatus = 'Previewed' | 'Committed' | 'Discarded';
+export type ImportBatchStatus = 'Previewed' | 'Committing' | 'Committed' | 'Discarded';
 export type ImportRowOutcome = 'New' | 'Updated' | 'Unchanged' | 'Error';
 
 export interface ImportCounts {

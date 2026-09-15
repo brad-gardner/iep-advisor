@@ -6,9 +6,9 @@ import { PermissionBadge, TeamMemberCell, TeamRoleCell } from './team-member-row
 
 interface ColumnOptions {
   canManage: boolean;
-  // Member ids with an in-flight role change (item-scoped, so two rows can
-  // update independently).
-  savingIds: ReadonlySet<number>;
+  // Member id → role chosen but not yet saved (item-scoped, so two rows can
+  // update independently and the select never snaps back mid-save).
+  pendingRoles: ReadonlyMap<number, TeamRole>;
   onRoleChange: (member: StudentTeamMember, teamRole: TeamRole) => void;
 }
 
@@ -16,7 +16,7 @@ interface ColumnOptions {
 // order (the API returns lead first; no `sortValue`, so it holds).
 export function teamMemberColumns({
   canManage,
-  savingIds,
+  pendingRoles,
   onRoleChange,
 }: ColumnOptions): TableColumn<StudentTeamMember>[] {
   return [
@@ -28,7 +28,7 @@ export function teamMemberColumns({
         <TeamRoleCell
           member={m}
           canManage={canManage}
-          saving={savingIds.has(m.id)}
+          pendingRole={pendingRoles.get(m.id)}
           onChange={(teamRole) => onRoleChange(m, teamRole)}
         />
       ),

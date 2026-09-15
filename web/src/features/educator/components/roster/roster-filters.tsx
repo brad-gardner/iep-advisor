@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { Input, Select } from '@/components/ui/input';
 import type { DistrictSchool } from '@/features/district-admin/types';
 import {
@@ -24,21 +24,28 @@ interface RosterFiltersProps {
 // not fire a request per keystroke; every other control emits immediately.
 export function RosterFilters({ value, onChange, schools }: RosterFiltersProps) {
   const [search, setSearch] = useState(value.q);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The last `q` this box sent up, and the last URL `q` it has seen. When the
+  // URL changes from outside (sidebar link, deep link while mounted) the box
+  // adopts it — unless the URL is merely catching up with what was typed.
+  const [emitted, setEmitted] = useState(value.q);
+  const [seenQ, setSeenQ] = useState(value.q);
+  if (value.q !== seenQ) {
+    setSeenQ(value.q);
+    if (value.q !== emitted && value.q !== search.trim()) setSearch(value.q);
+  }
 
-  // Drop any pending debounce on unmount so it cannot write to a gone page.
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    },
-    []
-  );
+  // Always calls the *latest* onChange, so a filter changed inside the
+  // debounce window is merged into, not overwritten by, the search patch.
+  const emit = useEffectEvent((q: string) => {
+    setEmitted(q.trim());
+    onChange({ q });
+  });
 
-  const handleSearch = (next: string) => {
-    setSearch(next);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => onChange({ q: next }), SEARCH_DEBOUNCE_MS);
-  };
+  useEffect(() => {
+    if (search.trim() === value.q) return;
+    const timer = setTimeout(() => emit(search), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [search, value.q]);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -48,15 +55,15 @@ export function RosterFilters({ value, onChange, schools }: RosterFiltersProps) 
         label="Search students"
         placeholder="Name or student ID"
         value={search}
-        onChange={(e) => handleSearch(e.target.value)}
+        onChange={(e) => setSearch(e.target.value)}
         data-testid="educator-students-search"
       />
 
       {schools && (
         <SchoolFilter
           schools={schools}
-          value={value.schoolId}
-          onChange={(schoolId) => onChange({ schoolId })}
+          value={value.schoolId ? String(value.schoolId) : ''}
+          onChange={(schoolId) => onChange({ schoolId: schoolId ? Number(schoolId) : null })}
         />
       )}
 

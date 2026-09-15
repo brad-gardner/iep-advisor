@@ -34,7 +34,11 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5" data-testid="edit-student-form">
-      {error && <Notice variant="error" title={error} />}
+      {error && (
+        <div role="alert">
+          <Notice variant="error" title={error} />
+        </div>
+      )}
 
       <fieldset className="space-y-4">
         <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-brand-slate-400">

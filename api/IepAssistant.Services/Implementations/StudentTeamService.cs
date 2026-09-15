@@ -44,6 +44,37 @@ public class StudentTeamService : IStudentTeamService
             .ToList());
     }
 
+    public async Task<ServiceResult<List<EligibleStaffModel>>> GetEligibleStaffAsync(int userId, int studentId, CancellationToken ct = default)
+    {
+        var (student, caller, denied) = await AuthorizeMutationAsync(userId, studentId, ct);
+        if (denied != null)
+            return ServiceResult<List<EligibleStaffModel>>.FailureResult(denied);
+
+        var districtId = caller!.DistrictId;
+        var schoolId = student!.SchoolId;
+        var staff = await _context.StaffProfiles.AsNoTracking()
+            .Where(p => p.IsActive && p.DistrictId == districtId
+                     && ((p.SchoolId == schoolId && p.OrgRoleId != OrgRoleIds.DistrictAdmin)
+                         || p.OrgRoleId == OrgRoleIds.RelatedServiceProvider)
+                     && !_context.StudentTeamMembers.Any(m => m.SchoolStudentId == studentId && m.IsActive && m.UserId == p.UserId))
+            .OrderBy(p => p.User.LastName).ThenBy(p => p.User.FirstName)
+            .Select(p => new EligibleStaffModel
+            {
+                StaffProfileId = p.Id,
+                UserId = p.UserId,
+                FirstName = p.User.FirstName,
+                LastName = p.User.LastName,
+                Email = p.User.Email,
+                OrgRoleId = p.OrgRoleId,
+                OrgRoleName = p.OrgRole.Name,
+                SchoolId = p.SchoolId,
+                SchoolName = p.School != null ? p.School.Name : null
+            })
+            .ToListAsync(ct);
+
+        return ServiceResult<List<EligibleStaffModel>>.SuccessResult(staff);
+    }
+
     public async Task<ServiceResult<StudentTeamMemberModel>> AddMemberAsync(int userId, int studentId, AddTeamMemberModel model, CancellationToken ct = default)
     {
         var (student, caller, denied) = await AuthorizeMutationAsync(userId, studentId, ct);

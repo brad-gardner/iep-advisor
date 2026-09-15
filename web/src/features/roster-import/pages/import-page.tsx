@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -9,8 +9,13 @@ import { useToast } from '@/components/ui/toast';
 import { isAdminOrgRole } from '@/features/educator/types';
 import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
 import { getImportBatches } from '../api/import-api';
-import type { ImportBatch, ImportKind, ImportResult } from '../types';
-import { useImportWizard, WIZARD_STEP_INDEX, WIZARD_STEP_LABELS } from '../hooks/use-import-wizard';
+import type { ImportBatch, ImportKind, ImportPreview, ImportResult } from '../types';
+import {
+  useImportWizard,
+  WIZARD_STEP_INDEX,
+  WIZARD_STEP_LABELS,
+  type WizardStep,
+} from '../hooks/use-import-wizard';
 import { ImportKindToggle } from '../components/import-kind-toggle';
 import { TemplateStep } from '../components/template-step';
 import { UploadStep } from '../components/upload-step';
@@ -34,8 +39,20 @@ export function ImportPage() {
 
   const wizard = useImportWizard();
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [batches, setBatches] = useState<ImportBatch[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+
+  // Each step unmounts the control that advanced it, which would drop focus
+  // to <body>; instead the new step's heading takes focus. Not on first paint.
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const lastStepRef = useRef<WizardStep | null>(null);
+  useEffect(() => {
+    if (lastStepRef.current !== null && lastStepRef.current !== wizard.step) {
+      stepHeadingRef.current?.focus();
+    }
+    lastStepRef.current = wizard.step;
+  }, [wizard.step]);
 
   const reloadHistory = useCallback(async () => {
     try {
@@ -71,6 +88,13 @@ export function ImportPage() {
     setSearchParams(params, { replace: true });
     setIsConfirming(false);
     wizard.reset();
+  };
+
+  // A preview that answers for the other kind (the toggle flipped while the
+  // upload was in flight) never lands on this wizard.
+  const handlePreviewed = (preview: ImportPreview) => {
+    if (preview.kind !== kind) return;
+    wizard.showPreview(preview);
   };
 
   const handleCommitted = async (result: ImportResult) => {
@@ -118,7 +142,9 @@ export function ImportPage() {
       title="Import"
       subtitle="Add or update many records at once from an Excel workbook."
       data-testid="roster-import-page"
-      actions={<ImportKindToggle value={kind} onChange={changeKind} />}
+      actions={
+        <ImportKindToggle value={kind} onChange={changeKind} disabled={isUploading || isConfirming} />
+      }
     >
       <ProgressDots
         current={stepIndex}
@@ -127,9 +153,17 @@ export function ImportPage() {
         testId="import-progress"
       />
 
-      {wizard.step === 'template' && <TemplateStep kind={kind} onContinue={wizard.goToUpload} />}
+      {wizard.step === 'template' && (
+        <TemplateStep kind={kind} onContinue={wizard.goToUpload} headingRef={stepHeadingRef} />
+      )}
       {wizard.step === 'upload' && (
-        <UploadStep kind={kind} onPreviewed={wizard.showPreview} onBack={wizard.reset} />
+        <UploadStep
+          kind={kind}
+          onPreviewed={handlePreviewed}
+          onBack={wizard.reset}
+          onBusyChange={setIsUploading}
+          headingRef={stepHeadingRef}
+        />
       )}
       {wizard.step === 'preview' && wizard.preview && (
         <PreviewStep
@@ -137,10 +171,16 @@ export function ImportPage() {
           onCommitted={handleCommitted}
           onStartOver={startOver}
           onConfirmingChange={setIsConfirming}
+          headingRef={stepHeadingRef}
         />
       )}
       {wizard.step === 'result' && wizard.result && (
-        <ResultStep kind={kind} result={wizard.result} onImportAnother={startOver} />
+        <ResultStep
+          kind={kind}
+          result={wizard.result}
+          onImportAnother={startOver}
+          headingRef={stepHeadingRef}
+        />
       )}
 
       <ImportHistory batches={batches} loading={historyLoading} />

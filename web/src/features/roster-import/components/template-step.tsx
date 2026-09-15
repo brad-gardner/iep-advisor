@@ -10,6 +10,8 @@ import type { ImportKind } from '../types';
 interface TemplateStepProps {
   kind: ImportKind;
   onContinue: () => void;
+  // The page focuses the step heading on each transition.
+  headingRef?: React.Ref<HTMLHeadingElement>;
 }
 
 const STUDENT_COLUMNS =
@@ -18,7 +20,7 @@ const STAFF_COLUMNS = 'Email, FirstName, LastName, Role, SchoolName, Title';
 
 // Step 1: fetch the server-generated workbook (its Values sheet carries the
 // live list of schools/roles/case managers) and explain what goes in it.
-export function TemplateStep({ kind, onContinue }: TemplateStepProps) {
+export function TemplateStep({ kind, onContinue, headingRef }: TemplateStepProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +44,13 @@ export function TemplateStep({ kind, onContinue }: TemplateStepProps) {
     <Card data-testid="import-template-step">
       <div className="space-y-4">
         <div>
-          <h2 className="font-serif text-lg text-brand-slate-800">Download the template</h2>
+          <h2
+            ref={headingRef}
+            tabIndex={-1}
+            className="font-serif text-lg text-brand-slate-800 focus:outline-none"
+          >
+            Download the template
+          </h2>
           <p className="mt-1 text-sm text-brand-slate-600">
             Fill in the <span className="font-medium">{sheet}</span> sheet — one row per{' '}
             {kind === 'Staff' ? 'staff member' : 'student'}. The <span className="font-medium">Values</span>{' '}
@@ -58,7 +66,11 @@ export function TemplateStep({ kind, onContinue }: TemplateStepProps) {
           )}
         </div>
 
-        {error && <Notice variant="error" title={error} />}
+        {error && (
+          <div role="alert">
+            <Notice variant="error" title={error} />
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2">
           <Button

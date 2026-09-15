@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { ToastProvider } from '@/components/ui/toast';
+import { apiRejection } from '@/test/axios-rejection';
 import { ORG_ROLE } from '../types';
 import { makeProfile, makeStudent } from '../test/fixtures';
 
@@ -31,7 +32,13 @@ import { EducatorStudentsPage } from './educator-students-page';
 
 function LocationProbe() {
   const location = useLocation();
-  return <output data-testid="location">{location.search}</output>;
+  return (
+    <>
+      <output data-testid="location">{location.search}</output>
+      {/* Stands in for the sidebar "Students" link: same route, no query. */}
+      <Link to="/educator/students">Reset link</Link>
+    </>
+  );
 }
 
 function renderPage(initialEntry = '/educator/students') {
@@ -187,21 +194,137 @@ describe('EducatorStudentsPage', () => {
     expect(screen.queryByLabelText('Filter by school')).not.toBeInTheDocument();
   });
 
-  it('keeps the ?attention= deep link: whole roster fetched, filtered to dashboard IDs', async () => {
-    districtApi.getDistrictDashboard.mockResolvedValue({
-      success: true,
-      data: {
-        schools: [], staffSummary: { activeCount: 0, deactivatedCount: 0, invitedCount: 0 },
-        invitesNeedingAttention: [],
-        studentsWithoutStaff: [{ schoolStudentId: 2, firstName: 'Alan', lastName: 'Turing', schoolName: 'x' }],
-        studentsWithoutParent: [],
-      },
-    });
+  it('keeps a filter changed inside the search debounce window', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText('Ada Lovelace');
+
+    await user.type(screen.getByLabelText('Search students'), 'ab');
+    await user.selectOptions(screen.getByLabelText('Status'), 'Exited');
+    await waitFor(() =>
+      expect(api.searchStudents).toHaveBeenLastCalledWith(
+        expect.objectContaining({ query: 'ab', status: 'Exited' })
+      )
+    );
+    expect(screen.getByTestId('location')).toHaveTextContent('status=Exited');
+    expect(screen.getByTestId('location')).toHaveTextContent('q=ab');
+    expect(screen.getByLabelText('Status')).toHaveValue('Exited');
+  });
+
+  it('adopts an external URL q change without clobbering typed text', async () => {
+    const user = userEvent.setup();
+    renderPage('/educator/students?q=ada');
+    await screen.findByText('Ada Lovelace');
+    const box = screen.getByLabelText('Search students');
+    expect(box).toHaveValue('ada');
+
+    // Sidebar-style navigation clears q while the page stays mounted.
+    await user.click(screen.getByRole('link', { name: 'Reset link' }));
+    await waitFor(() => expect(box).toHaveValue(''));
+
+    // Typing wins over the URL catching up with what was typed.
+    await user.type(box, 'al');
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('q=al'));
+    expect(box).toHaveValue('al');
+  });
+
+  it('resets to page 1 when the page size changes', async () => {
+    const user = userEvent.setup();
+    renderPage('/educator/students?page=3');
+    await screen.findByText('Ada Lovelace');
+    expect(api.searchStudents).toHaveBeenLastCalledWith(expect.objectContaining({ page: 3 }));
+
+    await user.selectOptions(screen.getByLabelText('Rows per page'), '100');
+    await waitFor(() =>
+      expect(api.searchStudents).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 1, pageSize: 100 })
+      )
+    );
+    expect(screen.getByTestId('location')).not.toHaveTextContent('page=');
+  });
+
+  it('keeps the ?attention= deep link: server-side narrowing with normal paging and Clear', async () => {
+    const user = userEvent.setup();
     renderPage('/educator/students?attention=no-staff');
     expect(await screen.findByTestId('attention-filter-indicator')).toHaveTextContent('no case manager');
-    expect(api.searchStudents).toHaveBeenCalledWith(expect.objectContaining({ page: 1, pageSize: 500 }));
-    await waitFor(() => expect(screen.queryByText('Ada Lovelace')).not.toBeInTheDocument());
-    expect(screen.getByText('Alan Turing')).toBeInTheDocument();
-    expect(screen.queryByTestId('student-list-pagination')).not.toBeInTheDocument();
+    expect(api.searchStudents).toHaveBeenCalledWith(
+      expect.objectContaining({ attention: 'NoCaseManager', page: 1, pageSize: 50 })
+    );
+    expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
+    expect(districtApi.getDistrictDashboard).not.toHaveBeenCalled();
+
+    // Paging composes with the attention filter.
+    await user.click(screen.getByRole('button', { name: /next/i }));
+    await waitFor(() =>
+      expect(api.searchStudents).toHaveBeenLastCalledWith(
+        expect.objectContaining({ attention: 'NoCaseManager', page: 2 })
+      )
+    );
+
+    await user.click(screen.getByTestId('attention-filter-clear'));
+    await waitFor(() =>
+      expect(api.searchStudents).toHaveBeenLastCalledWith(
+        expect.objectContaining({ attention: undefined, page: 1 })
+      )
+    );
+    expect(screen.queryByTestId('attention-filter-indicator')).not.toBeInTheDocument();
+  });
+
+  it('shows the roster as loading until the request resolves', async () => {
+    let resolve!: (value: unknown) => void;
+    api.searchStudents.mockReturnValue(new Promise((r) => (resolve = r)));
+    renderPage('/educator/students?attention=no-parent');
+    expect(screen.getByTestId('attention-filter-indicator')).toHaveTextContent('no linked parent');
+    // Skeleton rows, not an empty state or an unfiltered list, while pending.
+    expect(screen.queryByTestId('student-list-empty')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /Ada Lovelace/ })).not.toBeInTheDocument();
+
+    resolve({ success: true, data: { items: students, total: 2, page: 1, pageSize: 50 } });
+    expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Ada Lovelace/ })).toBeInTheDocument();
+  });
+
+  it('announces the selection count from a persistent live region', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText('Ada Lovelace');
+    const status = screen.getByTestId('roster-selection-status');
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).toHaveTextContent('');
+    await user.click(screen.getByRole('checkbox', { name: /Ada Lovelace/ }));
+    expect(status).toHaveTextContent('1 selected');
+  });
+
+  it('surfaces the server refusal when bulk assignment is rejected', async () => {
+    const user = userEvent.setup();
+    staffApi.getStaffList.mockResolvedValue({
+      success: true,
+      data: {
+        members: [
+          {
+            staffProfileId: 70, userId: 7, firstName: 'Casey', lastName: 'Manager',
+            email: 'casey@district.org', orgRoleId: ORG_ROLE.Teacher, orgRoleName: 'Teacher',
+            schoolId: 5, schoolName: 'Lincoln Elementary', isActive: true,
+          },
+        ],
+        pendingInvites: [],
+      },
+    });
+    api.assignCaseManagerBulk.mockRejectedValue(
+      apiRejection('Casey Manager is not allowed at Lincoln Elementary.')
+    );
+    renderPage();
+    await screen.findByText('Ada Lovelace');
+    await user.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }));
+    await user.click(screen.getByTestId('roster-bulk-assign-case-manager'));
+    const picker = await screen.findByLabelText('Case manager *');
+    await waitFor(() => expect(picker).not.toBeDisabled());
+    await user.selectOptions(picker, '7');
+    await user.click(screen.getByTestId('roster-assign-case-manager-submit'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Casey Manager is not allowed at Lincoln Elementary.'
+    );
+    expect(screen.getByTestId('roster-bulk-bar')).toBeInTheDocument();
   });
 });

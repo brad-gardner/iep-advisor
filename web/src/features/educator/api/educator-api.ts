@@ -7,6 +7,7 @@ import type {
   ChildLink,
   CreateSchoolStudentRequest,
   EducatorProfile,
+  EligibleStaff,
   ExitStudentRequest,
   InviteParentRequest,
   PagedResult,
@@ -37,6 +38,7 @@ export async function searchStudents(
   if (params.schoolId != null) query.schoolId = String(params.schoolId);
   if (params.status) query.status = params.status;
   if (params.grade) query.grade = params.grade;
+  if (params.attention) query.attention = params.attention;
   if (params.page != null) query.page = String(params.page);
   if (params.pageSize != null) query.pageSize = String(params.pageSize);
 
@@ -44,13 +46,6 @@ export async function searchStudents(
     params: query,
   });
   return response.data;
-}
-
-// Compatibility wrapper for callers that want the whole active roster as a
-// flat list. Fetches one large page and unwraps `items`.
-export async function getStudents(): Promise<ApiResponse<SchoolStudent[]>> {
-  const response = await searchStudents({ pageSize: 500 });
-  return { ...response, data: response.data?.items };
 }
 
 export async function createStudent(
@@ -131,6 +126,17 @@ export async function getTeam(studentId: number): Promise<ApiResponse<StudentTea
   return response.data;
 }
 
+// Staff the caller may add to this student's team (admin in scope or the
+// current lead case manager).
+export async function getEligibleTeamStaff(
+  studentId: number
+): Promise<ApiResponse<EligibleStaff[]>> {
+  const response = await apiClient.get<ApiResponse<EligibleStaff[]>>(
+    `${STUDENTS}/${studentId}/team/eligible`
+  );
+  return response.data;
+}
+
 export async function addTeamMember(
   studentId: number,
   data: AddTeamMemberRequest
@@ -168,10 +174,14 @@ export async function removeTeamMember(
   studentId: number,
   memberId: number
 ): Promise<ApiResponse<null>> {
-  const response = await apiClient.delete<ApiResponse<null>>(
+  const response = await apiClient.delete<ApiResponse<null> | ''>(
     `${STUDENTS}/${studentId}/team/${memberId}`
   );
-  return response.data;
+  // The route answers with the envelope; an empty 204 body (older servers)
+  // means the same thing, so both count as success.
+  return response.status === 204 || response.data === ''
+    ? { success: true, data: null }
+    : response.data;
 }
 
 // ---------------------------------------------------------------- Family links

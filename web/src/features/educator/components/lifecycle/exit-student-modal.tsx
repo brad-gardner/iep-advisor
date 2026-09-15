@@ -44,7 +44,11 @@ function ExitStudentForm({ studentName, onClose, onSubmit }: Omit<ExitStudentMod
         {studentName} will be marked as exited and hidden from the active roster. Documents,
         family links and the IEP team are kept, and the student can be reactivated later.
       </p>
-      {error && <Notice variant="error" title={error} />}
+      {error && (
+        <div role="alert">
+          <Notice variant="error" title={error} />
+        </div>
+      )}
 
       <Select
         id="exit-student-reason"

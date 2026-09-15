@@ -9,16 +9,21 @@ import { PageLayout } from "@/components/ui/page-layout";
 import { Pagination } from "@/components/ui/pagination";
 import { Table } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { apiErrorMessage } from "@/lib/api-error";
 import { assignCaseManagerBulk, createStudent } from "../api/educator-api";
 import { getDistrictSchools } from "@/features/district-admin/api/district-api";
 import type { DistrictSchool } from "@/features/district-admin/types";
 import type { CreateSchoolStudentRequest, StudentSearchParams } from "../types";
-import { ORG_ROLE, isAdminOrgRole, isCaseloadOrgRole } from "../types";
+import {
+  ATTENTION_FILTER_LABELS,
+  ORG_ROLE,
+  isAdminOrgRole,
+  isCaseloadOrgRole,
+} from "../types";
 import { useEducatorProfile } from "../hooks/use-educator-profile";
 import { useRosterQuery } from "../hooks/use-roster-query";
 import { useStudentSearch } from "../hooks/use-student-search";
 import { useRosterSelection } from "../hooks/use-roster-selection";
-import { ATTENTION_LABELS, useAttentionIds } from "../hooks/use-attention-ids";
 import { CreateStudentForm } from "../components/create-student-form";
 import { RosterFilters } from "../components/roster/roster-filters";
 import { RosterBulkBar } from "../components/roster/roster-bulk-bar";
@@ -31,10 +36,6 @@ import {
 const CASELOAD_EMPTY =
   "No students on your caseload yet — your school admin can add you to a student's IEP team, or create one.";
 
-// In attention mode the whole active roster is fetched as one page so the
-// client-side ID filter sees every student; pagination is hidden.
-const ATTENTION_PAGE_SIZE = 500;
-
 export function EducatorStudentsPage() {
   const { show: showToast } = useToast();
   const { profile } = useEducatorProfile();
@@ -43,21 +44,23 @@ export function EducatorStudentsPage() {
   const isCaseload = isCaseloadOrgRole(profile?.orgRoleId);
 
   const { query, update, clearAttention } = useRosterQuery();
-  const attentionLabel =
-    isAdmin && query.attention ? ATTENTION_LABELS[query.attention] : undefined;
-  const attentionIds = useAttentionIds(query.attention, isAdmin);
+  // The dashboard "needs attention" deep link: the server narrows the roster
+  // (same predicate as the tiles), so filters and paging compose as usual.
+  const attentionLabel = query.attention
+    ? ATTENTION_FILTER_LABELS[query.attention]
+    : undefined;
 
   const request = useMemo<StudentSearchParams>(
     () => ({
       query: query.q.trim() || undefined,
-      schoolId:
-        isDistrictAdmin && query.schoolId ? Number(query.schoolId) : undefined,
+      schoolId: isDistrictAdmin && query.schoolId ? query.schoolId : undefined,
       status: query.status,
       grade: query.grade || undefined,
-      page: attentionLabel ? 1 : query.page,
-      pageSize: attentionLabel ? ATTENTION_PAGE_SIZE : query.pageSize,
+      attention: query.attention ?? undefined,
+      page: query.page,
+      pageSize: query.pageSize,
     }),
-    [query, isDistrictAdmin, attentionLabel],
+    [query, isDistrictAdmin],
   );
   const { page, isLoading, failed, refresh } = useStudentSearch(request);
   const selection = useRosterSelection();
@@ -86,14 +89,6 @@ export function EducatorStudentsPage() {
     };
   }, [isDistrictAdmin]);
 
-  const visibleStudents = useMemo(
-    () =>
-      attentionLabel && attentionIds
-        ? page.items.filter((s) => attentionIds.has(s.id))
-        : page.items,
-    [page.items, attentionLabel, attentionIds],
-  );
-
   const handleCreate = async (data: CreateSchoolStudentRequest) => {
     try {
       const response = await createStudent(data);
@@ -104,8 +99,8 @@ export function EducatorStudentsPage() {
         return { success: true };
       }
       return { success: false, error: response.message || "Failed to add student" };
-    } catch {
-      return { success: false, error: "An error occurred" };
+    } catch (err) {
+      return { success: false, error: apiErrorMessage(err, "Failed to add student") };
     }
   };
 
@@ -130,8 +125,11 @@ export function EducatorStudentsPage() {
         success: false,
         error: response.message || "Could not assign the case manager",
       };
-    } catch {
-      return { success: false, error: "An error occurred" };
+    } catch (err) {
+      return {
+        success: false,
+        error: apiErrorMessage(err, "Could not assign the case manager"),
+      };
     }
   };
 
@@ -208,18 +206,26 @@ export function EducatorStudentsPage() {
       )}
 
       {isAdmin && (
-        <RosterBulkBar
-          selectedCount={selection.selectedIds.size}
-          onAssignCaseManager={() => setIsAssignOpen(true)}
-          onClear={selection.clear}
-        />
+        <>
+          {/* Always mounted so AT announces the very first selection too. */}
+          <p className="sr-only" aria-live="polite" data-testid="roster-selection-status">
+            {selection.selectedIds.size > 0
+              ? `${selection.selectedIds.size} selected`
+              : ""}
+          </p>
+          <RosterBulkBar
+            selectedCount={selection.selectedIds.size}
+            onAssignCaseManager={() => setIsAssignOpen(true)}
+            onClear={selection.clear}
+          />
+        </>
       )}
 
       <Table
         label="Students"
         data-testid="student-list"
         columns={columns}
-        rows={visibleStudents}
+        rows={page.items}
         rowKey={(s) => s.id}
         rowHref={(s) => `/educator/students/${s.id}`}
         loading={isLoading}
@@ -248,17 +254,15 @@ export function EducatorStudentsPage() {
         }
       />
 
-      {!attentionLabel && (
-        <Pagination
-          label="Students pagination"
-          page={query.page}
-          pageSize={query.pageSize}
-          total={page.total}
-          onPageChange={(next) => update({ page: next })}
-          onPageSizeChange={(size) => update({ pageSize: size })}
-          data-testid="student-list-pagination"
-        />
-      )}
+      <Pagination
+        label="Students pagination"
+        page={query.page}
+        pageSize={query.pageSize}
+        total={page.total}
+        onPageChange={(next) => update({ page: next })}
+        onPageSizeChange={(size) => update({ pageSize: size })}
+        data-testid="student-list-pagination"
+      />
 
       <Modal
         open={isAddOpen}

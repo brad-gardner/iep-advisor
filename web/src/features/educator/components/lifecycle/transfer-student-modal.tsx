@@ -55,7 +55,11 @@ function TransferStudentForm({
         {studentName}&apos;s documents, family links and team come along. Team members based at
         another school (other than related service providers) are removed from the team.
       </p>
-      {error && <Notice variant="error" title={error} />}
+      {error && (
+        <div role="alert">
+          <Notice variant="error" title={error} />
+        </div>
+      )}
 
       <Select
         id="transfer-student-school"

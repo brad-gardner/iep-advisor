@@ -21,6 +21,20 @@ public class StudentTeamMemberModel
     public DateTime AddedAt { get; set; }
 }
 
+/// <summary>An active staff member who may be added to a given student's team (not already an active member).</summary>
+public class EligibleStaffModel
+{
+    public int StaffProfileId { get; set; }
+    public int UserId { get; set; }
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public int OrgRoleId { get; set; }
+    public string OrgRoleName { get; set; } = string.Empty;
+    public int? SchoolId { get; set; }
+    public string? SchoolName { get; set; }
+}
+
 public class AddTeamMemberModel
 {
     public int StaffProfileId { get; set; }

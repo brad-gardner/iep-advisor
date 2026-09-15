@@ -61,6 +61,17 @@ public class ExitStudentModel
     public DateTime? ExitedAt { get; set; }
 }
 
+/// <summary>
+/// Dashboard "needs attention" narrowing for the roster (same predicates as the district dashboard
+/// tiles): <see cref="NoCaseManager"/> = no active lead whose staff profile is still active in the
+/// district; <see cref="NoLinkedParent"/> = no accepted, active parent link.
+/// </summary>
+public enum StudentAttention
+{
+    NoCaseManager,
+    NoLinkedParent
+}
+
 /// <summary>Roster search/filter/paging input. <see cref="Status"/> null means every status ("All").</summary>
 public class StudentSearchQuery
 {
@@ -68,6 +79,7 @@ public class StudentSearchQuery
     public int? SchoolId { get; set; }
     public StudentStatus? Status { get; set; } = StudentStatus.Active;
     public GradeLevel? Grade { get; set; }
+    public StudentAttention? Attention { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 50;
 }
