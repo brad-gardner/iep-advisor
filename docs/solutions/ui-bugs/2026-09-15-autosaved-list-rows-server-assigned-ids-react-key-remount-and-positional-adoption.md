@@ -65,7 +65,7 @@ export function adoptRowIds(current, sent, saved) {
 ```
 
 ## Verification
-- `web/src/features/document-authoring/lib/table-rows.test.ts` (4 tests): keys unchanged after adoption; removal during in-flight save pairs the surviving row with *its* id (not the deleted row's); later-added rows and rows with existing ids untouched; non-array responses ignored.
+- `web/src/features/document-authoring/lib/table-rows.test.ts` (5 tests — 1 `coerceRows`, 4 `adoptRowIds`): keys unchanged after adoption; removal during in-flight save pairs the surviving row with *its* id (not the deleted row's); later-added rows and rows with existing ids untouched; non-array responses ignored.
 - `web/src/features/document-authoring/components/field-renderers/table-field.test.tsx`: the same textarea element stays mounted and focused across the adopting save (`expect(screen.getByRole('textbox', …)).toBe(goalInput)`, `document.activeElement === goalInput`).
 - Independent pass-2 review (react-async-reviewer) traced the overlapping-save interleavings and "could not construct an interleaving where ids diverge"; it noted the test named "sends the latest rows" is vacuous as written (tracked as P3 in `todos/011-pending-p3-web-editor.md`) — the *stale-payload* half of the fix is verified by code trace, not yet by a regression test.
 - Full web suite 119/119, backend 509/509, type-check/lint/build/guard:ux green at `e2403e8`.
