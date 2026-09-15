@@ -146,4 +146,38 @@ describe('Table', () => {
     fireEvent.click(screen.getAllByTestId(/^edit-/)[0]);
     expect(onEdit).toHaveBeenCalledTimes(1);
   });
+
+  it('renders labelled selection checkboxes and a select-all that toggles the visible page', () => {
+    const onToggle = vi.fn();
+    const onToggleAll = vi.fn();
+    renderInRouter(
+      <Table
+        label="Schools"
+        data-testid="schools"
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        rowHref={(r) => `/schools/${r.id}`}
+        selection={{
+          selectedKeys: new Set([2]),
+          onToggle,
+          onToggleAll,
+          rowLabel: (r) => r.name,
+        }}
+      />,
+    );
+    const adams = screen.getByRole('checkbox', { name: 'Select Adams' });
+    expect(adams).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select Banneker' })).not.toBeChecked();
+    // Lives in its own cell, never inside the row's <Link>.
+    expect(adams.closest('a')).toBeNull();
+
+    fireEvent.click(adams);
+    expect(onToggle).toHaveBeenCalledWith(rows[1]);
+
+    const all = screen.getByRole('checkbox', { name: 'Select all rows on this page' });
+    expect(all).not.toBeChecked();
+    fireEvent.click(all);
+    expect(onToggleAll).toHaveBeenCalledWith(rows, true);
+  });
 });

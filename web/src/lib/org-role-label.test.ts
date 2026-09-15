@@ -6,6 +6,8 @@ describe('orgRoleLabel', () => {
     expect(orgRoleLabel('DistrictAdmin')).toBe('District administrator');
     expect(orgRoleLabel('SchoolAdmin')).toBe('School administrator');
     expect(orgRoleLabel('Teacher')).toBe('Teacher');
+    expect(orgRoleLabel('RelatedServiceProvider')).toBe('Related service provider');
+    expect(orgRoleLabel('GeneralEducator')).toBe('General educator');
   });
 
   it('passes unknown role names through unchanged', () => {

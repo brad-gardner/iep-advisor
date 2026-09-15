@@ -8,11 +8,11 @@ interface SchoolFilterProps {
   onChange: (value: string) => void;
 }
 
-// DistrictAdmin-only client-side filter for the roster, scoping the visible
-// students to a single school (or all).
+// DistrictAdmin-only roster filter, scoping the (server-searched) roster to a
+// single school (or all).
 export function SchoolFilter({ schools, value, onChange }: SchoolFilterProps) {
   return (
-    <div className="max-w-xs">
+    <div>
       <Select
         id="educator-students-school-filter"
         label="Filter by school"

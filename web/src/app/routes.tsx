@@ -46,6 +46,7 @@ import { DistrictSchoolsPage } from '@/features/district-admin/pages/district-sc
 import { DistrictAuditLogPage } from '@/features/district-admin/pages/district-audit-log-page';
 import { DistrictSetupWizard } from '@/features/district-admin/pages/district-setup-wizard';
 import { DistrictStaffPage } from '@/features/staff-invites/pages/district-staff-page';
+import { ImportPage } from '@/features/roster-import/pages/import-page';
 import { StaffAcceptInvitePage } from '@/features/staff-invites/pages/staff-accept-invite-page';
 import { DocumentListPage } from '@/features/document-authoring/pages/document-list-page';
 import { DocumentEditorPage } from '@/features/document-authoring/pages/document-editor-page';
@@ -381,6 +382,18 @@ export function AppRouter() {
             <RoleRoute allow={['Educator']}>
               <MainLayout>
                 <DistrictAuditLogPage />
+              </MainLayout>
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/admin/imports"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allow={['Educator']}>
+              <MainLayout>
+                <ImportPage />
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>

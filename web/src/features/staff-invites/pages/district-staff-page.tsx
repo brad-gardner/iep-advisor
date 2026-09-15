@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Ban, RotateCcw, Send, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Plus, Ban, RotateCcw, Send, Trash2, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -268,13 +269,21 @@ export function DistrictStaffPage() {
       data-testid="district-staff-page"
       actions={
         profile && (
-          <Button
-            onClick={() => setIsInviteOpen(true)}
-            data-testid="district-staff-invite-open"
-          >
-            <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-            Invite staff
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/educator/admin/imports?kind=Staff">
+              <Button variant="secondary" data-testid="district-staff-import-link">
+                <Upload className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+                Import staff
+              </Button>
+            </Link>
+            <Button
+              onClick={() => setIsInviteOpen(true)}
+              data-testid="district-staff-invite-open"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+              Invite staff
+            </Button>
+          </div>
         )
       }
     >

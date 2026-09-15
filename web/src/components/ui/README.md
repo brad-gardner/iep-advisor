@@ -18,7 +18,8 @@ The shared UI vocabulary for IEP Advisor. **Use these primitives; don't hand-rol
 | Short form / focused dialog | `Modal` | Native `<dialog>` (`open`/`onClose`/`title`/`size`/`footer`). Hosts ≤~5-field forms opened from a `PageHeader` action. Unmounts children when closed. |
 | Long / multi-section form | `Drawer` | Right-anchored native `<dialog>`, same contract as `Modal`. Keeps list context. |
 | Destructive confirmation | `ConfirmDialog` | `role="alertdialog"`, focuses **Cancel**, action-named confirm button, optional `error` slot (server failure stays in the dialog). Replaces `window.confirm()`. |
-| Data list | `Table` | Native `<table>`, sortable `<th>` headers (`aria-sort`), kebab `rowActions`, `rowHref` (accessible whole-row link), skeleton/`empty` states, `hideBelow` per-column. Client-sort ≤ `CLIENT_SORT_ROW_CEILING`. |
+| Data list | `Table` | Native `<table>`, sortable `<th>` headers (`aria-sort`), kebab `rowActions`, `rowHref` (accessible whole-row link), skeleton/`empty` states, `hideBelow` per-column, opt-in `selection` (labelled row checkboxes + select-all for bulk actions; the consumer owns the key set). Client-sort ≤ `CLIENT_SORT_ROW_CEILING`. |
+| Server-paged list footer | `Pagination` | `<nav>` with a polite "Showing a–b of n" summary, Previous/Next, optional rows-per-page picker. Pair with a `Table` fed one page at a time; keep `page`/`pageSize` in the URL. |
 | Row / dropdown actions | `Menu` | APG menu-button, portals to `<body>` (never clipped). Backs the Table kebab. |
 | Two-column detail page | `DetailLayout` | `main` + `sidebar` (status/metadata/quick-actions); **main first in source order**; stacks under `md`. |
 | Reading-width cap | `ReadingColumn` | Caps long-form/document/reading blocks at ~65ch (`max-w-prose`) inside the wide `max-w-7xl` shell. Wrap IEP/ETR/PDF viewers. |
