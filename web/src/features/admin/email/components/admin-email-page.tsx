@@ -148,7 +148,7 @@ export function AdminEmailPage() {
       )}
       {status?.configured && (
         <p className="text-sm text-brand-slate-500" data-testid="email-status-summary">
-          {status.queued} queued · {status.failed} failed
+          {status.queued} queued · {status.sending} sending · {status.failed} failed
           {status.lastSentAt ? ` · last sent ${new Date(status.lastSentAt).toLocaleString()}` : ''}
         </p>
       )}

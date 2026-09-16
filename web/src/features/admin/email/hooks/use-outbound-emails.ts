@@ -63,7 +63,7 @@ export function useOutboundEmails(status: OutboundEmailStatusFilter): UseOutboun
           setError(listRes.message ?? 'Could not load outbound emails.');
         }
         if (statusRes.success && statusRes.data) {
-          queuedRef.current = statusRes.data.queued;
+          queuedRef.current = statusRes.data.queued + statusRes.data.sending;
           setEmailStatus(statusRes.data);
         }
       } catch (err) {

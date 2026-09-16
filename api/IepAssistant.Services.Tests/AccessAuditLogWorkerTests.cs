@@ -196,5 +196,55 @@ public sealed class AccessAuditLogWorkerTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task PersistBatch_TwoWritersAtOnce_ProduceOneUnforkedChain()
+    {
+        // A file-backed SQLite database so two contexts/transactions genuinely contend (an in-memory
+        // connection is single-connection). SQLite serialises writers with a database lock, which is a
+        // weaker stand-in for SQL Server's SERIALIZABLE range locks — the property under test is that the
+        // tip is read inside the transaction and the retry loop absorbs the loser, so the chain never forks.
+        var path = Path.Combine(Path.GetTempPath(), $"audit-chain-{Guid.NewGuid():N}.db");
+        try
+        {
+            var services = new ServiceCollection();
+            services.AddDbContext<ApplicationDbContext>(o => o.UseSqlite($"DataSource={path}"), ServiceLifetime.Transient, ServiceLifetime.Singleton);
+            var provider = services.BuildServiceProvider();
+            using (var scope = provider.CreateScope())
+                scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.EnsureCreated();
+            var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
+
+            var zero = new[] { TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero };
+            var a = new AccessAuditLogWorker(new AuditLogger(), scopeFactory, NullLogger<AccessAuditLogWorker>.Instance, zero);
+            var b = new AccessAuditLogWorker(new AuditLogger(), scopeFactory, NullLogger<AccessAuditLogWorker>.Instance, zero);
+
+            var tasks = new List<Task>();
+            for (var round = 0; round < 5; round++)
+            {
+                tasks.Add(InvokePrivateAsync(a, "PersistBatchWithRetryAsync", new List<AuditEntry> { Entry(round * 10 + 1), Entry(round * 10 + 2) }, CancellationToken.None));
+                tasks.Add(InvokePrivateAsync(b, "PersistBatchWithRetryAsync", new List<AuditEntry> { Entry(round * 10 + 5) }, CancellationToken.None));
+            }
+            await Task.WhenAll(tasks);
+
+            using var verify = provider.CreateScope();
+            var ctx = verify.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var rows = ctx.AccessAuditLogs.OrderBy(r => r.Id).ToList();
+            var staged = ctx.PendingAuditEvents.Count();
+            Assert.Equal(15, rows.Count + staged); // every event landed or was durably staged — none vanished
+            string? prev = null;
+            foreach (var row in rows)
+            {
+                Assert.Equal(prev, row.PrevHash); // one chain: each row's PrevHash is exactly the previous row's Hash
+                Assert.Equal(AuditHashChain.ComputeHash(row.Id, row.Action, row.ActorUserId, row.ResourceType, row.ResourceId, row.RecipientUserId, row.CreatedAt, prev), row.Hash);
+                prev = row.Hash;
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            foreach (var f in new[] { path, path + "-journal", path + "-wal", path + "-shm" })
+                if (File.Exists(f)) File.Delete(f);
+        }
+    }
+
     public void Dispose() => _connection.Dispose();
 }

@@ -30,5 +30,7 @@ export interface OutboundEmailStatusDto {
   configured: boolean;
   queued: number;
   failed: number;
+  /** Rows claimed by the worker right now; persistently non-zero means a stuck send. */
+  sending: number;
   lastSentAt: string | null;
 }

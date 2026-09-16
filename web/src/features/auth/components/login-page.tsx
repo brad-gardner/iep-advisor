@@ -43,18 +43,20 @@ export function LoginPage() {
     setError('');
     setIsLoading(true);
 
-    const result = await login({ email: email.trim(), password });
+    try {
+      const result = await login({ email: email.trim(), password });
 
-    if (result.success) {
-      navigate('/dashboard');
-    } else if (result.requiresMfa && result.mfaPendingToken) {
-      navigate('/mfa-verify', { state: { mfaPendingToken: result.mfaPendingToken } });
-    } else {
-      if (showMagicLinkRef.current) return; // the user moved to the magic-link panel; drop the stale failure
-      setError(result.error || 'Login failed');
+      if (result.success) {
+        navigate('/dashboard');
+      } else if (result.requiresMfa && result.mfaPendingToken) {
+        navigate('/mfa-verify', { state: { mfaPendingToken: result.mfaPendingToken } });
+      } else if (!showMagicLinkRef.current) {
+        // (a failure that lands after the user moved to the magic-link panel is dropped)
+        setError(result.error || 'Login failed');
+      }
+    } finally {
+      setIsLoading(false); // on every path — a stuck `loading` would disable Sign In until a reload
     }
-
-    setIsLoading(false);
   };
 
   return (
@@ -65,7 +67,7 @@ export function LoginPage() {
       {error && <div className="mb-4" data-testid="login-error"><Notice variant="error" title={error} /></div>}
 
       {showMagicLink ? (
-        <div data-testid="login-magic-link-panel" ref={panelRef} tabIndex={-1} className="focus:outline-none">
+        <div data-testid="login-magic-link-panel" ref={panelRef} tabIndex={-1} className="rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400">
           <MagicLinkRequestForm />
           <div className="mt-4 text-center">
             <button
@@ -79,7 +81,7 @@ export function LoginPage() {
           </div>
         </div>
       ) : (
-        <div ref={passwordPanelRef} tabIndex={-1} className="focus:outline-none" data-testid="login-password-panel">
+        <div ref={passwordPanelRef} tabIndex={-1} className="rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400" data-testid="login-password-panel">
           <form onSubmit={handleSubmit} className="space-y-4" data-testid="login-form">
             <Input
               label="Email"

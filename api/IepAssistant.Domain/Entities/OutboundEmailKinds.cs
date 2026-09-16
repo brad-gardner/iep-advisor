@@ -13,6 +13,8 @@ public static class OutboundEmailKinds
     {
         "MagicLink", "PasswordReset", "AccountDeletionCancelLink", "ShareInvite", "SchoolLinkInvite",
         "StudentInvite", "StaffInvite", "BetaInvite",
+        // Meeting notifications carry the participant's RSVP token (a bearer credential until the meeting starts).
+        "MeetingInvitation", "MeetingUpdated", "MeetingCancelled",
     };
 
     public static bool CarriesOneTimeSecret(string? kind) => kind != null && OneTimeSecretKinds.Contains(kind);

@@ -33,8 +33,8 @@ function email(overrides: Partial<OutboundEmailDto> = {}): OutboundEmailDto {
   };
 }
 
-const configuredStatus = { success: true, data: { configured: true, queued: 0, failed: 1, lastSentAt: null } };
-const unconfiguredStatus = { success: true, data: { configured: false, queued: 0, failed: 0, lastSentAt: null } };
+const configuredStatus = { success: true, data: { configured: true, queued: 0, failed: 1, sending: 0, lastSentAt: null } };
+const unconfiguredStatus = { success: true, data: { configured: false, queued: 0, failed: 0, sending: 0, lastSentAt: null } };
 
 describe('AdminEmailPage', () => {
   beforeEach(() => {
@@ -59,7 +59,7 @@ describe('AdminEmailPage', () => {
 
     render(<AdminEmailPage />);
 
-    expect(await screen.findByTestId('email-status-summary')).toHaveTextContent('0 queued · 1 failed');
+    expect(await screen.findByTestId('email-status-summary')).toHaveTextContent('0 queued · 0 sending · 1 failed');
     expect(screen.queryByTestId('email-unconfigured-banner')).not.toBeInTheDocument();
   });
 

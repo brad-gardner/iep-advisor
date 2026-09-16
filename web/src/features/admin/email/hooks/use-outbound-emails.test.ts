@@ -26,7 +26,7 @@ function email(id: number, status: OutboundEmailDto['status']): OutboundEmailDto
   };
 }
 
-const statusOk = { success: true, data: { configured: true, queued: 0, failed: 0, lastSentAt: null } };
+const statusOk = { success: true, data: { configured: true, queued: 0, failed: 0, sending: 0, lastSentAt: null } };
 
 describe('useOutboundEmails', () => {
   beforeEach(() => {
@@ -86,5 +86,30 @@ describe('useOutboundEmails', () => {
 
     rerender({ status: 'Queued' });
     await waitFor(() => expect(api.listOutboundEmails).toHaveBeenLastCalledWith('Queued'));
+  });
+
+  it('keeps polling under the Failed filter while the unfiltered queue still has rows in flight', async () => {
+    vi.useFakeTimers();
+    api.listOutboundEmails.mockResolvedValue({ success: true, data: [] }); // the Failed tab never shows Queued/Sending rows
+    api.getOutboundEmailStatus
+      .mockResolvedValueOnce({ success: true, data: { configured: true, queued: 0, failed: 0, sending: 2, lastSentAt: null } })
+      .mockResolvedValue({ success: true, data: { configured: true, queued: 0, failed: 0, sending: 0, lastSentAt: null } });
+
+    renderHook(() => useOutboundEmails('Failed'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(api.listOutboundEmails).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(api.listOutboundEmails).toHaveBeenCalledTimes(2); // sending > 0 kept the poll alive
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(api.listOutboundEmails).toHaveBeenCalledTimes(2); // nothing in flight any more
+    vi.useRealTimers();
   });
 });

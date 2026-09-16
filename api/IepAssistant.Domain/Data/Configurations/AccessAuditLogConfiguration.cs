@@ -15,6 +15,12 @@ public class AccessAuditLogConfiguration : IEntityTypeConfiguration<AccessAuditL
         // ("cannot have any enabled triggers … OUTPUT clause without INTO"). SQLite ignores it.
         builder.ToTable("AccessAuditLogs", t => t.HasTrigger("TR_AccessAuditLogs_Immutable"));
 
+        // The hash backfill asks "any unhashed rows left?" on every restart; a filtered index turns that
+        // into a probe instead of a scan of an ever-growing table (SQL Server filter syntax; SQLite ignores).
+        builder.HasIndex(a => a.Id)
+            .HasDatabaseName("IX_AccessAuditLogs_Unhashed")
+            .HasFilter("[Hash] IS NULL");
+
         builder.Property(a => a.Action)
             .HasConversion<string>()
             .HasMaxLength(20)
