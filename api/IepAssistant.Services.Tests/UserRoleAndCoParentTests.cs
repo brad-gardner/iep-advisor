@@ -1,9 +1,12 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Repositories;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Tests.TestSupport;
 using Xunit;
 
 namespace IepAssistant.Services.Tests;
@@ -175,7 +178,10 @@ public sealed class UserRoleAndCoParentTests : IDisposable
                 new UserRepository(ctx),
                 ctx,
                 totpService: null!,
-                protector: null!);
+                protector: null!,
+                emailService: new TestEmailServiceBase(),
+                dataProtectionProvider: DataProtectionProvider.Create("test"),
+                configuration: new ConfigurationBuilder().Build());
 
             var export = await service.ExportDataAsync(userBId);
 

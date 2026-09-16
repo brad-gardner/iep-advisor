@@ -187,10 +187,12 @@ public class AnalysisRunService : IAnalysisRunService
                 _logger.LogError(
                     "AnalysisRun {RunId} failed with {Kind}: Claude response could not be parsed",
                     runId, ClaudeFailureKind.InvalidResponse);
-                // CancellationToken.None for the same reason as the catch blocks below: the refund
-                // inside FailRunAsync must not be abortable, or the reserved unit leaks.
+                // CancellationToken.None: see FailRunAsync's doc comment. refundQuota: false
+                // (todos/P2-02) — the call was genuinely billed, and a document crafted to make
+                // Claude's output consistently unparseable (prompt injection, not a real transient
+                // failure) must not be able to retry this at zero quota cost forever.
                 await FailRunAsync(
-                    runId, ClaudeFailureMessages.InvalidResponse, ct: CancellationToken.None);
+                    runId, ClaudeFailureMessages.InvalidResponse, refundQuota: false, ct: CancellationToken.None);
                 return;
             }
 
@@ -261,15 +263,27 @@ public class AnalysisRunService : IAnalysisRunService
 
             _logger.LogInformation("AnalysisRun {RunId} completed", runId);
         }
-        catch (ClaudeApiException ex)
+        catch (ClaudeApiException ex) when (!ct.IsCancellationRequested)
         {
+            // Guarded by !ct.IsCancellationRequested (todos/P2-01) rather than relying on
+            // ClaudeClient's own exception typing: if Anthropic.SDK ever surfaces a cancellation as
+            // something ClaudeClient maps to ClaudeApiException instead of propagating
+            // OperationCanceledException, this arm must not claim it as a real analysis failure — a
+            // graceful deploy restart is not "An unexpected error occurred during analysis." Falls
+            // through to the OperationCanceledException arm below in that case, which does not
+            // require trusting any unverified SDK internals.
+            //
             // The kind is not persisted in this phase, so this structured log line is the ONLY
             // record of it — it is what makes triage a Kibana query rather than a code read.
             _logger.LogError(ex, "AnalysisRun {RunId} failed with {Kind}", runId, ex.Kind);
             // Must go through FailRunAsync: the quota refund lives there, and once the status is
             // terminal neither the idempotency guard nor ReconcileOrphanedRunsAsync will repair a
-            // reservation leaked by setting Status/ErrorMessage inline.
-            await FailRunAsync(runId, ex.UserMessage, ct: CancellationToken.None);
+            // reservation leaked by setting Status/ErrorMessage inline. InvalidResponse consumes the
+            // quota unit rather than refunding it (todos/P2-02): the call really was billed, and
+            // refunding it here would let a document crafted to make Claude's output unparseable
+            // (prompt injection, not a real transient failure) retry at zero quota cost indefinitely.
+            var refundQuota = ex.Kind != ClaudeFailureKind.InvalidResponse;
+            await FailRunAsync(runId, ex.UserMessage, refundQuota, ct: CancellationToken.None);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -277,14 +291,13 @@ public class AnalysisRunService : IAnalysisRunService
             // arm the broad catch below would relabel it "An unexpected error occurred" with a null
             // FailureKind, which is a different lie and leaves the Phase 4 UI nothing to branch on.
             _logger.LogWarning("AnalysisRun {RunId} interrupted by host shutdown", runId);
-            await FailRunAsync(runId, "Analysis was interrupted.", ct: CancellationToken.None);
+            await FailRunAsync(runId, "Analysis was interrupted.", refundQuota: true, ct: CancellationToken.None);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error executing AnalysisRun {RunId}", runId);
-            // CancellationToken.None, not ct: on shutdown ct is already cancelled, and the refund's
-            // SaveChangesAsync(ct) inside FailRunAsync would throw, leaking the reserved unit.
-            await FailRunAsync(runId, "An unexpected error occurred during analysis.", ct: CancellationToken.None);
+            // CancellationToken.None, not ct: see FailRunAsync's doc comment.
+            await FailRunAsync(runId, "An unexpected error occurred during analysis.", refundQuota: true, ct: CancellationToken.None);
         }
     }
 
@@ -617,7 +630,15 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
         }
     }
 
-    public async Task FailRunAsync(int runId, string message, CancellationToken ct = default)
+    /// <summary>
+    /// Transitions a run to Error and, unless <paramref name="refundQuota"/> is false, refunds its
+    /// reserved quota unit. Idempotent: a no-op if the run is already terminal (Completed/Error).
+    ///
+    /// <paramref name="ct"/> is deliberately <see cref="CancellationToken.None"/> at every call site
+    /// (a Claude/parse failure, host shutdown, an unexpected exception, or the orphan sweep): this
+    /// method's refund must never be abortable, or the reserved unit leaks with no recovery path.
+    /// </summary>
+    public async Task FailRunAsync(int runId, string message, bool refundQuota = true, CancellationToken ct = default)
     {
         // Drop any uncommitted state from the work that just failed. This context is shared with
         // ExecuteRunAsync, so without this the save below would flush partial results (summary,
@@ -638,18 +659,26 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
         if (run.Status is AnalysisRunStatus.Completed or AnalysisRunStatus.Error)
             return;
 
+        var usageRecordId = run.UsageRecordId;
+
+        // todos/P2-03: release the usage row BEFORE committing Status=Error/UsageRecordId=null, not
+        // after. If ReleaseUsageByIdAsync throws (DB blip, connection reset) or the process is killed
+        // between the two, this ordering leaves the run non-terminal with UsageRecordId still set —
+        // recoverable, because the next sweep re-enters this method and tries the release again
+        // (ReleaseUsageByIdAsync no-ops if the row is already gone) before completing the transition.
+        // The old order (commit first, delete second) could instead lose the usage row forever: the
+        // run would already be terminal, so no sweep would ever retry the release.
+        if (refundQuota && usageRecordId.HasValue)
+            await _subscriptionService.ReleaseUsageByIdAsync(usageRecordId.Value, ct);
+
         run.Status = AnalysisRunStatus.Error;
         run.ErrorMessage = message;
         run.UpdatedAt = DateTime.UtcNow;
-
-        // Refund this run's exact reserved quota unit and clear the id in the same save so a
-        // second failure path (e.g. worker catch + startup sweep) cannot double-refund.
-        var usageRecordId = run.UsageRecordId;
-        run.UsageRecordId = null;
+        // refundQuota: false leaves UsageRecordId untouched — the reservation is intentionally kept
+        // (consumed, not refunded) rather than released above.
+        if (refundQuota)
+            run.UsageRecordId = null;
         await _context.SaveChangesAsync(ct);
-
-        if (usageRecordId.HasValue)
-            await _subscriptionService.ReleaseUsageByIdAsync(usageRecordId.Value, ct);
     }
 
     // --- Mapping ---

@@ -1,5 +1,7 @@
 using System.Net;
+using System.Security.Authentication;
 using System.Text;
+using Anthropic.SDK.Messaging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using IepAssistant.Services.Implementations;
@@ -123,7 +125,7 @@ public class ClaudeClientTests
     }
 
     private static IOptions<AnthropicOptions> BuildOptions(
-        string apiKey = "test-key", string model = ConfiguredModel, string effort = "medium") =>
+        string apiKey = "test-key", string model = ConfiguredModel, ThinkingEffort effort = ThinkingEffort.medium) =>
         Options.Create(new AnthropicOptions { ApiKey = apiKey, Model = model, Effort = effort });
 
     private static ClaudeClient BuildClient(HttpMessageHandler handler, IOptions<AnthropicOptions>? options = null) =>
@@ -190,7 +192,7 @@ public class ClaudeClientTests
     public async Task CompleteAsync_SendsAdaptiveThinkingWithConfiguredEffort()
     {
         var handler = new StubHandler(CannedResponse);
-        var client = BuildClient(handler, BuildOptions(effort: "medium"));
+        var client = BuildClient(handler, BuildOptions(effort: ThinkingEffort.medium));
 
         await client.CompleteAsync(Request());
 
@@ -267,6 +269,22 @@ public class ClaudeClientTests
         Assert.DoesNotContain("req_", ex.UserMessage);
     }
 
+    [Fact]
+    public async Task CompleteAsync_DoesNotMisclassify_WrappedAuthenticationException_AsConfiguration()
+    {
+        // todos/P3-01 #1: AuthenticationException is ALSO .NET's TLS handshake failure type. The
+        // SDK's own 401 exception is always freshly constructed with no InnerException; one that DOES
+        // carry an InnerException (as a wrapped TLS failure would, were it ever to escape HttpClient's
+        // normal HttpRequestException wrapping) must not be misclassified Configuration — that would
+        // suppress retry and page a momentary TLS blip as a service-configuration incident.
+        var handler = new ThrowingHandler(() => new AuthenticationException("TLS handshake failed", new IOException("connection reset")));
+        var client = BuildClient(handler);
+
+        var ex = await Assert.ThrowsAsync<ClaudeApiException>(() => client.CompleteAsync(Request()));
+
+        Assert.NotEqual(ClaudeFailureKind.Configuration, ex.Kind);
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized, "authentication_error", ClaudeFailureKind.Configuration)]
     [InlineData(HttpStatusCode.Forbidden, "permission_error", ClaudeFailureKind.Configuration)]
@@ -289,7 +307,8 @@ public class ClaudeClientTests
     [Fact]
     public async Task CompleteAsync_ClassifiesFromErrorBody_WhenStatusCarriesNoMapping()
     {
-        // 400 is not in the status-code map, so this can only be classified from error.type.
+        // A 400 that is not the context-overflow message classifies as Configuration (todos/P2-05:
+        // classification is by status code alone now; error.type in the body is no longer parsed).
         var handler = new StubHandler(ErrorBody("invalid_request_error"), HttpStatusCode.BadRequest);
         var client = BuildClient(handler);
 
@@ -346,16 +365,52 @@ public class ClaudeClientTests
     }
 
     [Fact]
-    public async Task CompleteAsync_ClassifiesUnknown_OnMalformedErrorBody()
+    public async Task CompleteAsync_ClassifiesUnknown_OnUnmappedStatusCode()
     {
-        // A body the mapper cannot parse must degrade to Unknown, never throw out of the mapper.
-        var handler = new StubHandler("<html>gateway exploded</html>", HttpStatusCode.BadRequest);
+        // todos/P2-05: classification is by status code alone now (no body parsing at all, so a
+        // malformed/non-JSON body can no longer influence — or crash — classification). A status
+        // code this product has never seen from Anthropic falls through every explicit arm to Unknown.
+        var handler = new StubHandler("<html>gateway exploded</html>", HttpStatusCode.UnprocessableEntity);
         var client = BuildClient(handler);
 
         var ex = await Assert.ThrowsAsync<ClaudeApiException>(() => client.CompleteAsync(Request()));
 
         Assert.Equal(ClaudeFailureKind.Unknown, ex.Kind);
         Assert.Equal(ClaudeFailureMessages.Unknown, ex.UserMessage);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_Throws_InvalidResponse_WhenBodyIsNotJson()
+    {
+        // todos/P2-05: the only test previously covering ClaudeClient's catch (JsonException) arm.
+        // A 200 whose body the SDK cannot deserialize into MessageResponse at all (not merely a
+        // shape the classifier can't parse) must still surface as a typed, classified failure.
+        var handler = new StubHandler("not json at all", HttpStatusCode.OK);
+        var client = BuildClient(handler);
+
+        var ex = await Assert.ThrowsAsync<ClaudeApiException>(() => client.CompleteAsync(Request()));
+
+        Assert.Equal(ClaudeFailureKind.InvalidResponse, ex.Kind);
+        Assert.Equal(ClaudeFailureMessages.InvalidResponse, ex.UserMessage);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_Throws_InvalidResponse_ForUnclassifiedException()
+    {
+        // todos/P2-04: NullReferenceException (SDK foreach-es messageResponse.Content with no null
+        // guard) and FormatException/OverflowException (unguarded long.Parse/DateTime.Parse over
+        // anthropic-ratelimit-* headers) are reachable from GetClaudeMessageAsync but are none of the
+        // four previously-caught types. Any such exception must still surface as a typed
+        // ClaudeApiException instead of escaping this contract unclassified — and must not leak its
+        // message to the caller-visible UserMessage.
+        var handler = new ThrowingHandler(() => new InvalidOperationException("boom from deep in the SDK"));
+        var client = BuildClient(handler);
+
+        var ex = await Assert.ThrowsAsync<ClaudeApiException>(() => client.CompleteAsync(Request()));
+
+        Assert.Equal(ClaudeFailureKind.InvalidResponse, ex.Kind);
+        Assert.Equal(ClaudeFailureMessages.InvalidResponse, ex.UserMessage);
+        Assert.DoesNotContain("boom from deep in the SDK", ex.UserMessage);
     }
 
     // --- Cancellation vs. timeout ---

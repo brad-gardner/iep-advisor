@@ -1,4 +1,3 @@
-using System.Net;
 using System.Security.Authentication;
 using System.Text.Json;
 using Anthropic.SDK;
@@ -81,7 +80,7 @@ public class ClaudeClient : IClaudeClient
             // the wire. Effort bounds how much of MaxTokens is spent thinking before answer text.
             OutputConfig = new OutputConfig
             {
-                Effort = ResolveEffort(_options.Effort),
+                Effort = _options.Effort,
             },
         };
 
@@ -99,11 +98,23 @@ public class ClaudeClient : IClaudeClient
             _logger.LogError(ex, "Claude call timed out for model {Model}", model);
             throw new ClaudeApiException(ClaudeFailureKind.Timeout, ex);
         }
-        catch (AuthenticationException ex)
+        catch (AuthenticationException ex) when (ex.InnerException is null)
         {
             // Anthropic.SDK throws this — not HttpRequestException — for a 401, and embeds the whole
             // API response body in the message. Without this arm a bad key would escape unclassified
-            // to the caller's broad catch, and that body is exactly what must never be surfaced.
+            // to the caller's broad catch, and that body is never surfaced (only a canned message is).
+            //
+            // Guarded by `ex.InnerException is null` (todos/P3-01 #1): System.Security.Authentication.
+            // AuthenticationException is ALSO the type .NET's TLS stack throws for a handshake
+            // failure. HttpClient normally wraps that as HttpRequestException (→ Classify →
+            // SecureConnectionError → Transient, correct), but if it were ever to escape unwrapped, a
+            // momentary TLS blip would otherwise be misclassified Configuration — suppressing retry
+            // and paging as a service-configuration incident for what is actually transient. The
+            // SDK's own auth-failure exception is always freshly constructed with no InnerException;
+            // a wrapped TLS exception always has one, so this filter tells them apart without relying
+            // on the SDK's exact message text. An exception that fails the filter falls through to
+            // the broad catch below, which still classifies it (as InvalidResponse) rather than
+            // dropping it.
             _logger.LogError(ex, "Claude rejected the configured API key for model {Model}", model);
             throw new ClaudeApiException(ClaudeFailureKind.Configuration, ex);
         }
@@ -121,6 +132,25 @@ public class ClaudeClient : IClaudeClient
             _logger.LogError(ex, "Claude returned a body that could not be deserialized for model {Model}", model);
             throw new ClaudeApiException(ClaudeFailureKind.InvalidResponse, ex);
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // todos/P2-04: two more SDK-internal exception types are reachable from
+            // GetClaudeMessageAsync and were escaping this typed contract entirely — a
+            // NullReferenceException (the SDK foreach-es messageResponse.Content with no null guard,
+            // so a 200 with a literal-null or content-less body throws this instead of JsonException),
+            // and FormatException/OverflowException (unguarded long.Parse/DateTime.Parse over
+            // anthropic-ratelimit-* response headers on an otherwise-successful call). Neither leaks
+            // anything (both would otherwise land in a caller's own unclassified catch with no
+            // {Kind}), but without this arm they defeat the Kibana-query triage this typed contract
+            // exists to enable. Kept last so every more specific arm above still wins.
+            //
+            // Guarded by `ex is not OperationCanceledException` so a cancellation that fell through
+            // the (cancellationToken.IsCancellationRequested) filter on the first catch above — i.e.
+            // a genuine host shutdown — still propagates as OperationCanceledException instead of
+            // being relabelled a Claude failure here.
+            _logger.LogError(ex, "Claude call raised an unclassified exception for model {Model}", model);
+            throw new ClaudeApiException(ClaudeFailureKind.InvalidResponse, ex);
+        }
 
         // Models with thinking enabled return a thinking block FIRST, so taking the first content
         // block and casting it to TextContent silently yields null. Concatenate every text block.
@@ -136,70 +166,32 @@ public class ClaudeClient : IClaudeClient
         return responseText;
     }
 
-    // Anthropic.SDK 5.10.0 declares ThinkingEffort with lowercase members and has no "xhigh" level,
-    // so AnthropicOptions.Effort is constrained to the four the SDK can actually send. Unrecognized
-    // input cannot reach here in the API host (ValidateOnStart rejects it at boot); the medium
-    // fallback covers hosts that bind the options without validation.
-    private static ThinkingEffort ResolveEffort(string? effort) => effort?.Trim().ToLowerInvariant() switch
-    {
-        "low" => ThinkingEffort.low,
-        "high" => ThinkingEffort.high,
-        "max" => ThinkingEffort.max,
-        _ => ThinkingEffort.medium,
-    };
-
     /// <summary>
-    /// Classifies an SDK HTTP failure using every available signal, most reliable first: the HTTP
-    /// status code when the SDK surfaced one, then the transport-level error for failures that
-    /// never reached the API at all, then the <c>error</c> object inside the raw JSON body the SDK
-    /// puts in the exception message. Never throws.
+    /// Classifies an SDK HTTP failure by status code alone (todos/P2-05). The prior version also
+    /// parsed the Anthropic error body's <c>error.type</c> into a second, near-fully-redundant
+    /// classification layer — <c>ClaudeClientTests.CompleteAsync_ClassifiesApiErrors</c>, flipped so
+    /// status and error type disagreed, showed the status code wins whenever the SDK surfaces one, so
+    /// that layer was deleted. The one thing it genuinely decided — a 400's context-overflow split —
+    /// is preserved below by scanning <paramref name="ex"/>'s own <c>Message</c> directly (which
+    /// already carries the raw response body verbatim, per <c>Program.cs</c>'s comment on the "Claude"
+    /// HttpClient) instead of re-parsing it as JSON first.
     /// </summary>
-    private static ClaudeFailureKind Classify(HttpRequestException ex)
-    {
-        if (ex.StatusCode is { } status && MapStatusCode(status) is { } byStatus)
-            return byStatus;
-
-        // No response at all — DNS, TLS, proxy, or a refused connection. The request never reached
-        // Anthropic, so there is no body to parse and retrying is exactly the right advice.
-        if (ex.HttpRequestError is HttpRequestError.ConnectionError
-            or HttpRequestError.NameResolutionError
-            or HttpRequestError.SecureConnectionError
-            or HttpRequestError.ProxyTunnelError
-            or HttpRequestError.ResponseEnded)
-            return ClaudeFailureKind.Transient;
-
-        var (errorType, errorMessage) = TryParseError(ex.Message);
-        if (MapErrorType(errorType, errorMessage) is { } byErrorType)
-            return byErrorType;
-
-        return ClaudeFailureKind.Unknown;
-    }
-
-    private static ClaudeFailureKind? MapStatusCode(HttpStatusCode status) => (int)status switch
+    private static ClaudeFailureKind Classify(HttpRequestException ex) => (int?)ex.StatusCode switch
     {
         401 or 403 or 404 => ClaudeFailureKind.Configuration,
-        413 => ClaudeFailureKind.RequestTooLarge,
-        429 => ClaudeFailureKind.RateLimited,
-        >= 500 and <= 599 => ClaudeFailureKind.Transient,
-        _ => null,
-    };
-
-    private static ClaudeFailureKind? MapErrorType(string? errorType, string? errorMessage) => errorType switch
-    {
-        "not_found_error" or "authentication_error" or "permission_error"
-            => ClaudeFailureKind.Configuration,
-        "rate_limit_error" => ClaudeFailureKind.RateLimited,
-        "overloaded_error" or "api_error" => ClaudeFailureKind.Transient,
-        "request_too_large" => ClaudeFailureKind.RequestTooLarge,
         // Context-window overflow arrives as a 400 invalid_request_error, not a 413. It is the most
         // likely user-triggered failure on a large multi-document run, and it must not land in
         // Configuration: that kind suppresses retry and offers no "select fewer documents" guidance,
         // leaving the user at a dead end for something one click would fix. It would also page an
         // oversized document set as a service-configuration incident.
-        "invalid_request_error" => IsContextOverflow(errorMessage)
-            ? ClaudeFailureKind.RequestTooLarge
-            : ClaudeFailureKind.Configuration,
-        _ => null,
+        400 => IsContextOverflow(ex.Message) ? ClaudeFailureKind.RequestTooLarge : ClaudeFailureKind.Configuration,
+        413 => ClaudeFailureKind.RequestTooLarge,
+        429 => ClaudeFailureKind.RateLimited,
+        >= 500 and <= 599 => ClaudeFailureKind.Transient,
+        // No status at all — DNS, TLS, proxy, or a refused connection; the request never reached
+        // Anthropic, so retrying is exactly the right advice.
+        null => ClaudeFailureKind.Transient,
+        _ => ClaudeFailureKind.Unknown,
     };
 
     private static bool IsContextOverflow(string? errorMessage) =>
@@ -207,46 +199,4 @@ public class ClaudeClient : IClaudeClient
         && (errorMessage.Contains("prompt is too long", StringComparison.OrdinalIgnoreCase)
             || errorMessage.Contains("too many tokens", StringComparison.OrdinalIgnoreCase)
             || errorMessage.Contains("exceed context limit", StringComparison.OrdinalIgnoreCase));
-
-    /// <summary>
-    /// Pulls <c>error.type</c> and <c>error.message</c> out of an Anthropic error body such as
-    /// <c>{"type":"error","error":{"type":"not_found_error","message":"..."},"request_id":"..."}</c>.
-    /// Returns nulls for anything that is not that shape; never throws. The message is used only to
-    /// sub-classify — it is never surfaced to a user.
-    /// </summary>
-    private static (string? Type, string? Message) TryParseError(string? body)
-    {
-        if (string.IsNullOrWhiteSpace(body))
-            return (null, null);
-
-        var start = body.IndexOf('{');
-        var end = body.LastIndexOf('}');
-        if (start < 0 || end <= start)
-            return (null, null);
-
-        try
-        {
-            using var document = JsonDocument.Parse(body[start..(end + 1)]);
-            if (document.RootElement.ValueKind == JsonValueKind.Object
-                && document.RootElement.TryGetProperty("error", out var error)
-                && error.ValueKind == JsonValueKind.Object
-                && error.TryGetProperty("type", out var type)
-                && type.ValueKind == JsonValueKind.String)
-            {
-                var message = error.TryGetProperty("message", out var messageElement)
-                    && messageElement.ValueKind == JsonValueKind.String
-                        ? messageElement.GetString()
-                        : null;
-
-                return (type.GetString(), message);
-            }
-        }
-        catch (JsonException)
-        {
-            // Malformed body: fall through to the Unknown classification rather than throwing
-            // out of the mapper and masking the original failure.
-        }
-
-        return (null, null);
-    }
 }

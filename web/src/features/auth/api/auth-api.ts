@@ -92,6 +92,32 @@ export async function cancelDeletion(): Promise<ApiResponse<null>> {
   return response.data;
 }
 
+// Pilot-gates plan, phase 2: the anonymous counterpart to `cancelDeletion` —
+// usable from the signed link emailed at request time, even though the
+// requesting account is deactivated (sessions revoked) the moment deletion is
+// scheduled. Hits `AccountController`, not `AuthController`.
+export async function cancelDeletionByToken(token: string): Promise<ApiResponse<null>> {
+  const response = await apiClient.post<ApiResponse<null>>('/api/account/cancel-deletion', { token });
+  return response.data;
+}
+
+// Magic link (pilot-gates plan, phase 3). Always 202s — the response never
+// reveals whether the address is eligible.
+export async function requestMagicLink(email: string): Promise<ApiResponse<null>> {
+  const response = await apiClient.post<ApiResponse<null>>('/api/auth/magic-link', { email });
+  return response.data;
+}
+
+// Same response shape as `login` (an existing-MFA challenge or a full
+// session), plus a district-requires-MFA-setup refusal unique to this
+// endpoint — see `LoginResponse.mfaSetupRequired`. An invalid/expired token
+// answers 400 like the other public-token endpoints, so the shared client
+// (and its 401 → "session died" interceptor) is safe to use here.
+export async function consumeMagicLink(token: string): Promise<ApiResponse<LoginResponse>> {
+  const response = await apiClient.post<ApiResponse<LoginResponse>>('/api/auth/magic-link/consume', { token });
+  return response.data;
+}
+
 // Onboarding
 export async function completeOnboarding(): Promise<ApiResponse<null>> {
   const response = await apiClient.post<ApiResponse<null>>('/api/auth/complete-onboarding');

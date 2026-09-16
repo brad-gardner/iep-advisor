@@ -1,5 +1,4 @@
 using System.Net;
-using Azure.Communication.Email;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Services.Interfaces;
@@ -7,21 +6,22 @@ using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
+/// <summary>
+/// Composes every outbound email's subject/HTML/text and hands the result to
+/// <see cref="IOutboundEmailQueue"/> — it no longer sends anything itself (pilot-gates plan, phase 1,
+/// decision 2). <c>OutboundEmailWorker</c> + <c>IEmailTransport</c> are the only real sender; this class
+/// only renders. Enqueueing does not swallow: a queue write failure (e.g. the database is down)
+/// propagates to the caller, same as any other write.
+/// </summary>
 public class EmailService : IEmailService
 {
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<EmailService> _logger;
+    private readonly IOutboundEmailQueue _queue;
     private readonly string _frontendUrl;
-    private readonly string? _connectionString;
-    private readonly string _senderAddress;
 
-    public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
+    public EmailService(IConfiguration configuration, IOutboundEmailQueue queue)
     {
-        _configuration = configuration;
-        _logger = logger;
-        _frontendUrl = _configuration["App:FrontendUrl"] ?? "http://localhost:5173";
-        _connectionString = _configuration["Email:ConnectionString"];
-        _senderAddress = _configuration["Email:SenderAddress"] ?? "DoNotReply@mail.iep-advisor.com";
+        _queue = queue;
+        _frontendUrl = configuration["App:FrontendUrl"] ?? "http://localhost:5173";
     }
 
     public async Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default)
@@ -55,7 +55,7 @@ public class EmailService : IEmailService
 
         var plainText = $"Reset your IEP Advisor password by visiting: {resetUrl}\n\nThis link expires in 15 minutes. If you didn't request this, ignore this email.";
 
-        await SendEmailAsync(toEmail, subject, html, plainText, ct);
+        await EnqueueEmailAsync(toEmail, subject, html, plainText, "PasswordReset", null, ct);
     }
 
     public async Task SendShareInviteEmailAsync(string toEmail, string inviterName, string childName, string role, string inviteToken, CancellationToken ct = default)
@@ -93,7 +93,7 @@ public class EmailService : IEmailService
 
         var plainText = $"{inviterName} has invited you to {roleDisplay} {childName}'s IEP information on IEP Advisor.\n\nAccept the invitation: {inviteUrl}\n\nThis invitation expires in 7 days.";
 
-        await SendEmailAsync(toEmail, subject, html, plainText, ct);
+        await EnqueueEmailAsync(toEmail, subject, html, plainText, "ShareInvite", null, ct);
     }
 
     public async Task SendSchoolLinkInviteEmailAsync(string toEmail, string educatorName, string schoolName, string studentName, string inviteToken, CancellationToken ct = default)
@@ -131,7 +131,7 @@ public class EmailService : IEmailService
 
         var plainText = $"{educatorName} at {schoolName} has invited you to connect with {studentName}'s record on IEP Advisor.\n\nAccept the invitation: {inviteUrl}\n\nThis invitation expires in 14 days.";
 
-        await SendEmailAsync(toEmail, subject, html, plainText, ct);
+        await EnqueueEmailAsync(toEmail, subject, html, plainText, "SchoolLinkInvite", null, ct);
     }
 
     public async Task SendStudentInviteEmailAsync(string toEmail, string inviterName, string context, string inviteToken, CancellationToken ct = default)
@@ -170,7 +170,7 @@ public class EmailService : IEmailService
 
         var plainText = $"{inviterName} has invited you to set up your own student account on IEP Advisor {context}.\n\nYou'll be asked to accept a short consent before your account is activated.\n\nAccept the invitation: {inviteUrl}\n\nThis invitation expires in 14 days.";
 
-        await SendEmailAsync(toEmail, subject, html, plainText, ct);
+        await EnqueueEmailAsync(toEmail, subject, html, plainText, "StudentInvite", null, ct);
     }
 
     public async Task SendStaffInviteEmailAsync(string toEmail, string districtName, string? schoolName, string roleName, string inviteToken, CancellationToken ct = default)
@@ -216,7 +216,7 @@ public class EmailService : IEmailService
 
         var plainText = $"You've been invited to join {orgLinePlain} on IEP Advisor as a {roleName}.\n\nAccept the invitation: {inviteUrl}\n\nThis invitation expires in 14 days and is tied to this email address.";
 
-        await SendEmailAsync(toEmail, subject, html, plainText, ct);
+        await EnqueueEmailAsync(toEmail, subject, html, plainText, "StaffInvite", null, ct);
     }
 
     public async Task SendStaffInviteExpiringEmailAsync(string toEmail, string inviteeEmail, string districtName, string? schoolName, DateTime expiresAt, CancellationToken ct = default)
@@ -264,7 +264,7 @@ public class EmailService : IEmailService
 
         var plainText = $"The staff invite you sent to {inviteeEmail} to join {orgLinePlain} on IEP Advisor expires on {expiresDisplay} and hasn't been accepted yet.\n\nIf they still need access, resend the invite to reset the clock: {staffUrl}\n\nIf not, no action is needed — the invite will simply expire. Only you are notified.";
 
-        await SendEmailAsync(toEmail, subject, html, plainText, ct);
+        await EnqueueEmailAsync(toEmail, subject, html, plainText, "StaffInviteExpiring", null, ct);
     }
 
     public async Task SendBetaInviteEmailAsync(string toEmail, string inviteCode, CancellationToken ct = default)
@@ -355,56 +355,97 @@ Brad Gardner
 IEP Advisor · iep-advisor.com
 You're receiving this because you signed up for the beta.";
 
-        await SendEmailAsync(toEmail, subject, html, plainText, ct);
+        await EnqueueEmailAsync(toEmail, subject, html, plainText, "BetaInvite", null, ct);
     }
 
-    private async Task SendEmailAsync(string toEmail, string subject, string htmlContent, string plainTextContent, CancellationToken ct)
+    public async Task SendAccountDeletionCancelLinkEmailAsync(string toEmail, string firstName, string cancelUrl, DateTime purgeDate, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(_connectionString))
-        {
-            // Development mode — log instead of sending
-            _logger.LogInformation("Email would be sent to {Email}: {Subject}", toEmail, subject);
-            _logger.LogDebug("Email HTML content length: {Length} chars", htmlContent.Length);
-            return;
-        }
+        var safeFirstName = WebUtility.HtmlEncode(firstName);
+        var safeCancelUrl = WebUtility.HtmlEncode(cancelUrl);
+        var purgeDateDisplay = purgeDate.ToString("MMMM d, yyyy");
 
-        try
-        {
-            var client = new EmailClient(_connectionString);
+        var subject = "Your IEP Advisor account is scheduled for deletion";
+        var html = $@"
+            <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
+                <div style=""text-align: center; margin-bottom: 24px;"">
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
+                </div>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">Your Account Is Scheduled for Deletion</h1>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
+                    Hi {safeFirstName}, we received a request to delete your IEP Advisor account. It will be
+                    permanently deleted on <strong>{purgeDateDisplay}</strong> unless you cancel before then.
+                </p>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
+                    If this was you and you want your account deleted, no action is needed. If you didn't
+                    request this — or changed your mind — click below to cancel.
+                </p>
+                <div style=""text-align: center; margin: 24px 0;"">
+                    <a href=""{safeCancelUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                        Cancel Deletion
+                    </a>
+                </div>
+                <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
+                    Your account has been deactivated in the meantime, so this link is the only way to cancel — signing in will not work until you use it.
+                </p>
+                <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
+                <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
+                    IEP Advisor — Navigate with confidence
+                </p>
+            </div>";
 
-            var emailMessage = new EmailMessage(
-                senderAddress: _senderAddress,
-                recipientAddress: toEmail,
-                content: new EmailContent(subject)
-                {
-                    Html = htmlContent,
-                    PlainText = plainTextContent
-                });
+        var plainText = $"Hi {firstName}, we received a request to delete your IEP Advisor account. It will be permanently deleted on {purgeDateDisplay} unless you cancel before then.\n\nCancel deletion: {cancelUrl}\n\nYour account has been deactivated in the meantime, so this link is the only way to cancel.";
 
-            var operation = await client.SendAsync(Azure.WaitUntil.Started, emailMessage, ct);
+        await EnqueueEmailAsync(toEmail, subject, html, plainText, "AccountDeletionCancelLink", null, ct);
+    }
 
-            _logger.LogInformation("Email sent to {Email}: {Subject} (OperationId: {OperationId})",
-                toEmail, subject, operation.Id);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to send email to {Email}: {Subject}", toEmail, subject);
-            // Don't throw — email failure should not break the calling flow
-        }
+    public async Task SendMagicLinkEmailAsync(string toEmail, string firstName, string magicLinkUrl, CancellationToken ct = default)
+    {
+        var safeFirstName = WebUtility.HtmlEncode(firstName);
+        var safeMagicLinkUrl = WebUtility.HtmlEncode(magicLinkUrl);
+
+        var subject = "Your IEP Advisor sign-in link";
+        var html = $@"
+            <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
+                <div style=""text-align: center; margin-bottom: 24px;"">
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
+                </div>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">Sign In to IEP Advisor</h1>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
+                    Hi {safeFirstName}, click below to sign in. This link expires in 15 minutes and can only be used once.
+                </p>
+                <div style=""text-align: center; margin: 24px 0;"">
+                    <a href=""{safeMagicLinkUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                        Sign In
+                    </a>
+                </div>
+                <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
+                    If you didn't request this link, you can safely ignore this email — no one can sign in without it.
+                </p>
+                <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
+                <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
+                    IEP Advisor — Navigate with confidence
+                </p>
+            </div>";
+
+        var plainText = $"Hi {firstName}, use the link below to sign in to IEP Advisor. This link expires in 15 minutes and can only be used once.\n\nSign in: {magicLinkUrl}\n\nIf you didn't request this link, you can safely ignore this email.";
+
+        await EnqueueEmailAsync(toEmail, subject, html, plainText, "MagicLink", null, ct);
     }
 
     // ----------------------------------------------------------------- Plan 4 additions (throw on failure)
 
     public Task SendMeetingInvitationAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
-        => SendMeetingEmailAsync(toEmail, "Meeting scheduled", "A meeting has been scheduled", model, ics, ct);
+        => SendMeetingEmailAsync(toEmail, "Meeting scheduled", "A meeting has been scheduled", "MeetingInvitation", model, ics, ct);
 
     public Task SendMeetingUpdatedAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
-        => SendMeetingEmailAsync(toEmail, "Meeting updated", "A meeting has been updated", model, ics, ct);
+        => SendMeetingEmailAsync(toEmail, "Meeting updated", "A meeting has been updated", "MeetingUpdated", model, ics, ct);
 
     public Task SendMeetingCancelledAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
-        => SendMeetingEmailAsync(toEmail, "Meeting cancelled", "A meeting has been cancelled", model, ics, ct);
+        => SendMeetingEmailAsync(toEmail, "Meeting cancelled", "A meeting has been cancelled", "MeetingCancelled", model, ics, ct);
 
-    private async Task SendMeetingEmailAsync(string toEmail, string subjectPrefix, string introText, MeetingEmailModel model, byte[] ics, CancellationToken ct)
+    private async Task SendMeetingEmailAsync(string toEmail, string subjectPrefix, string introText, string kind, MeetingEmailModel model, byte[] ics, CancellationToken ct)
     {
         var subject = $"{subjectPrefix}: {model.Title} for {model.StudentFirstName}";
         var whenLine = $"{model.StartsAtUtc:MMMM d, yyyy} at {model.StartsAtUtc:h:mm tt} ({model.TimeZoneId})";
@@ -416,8 +457,8 @@ You're receiving this because you signed up for the beta.";
         var html = RenderMeetingHtml(introText, model);
         var plainText = $"{introText}\n\n{model.Title} for {model.StudentFirstName}, organized by {model.OrganizerName}.\n{whenLine} - {model.DurationMinutes} minutes{(string.IsNullOrWhiteSpace(model.Location) ? "" : $" - {model.Location}")}\n{rsvpPlain}\nDetails: {model.DetailUrl}\nA calendar invite (.ics) is attached.";
 
-        var attachment = new EmailAttachment("meeting.ics", "text/calendar", new BinaryData(ics));
-        await SendEmailOrThrowAsync(toEmail, subject, html, plainText, new[] { attachment }, ct);
+        var attachment = new OutboundEmailAttachmentDraft("meeting.ics", "text/calendar", ics);
+        await EnqueueEmailAsync(toEmail, subject, html, plainText, kind, new[] { attachment }, ct);
     }
 
     /// <summary>Renders <see cref="SendMeetingEmailAsync"/>'s HTML body. Every interpolated value that
@@ -476,7 +517,7 @@ You're receiving this because you signed up for the beta.";
         var html = RenderNotificationHtml(title, body, linkUrl);
         var plainText = $"{title}\n\n{body}\n\nView in IEP Advisor: {linkUrl}";
 
-        await SendEmailOrThrowAsync(toEmail, title, html, plainText, null, ct);
+        await EnqueueEmailAsync(toEmail, title, html, plainText, "Notification", null, ct);
     }
 
     /// <summary>Renders <see cref="SendNotificationAsync"/>'s HTML body. <paramref name="title"/>/
@@ -519,7 +560,7 @@ You're receiving this because you signed up for the beta.";
             (model.UpcomingMeetings.Count == 0 ? "No meetings in the next 7 days.\n" : string.Concat(model.UpcomingMeetings.Select(m => $"- {m.Title} for {m.StudentName} - {m.StartsAtUtc:MMM d, h:mm tt} ({m.TimeZoneId})\n"))) +
             $"\nOpen IEP Advisor: {model.DetailUrl}";
 
-        await SendEmailOrThrowAsync(toEmail, subject, html, plainText, null, ct);
+        await EnqueueEmailAsync(toEmail, subject, html, plainText, "Digest", null, ct);
     }
 
     /// <summary>Renders <see cref="SendDigestAsync"/>'s HTML body. Obligation/meeting StudentName and
@@ -562,47 +603,24 @@ You're receiving this because you signed up for the beta.";
             </div>";
     }
 
-    /// <summary>
-    /// Plan 4's throwing counterpart to <see cref="SendEmailAsync"/>: the dev-mode (no ACS connection
-    /// string) path still logs-and-returns success, but a real send failure is logged AND rethrown so the
-    /// caller (a background worker/service) can record it rather than have it silently disappear.
-    /// </summary>
-    private async Task SendEmailOrThrowAsync(string toEmail, string subject, string htmlContent, string plainTextContent, IReadOnlyList<EmailAttachment>? attachments, CancellationToken ct)
-    {
-        if (string.IsNullOrEmpty(_connectionString))
+    /// <summary>Composes an <see cref="OutboundEmailDraft"/> and enqueues it. This is the ONLY place any
+    /// Send* method reaches the queue — a queue write failure (not a delivery failure; there is no send
+    /// attempt yet) propagates to the caller unchanged, which is decision 2's "no longer swallows".</summary>
+    private Task EnqueueEmailAsync(
+        string toEmail,
+        string subject,
+        string htmlContent,
+        string plainTextContent,
+        string kind,
+        IReadOnlyList<OutboundEmailAttachmentDraft>? attachments,
+        CancellationToken ct)
+        => _queue.EnqueueAsync(new OutboundEmailDraft
         {
-            // No recipient/subject in the log line (subject embeds a student/meeting title) — plan 4's
-            // "no PII in logs" constraint applies to this new throwing path even though the pre-existing
-            // swallowing SendEmailAsync above still logs both (unchanged, out of scope for this plan).
-            _logger.LogInformation("Email (dev mode, not sent): {Length} chars HTML", htmlContent.Length);
-            return;
-        }
-
-        var client = new EmailClient(_connectionString);
-        var emailMessage = new EmailMessage(
-            senderAddress: _senderAddress,
-            recipientAddress: toEmail,
-            content: new EmailContent(subject)
-            {
-                Html = htmlContent,
-                PlainText = plainTextContent
-            });
-
-        if (attachments != null)
-        {
-            foreach (var attachment in attachments)
-                emailMessage.Attachments.Add(attachment);
-        }
-
-        try
-        {
-            var operation = await client.SendAsync(Azure.WaitUntil.Started, emailMessage, ct);
-            _logger.LogInformation("Email sent (OperationId: {OperationId})", operation.Id);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to send email (OperationId unavailable — send threw before completion)");
-            throw;
-        }
-    }
+            ToEmail = toEmail,
+            Subject = subject,
+            HtmlBody = htmlContent,
+            TextBody = plainTextContent,
+            Kind = kind,
+            Attachments = attachments
+        }, ct);
 }

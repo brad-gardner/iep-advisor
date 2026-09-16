@@ -41,6 +41,19 @@ namespace IepAssistant.Domain.Data;
 /// </summary>
 public sealed class ImmutableVersionInterceptor : SaveChangesInterceptor
 {
+    private readonly ImmutabilityGuardBypass? _bypass;
+
+    /// <summary>
+    /// <paramref name="bypass"/> is optional so every existing call site that constructs this directly
+    /// (<c>new ImmutableVersionInterceptor()</c> — production DI and every test fixture) keeps compiling
+    /// and behaves exactly as before. Only the demo-reset scope (pilot-gates plan, phase 3) resolves this
+    /// via DI and flips <see cref="ImmutabilityGuardBypass.Enabled"/> for the duration of its deletes.
+    /// </summary>
+    public ImmutableVersionInterceptor(ImmutabilityGuardBypass? bypass = null)
+    {
+        _bypass = bypass;
+    }
+
     public override InterceptionResult<int> SavingChanges(
         DbContextEventData eventData, InterceptionResult<int> result)
     {
@@ -55,9 +68,9 @@ public sealed class ImmutableVersionInterceptor : SaveChangesInterceptor
         return base.SavingChangesAsync(eventData, result, cancellationToken);
     }
 
-    private static void Guard(DbContext? context)
+    private void Guard(DbContext? context)
     {
-        if (context is null)
+        if (context is null || _bypass?.Enabled == true)
             return;
 
         foreach (var entry in context.ChangeTracker.Entries())
@@ -133,4 +146,17 @@ public sealed class ImmutableVersionInterceptor : SaveChangesInterceptor
         var version = context.Set<DocumentTemplateVersion>().Find(versionId);
         return version?.Status == TemplateVersionStatus.Published;
     }
+}
+
+/// <summary>
+/// Scoped switch (pilot-gates plan, phase 3) that lets one specific, deliberate operation — the
+/// demo-district reset (<c>DemoSeeder.ResetAsync</c>) — bypass <see cref="ImmutableVersionInterceptor"/>
+/// for the lifetime of its own request/CLI scope. Defaults to disabled; nothing in normal request
+/// handling ever sets it, so every other code path is guarded exactly as before. Registered Scoped
+/// alongside the DbContext it is baked into (see <c>DependencyInjection.AddDomain</c>) — flipping it in
+/// one scope cannot affect a concurrent scope's DbContext/interceptor instance.
+/// </summary>
+public sealed class ImmutabilityGuardBypass
+{
+    public bool Enabled { get; set; }
 }

@@ -45,14 +45,10 @@ public class AnalysisRunServiceTests
     private sealed class ThrowingClaudeClient : IClaudeClient
     {
         private readonly ClaudeFailureKind _kind;
-        public int CallCount { get; private set; }
         public ThrowingClaudeClient(ClaudeFailureKind kind) => _kind = kind;
 
         public Task<string?> CompleteAsync(ClaudeCompletionRequest request, CancellationToken cancellationToken = default)
-        {
-            CallCount++;
-            throw new ClaudeApiException(_kind);
-        }
+            => throw new ClaudeApiException(_kind);
     }
 
     private AnalysisRunService BuildService(ApplicationDbContext context, IClaudeClient claudeClient)
@@ -230,8 +226,12 @@ public class AnalysisRunServiceTests
     }
 
     [Fact]
-    public async Task ExecuteRunAsync_NullClaudeResponse_ErrorsAndRefundsUsage()
+    public async Task ExecuteRunAsync_NullClaudeResponse_ErrorsAndConsumesUsage()
     {
+        // todos/P2-02: InvalidResponse (an unparseable/null Claude response) now CONSUMES the
+        // reserved quota unit instead of refunding it — the call was genuinely billed, and refunding
+        // it would let a document engineered to make Claude's output unparseable retry indefinitely
+        // at zero quota cost. See the "refunded" assertion below, updated accordingly.
         using var _fixture = new AnalysisRunTestFixture();
         var iepId = _fixture.SeedIepDocument();
 
@@ -272,9 +272,12 @@ public class AnalysisRunServiceTests
         Assert.Equal(AnalysisRunStatus.Error, run.Status);
         Assert.Equal(ClaudeFailureMessages.InvalidResponse, run.ErrorMessage);
 
+        // Consumed, not refunded (todos/P2-02): the reservation taken at create time is left in
+        // place (UsageRecordId still set, one more usage row than before the run).
+        Assert.NotNull(run.UsageRecordId);
         var usageAfter = verifyContext.UsageRecords.Count(u =>
             u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
-        Assert.Equal(usageBefore, usageAfter); // refunded
+        Assert.Equal(usageBefore + 1, usageAfter);
     }
 
     [Fact]
@@ -346,10 +349,12 @@ public class AnalysisRunServiceTests
             secondRunUsageId = midContext.AnalysisRuns.Find(secondRunId)!.UsageRecordId!.Value;
         }
 
-        // Fail ONLY the first run (null Claude response => parse failure => refund).
+        // Fail ONLY the first run. Uses a Configuration failure (refunds), not a null/unparseable
+        // Claude response — InvalidResponse deliberately does NOT refund any more (todos/P2-02) and
+        // would defeat this test's whole point (run-scoped refund correctness).
         using (var execContext = _fixture.CreateContext())
         {
-            var execService = BuildService(execContext, new FakeClaudeClient(null));
+            var execService = BuildService(execContext, new ThrowingClaudeClient(ClaudeFailureKind.Configuration));
             await execService.ExecuteRunAsync(firstRunId, CancellationToken.None);
         }
 

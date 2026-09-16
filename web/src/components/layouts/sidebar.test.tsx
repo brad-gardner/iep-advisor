@@ -194,3 +194,51 @@ describe('Sidebar Administration async gate', () => {
     );
   });
 });
+
+describe('Sidebar footer and platform-admin links', () => {
+  beforeEach(() => {
+    useAuthMock.mockReset();
+    useEducatorProfileMock.mockReset();
+    useEducatorProfileMock.mockReturnValue({ profile: null, isLoading: false });
+  });
+
+  it('links Support to a mailto address with a response-time note (no Google Form)', () => {
+    useAuthMock.mockReturnValue({ user: makeUser('Parent') });
+    renderSidebar();
+
+    const [support] = screen.getAllByTestId('nav-support');
+    expect(support).toHaveAttribute('href', 'mailto:support@iep-advisor.com');
+    expect(screen.getAllByTestId('nav-support-note')[0]).toHaveTextContent('We reply within 1 business day');
+  });
+
+  it('links Trust & privacy to the marketing trust page, opened in a new tab', () => {
+    useAuthMock.mockReturnValue({ user: makeUser('Parent') });
+    renderSidebar();
+
+    const [trust] = screen.getAllByTestId('nav-trust');
+    expect(trust).toHaveAttribute('href', 'https://iep-advisor.com/trust.html');
+    expect(trust).toHaveAttribute('target', '_blank');
+    expect(trust).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('shows Outbound email and Audit integrity links for a platform admin', () => {
+    useAuthMock.mockReturnValue({ user: makeUser('Admin') });
+    renderSidebar();
+
+    const email = screen.getAllByTestId('nav-admin-email');
+    expect(email).toHaveLength(2);
+    expect(email[0]).toHaveAttribute('href', '/admin/email');
+
+    const audit = screen.getAllByTestId('nav-admin-audit');
+    expect(audit).toHaveLength(2);
+    expect(audit[0]).toHaveAttribute('href', '/admin/audit');
+  });
+
+  it('hides the platform-admin links for a non-admin role', () => {
+    useAuthMock.mockReturnValue({ user: makeUser('Parent') });
+    renderSidebar();
+
+    expect(screen.queryByTestId('nav-admin-email')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nav-admin-audit')).not.toBeInTheDocument();
+  });
+});

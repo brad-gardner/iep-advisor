@@ -80,4 +80,23 @@ public sealed class AuditLoggerTests : IDisposable
     }
 
     public void Dispose() => _connection.Dispose();
+
+    [Fact]
+    public void Record_WhenTheBacklogIsFull_RefusesTheNewestEventAndCountsIt()
+    {
+        var logger = new AuditLogger();
+        for (var i = 0; i < AuditLogger.Capacity; i++)
+            logger.Record(AuditAction.View, 1, "Doc", i);
+        Assert.Equal(AuditLogger.Capacity, logger.Depth);
+        Assert.Equal(0, logger.DroppedCount);
+
+        logger.Record(AuditAction.View, 1, "Doc", -1);
+        Assert.Equal(1, logger.DroppedCount); // refused, never blocked, never thrown
+        Assert.Equal(AuditLogger.Capacity, logger.Depth);
+
+        // Draining makes room again.
+        Assert.Equal(AuditLogger.Capacity, logger.DrainImmediately().Count);
+        logger.Record(AuditAction.View, 1, "Doc", 2);
+        Assert.Equal(1, logger.Depth);
+    }
 }

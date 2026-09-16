@@ -118,7 +118,7 @@ public class StaffInviteExpiryService : IStaffInviteExpiryService
         var districtName = await _context.Districts.AsNoTracking()
             .Where(d => d.Id == invite.DistrictId).Select(d => d.Name).FirstOrDefaultAsync(ct) ?? "your district";
 
-        // Send first — best-effort, EmailService swallows ACS failures internally (we add no throwing behavior).
+        // Send first — best-effort, EmailService only enqueues; a queue write failure propagates, while delivery failures surface later on the OutboundEmail row.
         await _emailService.SendStaffInviteExpiringEmailAsync(
             inviterEmail, invite.Email, districtName, schoolName, invite.InviteExpiresAt, ct);
 

@@ -28,4 +28,8 @@
     <ProjectReference Include="..\IepAssistant.Domain\IepAssistant.Domain.csproj" />
     <ProjectReference Include="..\IepAssistant.Services\IepAssistant.Services.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="IepAssistant.Services.Tests" />
+  </ItemGroup>
+
 </Project>

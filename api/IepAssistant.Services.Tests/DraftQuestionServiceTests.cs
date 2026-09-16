@@ -48,8 +48,8 @@ public sealed class DraftQuestionServiceTests : IDisposable
         }
     }
 
-    private DraftQuestionService CreateService(ApplicationDbContext ctx) =>
-        new(ctx, new AccessService(ctx), _claude, NullLogger<DraftQuestionService>.Instance);
+    private DraftQuestionService CreateService(ApplicationDbContext ctx, Microsoft.Extensions.Logging.ILogger<DraftQuestionService>? logger = null) =>
+        new(ctx, new AccessService(ctx), _claude, logger ?? NullLogger<DraftQuestionService>.Instance);
 
     private sealed record Scenario(int RevisionId, int DistrictId, int ParentId, int CoParentId, int ChildId, Guid GoalsKey, Guid GoalCol, string RowId);
 
@@ -233,6 +233,35 @@ public sealed class DraftQuestionServiceTests : IDisposable
         var tooLong = await service.AskAsync(s.ParentId, s.RevisionId, new AskDraftQuestionModel { Question = "Is this ok?", TargetFieldKey = s.GoalsKey, TargetRowId = new string('a', 65) }, default);
         Assert.False(tooLong.Success);
         Assert.Contains("64", tooLong.Message);
+    }
+
+    /// <summary>
+    /// Pilot-gates plan, phase 2: no parent question or draft/goal text reaches a log line, on either
+    /// the happy path or a Claude failure — checked against a REAL Serilog pipeline. Regression guard:
+    /// every existing log call in DraftQuestionService already only ever interpolates ids/enums.
+    /// </summary>
+    [Fact]
+    public async Task Ask_NeverLogsQuestionOrDraftText_OnSuccessOrClaudeFailure()
+    {
+        var s = Seed("logsafe", goalText: "Improve fine motor skills daily");
+        using var capturing = new TestSupport.CapturingSerilogLogger();
+        var logger = capturing.CreateLogger<DraftQuestionService>();
+
+        const string question = "Will grandma find out about the fine motor goal?";
+
+        using var ctx = CreateContext();
+        var service = CreateService(ctx, logger);
+
+        var ok = await service.AskAsync(s.ParentId, s.RevisionId, new AskDraftQuestionModel { Question = question }, default);
+        Assert.True(ok.Success, ok.Message);
+
+        _claude.CannedResponse = null; // empty Claude response path (LogWarning)
+        var empty = await service.AskAsync(s.ParentId, s.RevisionId, new AskDraftQuestionModel { Question = question }, default);
+        Assert.False(empty.Success);
+
+        Assert.True(capturing.EventCount > 0, "Expected at least one log event to actually check.");
+        Assert.False(capturing.ContainsText(question), "The parent's question must never reach a log line.");
+        Assert.False(capturing.ContainsText("Improve fine motor skills daily"), "Draft goal text must never reach a log line.");
     }
 
     public void Dispose() => _connection.Dispose();

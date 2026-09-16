@@ -10,5 +10,9 @@ public enum AuditAction
     // Admin published/forked a document template version — a governance action that determines the
     // schema every future student document of that (state, type) is pinned to. Templates carry no
     // student PII, but the action is recorded for a tamper-evident authoring trail (cross-cutting G-e.4).
-    Publish = 5
+    Publish = 5,
+
+    /// <summary>An account purge (pilot-gates plan, phase 2): a parent's data was erased, or a staff
+    /// member's account was deactivated and anonymised. ResourceType is "User".</summary>
+    Delete = 6
 }

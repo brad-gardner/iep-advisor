@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home, ScrollText, FileText, Upload, Calendar, Bell, MailWarning, ClipboardCheck, Download } from 'lucide-react';
+import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home, ScrollText, FileText, Upload, Calendar, Bell, MailWarning, ClipboardCheck, Download, Mail, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -51,6 +51,11 @@ const adminNavItems: {
   // DistrictAdmin-only, not offered to a SchoolAdmin.
   { to: '/educator/admin/exports', label: 'Exports', Icon: Download, schoolAdmin: false },
 ];
+
+// Pilot-gates plan, phase 4, decision 8: linked in the sidebar footer.
+// `VITE_MARKETING_URL` — when the marketing site is deployed somewhere other
+// than the default — should hold the trust page's own full URL.
+const TRUST_URL = import.meta.env.VITE_MARKETING_URL || 'https://iep-advisor.com/trust.html';
 
 interface SidebarProps {
   onLogout: () => void;
@@ -132,15 +137,16 @@ export function Sidebar({ onLogout }: SidebarProps) {
           );
         })}
         <a
-          href="https://docs.google.com/forms/d/e/1FAIpQLSfhj_T_TiRlPp9MYgmxHPqtgKfyNkTk0CXoXQn7HWXILaDmfQ/viewform?usp=publish-editor"
-          target="_blank"
-          rel="noopener noreferrer"
+          href="mailto:support@iep-advisor.com"
           data-testid="nav-support"
           className="flex items-center gap-3 px-3 py-2.5 rounded-button text-sm text-brand-slate-400 hover:text-brand-slate-200 hover:bg-brand-slate-700 transition-colors"
         >
           <LifeBuoy size={18} strokeWidth={1.8} />
           Support
         </a>
+        <p className="px-3 text-[11px] text-brand-slate-500" data-testid="nav-support-note">
+          We reply within 1 business day
+        </p>
       </nav>
 
       {adminGroupPending && (
@@ -240,6 +246,32 @@ export function Sidebar({ onLogout }: SidebarProps) {
             <MailWarning size={18} strokeWidth={1.8} />
             Email failures
           </Link>
+          <Link
+            to="/admin/email"
+            data-testid="nav-admin-email"
+            onClick={() => setMobileOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-button text-sm transition-colors ${
+              isActive('/admin/email')
+                ? 'text-brand-teal-400 bg-brand-slate-700 border-l-2 border-brand-teal-500 -ml-px'
+                : 'text-brand-slate-400 hover:text-brand-slate-200 hover:bg-brand-slate-700'
+            }`}
+          >
+            <Mail size={18} strokeWidth={1.8} />
+            Outbound email
+          </Link>
+          <Link
+            to="/admin/audit"
+            data-testid="nav-admin-audit"
+            onClick={() => setMobileOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-button text-sm transition-colors ${
+              isActive('/admin/audit')
+                ? 'text-brand-teal-400 bg-brand-slate-700 border-l-2 border-brand-teal-500 -ml-px'
+                : 'text-brand-slate-400 hover:text-brand-slate-200 hover:bg-brand-slate-700'
+            }`}
+          >
+            <ShieldCheck size={18} strokeWidth={1.8} />
+            Audit integrity
+          </Link>
         </div>
       )}
 
@@ -267,6 +299,15 @@ export function Sidebar({ onLogout }: SidebarProps) {
           <LogOut size={16} strokeWidth={1.8} />
           Sign Out
         </button>
+        <a
+          href={TRUST_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="nav-trust"
+          className="mt-3 block text-xs text-brand-slate-500 hover:text-brand-slate-300 transition-colors"
+        >
+          Trust &amp; privacy
+        </a>
       </div>
     </>
   );

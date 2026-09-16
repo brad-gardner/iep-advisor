@@ -10,6 +10,17 @@ public class AccessAuditLogConfiguration : IEntityTypeConfiguration<AccessAuditL
     {
         builder.HasKey(a => a.Id);
 
+        // The immutability trigger (migration AddPilotGatesPhase12) must be declared here: EF Core 7+
+        // otherwise saves with an OUTPUT clause, which SQL Server rejects on a table with any trigger
+        // ("cannot have any enabled triggers … OUTPUT clause without INTO"). SQLite ignores it.
+        builder.ToTable("AccessAuditLogs", t => t.HasTrigger("TR_AccessAuditLogs_Immutable"));
+
+        // The hash backfill asks "any unhashed rows left?" on every restart; a filtered index turns that
+        // into a probe instead of a scan of an ever-growing table (the bracket-quoted filter is valid on both providers).
+        builder.HasIndex(a => a.Id)
+            .HasDatabaseName("IX_AccessAuditLogs_Unhashed")
+            .HasFilter("[Hash] IS NULL");
+
         builder.Property(a => a.Action)
             .HasConversion<string>()
             .HasMaxLength(20)
@@ -18,6 +29,16 @@ public class AccessAuditLogConfiguration : IEntityTypeConfiguration<AccessAuditL
         builder.Property(a => a.ResourceType)
             .HasMaxLength(50)
             .IsRequired();
+
+        // Hash-chain columns (pilot-gates plan, phase 1). Nullable: a freshly-migrated historical row
+        // has neither until AccessAuditLogWorker's startup backfill pass computes them, in Id order.
+        builder.Property(a => a.PrevHash)
+            .HasMaxLength(64)
+            .IsFixedLength();
+
+        builder.Property(a => a.Hash)
+            .HasMaxLength(64)
+            .IsFixedLength();
 
         // Primary access-history lookup: "everything that touched this resource, in order."
         builder.HasIndex(a => new { a.ResourceType, a.ResourceId, a.CreatedAt });

@@ -20,5 +20,9 @@ public enum NotificationKind
     EvaluatorOverdue,
     /// <summary>Plan 7: a requested <see cref="ExportJob"/> finished (Completed or Failed) — sent to the requester.</summary>
     ExportReady,
+
+    /// <summary>Pilot-gates plan, phase 1: the nightly (or on-demand) audit hash-chain walk found a
+    /// tampered/mismatched row. Sent to every platform admin.</summary>
+    AuditIntegrityBroken,
     Generic
 }

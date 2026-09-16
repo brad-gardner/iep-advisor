@@ -1,7 +1,7 @@
 ---
 title: "chore: Pilot gates — durable audit, delivery visibility, account closure, demo seed/reset, telemetry review, trust page & school marketing track, review debt, docs refresh"
 type: chore
-status: active
+status: completed
 date: 2026-09-15
 origin: docs/gap/combined-findings.md
 slicing_approach: vertical
@@ -46,16 +46,26 @@ Section 6 of the combined findings lists evidence/operational gaps that block a 
 
 ## Acceptance Criteria
 
-- [ ] Audit events survive worker failure/restart; a modified audit row is detected by the integrity job; UPDATE/DELETE on audit and version tables is rejected at the database.
-- [ ] Every outbound email is queued, retried and its failure visible/resendable by a platform admin; non-dev start without ACS logs a warning.
-- [ ] Deletion requests are purged after 30 days with blob cleanup; cancellation works for a revoked session; staff purge preserves school records.
-- [ ] Sentry sends no email/PII; no document text in logs (test asserts).
-- [ ] `seed-demo`/`--reset` produce and remove the fictional district; blocked in Production.
-- [ ] CI: backend + web tests + pending-migration check gate deploy.
-- [ ] `todos/P2-*` and `P3-01` resolved and removed.
-- [ ] README current; PLAN/PROGRESS archived; marketing has a school track and trust page; runbook updated; support link replaced.
-- [ ] Magic-link sign-in works for provider/gen-ed roles.
-- [ ] All checks pass.
+- [x] Audit events survive worker failure/restart; a modified audit row is detected by the integrity job; UPDATE/DELETE on audit and version tables is rejected at the database.
+  - Live on QA: startup hashed 94 historical rows and replayed 3 pending events stranded by an earlier failure; `UPDATE`/`DELETE` on `AccessAuditLogs`/`AuthoredDocumentVersions` rejected by `TR_*_Immutable`; a DBA-style tamper (trigger disabled) → integrity run `Broken`, `firstBrokenId 2`, `AuditIntegrityBroken` notification + email to platform admins; restored → `Ok` over 98 rows.
+- [x] Every outbound email is queued, retried and its failure visible/resendable by a platform admin; non-dev start without ACS logs a warning.
+  - Live: password reset + three integrity alerts queued (`OutboundEmails`) and drained by `OutboundEmailWorker` (Development "would be sent" path → Sent); `/api/admin/email` lists/resends/cancels; `/api/admin/email/status` reports configured/queued/failed; ACS-unconfigured warning outside Development (AcsEmailTransportTests).
+- [x] Deletion requests are purged after 30 days with blob cleanup; cancellation works for a revoked session; staff purge preserves school records.
+  - AccountPurgeServiceTests (parent purge removes rows + blobs, staff purge anonymises and keeps versions); AccountServiceTests: signed cancel token works after the session was revoked, rejects expired/forged; anonymous `POST /api/account/cancel-deletion`.
+- [x] Sentry sends no email/PII; no document text in logs (test asserts).
+  - web `sendDefaultPii: false` + `scrubSentryEvent` (request data, user email/username/ip, auth headers) with a unit test; API `LogSafety` + a Serilog capturing-sink test asserting no draft text or parent question is logged by DocumentAssistService/DraftQuestionService.
+- [x] `seed-demo`/`--reset` produce and remove the fictional district; blocked in Production.
+  - Live on QA: `seed-demo` built Maple Ridge Local Schools (3 schools, 9 staff, 40 students, 20 finalized docs with rendered PDFs, 30 goal records / 88 observations, 6 meetings, 2 parents, shared revision + responses, evaluation case) in 65 s from a laptop over the public internet (58 s reset); idempotent second run 0.9 s; refused in Production; demo login + 40-student roster verified.
+- [x] CI: backend + web tests + pending-migration check gate deploy.
+  - `.github/workflows/checks.yml` (backend-tests, web-checks with a 36-error lint baseline gate, migrations-check via `dotnet ef migrations has-pending-model-changes` under `ASPNETCORE_ENVIRONMENT=CI`) runs on PR/push and is `uses:`d by `deploy-api.yml`/`deploy-web.yml` before build/deploy.
+- [x] `todos/P2-*` and `P3-01` resolved and removed.
+  - P2-01..05 and the correctness items of P3-01 implemented with tests (`AnalysisRunService`, `ClaudeClient`, `AnthropicOptions`); the six todo files deleted (P3-01 #6/#8 test-only cleanups skipped).
+- [x] README current; PLAN/PROGRESS archived; marketing has a school track and trust page; runbook updated; support link replaced.
+  - README rewritten (stack, ports 7200/5200, seed-demo, checks, conventions); `PLAN.md`/`PROGRESS.md` → `docs/archive/`; marketing school track + `trust.html` (sitemap entry, nav/footer links); runbook covers seed-demo/import/authoring/sharing/meetings/records; sidebar support link → `mailto:support@iep-advisor.com` + "Trust & privacy" footer link.
+- [x] Magic-link sign-in works for provider/gen-ed roles.
+  - Live on QA with the demo gen-ed teacher: request → 202 (unknown email also 202), queued email carries a single-use 15-minute token; consume → the district's `RequireMfaForMagicLink` default returns the MFA-setup refusal; reuse and a forged token → 400. Web `/auth/magic` page + "Email me a sign-in link" on the login page.
+- [x] All checks pass.
+  - `dotnet build` + `dotnet test` (876 passed); web `tsc -b`, `test:types`, vitest (493 passed), lint (36-error baseline unchanged), `build`, `guard:ux`.
 
 ## Dependencies & Risks
 
@@ -66,3 +76,12 @@ Section 6 of the combined findings lists evidence/operational gaps that block a 
 
 - Origin: [combined-findings](../gap/combined-findings.md) §6, "Release and demo hygiene", C11 adoption; `todos/P2-0[1-5]`, `todos/P3-01`
 - Code: `AuditLogger.cs`, `AccessAuditLogWorker.cs`, `EmailService.cs`, `AccountService.cs`, `web/src/lib/sentry*`, `Program.cs`, `.github/workflows/*.yml`, `marketing/index.html`
+
+## Implementation Notes (2026-09-16)
+
+- Branch `chore/pilot-gates`; migrations `AddPilotGatesPhase12` (audit hash chain + pending events + integrity runs + outbound emails + four SQL Server triggers; five FKs onto `SharedDraftRevisions` changed Cascade→Restrict because SQL Server forbids INSTEAD OF triggers on cascade targets) and `AddPilotGatesPhase3` (District.IsDemo/MagicLinkEnabled/RequireMfaForMagicLink, MagicLinkTokens) applied to QA.
+- Coordinator fix during live checks: the four trigger-guarded entity configurations declare `HasTrigger` — without it EF Core used an OUTPUT clause and SQL Server rejected every audit batch insert and the hash backfill (the integrity check trivially passed over 0 rows). Also: magic-link consume answers a refused token with 400 (not 401, which the web client treats as session death).
+- Deviations: trigger carve-outs (`Hash/PrevHash` one-time set on audit rows; `SignatureStatus` on versions; `Status/WithdrawnAt/WithdrawnByUserId` on shared revisions); `DocumentInstanceService.DeleteAsync` now refuses to delete a draft that has been shared (FK Restrict) instead of cascading family history away; magic-link MFA-setup returns a labelled refusal (`requiresMfa + mfaSetupRequired`) because no enrolment-forcing flow exists; the lint-baseline gate lives inline in `checks.yml`; parent/student demo accounts register through a seeded `BetaInviteCode`; seed timing measured over the public internet (I/O-bound, ~700 round trips).
+- Known limits: `DemoSeeder` has no unit tests (exercised end to end on QA); `OutboundEmail.Attempts` stays 0 on a first-try success (cosmetic); `IepVersions` trigger reject path not exercised on QA (table empty).
+- Subagents on Sonnet; the phase-4 docs/marketing slice was done by the coordinator.
+

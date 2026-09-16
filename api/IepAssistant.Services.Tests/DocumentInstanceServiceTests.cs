@@ -706,5 +706,49 @@ public sealed class DocumentInstanceServiceTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Pilot-gates plan, phase 1: SharedDraftRevision -&gt; DocumentInstance is Restrict now, not
+    /// Cascade (SQL Server disallows an immutability trigger on a table with any cascading FK
+    /// touching it). A Draft-status instance can legitimately have been shared with the family before
+    /// someone tries to delete it — that must surface as a friendly refusal, never a silent
+    /// cascade-delete of the family's shared history nor an unhandled 500.
+    /// </summary>
+    [Fact]
+    public async Task Delete_Draft_WithSharedRevision_IsBlocked()
+    {
+        var s = SeedSchoolWithStudent("delete-shared");
+        var keys = SeedPublishedTemplate(null, IepTypeId);
+        var instanceId = await CreateInstanceAsync(s);
+
+        using (var ctx = CreateContext())
+        {
+            ctx.SharedDraftRevisions.Add(new SharedDraftRevision
+            {
+                DocumentInstanceId = instanceId,
+                RevisionNumber = 1,
+                ValuesJson = "{}",
+                DocumentTemplateVersionId = keys.VersionId,
+                SharedByUserId = s.CollaboratorUserId,
+                SharedAt = DateTime.UtcNow,
+                Status = SharedDraftStatus.Active
+            });
+            ctx.SaveChanges();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var result = await CreateService(ctx).DeleteAsync(instanceId, s.CollaboratorUserId);
+            Assert.False(result.Success);
+            Assert.Contains("shared", result.Message!, StringComparison.OrdinalIgnoreCase);
+        }
+
+        using (var ctx = CreateContext())
+        {
+            // Neither the instance nor its shared revision was touched by the failed attempt.
+            Assert.NotNull(ctx.DocumentInstances.Find(instanceId));
+            Assert.Single(ctx.SharedDraftRevisions.Where(r => r.DocumentInstanceId == instanceId));
+        }
+    }
+
     public void Dispose() => _connection.Dispose();
 }

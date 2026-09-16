@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Repositories;
@@ -9,21 +11,37 @@ namespace IepAssistant.Services.Implementations;
 
 public class AccountService : IAccountService
 {
+    /// <summary>Grace period before <c>AccountPurgeWorker</c> is eligible to purge a pending deletion
+    /// (pilot-gates plan, phase 2, decision 3) — kept as one constant so the email's stated purge date,
+    /// the signed link's implicit validity window, and the worker's eligibility check can never drift.</summary>
+    public const int DeletionGraceDays = 30;
+
+    internal const string DeletionTokenPurpose = "account-deletion";
+
     private readonly IUserRepository _userRepository;
     private readonly ApplicationDbContext _context;
     private readonly ITotpService _totpService;
     private readonly MfaSecretProtector _protector;
+    private readonly IEmailService _emailService;
+    private readonly IDataProtector _deletionTokenProtector;
+    private readonly string _frontendUrl;
 
     public AccountService(
         IUserRepository userRepository,
         ApplicationDbContext context,
         ITotpService totpService,
-        MfaSecretProtector protector)
+        MfaSecretProtector protector,
+        IEmailService emailService,
+        IDataProtectionProvider dataProtectionProvider,
+        IConfiguration configuration)
     {
         _userRepository = userRepository;
         _context = context;
         _totpService = totpService;
         _protector = protector;
+        _emailService = emailService;
+        _deletionTokenProtector = dataProtectionProvider.CreateProtector(DeletionTokenPurpose);
+        _frontendUrl = configuration["App:FrontendUrl"] ?? "http://localhost:5173";
     }
 
     public async Task<object> ExportDataAsync(int userId, CancellationToken ct = default)
@@ -189,6 +207,16 @@ public class AccountService : IAccountService
         _userRepository.Update(user);
         await _context.SaveChangesAsync(ct);
 
+        // Deactivation above just invalidated this very session's token for every request after this
+        // one, so the authenticated CancelDeletionAsync path is unreachable from here on — the signed
+        // link is the only way back in. Not wrapped in try/catch: EnqueueAsync failing means the write
+        // path itself is broken, which should surface as a failure rather than silently leave the user
+        // unable to ever cancel.
+        var purgeDate = user.DeletionRequestedAt.Value.AddDays(DeletionGraceDays);
+        var token = _deletionTokenProtector.Protect($"{user.Id}|{user.DeletionRequestedAt.Value.Ticks}");
+        var cancelUrl = $"{_frontendUrl}/account/cancel-deletion?token={Uri.EscapeDataString(token)}";
+        await _emailService.SendAccountDeletionCancelLinkEmailAsync(user.Email, user.FirstName, cancelUrl, purgeDate, ct);
+
         return ServiceResult.SuccessResult("Account scheduled for deletion. You have 30 days to cancel.");
     }
 
@@ -202,7 +230,7 @@ public class AccountService : IAccountService
             return ServiceResult.FailureResult("No pending deletion request");
 
         var daysSinceRequest = (DateTime.UtcNow - user.DeletionRequestedAt.Value).TotalDays;
-        if (daysSinceRequest > 30)
+        if (daysSinceRequest > DeletionGraceDays)
             return ServiceResult.FailureResult("Deletion grace period has expired");
 
         user.DeletionRequestedAt = null;
@@ -210,5 +238,50 @@ public class AccountService : IAccountService
         await _context.SaveChangesAsync(ct);
 
         return ServiceResult.SuccessResult("Account deletion cancelled. Your account is active again.");
+    }
+
+    public async Task<ServiceResult> CancelDeletionByTokenAsync(string token, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return ServiceResult.FailureResult("Invalid or expired cancellation link.");
+
+        int userId;
+        long requestedAtTicks;
+        try
+        {
+            var payload = _deletionTokenProtector.Unprotect(token);
+            var parts = payload.Split('|');
+            if (parts.Length != 2 || !int.TryParse(parts[0], out userId) || !long.TryParse(parts[1], out requestedAtTicks))
+                return ServiceResult.FailureResult("Invalid or expired cancellation link.");
+        }
+        catch
+        {
+            // IDataProtector.Unprotect throws (CryptographicException, FormatException, ...) on any
+            // forged, corrupted, or garbage token. Never let the exact exception surface to an
+            // anonymous caller.
+            return ServiceResult.FailureResult("Invalid or expired cancellation link.");
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+
+        // The embedded DeletionRequestedAt must match the CURRENT value exactly: it no longer will once
+        // the request is cancelled (null), superseded by a later request (different ticks), or already
+        // purged (parent: user gone entirely; staff: DeletionRequestedAt cleared by the purge worker) —
+        // which is what makes an old token stop working without needing a separate hard expiry.
+        if (user == null || user.DeletionRequestedAt == null || user.DeletionRequestedAt.Value.Ticks != requestedAtTicks)
+            return ServiceResult.FailureResult("Invalid or expired cancellation link.");
+
+        // Hard expiry independent of the purge worker: the link is good for the grace period only, so a
+        // delayed purge never leaves an old email able to reactivate an account months later.
+        var requestedAt = new DateTime(requestedAtTicks, DateTimeKind.Utc);
+        if (DateTime.UtcNow - requestedAt > TimeSpan.FromDays(DeletionGraceDays))
+            return ServiceResult.FailureResult("Invalid or expired cancellation link.");
+
+        user.DeletionRequestedAt = null;
+        user.IsActive = true;
+        user.SecurityStamp++; // any token minted while deactivated should not remain usable after reactivation
+        await _context.SaveChangesAsync(ct);
+
+        return ServiceResult.SuccessResult("Account deletion cancelled. Your account is active again. Please sign in.");
     }
 }

@@ -10,10 +10,15 @@ public class DraftAcknowledgementConfiguration : IEntityTypeConfiguration<DraftA
     {
         builder.HasKey(a => a.Id);
 
+        // Restrict, not Cascade (pilot-gates plan, phase 1): SQL Server refuses to create an INSTEAD
+        // OF UPDATE/DELETE trigger on a table that has an incoming cascading FK, and
+        // SharedDraftRevisions needs exactly such a trigger for its own immutability. A revision is
+        // never actually deleted by application code (it is superseded/withdrawn, not removed), so
+        // this changes no real runtime behavior.
         builder.HasOne(a => a.SharedDraftRevision)
             .WithMany()
             .HasForeignKey(a => a.SharedDraftRevisionId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(a => a.User)
             .WithMany()

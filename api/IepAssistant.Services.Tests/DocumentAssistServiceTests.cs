@@ -38,8 +38,8 @@ public sealed class DocumentAssistServiceTests : IDisposable
 
     private ApplicationDbContext CreateContext() => new(_options);
 
-    private DocumentAssistService CreateService(ApplicationDbContext ctx, IStudentEvidenceService? evidence = null)
-        => new(ctx, new OrgAccessService(ctx), _claude, _audit, NullLogger<DocumentAssistService>.Instance, evidence);
+    private DocumentAssistService CreateService(ApplicationDbContext ctx, IStudentEvidenceService? evidence = null, Microsoft.Extensions.Logging.ILogger<DocumentAssistService>? logger = null)
+        => new(ctx, new OrgAccessService(ctx), _claude, _audit, logger ?? NullLogger<DocumentAssistService>.Instance, evidence);
 
     /// <summary>Canned evidence so grounding can be tested without the full bundle pipeline.</summary>
     private sealed class FakeEvidence : IStudentEvidenceService
@@ -344,6 +344,39 @@ public sealed class DocumentAssistServiceTests : IDisposable
 
         var empty = await CreateService(ctx).ChatAsync(s.TeacherId, s.InstanceId, Array.Empty<ChatMessage>());
         Assert.Contains("At least one message", empty.Message);
+    }
+
+    /// <summary>
+    /// Pilot-gates plan, phase 2: no draft/document content reaches a log line, on either the happy
+    /// path or a Claude failure — checked against a REAL Serilog pipeline, not just the raw call args.
+    /// This is a regression guard: every existing log call in DocumentAssistService already only ever
+    /// interpolates ids/enums, never request content — this test is what keeps that true.
+    /// </summary>
+    [Fact]
+    public async Task Assist_And_Chat_NeverLogDocumentContent_OnSuccessOrClaudeFailure()
+    {
+        var s = Seed("logsafe");
+        using var capturing = new TestSupport.CapturingSerilogLogger();
+        var logger = capturing.CreateLogger<DocumentAssistService>();
+
+        using var ctx = CreateContext();
+        var ok = await CreateService(ctx, logger: logger).AssistAsync(s.TeacherId, s.InstanceId, s.GoalsKey, s.RowId, AssistKind.Rewrite);
+        Assert.True(ok.Success, ok.Message);
+
+        _claude.ThrowKind = ClaudeFailureKind.InvalidResponse;
+        var failed = await CreateService(ctx, logger: logger).AssistAsync(s.TeacherId, s.InstanceId, s.GoalsKey, s.RowId, AssistKind.Rewrite);
+        Assert.False(failed.Success);
+
+        var chatFailed = await CreateService(ctx, logger: logger).ChatAsync(s.TeacherId, s.InstanceId, new[]
+        {
+            new ChatMessage { Role = "user", Content = "Read better baseline question" }
+        });
+        Assert.False(chatFailed.Success);
+
+        Assert.True(capturing.EventCount > 0, "Expected at least one log event to actually check.");
+        Assert.False(capturing.ContainsText("Read better"), "Goal text must never reach a log line.");
+        Assert.False(capturing.ContainsText("42 wpm"), "Baseline text must never reach a log line.");
+        Assert.False(capturing.ContainsText("Read better baseline question"), "Chat message content must never reach a log line.");
     }
 
     public void Dispose() => _connection.Dispose();
