@@ -56,8 +56,8 @@ export function FamilyLinksSection({ studentId }: { studentId: number }) {
         return { success: true, message: response.message };
       }
       return { success: false, message: response.message };
-    } catch {
-      return { success: false, message: 'An error occurred sending the invitation' };
+    } catch (err) {
+      return { success: false, message: apiErrorMessage(err, 'An error occurred sending the invitation') };
     }
   };
 

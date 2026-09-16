@@ -140,7 +140,7 @@ export function PreviewStep({
             <h2
               ref={headingRef}
               tabIndex={-1}
-              className="font-serif text-lg text-brand-slate-800 focus:outline-none"
+              className="font-serif text-lg text-brand-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
             >
               Preview
             </h2>

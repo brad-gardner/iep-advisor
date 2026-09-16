@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
+import { apiErrorMessage } from "@/lib/api-error";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -62,8 +63,8 @@ export function EducatorStudentDetailPage() {
       const response = await inviteStudentFromEducator(studentId, email);
       if (response.success) setIsInviteStudentOpen(false);
       return { success: response.success, message: response.message };
-    } catch {
-      return { success: false, message: "An error occurred sending the invitation" };
+    } catch (err) {
+      return { success: false, message: apiErrorMessage(err, "An error occurred sending the invitation") };
     }
   };
 

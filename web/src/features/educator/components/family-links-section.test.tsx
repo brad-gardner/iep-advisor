@@ -49,6 +49,20 @@ describe('FamilyLinksSection', () => {
     expect(api.getStudentLinks).toHaveBeenCalledTimes(1);
   });
 
+  it('surfaces the server refusal when an invite is rejected', async () => {
+    const user = userEvent.setup();
+    api.inviteParent.mockRejectedValue(apiRejection('That parent already has a pending invite.'));
+    render(
+      <ToastProvider>
+        <FamilyLinksSection studentId={10} />
+      </ToastProvider>
+    );
+    await user.click(await screen.findByRole('button', { name: 'Invite parent' }));
+    await user.type(screen.getByTestId('invite-parent-email'), 'parent2@example.org');
+    await user.click(screen.getByTestId('invite-parent-submit'));
+    expect(await screen.findByText('That parent already has a pending invite.')).toBeInTheDocument();
+  });
+
   it('revokes a link, shows the forward-only note and reloads', async () => {
     const user = userEvent.setup();
     api.revokeStudentLink.mockResolvedValue({ success: true, data: null, message: 'Link revoked.' });
