@@ -8,6 +8,7 @@ import { ShareChildDialog } from "@/features/sharing/components/share-child-dial
 import { AccessList } from "@/features/sharing/components/access-list";
 import { SchoolIepsCard } from "@/features/iep-versions/components/school-ieps-card";
 import { AboutMyChildCard } from "@/features/contributions/components/about-my-child-card";
+import { UpcomingMeetingCard } from "./upcoming-meeting-card";
 import { InviteStudentForm } from "@/features/student/components/invite-student-form";
 import { inviteStudentFromParent } from "@/features/student/api/student-invite-api";
 import type { ChildOutletContext } from "./child-detail-page";
@@ -59,6 +60,8 @@ export function ChildOverviewTab() {
           )}
         </div>
       </Card>
+
+      <UpcomingMeetingCard childId={childId} />
 
       <SchoolIepsCard childId={childId} />
 

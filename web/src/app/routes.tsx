@@ -60,6 +60,10 @@ import { ParentAuthoredVersionPage } from '@/features/document-authoring/pages/p
 import { RoleHome, RoleRoute } from '@/app/role-routing';
 import { roleHome } from '@/app/role-home';
 import { Spinner } from '@/components/ui/spinner';
+import { EducatorCalendarPage } from '@/features/calendar/pages/educator-calendar-page';
+import { NotificationsPage } from '@/features/notifications/pages/notifications-page';
+import { AdminNotificationFailuresPage } from '@/features/notifications/pages/admin-notification-failures-page';
+import { MeetingRsvpPage } from '@/features/meetings/pages/meeting-rsvp-page';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -159,6 +163,10 @@ export function AppRouter() {
         }
       />
       <Route path="/mfa-verify" element={<MfaVerifyPage />} />
+      {/* Public, unauthenticated: linked from the meeting invitation email.
+          No ProtectedRoute/PublicRoute — works whether or not the visitor is
+          logged in, own chrome (no MainLayout/AuthLayout). */}
+      <Route path="/meetings/rsvp" element={<MeetingRsvpPage />} />
       <Route
         path="/onboarding"
         element={
@@ -285,6 +293,17 @@ export function AppRouter() {
           </ProtectedRoute>
         }
       />
+      {/* All roles — no RoleRoute gate. */}
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <NotificationsPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/mfa-setup"
         element={
@@ -394,6 +413,18 @@ export function AppRouter() {
             <RoleRoute allow={['Educator']}>
               <MainLayout>
                 <ImportPage />
+              </MainLayout>
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/calendar"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allow={['Educator']}>
+              <MainLayout>
+                <EducatorCalendarPage />
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -627,6 +658,18 @@ export function AppRouter() {
             <MainLayout>
               <AdminRouteGuard>
                 <TemplateBuilderPage />
+              </AdminRouteGuard>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/notifications"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <AdminRouteGuard>
+                <AdminNotificationFailuresPage />
               </AdminRouteGuard>
             </MainLayout>
           </ProtectedRoute>

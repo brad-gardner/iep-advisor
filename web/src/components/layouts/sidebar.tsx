@@ -1,14 +1,16 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home, ScrollText, FileText, Upload } from 'lucide-react';
+import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home, ScrollText, FileText, Upload, Calendar, Bell, MailWarning } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
 import { ORG_ROLE } from '@/features/educator/types';
+import { NotificationBell } from '@/features/notifications/components/notification-bell';
 
 // Common items shown to every role, after any role-specific section above.
 const commonNavItems = [
+  { to: '/notifications', label: 'Notifications', Icon: Bell },
   { to: '/profile', label: 'Profile', Icon: UserCircle },
   // { to: '/subscription', label: 'Subscription', Icon: CreditCard }, // Hidden during beta
   { to: '/knowledge-base', label: 'Knowledge Base', Icon: BookOpen },
@@ -24,6 +26,7 @@ const parentNavItems = [
 const educatorNavItems = [
   { to: '/educator', label: 'Home', Icon: Home },
   { to: '/educator/students', label: 'Students', Icon: School },
+  { to: '/educator/calendar', label: 'Calendar', Icon: Calendar },
 ];
 
 const studentNavItems = [
@@ -98,8 +101,9 @@ export function Sidebar({ onLogout }: SidebarProps) {
 
   const navContent = (
     <>
-      <div className="p-6">
+      <div className="flex items-center justify-between p-6">
         <Logo variant="dark" size="md" data-testid="sidebar-logo" />
+        <NotificationBell />
       </div>
 
       <nav className="flex-1 px-3 space-y-1">
@@ -218,6 +222,19 @@ export function Sidebar({ onLogout }: SidebarProps) {
           >
             <FileText size={18} strokeWidth={1.8} />
             Templates
+          </Link>
+          <Link
+            to="/admin/notifications"
+            data-testid="nav-admin-notifications"
+            onClick={() => setMobileOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-button text-sm transition-colors ${
+              isActive('/admin/notifications')
+                ? 'text-brand-teal-400 bg-brand-slate-700 border-l-2 border-brand-teal-500 -ml-px'
+                : 'text-brand-slate-400 hover:text-brand-slate-200 hover:bg-brand-slate-700'
+            }`}
+          >
+            <MailWarning size={18} strokeWidth={1.8} />
+            Email failures
           </Link>
         </div>
       )}
