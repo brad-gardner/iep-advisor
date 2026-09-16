@@ -5,6 +5,7 @@ import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api-error';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { MeetingDrawer } from '@/features/meetings/components/meeting-drawer';
 import { ScheduleMeetingModal } from '@/features/meetings/components/schedule-meeting-modal';
 import type { MeetingDto } from '@/features/meetings/types';
@@ -18,6 +19,7 @@ import { calendarItemLocalDateIso } from '../lib/calendar-item-date';
 import type { CalendarItemDto } from '../types';
 
 export function EducatorCalendarPage() {
+  usePageTitle('Calendar');
   const { monthLabel, days, rangeFromIso, rangeToIso, goToPreviousMonth, goToNextMonth, goToToday } =
     useCalendarRange();
   const [items, setItems] = useState<CalendarItemDto[] | null>(null);

@@ -2,12 +2,14 @@ import { Search as SearchIcon } from 'lucide-react';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { useKnowledgeBase } from '../hooks/use-knowledge-base';
 import { KnowledgeBaseSearch } from './knowledge-base-search';
 import { CategoryTabs } from './category-tabs';
 import { KnowledgeBaseEntryCard } from './knowledge-base-entry-card';
 
 export function KnowledgeBasePage() {
+  usePageTitle('Knowledge Base');
   const {
     entries,
     categories,

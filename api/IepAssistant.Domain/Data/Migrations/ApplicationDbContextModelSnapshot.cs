@@ -56,6 +56,8 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("ActorUserId");
 
+                    b.HasIndex("ActorUserId", "CreatedAt");
+
                     b.HasIndex("ActorUserId", "Id");
 
                     b.HasIndex("ResourceType", "ResourceId", "CreatedAt");
@@ -2069,6 +2071,8 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("SchoolStudentId");
 
+                    b.HasIndex("StartsAtUtc");
+
                     b.HasIndex("Status", "StartsAtUtc");
 
                     b.ToTable("Meetings");
@@ -2769,7 +2773,11 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AnnualReviewDueDate");
+
                     b.HasIndex("CaseManagerUserId");
+
+                    b.HasIndex("ReevaluationDueDate");
 
                     b.HasIndex("SchoolId");
 

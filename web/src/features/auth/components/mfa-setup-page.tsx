@@ -7,9 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 
+import { usePageTitle } from '@/hooks/use-page-title';
+
 type SetupStep = 'qr' | 'verify' | 'recovery';
 
 export function MfaSetupPage() {
+  usePageTitle('Set up two-factor authentication');
   const navigate = useNavigate();
   const [step, setStep] = useState<SetupStep>('qr');
   const [otpauthUri, setOtpauthUri] = useState('');

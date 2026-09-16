@@ -7,10 +7,12 @@ import { Spinner } from '@/components/ui/spinner';
 import { acceptLink, previewLink } from '../api/child-links-api';
 import type { AcceptedChildLink, ChildLinkInvitePreview } from '../types';
 import { ChildLinkChoice, CREATE_NEW } from './child-link-choice';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 type Status = 'loading' | 'ready' | 'submitting' | 'success' | 'error';
 
 export function AcceptLinkPage() {
+  usePageTitle('Accept school link');
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
 

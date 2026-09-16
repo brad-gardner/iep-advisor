@@ -14,6 +14,10 @@ public interface IObligationService
     /// <summary>Admin-only: obligations across the caller's district (optionally narrowed to one school).</summary>
     Task<ServiceResult<List<ObligationModel>>> GetForScopeAsync(int userId, int? schoolId, ObligationStatus? status, CancellationToken ct = default);
 
+    /// <summary>Same as the userId overload but takes an already-resolved <see cref="StaffContext"/>,
+    /// skipping the staff-context lookup for a caller (e.g. <c>HomeService</c>) that resolved it already.</summary>
+    Task<ServiceResult<List<ObligationModel>>> GetForScopeAsync(StaffContext staffCtx, int? schoolId, ObligationStatus? status, CancellationToken ct = default);
+
     /// <summary>Obligations for students where <paramref name="userId"/> is personally the lead case
     /// manager — regardless of admin scope. Unlike <see cref="GetMineAsync"/>, a School/District admin gets
     /// no scope superset here: used by the anonymous per-user calendar feed token

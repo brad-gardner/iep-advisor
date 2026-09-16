@@ -7,6 +7,7 @@ import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Pagination } from "@/components/ui/pagination";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Table } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { apiErrorMessage } from "@/lib/api-error";
@@ -37,6 +38,7 @@ const CASELOAD_EMPTY =
   "No students on your caseload yet — your school admin can add you to a student's IEP team, or create one.";
 
 export function EducatorStudentsPage() {
+  usePageTitle("Students");
   const { show: showToast } = useToast();
   const { profile } = useEducatorProfile();
   const isDistrictAdmin = profile?.orgRoleId === ORG_ROLE.DistrictAdmin;
@@ -46,9 +48,14 @@ export function EducatorStudentsPage() {
   const { query, update, clearAttention } = useRosterQuery();
   // The dashboard "needs attention" deep link: the server narrows the roster
   // (same predicate as the tiles), so filters and paging compose as usual.
-  const attentionLabel = query.attention
-    ? ATTENTION_FILTER_LABELS[query.attention]
-    : undefined;
+  // `DueInRange` carries its own caller-chosen window, so its label is built
+  // from the query's `from`/`to` rather than the static lookup table.
+  const attentionLabel =
+    query.attention === 'DueInRange' && query.from && query.to
+      ? `due between ${query.from} and ${query.to}`
+      : query.attention
+        ? ATTENTION_FILTER_LABELS[query.attention]
+        : undefined;
 
   const request = useMemo<StudentSearchParams>(
     () => ({
@@ -57,6 +64,8 @@ export function EducatorStudentsPage() {
       status: query.status,
       grade: query.grade || undefined,
       attention: query.attention ?? undefined,
+      from: query.from ?? undefined,
+      to: query.to ?? undefined,
       page: query.page,
       pageSize: query.pageSize,
     }),

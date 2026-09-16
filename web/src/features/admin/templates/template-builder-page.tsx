@@ -8,6 +8,7 @@ import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { PageLayout } from '@/components/ui/page-layout';
 import { useToast } from '@/components/ui/toast';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { useTemplateBuilder } from './hooks/use-template-builder';
 import { SectionEditor } from './components/section-editor';
 import { FormPreview } from './components/form-preview';
@@ -18,6 +19,7 @@ export function TemplateBuilderPage() {
   const { show: showToast } = useToast();
   const builder = useTemplateBuilder(id);
   const { template, version, isLoading, loadError, conflict, readOnly } = builder;
+  usePageTitle(template ? template.name : 'Template');
 
   const [addingSection, setAddingSection] = useState(false);
   const [publishing, setPublishing] = useState(false);

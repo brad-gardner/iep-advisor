@@ -39,6 +39,8 @@ export async function searchStudents(
   if (params.status) query.status = params.status;
   if (params.grade) query.grade = params.grade;
   if (params.attention) query.attention = params.attention;
+  if (params.from) query.from = params.from;
+  if (params.to) query.to = params.to;
   if (params.page != null) query.page = String(params.page);
   if (params.pageSize != null) query.pageSize = String(params.pageSize);
 

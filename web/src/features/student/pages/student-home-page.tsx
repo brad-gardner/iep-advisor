@@ -5,7 +5,11 @@ import { Notice } from "@/components/ui/notice";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { NextMeetingCard } from "@/features/home/components/next-meeting-card";
+import { useHome } from "@/features/home/hooks/use-home";
+import type { HomeMeetingDto } from "@/features/home/types";
 import { AiInterviewHelper } from "../components/ai-interview-helper";
 import { WorkspaceSection } from "../components/workspace-section";
 import { useStudentWorkspace } from "../hooks/use-student-workspace";
@@ -19,6 +23,7 @@ import type {
 export function StudentHomePage() {
   const { user } = useAuth();
   const { show } = useToast();
+  usePageTitle(user?.firstName ? `Welcome, ${user.firstName}` : "Your space");
   const {
     entries,
     status,
@@ -29,6 +34,16 @@ export function StudentHomePage() {
     removeEntry,
     interview,
   } = useStudentWorkspace();
+  // Independent of the workspace fetch above — a failure here shouldn't block
+  // the workspace, and vice versa. A failure renders its own error notice
+  // below rather than silently looking like "nothing scheduled".
+  const { home, error: homeError, retry: retryHome } = useHome();
+  const studentHome = home?.kind === "Student" ? home.student : null;
+  const [meetingOverride, setMeetingOverride] = useState<HomeMeetingDto | null>(null);
+  const nextMeeting =
+    meetingOverride && meetingOverride.id === studentHome?.nextMeeting?.id
+      ? meetingOverride
+      : studentHome?.nextMeeting ?? null;
 
   const entriesByKind = (
     kind: StudentWorkspaceEntryKind,
@@ -80,6 +95,28 @@ export function StudentHomePage() {
       title={user?.firstName ? `Welcome, ${user.firstName}` : "Your space"}
       subtitle="Add your strengths, interests, and what you want to say — then choose what to share with your team."
     >
+      {homeError && (
+        <div role="alert">
+          <Notice variant="error" title={homeError} data-testid="student-home-error">
+            <Button variant="secondary" size="sm" className="mt-2" onClick={retryHome} data-testid="student-home-retry">
+              Try again
+            </Button>
+          </Notice>
+        </div>
+      )}
+
+      {studentHome?.workspaceNudge && (
+        <Notice variant="info" title={studentHome.workspaceNudge} data-testid="student-home-nudge" />
+      )}
+
+      {nextMeeting && (
+        <NextMeetingCard
+          meeting={nextMeeting}
+          onUpdated={setMeetingOverride}
+          data-testid="student-home-next-meeting"
+        />
+      )}
+
       {status === "loading" && (
         <div className="flex justify-center py-12">
           <Spinner

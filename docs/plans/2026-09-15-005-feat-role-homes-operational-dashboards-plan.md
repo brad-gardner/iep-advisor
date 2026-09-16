@@ -1,7 +1,7 @@
 ---
 title: "feat: Role-specific operational homes and district compliance dashboard with analytics"
 type: feat
-status: active
+status: completed
 date: 2026-09-15
 origin: docs/gap/combined-findings.md
 slicing_approach: vertical
@@ -54,12 +54,26 @@ depends_on: docs/plans/2026-09-15-004-feat-meetings-deadlines-notifications-cale
 
 ## Acceptance Criteria
 
-- [ ] Each role's home answers "what needs me" from live data; every alert/tile links to the actual student/document/meeting; completing the task removes the item on reload.
-- [ ] District compliance board with school/date filters, drilldowns whose row counts match the tiles, adoption and engagement tiles; SchoolAdmin scoped to own school; no staff ranking or family risk scoring anywhere.
-- [ ] Parent home is meeting-relative and shows finalized documents and upcoming meetings.
-- [ ] Unknown dates surface as Unknown, never as healthy; load failures show an error notice with retry.
-- [ ] Sidebar footer no longer clips; no duplicate district heading; `document.title` set per route.
-- [ ] All checks pass; `guard:ux` extended to the new feature folders.
+- [x] Each role's home answers "what needs me" from live data; every alert/tile links to the actual student/document/meeting; completing the task removes the item on reload. *(Live: Steph's home shows "This week", the Due-soon annual review and four drafts with completeness %.)*
+- [x] District compliance board with school/date filters, drilldowns whose row counts match the tiles, adoption and engagement tiles; SchoolAdmin scoped to own school; no staff ranking or family risk scoring anywhere. *(Live: tiles 0/0/1/1/4/3; "No case manager" → `/educator/students?attention=NoCaseManager&school=37` lists the same 3 students; roster totals equal board counts, also asserted by a parity test.)*
+- [x] Parent home is meeting-relative and shows finalized documents and upcoming meetings.
+- [x] Unknown dates surface as Unknown, never as healthy; load failures show an error notice with retry.
+- [x] Sidebar footer no longer clips; no duplicate district heading; `document.title` set per route. *(Live: "Maple Ridge Middle School · IEP Advisor".)*
+- [x] All checks pass: `dotnet test` 724, vitest 344, tsc + test:types, build, guard:ux (its recursive walk already covers the new folders); lint 36 (baseline).
+
+## Implementation notes (2026-09-16)
+
+- Migration `AddHomeDashboardIndexes` applied to QA.
+- `StudentAttentionRules` holds the EF predicates shared by the roster `attention` filter and the compliance board, so counts and drilldowns cannot drift; `Due60` is cumulative (includes `Due30`).
+- Adoption "active" = at least one access-audit entry in the window (the audit table exists); RSVP/notification reads are not audited yet.
+- The roster school filter param is `school=` (not `schoolId=`); drill links use it.
+- Plan-6/7 sections (shared drafts, family responses, provider requests, unsigned finalized) render empty-safe hints.
+
+## Operational validation notes (for ship)
+
+- **Runtime impact:** `GET /api/home` (≤ 7 queries per role, measured) replaces the dashboard aggregate for staff homes; three new district endpoints. Watch: home latency for large districts (drafts capped at 20; board counts are index-backed via the new indexes).
+- **Healthy signal:** each role lands on a populated home; board tiles equal the roster totals for the same filter.
+- **Failure/mitigation:** home load failures render a retry notice (no blank dashboard); the previous educator dashboard component was removed — revert the web commit to restore it if needed. Owner: Brad; window: first admin session after deploy.
 
 ## System-Wide Impact
 

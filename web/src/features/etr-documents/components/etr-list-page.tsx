@@ -7,6 +7,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageLayout } from '@/components/ui/page-layout';
 import { useAllEtrs } from '../hooks/use-all-etrs';
+import { usePageTitle } from '@/hooks/use-page-title';
 import type { EtrDocumentListItem } from '../types';
 import { EtrListGroup } from './etr-list-group';
 
@@ -36,6 +37,7 @@ function groupByChild(etrs: EtrDocumentListItem[]): ChildGroup[] {
 }
 
 export function EtrListPage() {
+  usePageTitle('Evaluations (ETRs)');
   const { etrs, loading, error, refresh } = useAllEtrs();
   const groups = useMemo(() => groupByChild(etrs), [etrs]);
 

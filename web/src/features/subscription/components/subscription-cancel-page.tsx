@@ -3,8 +3,10 @@ import { XCircle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageLayout } from '@/components/ui/page-layout';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 export function SubscriptionCancelPage() {
+  usePageTitle('Subscription');
   return (
     <PageLayout title="Subscription">
       <Card className="max-w-md">

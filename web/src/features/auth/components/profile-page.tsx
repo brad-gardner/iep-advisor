@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 function MfaSection() {
   const { user } = useAuth();
@@ -121,6 +122,7 @@ function MfaSection() {
 }
 
 export function ProfilePage() {
+  usePageTitle('Profile');
   const { user, updateProfile } = useAuth();
   const [firstName, setFirstName] = useState(user?.firstName ?? '');
   const [lastName, setLastName] = useState(user?.lastName ?? '');

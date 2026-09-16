@@ -6,9 +6,11 @@ import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { useToast } from '@/components/ui/toast';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { redeemInvite } from '../api/subscription-api';
 
 export function RedeemInvitePage() {
+  usePageTitle('Redeem invite code');
   const { show } = useToast();
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);

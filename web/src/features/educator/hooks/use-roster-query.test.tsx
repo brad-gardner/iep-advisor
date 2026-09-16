@@ -34,6 +34,48 @@ describe('useRosterQuery', () => {
     expect(at('')).toBeNull();
   });
 
+  it('accepts the plan-5 compliance attention values (home/board drilldowns)', () => {
+    const at = (search: string) =>
+      renderHook(() => useRosterQuery(), { wrapper: wrapper(`/educator/students?${search}`) }).result.current
+        .query.attention;
+    expect(at('attention=OverdueAnnual')).toBe('OverdueAnnual');
+    expect(at('attention=OverdueReeval')).toBe('OverdueReeval');
+    expect(at('attention=Due30')).toBe('Due30');
+    expect(at('attention=Due60')).toBe('Due60');
+    expect(at('attention=UnknownDates')).toBe('UnknownDates');
+  });
+
+  it('never resolves a raw value to an inherited Object.prototype member', () => {
+    const { result } = renderHook(() => useRosterQuery(), {
+      wrapper: wrapper('/educator/students?attention=toString'),
+    });
+    expect(result.current.query.attention).toBeNull();
+  });
+
+  it('accepts DueInRange with a from/to window and ignores malformed dates', () => {
+    const { result } = renderHook(() => useRosterQuery(), {
+      wrapper: wrapper('/educator/students?attention=DueInRange&from=2026-09-16&to=2026-11-15'),
+    });
+    expect(result.current.query).toMatchObject({
+      attention: 'DueInRange',
+      from: '2026-09-16',
+      to: '2026-11-15',
+    });
+
+    const { result: bogus } = renderHook(() => useRosterQuery(), {
+      wrapper: wrapper('/educator/students?attention=DueInRange&from=not-a-date'),
+    });
+    expect(bogus.current.query.from).toBeNull();
+  });
+
+  it('clearAttention also clears the DueInRange from/to window', () => {
+    const { result } = renderHook(() => useRosterQuery(), {
+      wrapper: wrapper('/educator/students?attention=DueInRange&from=2026-09-16&to=2026-11-15&page=2'),
+    });
+    act(() => result.current.clearAttention());
+    expect(result.current.query).toMatchObject({ attention: null, from: null, to: null, page: 1 });
+  });
+
   it('parses school as a positive integer', () => {
     const { result } = renderHook(() => useRosterQuery(), {
       wrapper: wrapper('/educator/students?school=12'),

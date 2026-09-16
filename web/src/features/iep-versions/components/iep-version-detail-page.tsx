@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { PageLayout } from '@/components/ui/page-layout';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { getVersion } from '../api/iep-versions-api';
 import type { IepVersionDto } from '../types';
 import { DownloadPdfButton } from './download-pdf-button';
@@ -24,6 +25,7 @@ export function IepVersionDetailPage({ canRetry, backTo, backLabel }: IepVersion
   const [version, setVersion] = useState<IepVersionDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  usePageTitle(version ? `${version.title || 'IEP'} v${version.versionNumber}` : 'IEP version');
 
   useEffect(() => {
     let active = true;

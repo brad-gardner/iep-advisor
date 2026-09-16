@@ -10,6 +10,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { orgRoleLabel } from "@/lib/org-role-label";
 import { useEducatorProfile } from "@/features/educator/hooks/use-educator-profile";
 import { getDistrictSchools } from "@/features/district-admin/api/district-api";
@@ -46,6 +47,7 @@ function formatExpiry(iso: string): string {
 }
 
 export function DistrictStaffPage() {
+  usePageTitle("Staff");
   const { profile } = useEducatorProfile();
   const { show: showToast } = useToast();
   const [staff, setStaff] = useState<StaffListData>(EMPTY_LIST);

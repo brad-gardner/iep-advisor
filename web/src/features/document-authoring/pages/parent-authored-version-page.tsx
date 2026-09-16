@@ -5,6 +5,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { AuthoredPdfDownload } from '../components/authored-pdf-download';
 import { AuthoredVersionSnapshot } from '../components/authored-version-snapshot';
 import { useAuthoredVersion } from '../hooks/use-authored-version';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 /**
  * Parent read-only view of a finalized document the school shared for their
@@ -19,6 +20,7 @@ export function ParentAuthoredVersionPage() {
   const childId = Number(childIdParam);
   const versionId = Number(versionIdParam);
   const { version, isLoading, error } = useAuthoredVersion(versionId);
+  usePageTitle(version ? `${version.documentTypeDisplayName} v${version.versionNumber}` : 'Document version');
 
   const backTo = `/children/${childId}/overview`;
 

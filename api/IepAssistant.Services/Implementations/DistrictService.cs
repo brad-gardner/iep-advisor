@@ -346,4 +346,222 @@ public class DistrictService : IDistrictService
 
     private static string? NormalizeStateCode(string? raw)
         => string.IsNullOrWhiteSpace(raw) ? null : raw.Trim().ToUpperInvariant();
+
+    // ----------------------------------------------------------------- Plan 5: compliance / adoption / engagement
+
+    public async Task<ServiceResult<ComplianceBoardModel>> GetComplianceBoardAsync(int userId, int? schoolId, DateTime? from, DateTime? to, CancellationToken ct = default)
+    {
+        var today = DateTime.UtcNow.Date;
+        if (!AdminQueryLimits.IsWithinRange(from, today) || !AdminQueryLimits.IsWithinRange(to, today))
+            return ServiceResult<ComplianceBoardModel>.FailureResult("The requested date range is out of bounds.");
+
+        var scope = await ResolveAdminScopeAsync(userId, schoolId, ct);
+        if (scope.Error != null)
+            return ServiceResult<ComplianceBoardModel>.FailureResult(scope.Error);
+        if (scope.Empty)
+            return ServiceResult<ComplianceBoardModel>.SuccessResult(EmptyComplianceBoard());
+
+        var fromDate = (from ?? today).Date;
+        var toDate = (to ?? fromDate.AddDays(60)).Date;
+        if (toDate < fromDate)
+            toDate = fromDate;
+
+        var schoolsQuery = ScopedActiveSchools(scope.DistrictId, scope.SchoolId);
+        var districtId = scope.DistrictId;
+
+        // One query: each row's counts are correlated COUNT subqueries against SchoolStudents (the same
+        // pattern GetDashboardAsync already uses for ActiveStudentCount), so this is a single round trip
+        // regardless of how many schools are in scope. Every predicate is the SAME Expression<> the
+        // roster's StudentAttention filter uses, so a board count and its drilldown always agree. Due30/
+        // Due60 are always anchored on TODAY (never on the caller's from/to) — only DueInRange uses the
+        // requested [fromDate, toDate] window — so a non-default date-range selection can never desync
+        // the Due30/Due60 tiles from their drilldowns (review-fix contract addition 1).
+        var bySchool = await schoolsQuery
+            .OrderBy(s => s.Name)
+            .Select(s => new ComplianceSchoolRowModel
+            {
+                SchoolId = s.Id,
+                SchoolName = s.Name,
+                ActiveStudents = _context.SchoolStudents.Count(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active),
+                OverdueAnnual = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.OverdueAnnual(today)),
+                OverdueReeval = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.OverdueReeval(today)),
+                Due30 = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.DueWithin(today, today.AddDays(30))),
+                Due60 = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.DueWithin(today, today.AddDays(60))),
+                DueInRange = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.DueWithin(fromDate, toDate)),
+                UnknownDates = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.UnknownDates()),
+                NoLead = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.NoLead(_context, districtId))
+            })
+            .ToListAsync(ct);
+
+        var summary = new ComplianceSummaryModel
+        {
+            ActiveStudents = bySchool.Sum(r => r.ActiveStudents),
+            OverdueAnnual = bySchool.Sum(r => r.OverdueAnnual),
+            OverdueReeval = bySchool.Sum(r => r.OverdueReeval),
+            Due30 = bySchool.Sum(r => r.Due30),
+            Due60 = bySchool.Sum(r => r.Due60),
+            DueInRange = bySchool.Sum(r => r.DueInRange),
+            UnknownDates = bySchool.Sum(r => r.UnknownDates),
+            NoLead = bySchool.Sum(r => r.NoLead)
+        };
+
+        return ServiceResult<ComplianceBoardModel>.SuccessResult(new ComplianceBoardModel
+        {
+            GeneratedAt = DateTime.UtcNow,
+            From = fromDate,
+            To = toDate,
+            Summary = summary,
+            BySchool = bySchool,
+            Drill = ComplianceDrillMap(fromDate, toDate)
+        });
+    }
+
+    public async Task<ServiceResult<AdoptionModel>> GetAdoptionAsync(int userId, int? schoolId, int days, CancellationToken ct = default)
+    {
+        days = AdminQueryLimits.ClampDays(days, defaultDays: 30);
+
+        var scope = await ResolveAdminScopeAsync(userId, schoolId, ct);
+        if (scope.Error != null)
+            return ServiceResult<AdoptionModel>.FailureResult(scope.Error);
+        if (scope.Empty)
+            return ServiceResult<AdoptionModel>.SuccessResult(new AdoptionModel { Days = days, ActiveRule = AdoptionActiveRule });
+
+        var windowStart = DateTime.UtcNow.AddDays(-days);
+
+        var schoolsQuery = ScopedActiveSchools(scope.DistrictId, scope.SchoolId);
+
+        var bySchool = await schoolsQuery
+            .OrderBy(s => s.Name)
+            .Select(s => new AdoptionSchoolModel
+            {
+                SchoolId = s.Id,
+                SchoolName = s.Name,
+                StaffTotal = _context.StaffProfiles.Count(p => p.SchoolId == s.Id && p.IsActive),
+                StaffActive = _context.StaffProfiles.Count(p => p.SchoolId == s.Id && p.IsActive
+                    && _context.AccessAuditLogs.Any(a => a.ActorUserId == p.UserId && a.CreatedAt >= windowStart)),
+                DraftsStarted = _context.DocumentInstances.Count(i => i.SchoolStudent.SchoolId == s.Id && i.CreatedAt >= windowStart),
+                DraftsFinalized = _context.AuthoredDocumentVersions.Count(v => v.SchoolStudent.SchoolId == s.Id && v.FinalizedAt >= windowStart)
+            })
+            .ToListAsync(ct);
+
+        // Staff/active totals are computed over the FULL admin scope (district-wide when unfiltered),
+        // not summed from bySchool, so a DistrictAdmin-tier user (bound to no single school) still
+        // counts toward the district total.
+        var staffScope = _context.StaffProfiles.AsNoTracking().Where(p => p.IsActive && p.DistrictId == scope.DistrictId);
+        if (scope.SchoolId.HasValue)
+            staffScope = staffScope.Where(p => p.SchoolId == scope.SchoolId.Value);
+
+        var staffTotal = await staffScope.CountAsync(ct);
+        var staffActive = await staffScope.CountAsync(p => _context.AccessAuditLogs.Any(a => a.ActorUserId == p.UserId && a.CreatedAt >= windowStart), ct);
+
+        return ServiceResult<AdoptionModel>.SuccessResult(new AdoptionModel
+        {
+            Days = days,
+            StaffActiveLast14 = staffActive,
+            StaffTotal = staffTotal,
+            BySchool = bySchool,
+            DraftsStarted = bySchool.Sum(r => r.DraftsStarted),
+            DraftsFinalized = bySchool.Sum(r => r.DraftsFinalized),
+            ActiveRule = AdoptionActiveRule
+        });
+    }
+
+    public async Task<ServiceResult<EngagementModel>> GetEngagementAsync(int userId, int? schoolId, CancellationToken ct = default)
+    {
+        var scope = await ResolveAdminScopeAsync(userId, schoolId, ct);
+        if (scope.Error != null)
+            return ServiceResult<EngagementModel>.FailureResult(scope.Error);
+        if (scope.Empty)
+            return ServiceResult<EngagementModel>.SuccessResult(new EngagementModel());
+
+        var schoolsQuery = ScopedActiveSchools(scope.DistrictId, scope.SchoolId);
+
+        var bySchool = await schoolsQuery
+            .OrderBy(s => s.Name)
+            .Select(s => new EngagementSchoolModel
+            {
+                SchoolId = s.Id,
+                SchoolName = s.Name,
+                ActiveStudents = _context.SchoolStudents.Count(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active),
+                StudentsWithFamilyLink = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.HasFamily(_context))
+            })
+            .ToListAsync(ct);
+
+        return ServiceResult<EngagementModel>.SuccessResult(new EngagementModel
+        {
+            ActiveStudents = bySchool.Sum(r => r.ActiveStudents),
+            StudentsWithFamilyLink = bySchool.Sum(r => r.StudentsWithFamilyLink),
+            DraftsShared = 0,
+            ResponsesReceived = 0,
+            BySchool = bySchool
+        });
+    }
+
+    // ----------------------------------------------------------------- Plan 5 helpers
+
+    private const string AdoptionActiveRule = "Active = at least one FERPA access-audit entry (view, edit, share, finalize, or export) for that staff member in the window.";
+
+    private sealed record AdminScope(int DistrictId, int? SchoolId, bool Empty, string? Error);
+
+    /// <summary>
+    /// Resolves the caller's admin scope for the plan-5 board reads: DistrictAdmin gets the whole
+    /// district (optionally narrowed to an in-district active school); SchoolAdmin is FORCED to their
+    /// own school regardless of a caller-supplied schoolId (mirrors <see cref="GetDashboardAsync"/>); a
+    /// SchoolAdmin with no school binding gets a valid empty result, not an error; every other role is denied.
+    /// </summary>
+    private async Task<AdminScope> ResolveAdminScopeAsync(int userId, int? schoolId, CancellationToken ct)
+    {
+        var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
+        if (ctx == null)
+            return new AdminScope(0, null, true, "Educator profile not found.");
+        if (!OrgRoleIds.IsAdmin(ctx.OrgRoleId))
+            return new AdminScope(0, null, true, "You do not have permission to view this data.");
+
+        if (ctx.OrgRoleId == OrgRoleIds.DistrictAdmin)
+        {
+            if (schoolId.HasValue && !await _orgAccess.CanActOnSchoolAsync(userId, schoolId.Value, ct))
+                return new AdminScope(0, null, true, "You do not have permission to view this school's data.");
+            return new AdminScope(ctx.DistrictId, schoolId, false, null);
+        }
+
+        // SchoolAdmin: forced to their own school; no binding -> valid empty payload (mirrors GetDashboardAsync).
+        if (ctx.SchoolId == null)
+            return new AdminScope(ctx.DistrictId, null, true, null);
+        return new AdminScope(ctx.DistrictId, ctx.SchoolId, false, null);
+    }
+
+    private IQueryable<School> ScopedActiveSchools(int districtId, int? schoolId)
+    {
+        var query = _context.Schools.AsNoTracking().Where(s => s.DistrictId == districtId && s.IsActive);
+        if (schoolId.HasValue)
+            query = query.Where(s => s.Id == schoolId.Value);
+        return query;
+    }
+
+    private static ComplianceBoardModel EmptyComplianceBoard()
+    {
+        var from = DateTime.UtcNow.Date;
+        var to = from.AddDays(60);
+        return new ComplianceBoardModel
+        {
+            GeneratedAt = DateTime.UtcNow,
+            From = from,
+            To = to,
+            Drill = ComplianceDrillMap(from, to)
+        };
+    }
+
+    /// <summary>Due30/Due60/overdue drill keys never carry date params (they're always today-anchored);
+    /// only "dueInRange" carries the caller's effective [<paramref name="from"/>, <paramref name="to"/>]
+    /// window, so its roster rows always equal the tile regardless of the chosen range.</summary>
+    private static Dictionary<string, string> ComplianceDrillMap(DateTime from, DateTime to) => new()
+    {
+        ["overdueAnnual"] = "attention=OverdueAnnual",
+        ["overdueReeval"] = "attention=OverdueReeval",
+        ["due30"] = "attention=Due30",
+        ["due60"] = "attention=Due60",
+        ["dueInRange"] = $"attention=DueInRange&from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}",
+        ["unknownDates"] = "attention=UnknownDates",
+        ["noLead"] = "attention=NoCaseManager"
+    };
 }

@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { useAuth } from '@/features/auth/hooks/use-auth';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { acceptInvite, previewInvite } from '../api/student-invite-api';
 import type { StudentInvitePreviewDto } from '../types';
 
@@ -15,6 +16,7 @@ const CONSENT_LABEL =
   'I understand and consent to activating my student account and participating in my IEP process.';
 
 export function StudentAcceptInvitePage() {
+  usePageTitle('Activate your student account');
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const navigate = useNavigate();

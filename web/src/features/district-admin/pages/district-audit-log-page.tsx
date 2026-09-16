@@ -6,6 +6,7 @@ import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageLayout } from '@/components/ui/page-layout';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { ORG_ROLE } from '@/features/educator/types';
 import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
 import { getAuditLog } from '../api/district-api';
@@ -20,6 +21,7 @@ const PAGE_SIZE = 25;
 // (server-scoped). Keyset ("Load more") paging — offset paging would drift as
 // the audit worker appends rows.
 export function DistrictAuditLogPage() {
+  usePageTitle('Activity log');
   const { profile, isLoading: profileLoading } = useEducatorProfile();
   const isAdmin =
     profile?.orgRoleId === ORG_ROLE.DistrictAdmin ||

@@ -1,6 +1,7 @@
 import { BookOpen, FileText, Users, Shield, Calendar, Library, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 function SectionHeader({
   Icon,
@@ -34,6 +35,7 @@ function GlossaryTerm({ term, definition }: { term: string; definition: string }
 }
 
 export function Iep101Page() {
+  usePageTitle('IEP 101');
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Page header */}

@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Logo } from '@/components/ui/logo';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 export function MfaVerifyPage() {
+  usePageTitle('Verify your identity');
   const navigate = useNavigate();
   const location = useLocation();
   const { mfaPendingToken: contextToken, completeMfaLogin } = useAuth();

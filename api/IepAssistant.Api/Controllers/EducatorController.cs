@@ -41,8 +41,11 @@ public class EducatorController : ControllerBase
     /// <summary>
     /// Paged roster. <c>status</c> = Active (default) | Exited | Archived | All; <c>query</c> matches
     /// first/last name or external student id; <c>schoolId</c>/<c>grade</c> narrow the role-scoped set;
-    /// <c>attention</c> = NoCaseManager | NoLinkedParent narrows to the dashboard's "needs attention" sets
-    /// (server-side, so paging stays exact).
+    /// <c>attention</c> = NoCaseManager | NoLinkedParent | OverdueAnnual | OverdueReeval | Due30 | Due60 |
+    /// UnknownDates | DueInRange narrows to the dashboard/compliance-board's "needs attention" sets
+    /// (server-side, so paging stays exact and drilldown counts match the board); <c>from</c>/<c>to</c>
+    /// are only consulted for <c>attention=DueInRange</c> (the compliance board's date-range-bound tile —
+    /// Due30/Due60 stay anchored on today regardless of these).
     /// </summary>
     [HttpGet("students")]
     [ProducesResponseType(typeof(ApiResponse<PagedResultDto<SchoolStudentDto>>), StatusCodes.Status200OK)]
@@ -53,6 +56,8 @@ public class EducatorController : ControllerBase
         [FromQuery] string? status,
         [FromQuery] GradeLevel? grade,
         [FromQuery] string? attention,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         CancellationToken ct = default)
@@ -84,6 +89,8 @@ public class EducatorController : ControllerBase
             Status = statusFilter,
             Grade = grade,
             Attention = attentionFilter,
+            From = from,
+            To = to,
             Page = page,
             PageSize = pageSize
         }, ct);

@@ -16,6 +16,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageLayout } from "@/components/ui/page-layout";
 import { useToast } from "@/components/ui/toast";
 import { TabsNav, TabLink } from "@/components/ui/tabs";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 export function ChildDetailPage() {
   const { childId: childIdParam } = useParams<{ childId: string }>();
@@ -23,6 +24,11 @@ export function ChildDetailPage() {
   const navigate = useNavigate();
   const { show: showToast } = useToast();
   const [child, setChild] = useState<ChildProfile | null>(null);
+  // Never the child's legal name — the tab title lands in browser history,
+  // OS taskbar/Alt-Tab previews, and screen-share tab pickers, all reachable
+  // by a bystander who never authenticated to the app. The full name stays in
+  // the in-page heading only (see `PageLayout title=...` below).
+  usePageTitle("Child profile");
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);

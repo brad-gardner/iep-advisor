@@ -6,6 +6,7 @@ import { PageLayout } from '@/components/ui/page-layout';
 import { ProgressDots } from '@/components/ui/progress-dots';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { isAdminOrgRole } from '@/features/educator/types';
 import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
 import { getImportBatches } from '../api/import-api';
@@ -31,6 +32,7 @@ function parseKind(raw: string | null): ImportKind {
 // The wizard is linear — template → upload → preview → commit → result — and
 // the batch history below reloads after every commit.
 export function ImportPage() {
+  usePageTitle('Import');
   const { profile, isLoading: profileLoading } = useEducatorProfile();
   const isAdmin = isAdminOrgRole(profile?.orgRoleId);
   const { show: showToast } = useToast();

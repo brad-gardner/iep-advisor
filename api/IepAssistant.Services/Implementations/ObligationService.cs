@@ -121,9 +121,17 @@ public class ObligationService : IObligationService
         var staffCtx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (staffCtx == null)
             return ServiceResult<List<ObligationModel>>.FailureResult("Educator profile not found.");
+        return await GetForScopeAsync(staffCtx, schoolId, status, ct);
+    }
+
+    /// <summary>Same as <see cref="GetForScopeAsync(int, int?, ObligationStatus?, CancellationToken)"/>
+    /// but skips the staff-context re-lookup for a caller (e.g. <see cref="HomeService"/>) that already
+    /// resolved it — avoids a duplicated round trip on the admin home path (review-fix contract, todos/074).</summary>
+    public async Task<ServiceResult<List<ObligationModel>>> GetForScopeAsync(StaffContext staffCtx, int? schoolId, ObligationStatus? status, CancellationToken ct = default)
+    {
         if (!OrgRoleIds.IsAdmin(staffCtx.OrgRoleId))
             return ServiceResult<List<ObligationModel>>.FailureResult("You do not have permission to view district obligations.");
-        if (schoolId.HasValue && !await _orgAccess.CanActOnSchoolAsync(userId, schoolId.Value, ct))
+        if (schoolId.HasValue && !await _orgAccess.CanActOnSchoolAsync(staffCtx.UserId, schoolId.Value, ct))
             return ServiceResult<List<ObligationModel>>.FailureResult("You do not have permission to view this school's obligations.");
 
         var students = await LoadScopedStudentsAsync(staffCtx, schoolId, ct);
@@ -164,7 +172,10 @@ public class ObligationService : IObligationService
         {
             if (ctx.SchoolId == null)
                 return new List<StudentObligationContext>();
-            query = _context.SchoolStudents.Where(s => s.SchoolId == ctx.SchoolId.Value);
+            // Matches DistrictService.ScopedActiveSchools' School.IsActive filter — a SchoolAdmin still
+            // bound to a since-deactivated school must see the same (empty) picture the compliance board
+            // shows for that school, not a stale non-zero one (review-fix contract, todos/086 P3 #3).
+            query = _context.SchoolStudents.Where(s => s.SchoolId == ctx.SchoolId.Value && s.School.IsActive);
         }
         else
         {

@@ -75,6 +75,10 @@ public static class DependencyInjection
         services.AddScoped<IMeetingReminderService, MeetingReminderService>();
         services.AddScoped<IDigestService, DigestService>();
 
+        // Plan 5: role homes and district compliance/adoption/engagement.
+        services.AddScoped<IDocumentCompletenessService, DocumentCompletenessService>();
+        services.AddScoped<IHomeService, HomeService>();
+
         // Stateless JWT minting reused by create-and-sign-in flows (staff invite accept).
         services.AddScoped<JwtTokenFactory>();
 

@@ -9,12 +9,14 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useUsers } from "../hooks/use-users";
 import { inviteBetaUser } from "../api/admin-api";
 
 type AdminUser = ReturnType<typeof useUsers>["users"][number];
 
 export function AdminUsersPage() {
+  usePageTitle("User Management");
   const { users, isLoading, error, reload } = useUsers();
   const { show: showToast } = useToast();
   const [search, setSearch] = useState("");

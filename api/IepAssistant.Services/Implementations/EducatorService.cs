@@ -177,19 +177,36 @@ public class EducatorService : IEducatorService
             query = query.Where(s => s.SchoolId == search.SchoolId.Value);
         if (search.Grade != null)
             query = query.Where(s => s.GradeLevel == search.Grade.Value);
-        // Dashboard "needs attention" deep links: the same predicates DistrictService uses for its
-        // tiles, composed onto the role-scoped query so paging and the other filters still apply.
+        // Dashboard "needs attention" deep links: the SAME predicates (StudentAttentionRules, plan 5)
+        // the district dashboard/compliance board use, composed onto the role-scoped query so paging
+        // and the other filters still apply and a board count always matches its drilldown row count.
+        var today = DateTime.UtcNow.Date;
         if (search.Attention == StudentAttention.NoCaseManager)
-        {
-            var districtId = ctx.DistrictId;
-            query = query.Where(s => !_context.StudentTeamMembers.Any(m =>
-                m.SchoolStudentId == s.Id && m.IsActive && m.IsLead
-                && _context.StaffProfiles.Any(p => p.UserId == m.UserId && p.IsActive && p.DistrictId == districtId)));
-        }
+            query = query.Where(StudentAttentionRules.NoLead(_context, ctx.DistrictId));
         else if (search.Attention == StudentAttention.NoLinkedParent)
+            query = query.Where(StudentAttentionRules.NoFamily(_context));
+        else if (search.Attention == StudentAttention.OverdueAnnual)
+            query = query.Where(StudentAttentionRules.OverdueAnnual(today));
+        else if (search.Attention == StudentAttention.OverdueReeval)
+            query = query.Where(StudentAttentionRules.OverdueReeval(today));
+        else if (search.Attention == StudentAttention.Due30)
+            query = query.Where(StudentAttentionRules.DueWithin(today, today.AddDays(30)));
+        else if (search.Attention == StudentAttention.Due60)
+            query = query.Where(StudentAttentionRules.DueWithin(today, today.AddDays(60)));
+        else if (search.Attention == StudentAttention.UnknownDates)
+            query = query.Where(StudentAttentionRules.UnknownDates());
+        else if (search.Attention == StudentAttention.DueInRange)
         {
-            query = query.Where(s => !_context.ChildLinks.Any(l =>
-                l.SchoolStudentId == s.Id && l.IsActive && l.AcceptedAt != null && l.ChildProfileId != null));
+            // Backs the compliance board's date-range-bound "dueInRange" drilldown (review-fix contract
+            // addition 1) — Due30/Due60 above stay anchored on today regardless of From/To.
+            if (!AdminQueryLimits.IsWithinRange(search.From, today) || !AdminQueryLimits.IsWithinRange(search.To, today))
+                return ServiceResult<PagedResult<SchoolStudentModel>>.FailureResult("The requested date range is out of bounds.");
+
+            var fromDate = (search.From ?? today).Date;
+            var toDate = (search.To ?? fromDate.AddDays(60)).Date;
+            if (toDate < fromDate)
+                toDate = fromDate;
+            query = query.Where(StudentAttentionRules.DueWithin(fromDate, toDate));
         }
         if (!string.IsNullOrWhiteSpace(search.Query))
         {

@@ -7,11 +7,13 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Table, type TableColumn } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { useTemplates } from './hooks/use-templates';
 import { CreateTemplateModal } from './create-template-modal';
 import type { DocumentTemplateDto } from './types';
 
 export function TemplateListPage() {
+  usePageTitle('Document Templates');
   const { templates, isLoading, error, reload, create } = useTemplates();
   const { show: showToast } = useToast();
   const [showCreate, setShowCreate] = useState(false);

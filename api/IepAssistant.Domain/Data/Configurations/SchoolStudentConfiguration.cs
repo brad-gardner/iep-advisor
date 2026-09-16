@@ -51,6 +51,10 @@ public class SchoolStudentConfiguration : IEntityTypeConfiguration<SchoolStudent
         builder.HasIndex(s => s.SchoolId);
         builder.HasIndex(s => s.CaseManagerUserId);
         builder.HasIndex(s => new { s.DistrictId, s.Status });
+        // Plan 5: the compliance board and the roster's Overdue/DueSoon/Unknown attention filters
+        // (StudentAttentionRules) range-scan these due-date columns across every active student in scope.
+        builder.HasIndex(s => s.AnnualReviewDueDate);
+        builder.HasIndex(s => s.ReevaluationDueDate);
 
         // Student identity key = (DistrictId, ExternalStudentId); unique only where an id is present.
         // Bracket-quoted filter is accepted by both SQL Server and SQLite (EnsureCreated in tests).

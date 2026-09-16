@@ -228,13 +228,36 @@ export interface PagedResult<T> {
 export type StudentStatusFilter = StudentStatus | 'All';
 
 // Server-side "needs attention" narrowing (same predicates as the dashboard
-// tiles): no active lead case manager / no accepted parent link. Composes with
-// the other filters and normal paging.
-export const ATTENTION_FILTERS = ['NoCaseManager', 'NoLinkedParent'] as const;
+// tiles and the plan-5 compliance board): no active lead case manager / no
+// accepted parent link / procedural-deadline buckets. `Due30`/`Due60` are due
+// within N days from today (not overdue); `UnknownDates` means the source
+// dates needed to compute a deadline are missing — never rendered as healthy.
+// `DueInRange` is the compliance board's caller-chosen `from`/`to` window (see
+// `use-roster-query.ts`'s `from`/`to` params) — distinct from the fixed
+// `Due30`/`Due60` buckets. Composes with the other filters and normal paging.
+export const ATTENTION_FILTERS = [
+  'NoCaseManager',
+  'NoLinkedParent',
+  'OverdueAnnual',
+  'OverdueReeval',
+  'Due30',
+  'Due60',
+  'UnknownDates',
+  'DueInRange',
+] as const;
 export type AttentionFilter = (typeof ATTENTION_FILTERS)[number];
+// `DueInRange`'s label is dynamic (built from the `from`/`to` query params by
+// the roster page) — this fallback only covers a `DueInRange` deep link with
+// no date bounds attached.
 export const ATTENTION_FILTER_LABELS: Record<AttentionFilter, string> = {
   NoCaseManager: 'no case manager',
   NoLinkedParent: 'no linked parent',
+  OverdueAnnual: 'an overdue annual review',
+  OverdueReeval: 'an overdue reevaluation',
+  Due30: 'a review due within 30 days',
+  Due60: 'a review due within 60 days',
+  UnknownDates: 'unknown dates',
+  DueInRange: 'a review due in the selected range',
 };
 
 export interface StudentSearchParams {
@@ -243,6 +266,9 @@ export interface StudentSearchParams {
   status?: StudentStatusFilter;
   grade?: GradeLevel;
   attention?: AttentionFilter;
+  // `yyyy-MM-dd` bounds for `attention: 'DueInRange'` only.
+  from?: string;
+  to?: string;
   page?: number;
   pageSize?: number;
 }

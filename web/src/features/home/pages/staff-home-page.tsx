@@ -4,16 +4,23 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { PageLayout } from '@/components/ui/page-layout';
 import { orgRoleLabel } from '@/lib/org-role-label';
-import { useEducatorProfile } from '../hooks/use-educator-profile';
-import { EducatorDashboard } from '../components/educator-dashboard';
-import { DeactivatedAccessNotice } from '../components/deactivated-access-notice';
+import { usePageTitle } from '@/hooks/use-page-title';
+import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
+import { DeactivatedAccessNotice } from '@/features/educator/components/deactivated-access-notice';
+import { StaffHomeBody } from '../components/staff-home-body';
 
-export function EducatorHomePage() {
+/**
+ * The staff (Educator role) home shell — variant dispatch happens one level
+ * down in `StaffHomeBody`/`CaseloadHome`/`AdminHome` once the single `/api/home`
+ * fetch resolves. This page only owns the profile-loading/deactivated/no-profile
+ * guards (unchanged from the previous `EducatorHomePage`) plus the page chrome.
+ */
+export function StaffHomePage() {
   const { profile, isLoading } = useEducatorProfile();
+  // Title upgrades from a generic "Home" to the org name once the profile
+  // resolves — called unconditionally so every guard state below gets a title.
+  usePageTitle(profile ? profile.schoolName || profile.districtName : 'Home');
 
-  // While the async profile (which decides the whole home) resolves, show a
-  // header + body skeleton rather than a wrong-home flash. Skeletons are
-  // decorative (aria-hidden), so a sibling status region announces the load.
   if (isLoading) {
     return (
       <div className="space-y-6" role="status" aria-label="Loading your home">
@@ -52,9 +59,6 @@ export function EducatorHomePage() {
     );
   }
 
-  // Active profile: identity moves into the page header (title = the school or
-  // district name; subtitle = human role + state), with "View students" as the
-  // header action. The body is operational modules only.
   const subtitle = [orgRoleLabel(profile.orgRoleName), profile.stateCode]
     .filter(Boolean)
     .join(' · ');
@@ -71,7 +75,7 @@ export function EducatorHomePage() {
         </Link>
       }
     >
-      <EducatorDashboard profile={profile} />
+      <StaffHomeBody />
     </PageLayout>
   );
 }

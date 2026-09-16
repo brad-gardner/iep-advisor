@@ -4,12 +4,14 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Spinner } from '@/components/ui/spinner';
 import { useDocumentInstance } from '../hooks/use-document-instance';
 import { DocumentEditor } from '../components/document-editor';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 export function DocumentEditorPage() {
   const { instanceId: instanceIdParam } = useParams<{ instanceId: string }>();
   const instanceId = Number(instanceIdParam);
   const instance = useDocumentInstance(instanceId);
   const { detail, isLoading, loadError } = instance;
+  usePageTitle(detail ? detail.documentTypeDisplayName : 'Document');
 
   if (isLoading) {
     return (

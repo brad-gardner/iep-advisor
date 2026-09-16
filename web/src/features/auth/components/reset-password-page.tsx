@@ -4,8 +4,10 @@ import { resetPassword } from '../api/auth-api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 export function ResetPasswordPage() {
+  usePageTitle('Reset password');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
