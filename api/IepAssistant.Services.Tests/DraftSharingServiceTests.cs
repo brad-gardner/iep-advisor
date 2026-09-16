@@ -311,6 +311,42 @@ public sealed class DraftSharingServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Lists_AttributeAcknowledgementsAndOpenCounts_ToTheRightRevision()
+    {
+        var s = Seed("lists");
+        int rev1, rev2;
+        using (var ctx = CreateContext())
+        {
+            var services = Services(ctx);
+            rev1 = (await services.Sharing.ShareAsync(s.TeacherId, s.InstanceId, null, default)).Data!.Id;
+            // Parent responds twice on rev 1 and acknowledges it, then rev 2 supersedes it.
+            Assert.True((await services.Responses.CreateAsync(s.ParentId, rev1, new CreateDraftResponseModel { Kind = DraftResponseKind.Question, Text = "Why?" }, default)).Success);
+            Assert.True((await services.Responses.CreateAsync(s.ParentId, rev1, new CreateDraftResponseModel { Kind = DraftResponseKind.Comment, Text = "Ok." }, default)).Success);
+            Assert.True((await services.Sharing.AcknowledgeAsync(s.ParentId, rev1, default)).Success);
+            rev2 = (await services.Sharing.ShareAsync(s.TeacherId, s.InstanceId, "again", default)).Data!.Id;
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var services = Services(ctx);
+            var staff = await services.Sharing.ListForInstanceAsync(s.TeacherId, s.InstanceId, default);
+            Assert.True(staff.Success, staff.Message);
+            var staffRev1 = Assert.Single(staff.Data!, r => r.Id == rev1);
+            var staffRev2 = Assert.Single(staff.Data!, r => r.Id == rev2);
+            Assert.Equal(2, staffRev1.OpenResponseCount);
+            Assert.Single(staffRev1.Acknowledgements);
+            Assert.Equal(0, staffRev2.OpenResponseCount);
+            Assert.Empty(staffRev2.Acknowledgements);
+
+            var parent = await services.Sharing.ListForParentAsync(s.ParentId, s.ChildId, default);
+            Assert.True(parent.Success, parent.Message);
+            Assert.NotNull(Assert.Single(parent.Data!, r => r.Id == rev1).AcknowledgedAt);
+            Assert.Null(Assert.Single(parent.Data!, r => r.Id == rev2).AcknowledgedAt);
+            Assert.Equal(2, parent.Data!.Single(r => r.Id == rev1).OpenResponseCount);
+        }
+    }
+
+    [Fact]
     public async Task Share_SchoolOnlyStudent_RefusesWithNoRecipients_ButPreviewStillWorks()
     {
         var s = Seed("school-only", familyLinked: false);

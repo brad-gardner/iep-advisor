@@ -99,7 +99,7 @@ export function DocumentEditorPage() {
       <div hidden={tab !== 'edit'}>
         <DocumentEditor detail={detail} instance={instance} />
       </div>
-      {tab === 'converge' && <ConvergeTab detail={detail} />}
+      {tab === 'converge' && <ConvergeTab detail={detail} onShowEditor={() => setTab('edit')} />}
     </div>
   );
 }

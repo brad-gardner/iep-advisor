@@ -9,11 +9,13 @@ import type { ConvergeDto, DraftResponseDto } from '../types';
 const draftSharingApi = vi.hoisted(() => ({
   getConverge: vi.fn(),
   resolveResponse: vi.fn(),
+  shareDraft: vi.fn(),
   getSharePreview: vi.fn().mockResolvedValue({ success: true, data: { recipients: [], policyEnabled: false, lastSharedAt: null, willSupersedeRevision: null } }),
 }));
 vi.mock('../api/draft-sharing-api', () => draftSharingApi);
 
 import { ConvergePanel } from './converge-panel';
+import { fieldElementId } from '@/features/document-authoring/components/field-renderers/types';
 
 const templateVersion: TemplateVersionDetailDto = {
   id: 1,
@@ -110,6 +112,80 @@ describe('ConvergePanel', () => {
     );
     expect(await screen.findByTestId('converge-resolved-responses')).toHaveTextContent('Yes, updated.');
     expect(screen.queryByTestId('converge-open-responses')).not.toBeInTheDocument();
+  });
+
+  it('reveals the editor before jumping to a response\'s field (the editor is hidden behind this tab)', async () => {
+    const user = userEvent.setup();
+    const withField: TemplateVersionDetailDto = {
+      ...templateVersion,
+      sections: [
+        {
+          id: 1,
+          sectionKey: 'goals',
+          title: 'Goals',
+          displayOrder: 0,
+          fields: [{ id: 100, fieldKey: 'goals-field', fieldType: 'Text', label: 'Goal', required: false, displayOrder: 0, configJson: null }],
+        },
+      ],
+    };
+    draftSharingApi.getConverge.mockResolvedValue({
+      success: true,
+      data: makeConverge({ openResponses: [makeResponse({ targetFieldKey: 'goals-field' })] }),
+    });
+    const onBeforeJump = vi.fn();
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0);
+      return 0;
+    });
+    const scrollIntoView = vi.fn();
+    const field = document.createElement('input');
+    field.id = fieldElementId(100);
+    field.scrollIntoView = scrollIntoView;
+    document.body.appendChild(field);
+
+    render(
+      <ToastProvider>
+        <ConvergePanel instanceId={7} status="Draft" templateVersion={withField} onBeforeJump={onBeforeJump} />
+      </ToastProvider>
+    );
+
+    await user.click(await screen.findByTestId('response-jump-9'));
+    expect(onBeforeJump).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalled();
+    expect(document.activeElement).toBe(field);
+    // The reveal happens before the (next-frame) scroll.
+    expect(onBeforeJump.mock.invocationCallOrder[0]).toBeLessThan(scrollIntoView.mock.invocationCallOrder[0]);
+
+    raf.mockRestore();
+    field.remove();
+  });
+
+  it('keeps the loaded responses and an open resolve dialog when a refresh fails', async () => {
+    const user = userEvent.setup();
+    draftSharingApi.getConverge.mockResolvedValueOnce({ success: true, data: makeConverge({ openResponses: [makeResponse()] }) });
+    draftSharingApi.getSharePreview.mockResolvedValue({
+      success: true,
+      data: { recipients: [{ userId: 1, displayName: 'Jamie Parent', relationship: 'Parent', email: 'j@example.com' }], policyEnabled: true, lastSharedAt: null, willSupersedeRevision: null },
+    });
+
+    render(
+      <ToastProvider>
+        <ConvergePanel instanceId={7} status="Draft" templateVersion={templateVersion} />
+      </ToastProvider>
+    );
+
+    await user.click(await screen.findByTestId('response-resolve-open-9'));
+    await user.type(screen.getByTestId('resolve-reply-input'), 'Half-typed reply');
+
+    // A refresh (what "Share again" triggers) that fails must not tear the tree down.
+    draftSharingApi.shareDraft.mockResolvedValue({ success: true, data: { id: 3, revisionNumber: 1 } });
+    draftSharingApi.getConverge.mockRejectedValueOnce(apiRejection('Server error', 500));
+    await user.click(screen.getByTestId('share-with-family-open'));
+    await user.click(await screen.findByTestId('share-with-family-submit'));
+
+    expect(await screen.findByTestId('converge-retry')).toBeInTheDocument();
+    expect(screen.getByTestId('converge-open-responses')).toBeInTheDocument();
+    expect(screen.getByTestId('resolve-reply-input')).toHaveValue('Half-typed reply');
   });
 
   it('surfaces a server refusal from a failed resolve inline', async () => {

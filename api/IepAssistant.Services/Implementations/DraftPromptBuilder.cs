@@ -17,17 +17,29 @@ public sealed record RenderedDraft(string Text, IReadOnlyList<DraftLine> Lines)
 {
     public DraftLine? Resolve(string id) => Lines.FirstOrDefault(l => string.Equals(l.Id, id.Trim(), StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Resolves a section title the model echoed back to the template section it came from
-    /// (case/whitespace-insensitive; a paraphrase that merely contains the real title still resolves).</summary>
+    /// <summary>
+    /// Resolves a section title the model echoed back to the template section it came from. Exact
+    /// (case/whitespace-insensitive) wins; otherwise a paraphrase that contains a real title resolves
+    /// to the longest such title — and if two candidates still tie, nothing resolves rather than a
+    /// guess that could pin an explanation to the wrong part of the IEP.
+    /// </summary>
     public (int Id, string Title)? ResolveSection(string title)
     {
         var wanted = Normalize(title);
         if (wanted.Length == 0) return null;
         var sections = Lines.Select(l => (l.SectionId, l.SectionTitle)).Distinct().ToList();
-        var exact = sections.FirstOrDefault(s => Normalize(s.SectionTitle) == wanted);
-        if (exact != default) return exact;
-        var loose = sections.FirstOrDefault(s => wanted.Contains(Normalize(s.SectionTitle)) || Normalize(s.SectionTitle).Contains(wanted));
-        return loose == default ? null : loose;
+        var exact = sections.Where(s => Normalize(s.SectionTitle) == wanted).ToList();
+        if (exact.Count == 1) return exact[0];
+        if (exact.Count > 1) return null;
+
+        var contained = sections
+            .Select(s => (Section: s, Length: Normalize(s.SectionTitle).Length))
+            .Where(x => x.Length > 0 && wanted.Contains(Normalize(x.Section.SectionTitle)))
+            .OrderByDescending(x => x.Length)
+            .ToList();
+        if (contained.Count == 0 || (contained.Count > 1 && contained[0].Length == contained[1].Length))
+            return null;
+        return contained[0].Section;
     }
 
     private static string Normalize(string value) => string.Join(' ', value.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
@@ -66,6 +78,7 @@ public static class DraftPromptBuilder
         {
             var node = values[field.FieldKey.ToString()];
             if (node == null) continue;
+            var sectionPrefix = SectionPrefix(section.Title);
 
             if (field.FieldType == FieldType.Table)
             {
@@ -87,7 +100,7 @@ public static class DraftPromptBuilder
 
                     var rowLabel = DraftRowLabeler.LabelForRow(row, columnLabels, columnSemantics, primarySemantic);
                     var draftLine = new DraftLine(field.FieldKey, rowId, rowLabel, section.Id, section.Title, cellText);
-                    var rendered = $"[{draftLine.Id}] {SectionPrefix(section.Title)}{field.Label}: {OneLine(Data(Truncate(cellText, 1200)))}";
+                    var rendered = $"[{draftLine.Id}] {sectionPrefix}{field.Label}: {OneLine(Data(Truncate(cellText, 1200)))}";
                     if (used + rendered.Length > charBudget)
                     {
                         sb.AppendLine("… (more omitted for length)");
@@ -104,7 +117,7 @@ public static class DraftPromptBuilder
                 if (string.IsNullOrWhiteSpace(text)) continue;
 
                 var draftLine = new DraftLine(field.FieldKey, null, field.Label, section.Id, section.Title, text);
-                var rendered = $"[{draftLine.Id}] {SectionPrefix(section.Title)}{field.Label}: {OneLine(Data(Truncate(text, 1500)))}";
+                var rendered = $"[{draftLine.Id}] {sectionPrefix}{field.Label}: {OneLine(Data(Truncate(text, 1500)))}";
                 if (used + rendered.Length > charBudget)
                 {
                     sb.AppendLine("… (more omitted for length)");

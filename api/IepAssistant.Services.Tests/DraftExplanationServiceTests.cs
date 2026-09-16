@@ -139,6 +139,7 @@ public sealed class DraftExplanationServiceTests : IDisposable
             Assert.Matches("^[0-9]+$", goalsSection.SectionId);
             // … while an unmatched one keeps an ordinal id and its own title.
             Assert.Contains(result.Data.Sections, x => x.SectionId == "s1" && x.Title == "Something the model made up");
+
             Assert.Single(result.Data.Items);
             Assert.Equal(s.GoalsKey, result.Data.Items[0].FieldKey);
             Assert.Equal(s.RowId, result.Data.Items[0].RowId);
@@ -211,6 +212,23 @@ public sealed class DraftExplanationServiceTests : IDisposable
         var result = await CreateService(ctx).GetOrGenerateAsync(stranger.Id, s.RevisionId, default);
         Assert.False(result.Success);
         Assert.Contains("permission", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ResolveSection_PrefersTheLongestContainedTitle_AndRefusesToGuessOnATie()
+    {
+        var rendered = new RenderedDraft("<draft></draft>", new[]
+        {
+            new DraftLine(Guid.NewGuid(), null, "g", 1, "Goals", "x"),
+            new DraftLine(Guid.NewGuid(), null, "p", 2, "Progress on Goals", "y"),
+            new DraftLine(Guid.NewGuid(), null, "s", 3, "Services", "z"),
+            new DraftLine(Guid.NewGuid(), null, "t", 4, "Supports", "w"),
+        });
+        Assert.Equal(1, rendered.ResolveSection("goals")!.Value.Id);
+        Assert.Equal(2, rendered.ResolveSection("Progress on goals (reading)")!.Value.Id);
+        Assert.Equal(3, rendered.ResolveSection("Goals and Services")!.Value.Id); // longest contained title wins
+        Assert.Null(rendered.ResolveSection("Services and Supports")); // two same-length candidates — ambiguous
+        Assert.Null(rendered.ResolveSection("Placement"));
     }
 
     public void Dispose() => _connection.Dispose();

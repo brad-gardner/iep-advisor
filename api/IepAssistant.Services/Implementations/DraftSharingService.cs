@@ -537,6 +537,7 @@ public class DraftSharingService : IDraftSharingService
         var ids = rows.Select(r => r.Id).ToList();
         var acknowledgedAt = await _context.DraftAcknowledgements.AsNoTracking()
             .Where(a => ids.Contains(a.SharedDraftRevisionId) && a.UserId == parentUserId)
+            .Select(a => new { a.SharedDraftRevisionId, a.AcknowledgedAt })
             .ToDictionaryAsync(a => a.SharedDraftRevisionId, a => a.AcknowledgedAt, ct);
         var openCounts = await OpenResponseCountsAsync(ids, ct);
 

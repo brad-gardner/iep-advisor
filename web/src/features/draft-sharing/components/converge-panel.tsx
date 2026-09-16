@@ -20,12 +20,15 @@ interface ConvergePanelProps {
   instanceId: number;
   status: DocumentInstanceStatus;
   templateVersion: TemplateVersionDetailDto;
+  /** Called before a jump-to-field so the host can reveal the editor (it is
+   *  hidden while this tab is active); the jump itself runs on the next frame. */
+  onBeforeJump?: () => void;
 }
 
 /** Staff aggregate view for one document: the latest shared revision, what
  *  changed in the live draft since then, and every family response grouped by
  *  open/resolved with jump-to-field and reply/resolve. */
-export function ConvergePanel({ instanceId, status, templateVersion }: ConvergePanelProps) {
+export function ConvergePanel({ instanceId, status, templateVersion, onBeforeJump }: ConvergePanelProps) {
   const { converge, isLoading, error, retry, applyResolvedResponse } = useConverge(instanceId);
   const [resolving, setResolving] = useState<DraftResponseDto | null>(null);
   const fieldLookup = useMemo(() => buildFieldLocationLookup(templateVersion), [templateVersion]);
@@ -38,7 +41,9 @@ export function ConvergePanel({ instanceId, status, templateVersion }: ConvergeP
     );
   }
 
-  if (error || !converge) {
+  // Only a first-load failure replaces the tree. A failed *refresh* keeps the last-good data
+  // (and any open reply/resolve dialog) on screen with the error shown inline above it.
+  if (!converge) {
     return (
       <div role="alert">
         <Notice variant="error" title={error ?? 'Could not load the converge view.'}>
@@ -53,11 +58,23 @@ export function ConvergePanel({ instanceId, status, templateVersion }: ConvergeP
   const jumpTo = (response: DraftResponseDto) => {
     const loc = response.targetFieldKey ? fieldLookup.get(response.targetFieldKey) : undefined;
     if (!loc) return;
-    jumpToField(fieldElementId(loc.fieldId), loc.sectionId);
+    // The editor is display:none behind this tab — reveal it first, then scroll/focus once
+    // it has laid out (a hidden element can neither be scrolled to nor focused).
+    onBeforeJump?.();
+    requestAnimationFrame(() => jumpToField(fieldElementId(loc.fieldId), loc.sectionId));
   };
 
   return (
     <div className="space-y-6" data-testid="converge-panel">
+      {error && (
+        <div role="alert">
+          <Notice variant="error" title={error}>
+            <Button variant="secondary" className="mt-2" onClick={retry} data-testid="converge-retry">
+              Try again
+            </Button>
+          </Notice>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {converge.latestRevision ? (
           <p className="text-sm text-brand-slate-600">
