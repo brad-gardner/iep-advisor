@@ -29,3 +29,25 @@ export function jumpToField(fieldElementId: string, sectionId: number): void {
     : field.querySelector<HTMLElement>('input,textarea,select,[tabindex]');
   focusable?.focus({ preventScroll: true });
 }
+
+/**
+ * Like `jumpToField`, but waits until the target is no longer inside a `hidden`
+ * ancestor before scrolling/focusing (neither works on `display:none`). The
+ * document page hides the editor behind the Converge tab and reveals it through
+ * a router search-param update, which React Router applies as a *transition* —
+ * so the reveal is not guaranteed to have committed by the next frame. Polls a
+ * frame at a time, bounded; if the target never appears it jumps anyway so a
+ * broken reveal degrades to the old behaviour rather than hanging.
+ */
+export function jumpToFieldWhenVisible(fieldElementId: string, sectionId: number, maxFrames = 60): void {
+  const attempt = (framesLeft: number) => {
+    const target = document.getElementById(fieldElementId) ?? document.getElementById(sectionDomId(sectionId));
+    const hidden = target?.closest('[hidden]') != null;
+    if (!hidden || framesLeft <= 0) {
+      jumpToField(fieldElementId, sectionId);
+      return;
+    }
+    requestAnimationFrame(() => attempt(framesLeft - 1));
+  };
+  requestAnimationFrame(() => attempt(maxFrames));
+}

@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { fieldElementId } from '@/features/document-authoring/components/field-renderers/types';
-import { jumpToField } from '@/features/document-authoring/lib/section-dom';
+import { jumpToFieldWhenVisible } from '@/features/document-authoring/lib/section-dom';
 import type { DocumentInstanceStatus } from '@/features/document-authoring/types';
 import { ChangeSummaryChips } from '@/features/shared-drafts/components/change-summary-chips';
 import { formatDate } from '@/lib/format-date';
@@ -58,10 +58,10 @@ export function ConvergePanel({ instanceId, status, templateVersion, onBeforeJum
   const jumpTo = (response: DraftResponseDto) => {
     const loc = response.targetFieldKey ? fieldLookup.get(response.targetFieldKey) : undefined;
     if (!loc) return;
-    // The editor is display:none behind this tab — reveal it first, then scroll/focus once
-    // it has laid out (a hidden element can neither be scrolled to nor focused).
+    // The editor is display:none behind this tab — ask the host to reveal it, then scroll/focus
+    // once it is actually un-hidden (the reveal is a router transition, so not necessarily next frame).
     onBeforeJump?.();
-    requestAnimationFrame(() => jumpToField(fieldElementId(loc.fieldId), loc.sectionId));
+    jumpToFieldWhenVisible(fieldElementId(loc.fieldId), loc.sectionId);
   };
 
   return (

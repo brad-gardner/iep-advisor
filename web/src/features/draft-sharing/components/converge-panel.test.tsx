@@ -114,7 +114,7 @@ describe('ConvergePanel', () => {
     expect(screen.queryByTestId('converge-open-responses')).not.toBeInTheDocument();
   });
 
-  it('reveals the editor before jumping to a response\'s field (the editor is hidden behind this tab)', async () => {
+  it('jumps to a response\'s field only once the host has actually un-hidden the editor', async () => {
     const user = userEvent.setup();
     const withField: TemplateVersionDetailDto = {
       ...templateVersion,
@@ -132,16 +132,23 @@ describe('ConvergePanel', () => {
       success: true,
       data: makeConverge({ openResponses: [makeResponse({ targetFieldKey: 'goals-field' })] }),
     });
-    const onBeforeJump = vi.fn();
+    // Frames are queued and flushed by hand so the test controls "time".
+    const frames: FrameRequestCallback[] = [];
     const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
-      cb(0);
-      return 0;
+      frames.push(cb);
+      return frames.length;
     });
-    const scrollIntoView = vi.fn();
+    const flushFrame = () => frames.splice(0).forEach((cb) => cb(0));
+    // The editor lives behind a `hidden` wrapper, exactly like the document page.
+    const wrapper = document.createElement('div');
+    wrapper.hidden = true;
     const field = document.createElement('input');
     field.id = fieldElementId(100);
+    const scrollIntoView = vi.fn();
     field.scrollIntoView = scrollIntoView;
-    document.body.appendChild(field);
+    wrapper.appendChild(field);
+    document.body.appendChild(wrapper);
+    const onBeforeJump = vi.fn();
 
     render(
       <ToastProvider>
@@ -151,13 +158,20 @@ describe('ConvergePanel', () => {
 
     await user.click(await screen.findByTestId('response-jump-9'));
     expect(onBeforeJump).toHaveBeenCalledTimes(1);
-    expect(scrollIntoView).toHaveBeenCalled();
+
+    // The host's reveal is a router transition — it may take several frames. Until it
+    // lands, nothing is scrolled or focused (both silently no-op on a hidden element).
+    flushFrame();
+    flushFrame();
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    wrapper.hidden = false; // the reveal commits
+    flushFrame();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
     expect(document.activeElement).toBe(field);
-    // The reveal happens before the (next-frame) scroll.
-    expect(onBeforeJump.mock.invocationCallOrder[0]).toBeLessThan(scrollIntoView.mock.invocationCallOrder[0]);
 
     raf.mockRestore();
-    field.remove();
+    wrapper.remove();
   });
 
   it('keeps the loaded responses and an open resolve dialog when a refresh fails', async () => {
