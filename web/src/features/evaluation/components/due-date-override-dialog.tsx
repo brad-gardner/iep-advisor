@@ -50,6 +50,7 @@ export function DueDateOverrideDialog({ open, studentId, evaluation, onClose, on
     <Modal
       open={open}
       onClose={onClose}
+      preventClose={isSubmitting}
       title="Override determination due date"
       size="sm"
       data-testid="due-date-override-dialog"

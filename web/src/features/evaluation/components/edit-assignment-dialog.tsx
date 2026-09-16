@@ -48,6 +48,7 @@ export function EditAssignmentDialog({ studentId, assignment, onClose, onChanged
     <Modal
       open
       onClose={onClose}
+      preventClose={isSubmitting}
       title={`Edit assignment — ${assignment.domain}`}
       size="sm"
       data-testid="edit-assignment-dialog"

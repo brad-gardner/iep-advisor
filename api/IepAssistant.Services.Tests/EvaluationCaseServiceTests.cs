@@ -331,5 +331,39 @@ public sealed class EvaluationCaseServiceTests : IDisposable
         Assert.Contains(FakeStudentEvidenceService.PresentLevelsText, plaafpValue);
     }
 
+    [Fact]
+    public async Task ReceiveConsent_ChecksTheDocumentBytes_AndStoresABareFileName()
+    {
+        var s = Seed(nameof(ReceiveConsent_ChecksTheDocumentBytes_AndStoresABareFileName));
+        using var ctx = CreateContext();
+        var service = CreateService(ctx);
+        await service.CreateAsync(s.LeadUserId, s.StudentId, new CreateEvaluationCaseModel { Kind = EvaluationCaseKind.Initial, ReferralDate = new DateTime(2026, 1, 1) });
+        await service.RequestConsentAsync(s.LeadUserId, s.StudentId, new DateTime(2026, 1, 3));
+
+        // Declared application/pdf, but the bytes are an executable header — refused, nothing recorded.
+        var notPdf = await service.ReceiveConsentAsync(s.LeadUserId, s.StudentId, new ReceiveConsentModel
+        {
+            ReceivedAt = new DateTime(2026, 1, 10),
+            FileStream = new MemoryStream(new byte[] { 0x4D, 0x5A, 0x90, 0x00, 0x03 }),
+            FileName = "consent.pdf",
+            ContentType = "application/pdf"
+        });
+        Assert.False(notPdf.Success);
+        Assert.Contains("PDF", notPdf.Message);
+        Assert.Null(ctx.EvaluationCases.Single().ConsentReceivedAt);
+
+        // A traversal-shaped name is reduced to a bare one before it is stored.
+        var ok = await service.ReceiveConsentAsync(s.LeadUserId, s.StudentId, new ReceiveConsentModel
+        {
+            ReceivedAt = new DateTime(2026, 1, 10),
+            FileStream = new MemoryStream(System.Text.Encoding.ASCII.GetBytes("%PDF-1.4 consent")),
+            FileName = "../../signed/consent.pdf",
+            ContentType = "application/pdf"
+        });
+        Assert.True(ok.Success, ok.Message);
+        Assert.Equal("consent.pdf", ok.Data!.ConsentFileName);
+        Assert.True(ok.Data.HasConsentDocument);
+    }
+
     public void Dispose() => _connection.Dispose();
 }

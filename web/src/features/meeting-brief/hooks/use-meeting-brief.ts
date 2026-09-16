@@ -30,6 +30,15 @@ export function useMeetingBrief(meetingId: number): UseMeetingBriefResult {
   // The meeting this hook currently shows; a regenerate that resolves after the route moved to
   // another meeting must not overwrite that meeting's brief (the page is not remounted per id).
   const currentMeetingRef = useRef(meetingId);
+  // A meeting switch also resets the generate state during render (the abandoned request's
+  // `finally` deliberately leaves it alone), so the new meeting never inherits a stuck spinner
+  // or the previous meeting's error.
+  const [seenMeetingId, setSeenMeetingId] = useState(meetingId);
+  if (meetingId !== seenMeetingId) {
+    setSeenMeetingId(meetingId);
+    setIsGenerating(false);
+    setGenerateError(null);
+  }
   useEffect(() => {
     if (!meetingId) return;
     let active = true;

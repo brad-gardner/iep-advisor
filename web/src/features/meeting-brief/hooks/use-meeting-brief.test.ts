@@ -40,5 +40,20 @@ describe('useMeetingBrief', () => {
 
     await act(async () => finishRegenerate({ success: true, data: brief(1, 'Regenerated 1') }));
     expect(result.current.brief?.summary).toBe('Brief for 2'); // meeting 1's late result never overwrote meeting 2
+    expect(result.current.isGenerating).toBe(false); // and meeting 2 did not inherit a stuck spinner
+    expect(result.current.generateError).toBeNull();
+  });
+
+  it('clears a stale generate error when switching meetings', async () => {
+    briefApi.getBrief.mockImplementation(async (id: number) => ({ success: true, data: brief(id, `Brief for ${id}`) }));
+    briefApi.generateBrief.mockResolvedValueOnce({ success: false, message: 'Model unavailable' });
+    const { result, rerender } = renderHook(({ id }) => useMeetingBrief(id), { initialProps: { id: 1 } });
+    await waitFor(() => expect(result.current.brief?.summary).toBe('Brief for 1'));
+    await act(async () => result.current.regenerate());
+    expect(result.current.generateError).toBe('Model unavailable');
+
+    rerender({ id: 2 });
+    expect(result.current.generateError).toBeNull();
+    expect(result.current.isGenerating).toBe(false);
   });
 });

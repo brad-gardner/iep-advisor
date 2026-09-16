@@ -54,6 +54,7 @@ export function EditDecisionDialog({ decision, onClose, onUpdated }: EditDecisio
     <Modal
       open={decision !== null}
       onClose={onClose}
+      preventClose={isSubmitting}
       title="Edit decision"
       data-testid="edit-decision-dialog"
       footer={

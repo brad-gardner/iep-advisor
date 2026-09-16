@@ -55,4 +55,13 @@ describe('ConfirmDialog', () => {
     expect(screen.getByTestId('revoke-confirm-cancel')).toBeDisabled();
     expect(screen.getByTestId('revoke-confirm-confirm')).toHaveAttribute('aria-busy', 'true');
   });
+
+  it('ignores Esc and backdrop clicks while loading, so a confirmed action cannot be "cancelled" mid-flight', () => {
+    const onCancel = vi.fn();
+    renderConfirm({ loading: true, onCancel });
+    const dialog = screen.getByTestId('revoke-confirm');
+    fireEvent(dialog, new Event('cancel', { cancelable: true }));
+    fireEvent.click(dialog);
+    expect(onCancel).not.toHaveBeenCalled();
+  });
 });

@@ -29,16 +29,37 @@ public static class PdfUploadGuard
         return read == header.Length && System.Text.Encoding.ASCII.GetString(header) == Magic;
     }
 
+    /// <summary>The persisted column width for uploaded file names (SignedArtifact.FileName, EvaluationCase.ConsentFileName).</summary>
+    public const int MaxFileNameLength = 260;
+
     /// <summary>
     /// A file name safe to persist and to embed in a storage or archive path: directory parts are
-    /// stripped, path separators and traversal segments removed, and an empty result falls back.
+    /// stripped, path separators and traversal segments removed, the result bounded to
+    /// <see cref="MaxFileNameLength"/> (keeping the extension), and an empty result falls back.
     /// </summary>
     public static string SafeFileName(string? fileName, string fallback)
     {
         var name = Path.GetFileName((fileName ?? string.Empty).Trim());
-        name = name.Replace("\\", "").Replace("/", "").Replace("..", "");
-        foreach (var c in Path.GetInvalidFileNameChars())
-            name = name.Replace(c.ToString(), "");
-        return string.IsNullOrWhiteSpace(name) ? fallback : name;
+        // Strip until stable: removing an invalid character can re-form a ".." or a separator
+        // (e.g. "." + NUL + "."), so a single pass is not enough for the result to be a bare name.
+        string previous;
+        do
+        {
+            previous = name;
+            name = name.Replace("\\", "").Replace("/", "").Replace("..", "");
+            foreach (var c in Path.GetInvalidFileNameChars())
+                name = name.Replace(c.ToString(), "");
+        } while (name != previous);
+        if (string.IsNullOrWhiteSpace(name))
+            return fallback;
+        if (name.Length > MaxFileNameLength)
+        {
+            // A multipart file name has no filesystem behind it, so it can be arbitrarily long —
+            // keep the extension (it is what viewers key on) and trim the stem.
+            var ext = Path.GetExtension(name);
+            if (ext.Length > 16) ext = string.Empty;
+            name = name[..(MaxFileNameLength - ext.Length)] + ext;
+        }
+        return name;
     }
 }
