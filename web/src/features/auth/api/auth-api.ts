@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { apiClient } from '@/lib/api-client';
 import type {
   ApiResponse,
@@ -89,6 +90,38 @@ export async function deleteAccount(password: string, mfaCode?: string): Promise
 
 export async function cancelDeletion(): Promise<ApiResponse<null>> {
   const response = await apiClient.post<ApiResponse<null>>('/api/auth/cancel-deletion');
+  return response.data;
+}
+
+// Pilot-gates plan, phase 2: the anonymous counterpart to `cancelDeletion` —
+// usable from the signed link emailed at request time, even though the
+// requesting account is deactivated (sessions revoked) the moment deletion is
+// scheduled. Hits `AccountController`, not `AuthController`.
+export async function cancelDeletionByToken(token: string): Promise<ApiResponse<null>> {
+  const response = await apiClient.post<ApiResponse<null>>('/api/account/cancel-deletion', { token });
+  return response.data;
+}
+
+// Magic link (pilot-gates plan, phase 3). Always 202s — the response never
+// reveals whether the address is eligible.
+export async function requestMagicLink(email: string): Promise<ApiResponse<null>> {
+  const response = await apiClient.post<ApiResponse<null>>('/api/auth/magic-link', { email });
+  return response.data;
+}
+
+// Same response shape as `login` (an existing-MFA challenge or a full
+// session), plus a district-requires-MFA-setup refusal unique to this
+// endpoint — see `LoginResponse.mfaSetupRequired`.
+//
+// Deliberately bypasses `apiClient`: an invalid/expired token answers 401
+// (`AuthController.ConsumeMagicLink`), unlike every other public-token
+// endpoint in this app (reset-password, staff-invite accept both answer
+// 400) — `apiClient`'s shared response interceptor treats ANY 401 as "this
+// session died," clearing the stored token and hard-navigating to /login
+// before the caller ever gets to show its own recovery UI. This endpoint is
+// anonymous, so there's no Authorization header to lose by skipping it.
+export async function consumeMagicLink(token: string): Promise<ApiResponse<LoginResponse>> {
+  const response = await axios.post<ApiResponse<LoginResponse>>('/api/auth/magic-link/consume', { token });
   return response.data;
 }
 

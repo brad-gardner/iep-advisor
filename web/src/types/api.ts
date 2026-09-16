@@ -37,6 +37,20 @@ export interface LoginResponse {
   user?: User;
   requiresMfa?: boolean;
   mfaPendingToken?: string;
+  // Pilot-gates plan, phase 3: `POST /api/auth/magic-link/consume` reuses
+  // this shape and adds this one field — set (with `requiresMfa: true` but
+  // NO `mfaPendingToken`) when the district requires MFA for magic-link
+  // sign-in and the user has none enrolled yet. This is a straight refusal
+  // of the magic-link shortcut, not a deferred success: no `token`/`user`
+  // are issued, and the accompanying `message` tells the user to sign in
+  // with their password instead (see `AuthController.ConsumeMagicLink`).
+  mfaSetupRequired?: boolean;
+}
+
+// Pilot-gates plan, phase 3: staff (RelatedServiceProvider/GeneralEducator)
+// sign-in via a 15-minute emailed link instead of a password.
+export interface MagicLinkRequest {
+  email: string;
 }
 
 // MFA types

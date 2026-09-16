@@ -70,6 +70,10 @@ import { AdminNotificationFailuresPage } from '@/features/notifications/pages/ad
 import { MeetingRsvpPage } from '@/features/meetings/pages/meeting-rsvp-page';
 import { MeetingBriefPage } from '@/features/meeting-brief/pages/meeting-brief-page';
 import { ExportsAdminPage } from '@/features/exports/pages/exports-admin-page';
+import { AdminEmailPage } from '@/features/admin/email/components/admin-email-page';
+import { AdminAuditPage } from '@/features/admin/audit/components/admin-audit-page';
+import { MagicLinkConsumePage } from '@/features/auth/components/magic-link-consume-page';
+import { CancelDeletionPage } from '@/features/auth/components/cancel-deletion-page';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -173,6 +177,20 @@ export function AppRouter() {
           No ProtectedRoute/PublicRoute — works whether or not the visitor is
           logged in, own chrome (no MainLayout/AuthLayout). */}
       <Route path="/meetings/rsvp" element={<MeetingRsvpPage />} />
+      {/* Magic-link sign-in (pilot-gates plan, phase 3). Bare like
+          /staff/accept-invite — works regardless of any existing session,
+          since consuming the link is meant to establish a fresh one. */}
+      <Route
+        path="/auth/magic"
+        element={
+          <AuthLayout>
+            <MagicLinkConsumePage />
+          </AuthLayout>
+        }
+      />
+      {/* Public, unauthenticated: linked from the deletion-request email.
+          Own chrome, no MainLayout/AuthLayout — mirrors /meetings/rsvp. */}
+      <Route path="/account/cancel-deletion" element={<CancelDeletionPage />} />
       <Route
         path="/onboarding"
         element={
@@ -743,6 +761,30 @@ export function AppRouter() {
             <MainLayout>
               <AdminRouteGuard>
                 <AdminNotificationFailuresPage />
+              </AdminRouteGuard>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/email"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <AdminRouteGuard>
+                <AdminEmailPage />
+              </AdminRouteGuard>
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/audit"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <AdminRouteGuard>
+                <AdminAuditPage />
               </AdminRouteGuard>
             </MainLayout>
           </ProtectedRoute>
