@@ -1,7 +1,7 @@
 ---
 title: "feat: Deliberate whole-draft sharing, parent review with AI explanation and private questions, per-item responses, converge view, post-meeting summary"
 type: feat
-status: active
+status: completed
 date: 2026-09-15
 origin: docs/gap/combined-findings.md
 slicing_approach: vertical
@@ -55,14 +55,22 @@ A document instance is Draft → Finalizing → Finalized; nothing between "hidd
 
 ## Acceptance Criteria
 
-- [ ] Sharing is a deliberate action with recipient preview; the parent sees a frozen revision; later edits stay private until re-shared; re-share shows what changed.
-- [ ] District policy can disable family draft sharing.
-- [ ] Parent gets per-section/per-goal plain-language explanations and can ask private questions answered with citations to the revision; private notes are never visible to staff.
-- [ ] Parent can submit Agree/Question/Change-request per item; staff see, reply, resolve in a converge view; counts appear on both homes.
-- [ ] Parent can mark a revision reviewed (not consent); staff see the stamp.
-- [ ] Post-meeting summary can be AI-drafted, edited, and explicitly sent; family receives it.
-- [ ] School-only students (no family link) are unaffected — no blocking states, no nag.
-- [ ] All checks pass.
+- [x] Sharing is a deliberate action with recipient preview; the parent sees a frozen revision; later edits stay private until re-shared; re-share shows what changed.
+  - Live: `GET /share/preview` listed the parent recipient; `POST /share` created rev 1, editing the reading goal and re-sharing produced rev 2 with `changeSummary` "1 row changed." and rev 1 → Superseded; parent detail returns the frozen `values`.
+- [x] District policy can disable family draft sharing.
+  - `PUT /api/district { familyDraftSharingEnabled }` + toggle on `/educator/admin/schools`; share returns 403 when disabled (DraftSharingServiceTests).
+- [x] Parent gets per-section/per-goal plain-language explanations and can ask private questions answered with citations to the revision; private notes are never visible to staff.
+  - Live: `GET /shared-drafts/1/explanations` generated once and served from `SharedDraftExplanation` on the second call; `POST /ask` returned an answer and persisted a `ParentDraftNote`; staff `GET /notes` → 403.
+- [x] Parent can submit Agree/Question/Change-request per item; staff see, reply, resolve in a converge view; counts appear on both homes.
+  - Live: parent `POST /shared-drafts/2/responses` → team `ResponseReceived`; staff resolve with reply → parent `DraftResponseResolved` at `/children/136/shared-drafts/2`; resolve without reply/flag → 400; `GET /converge` groups open/resolved; home counts wired in `HomeService` (HomeServiceTests).
+- [x] Parent can mark a revision reviewed (not consent); staff see the stamp.
+  - Live: `POST /acknowledge` stamps `acknowledgedAt` (idempotent); staff `GET /shares` shows `acknowledgements[]`; UI label "This is not consent or a signature".
+- [x] Post-meeting summary can be AI-drafted, edited, and explicitly sent; family receives it.
+  - `POST /meetings/{id}/summary/draft` → `PUT` edit → `POST /send` (MeetingSummaryServiceTests); family route `/children/:childId/meetings/:meetingId/summary`; `MeetingSummarySent` notification.
+- [x] School-only students (no family link) are unaffected — no blocking states, no nag.
+  - Preview for a student with no accepted `ChildLink` returns an empty recipient list and share returns 400 with no UI nag; the Share button only renders when `policyEnabled`.
+- [x] All checks pass.
+  - `dotnet build` + `dotnet test` (762 passed); web `tsc -b`, `test:types`, vitest (407 passed), lint (36-error baseline unchanged), `build`, `guard:ux`.
 
 ## System-Wide Impact
 
@@ -78,3 +86,13 @@ A document instance is Draft → Finalizing → Finalized; nothing between "hidd
 
 - Origin: [combined-findings](../gap/combined-findings.md) C04; J4 visibility model (whole-draft, deliberate); P1 privacy boundary; P7 veto rules
 - Code: `AuthoredDocumentVersionService.cs`, `AnalysisRunService.cs` (prompt guards), `ParentVersionDetailPage`, `ChildLinkService.cs`
+
+## Implementation Notes (2026-09-16)
+
+- Branch `feat/parent-draft-review`; migration `20260916072345_AddFamilyDraftSharing` applied to the QA database (six new tables, `Districts.FamilyDraftSharingEnabled`, `UsageRecords.DistrictId` + nullable `ChildProfileId`).
+- Deviations from the contract: the meeting summary DTO is named `FamilyMeetingSummaryDto` (a `MeetingSummaryDto` already existed); scalar field citations use `[F:{fieldKey}]` (no row id); the district toggle lives on the schools admin page rather than a separate settings page.
+- Review-stage fix during work: notification links now use the revision **id** and the child-scoped parent route (`/children/{childId}/shared-drafts/{revisionId}`); the resolve notification resolves the child id through `ParentAccessResolver`.
+- Known QA-data limitation: engagement counters on the staff home read 0 until parents on the QA tenant respond; explanation generation on the QA draft produced 2 sections and 0 item explanations because the draft's goal rows had no populated text at generation time.
+- Operational validation: watch `UsageRecords` rows with `OperationType in ('draft_explanation','draft_question','meeting_summary')` and 503s from `/explanations`; mitigation is the district toggle (no data loss — revisions persist). Window: first two weeks of a pilot; owner: platform admin.
+- Subagents ran on Sonnet because of the Opus weekly limit; independent review follows in `/sht-review`.
+

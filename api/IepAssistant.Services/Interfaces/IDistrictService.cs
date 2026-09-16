@@ -13,6 +13,9 @@ public interface IDistrictService
     /// <summary>Overview of the caller's district. Any active staff in the district may read.</summary>
     Task<ServiceResult<DistrictOverviewModel>> GetOverviewAsync(int userId, CancellationToken ct = default);
 
+    /// <summary>Plan 6, decision 2: toggles whether staff may share a whole draft with the family. DistrictAdmin only.</summary>
+    Task<ServiceResult<DistrictOverviewModel>> UpdateFamilyDraftSharingAsync(int userId, bool enabled, CancellationToken ct = default);
+
     /// <summary>
     /// Oversight dashboard aggregate for the caller's district. DistrictAdmin sees the whole district;
     /// SchoolAdmin sees only their own school's slice; Teacher is denied. Inactive schools/students are

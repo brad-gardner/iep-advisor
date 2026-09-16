@@ -10,10 +10,19 @@ import type {
   DistrictSchool,
   EngagementDto,
   SaveSchoolRequest,
+  UpdateDistrictRequest,
 } from '../types';
 
 export async function getDistrict(): Promise<ApiResponse<DistrictOverview>> {
   const response = await apiClient.get<ApiResponse<DistrictOverview>>('/api/district');
+  return response.data;
+}
+
+/** District-level settings (plan 6: the family draft sharing toggle). */
+export async function updateDistrict(
+  data: UpdateDistrictRequest
+): Promise<ApiResponse<DistrictOverview>> {
+  const response = await apiClient.put<ApiResponse<DistrictOverview>>('/api/district', data);
   return response.data;
 }
 

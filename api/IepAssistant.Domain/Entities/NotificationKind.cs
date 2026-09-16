@@ -10,5 +10,9 @@ public enum NotificationKind
     ObligationDigest,
     DraftShared,
     ResponseReceived,
+    /// <summary>Plan 6: staff resolved a family's <see cref="DraftResponse"/> — notifies the parent who submitted it.</summary>
+    DraftResponseResolved,
+    /// <summary>Plan 6: a post-meeting family summary was sent.</summary>
+    MeetingSummarySent,
     Generic
 }

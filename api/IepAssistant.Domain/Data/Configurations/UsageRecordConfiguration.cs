@@ -19,12 +19,21 @@ public class UsageRecordConfiguration : IEntityTypeConfiguration<UsageRecord>
             .HasForeignKey(ur => ur.UserId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Nullable since plan 6 (a staff-triggered, district-billed operation may have no child profile).
         builder.HasOne(ur => ur.ChildProfile)
             .WithMany()
             .HasForeignKey(ur => ur.ChildProfileId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Plan 6: district-sponsored usage (draft explanations/questions, meeting summaries) attributes
+        // billing to the school rather than (or in addition to) the parent's own subscription.
+        builder.HasOne(ur => ur.District)
+            .WithMany()
+            .HasForeignKey(ur => ur.DistrictId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(ur => ur.UserId);
         builder.HasIndex(ur => ur.ChildProfileId);
+        builder.HasIndex(ur => ur.DistrictId);
     }
 }

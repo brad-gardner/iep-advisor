@@ -6,6 +6,8 @@ import { Card } from '@/components/ui/card';
 import { Drawer } from '@/components/ui/drawer';
 import { Notice } from '@/components/ui/notice';
 import { AutosaveIndicator } from '@/features/admin/templates/components/autosave-indicator';
+import { SharedBanner } from '@/features/draft-sharing/components/shared-banner';
+import { ShareWithFamilyButton } from '@/features/draft-sharing/components/share-with-family-button';
 import { useFlushRegistry } from '@/hooks/use-flush-registry';
 import { useFlushOnNavigate } from '@/hooks/use-flush-on-navigate';
 import type { DocumentInstance } from '../hooks/use-document-instance';
@@ -104,6 +106,9 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
     []
   );
   const [evidenceOpen, setEvidenceOpen] = useState(false);
+  // Bumped after a successful share so `SharedBanner` remounts and refetches
+  // (it owns its own fetch — this just tells it "something changed").
+  const [shareVersion, setShareVersion] = useState(0);
   const editorContext = useMemo(
     () => ({ instanceId: detail.id, studentId: detail.schoolStudentId, shareableEntries, setActiveField, clearActiveField }),
     [detail.id, detail.schoolStudentId, shareableEntries, setActiveField, clearActiveField]
@@ -120,6 +125,11 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
             </div>
             <div className="flex items-center gap-3">
               <AutosaveIndicator status={saveStatus} />
+              <ShareWithFamilyButton
+                instanceId={detail.id}
+                status={detail.status}
+                onShared={() => setShareVersion((v) => v + 1)}
+              />
               <Button
                 variant="secondary"
                 size="sm"
@@ -141,6 +151,8 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
               </Button>
             </div>
           </div>
+
+          <SharedBanner key={shareVersion} instanceId={detail.id} />
 
           {conflict && (
             <div role="alert">

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { useToast } from '@/components/ui/toast';
+import { FamilySummaryPanel } from '@/features/draft-sharing/components/family-summary-panel';
 import { apiErrorMessage } from '@/lib/api-error';
 import { recordAttendance, rsvpToMeeting } from '../api/meetings-api';
 import { formatMeetingWhen, timeZoneLabel } from '../lib/meeting-time';
@@ -244,6 +245,14 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
               </div>
             )}
           </div>
+
+          {meeting.canManage && (meeting.status === 'Held' || meeting.status === 'Continued') && (
+            <div className="rounded-card border border-brand-slate-200 p-4">
+              {/* Keyed so a meeting switch remounts the panel: its draft text must never be
+                  saved or sent under the next meeting's id (see the drawer's own state reset). */}
+              <FamilySummaryPanel key={meeting.id} meetingId={meeting.id} />
+            </div>
+          )}
 
           {meeting.canManage && (
             <MeetingManagerActions

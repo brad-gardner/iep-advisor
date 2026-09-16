@@ -546,6 +546,11 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Property<int?>("CreatedById")
                         .HasColumnType("int");
 
+                    b.Property<bool>("FamilyDraftSharingEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -782,6 +787,117 @@ namespace IepAssistant.Domain.Data.Migrations
                             Key = "ETR",
                             UpdatedAt = new DateTime(2026, 7, 20, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.DraftAcknowledgement", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AcknowledgedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SharedDraftRevisionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("SharedDraftRevisionId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("DraftAcknowledgements");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.DraftResponse", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("ParentUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ResolvedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("ResolvedInDraft")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("SharedDraftRevisionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StaffReply")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid?>("TargetFieldKey")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TargetRowId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentUserId");
+
+                    b.HasIndex("SharedDraftRevisionId", "ParentUserId");
+
+                    b.HasIndex("SharedDraftRevisionId", "Status");
+
+                    b.ToTable("DraftResponses");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.EtrAnalysis", b =>
@@ -2266,6 +2382,59 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.ToTable("MeetingReminders");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.MeetingSummary", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("EditedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("GeneratedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("MeetingId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("SentByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MeetingId")
+                        .IsUnique();
+
+                    b.ToTable("MeetingSummaries");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.Notification", b =>
                 {
                     b.Property<int>("Id")
@@ -2465,6 +2634,60 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasIndex("ChildProfileId", "IsShared");
 
                     b.ToTable("ParentContributions");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.ParentDraftNote", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Answer")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CitationsJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ParentUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Question")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("SharedDraftRevisionId")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("TargetFieldKey")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TargetRowId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentUserId");
+
+                    b.HasIndex("SharedDraftRevisionId", "ParentUserId");
+
+                    b.ToTable("ParentDraftNotes");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.PasswordResetToken", b =>
@@ -2832,6 +3055,115 @@ namespace IepAssistant.Domain.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("SchoolStudentAccesses");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.SharedDraftExplanation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ExplanationJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("GeneratedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SharedDraftRevisionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SharedDraftRevisionId")
+                        .IsUnique();
+
+                    b.ToTable("SharedDraftExplanations");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.SharedDraftRevision", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ChangeSummaryJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DocumentInstanceId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DocumentTemplateVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("RevisionNumber")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("SharedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SharedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ValuesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("WithdrawnAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("WithdrawnByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentTemplateVersionId");
+
+                    b.HasIndex("SharedByUserId");
+
+                    b.HasIndex("DocumentInstanceId", "RevisionNumber")
+                        .IsUnique();
+
+                    b.HasIndex("DocumentInstanceId", "Status");
+
+                    b.ToTable("SharedDraftRevisions");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.StaffInvite", b =>
@@ -3324,11 +3656,14 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("ChildProfileId")
+                    b.Property<int?>("ChildProfileId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<int?>("DistrictId")
+                        .HasColumnType("int");
 
                     b.Property<string>("OperationType")
                         .IsRequired()
@@ -3341,6 +3676,8 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ChildProfileId");
+
+                    b.HasIndex("DistrictId");
 
                     b.HasIndex("UserId");
 
@@ -3679,6 +4016,44 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Navigation("DocumentTemplate");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.DraftAcknowledgement", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.SharedDraftRevision", "SharedDraftRevision")
+                        .WithMany()
+                        .HasForeignKey("SharedDraftRevisionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SharedDraftRevision");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.DraftResponse", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.User", "ParentUser")
+                        .WithMany()
+                        .HasForeignKey("ParentUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.SharedDraftRevision", "SharedDraftRevision")
+                        .WithMany()
+                        .HasForeignKey("SharedDraftRevisionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ParentUser");
+
+                    b.Navigation("SharedDraftRevision");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.EtrAnalysis", b =>
                 {
                     b.HasOne("IepAssistant.Domain.Entities.EtrDocument", "EtrDocument")
@@ -4002,6 +4377,17 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.MeetingSummary", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.Meeting", "Meeting")
+                        .WithMany()
+                        .HasForeignKey("MeetingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Meeting");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.Notification", b =>
                 {
                     b.HasOne("IepAssistant.Domain.Entities.User", "User")
@@ -4033,6 +4419,25 @@ namespace IepAssistant.Domain.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("ChildProfile");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.ParentDraftNote", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.User", "ParentUser")
+                        .WithMany()
+                        .HasForeignKey("ParentUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.SharedDraftRevision", "SharedDraftRevision")
+                        .WithMany()
+                        .HasForeignKey("SharedDraftRevisionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ParentUser");
+
+                    b.Navigation("SharedDraftRevision");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.PasswordResetToken", b =>
@@ -4130,6 +4535,44 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Navigation("SchoolStudent");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.SharedDraftExplanation", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.SharedDraftRevision", "SharedDraftRevision")
+                        .WithMany()
+                        .HasForeignKey("SharedDraftRevisionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SharedDraftRevision");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.SharedDraftRevision", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.DocumentInstance", "DocumentInstance")
+                        .WithMany()
+                        .HasForeignKey("DocumentInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.DocumentTemplateVersion", "DocumentTemplateVersion")
+                        .WithMany()
+                        .HasForeignKey("DocumentTemplateVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.User", "SharedByUser")
+                        .WithMany()
+                        .HasForeignKey("SharedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DocumentInstance");
+
+                    b.Navigation("DocumentTemplateVersion");
+
+                    b.Navigation("SharedByUser");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.StaffInvite", b =>
@@ -4306,8 +4749,12 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasOne("IepAssistant.Domain.Entities.ChildProfile", "ChildProfile")
                         .WithMany()
                         .HasForeignKey("ChildProfileId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("IepAssistant.Domain.Entities.District", "District")
+                        .WithMany()
+                        .HasForeignKey("DistrictId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("IepAssistant.Domain.Entities.User", "User")
                         .WithMany()
@@ -4316,6 +4763,8 @@ namespace IepAssistant.Domain.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("ChildProfile");
+
+                    b.Navigation("District");
 
                     b.Navigation("User");
                 });

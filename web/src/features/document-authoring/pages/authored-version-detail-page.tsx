@@ -58,7 +58,7 @@ export function AuthoredVersionDetailPage() {
         />
       }
     >
-      <AuthoredVersionSnapshot version={version} />
+      <AuthoredVersionSnapshot templateVersion={version.templateVersion} values={version.values} />
     </PageLayout>
   );
 }

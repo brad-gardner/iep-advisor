@@ -32,6 +32,23 @@ public class DistrictController : ControllerBase
         return Ok(ApiResponse<DistrictOverviewDto>.SuccessResponse(MapOverview(result.Data!)));
     }
 
+    /// <summary>Plan 6, decision 2: toggles whether staff may share a whole draft with the family. DistrictAdmin only.</summary>
+    [HttpPut]
+    [ProducesResponseType(typeof(ApiResponse<DistrictOverviewDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> UpdateDistrict([FromBody] UpdateDistrictRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var result = await _districtService.UpdateFamilyDraftSharingAsync(User.GetUserId(), request.FamilyDraftSharingEnabled, ct);
+        if (!result.Success)
+            return MapFailure<DistrictOverviewDto>(result.Message);
+
+        return Ok(ApiResponse<DistrictOverviewDto>.SuccessResponse(MapOverview(result.Data!)));
+    }
+
     [HttpGet("dashboard")]
     [ProducesResponseType(typeof(ApiResponse<DistrictDashboardDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
@@ -160,7 +177,8 @@ public class DistrictController : ControllerBase
         Name = m.Name,
         StateCode = m.StateCode,
         ActiveSchoolCount = m.ActiveSchoolCount,
-        ActiveStaffCount = m.ActiveStaffCount
+        ActiveStaffCount = m.ActiveStaffCount,
+        FamilyDraftSharingEnabled = m.FamilyDraftSharingEnabled
     };
 
     private static DistrictSchoolDto MapSchool(DistrictSchoolModel m) => new()

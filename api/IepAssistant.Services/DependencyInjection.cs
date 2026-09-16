@@ -79,6 +79,13 @@ public static class DependencyInjection
         services.AddScoped<IDocumentCompletenessService, DocumentCompletenessService>();
         services.AddScoped<IHomeService, HomeService>();
 
+        // Plan 6: family draft sharing, review, AI explanations/questions, responses, converge, meeting summaries.
+        services.AddScoped<IDraftResponseService, DraftResponseService>();
+        services.AddScoped<IDraftSharingService, DraftSharingService>();
+        services.AddScoped<IDraftExplanationService, DraftExplanationService>();
+        services.AddScoped<IDraftQuestionService, DraftQuestionService>();
+        services.AddScoped<IMeetingSummaryService, MeetingSummaryService>();
+
         // Stateless JWT minting reused by create-and-sign-in flows (staff invite accept).
         services.AddScoped<JwtTokenFactory>();
 
