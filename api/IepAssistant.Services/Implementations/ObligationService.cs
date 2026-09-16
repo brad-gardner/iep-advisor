@@ -62,6 +62,60 @@ public class ObligationService : IObligationService
         return ServiceResult<List<ObligationModel>>.SuccessResult(ComputeAndFilter(students, null));
     }
 
+    public async Task<Dictionary<int, List<ObligationModel>>> GetForStaffDigestAsync(IEnumerable<int> userIds, CancellationToken ct = default)
+    {
+        var idList = userIds.Distinct().ToList();
+        var result = new Dictionary<int, List<ObligationModel>>();
+        if (idList.Count == 0)
+            return result;
+
+        // Everyone: the students they personally lead.
+        var leadStudents = await ProjectContext(_context.SchoolStudents.AsNoTracking()
+                .Where(s => s.CaseManagerUserId != null && idList.Contains(s.CaseManagerUserId.Value) && s.Status == StudentStatus.Active))
+            .ToListAsync(ct);
+        foreach (var group in ComputeAndFilter(leadStudents, null).GroupBy(o => o.OwnerUserId!.Value))
+            result[group.Key] = group.ToList();
+
+        // Admins: their whole scope, the same superset GetMineAsync gives them one at a time.
+        var admins = await _context.StaffProfiles.AsNoTracking()
+            .Where(p => p.IsActive && idList.Contains(p.UserId)
+                        && (p.OrgRoleId == OrgRoleIds.DistrictAdmin || (p.OrgRoleId == OrgRoleIds.SchoolAdmin && p.SchoolId != null)))
+            .Select(p => new { p.UserId, p.OrgRoleId, p.DistrictId, p.SchoolId })
+            .ToListAsync(ct);
+        if (admins.Count == 0)
+            return result;
+
+        var districtIds = admins.Where(a => a.OrgRoleId == OrgRoleIds.DistrictAdmin).Select(a => a.DistrictId).Distinct().ToList();
+        var schoolIds = admins.Where(a => a.OrgRoleId == OrgRoleIds.SchoolAdmin).Select(a => a.SchoolId!.Value).Distinct().ToList();
+        var scoped = await _context.SchoolStudents.AsNoTracking()
+            .Where(s => s.Status == StudentStatus.Active
+                        && ((districtIds.Contains(s.School.DistrictId) && s.School.IsActive) || schoolIds.Contains(s.SchoolId)))
+            .Select(s => new { s.Id, s.SchoolId, s.School.DistrictId, SchoolActive = s.School.IsActive })
+            .ToListAsync(ct);
+        var scopedIds = scoped.Select(s => s.Id).ToList();
+        var scopedContexts = await ProjectContext(_context.SchoolStudents.AsNoTracking().Where(s => scopedIds.Contains(s.Id))).ToListAsync(ct);
+        var obligationsByStudent = ComputeAndFilter(scopedContexts, null).GroupBy(o => o.SchoolStudentId).ToDictionary(g => g.Key, g => g.ToList());
+        var placement = scoped.ToDictionary(s => s.Id);
+
+        foreach (var admin in admins)
+        {
+            var mine = result.TryGetValue(admin.UserId, out var existing) ? existing : new List<ObligationModel>();
+            var seen = mine.Select(o => (o.SchoolStudentId, o.Kind)).ToHashSet();
+            foreach (var (studentId, obligations) in obligationsByStudent)
+            {
+                var where = placement[studentId];
+                var inScope = admin.OrgRoleId == OrgRoleIds.DistrictAdmin
+                    ? where.DistrictId == admin.DistrictId && where.SchoolActive
+                    : where.SchoolId == admin.SchoolId;
+                if (!inScope) continue;
+                foreach (var o in obligations)
+                    if (seen.Add((o.SchoolStudentId, o.Kind))) mine.Add(o);
+            }
+            result[admin.UserId] = mine;
+        }
+        return result;
+    }
+
     public async Task<ServiceResult<List<ObligationModel>>> GetForScopeAsync(int userId, int? schoolId, ObligationStatus? status, CancellationToken ct = default)
     {
         var staffCtx = await _orgAccess.GetStaffContextAsync(userId, ct);

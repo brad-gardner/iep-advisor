@@ -166,6 +166,32 @@ public sealed class MeetingServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateAndUpdate_RejectNonHttpVideoUrl_AcceptHttps()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (leadUserId, _) = _db.Staff("lead@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.TeamMember(studentId, leadUserId, TeamRole.CaseManager, isLead: true);
+
+        using var ctx = _db.Context();
+        var service = CreateService(ctx);
+        var bad = BasicMeeting(DateTime.UtcNow.AddDays(1));
+        bad.VideoUrl = "javascript:alert(1)";
+        var rejected = await service.CreateAsync(leadUserId, studentId, bad);
+        Assert.False(rejected.Success);
+        Assert.Contains("http", rejected.Message, StringComparison.OrdinalIgnoreCase);
+
+        var good = BasicMeeting(DateTime.UtcNow.AddDays(1));
+        good.VideoUrl = "https://meet.example.com/abc";
+        var created = await service.CreateAsync(leadUserId, studentId, good);
+        Assert.True(created.Success, created.Message);
+
+        var update = await service.UpdateAsync(leadUserId, created.Data!.Id, new UpdateMeetingModel { VideoUrl = "data:text/html,x" });
+        Assert.False(update.Success);
+    }
+
+    [Fact]
     public async Task GetAsync_Stranger_CannotRead()
     {
         var districtId = _db.District();

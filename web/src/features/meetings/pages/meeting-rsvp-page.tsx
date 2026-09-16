@@ -22,6 +22,9 @@ export function MeetingRsvpPage() {
   const [result, setResult] = useState<TokenRsvpResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<InviteStatus | null>(null);
+  // A failed submit is shown inline next to the buttons; it never replaces the
+  // invitation (the load error above does that, with its own retry).
+  const [respondError, setRespondError] = useState<string | null>(null);
   // Whether the invitee is actively (re-)choosing a response, overriding the
   // "already responded" view derived below. Reset on every fresh token load
   // (see `seenToken`) and after a successful submit, so a revisit — the whole
@@ -72,17 +75,17 @@ export function MeetingRsvpPage() {
 
   const handleRespond = async (status: InviteStatus) => {
     setSubmitting(status);
-    setError(null);
+    setRespondError(null);
     try {
       const response = await submitTokenRsvp({ token, status });
       if (response.success && response.data) {
         setResult(response.data);
         setChanging(false);
       } else {
-        setError(response.message ?? 'Could not record your response.');
+        setRespondError(response.message ?? 'Could not record your response.');
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not record your response.'));
+      setRespondError(apiErrorMessage(err, 'Could not record your response.'));
     } finally {
       setSubmitting(null);
     }
@@ -139,6 +142,12 @@ export function MeetingRsvpPage() {
                 </Button>
               </Notice>
             ) : (
+              <div className="space-y-3">
+                {respondError && (
+                  <div role="alert">
+                    <Notice variant="error" title={respondError} />
+                  </div>
+                )}
               <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={() => handleRespond('Accepted')}
@@ -169,6 +178,7 @@ export function MeetingRsvpPage() {
                   <XCircle className="mr-1.5 h-4 w-4" aria-hidden="true" />
                   Decline
                 </Button>
+              </div>
               </div>
             )}
           </div>

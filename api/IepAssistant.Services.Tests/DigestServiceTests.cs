@@ -169,9 +169,42 @@ public sealed class DigestServiceTests : IDisposable
         Assert.True(counter.SaveChanges <= 3, $"SaveChanges = {counter.SaveChanges}");
     }
 
+    [Fact]
+    public async Task RunForDateAsync_SchoolAdminDigest_IncludesWholeSchoolScope_NotJustLedStudents()
+    {
+        // Pass-2 review: the batched digest must keep GetMineAsync's admin superset — an admin sees
+        // overdue obligations for students they do not personally case-manage.
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var otherSchoolId = _db.School(districtId, "School B");
+        var (adminUserId, _) = _db.Staff("admin@example.com", districtId, schoolId, Models.OrgRoleIds.SchoolAdmin);
+        var (teacherUserId, _) = _db.Staff("teacher@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var ledByTeacher = _db.Student(schoolId, "Led", "ByTeacher");
+        _db.TeamMember(ledByTeacher, teacherUserId, TeamRole.CaseManager, isLead: true);
+        var elsewhere = _db.Student(otherSchoolId, "Other", "School");
+        using (var ctx = _db.Context())
+        {
+            foreach (var id in new[] { ledByTeacher, elsewhere })
+                ctx.SchoolStudents.Single(s => s.Id == id).AnnualReviewDueDate = DateTime.UtcNow.Date.AddDays(-1);
+            ctx.SaveChanges();
+        }
+
+        var email = new CapturingDigestEmailService();
+        using var ctx2 = _db.Context();
+        await CreateService(ctx2, email).RunForDateAsync(DateOnly.FromDateTime(DateTime.UtcNow));
+
+        // Teacher (lead) and admin (scope) both get a digest; the admin's covers the school, not district.
+        Assert.Equal(2, email.SendCount);
+        Assert.Single(ctx2.Notifications.Where(n => n.UserId == adminUserId && n.Kind == NotificationKind.ObligationDigest));
+        var adminDigest = email.ByRecipient["admin@example.com"];
+        Assert.Contains(adminDigest.Obligations, o => o.StudentName == "Led ByTeacher");
+        Assert.DoesNotContain(adminDigest.Obligations, o => o.StudentName == "Other School");
+    }
+
     private sealed class CapturingDigestEmailService : TestSupport.TestEmailServiceBase
     {
         public DigestEmailModel? LastModel { get; private set; }
+        public Dictionary<string, DigestEmailModel> ByRecipient { get; } = new();
         public int SendCount { get; private set; }
         public bool ThrowOnSend { get; set; }
 
@@ -180,6 +213,7 @@ public sealed class DigestServiceTests : IDisposable
             if (ThrowOnSend)
                 throw new InvalidOperationException("simulated ACS failure");
             LastModel = model;
+            ByRecipient[toEmail] = model;
             SendCount++;
             return Task.CompletedTask;
         }

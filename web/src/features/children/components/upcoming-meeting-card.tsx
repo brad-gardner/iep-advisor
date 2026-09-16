@@ -34,6 +34,9 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
   // `undefined` = loading, `null` = loaded with nothing upcoming.
   const [meeting, setMeeting] = useState<MeetingDto | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  // A failed RSVP is shown inline under the buttons; the card (and the meeting)
+  // stays visible so the family can simply try the response again.
+  const [rsvpError, setRsvpError] = useState<string | null>(null);
   const [responding, setResponding] = useState<InviteStatus | null>(null);
   // Bumped by the "Try again" button to re-run the load effect below.
   const [retryToken, setRetryToken] = useState(0);
@@ -62,12 +65,13 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
   const handleRsvp = async (status: InviteStatus) => {
     if (!meeting) return;
     setResponding(status);
+    setRsvpError(null);
     try {
       const response = await rsvpToMeeting(meeting.id, { status });
       if (response.success && response.data) setMeeting(response.data);
-      else setError(response.message ?? 'Could not record your response');
+      else setRsvpError(response.message ?? 'Could not record your response');
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not record your response'));
+      setRsvpError(apiErrorMessage(err, 'Could not record your response'));
     } finally {
       setResponding(null);
     }
@@ -104,6 +108,12 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
           <Badge variant={inviteBadgeVariant[meeting.myInviteStatus]}>
             {INVITE_STATUS_LABELS[meeting.myInviteStatus]}
           </Badge>
+        </div>
+      )}
+
+      {rsvpError && (
+        <div role="alert" className="mt-3">
+          <Notice variant="error" title={rsvpError} />
         </div>
       )}
 

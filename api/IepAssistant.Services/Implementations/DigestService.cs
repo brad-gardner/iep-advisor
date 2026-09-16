@@ -55,13 +55,13 @@ public class DigestService : IDigestService
         if (pendingUserIds.Count == 0)
             return;
 
-        // Lead obligations for every pending staff user in one query, grouped by owner in memory, instead
-        // of GetMineAsync's (GetStaffContextAsync + LoadLeadStudentsAsync) per user (todos/067).
-        var obligationsResult = await _obligationService.GetForLeadUsersAsync(pendingUserIds, ct);
-        var obligationsByUser = (obligationsResult.Data ?? new List<ObligationModel>())
-            .Where(o => o.Status is ObligationStatus.DueSoon or ObligationStatus.Overdue)
-            .GroupBy(o => o.OwnerUserId!.Value)
-            .ToDictionary(g => g.Key, g => g.ToList());
+        // Obligations for every pending staff user in a handful of queries — lead caseload for everyone
+        // plus the full scope for School/District admins, i.e. exactly what GetMineAsync would give each
+        // of them one at a time (todos/067, pass-2 fix).
+        var obligationsByUser = (await _obligationService.GetForStaffDigestAsync(pendingUserIds, ct))
+            .Select(kv => (kv.Key, Items: kv.Value.Where(o => o.Status is ObligationStatus.DueSoon or ObligationStatus.Overdue).ToList()))
+            .Where(kv => kv.Items.Count > 0)
+            .ToDictionary(kv => kv.Key, kv => kv.Items);
 
         // Upcoming meetings for every pending staff user in one query, grouped by participant in memory.
         // An explicit join (rather than a Where(...) inside a SelectMany over the Participants navigation)

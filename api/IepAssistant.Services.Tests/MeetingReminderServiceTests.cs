@@ -175,13 +175,30 @@ public sealed class MeetingReminderServiceTests : IDisposable
     [Fact]
     public void IsReminderUniqueIndexCollision_MatchesOnlyTheExpectedIndexName()
     {
-        var collision = new DbUpdateException("update failed",
-            new InvalidOperationException("SQLite Error 19: 'UNIQUE constraint failed: IX_MeetingReminders_MeetingId_UserId_Offset'"));
+        var sqlServer = new DbUpdateException("update failed",
+            new InvalidOperationException("Violation of UNIQUE KEY constraint 'IX_MeetingReminders_MeetingId_UserId_Offset'. Cannot insert duplicate key"));
         var unrelated = new DbUpdateException("update failed",
             new InvalidOperationException("SQLite Error 19: 'FOREIGN KEY constraint failed'"));
 
-        Assert.True(MeetingReminderService.IsReminderUniqueIndexCollision(collision));
+        Assert.True(MeetingReminderService.IsReminderUniqueIndexCollision(sqlServer));
         Assert.False(MeetingReminderService.IsReminderUniqueIndexCollision(unrelated));
+    }
+
+    [Fact]
+    public async Task IsReminderUniqueIndexCollision_RecognisesARealSqliteDuplicate()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (leadUserId, _) = _db.Staff("lead@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var meetingId = _db.Meeting(studentId, leadUserId, DateTime.UtcNow.AddDays(1));
+
+        using var ctx = _db.Context();
+        ctx.MeetingReminders.Add(new MeetingReminder { MeetingId = meetingId, UserId = leadUserId, Offset = ReminderOffset.OneDay, SentAt = DateTime.UtcNow });
+        await ctx.SaveChangesAsync();
+        ctx.MeetingReminders.Add(new MeetingReminder { MeetingId = meetingId, UserId = leadUserId, Offset = ReminderOffset.OneDay, SentAt = DateTime.UtcNow });
+        var ex = await Assert.ThrowsAsync<DbUpdateException>(() => ctx.SaveChangesAsync());
+        Assert.True(MeetingReminderService.IsReminderUniqueIndexCollision(ex), ex.InnerException?.Message);
     }
 
     public void Dispose() => _db.Dispose();

@@ -65,9 +65,19 @@ export function NotificationBell() {
 
   // Focus the first focusable row (APG: opening a menu-button focuses its
   // first item) once there's something real to focus — while `items` is
-  // still `null` the dropdown only shows a "Loading…" placeholder.
+  // still `null` the dropdown only shows a "Loading…" placeholder. Focus is
+  // moved once per open: a later refetch replacing `items` while the menu is
+  // already open must not yank focus away from wherever the user arrowed to.
+  const focusedForOpenRef = useRef(false);
   useEffect(() => {
-    if (open && items !== null) itemRefs.current[0]?.focus();
+    if (!open) {
+      focusedForOpenRef.current = false;
+      return;
+    }
+    if (items !== null && !focusedForOpenRef.current) {
+      focusedForOpenRef.current = true;
+      itemRefs.current[0]?.focus();
+    }
   }, [open, items]);
 
   const focusItemAt = useCallback((start: number, direction: 1 | -1) => {

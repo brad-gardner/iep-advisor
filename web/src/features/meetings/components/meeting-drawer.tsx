@@ -47,6 +47,16 @@ function canCaptureAttendanceFor(meeting: MeetingDto): boolean {
  * status, my own RSVP buttons, attendance capture (Held/Continued only), and
  * manager-only status/reschedule/cancel/ICS controls.
  */
+/** Only http(s) links are rendered as a clickable video link (the server enforces the same rule). */
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDrawerProps) {
   const { show: showToast } = useToast();
   const [rsvpSaving, setRsvpSaving] = useState<InviteStatus | null>(null);
@@ -75,6 +85,7 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
     setSeenMeetingId(meeting.id);
     setAttendance(canCaptureAttendance ? initialAttendance(meeting) : null);
     setRsvpError(null);
+    setRsvpSaving(null);
     setAttendanceError(null);
     setRescheduling(false);
   }
@@ -146,7 +157,7 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
                 Scheduled in {timeZoneLabel(meeting.timeZoneId)}
               </p>
               {meeting.location && <p className="mt-1 text-sm text-brand-slate-600">{meeting.location}</p>}
-              {meeting.videoUrl && (
+              {meeting.videoUrl && isHttpUrl(meeting.videoUrl) && (
                 <a
                   href={meeting.videoUrl}
                   target="_blank"

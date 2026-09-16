@@ -77,6 +77,8 @@ public class MeetingService : IMeetingService
             return ServiceResult<MeetingModel>.FailureResult("Title contains invalid characters.");
         if (HasControlCharacters(model.Location))
             return ServiceResult<MeetingModel>.FailureResult("Location contains invalid characters.");
+        if (!IsSafeHttpUrl(model.VideoUrl))
+            return ServiceResult<MeetingModel>.FailureResult("Video link must be an http(s) URL.");
 
         var title = string.IsNullOrWhiteSpace(model.Title) ? $"{model.Type.ToDisplay()} Meeting" : model.Title.Trim();
 
@@ -244,6 +246,8 @@ public class MeetingService : IMeetingService
             return ServiceResult<MeetingModel>.FailureResult("Title contains invalid characters.");
         if (HasControlCharacters(model.Location))
             return ServiceResult<MeetingModel>.FailureResult("Location contains invalid characters.");
+        if (!IsSafeHttpUrl(model.VideoUrl))
+            return ServiceResult<MeetingModel>.FailureResult("Video link must be an http(s) URL.");
 
         var scheduleChanged = false;
 
@@ -796,6 +800,14 @@ public class MeetingService : IMeetingService
     // ----------------------------------------------------------------- Input validation (todos/065)
 
     private static readonly EmailAddressAttribute EmailValidator = new();
+
+    /// <summary>Only absolute http/https links are accepted for the video call — the web renders it as an href.</summary>
+    private static bool IsSafeHttpUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return true;
+        return Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+    }
 
     private static bool HasControlCharacters(string? value) => value != null && value.Any(char.IsControl);
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { makeMeeting } from '@/features/meetings/test/fixtures';
+import { apiRejection } from '@/test/axios-rejection';
 
 const meetingsApi = vi.hoisted(() => ({
   listChildMeetings: vi.fn(),
@@ -29,6 +30,23 @@ describe('UpcomingMeetingCard', () => {
 
     expect(await screen.findByTestId('upcoming-meeting-card')).toBeInTheDocument();
     expect(screen.getByTestId('upcoming-meeting-accept')).toBeInTheDocument();
+  });
+
+  it('keeps the meeting and buttons visible when an RSVP fails, showing the server message inline', async () => {
+    const user = userEvent.setup();
+    meetingsApi.listChildMeetings.mockResolvedValue({
+      success: true,
+      data: [makeMeeting({ startsAtUtc: '2099-01-01T15:00:00.000Z', myInviteStatus: 'Pending' })],
+    });
+    meetingsApi.rsvpToMeeting.mockRejectedValue(apiRejection('This meeting already started.'));
+    renderCard();
+    await screen.findByTestId('upcoming-meeting-card');
+
+    await user.click(screen.getByTestId('upcoming-meeting-accept'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('This meeting already started.');
+    expect(screen.getByTestId('upcoming-meeting-card')).toBeInTheDocument();
+    expect(screen.getByTestId('upcoming-meeting-accept')).toBeEnabled();
+    expect(screen.queryByTestId('upcoming-meeting-error')).not.toBeInTheDocument();
   });
 
   it('disables the whole RSVP group while one response is in flight', async () => {

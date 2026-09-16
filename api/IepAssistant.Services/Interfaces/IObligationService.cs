@@ -25,4 +25,9 @@ public interface IObligationService
     /// eligible obligation across all students led by any of <paramref name="userIds"/>, in one query,
     /// distinguished by <see cref="ObligationModel.OwnerUserId"/> (todos/067).</summary>
     Task<ServiceResult<List<ObligationModel>>> GetForLeadUsersAsync(IEnumerable<int> userIds, CancellationToken ct = default);
+
+    /// <summary>Batched form of <see cref="GetMineAsync"/> for the digest: every staff user's obligations keyed by
+    /// user id — lead-caseload for everyone, plus the full school/district scope for School/District admins —
+    /// in a handful of queries regardless of staff count.</summary>
+    Task<Dictionary<int, List<ObligationModel>>> GetForStaffDigestAsync(IEnumerable<int> userIds, CancellationToken ct = default);
 }

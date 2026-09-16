@@ -110,5 +110,10 @@ public class MeetingReminderService : IMeetingReminderService
     /// <see cref="DbUpdateException"/> (a transient connection failure, an FK violation, etc.) must not be
     /// silently treated as "already sent" (todos/053).</summary>
     internal static bool IsReminderUniqueIndexCollision(DbUpdateException ex)
-        => ex.InnerException?.Message.Contains("IX_MeetingReminders_MeetingId_UserId_Offset", StringComparison.OrdinalIgnoreCase) == true;
+    {
+        var message = ex.InnerException?.Message ?? ex.Message;
+        // SQL Server names the index; SQLite (tests) lists the columns.
+        return message.Contains("IX_MeetingReminders_MeetingId_UserId_Offset", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("MeetingReminders.MeetingId, MeetingReminders.UserId, MeetingReminders.Offset", StringComparison.OrdinalIgnoreCase);
+    }
 }

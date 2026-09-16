@@ -123,5 +123,8 @@ describe('MeetingRsvpPage', () => {
 
     await user.click(screen.getByTestId('rsvp-decline'));
     expect(await screen.findByRole('alert')).toHaveTextContent('This meeting already started.');
+    // The invitation and the buttons stay on screen so the invitee can retry the response.
+    expect(screen.getByTestId('rsvp-accept')).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
   });
 });
