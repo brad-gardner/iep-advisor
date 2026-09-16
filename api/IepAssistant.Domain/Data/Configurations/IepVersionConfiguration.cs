@@ -10,6 +10,11 @@ public class IepVersionConfiguration : IEntityTypeConfiguration<IepVersion>
     {
         builder.HasKey(v => v.Id);
 
+        // The immutability trigger (migration AddPilotGatesPhase12) must be declared here: EF Core 7+
+        // otherwise saves with an OUTPUT clause, which SQL Server rejects on a table with any trigger
+        // ("cannot have any enabled triggers … OUTPUT clause without INTO"). SQLite ignores it.
+        builder.ToTable("IepVersions", t => t.HasTrigger("TR_IepVersions_Immutable"));
+
         builder.Property(v => v.DocumentType)
             .HasConversion<string>()
             .HasMaxLength(30)

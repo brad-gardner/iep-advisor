@@ -10,6 +10,11 @@ public class AuthoredDocumentVersionConfiguration : IEntityTypeConfiguration<Aut
     {
         builder.HasKey(v => v.Id);
 
+        // The immutability trigger (migration AddPilotGatesPhase12) must be declared here: EF Core 7+
+        // otherwise saves with an OUTPUT clause, which SQL Server rejects on a table with any trigger
+        // ("cannot have any enabled triggers … OUTPUT clause without INTO"). SQLite ignores it.
+        builder.ToTable("AuthoredDocumentVersions", t => t.HasTrigger("TR_AuthoredDocumentVersions_Immutable"));
+
         // The frozen value-document. Required; a max size is enforced upstream on the mutable
         // DocumentInstance (DocumentInstanceService.MaxValuesJsonBytes) so it can never grow here.
         builder.Property(v => v.ValuesJson).IsRequired();

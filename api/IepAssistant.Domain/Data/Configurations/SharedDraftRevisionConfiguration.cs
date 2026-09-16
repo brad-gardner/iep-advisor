@@ -10,6 +10,11 @@ public class SharedDraftRevisionConfiguration : IEntityTypeConfiguration<SharedD
     {
         builder.HasKey(r => r.Id);
 
+        // The immutability trigger (migration AddPilotGatesPhase12) must be declared here: EF Core 7+
+        // otherwise saves with an OUTPUT clause, which SQL Server rejects on a table with any trigger
+        // ("cannot have any enabled triggers … OUTPUT clause without INTO"). SQLite ignores it.
+        builder.ToTable("SharedDraftRevisions", t => t.HasTrigger("TR_SharedDraftRevisions_Immutable"));
+
         builder.Property(r => r.ValuesJson).IsRequired();
         builder.Property(r => r.Message).HasMaxLength(1000);
 

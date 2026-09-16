@@ -10,6 +10,11 @@ public class AccessAuditLogConfiguration : IEntityTypeConfiguration<AccessAuditL
     {
         builder.HasKey(a => a.Id);
 
+        // The immutability trigger (migration AddPilotGatesPhase12) must be declared here: EF Core 7+
+        // otherwise saves with an OUTPUT clause, which SQL Server rejects on a table with any trigger
+        // ("cannot have any enabled triggers … OUTPUT clause without INTO"). SQLite ignores it.
+        builder.ToTable("AccessAuditLogs", t => t.HasTrigger("TR_AccessAuditLogs_Immutable"));
+
         builder.Property(a => a.Action)
             .HasConversion<string>()
             .HasMaxLength(20)
