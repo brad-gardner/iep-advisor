@@ -37,6 +37,8 @@ function LocationProbe() {
       <output data-testid="location">{location.search}</output>
       {/* Stands in for the sidebar "Students" link: same route, no query. */}
       <Link to="/educator/students">Reset link</Link>
+      {/* Stands in for Back to a history entry that carries a previously typed q. */}
+      <Link to="/educator/students?q=ab">Back to ab</Link>
     </>
   );
 }
@@ -226,6 +228,25 @@ describe('EducatorStudentsPage', () => {
     await user.type(box, 'al');
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('q=al'));
     expect(box).toHaveValue('al');
+  });
+
+  it('re-adopts a URL q it had typed earlier instead of debouncing it away', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText('Ada Lovelace');
+    const box = screen.getByLabelText('Search students');
+
+    await user.type(box, 'ab');
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('q=ab'));
+    await user.click(screen.getByRole('link', { name: 'Reset link' }));
+    await waitFor(() => expect(box).toHaveValue(''));
+
+    await user.click(screen.getByRole('link', { name: 'Back to ab' }));
+    await waitFor(() => expect(box).toHaveValue('ab'));
+    // The debounce must not strip q again: the URL still carries it after the window.
+    await new Promise((r) => setTimeout(r, 400));
+    expect(screen.getByTestId('location')).toHaveTextContent('q=ab');
+    expect(box).toHaveValue('ab');
   });
 
   it('resets to page 1 when the page size changes', async () => {

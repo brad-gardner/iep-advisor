@@ -32,6 +32,10 @@ export function RosterFilters({ value, onChange, schools }: RosterFiltersProps) 
   if (value.q !== seenQ) {
     setSeenQ(value.q);
     if (value.q !== emitted && value.q !== search.trim()) setSearch(value.q);
+    // Whatever the URL now says is the new baseline — otherwise a history entry
+    // whose q equals something typed earlier (Back after clearing) would be
+    // refused and then debounced away.
+    if (value.q !== emitted) setEmitted(value.q);
   }
 
   // Always calls the *latest* onChange, so a filter changed inside the
