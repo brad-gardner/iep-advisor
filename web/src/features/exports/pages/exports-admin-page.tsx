@@ -5,6 +5,7 @@ import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Table, type TableColumn } from '@/components/ui/table';
 import { usePageTitle } from '@/hooks/use-page-title';
+import { apiErrorMessage } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
 import { getExportDownloadUrl } from '../api/exports-api';
 import { useDistrictExports } from '../hooks/use-district-exports';
@@ -32,14 +33,20 @@ export function ExportsAdminPage() {
   usePageTitle('Exports');
   const { jobs, isLoading, error, retry, requestExport, isRequesting, requestError } = useDistrictExports();
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const handleDownload = async (jobId: number) => {
     setDownloadingId(jobId);
+    setDownloadError(null);
     try {
       const res = await getExportDownloadUrl(jobId);
       if (res.success && res.data?.url) {
         window.open(res.data.url, '_blank', 'noopener,noreferrer');
+      } else {
+        setDownloadError(res.message ?? 'Could not prepare the download.');
       }
+    } catch (err) {
+      setDownloadError(apiErrorMessage(err, 'Could not prepare the download.'));
     } finally {
       setDownloadingId(null);
     }
@@ -125,6 +132,11 @@ export function ExportsAdminPage() {
       {requestError && (
         <div role="alert" className="mb-4">
           <Notice variant="error" title={requestError} />
+        </div>
+      )}
+      {downloadError && (
+        <div role="alert" className="mb-4">
+          <Notice variant="error" title={downloadError} />
         </div>
       )}
 

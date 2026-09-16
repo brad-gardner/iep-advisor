@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,12 +21,17 @@ export function GoalsCard({ studentId }: GoalsCardProps) {
   const [searchParams] = useSearchParams();
   const focusGoalId = searchParams.get('goal');
 
+  // Scroll/focus the deep-linked card exactly once, when it first exists. `goals` is a fresh
+  // array after every log/status update, so keying only on it would yank focus back to the
+  // linked card each time the user touches any goal.
+  const focusedGoalIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!focusGoalId || !goals) return;
+    if (!focusGoalId || !goals || focusedGoalIdRef.current === focusGoalId) return;
     const el = document.getElementById(`goal-card-${focusGoalId}`);
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     el.focus({ preventScroll: true });
+    focusedGoalIdRef.current = focusGoalId;
   }, [focusGoalId, goals]);
 
   return (

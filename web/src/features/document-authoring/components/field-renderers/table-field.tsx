@@ -108,13 +108,19 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
     }
     removeRow(rowKey);
   };
+  // Second line of defence behind the dialog's preventClose: a removal only lands if it is still
+  // the pending one when the retirement request resolves.
+  const pendingGoalRemovalRef = useRef<typeof pendingGoalRemoval>(null);
   const confirmGoalRemoval = async (reason: string) => {
     if (!pendingGoalRemoval || !editor) return;
+    const target = pendingGoalRemoval;
+    pendingGoalRemovalRef.current = target;
     setGoalRemovalSubmitting(true);
     setGoalRemovalError(null);
     try {
-      await recordGoalRetirement(editor.instanceId, { lineageId: pendingGoalRemoval.lineageId, reason });
-      removeRow(pendingGoalRemoval.rowKey);
+      await recordGoalRetirement(editor.instanceId, { lineageId: target.lineageId, reason });
+      if (pendingGoalRemovalRef.current !== target) return; // cancelled while in flight — leave the row
+      removeRow(target.rowKey);
       setPendingGoalRemoval(null);
     } catch (err) {
       setGoalRemovalError(apiErrorMessage(err, 'Could not record the retirement reason.'));
@@ -328,7 +334,10 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
             loading={goalRemovalSubmitting}
             error={goalRemovalError}
             onConfirm={(reason) => void confirmGoalRemoval(reason)}
-            onCancel={() => setPendingGoalRemoval(null)}
+            onCancel={() => {
+              pendingGoalRemovalRef.current = null;
+              setPendingGoalRemoval(null);
+            }}
           />
         )}
       </div>

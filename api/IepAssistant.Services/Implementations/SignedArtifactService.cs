@@ -58,7 +58,10 @@ public class SignedArtifactService : ISignedArtifactService
         if (!await _orgAccess.CanActOnStudentAsync(userId, version.SchoolStudentId, AccessRole.Collaborator, ct))
             return ServiceResult<SignedArtifactModel>.FailureResult(PermissionMessage);
 
-        var fileName = string.IsNullOrWhiteSpace(model.FileName) ? "signed.pdf" : model.FileName.Trim();
+        if (!await PdfUploadGuard.LooksLikePdfAsync(model.FileStream, ct))
+            return ServiceResult<SignedArtifactModel>.FailureResult(PdfOnlyMessage);
+
+        var fileName = PdfUploadGuard.SafeFileName(model.FileName, "signed.pdf");
         var blobPath = $"signed-artifacts/{versionId}/{Guid.NewGuid():N}.pdf";
         await _blob.UploadAsync(blobPath, model.FileStream, "application/pdf", ct);
 
@@ -133,22 +136,12 @@ public class SignedArtifactService : ISignedArtifactService
             .Select(v => new VersionHeader(v.SchoolStudentId))
             .FirstOrDefaultAsync(ct);
 
-    /// <summary>Educator with org access (Viewer+) OR a linked parent (mirrors AuthoredDocumentVersionService.CanReadStudentAsync).</summary>
+    /// <summary>Educator with org access (Viewer+) OR a linked parent — the same rule the version read paths use.</summary>
     private async Task<bool> CanReadStudentAsync(int userId, int studentId, CancellationToken ct)
     {
         if (await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
             return true;
-
-        var linkedChildIds = await _context.ChildLinks.AsNoTracking()
-            .Where(l => l.SchoolStudentId == studentId && l.IsActive && l.AcceptedAt != null && l.ChildProfileId != null)
-            .Select(l => l.ChildProfileId!.Value)
-            .ToListAsync(ct);
-        foreach (var childId in linkedChildIds)
-        {
-            if (await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Viewer, ct))
-                return true;
-        }
-        return false;
+        return await ParentAccessResolver.ResolveChildIdAsync(_context, _accessService, userId, studentId, AccessRole.Viewer, ct) != null;
     }
 
     private static IQueryable<SignedArtifactModel> MapQuery(IQueryable<SignedArtifact> query) =>

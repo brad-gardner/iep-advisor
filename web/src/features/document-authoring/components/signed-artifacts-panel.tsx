@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -57,6 +57,8 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -108,8 +110,7 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
         onUploaded(res.data, status);
         setFile(null);
         setSignerSummary('');
-        const input = document.getElementById('signed-artifact-file') as HTMLInputElement | null;
-        if (input) input.value = '';
+        if (fileInputRef.current) fileInputRef.current.value = '';
       } else {
         setUploadError(res.message ?? 'Could not attach the signed PDF.');
       }
@@ -122,11 +123,16 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
 
   const handleDownload = async (artifactId: number) => {
     setDownloadingId(artifactId);
+    setDownloadError(null);
     try {
       const res = await getSignedArtifactDownloadUrl(artifactId);
       if (res.success && res.data?.url) {
         window.open(res.data.url, '_blank', 'noopener,noreferrer');
+      } else {
+        setDownloadError(res.message ?? 'Could not prepare the download.');
       }
+    } catch (err) {
+      setDownloadError(apiErrorMessage(err, 'Could not prepare the download.'));
     } finally {
       setDownloadingId(null);
     }
@@ -147,10 +153,12 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
             Signed PDF (up to 20 MB)
           </label>
           <input
+            ref={fileInputRef}
             id="signed-artifact-file"
             type="file"
             accept="application/pdf"
             onChange={handleFileChange}
+            disabled={isUploading}
             data-testid="signed-artifact-file"
             className="block w-full text-sm text-brand-slate-600"
           />
@@ -201,6 +209,12 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
       )}
 
       {!loadError && !isLoading && artifacts.length > 0 && (
+        <>
+        {downloadError && (
+          <div role="alert" className="mb-2">
+            <Notice variant="error" title={downloadError} />
+          </div>
+        )}
         <ul className="divide-y divide-brand-slate-100" data-testid="signed-artifacts-list">
           {artifacts.map((a) => (
             <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
@@ -227,6 +241,7 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
             </li>
           ))}
         </ul>
+        </>
       )}
     </Card>
   );

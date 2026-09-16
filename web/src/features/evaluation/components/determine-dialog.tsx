@@ -73,6 +73,7 @@ export function DetermineDialog({ open, studentId, onClose, onDetermined }: Dete
     <Modal
       open={open}
       onClose={handleClose}
+      preventClose={isSubmitting}
       title="Determine eligibility"
       data-testid="determine-dialog"
       footer={

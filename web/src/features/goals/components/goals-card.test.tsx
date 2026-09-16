@@ -38,10 +38,10 @@ function makeGoal(overrides: Partial<GoalRecordDto> = {}): GoalRecordDto {
   };
 }
 
-function renderCard(studentId = 5) {
+function renderCard(studentId = 5, search = '') {
   return render(
     <ToastProvider>
-      <MemoryRouter initialEntries={[`/educator/students/${studentId}`]}>
+      <MemoryRouter initialEntries={[`/educator/students/${studentId}${search}`]}>
         <GoalsCard studentId={studentId} />
       </MemoryRouter>
     </ToastProvider>
@@ -80,6 +80,32 @@ describe('GoalsCard', () => {
 
     expect(await screen.findByTestId('goal-trajectory-insufficient')).toHaveTextContent('Insufficient data');
     expect(screen.queryByTestId('goal-trajectory-sparkline')).not.toBeInTheDocument();
+  });
+
+  it('focuses the ?goal= deep-linked card once, and not again after an unrelated update', async () => {
+    goalsApi.getStudentGoals.mockResolvedValue({ success: true, data: [makeGoal()] });
+    goalsApi.addGoalObservation.mockResolvedValue({
+      success: true,
+      data: { id: 99, goalRecordId: 1, observedAt: '2026-02-01T00:00:00.000Z', value: 75, unit: 'wpm', note: null, recordedByUserId: 1 },
+    });
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+
+    renderCard(5, '?goal=1');
+    await screen.findByText('Read grade-level text with 90% accuracy');
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+    expect(document.activeElement?.id).toBe('goal-card-1');
+
+    // Logging progress replaces the goals array; focus must stay where the user put it.
+    fireEvent.click(screen.getByTestId('goal-log-progress-open-1'));
+    const valueInput = screen.getByTestId('goal-log-progress-form-1-value');
+    valueInput.focus();
+    fireEvent.change(valueInput, { target: { value: '75' } });
+    fireEvent.click(screen.getByTestId('goal-log-progress-form-1-submit'));
+    await waitFor(() => expect(goalsApi.addGoalObservation).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId('goal-log-progress-form-1-value')).not.toBeInTheDocument());
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(document.activeElement?.id).not.toBe('goal-card-1');
   });
 
   it('logs progress: posts the observation and optimistically appends it to the trajectory', async () => {

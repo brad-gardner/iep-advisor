@@ -44,6 +44,7 @@ export function RemoveGoalDialog({ open, goalLabel, loading = false, error, onCo
     <Modal
       open={open}
       onClose={handleCancel}
+      preventClose={loading}
       title="Remove goal"
       size="sm"
       data-testid="remove-goal-dialog"

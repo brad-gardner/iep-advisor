@@ -195,8 +195,14 @@ public class ExportService : IExportService
             {
                 using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Create, leaveOpen: true))
                 {
-                    foreach (var studentId in studentIds)
-                        await WriteStudentFilesAsync(archive, studentId, manifestFiles, ct);
+                    // Per-student metadata is prefetched in bulk (3 queries per chunk of students, not 3
+                    // per student) — a district export walks every active student.
+                    foreach (var chunk in studentIds.Chunk(StudentPrefetchChunk))
+                    {
+                        var prefetch = await PrefetchStudentDataAsync(chunk, ct);
+                        foreach (var studentId in chunk)
+                            await WriteStudentFilesAsync(archive, studentId, prefetch, manifestFiles, ct);
+                    }
 
                     await WriteAggregateFilesAsync(archive, studentIds, manifestFiles, ct);
 
@@ -267,34 +273,50 @@ public class ExportService : IExportService
 
     // ---------------------------------------------------------------- Per-student files
 
-    private async Task WriteStudentFilesAsync(ZipArchive archive, int studentId, List<ExportManifestFileModel> manifestFiles, CancellationToken ct)
+    private const int StudentPrefetchChunk = 200;
+
+    private sealed record StudentRow(int Id, string? FirstName, string? LastName, DateTime? DateOfBirth, GradeLevel? GradeLevel,
+        DisabilityCategory? DisabilityCategory, int? CaseManagerUserId, StudentStatus Status, DateTime? IepDate,
+        DateTime? AnnualReviewDueDate, DateTime? EtrDate, DateTime? ReevaluationDueDate);
+    private sealed record VersionRow(int Id, int SchoolStudentId, int VersionNumber, string DocumentTypeKey, string ValuesJson, PdfRenderStatus PdfStatus);
+    private sealed record ArtifactRow(int Id, int SchoolStudentId, string BlobPath, string FileName);
+
+    private sealed record StudentPrefetch(
+        Dictionary<int, StudentRow> Students,
+        ILookup<int, VersionRow> Versions,
+        ILookup<int, ArtifactRow> Artifacts);
+
+    /// <summary>Three set-based queries for a chunk of students (mirrors WriteAggregateFilesAsync's batching).</summary>
+    private async Task<StudentPrefetch> PrefetchStudentDataAsync(int[] studentIds, CancellationToken ct)
     {
-        var student = await _context.SchoolStudents.AsNoTracking()
-            .Where(s => s.Id == studentId)
-            .Select(s => new
-            {
-                s.Id, s.FirstName, s.LastName, s.DateOfBirth, s.GradeLevel, s.DisabilityCategory,
-                s.CaseManagerUserId, s.Status, s.IepDate, s.AnnualReviewDueDate, s.EtrDate, s.ReevaluationDueDate
-            })
-            .FirstOrDefaultAsync(ct);
-        if (student == null)
+        var students = await _context.SchoolStudents.AsNoTracking()
+            .Where(s => studentIds.Contains(s.Id))
+            .Select(s => new StudentRow(s.Id, s.FirstName, s.LastName, s.DateOfBirth, s.GradeLevel, s.DisabilityCategory,
+                s.CaseManagerUserId, s.Status, s.IepDate, s.AnnualReviewDueDate, s.EtrDate, s.ReevaluationDueDate))
+            .ToDictionaryAsync(s => s.Id, ct);
+
+        var versions = await _context.AuthoredDocumentVersions.AsNoTracking()
+            .Where(v => studentIds.Contains(v.SchoolStudentId))
+            .Select(v => new VersionRow(v.Id, v.SchoolStudentId, v.VersionNumber, v.DocumentType.Key, v.ValuesJson,
+                v.Pdf != null ? v.Pdf.RenderStatus : PdfRenderStatus.Pending))
+            .ToListAsync(ct);
+
+        var artifacts = await _context.SignedArtifacts.AsNoTracking()
+            .Where(a => studentIds.Contains(a.AuthoredDocumentVersion.SchoolStudentId))
+            .Select(a => new ArtifactRow(a.Id, a.AuthoredDocumentVersion.SchoolStudentId, a.BlobPath, a.FileName))
+            .ToListAsync(ct);
+
+        return new StudentPrefetch(students, versions.ToLookup(v => v.SchoolStudentId), artifacts.ToLookup(a => a.SchoolStudentId));
+    }
+
+    private async Task WriteStudentFilesAsync(ZipArchive archive, int studentId, StudentPrefetch prefetch, List<ExportManifestFileModel> manifestFiles, CancellationToken ct)
+    {
+        if (!prefetch.Students.TryGetValue(studentId, out var student))
             return;
 
         await WriteJsonEntryAsync(archive, $"students/{studentId}/student.json", student, manifestFiles, ct);
 
-        var versions = await _context.AuthoredDocumentVersions.AsNoTracking()
-            .Where(v => v.SchoolStudentId == studentId)
-            .Select(v => new
-            {
-                v.Id,
-                v.VersionNumber,
-                DocumentTypeKey = v.DocumentType.Key,
-                v.ValuesJson,
-                PdfStatus = v.Pdf != null ? v.Pdf.RenderStatus : PdfRenderStatus.Pending
-            })
-            .ToListAsync(ct);
-
-        foreach (var v in versions)
+        foreach (var v in prefetch.Versions[studentId].OrderBy(v => v.DocumentTypeKey).ThenBy(v => v.VersionNumber))
         {
             var basePath = $"students/{studentId}/versions/{v.DocumentTypeKey}-v{v.VersionNumber}";
             var valuesNode = ParseValuesOrEmpty(v.ValuesJson);
@@ -315,17 +337,12 @@ public class ExportService : IExportService
             }
         }
 
-        var artifacts = await _context.SignedArtifacts.AsNoTracking()
-            .Where(a => a.AuthoredDocumentVersion.SchoolStudentId == studentId)
-            .Select(a => new { a.Id, a.BlobPath, a.FileName })
-            .ToListAsync(ct);
-
-        foreach (var a in artifacts)
+        foreach (var a in prefetch.Artifacts[studentId])
         {
             try
             {
                 var bytes = await DownloadBytesAsync(a.BlobPath, ct);
-                await WriteBytesEntryAsync(archive, $"signed/{a.Id}-{a.FileName}", bytes, manifestFiles);
+                await WriteBytesEntryAsync(archive, $"signed/{a.Id}-{PdfUploadGuard.SafeFileName(a.FileName, "signed.pdf")}", bytes, manifestFiles);
             }
             catch (Exception ex)
             {

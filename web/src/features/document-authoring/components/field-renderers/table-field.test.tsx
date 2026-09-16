@@ -238,6 +238,29 @@ describe('TableField evidence-insert target', () => {
     expect(screen.getByRole('textbox', { name: /^Goal\s*\*?$/ })).toHaveValue('Read 70 wpm');
   });
 
+  it('ignores Esc / backdrop / × while the retirement request is in flight, so the row is never removed behind a "cancel"', async () => {
+    const onSave = vi.fn().mockResolvedValue({ ok: true, values: {} });
+    let finish!: () => void;
+    goalsApi.recordGoalRetirement.mockReturnValueOnce(new Promise<void>((resolve) => (finish = resolve)));
+    renderInEditor([{ _rowId: 'ID-1', [goalCol]: 'Read 70 wpm', [baseCol]: '' }], onSave);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove goal 1' }));
+    fireEvent.change(await screen.findByTestId('remove-goal-dialog-reason'), { target: { value: 'Goal met and replaced by a comprehension goal' } });
+    fireEvent.click(screen.getByTestId('remove-goal-dialog-confirm'));
+    await waitFor(() => expect(goalsApi.recordGoalRetirement).toHaveBeenCalledTimes(1));
+
+    // Every dismiss gesture is inert while submitting: the dialog stays, the × is disabled.
+    const dialog = screen.getByTestId('remove-goal-dialog');
+    fireEvent(dialog, new Event('cancel', { bubbles: false, cancelable: true }));
+    fireEvent.click(dialog);
+    expect(screen.getByTestId('remove-goal-dialog-close')).toBeDisabled();
+    expect(screen.getByTestId('remove-goal-dialog-reason')).toBeInTheDocument();
+
+    await act(async () => finish());
+    await waitFor(() => expect(screen.queryByTestId('remove-goal-dialog-reason')).not.toBeInTheDocument());
+    expect(screen.queryByText('Goal 1')).not.toBeInTheDocument(); // the confirmed removal landed
+  });
+
   it('removes a never-finalized row immediately (no lineage to retire)', async () => {
     const onSave = vi.fn().mockResolvedValue({ ok: true, values: {} });
     renderInEditor([], onSave);

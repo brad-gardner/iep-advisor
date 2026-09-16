@@ -69,6 +69,7 @@ export function AmendDialog({ open, versionId, onClose, onAmended }: AmendDialog
     <Modal
       open={open}
       onClose={handleClose}
+      preventClose={isSubmitting}
       title="Amend this version"
       data-testid="amend-dialog"
       footer={

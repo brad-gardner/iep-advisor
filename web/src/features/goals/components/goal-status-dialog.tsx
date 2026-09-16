@@ -63,6 +63,7 @@ export function GoalStatusDialog({ open, goal, onClose, onChanged }: GoalStatusD
     <Modal
       open={open}
       onClose={handleClose}
+      preventClose={isSubmitting}
       title="Update goal status"
       data-testid="goal-status-dialog"
       footer={

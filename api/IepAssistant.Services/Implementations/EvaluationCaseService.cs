@@ -120,11 +120,13 @@ public class EvaluationCaseService : IEvaluationCaseService
                 return ServiceResult<EvaluationCaseModel>.FailureResult("The consent document must be a PDF.");
             if (model.FileStream.CanSeek && model.FileStream.Length > MaxConsentFileBytes)
                 return ServiceResult<EvaluationCaseModel>.FailureResult("The consent document must be 10 MB or smaller.");
+            if (!await PdfUploadGuard.LooksLikePdfAsync(model.FileStream, ct))
+                return ServiceResult<EvaluationCaseModel>.FailureResult("The consent document must be a PDF.");
 
             var blobPath = $"evaluations/{kase!.Id}/consent.pdf";
             await _blob.UploadAsync(blobPath, model.FileStream, "application/pdf", ct);
             kase.ConsentBlobPath = blobPath;
-            kase.ConsentFileName = string.IsNullOrWhiteSpace(model.FileName) ? "consent.pdf" : model.FileName;
+            kase.ConsentFileName = PdfUploadGuard.SafeFileName(model.FileName, "consent.pdf");
         }
 
         kase!.ConsentReceivedAt = model.ReceivedAt;

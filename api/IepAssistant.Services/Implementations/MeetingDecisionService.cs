@@ -27,6 +27,7 @@ public class MeetingDecisionService : IMeetingDecisionService
     private const string TextRequiredMessage = "Decision text is required.";
     private const int MaxTextLength = 2000;
     private const int MaxTargetLabelLength = 500;
+    private const int MaxTargetRowIdLength = 64; // matches the MeetingDecisions.TargetRowId column
     private const int ProposedEditWindowDays = 60;
 
     private readonly ApplicationDbContext _context;
@@ -60,6 +61,8 @@ public class MeetingDecisionService : IMeetingDecisionService
         var text = model.Text.Trim();
         if (text.Length > MaxTextLength)
             return ServiceResult<MeetingDecisionModel>.FailureResult($"Decision text must be {MaxTextLength} characters or fewer.");
+        if (model.TargetRowId is { Length: > MaxTargetRowIdLength })
+            return ServiceResult<MeetingDecisionModel>.FailureResult($"Target row id must be {MaxTargetRowIdLength} characters or fewer.");
 
         var meeting = await LoadMeetingHeaderAsync(meetingId, ct);
         if (meeting == null)

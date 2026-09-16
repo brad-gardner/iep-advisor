@@ -37,11 +37,15 @@ export function useDistrictExports(): UseDistrictExportsResult {
 
   useEffect(() => {
     let active = true;
+    // Latest request wins: a slow poll that resolves after a newer one (or after a manual reload)
+    // must not roll the table back to an older snapshot.
+    let generation = 0;
 
     async function load() {
+      const mine = ++generation;
       try {
         const res = await listDistrictExports();
-        if (!active) return;
+        if (!active || mine !== generation) return;
         if (res.success && res.data) {
           jobsRef.current = res.data;
           setJobs(res.data);
@@ -50,9 +54,9 @@ export function useDistrictExports(): UseDistrictExportsResult {
           setError(res.message ?? 'Could not load export jobs.');
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load export jobs.'));
+        if (active && mine === generation) setError(apiErrorMessage(err, 'Could not load export jobs.'));
       } finally {
-        if (active) setIsLoading(false);
+        if (active && mine === generation) setIsLoading(false);
       }
     }
 

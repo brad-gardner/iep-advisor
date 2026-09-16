@@ -68,6 +68,9 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
         => new(ctx, new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance), blob, NullLogger<AuthoredDocumentPdfService>.Instance);
 
     // ---- Blob fakes ----
+    /// <summary>The smallest byte sequence the upload guard accepts as a PDF.</summary>
+    private static readonly byte[] PdfBytes = System.Text.Encoding.ASCII.GetBytes("%PDF-1.4 fake");
+
     private sealed class SuccessBlobStorageFake : IBlobStorageService
     {
         public string? LastBlobPath { get; private set; }
@@ -1096,6 +1099,7 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
             Assert.Equal(originalVersionId, newInstance.AmendsVersionId);
             Assert.Equal("Change in services", newInstance.AmendmentReason);
             Assert.Equal(DocumentInstanceStatus.Draft, newInstance.Status);
+            Assert.NotNull(newInstance.RowVersion); // concurrency token live from the first read, like CreateAsync
             // Prefilled VERBATIM — every _rowId survives the copy.
             Assert.Contains(rowId1.ToString(), newInstance.ValuesJson);
             Assert.Contains(rowId2.ToString(), newInstance.ValuesJson);
@@ -1154,7 +1158,7 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
             var service = CreateSignedArtifactService(ctx, blob);
             var upload = await service.UploadAsync(s.CollaboratorUserId, versionId, new UploadSignedArtifactModel
             {
-                FileStream = new MemoryStream(new byte[] { 1, 2, 3 }),
+                FileStream = new MemoryStream(PdfBytes),
                 FileName = "signed.pdf",
                 ContentType = "application/pdf",
                 SizeBytes = 3,
@@ -1187,7 +1191,7 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
             var service = CreateSignedArtifactService(ctx, blob);
             var upload = await service.UploadAsync(s.CollaboratorUserId, versionId, new UploadSignedArtifactModel
             {
-                FileStream = new MemoryStream(new byte[] { 4, 5 }),
+                FileStream = new MemoryStream(PdfBytes),
                 FileName = "signed2.pdf",
                 ContentType = "application/pdf",
                 SizeBytes = 2,
@@ -1214,13 +1218,51 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
         var service = CreateSignedArtifactService(ctx, new SuccessBlobStorageFake());
         var upload = await service.UploadAsync(s.CollaboratorUserId, versionId, new UploadSignedArtifactModel
         {
-            FileStream = new MemoryStream(new byte[] { 1 }),
+            FileStream = new MemoryStream(PdfBytes),
             FileName = "x.pdf",
             ContentType = "application/pdf",
             SizeBytes = 1,
             SignatureStatus = SignatureStatus.Unsigned
         });
         Assert.False(upload.Success);
+    }
+
+    [Fact]
+    public async Task SignedArtifactUpload_ChecksTheBytesNotTheHeader_AndStoresABareFileName()
+    {
+        var s = SeedSchoolWithStudent("sig-guard");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered);
+
+        using var ctx = CreateContext();
+        var blob = new SuccessBlobStorageFake();
+        var service = CreateSignedArtifactService(ctx, blob);
+
+        // A declared application/pdf content type does not make an executable a PDF.
+        var notPdf = await service.UploadAsync(s.CollaboratorUserId, versionId, new UploadSignedArtifactModel
+        {
+            FileStream = new MemoryStream(new byte[] { 0x4D, 0x5A, 0x90, 0x00, 0x03 }),
+            FileName = "signed.pdf",
+            ContentType = "application/pdf",
+            SizeBytes = 5,
+            SignatureStatus = SignatureStatus.Signed
+        });
+        Assert.False(notPdf.Success);
+        Assert.Contains("PDF", notPdf.Message);
+        Assert.Empty(ctx.SignedArtifacts);
+
+        // A traversal-shaped client file name is reduced to a bare name before it is stored.
+        var traversal = await service.UploadAsync(s.CollaboratorUserId, versionId, new UploadSignedArtifactModel
+        {
+            FileStream = new MemoryStream(PdfBytes),
+            FileName = "../../etc/evil.pdf",
+            ContentType = "application/pdf",
+            SizeBytes = PdfBytes.Length,
+            SignatureStatus = SignatureStatus.Signed
+        });
+        Assert.True(traversal.Success, traversal.Message);
+        Assert.Equal("evil.pdf", traversal.Data!.FileName);
+        Assert.DoesNotContain("..", ctx.SignedArtifacts.Single().FileName);
     }
 
     public void Dispose() => _connection.Dispose();

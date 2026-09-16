@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AxiosError } from 'axios';
 import { apiErrorMessage } from '@/lib/api-error';
 import { generateBrief, getBrief } from '../api/meeting-brief-api';
@@ -27,9 +27,13 @@ export function useMeetingBrief(meetingId: number): UseMeetingBriefResult {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
 
+  // The meeting this hook currently shows; a regenerate that resolves after the route moved to
+  // another meeting must not overwrite that meeting's brief (the page is not remounted per id).
+  const currentMeetingRef = useRef(meetingId);
   useEffect(() => {
     if (!meetingId) return;
     let active = true;
+    currentMeetingRef.current = meetingId;
     (async () => {
       try {
         const res = await getBrief(meetingId);
@@ -63,6 +67,7 @@ export function useMeetingBrief(meetingId: number): UseMeetingBriefResult {
     setGenerateError(null);
     try {
       const res = await generateBrief(meetingId);
+      if (currentMeetingRef.current !== meetingId) return; // superseded by a meeting switch
       if (res.success && res.data) {
         setBrief(res.data);
         setNotFound(false);
@@ -71,9 +76,10 @@ export function useMeetingBrief(meetingId: number): UseMeetingBriefResult {
         setGenerateError(res.message ?? 'Could not generate the brief.');
       }
     } catch (err) {
+      if (currentMeetingRef.current !== meetingId) return;
       setGenerateError(apiErrorMessage(err, 'Could not generate the brief.'));
     } finally {
-      setIsGenerating(false);
+      if (currentMeetingRef.current === meetingId) setIsGenerating(false);
     }
   }, [meetingId]);
 

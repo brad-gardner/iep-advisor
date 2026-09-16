@@ -409,6 +409,9 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             DocumentTemplateVersionId = version.DocumentTemplateVersionId,
             Status = DocumentInstanceStatus.Draft,
             ValuesJson = version.ValuesJson,
+            // Same as DocumentInstanceService.CreateAsync: a live concurrency token from the first read,
+            // so two staff opening the fresh amendment cannot silently overwrite each other.
+            RowVersion = Guid.NewGuid().ToByteArray(),
             AmendsVersionId = version.Id,
             AmendmentReason = reason,
             EffectiveDate = model.EffectiveDate,
@@ -722,18 +725,9 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
     /// </summary>
     private async Task<bool> ParentCanViewStudentAsync(int userId, int studentId, CancellationToken ct)
     {
-        var linkedChildIds = await _context.ChildLinks
-            .AsNoTracking()
-            .Where(l => l.SchoolStudentId == studentId && l.IsActive && l.AcceptedAt != null && l.ChildProfileId != null)
-            .Select(l => l.ChildProfileId!.Value)
-            .ToListAsync(ct);
-
-        foreach (var childId in linkedChildIds)
-        {
-            if (await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Viewer, ct))
-                return true;
-        }
-        return false;
+        // One rule for "is this caller a parent of this student" — ParentAccessResolver (plan 6) is
+        // the shared implementation; the version/artifact read paths must never drift from it.
+        return await ParentAccessResolver.ResolveChildIdAsync(_context, _accessService, userId, studentId, AccessRole.Viewer, ct) != null;
     }
 
     private sealed record InstanceHeader(int SchoolStudentId, int DocumentTypeId, DocumentInstanceStatus Status);
