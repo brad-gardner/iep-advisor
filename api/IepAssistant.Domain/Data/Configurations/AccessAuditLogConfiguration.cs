@@ -16,7 +16,7 @@ public class AccessAuditLogConfiguration : IEntityTypeConfiguration<AccessAuditL
         builder.ToTable("AccessAuditLogs", t => t.HasTrigger("TR_AccessAuditLogs_Immutable"));
 
         // The hash backfill asks "any unhashed rows left?" on every restart; a filtered index turns that
-        // into a probe instead of a scan of an ever-growing table (SQL Server filter syntax; SQLite ignores).
+        // into a probe instead of a scan of an ever-growing table (the bracket-quoted filter is valid on both providers).
         builder.HasIndex(a => a.Id)
             .HasDatabaseName("IX_AccessAuditLogs_Unhashed")
             .HasFilter("[Hash] IS NULL");

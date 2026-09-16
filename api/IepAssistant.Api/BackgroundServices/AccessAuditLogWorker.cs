@@ -14,9 +14,9 @@ namespace IepAssistant.Api.BackgroundServices;
 /// inside its own SERIALIZABLE transaction (the latest row by Id), so two API instances writing at
 /// once — a rolling deploy, an autoscale — serialize on the tip instead of forking the chain; the
 /// loser's transaction fails (SQL Server: a deadlock/serialization error, caught by the retry loop) and is
-/// retried against the new tip. Nothing about the chain depends on a single process. The unit suite proves
-/// the unforked-chain property against SQLite's database lock; SQL Server's range-lock/deadlock behaviour
-/// itself is exercised only by a live environment.</para>
+/// retried against the new tip. Nothing about the chain depends on a single process. The unit suite drives
+/// two workers on separate threads against a file-backed SQLite database (whose writer lock stands in for
+/// SQL Server's range locks); SQL Server's own lock/deadlock behaviour is exercised only by a live environment.</para>
 ///
 /// <para><b>Durability (decision 1):</b> a batch that still fails after <see cref="MaxAttempts"/> retries
 /// (backoff 1s/5s/30s) is staged into <see cref="PendingAuditEvent"/> instead of being dropped; on host

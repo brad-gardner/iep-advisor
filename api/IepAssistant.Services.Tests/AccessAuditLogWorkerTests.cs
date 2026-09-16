@@ -217,13 +217,20 @@ public sealed class AccessAuditLogWorkerTests : IDisposable
             var a = new AccessAuditLogWorker(new AuditLogger(), scopeFactory, NullLogger<AccessAuditLogWorker>.Instance, zero);
             var b = new AccessAuditLogWorker(new AuditLogger(), scopeFactory, NullLogger<AccessAuditLogWorker>.Instance, zero);
 
-            var tasks = new List<Task>();
-            for (var round = 0; round < 5; round++)
+            // Microsoft.Data.Sqlite's "async" ADO.NET calls complete synchronously, so invoking the
+            // workers inline would run them one after the other. Each side runs on its own thread pool
+            // thread, released by a barrier so both begin their first transaction at the same moment.
+            using var start = new Barrier(2);
+            async Task Writer(AccessAuditLogWorker worker, int offset, int rows)
             {
-                tasks.Add(InvokePrivateAsync(a, "PersistBatchWithRetryAsync", new List<AuditEntry> { Entry(round * 10 + 1), Entry(round * 10 + 2) }, CancellationToken.None));
-                tasks.Add(InvokePrivateAsync(b, "PersistBatchWithRetryAsync", new List<AuditEntry> { Entry(round * 10 + 5) }, CancellationToken.None));
+                start.SignalAndWait();
+                for (var round = 0; round < 5; round++)
+                {
+                    var batch = Enumerable.Range(0, rows).Select(i => Entry(round * 10 + offset + i)).ToList();
+                    await InvokePrivateAsync(worker, "PersistBatchWithRetryAsync", batch, CancellationToken.None);
+                }
             }
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(Task.Run(() => Writer(a, 1, 2)), Task.Run(() => Writer(b, 5, 1)));
 
             using var verify = provider.CreateScope();
             var ctx = verify.ServiceProvider.GetRequiredService<ApplicationDbContext>();
