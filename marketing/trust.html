@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trust &amp; privacy — IEP Advisor</title>
+  <meta name="description"
+    content="How IEP Advisor handles student and family data: retention and deletion, sub-processors, AI governance, and our accessibility commitment.">
+  <link rel="canonical" href="https://iep-advisor.com/trust.html">
+  <link rel="icon" href="favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Lora:wght@400;600;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              teal: {
+                50: '#EDF8F5',
+                100: '#C8EEE6',
+                200: '#A3E4D7',
+                300: '#6DD4C0',
+                400: '#3BC4A9',
+                500: '#1A9478',
+                600: '#0F6652',
+                700: '#0A4D3E',
+                800: '#06342A',
+              },
+              amber: {
+                50: '#FEF7EC',
+                100: '#FCE8C0',
+                200: '#F9D98A',
+                300: '#F0C050',
+                400: '#D4820F',
+                500: '#A8620A',
+                600: '#7C4808',
+              },
+              slate: {
+                50: '#F5F7F7',
+                100: '#E8ECEC',
+                200: '#D1D8D8',
+                300: '#A8B5B5',
+                400: '#7F9292',
+                500: '#5A6F6F',
+                600: '#3E5252',
+                700: '#2C3C3C',
+                800: '#1E2A2A',
+              },
+              red: '#B91C1C',
+            },
+          },
+          fontFamily: {
+            serif: ['Lora', 'Georgia', 'serif'],
+            sans: ['DM Sans', 'system-ui', 'sans-serif'],
+          },
+          borderRadius: {
+            button: '8px',
+            card: '12px',
+          },
+        },
+      },
+    }
+  </script>
+
+  <style>
+    html {
+      scroll-behavior: smooth;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      .animate-fade-up {
+        animation: none !important;
+        opacity: 1 !important;
+      }
+    }
+
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      color: #1E2A2A;
+    }
+
+    /* Hero background pattern */
+    .hero-bg {
+      background-color: #FAFCFB;
+      background-image:
+        radial-gradient(circle at 20% 50%, #EDF8F510 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, #EDF8F520 0%, transparent 40%);
+    }
+
+    .hero-bg::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='20' cy='20' r='1' fill='%231A9478' fill-opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+
+    /* Fade-up animation */
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-fade-up {
+      animation: fadeUp 0.6s ease-out forwards;
+      opacity: 0;
+    }
+
+    .animate-delay-1 {
+      animation-delay: 0.1s;
+    }
+
+    .animate-delay-2 {
+      animation-delay: 0.25s;
+    }
+
+    .animate-delay-3 {
+      animation-delay: 0.4s;
+    }
+
+    /* Underline accent */
+    .heading-underline {
+      text-decoration-color: #D4820F;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 4px;
+    }
+
+    /* Feature card hover */
+    .feature-card {
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .feature-card:hover {
+      border-color: #C8EEE6;
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+
+<body class="font-sans text-brand-slate-700 bg-white antialiased">
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:px-3 focus:py-2 focus:rounded-button">Skip to content</a>
+  <header class="border-b border-brand-slate-100">
+    <nav class="max-w-3xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between" aria-label="Main navigation">
+      <a href="index.html" class="font-serif text-lg text-brand-slate-800">IEP Advisor</a>
+      <div class="flex items-center gap-6 text-sm">
+        <a href="index.html#schools" class="text-brand-slate-500 hover:text-brand-teal-500 transition-colors">For schools</a>
+        <a href="https://app.iep-advisor.com" class="text-brand-slate-400 hover:text-brand-slate-600 transition-colors">Sign In</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main" class="max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-12">
+    <div>
+      <p class="text-xs font-medium tracking-widest uppercase text-brand-teal-500 mb-3">Trust &amp; privacy</p>
+      <h1 class="font-serif text-3xl sm:text-4xl font-semibold text-brand-slate-800">How we handle student and family data</h1>
+      <p class="mt-4 text-brand-slate-500 leading-relaxed">
+        IEP Advisor holds some of the most sensitive records a school keeps. This page states, plainly, what we store,
+        who can see it, how long we keep it, which vendors touch it, and how our AI features are governed.
+        <span class="block mt-2 text-sm text-brand-slate-400">Last updated 2026-09-16. Statements describe the product as configured; a signed data-processing agreement governs a pilot.</span>
+      </p>
+    </div>
+
+    <section aria-labelledby="data-heading">
+      <h2 id="data-heading" class="font-serif text-2xl text-brand-slate-800">What we store and who sees it</h2>
+      <ul class="mt-4 space-y-2 text-brand-slate-600 leading-relaxed list-disc pl-5">
+        <li><strong>School records</strong> (rosters, IEP/ETR/504 drafts and finalized versions, meetings, decisions, goal progress, evaluation cases, signed copies) belong to the district. Access follows role and student assignment: a case manager sees their students; a provider sees the students on their team; administrators see their school or district.</li>
+        <li><strong>Family data</strong> (child profile, uploaded documents, contributions, questions asked of the AI) belongs to the parent. Private questions and notes are never visible to school staff. What a parent chooses to <em>respond</em> to a shared draft is visible to the student's team.</li>
+        <li><strong>Immutable records.</strong> Finalized versions, shared revisions and the audit log cannot be edited or deleted — the application layer and the database both refuse. Every view, share, export and delete is written to an audit log that administrators can review, and the log's integrity is checked daily.</li>
+        <li><strong>Exports.</strong> A district can export its full record (PDFs, signed copies, values, goals, meetings, family responses that staff could already see, and an audit extract) at any time. Private parent notes are never included.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="retention-heading">
+      <h2 id="retention-heading" class="font-serif text-2xl text-brand-slate-800">Retention and deletion</h2>
+      <ul class="mt-4 space-y-2 text-brand-slate-600 leading-relaxed list-disc pl-5">
+        <li>School records are retained for the term of the agreement and returned or deleted at its end, per the district's records schedule.</li>
+        <li>A parent can request account deletion in the app. The request can be cancelled for <strong>30 days</strong> (including from the emailed link, even if the session was revoked); after that the account, children, uploaded documents, analyses and private notes are purged, including files in storage.</li>
+        <li>A staff account that is closed is anonymised; the school records it authored stay with the district.</li>
+        <li>Backups roll off on a fixed schedule; purged data leaves backups within that window.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="ai-heading">
+      <h2 id="ai-heading" class="font-serif text-2xl text-brand-slate-800">AI governance</h2>
+      <ul class="mt-4 space-y-2 text-brand-slate-600 leading-relaxed list-disc pl-5">
+        <li><strong>A human approves every word.</strong> AI drafts suggestions, explanations, briefs and summaries; nothing is written to a record or sent to a family without a person accepting or editing it.</li>
+        <li><strong>Sources are shown.</strong> Suggestions cite the evidence they came from (prior versions, evaluations, family input); answers to parents cite the draft. Ids the model references are checked by the server — unknown citations are dropped.</li>
+        <li><strong>Data sent to the model is bounded.</strong> Only the document or draft in question and evidence the user is already allowed to see; family questions never include other students or staff-only notes. Document text is not written to application logs.</li>
+        <li><strong>No training on customer data</strong> as configured: our model provider is used under API terms that exclude training on submitted content.</li>
+        <li><strong>Billing.</strong> AI use by families on a district's shared drafts is billed to the district, never gated by a parent's subscription.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="subprocessors-heading">
+      <h2 id="subprocessors-heading" class="font-serif text-2xl text-brand-slate-800">Sub-processors</h2>
+      <div class="mt-4 overflow-x-auto">
+        <table class="min-w-full text-sm text-left text-brand-slate-600">
+          <thead class="text-xs uppercase tracking-wide text-brand-slate-400 border-b border-brand-slate-100">
+            <tr><th class="py-2 pr-4">Vendor</th><th class="py-2 pr-4">Purpose</th><th class="py-2">Data</th></tr>
+          </thead>
+          <tbody class="divide-y divide-brand-slate-100">
+            <tr><td class="py-2 pr-4">Microsoft Azure</td><td class="py-2 pr-4">Hosting, database, file storage, email delivery (Communication Services)</td><td class="py-2">All application data; email addresses and message content</td></tr>
+            <tr><td class="py-2 pr-4">Anthropic</td><td class="py-2 pr-4">AI drafting, explanations, briefs</td><td class="py-2">The document/draft and evidence in scope for the request; no training on content</td></tr>
+            <tr><td class="py-2 pr-4">Stripe</td><td class="py-2 pr-4">Parent subscription billing</td><td class="py-2">Parent name, email, payment details (held by Stripe)</td></tr>
+            <tr><td class="py-2 pr-4">Sentry</td><td class="py-2 pr-4">Error monitoring</td><td class="py-2">Technical error data with a numeric user id; no email, no request bodies</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="mt-3 text-sm text-brand-slate-400">We notify districts before adding a sub-processor.</p>
+    </section>
+
+    <section id="accessibility" aria-labelledby="a11y-heading">
+      <h2 id="a11y-heading" class="font-serif text-2xl text-brand-slate-800">Accessibility</h2>
+      <p class="mt-4 text-brand-slate-600 leading-relaxed">
+        We build to <strong>WCAG 2.1 AA</strong>: keyboard-operable dialogs and forms, live regions for asynchronous
+        results, visible focus, reduced-motion support, and phone-first reading views for families. Charts carry a
+        text alternative. If something gets in your way, email
+        <a href="mailto:support@iep-advisor.com" class="text-brand-teal-600 underline">support@iep-advisor.com</a> — we
+        reply within one business day and treat accessibility defects as blocking.
+      </p>
+    </section>
+
+    <section aria-labelledby="agreements-heading">
+      <h2 id="agreements-heading" class="font-serif text-2xl text-brand-slate-800">Agreements and contact</h2>
+      <p class="mt-4 text-brand-slate-600 leading-relaxed">
+        A data-processing agreement (including FERPA "school official" terms and a breach-notification commitment) is
+        available on request and precedes any pilot with real student data. Questions:
+        <a href="mailto:privacy@iep-advisor.com" class="text-brand-teal-600 underline">privacy@iep-advisor.com</a>.
+      </p>
+    </section>
+  </main>
+
+  <footer class="py-10 px-4 sm:px-6 border-t border-brand-slate-100 bg-brand-slate-50" role="contentinfo">
+    <div class="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs text-brand-slate-400">
+      <span>&copy; 2026 IEP Advisor</span>
+      <span class="hidden sm:inline">&middot;</span>
+      <a href="index.html" class="hover:text-brand-slate-600 transition-colors">Home</a>
+      <span class="hidden sm:inline">&middot;</span>
+      <a href="mailto:support@iep-advisor.com" class="hover:text-brand-slate-600 transition-colors">Support</a>
+    </div>
+  </footer>
+</body>
+
+</html>

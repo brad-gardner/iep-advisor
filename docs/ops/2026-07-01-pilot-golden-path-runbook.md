@@ -6,10 +6,11 @@
 
 ## Pre-flight (dev stack)
 
-- [ ] API running (`dotnet run` in `api/IepAssistant.Api`) — reachable at its HTTPS port (7200 in this env).
-- [ ] Web running at `https://localhost:5200` (the value of `App:FrontendUrl` / e2e `BASE_URL`). Note: `vite` defaults to `5173`; the pilot walkthrough and e2e expect **5200** — start web with the port the config points at, or the invite links (built from `App:FrontendUrl`) won't match the browser origin.
-- [ ] `Email:ExposeLinksForTesting = true` in dev so invite URLs surface in API responses (already set in `appsettings.Development.json`).
-- [ ] DB migrations applied: `AddAuditLogActorCreatedAtIndex`, `AddStaffInviteExpiryReminder` (run `dotnet ef database update` in `api/IepAssistant.Api`).
+- [ ] API running: `cd api && ASPNETCORE_ENVIRONMENT=Development dotnet run --project IepAssistant.Api --no-launch-profile --urls https://localhost:7200`.
+- [ ] Web running at `https://localhost:5200` (`cd web && npx vite --port 5200`) — the value of `App:FrontendUrl`; invite links are built from it, so `5173` will not match.
+- [ ] `Email:ExposeLinksForTesting = true` in dev so invite URLs surface in API responses (set in `appsettings.Development.json`). Outbound email is queued in `OutboundEmails`; without ACS the worker logs "would be sent" and the row is marked Sent. Failures are visible at `/admin/email`.
+- [ ] DB migrations applied (`dotnet ef database update --project IepAssistant.Domain --startup-project IepAssistant.Api` from `api/`).
+- [ ] **Demo district (optional, recommended for a demo):** `dotnet run --project IepAssistant.Api -- seed-demo` (add `--reset` to wipe and recreate). Prints the logins; every account uses the printed password. Refused in Production.
 
 ## Happy path
 
@@ -25,6 +26,13 @@ Run as a brand-new district (fresh email each pass — the flow is one-district-
 8. **Activity log (NEW)** — as the staff member, open/view the student's IEP draft (creates an audit "View"). As the admin, open **Administration → Activity log** (`/educator/admin/activity`): confirm the staff member's activity appears with a human action verb, the staff member's name, and the student/resource name. Exercise the filters (staff member, action, date range) and **Load more** if there are enough rows.
 9. **Attention deep-link** — on the dashboard, click a **Needs attention → View all** link; confirm it lands on `/educator/students?attention=no-staff` (or `no-parent`) with the filter indicator banner, showing only the matching students, and **Clear** restores the full roster.
 
+10. **Roster import** — `/educator/students` → **Import** → upload the XLSX template (see `docs/solutions/performance-issues/2026-09-15-set-based-xlsx-import-…`) → preview → commit. Rows land with external ids, grade/disability enums and timeline dates; errors are per-row.
+11. **Author and finalize** — student → **Documents** → *New document* (OH IEP) → the editor prefills from the evidence bundle (prior versions, ETR, parent contributions) → AI assist inserts cited suggestions → **Finalize**. The version renders as an OH form-style PDF (PR-07 header, numbered sections, "Not addressed", goal blocks, signature blocks) and projects **goal records**.
+12. **Share with the family** — editor → **Share with family** → the linked parent sees the frozen revision at `/children/{id}/shared-drafts/{rev}` with Explain / Ask (private) / Respond; staff see responses in the **Converge** tab and resolve them.
+13. **Meeting** — student → **Meetings** → schedule (default participants, ICS, reminders) → **Brief** (summary, changes, resource commitments, procedural checklist) → mark **Held** → record **decisions** → the editor lists them as **proposed edits** → **Family summary** drafted, edited, sent.
+14. **Progress** — student → **Goals** → *Log progress* (60 seconds) → the trajectory sparkline updates; stale goals (45 days) surface on the home obligation list.
+15. **Record** — version detail → **Attach signed PDF** (status → Signed) → **Amend** (opens a prefilled draft; finalize records the chain) → student **Export record** → `/educator/admin/exports` → download the ZIP (manifest with sha256; private parent notes never included).
+
 ## Unhappy branches (must also pass)
 
 - [ ] **Accept an expired invite** — take an invite whose window has passed (or manually age `InviteExpiresAt`); the accept page must show a clear "invite expired" message, not a crash or silent failure. This is the reason Phase 3 exists — confirm the dashboard **Invites** tile flags such invites as *Expired* and they remain resendable.
@@ -35,7 +43,7 @@ Run as a brand-new district (fresh email each pass — the flow is one-district-
 
 ## ACS email config verification (carried from launch checklist)
 
-Expiry reminders and all invite emails silently no-op without ACS configured. Before pilot, verify in the target environment:
+All outbound email is queued and sent by `OutboundEmailWorker`; without ACS configured outside Development the API logs a startup **warning** and `/admin/email` shows *Email delivery is not configured*. Before pilot, verify in the target environment:
 
 - [ ] `Email__ConnectionString` set (ACS resource).
 - [ ] `Email__SenderAddress` set and verified on the ACS domain.
