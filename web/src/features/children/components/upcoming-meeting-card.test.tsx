@@ -49,6 +49,23 @@ describe('UpcomingMeetingCard', () => {
     expect(screen.queryByTestId('upcoming-meeting-error')).not.toBeInTheDocument();
   });
 
+  it('clears a previous RSVP error when the card switches to another child', async () => {
+    const user = userEvent.setup();
+    meetingsApi.listChildMeetings.mockResolvedValue({
+      success: true,
+      data: [makeMeeting({ startsAtUtc: '2099-01-01T15:00:00.000Z', myInviteStatus: 'Pending' })],
+    });
+    meetingsApi.rsvpToMeeting.mockRejectedValue(apiRejection('This meeting already started.'));
+    const { rerender } = render(<UpcomingMeetingCard childId={5} />);
+    await screen.findByTestId('upcoming-meeting-card');
+    await user.click(screen.getByTestId('upcoming-meeting-accept'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('This meeting already started.');
+
+    rerender(<UpcomingMeetingCard childId={6} />);
+    await screen.findByTestId('upcoming-meeting-card');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('disables the whole RSVP group while one response is in flight', async () => {
     const user = userEvent.setup();
     meetingsApi.listChildMeetings.mockResolvedValue({

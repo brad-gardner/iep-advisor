@@ -40,6 +40,14 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
   const [responding, setResponding] = useState<InviteStatus | null>(null);
   // Bumped by the "Try again" button to re-run the load effect below.
   const [retryToken, setRetryToken] = useState(0);
+  // The overview route keeps this card mounted across a `:childId` change (a
+  // bell link from one child to another), so per-child RSVP state is reset
+  // during render when the child changes — same idiom as meeting-drawer.tsx.
+  const [seenChildId, setSeenChildId] = useState(childId);
+  if (childId !== seenChildId) {
+    setSeenChildId(childId);
+    setRsvpError(null);
+  }
 
   useEffect(() => {
     let active = true;

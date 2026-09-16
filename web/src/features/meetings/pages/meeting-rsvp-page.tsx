@@ -35,6 +35,7 @@ export function MeetingRsvpPage() {
   if (token !== seenToken) {
     setSeenToken(token);
     setChanging(false);
+    setRespondError(null);
   }
   // Bumped by the "Try again" button to re-run the token load effect below.
   const [retryToken, setRetryToken] = useState(0);
