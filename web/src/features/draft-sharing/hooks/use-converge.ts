@@ -18,18 +18,25 @@ export function useConverge(instanceId: number): UseConvergeResult {
   const [converge, setConverge] = useState<ConvergeDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
+  const [loadedFor, setLoadedFor] = useState<number | null>(null);
 
   useEffect(() => {
     if (!instanceId) return;
     let active = true;
     (async () => {
-      setConverge(null);
+      // A refresh (e.g. after "Share again") keeps the current data on screen while it
+      // reloads, so an open reply/resolve dialog — and the reply typed into it — survives.
+      // Only a genuine instance switch drops the previous document's data.
       setError(null);
       try {
         const res = await getConverge(instanceId);
         if (!active) return;
-        if (res.success && res.data) setConverge(res.data);
-        else setError(res.message ?? 'Could not load the converge view.');
+        if (res.success && res.data) {
+          setConverge(res.data);
+          setLoadedFor(instanceId);
+        } else {
+          setError(res.message ?? 'Could not load the converge view.');
+        }
       } catch (err) {
         if (active) setError(apiErrorMessage(err, 'Could not load the converge view.'));
       }
@@ -38,6 +45,8 @@ export function useConverge(instanceId: number): UseConvergeResult {
       active = false;
     };
   }, [instanceId, retryToken]);
+
+  const current = loadedFor === instanceId ? converge : null;
 
   const applyResolvedResponse = useCallback((updated: ConvergeDto['openResponses'][number]) => {
     setConverge((cur) => {
@@ -51,8 +60,8 @@ export function useConverge(instanceId: number): UseConvergeResult {
   }, []);
 
   return {
-    converge,
-    isLoading: converge === null && error === null,
+    converge: current,
+    isLoading: current === null && error === null,
     error,
     retry: () => setRetryToken((t) => t + 1),
     applyResolvedResponse,

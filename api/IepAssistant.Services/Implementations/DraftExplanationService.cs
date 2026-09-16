@@ -162,7 +162,15 @@ public class DraftExplanationService : IDraftExplanationService
                 var explanation = s.TryGetProperty("explanation", out var e) && e.ValueKind == JsonValueKind.String ? e.GetString()?.Trim() : null;
                 if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(explanation))
                     continue;
-                sections.Add(new ExplanationSectionModel { SectionId = $"s{++seq}", Title = title!, Explanation = explanation! });
+                // Resolve to the template section when the title matches one we rendered, so the client can
+                // attach the explanation to that section by id; an unresolved title keeps an ordinal id.
+                var resolved = rendered.ResolveSection(title!);
+                sections.Add(new ExplanationSectionModel
+                {
+                    SectionId = resolved?.Id.ToString() ?? $"s{++seq}",
+                    Title = resolved?.Title ?? title!,
+                    Explanation = explanation!
+                });
             }
         }
 

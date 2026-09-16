@@ -248,7 +248,9 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
 
           {meeting.canManage && (meeting.status === 'Held' || meeting.status === 'Continued') && (
             <div className="rounded-card border border-brand-slate-200 p-4">
-              <FamilySummaryPanel meetingId={meeting.id} />
+              {/* Keyed so a meeting switch remounts the panel: its draft text must never be
+                  saved or sent under the next meeting's id (see the drawer's own state reset). */}
+              <FamilySummaryPanel key={meeting.id} meetingId={meeting.id} />
             </div>
           )}
 

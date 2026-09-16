@@ -69,7 +69,7 @@ export function DraftItemCard({
       )}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-brand-slate-100 pt-3">
-        <ExplainPanel fieldKey={fieldKey} rowId={rowId} data-testid={`explain-${fieldKey}-${rowId ?? 'field'}`} />
+        <ExplainPanel target={{ kind: 'item', fieldKey, rowId }} data-testid={`explain-${fieldKey}-${rowId ?? 'field'}`} />
         <Button
           size="sm"
           variant="ghost"

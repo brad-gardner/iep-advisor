@@ -575,7 +575,7 @@ public class HomeService : IHomeService
                         DocumentTypeDisplayName = d.DocumentTypeDisplayName,
                         VersionNumber = d.RevisionNumber,
                         Date = d.SharedAt,
-                        LinkPath = $"/children/{docChild.ChildId}/shared-drafts/{d.RevisionNumber}"
+                        LinkPath = $"/children/{docChild.ChildId}/shared-drafts/{d.Id}" // route takes the revision id, not the per-document number
                     };
                 });
 

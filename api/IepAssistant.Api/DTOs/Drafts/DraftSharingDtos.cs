@@ -133,6 +133,7 @@ public class AskQuestionRequest
     public string Question { get; set; } = string.Empty;
 
     public Guid? TargetFieldKey { get; set; }
+    [MaxLength(64)]
     public string? TargetRowId { get; set; }
 }
 
@@ -163,6 +164,7 @@ public class ParentDraftNoteDto
     public string Answer { get; set; } = string.Empty;
     public Guid? TargetFieldKey { get; set; }
     public string? TargetRowId { get; set; }
+    public List<DraftCitationDto> Citations { get; set; } = new();
     public DateTime CreatedAt { get; set; }
 }
 
@@ -178,6 +180,7 @@ public class CreateResponseRequest
     public string Text { get; set; } = string.Empty;
 
     public Guid? TargetFieldKey { get; set; }
+    [MaxLength(64)]
     public string? TargetRowId { get; set; }
 }
 

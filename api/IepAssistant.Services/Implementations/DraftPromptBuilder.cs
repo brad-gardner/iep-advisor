@@ -1,13 +1,12 @@
 using System.Text;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
 /// <summary>One renderable line of a frozen revision: a scalar field, or one row of a table field.</summary>
-public sealed record DraftLine(Guid FieldKey, string? RowId, string Label, string SectionTitle, string Text)
+public sealed record DraftLine(Guid FieldKey, string? RowId, string Label, int SectionId, string SectionTitle, string Text)
 {
     /// <summary>The citation id the model is asked to use verbatim: <c>F:{fieldKey}</c> or <c>F:{fieldKey}|R:{rowId}</c>.</summary>
     public string Id => RowId == null ? $"F:{FieldKey}" : $"F:{FieldKey}|R:{RowId}";
@@ -17,6 +16,21 @@ public sealed record DraftLine(Guid FieldKey, string? RowId, string Label, strin
 public sealed record RenderedDraft(string Text, IReadOnlyList<DraftLine> Lines)
 {
     public DraftLine? Resolve(string id) => Lines.FirstOrDefault(l => string.Equals(l.Id, id.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Resolves a section title the model echoed back to the template section it came from
+    /// (case/whitespace-insensitive; a paraphrase that merely contains the real title still resolves).</summary>
+    public (int Id, string Title)? ResolveSection(string title)
+    {
+        var wanted = Normalize(title);
+        if (wanted.Length == 0) return null;
+        var sections = Lines.Select(l => (l.SectionId, l.SectionTitle)).Distinct().ToList();
+        var exact = sections.FirstOrDefault(s => Normalize(s.SectionTitle) == wanted);
+        if (exact != default) return exact;
+        var loose = sections.FirstOrDefault(s => wanted.Contains(Normalize(s.SectionTitle)) || Normalize(s.SectionTitle).Contains(wanted));
+        return loose == default ? null : loose;
+    }
+
+    private static string Normalize(string value) => string.Join(' ', value.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
 }
 
 /// <summary>
@@ -72,8 +86,8 @@ public static class DraftPromptBuilder
                     if (string.IsNullOrWhiteSpace(cellText)) continue;
 
                     var rowLabel = DraftRowLabeler.LabelForRow(row, columnLabels, columnSemantics, primarySemantic);
-                    var draftLine = new DraftLine(field.FieldKey, rowId, rowLabel, section.Title, cellText);
-                    var rendered = $"[{draftLine.Id}] {field.Label}: {OneLine(Data(Truncate(cellText, 1200)))}";
+                    var draftLine = new DraftLine(field.FieldKey, rowId, rowLabel, section.Id, section.Title, cellText);
+                    var rendered = $"[{draftLine.Id}] {SectionPrefix(section.Title)}{field.Label}: {OneLine(Data(Truncate(cellText, 1200)))}";
                     if (used + rendered.Length > charBudget)
                     {
                         sb.AppendLine("… (more omitted for length)");
@@ -89,8 +103,8 @@ public static class DraftPromptBuilder
                 var text = ScalarText(node, field.FieldType);
                 if (string.IsNullOrWhiteSpace(text)) continue;
 
-                var draftLine = new DraftLine(field.FieldKey, null, field.Label, section.Title, text);
-                var rendered = $"[{draftLine.Id}] {field.Label}: {OneLine(Data(Truncate(text, 1500)))}";
+                var draftLine = new DraftLine(field.FieldKey, null, field.Label, section.Id, section.Title, text);
+                var rendered = $"[{draftLine.Id}] {SectionPrefix(section.Title)}{field.Label}: {OneLine(Data(Truncate(text, 1500)))}";
                 if (used + rendered.Length > charBudget)
                 {
                     sb.AppendLine("… (more omitted for length)");
@@ -104,6 +118,11 @@ public static class DraftPromptBuilder
 
         return new RenderedDraft(Close(sb), lines);
     }
+
+    /// <summary>Each line names its section so the model can address sections by the title we know
+    /// (<c>[id] Section title › Field label: text</c>); the title is data-encoded like everything else.</summary>
+    private static string SectionPrefix(string sectionTitle) =>
+        string.IsNullOrWhiteSpace(sectionTitle) ? string.Empty : $"{OneLine(Data(sectionTitle.Trim()))} › ";
 
     private static string Close(StringBuilder sb)
     {
@@ -144,28 +163,12 @@ public static class DraftPromptBuilder
         return type == FieldType.RichText ? StripHtml(raw) : raw;
     }
 
-    private static readonly Regex TagStripper = new("<[^>]+>", RegexOptions.Compiled);
+    private static string StripHtml(string html) => PromptText.StripHtml(html);
 
-    private static string StripHtml(string html)
-    {
-        var text = TagStripper.Replace(html.Replace("</p>", "\n").Replace("<br>", "\n").Replace("<br/>", "\n"), string.Empty);
-        return System.Net.WebUtility.HtmlDecode(text).Trim();
-    }
+    public static string OneLine(string value) => PromptText.OneLine(value);
 
-    /// <summary>Collapses a value onto a single physical line — content can never open a new bracketed line.</summary>
-    public static string OneLine(string value) => value.Replace("\r", " ").Replace("\n", " ");
+    public static string Truncate(string? value, int max) => PromptText.Truncate(value, max);
 
-    public static string Truncate(string? value, int max)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return "(empty)";
-        value = value.Trim();
-        return value.Length <= max ? value : value[..max] + "…";
-    }
-
-    /// <summary>
-    /// Every value placed inside a <c>&lt;draft&gt;</c>/<c>&lt;notes&gt;</c> data tag passes through here:
-    /// tag delimiters are entity-encoded so document/parent text can never close the tag and escape the
-    /// data-not-instructions guard. Content is otherwise preserved.
-    /// </summary>
-    public static string Data(string? value) => value == null ? string.Empty : value.Replace("<", "&lt;").Replace(">", "&gt;");
+    /// <summary>See <see cref="PromptText.Data"/> — the shared data-tag guard.</summary>
+    public static string Data(string? value) => PromptText.Data(value);
 }

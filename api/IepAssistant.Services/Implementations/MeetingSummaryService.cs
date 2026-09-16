@@ -146,7 +146,20 @@ public class MeetingSummaryService : IMeetingSummaryService
             OperationType = "meeting_summary",
             CreatedAt = now
         }, ct);
-        await _context.SaveChangesAsync(ct);
+        try
+        {
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException) when (existing == null)
+        {
+            // Two first-time "Draft with AI" clicks raced on the unique MeetingId index. The winner's draft
+            // is as good as ours (same inputs) — return it instead of surfacing a 500.
+            _context.ChangeTracker.Clear();
+            var winner = await _context.MeetingSummaries.AsNoTracking().FirstOrDefaultAsync(s => s.MeetingId == meetingId, ct);
+            if (winner == null)
+                throw;
+            return ServiceResult<FamilyMeetingSummaryModel>.SuccessResult(await MapAsync(winner, ct));
+        }
 
         return ServiceResult<FamilyMeetingSummaryModel>.SuccessResult(await MapAsync(entity, ct));
     }

@@ -20,6 +20,12 @@ public class ParentDraftNote : BaseEntity, IAuditableEntity
     /// <summary>Optional target row id (`_rowId`) within a table field.</summary>
     public string? TargetRowId { get; set; }
 
+    /// <summary>
+    /// The resolved citations the answer was grounded in, as JSON (<c>[{fieldKey,rowId,label,excerpt}]</c>),
+    /// so a reloaded note still shows the parent *what in the draft* the answer came from.
+    /// </summary>
+    public string? CitationsJson { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public int? CreatedById { get; set; }

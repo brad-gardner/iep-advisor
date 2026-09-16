@@ -139,7 +139,7 @@ describe('SharedDraftReviewPage', () => {
       data: {
         revisionId: 55,
         generatedAt: '2026-09-10T00:00:00.000Z',
-        sections: [],
+        sections: [{ sectionId: '2', title: 'Present Levels (paraphrased)', explanation: 'This section describes how Jordan is doing now.' }],
         items: [
           { fieldKey: 'goals-field', rowId: 'row-1', label: 'Improve reading fluency', explanation: 'This goal targets reading speed.' },
           { fieldKey: 'goals-field', rowId: 'row-2', label: 'Improve math skills', explanation: 'This goal targets math accuracy.' },
@@ -156,6 +156,12 @@ describe('SharedDraftReviewPage', () => {
     await user.click(screen.getByTestId('explain-goals-field-row-2'));
     expect(await screen.findByText('This goal targets math accuracy.')).toBeInTheDocument();
 
+    // Narrative sections (no per-item cards) get the section-level explanation, matched by title.
+    await user.click(screen.getByTestId('explain-section-2'));
+    expect(await screen.findByText('This section describes how Jordan is doing now.')).toBeInTheDocument();
+    await user.click(screen.getByTestId('explain-section-1'));
+    expect(await screen.findByText('No explanation available for this section.')).toBeInTheDocument();
+
     expect(sharedDraftsApi.getDraftExplanations).toHaveBeenCalledTimes(1);
   });
 
@@ -166,7 +172,7 @@ describe('SharedDraftReviewPage', () => {
       noteId: 900,
       question: 'Is this ambitious enough?',
       answer: 'The goal appears appropriately ambitious given the baseline.',
-      citations: [],
+      citations: [{ fieldKey: 'goals-field', rowId: 'row-1', label: 'Improve reading fluency', excerpt: 'Baseline: 42 wpm' }],
       answeredAt: '2026-09-10T01:00:00.000Z',
       disclaimer: 'AI-generated, not legal advice.',
     };
@@ -191,6 +197,8 @@ describe('SharedDraftReviewPage', () => {
     expect(await screen.findByTestId('ask-question-drawer-goals-field-row-1-thread')).toHaveTextContent(
       'The goal appears appropriately ambitious given the baseline.'
     );
+    // The parent sees what in the draft the answer was grounded in.
+    expect(screen.getByTestId('note-citations-900')).toHaveTextContent('Based on: Improve reading fluency — “Baseline: 42 wpm”');
   });
 
   it('sends a response and shows it in "My responses" with the school reply once resolved', async () => {

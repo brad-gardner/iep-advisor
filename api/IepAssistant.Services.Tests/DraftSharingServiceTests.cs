@@ -68,7 +68,7 @@ public sealed class DraftSharingServiceTests : IDisposable
         int InstanceId, int StudentId, int TeacherId, int ParentId, int ChildId, int StudentUserId,
         Guid GoalsKey, Guid GoalCol, Guid BaselineCol, Guid PlaafpKey, Guid RowId);
 
-    private Scenario Seed(string prefix, bool policyEnabled = true, bool linkAccepted = true)
+    private Scenario Seed(string prefix, bool policyEnabled = true, bool linkAccepted = true, bool familyLinked = true)
     {
         using var ctx = CreateContext();
         var teacher = new User { Email = $"{prefix}-t@example.com", PasswordHash = "x", FirstName = "Steph", LastName = "Case", Role = UserRole.Educator };
@@ -93,16 +93,19 @@ public sealed class DraftSharingServiceTests : IDisposable
         ctx.ChildProfiles.Add(child);
         ctx.SaveChanges();
         ctx.ChildAccesses.Add(new ChildAccess { ChildProfileId = child.Id, UserId = parent.Id, Role = AccessRole.Owner, IsActive = true, AcceptedAt = DateTime.UtcNow });
-        ctx.ChildLinks.Add(new ChildLink
+        if (familyLinked)
         {
-            ChildProfileId = child.Id,
-            SchoolStudentId = student.Id,
-            IsActive = true,
-            AcceptedAt = linkAccepted ? DateTime.UtcNow : null,
-            LinkedAt = linkAccepted ? DateTime.UtcNow : null,
-            InviteExpiresAt = DateTime.UtcNow.AddDays(14)
-        });
-        ctx.StudentProfiles.Add(new StudentProfile { UserId = studentUser.Id, SchoolStudentId = student.Id });
+            ctx.ChildLinks.Add(new ChildLink
+            {
+                ChildProfileId = child.Id,
+                SchoolStudentId = student.Id,
+                IsActive = true,
+                AcceptedAt = linkAccepted ? DateTime.UtcNow : null,
+                LinkedAt = linkAccepted ? DateTime.UtcNow : null,
+                InviteExpiresAt = DateTime.UtcNow.AddDays(14)
+            });
+            ctx.StudentProfiles.Add(new StudentProfile { UserId = studentUser.Id, SchoolStudentId = student.Id });
+        }
         ctx.SaveChanges();
 
         var plaafp = Guid.NewGuid();
@@ -291,6 +294,37 @@ public sealed class DraftSharingServiceTests : IDisposable
             var again = await services.Sharing.WithdrawAsync(s.TeacherId, s.InstanceId, revisionId, default);
             Assert.False(again.Success);
         }
+
+        // History stays readable to the family — the revision is flagged, not hidden.
+        using (var ctx = CreateContext())
+        {
+            var services = Services(ctx);
+            var detail = await services.Sharing.GetForParentAsync(s.ParentId, revisionId, default);
+            Assert.True(detail.Success, detail.Message);
+            Assert.Equal(SharedDraftStatus.Withdrawn, detail.Data!.Status);
+            Assert.NotNull(detail.Data.WithdrawnAt);
+
+            var list = await services.Sharing.ListForParentAsync(s.ParentId, s.ChildId, default);
+            Assert.True(list.Success, list.Message);
+            Assert.Contains(list.Data!, r => r.Id == revisionId && r.Status == SharedDraftStatus.Withdrawn);
+        }
+    }
+
+    [Fact]
+    public async Task Share_SchoolOnlyStudent_RefusesWithNoRecipients_ButPreviewStillWorks()
+    {
+        var s = Seed("school-only", familyLinked: false);
+        using var ctx = CreateContext();
+        var services = Services(ctx);
+
+        var preview = await services.Sharing.PreviewRecipientsAsync(s.TeacherId, s.InstanceId, default);
+        Assert.True(preview.Success, preview.Message);
+        Assert.Empty(preview.Data!.Recipients);
+
+        var share = await services.Sharing.ShareAsync(s.TeacherId, s.InstanceId, null, default);
+        Assert.False(share.Success);
+        Assert.Contains("no family recipients", share.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(services.Notifications.Calls);
     }
 
     [Fact]

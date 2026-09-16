@@ -18,7 +18,7 @@ public static class DraftPrompts
         "direct, and specific — help the family understand what each goal, service, and accommodation " +
         "actually means for their child day to day.\n" +
         "Respond with ONLY a JSON object: {\"sections\": [{\"title\": \"<section title exactly as it " +
-        "appears in the draft>\", \"explanation\": \"<2-4 plain-language sentences>\"}], \"items\": " +
+        "appears before the › on the draft's lines>\", \"explanation\": \"<2-4 plain-language sentences>\"}], \"items\": " +
         "[{\"id\": \"<one bracketed id from the draft, exactly as given>\", \"explanation\": \"<1-2 " +
         "plain-language sentences about this specific item>\"}]}. Escape line breaks inside strings as " +
         "\\n. No markdown fences, no text outside the JSON.\n" + DraftPromptBuilder.SecurityGuard;

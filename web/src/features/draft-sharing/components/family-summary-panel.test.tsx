@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '@/components/ui/toast';
 import { apiRejection } from '@/test/axios-rejection';
@@ -80,6 +80,21 @@ describe('FamilySummaryPanel', () => {
     await waitFor(() => expect(sharedDraftsApi.updateMeetingSummary).toHaveBeenCalledWith(42, 'Updated summary text.'));
     await waitFor(() => expect(sharedDraftsApi.sendMeetingSummary).toHaveBeenCalledWith(42));
     expect(await screen.findByTestId('family-summary-sent')).toHaveTextContent('Updated summary text.');
+  });
+
+  it('blocks Send while a Save is still in flight (one write to the summary at a time)', async () => {
+    const user = userEvent.setup();
+    sharedDraftsApi.getMeetingSummary.mockResolvedValue(makeSummary());
+    let finishSave!: (value: { success: boolean; data: MeetingSummaryDto }) => void;
+    sharedDraftsApi.updateMeetingSummary.mockReturnValue(new Promise((resolve) => (finishSave = resolve)));
+    renderPanel();
+
+    await screen.findByTestId('family-summary-textarea');
+    await user.click(screen.getByTestId('family-summary-save'));
+    expect(screen.getByTestId('family-summary-send-open')).toBeDisabled();
+
+    await act(async () => finishSave({ success: true, data: makeSummary() }));
+    expect(screen.getByTestId('family-summary-send-open')).not.toBeDisabled();
   });
 
   it('surfaces a server refusal from a failed send', async () => {

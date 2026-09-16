@@ -112,6 +112,7 @@ internal static class DraftSharingMappers
         Answer = m.Answer,
         TargetFieldKey = m.TargetFieldKey,
         TargetRowId = m.TargetRowId,
+        Citations = m.Citations.Select(c => new DraftCitationDto { FieldKey = c.FieldKey, RowId = c.RowId, Label = c.Label, Excerpt = c.Excerpt }).ToList(),
         CreatedAt = m.CreatedAt
     };
 

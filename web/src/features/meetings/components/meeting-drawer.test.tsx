@@ -23,6 +23,14 @@ const educatorApi = vi.hoisted(() => ({
 }));
 vi.mock('@/features/educator/api/educator-api', () => educatorApi);
 
+const sharedDraftsApi = vi.hoisted(() => ({
+  getMeetingSummary: vi.fn().mockResolvedValue(null),
+  draftMeetingSummary: vi.fn(),
+  updateMeetingSummary: vi.fn(),
+  sendMeetingSummary: vi.fn(),
+}));
+vi.mock('@/features/shared-drafts/api/shared-drafts-api', () => sharedDraftsApi);
+
 import { MeetingDrawer } from './meeting-drawer';
 
 function renderDrawer(meeting = makeMeeting(), onUpdated = vi.fn()) {
@@ -130,6 +138,48 @@ describe('MeetingDrawer', () => {
         attendance: [{ participantId: 9, attended: true, excusalNote: undefined }],
       })
     );
+  });
+
+  it('remounts the family summary panel when the selected meeting changes', async () => {
+    const user = userEvent.setup();
+    const summaryFor = (meetingId: number, body: string) => ({
+      id: meetingId,
+      meetingId,
+      status: 'Draft' as const,
+      body,
+      generatedAt: '2026-09-10T00:00:00.000Z',
+      editedAt: null,
+      sentAt: null,
+      sentByName: null,
+      recipients: [],
+    });
+    sharedDraftsApi.getMeetingSummary.mockImplementation(async (id: number) =>
+      id === 100 ? summaryFor(100, 'Summary for meeting A') : summaryFor(101, 'Summary for meeting B')
+    );
+    const meetingA = makeMeeting({ id: 100, status: 'Held' });
+    const meetingB = makeMeeting({ id: 101, status: 'Held', title: 'Meeting B' });
+    const { rerender } = render(
+      <ToastProvider>
+        <MemoryRouter>
+          <MeetingDrawer open meeting={meetingA} onClose={vi.fn()} onUpdated={vi.fn()} />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+    const textarea = await screen.findByTestId('family-summary-textarea');
+    expect(textarea).toHaveValue('Summary for meeting A');
+    await user.type(textarea, ' plus an unsaved edit');
+
+    // The parent swaps `meeting` in place (one drawer, selection changes): the panel must
+    // start over for meeting B rather than carry A's text under B's id.
+    rerender(
+      <ToastProvider>
+        <MemoryRouter>
+          <MeetingDrawer open meeting={meetingB} onClose={vi.fn()} onUpdated={vi.fn()} />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+    expect(screen.queryByDisplayValue(/plus an unsaved edit/)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('family-summary-textarea')).toHaveValue('Summary for meeting B'));
   });
 
   it('does not offer attendance capture before the meeting is held', () => {

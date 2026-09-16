@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -39,6 +40,33 @@ export function SharedDraftReviewPage() {
 
   const backTo = `/children/${childId}/shared-drafts`;
 
+  // Every card (and its always-mounted drawers) reads this context; a stable
+  // value means one "Explain"/"Ask"/"Respond" doesn't re-render the whole list.
+  const detailId = detail?.id ?? revisionId;
+  const canRespond = detail?.status === 'Active';
+  const contextValue: DraftReviewContextValue = useMemo(
+    () => ({
+      revisionId: detailId,
+      canRespond,
+      notes: notesState.notes,
+      addNote: notesState.addNote,
+      removeNote: notesState.removeNote,
+      responses: responsesState.responses,
+      addResponse: responsesState.addResponse,
+      explanations,
+    }),
+    [
+      detailId,
+      canRespond,
+      notesState.notes,
+      notesState.addNote,
+      notesState.removeNote,
+      responsesState.responses,
+      responsesState.addResponse,
+      explanations,
+    ]
+  );
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
@@ -60,17 +88,6 @@ export function SharedDraftReviewPage() {
       </PageLayout>
     );
   }
-
-  const contextValue: DraftReviewContextValue = {
-    revisionId: detail.id,
-    canRespond: detail.status === 'Active',
-    notes: notesState.notes,
-    addNote: notesState.addNote,
-    removeNote: notesState.removeNote,
-    responses: responsesState.responses,
-    addResponse: responsesState.addResponse,
-    explanations,
-  };
 
   return (
     <PageLayout

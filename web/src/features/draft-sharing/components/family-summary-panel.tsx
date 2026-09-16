@@ -32,6 +32,8 @@ export function FamilySummaryPanel({ meetingId }: FamilySummaryPanelProps) {
   const [isSending, setIsSending] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Draft/save/send all write the same summary row — one in-flight operation at a time.
+  const isBusy = isDrafting || isSaving || isSending;
 
   useEffect(() => {
     let active = true;
@@ -131,7 +133,7 @@ export function FamilySummaryPanel({ meetingId }: FamilySummaryPanelProps) {
       )}
 
       {!summary && (
-        <Button size="sm" variant="secondary" onClick={handleDraft} loading={isDrafting} data-testid="family-summary-draft">
+        <Button size="sm" variant="secondary" onClick={handleDraft} loading={isDrafting} disabled={isBusy} data-testid="family-summary-draft">
           Draft with AI
         </Button>
       )}
@@ -146,13 +148,20 @@ export function FamilySummaryPanel({ meetingId }: FamilySummaryPanelProps) {
             data-testid="family-summary-textarea"
           />
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" onClick={handleSave} loading={isSaving} data-testid="family-summary-save">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleSave}
+              loading={isSaving}
+              disabled={isBusy}
+              data-testid="family-summary-save"
+            >
               Save changes
             </Button>
             <Button
               size="sm"
               onClick={() => setConfirmOpen(true)}
-              disabled={!draftText.trim()}
+              disabled={!draftText.trim() || isBusy}
               data-testid="family-summary-send-open"
             >
               Send to family

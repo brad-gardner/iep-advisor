@@ -32,7 +32,6 @@ public sealed class DocumentAssistService : IDocumentAssistService
     private const int MaxChatTurns = 20;
     private const int MaxChatMessageChars = 4_000;
 
-    private static readonly Regex TagStripper = new("<[^>]+>", RegexOptions.Compiled);
 
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
@@ -434,28 +433,14 @@ public sealed class DocumentAssistService : IDocumentAssistService
         return type == FieldType.RichText ? StripHtml(raw) : raw;
     }
 
-    private static string StripHtml(string html)
-    {
-        var text = TagStripper.Replace(html.Replace("</p>", "\n").Replace("<br>", "\n").Replace("<br/>", "\n"), string.Empty);
-        return System.Net.WebUtility.HtmlDecode(text).Trim();
-    }
+    private static string StripHtml(string html) => PromptText.StripHtml(html);
 
-    private static string OneLine(string value) => value.Replace("\r", " ").Replace("\n", " ");
+    private static string OneLine(string value) => PromptText.OneLine(value);
 
-    private static string Truncate(string? value, int max = 280)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return "(empty)";
-        value = value.Trim();
-        return value.Length <= max ? value : value[..max] + "…";
-    }
+    private static string Truncate(string? value, int max = 280) => PromptText.Truncate(value, max);
 
-    /// <summary>
-    /// Every value that goes inside a data tag passes through here: the tag delimiters are
-    /// entity-encoded so document text can never close &lt;field&gt;/&lt;section_text&gt;/&lt;context&gt;/
-    /// &lt;document&gt; and escape the data-not-instructions guard. Content is otherwise preserved.
-    /// </summary>
-    private static string Data(string? value)
-        => value == null ? string.Empty : value.Replace("<", "&lt;").Replace(">", "&gt;");
+    // Shared data-tag guard — see PromptText.Data.
+    private static string Data(string? value) => PromptText.Data(value);
 
     private static string PascalCase(string semantic)
         => string.IsNullOrEmpty(semantic) ? semantic : char.ToUpperInvariant(semantic[0]) + semantic[1..];

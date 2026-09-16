@@ -344,15 +344,21 @@ public sealed class HomeServiceTests : IDisposable
         {
             instanceId = SeedDraftInstance(seedCtx, studentId, templateVersionId, docTypeId: 1, lastEditedByUserId: teacherId);
         }
+        int revisionId;
         using (var seedCtx = _db.Context())
         {
-            SeedSharedDraftRevision(seedCtx, instanceId, templateVersionId, teacherId);
+            // Revision number 7 on a fresh instance so the number and the id cannot coincide by accident.
+            revisionId = SeedSharedDraftRevision(seedCtx, instanceId, templateVersionId, teacherId, revisionNumber: 7);
         }
 
         using var ctx = _db.Context();
         var result = await CreateService(ctx).GetForUserAsync(parentUserId);
         Assert.True(result.Success, result.Message);
-        Assert.Contains(result.Data!.Parent!.DocumentsToReview, d => d.Kind == ParentDocumentKind.SharedDraft && d.ChildId == childId);
+        var item = Assert.Single(result.Data!.Parent!.DocumentsToReview, d => d.Kind == ParentDocumentKind.SharedDraft && d.ChildId == childId);
+        Assert.Equal(revisionId, item.Id);
+        Assert.Equal(7, item.VersionNumber);
+        // The route resolves the revision by id — never by the per-document revision number.
+        Assert.Equal($"/children/{childId}/shared-drafts/{revisionId}", item.LinkPath);
     }
 
     // ----------------------------------------------------------------- Admin home: sorted by student, not staff

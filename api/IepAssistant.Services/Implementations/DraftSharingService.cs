@@ -184,11 +184,7 @@ public class DraftSharingService : IDraftSharingService
                 .OrderByDescending(r => r.RevisionNumber))
             .ToListAsync(ct);
 
-        var models = new List<SharedDraftRevisionModel>();
-        foreach (var row in rows)
-            models.Add(await MapForStaffAsync(row, ct));
-
-        return ServiceResult<List<SharedDraftRevisionModel>>.SuccessResult(models);
+        return ServiceResult<List<SharedDraftRevisionModel>>.SuccessResult(await MapForStaffAsync(rows, ct));
     }
 
     public async Task<ServiceResult<SharedDraftRevisionModel>> WithdrawAsync(int userId, int instanceId, int revisionId, CancellationToken ct = default)
@@ -250,7 +246,8 @@ public class DraftSharingService : IDraftSharingService
             var currentValuesJson = await _context.DocumentInstances.AsNoTracking()
                 .Where(i => i.Id == instanceId).Select(i => i.ValuesJson).FirstOrDefaultAsync(ct) ?? "{}";
             var sections = await TemplateSectionLoader.LoadAsync(_context, header.DocumentTemplateVersionId, ct);
-            var diff = ChangeSummaryBuilder.Build(sections, ValueDocumentJson.Parse(latestRow.ValuesJson), ValueDocumentJson.Parse(currentValuesJson));
+            var latestValuesJson = await LoadValuesJsonAsync(latestRow.Id, ct);
+            var diff = ChangeSummaryBuilder.Build(sections, ValueDocumentJson.Parse(latestValuesJson), ValueDocumentJson.Parse(currentValuesJson));
             model.ChangesSinceShare = diff.IsEmpty ? null : diff;
 
             // Reuses IDraftResponseService's own read (same pattern as HomeService reusing
@@ -284,11 +281,7 @@ public class DraftSharingService : IDraftSharingService
                 .OrderByDescending(r => r.RevisionNumber))
             .ToListAsync(ct);
 
-        var models = new List<SharedDraftRevisionModel>();
-        foreach (var row in rows)
-            models.Add(await MapForParentAsync(row, parentUserId, ct));
-
-        return ServiceResult<List<SharedDraftRevisionModel>>.SuccessResult(models);
+        return ServiceResult<List<SharedDraftRevisionModel>>.SuccessResult(await MapForParentAsync(rows, parentUserId, ct));
     }
 
     public async Task<ServiceResult<SharedDraftRevisionDetailModel>> GetForParentAsync(int parentUserId, int revisionId, CancellationToken ct = default)
@@ -305,7 +298,7 @@ public class DraftSharingService : IDraftSharingService
             return ServiceResult<SharedDraftRevisionDetailModel>.FailureResult(tree.Message ?? "The pinned template version could not be loaded.");
 
         var baseModel = await MapForParentAsync(row, parentUserId, ct);
-        var detail = ToDetail(baseModel, row.ValuesJson, tree.Data!);
+        var detail = ToDetail(baseModel, await LoadValuesJsonAsync(row.Id, ct), tree.Data!);
 
         _audit.Record(AuditAction.View, parentUserId, "SharedDraftRevision", revisionId);
         return ServiceResult<SharedDraftRevisionDetailModel>.SuccessResult(detail);
@@ -333,13 +326,27 @@ public class DraftSharingService : IDraftSharingService
                 CreatedById = parentUserId,
                 UpdatedById = parentUserId
             }, ct);
+            try
+            {
+                await _context.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                // A concurrent acknowledge (double-tap / client retry) won the unique (revision, user) index.
+                // Acknowledging is idempotent, so the existing stamp is the answer — not a 500.
+                _context.ChangeTracker.Clear();
+                var winner = await _context.DraftAcknowledgements.AsNoTracking()
+                    .FirstOrDefaultAsync(a => a.SharedDraftRevisionId == revisionId && a.UserId == parentUserId, ct);
+                if (winner == null)
+                    throw;
+            }
         }
         else
         {
             existing.AcknowledgedAt = now;
             existing.UpdatedById = parentUserId;
+            await _context.SaveChangesAsync(ct);
         }
-        await _context.SaveChangesAsync(ct);
 
         return ServiceResult<SharedDraftRevisionModel>.SuccessResult(await MapForParentAsync(row, parentUserId, ct));
     }
@@ -458,7 +465,7 @@ public class DraftSharingService : IDraftSharingService
     private sealed record RevisionRow(
         int Id, int DocumentInstanceId, int SchoolStudentId, string StudentName, string DocumentTypeKey, string DocumentTypeDisplayName,
         int RevisionNumber, SharedDraftStatus Status, DateTime SharedAt, string SharedByName, string? Message, DateTime? WithdrawnAt,
-        string? ChangeSummaryJson, int DocumentTemplateVersionId, string ValuesJson);
+        string? ChangeSummaryJson, int DocumentTemplateVersionId);
 
     /// <summary>
     /// Projects a raw, already-filtered <see cref="SharedDraftRevision"/> query into <see cref="RevisionRow"/>.
@@ -481,8 +488,11 @@ public class DraftSharingService : IDraftSharingService
             r.Message,
             r.WithdrawnAt,
             r.ChangeSummaryJson,
-            r.DocumentTemplateVersionId,
-            r.ValuesJson));
+            r.DocumentTemplateVersionId));
+
+    /// <summary>The frozen value document — fetched on its own, only by the single-revision paths that render or diff it.</summary>
+    private Task<string> LoadValuesJsonAsync(int revisionId, CancellationToken ct) =>
+        _context.SharedDraftRevisions.AsNoTracking().Where(r => r.Id == revisionId).Select(r => r.ValuesJson).FirstAsync(ct);
 
     private IQueryable<SharedDraftRevision> RevisionsById(int revisionId) =>
         _context.SharedDraftRevisions.AsNoTracking().Where(r => r.Id == revisionId);
@@ -493,31 +503,58 @@ public class DraftSharingService : IDraftSharingService
         return await MapForStaffAsync(row, ct);
     }
 
-    private async Task<SharedDraftRevisionModel> MapForStaffAsync(RevisionRow row, CancellationToken ct)
+    private async Task<SharedDraftRevisionModel> MapForStaffAsync(RevisionRow row, CancellationToken ct) =>
+        (await MapForStaffAsync(new[] { row }, ct))[0];
+
+    // The list endpoints are unpaged and revisions are never purged, so the per-revision extras are
+    // batch-loaded for the whole id set: three round trips regardless of how many times a draft was shared.
+    private async Task<List<SharedDraftRevisionModel>> MapForStaffAsync(IReadOnlyList<RevisionRow> rows, CancellationToken ct)
     {
-        var model = MapRow(row);
-        model.Acknowledgements = await _context.DraftAcknowledgements.AsNoTracking()
-            .Where(a => a.SharedDraftRevisionId == row.Id)
-            .Select(a => new AcknowledgementModel { ParentName = a.User.FirstName + " " + a.User.LastName, AcknowledgedAt = a.AcknowledgedAt })
+        var ids = rows.Select(r => r.Id).ToList();
+        var acks = await _context.DraftAcknowledgements.AsNoTracking()
+            .Where(a => ids.Contains(a.SharedDraftRevisionId))
+            .Select(a => new { a.SharedDraftRevisionId, ParentName = a.User.FirstName + " " + a.User.LastName, a.AcknowledgedAt })
             .ToListAsync(ct);
-        foreach (var ack in model.Acknowledgements)
-            ack.ParentName = ack.ParentName.Trim();
-        model.OpenResponseCount = await _context.DraftResponses.AsNoTracking()
-            .CountAsync(r => r.SharedDraftRevisionId == row.Id && r.Status == DraftResponseStatus.Open, ct);
-        return model;
+        var acksByRevision = acks.ToLookup(a => a.SharedDraftRevisionId);
+        var openCounts = await OpenResponseCountsAsync(ids, ct);
+
+        return rows.Select(row =>
+        {
+            var model = MapRow(row);
+            model.Acknowledgements = acksByRevision[row.Id]
+                .Select(a => new AcknowledgementModel { ParentName = a.ParentName.Trim(), AcknowledgedAt = a.AcknowledgedAt })
+                .ToList();
+            model.OpenResponseCount = openCounts.GetValueOrDefault(row.Id);
+            return model;
+        }).ToList();
     }
 
-    private async Task<SharedDraftRevisionModel> MapForParentAsync(RevisionRow row, int parentUserId, CancellationToken ct)
+    private async Task<SharedDraftRevisionModel> MapForParentAsync(RevisionRow row, int parentUserId, CancellationToken ct) =>
+        (await MapForParentAsync(new[] { row }, parentUserId, ct))[0];
+
+    private async Task<List<SharedDraftRevisionModel>> MapForParentAsync(IReadOnlyList<RevisionRow> rows, int parentUserId, CancellationToken ct)
     {
-        var model = MapRow(row);
-        model.AcknowledgedAt = await _context.DraftAcknowledgements.AsNoTracking()
-            .Where(a => a.SharedDraftRevisionId == row.Id && a.UserId == parentUserId)
-            .Select(a => (DateTime?)a.AcknowledgedAt)
-            .FirstOrDefaultAsync(ct);
-        model.OpenResponseCount = await _context.DraftResponses.AsNoTracking()
-            .CountAsync(r => r.SharedDraftRevisionId == row.Id && r.Status == DraftResponseStatus.Open, ct);
-        return model;
+        var ids = rows.Select(r => r.Id).ToList();
+        var acknowledgedAt = await _context.DraftAcknowledgements.AsNoTracking()
+            .Where(a => ids.Contains(a.SharedDraftRevisionId) && a.UserId == parentUserId)
+            .ToDictionaryAsync(a => a.SharedDraftRevisionId, a => a.AcknowledgedAt, ct);
+        var openCounts = await OpenResponseCountsAsync(ids, ct);
+
+        return rows.Select(row =>
+        {
+            var model = MapRow(row);
+            model.AcknowledgedAt = acknowledgedAt.TryGetValue(row.Id, out var at) ? at : null;
+            model.OpenResponseCount = openCounts.GetValueOrDefault(row.Id);
+            return model;
+        }).ToList();
     }
+
+    private async Task<Dictionary<int, int>> OpenResponseCountsAsync(List<int> revisionIds, CancellationToken ct) =>
+        await _context.DraftResponses.AsNoTracking()
+            .Where(r => revisionIds.Contains(r.SharedDraftRevisionId) && r.Status == DraftResponseStatus.Open)
+            .GroupBy(r => r.SharedDraftRevisionId)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.Key, g => g.Count, ct);
 
     private static SharedDraftRevisionModel MapRow(RevisionRow r) => new()
     {

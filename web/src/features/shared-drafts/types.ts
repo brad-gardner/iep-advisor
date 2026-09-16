@@ -75,7 +75,10 @@ export interface SharedDraftRevisionDetailDto extends SharedDraftRevisionDto {
 }
 
 export interface DraftExplanationSectionDto {
-  sectionId: number;
+  /** The template section's id (as a string) when the server could resolve the
+   *  model's title to one; otherwise an ordinal (`s1`, `s2`, …) and `title` is
+   *  the only handle. */
+  sectionId: string;
   title: string;
   explanation: string;
 }
@@ -102,7 +105,8 @@ export interface AskQuestionRequest {
 }
 
 export interface DraftAnswerCitationDto {
-  fieldKey: string;
+  /** Null when the citation is not tied to a template field. */
+  fieldKey: string | null;
   rowId: string | null;
   label: string;
   excerpt: string;
@@ -125,6 +129,8 @@ export interface ParentDraftNoteDto {
   answer: string;
   targetFieldKey: string | null;
   targetRowId: string | null;
+  /** What in the revision the answer was grounded in (persisted with the note). */
+  citations: DraftAnswerCitationDto[];
   createdAt: string;
 }
 

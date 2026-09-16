@@ -1,8 +1,10 @@
+import { memo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { FieldValueDisplay } from '@/features/document-authoring/components/authored-version-snapshot';
 import type { TemplateFieldDto, TemplateVersionDetailDto } from '@/features/admin/templates/types';
 import { DraftItemCard } from './draft-item-card';
+import { ExplainPanel } from './explain-panel';
 import {
   coerceRows,
   isCardRowField,
@@ -22,12 +24,22 @@ interface FrozenSectionListProps {
 }
 
 /**
+ * Memoised: its props are the frozen revision (stable references), so the
+ * parent page's own state changes (a note added, a response sent) don't
+ * re-render every section — only the context consumers that care do.
+ *
  * Reads the frozen template tree the same way `AuthoredVersionSnapshot` does,
  * but a goal/service/accommodation table renders each row as an interactive
  * `DraftItemCard` (Explain / Ask a question / Respond) instead of a plain
  * `<table>`. Every other field falls back to the shared generic renderer.
  */
-export function FrozenSectionList({ revisionId, canRespond, templateVersion, values, changeSummary }: FrozenSectionListProps) {
+export const FrozenSectionList = memo(function FrozenSectionList({
+  revisionId,
+  canRespond,
+  templateVersion,
+  values,
+  changeSummary,
+}: FrozenSectionListProps) {
   const sections = [...templateVersion.sections].sort((a, b) => a.displayOrder - b.displayOrder);
   if (sections.length === 0) {
     return <p className="text-sm text-brand-slate-400">This document has no sections.</p>;
@@ -47,7 +59,12 @@ export function FrozenSectionList({ revisionId, canRespond, templateVersion, val
 
         return (
           <section key={section.id} data-testid={`frozen-section-${section.id}`}>
-            <h2 className="mb-3 font-serif text-lg text-brand-slate-800">{section.title || 'Untitled section'}</h2>
+            <h2 className="mb-1 font-serif text-lg text-brand-slate-800">{section.title || 'Untitled section'}</h2>
+            {/* Section-level plain-language explanation — the only Explain affordance for
+                narrative fields (Present Levels etc.), which have no per-item cards. */}
+            <div className="mb-3">
+              <ExplainPanel target={{ kind: 'section', sectionId: section.id, title: section.title }} data-testid={`explain-section-${section.id}`} />
+            </div>
 
             {otherFields.length > 0 && (
               <Card className="mb-4 space-y-4">
@@ -81,7 +98,7 @@ export function FrozenSectionList({ revisionId, canRespond, templateVersion, val
       })}
     </div>
   );
-}
+});
 
 function RowBlockGroup({
   revisionId,

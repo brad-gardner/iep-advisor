@@ -35,5 +35,6 @@ public class ParentDraftNoteModel
     public string Answer { get; set; } = string.Empty;
     public Guid? TargetFieldKey { get; set; }
     public string? TargetRowId { get; set; }
+    public List<DraftCitationModel> Citations { get; set; } = new();
     public DateTime CreatedAt { get; set; }
 }

@@ -122,7 +122,8 @@ public sealed class DraftExplanationServiceTests : IDisposable
     {
         var s = Seed("explain");
         _claude.CannedResponse = $$"""
-        {"sections": [{"title": "Goals", "explanation": "This section lists what your child will work on."}],
+        {"sections": [{"title": "Annual goals", "explanation": "This section lists what your child will work on."},
+                      {"title": "Something the model made up", "explanation": "Unmatched."}],
          "items": [{"id": "F:{{s.GoalsKey}}|R:{{s.RowId}}", "explanation": "This goal is about reading better."}]}
         """;
 
@@ -130,7 +131,14 @@ public sealed class DraftExplanationServiceTests : IDisposable
         {
             var result = await CreateService(ctx).GetOrGenerateAsync(s.ParentId, s.RevisionId, default);
             Assert.True(result.Success, result.Message);
-            Assert.Single(result.Data!.Sections);
+            Assert.Equal(2, result.Data!.Sections.Count);
+            // The prompt names each line's section ("Goals › Goal: …"); a paraphrased title that still
+            // contains it resolves to the template section's id and canonical title …
+            Assert.Contains("] Goals › ", _claude.LastRequest!.UserText);
+            var goalsSection = Assert.Single(result.Data.Sections, x => x.Title == "Goals");
+            Assert.Matches("^[0-9]+$", goalsSection.SectionId);
+            // … while an unmatched one keeps an ordinal id and its own title.
+            Assert.Contains(result.Data.Sections, x => x.SectionId == "s1" && x.Title == "Something the model made up");
             Assert.Single(result.Data.Items);
             Assert.Equal(s.GoalsKey, result.Data.Items[0].FieldKey);
             Assert.Equal(s.RowId, result.Data.Items[0].RowId);

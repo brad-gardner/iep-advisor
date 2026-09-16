@@ -93,7 +93,13 @@ export function DocumentEditorPage() {
         </button>
       </div>
 
-      {tab === 'converge' ? <ConvergeTab detail={detail} /> : <DocumentEditor detail={detail} instance={instance} />}
+      {/* The editor stays mounted while Converge is showing: its autosave queue and the
+          ephemeral assistant chat thread live in component state and must survive a tab
+          round-trip. Converge is cheap to remount, so it is rendered only when selected. */}
+      <div hidden={tab !== 'edit'}>
+        <DocumentEditor detail={detail} instance={instance} />
+      </div>
+      {tab === 'converge' && <ConvergeTab detail={detail} />}
     </div>
   );
 }

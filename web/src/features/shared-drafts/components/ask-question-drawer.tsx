@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
@@ -38,13 +38,21 @@ export function AskQuestionDrawer({
   const [isAsking, setIsAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const notes = ctx?.notes;
+  // One drawer per card, all mounted: keep the per-card filter off the hot path
+  // so a note added to one card doesn't re-filter every other card's thread.
+  const thread = useMemo(
+    () =>
+      (notes ?? [])
+        .filter(
+          (n) =>
+            (n.targetFieldKey ?? null) === (targetFieldKey ?? null) && (n.targetRowId ?? null) === (targetRowId ?? null)
+        )
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    [notes, targetFieldKey, targetRowId]
+  );
   if (!ctx) return null;
-  const { notes, addNote, removeNote } = ctx;
-  const thread = notes
-    .filter(
-      (n) => (n.targetFieldKey ?? null) === (targetFieldKey ?? null) && (n.targetRowId ?? null) === (targetRowId ?? null)
-    )
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const { addNote, removeNote } = ctx;
 
   const handleAsk = async (e: FormEvent) => {
     e.preventDefault();
@@ -62,6 +70,7 @@ export function AskQuestionDrawer({
           answer: res.data.answer,
           targetFieldKey: targetFieldKey ?? null,
           targetRowId: targetRowId ?? null,
+          citations: res.data.citations,
           createdAt: res.data.answeredAt,
         });
         setQuestion('');
@@ -87,6 +96,9 @@ export function AskQuestionDrawer({
           Your questions and answers here are never visible to the school team.
         </Notice>
 
+        {/* Live region: a new answer lands asynchronously after "Ask", so it is
+            announced (same idiom as the editor's AssistPopover). */}
+        <div aria-live="polite">
         {thread.length === 0 ? (
           <p className="text-sm text-brand-slate-400">No questions yet.</p>
         ) : (
@@ -106,10 +118,26 @@ export function AskQuestionDrawer({
                   </button>
                 </div>
                 <p className="mt-1 whitespace-pre-wrap text-sm text-brand-slate-600">{note.answer}</p>
+                {note.citations.length > 0 && (
+                  <ul className="mt-2 space-y-1 border-t border-brand-slate-100 pt-2" data-testid={`note-citations-${note.id}`}>
+                    {note.citations.map((c, i) => (
+                      <li key={i} className="text-xs text-brand-slate-500">
+                        <span className="font-medium text-brand-slate-600">Based on: {c.label}</span>
+                        {c.excerpt && <span> — “{c.excerpt}”</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>
         )}
+        {isAsking && (
+          <p className="text-sm text-brand-slate-500" data-testid={`${testId}-thinking`}>
+            Finding an answer in the draft…
+          </p>
+        )}
+        </div>
 
         {error && (
           <div role="alert">

@@ -22,6 +22,7 @@ public class DraftResponseService : IDraftResponseService
     private const string NotActiveMessage = "You can only respond to the currently active revision.";
     private const string ResolveRequiresInputMessage = "Provide a reply or mark this resolved in the draft.";
     private const int MaxTextLength = 2000;
+    private const int MaxTargetRowIdLength = 64; // matches the DraftResponses.TargetRowId column
 
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _accessService;
@@ -52,6 +53,8 @@ public class DraftResponseService : IDraftResponseService
         var text = model.Text.Trim();
         if (text.Length > MaxTextLength)
             return ServiceResult<DraftResponseModel>.FailureResult($"Text must be {MaxTextLength} characters or fewer.");
+        if (model.TargetRowId is { Length: > MaxTargetRowIdLength })
+            return ServiceResult<DraftResponseModel>.FailureResult($"Target row id must be {MaxTargetRowIdLength} characters or fewer.");
 
         var header = await LoadRevisionHeaderAsync(revisionId, ct);
         if (header == null)
@@ -220,7 +223,7 @@ public class DraftResponseService : IDraftResponseService
         int Id, int SharedDraftRevisionId, int DocumentInstanceId, int ParentUserId, string ParentName,
         Guid? TargetFieldKey, string? TargetRowId, DraftResponseKind Kind, string Text, DateTime CreatedAt,
         DraftResponseStatus Status, string? StaffReply, bool ResolvedInDraft, string? ResolvedByName, DateTime? ResolvedAt,
-        int DocumentTemplateVersionId, string ValuesJson);
+        int DocumentTemplateVersionId);
 
     /// <summary>
     /// Projects a raw, already-filtered <see cref="DraftResponse"/> query into <see cref="ResponseRow"/>.
@@ -244,8 +247,7 @@ public class DraftResponseService : IDraftResponseService
             r.ResolvedInDraft,
             r.ResolvedByUserId == null ? null : _context.Users.Where(u => u.Id == r.ResolvedByUserId).Select(u => u.FirstName + " " + u.LastName).FirstOrDefault(),
             r.ResolvedAt,
-            r.SharedDraftRevision.DocumentTemplateVersionId,
-            r.SharedDraftRevision.ValuesJson));
+            r.SharedDraftRevision.DocumentTemplateVersionId));
 
     private async Task<DraftResponseModel> MapAsync(int responseId, CancellationToken ct)
     {
@@ -255,23 +257,34 @@ public class DraftResponseService : IDraftResponseService
     }
 
     /// <summary>Resolves each row's target label, caching the pinned schema per distinct template version
-    /// so a page of responses spanning several revisions of the same instance loads it once.</summary>
+    /// so a page of responses spanning several revisions of the same instance loads it once. The frozen
+    /// value document (a whole IEP's JSON) is fetched once per revision that actually has a targeted
+    /// response, rather than joined onto every row.</summary>
     private async Task<List<DraftResponseModel>> MapRowsAsync(List<ResponseRow> rows, CancellationToken ct)
     {
         var models = new List<DraftResponseModel>();
         var sectionsByVersion = new Dictionary<int, List<TemplateSectionModel>>();
 
+        var targetedRevisionIds = rows.Where(r => r.TargetFieldKey != null).Select(r => r.SharedDraftRevisionId).Distinct().ToList();
+        var valuesByRevision = targetedRevisionIds.Count == 0
+            ? new Dictionary<int, System.Text.Json.Nodes.JsonObject>()
+            : (await _context.SharedDraftRevisions.AsNoTracking()
+                .Where(r => targetedRevisionIds.Contains(r.Id))
+                .Select(r => new { r.Id, r.ValuesJson })
+                .ToListAsync(ct))
+                .ToDictionary(r => r.Id, r => ValueDocumentJson.Parse(r.ValuesJson));
+
         foreach (var r in rows)
         {
             string? targetLabel = null;
-            if (r.TargetFieldKey != null)
+            if (r.TargetFieldKey != null && valuesByRevision.TryGetValue(r.SharedDraftRevisionId, out var values))
             {
                 if (!sectionsByVersion.TryGetValue(r.DocumentTemplateVersionId, out var sections))
                 {
                     sections = await TemplateSectionLoader.LoadAsync(_context, r.DocumentTemplateVersionId, ct);
                     sectionsByVersion[r.DocumentTemplateVersionId] = sections;
                 }
-                targetLabel = DraftRowLabeler.ResolveTargetLabel(sections, ValueDocumentJson.Parse(r.ValuesJson), r.TargetFieldKey.Value, r.TargetRowId);
+                targetLabel = DraftRowLabeler.ResolveTargetLabel(sections, values, r.TargetFieldKey.Value, r.TargetRowId);
             }
 
             models.Add(new DraftResponseModel

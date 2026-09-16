@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { apiErrorMessage } from '@/lib/api-error';
 import { getDraftExplanations } from '../api/shared-drafts-api';
 import type { DraftExplanationDto } from '../types';
@@ -11,6 +11,9 @@ export interface UseDraftExplanationsResult {
   isLoading: boolean;
   error: string | null;
   getItemExplanation: (fieldKey: string, rowId: string | null) => string | null;
+  /** Section-level explanation: matched by the template section id the server
+   *  resolved (`sectionId`), falling back to the title for unresolved ones. */
+  getSectionExplanation: (sectionId: number, sectionTitle: string) => string | null;
   disclaimer: string | null;
 }
 
@@ -72,5 +75,20 @@ export function useDraftExplanations(revisionId: number): UseDraftExplanationsRe
     [data]
   );
 
-  return { ensureLoaded, isLoading, error, getItemExplanation, disclaimer: data?.disclaimer ?? null };
+  const getSectionExplanation = useCallback(
+    (sectionId: number, sectionTitle: string): string | null => {
+      const byId = data?.sections.find((s) => s.sectionId === String(sectionId));
+      if (byId) return byId.explanation;
+      const wanted = sectionTitle.trim().toLowerCase();
+      const byTitle = data?.sections.find((s) => s.title.trim().toLowerCase() === wanted);
+      return byTitle?.explanation ?? null;
+    },
+    [data]
+  );
+
+  const disclaimer = data?.disclaimer ?? null;
+  return useMemo(
+    () => ({ ensureLoaded, isLoading, error, getItemExplanation, getSectionExplanation, disclaimer }),
+    [ensureLoaded, isLoading, error, getItemExplanation, getSectionExplanation, disclaimer]
+  );
 }
