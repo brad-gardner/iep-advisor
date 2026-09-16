@@ -50,6 +50,7 @@ export function ConfirmDialog({
     <Modal
       open={open}
       onClose={onCancel}
+      preventClose={loading}
       title={title}
       size="sm"
       role="alertdialog"

@@ -18,12 +18,16 @@ namespace IepAssistant.Api.Controllers;
 [Authorize]
 public class AuthoredDocumentVersionController : ControllerBase
 {
+    private const long MaxSignedArtifactBytes = 20 * 1024 * 1024;
+
     private readonly IAuthoredDocumentVersionService _service;
+    private readonly ISignedArtifactService _signedArtifacts;
     private readonly AuthoredDocumentPdfQueue _pdfQueue;
 
-    public AuthoredDocumentVersionController(IAuthoredDocumentVersionService service, AuthoredDocumentPdfQueue pdfQueue)
+    public AuthoredDocumentVersionController(IAuthoredDocumentVersionService service, ISignedArtifactService signedArtifacts, AuthoredDocumentPdfQueue pdfQueue)
     {
         _service = service;
+        _signedArtifacts = signedArtifacts;
         _pdfQueue = pdfQueue;
     }
 
@@ -144,6 +148,88 @@ public class AuthoredDocumentVersionController : ControllerBase
         await _pdfQueue.EnqueueAsync(result.Data, CancellationToken.None);
 
         return Ok(ApiResponse<object>.SuccessResponse(new { versionId, status = "Pending" }));
+    }
+
+    // ---------------------------------------------------------------- Plan 7: amend
+
+    [HttpPost("api/authored-versions/{versionId:int}/amend")]
+    [ProducesResponseType(typeof(ApiResponse<AmendResultDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Amend(int versionId, [FromBody] AmendDocumentVersionRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var result = await _service.AmendAsync(versionId, User.GetUserId(), new IepAssistant.Services.Models.AmendDocumentVersionModel
+        {
+            Reason = request.Reason,
+            EffectiveDate = request.EffectiveDate
+        }, ct);
+        if (!result.Success) return MapFailure(result.Message);
+
+        var instanceId = result.Data!.InstanceId;
+        return Created($"/api/documents/{instanceId}", ApiResponse<AmendResultDto>.SuccessResponse(new AmendResultDto { InstanceId = instanceId }));
+    }
+
+    // ---------------------------------------------------------------- Plan 7: signed artifacts
+
+    [HttpPost("api/authored-versions/{versionId:int}/signed-artifacts")]
+    [RequestSizeLimit(MaxSignedArtifactBytes + 1024)]
+    [ProducesResponseType(typeof(ApiResponse<SignedArtifactDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UploadSignedArtifact(int versionId, CancellationToken ct)
+    {
+        if (!Request.HasFormContentType)
+            return BadRequest(ApiResponse<object>.Error("A multipart form with a file is required."));
+
+        var form = await Request.ReadFormAsync(ct);
+        var file = form.Files.GetFile("file");
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResponse<object>.Error("file is required."));
+
+        if (!Enum.TryParse<IepAssistant.Domain.Entities.SignatureStatus>(form["signatureStatus"], out var signatureStatus))
+            return BadRequest(ApiResponse<object>.Error("signatureStatus must be PartiallySigned or Signed."));
+
+        await using var stream = file.OpenReadStream();
+        var result = await _signedArtifacts.UploadAsync(User.GetUserId(), versionId, new IepAssistant.Services.Models.UploadSignedArtifactModel
+        {
+            FileStream = stream,
+            FileName = file.FileName,
+            ContentType = file.ContentType,
+            SizeBytes = file.Length,
+            SignerSummary = form["signerSummary"],
+            SignatureStatus = signatureStatus
+        }, ct);
+        if (!result.Success) return MapFailure(result.Message);
+
+        var dto = AuthoredDocumentVersionMappers.MapSignedArtifact(result.Data!);
+        return CreatedAtAction(nameof(ListSignedArtifacts), new { versionId }, ApiResponse<SignedArtifactDto>.SuccessResponse(dto));
+    }
+
+    [HttpGet("api/authored-versions/{versionId:int}/signed-artifacts")]
+    [ProducesResponseType(typeof(ApiResponse<List<SignedArtifactDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ListSignedArtifacts(int versionId, CancellationToken ct)
+    {
+        var result = await _signedArtifacts.ListAsync(User.GetUserId(), versionId, ct);
+        if (!result.Success) return MapFailure(result.Message);
+        return Ok(ApiResponse<List<SignedArtifactDto>>.SuccessResponse(result.Data!.Select(AuthoredDocumentVersionMappers.MapSignedArtifact).ToList()));
+    }
+
+    [HttpGet("api/signed-artifacts/{artifactId:int}/download")]
+    [ProducesResponseType(typeof(ApiResponse<AuthoredDocumentPdfDownloadDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadSignedArtifact(int artifactId, CancellationToken ct)
+    {
+        var result = await _signedArtifacts.GetDownloadUrlAsync(User.GetUserId(), artifactId, ct);
+        if (!result.Success) return MapFailure(result.Message);
+        return Ok(ApiResponse<AuthoredDocumentPdfDownloadDto>.SuccessResponse(new AuthoredDocumentPdfDownloadDto { Url = result.Data! }));
     }
 
     // ---------------------------------------------------------------- Helpers

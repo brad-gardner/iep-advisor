@@ -37,6 +37,12 @@ public class DocumentInstanceDetailModel
     /// <summary>Optimistic-concurrency token to echo on the next save.</summary>
     public byte[]? RowVersion { get; set; }
 
+    /// <summary>Plan 7: set when this draft was opened as an amendment of a finalized version.</summary>
+    public int? AmendsVersionId { get; set; }
+    public int? AmendsVersionNumber { get; set; }
+    public string? AmendmentReason { get; set; }
+    public DateTime? EffectiveDate { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime? LastEditedAt { get; set; }
     public int? LastEditedByUserId { get; set; }

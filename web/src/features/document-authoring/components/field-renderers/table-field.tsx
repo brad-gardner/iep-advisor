@@ -7,6 +7,9 @@ import {
   readColumnOptions,
   type TableColumn,
 } from '@/features/admin/templates/template-config';
+import { recordGoalRetirement } from '@/features/goals/api/goals-api';
+import { RemoveGoalDialog } from '@/features/goals/components/remove-goal-dialog';
+import { apiErrorMessage } from '@/lib/api-error';
 import type { TableCellValue } from '../../types';
 import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { fieldElementId, type FieldRendererProps } from './types';
@@ -31,6 +34,9 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
   const { columns, minRows, maxRows } = table;
   const labelId = `${fieldElementId(field.id)}-label`;
   const editor = useDocumentEditorContext();
+  // Removing a row from a Goals table requires a reason recorded BEFORE the
+  // row is actually removed (plan 7, decision 6) — see `requestRemoveRow`.
+  const isGoalsTable = config.kind === 'Table' && config.semantic === 'goals';
 
   // `rowsRef` is the single source of truth and is written synchronously by
   // every mutation, so a save always sends the LATEST rows (including any
@@ -83,6 +89,44 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
   const removeRow = (rowKey: string) => {
     editor?.clearActiveField(`${field.fieldKey}:${rowKey}`);
     commit((current) => current.filter((r) => r.key !== rowKey), true);
+  };
+
+  // Goal rows: a persisted row (one with a server `_rowId`, i.e. a lineage
+  // that has survived at least one finalize) needs a reason recorded via
+  // `goal-retirements` before it can be removed; a row never finalized has no
+  // lineage to retire and is removed immediately, same as any other table.
+  const [pendingGoalRemoval, setPendingGoalRemoval] = useState<{ rowKey: string; lineageId: string; label: string } | null>(null);
+  const [goalRemovalSubmitting, setGoalRemovalSubmitting] = useState(false);
+  const [goalRemovalError, setGoalRemovalError] = useState<string | null>(null);
+  const requestRemoveRow = (rowKey: string, label: string) => {
+    const row = rowsRef.current.find((r) => r.key === rowKey);
+    const lineageId = isGoalsTable && row ? rowId(row) : undefined;
+    if (isGoalsTable && lineageId && editor) {
+      setGoalRemovalError(null);
+      setPendingGoalRemoval({ rowKey, lineageId, label });
+      return;
+    }
+    removeRow(rowKey);
+  };
+  // Second line of defence behind the dialog's preventClose: a removal only lands if it is still
+  // the pending one when the retirement request resolves.
+  const pendingGoalRemovalRef = useRef<typeof pendingGoalRemoval>(null);
+  const confirmGoalRemoval = async (reason: string) => {
+    if (!pendingGoalRemoval || !editor) return;
+    const target = pendingGoalRemoval;
+    pendingGoalRemovalRef.current = target;
+    setGoalRemovalSubmitting(true);
+    setGoalRemovalError(null);
+    try {
+      await recordGoalRetirement(editor.instanceId, { lineageId: target.lineageId, reason });
+      if (pendingGoalRemovalRef.current !== target) return; // cancelled while in flight — leave the row
+      removeRow(target.rowKey);
+      setPendingGoalRemoval(null);
+    } catch (err) {
+      setGoalRemovalError(apiErrorMessage(err, 'Could not record the retirement reason.'));
+    } finally {
+      setGoalRemovalSubmitting(false);
+    }
   };
 
   // Evidence insert into a cell: append to whatever the cell holds now (read
@@ -205,7 +249,10 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                         variant="danger"
                         size="sm"
                         disabled={disabled || atMin}
-                        onClick={() => removeRow(row.key)}
+                        onClick={() => {
+                          const primaryValue = primaryColumn ? row.cells[primaryColumn.columnKey] : undefined;
+                          requestRemoveRow(row.key, typeof primaryValue === 'string' ? primaryValue : '');
+                        }}
                         aria-label={`Remove ${blockLabel(blockSemantic).toLowerCase()} ${rowIndex + 1}`}
                         data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
                       >
@@ -279,6 +326,20 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
             Add {blockLabel(blockSemantic).toLowerCase()}
           </Button>
         </div>
+
+        {isGoalsTable && (
+          <RemoveGoalDialog
+            open={pendingGoalRemoval != null}
+            goalLabel={pendingGoalRemoval?.label ?? ''}
+            loading={goalRemovalSubmitting}
+            error={goalRemovalError}
+            onConfirm={(reason) => void confirmGoalRemoval(reason)}
+            onCancel={() => {
+              pendingGoalRemovalRef.current = null;
+              setPendingGoalRemoval(null);
+            }}
+          />
+        )}
       </div>
     );
   }

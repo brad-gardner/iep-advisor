@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getAuthoredVersion } from '../api/documents-api';
 import type { AuthoredDocumentVersionDetailDto } from '../types';
 
@@ -6,6 +6,8 @@ interface UseAuthoredVersionResult {
   version: AuthoredDocumentVersionDetailDto | null;
   isLoading: boolean;
   error: string | null;
+  /** Adopt a server response after a mutation (signed-artifact upload, amend). */
+  applyUpdate: (patch: Partial<AuthoredDocumentVersionDetailDto>) => void;
 }
 
 /** Loads one finalized authored version's full frozen snapshot. */
@@ -34,5 +36,9 @@ export function useAuthoredVersion(versionId: number): UseAuthoredVersionResult 
     };
   }, [versionId]);
 
-  return { version, isLoading, error };
+  const applyUpdate = useCallback((patch: Partial<AuthoredDocumentVersionDetailDto>) => {
+    setVersion((prev) => (prev ? { ...prev, ...patch } : prev));
+  }, []);
+
+  return { version, isLoading, error, applyUpdate };
 }

@@ -83,6 +83,26 @@ public class ApplicationDbContext : DbContext
     public DbSet<DraftAcknowledgement> DraftAcknowledgements => Set<DraftAcknowledgement>();
     public DbSet<MeetingSummary> MeetingSummaries => Set<MeetingSummary>();
 
+    // Plan 7 phase 1: goals as entities + provider observations.
+    public DbSet<GoalRecord> GoalRecords => Set<GoalRecord>();
+    public DbSet<GoalObservation> GoalObservations => Set<GoalObservation>();
+    public DbSet<GoalRetirement> GoalRetirements => Set<GoalRetirement>();
+
+    // Plan 7 phase 2: evaluation case + clock + evaluator assignments.
+    public DbSet<EvaluationCase> EvaluationCases => Set<EvaluationCase>();
+    public DbSet<EvaluatorAssignment> EvaluatorAssignments => Set<EvaluatorAssignment>();
+
+    // Plan 7 phase 3: meeting brief, attendance decisions, offline family participation.
+    public DbSet<MeetingBrief> MeetingBriefs => Set<MeetingBrief>();
+    public DbSet<MeetingDecision> MeetingDecisions => Set<MeetingDecision>();
+    public DbSet<FamilyContactAttempt> FamilyContactAttempts => Set<FamilyContactAttempt>();
+    public DbSet<OfflineFamilyInput> OfflineFamilyInputs => Set<OfflineFamilyInput>();
+
+    // Plan 7 phase 4: signed artifacts, amendments, district export.
+    public DbSet<SignedArtifact> SignedArtifacts => Set<SignedArtifact>();
+    public DbSet<SignatureEvent> SignatureEvents => Set<SignatureEvent>();
+    public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         // Suppress warning about pending model changes

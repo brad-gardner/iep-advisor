@@ -21,11 +21,13 @@ public class MeetingsController : ControllerBase
 {
     private readonly IMeetingService _meetingService;
     private readonly IMeetingSummaryService _summaryService;
+    private readonly IMeetingBriefService _briefService;
 
-    public MeetingsController(IMeetingService meetingService, IMeetingSummaryService summaryService)
+    public MeetingsController(IMeetingService meetingService, IMeetingSummaryService summaryService, IMeetingBriefService briefService)
     {
         _meetingService = meetingService;
         _summaryService = summaryService;
+        _briefService = briefService;
     }
 
     [HttpPost("educator/students/{studentId:int}/meetings")]
@@ -280,6 +282,30 @@ public class MeetingsController : ControllerBase
             return MapFailure<FamilyMeetingSummaryDto>(result.Message);
 
         return Ok(ApiResponse<FamilyMeetingSummaryDto>.SuccessResponse(MapFamilySummary(result.Data!)));
+    }
+
+    // ----------------------------------------------------------------- Plan 7: pre-meeting brief
+
+    [HttpGet("meetings/{id:int}/brief")]
+    [ProducesResponseType(typeof(ApiResponse<MeetingBriefDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetBrief(int id, CancellationToken ct)
+    {
+        var result = await _briefService.GetAsync(User.GetUserId(), id, ct);
+        if (!result.Success) return MapFailure<MeetingBriefDto>(result.Message);
+        return Ok(ApiResponse<MeetingBriefDto>.SuccessResponse(MeetingBriefMappers.MapBrief(result.Data!)));
+    }
+
+    [HttpPost("meetings/{id:int}/brief")]
+    [ProducesResponseType(typeof(ApiResponse<MeetingBriefDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GenerateBrief(int id, CancellationToken ct)
+    {
+        var result = await _briefService.GenerateAsync(User.GetUserId(), id, ct);
+        if (!result.Success) return MapFailure<MeetingBriefDto>(result.Message);
+        return Ok(ApiResponse<MeetingBriefDto>.SuccessResponse(MeetingBriefMappers.MapBrief(result.Data!)));
     }
 
     // ----------------------------------------------------------------- Anonymous email-link RSVP

@@ -90,7 +90,7 @@ export function AskQuestionDrawer({
   };
 
   return (
-    <Drawer open={open} onClose={onClose} title={`Ask about: ${targetLabel}`} data-testid={testId}>
+    <Drawer open={open} onClose={onClose} preventClose={isAsking} title={`Ask about: ${targetLabel}`} data-testid={testId}>
       <div className="space-y-4">
         <Notice variant="info" title="Private — only you can see this">
           Your questions and answers here are never visible to the school team.

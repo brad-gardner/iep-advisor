@@ -44,4 +44,14 @@ public static class DraftPrompts
         "given. Cover what was discussed, what was decided (goals, services, accommodations), and any " +
         "open items the family raised. Keep it warm, direct, and concrete — 2 to 5 short paragraphs.\n" +
         "Respond with ONLY the summary text — no preamble, no markdown headers, no JSON.\n" + DraftPromptBuilder.SecurityGuard;
+
+    /// <summary>Plan 7, decision 2 — the pre-meeting brief's one AI-drafted part. Framed for the staff LEA
+    /// rep preparing to run the meeting, not for the family (contrast <see cref="MeetingSummary"/>).</summary>
+    public const string MeetingBrief =
+        "You are helping an IEP team's LEA representative prepare for an upcoming meeting. Write a short, " +
+        "plain-language summary (at most 6 sentences) of what is being proposed in the draft below: the " +
+        "key goals, services, accommodations, and any notable changes. Never give legal advice, never " +
+        "invent facts, numbers, or dates that are not in what you were given, and never make the team's " +
+        "decision for them — this is advisory background only, to help them walk in prepared.\n" +
+        "Respond with ONLY the summary text — no preamble, no markdown headers, no JSON.\n" + DraftPromptBuilder.SecurityGuard;
 }

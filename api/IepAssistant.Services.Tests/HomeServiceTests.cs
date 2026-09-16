@@ -717,24 +717,28 @@ public sealed class HomeServiceTests : IDisposable
         // Admin path: profile/scope label, meetings-this-week, drafts, the two plan-6 shared-draft queries
         // (sharedDraftsAwaitingFamily, familyResponsesToReview), obligations-for-scope (shared
         // StaffContext, no re-lookup), the no-filter compliance board (supplies NoLead too), noFamily —
-        // measured at 9 after plan 6 added the two shared-draft home queries (was pinned at 7 before that).
+        // was pinned at 9 after plan 6; plan 7 adds 3 fixed (not per-student) obligation queries to every
+        // ComputeAndFilterAsync call (GoalRecords, EvaluationCases, EvaluatorAssignments), so this is
+        // now measured at 12.
         var counter = new DbActivityCounter();
         using (var ctx = _db.Context(counter))
         {
             var result = await CreateService(ctx).GetForUserAsync(adminId);
             Assert.True(result.Success, result.Message);
         }
-        Assert.True(counter.Queries <= 9, $"DistrictAdmin home issued {counter.Queries} queries");
+        Assert.True(counter.Queries <= 12, $"DistrictAdmin home issued {counter.Queries} queries");
 
         // Staff-tier path: profile/scope label, meetings-this-week, lead-only obligations, drafts, plus
-        // the same two plan-6 shared-draft queries — measured at 7 (was 5 before plan 6).
+        // the same two plan-6 shared-draft queries — was 7 (was 5 before plan 6); plan 7 phases 1-2's 3
+        // fixed obligation queries (see above) brought this to 10; phase 4's CaseManager-scoped unsigned
+        // finalized documents list adds one more, now 11.
         counter.Reset();
         using (var ctx = _db.Context(counter))
         {
             var result = await CreateService(ctx).GetForUserAsync(leadId);
             Assert.True(result.Success, result.Message);
         }
-        Assert.True(counter.Queries <= 7, $"CaseManager home issued {counter.Queries} queries");
+        Assert.True(counter.Queries <= 11, $"CaseManager home issued {counter.Queries} queries");
 
         // Parent and student paths are lighter still (no obligation/roster computation at all). Parent
         // gains one plan-6 query (unacknowledged Active shared-draft revisions) — measured at 7 (was 6).

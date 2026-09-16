@@ -13,6 +13,8 @@ interface DrawerProps {
   title: string;
   size?: DrawerSize;
   footer?: React.ReactNode;
+  /** While `true`, Esc, backdrop clicks and the header X are inert (same contract as Modal). */
+  preventClose?: boolean;
   children: React.ReactNode;
   "data-testid"?: string;
 }
@@ -34,12 +36,14 @@ export function Drawer({
   title,
   size = "md",
   footer,
+  preventClose = false,
   children,
   "data-testid": testId,
 }: DrawerProps) {
+  const requestClose = preventClose ? () => {} : onClose;
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogElement(
     open,
-    onClose,
+    requestClose,
   );
   const titleId = useId();
 
@@ -71,7 +75,8 @@ export function Drawer({
             </h2>
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
+              disabled={preventClose}
               aria-label="Close dialog"
               data-testid={testId ? `${testId}-close` : undefined}
               className="-mr-1.5 -mt-0.5 rounded-button p-1 text-brand-slate-400 transition-colors hover:bg-brand-slate-50 hover:text-brand-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"

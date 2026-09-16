@@ -77,7 +77,7 @@ export function CreateTemplateModal({ open, onClose, onCreate }: CreateTemplateM
   return (
     <Modal
       open={open}
-      onClose={handleClose}
+      onClose={handleClose} preventClose={isSubmitting}
       title="Create Template"
       data-testid="create-template-modal"
       footer={

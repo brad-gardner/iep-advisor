@@ -32,6 +32,8 @@ interface ScheduleMeetingFormProps {
   meeting?: MeetingDto;
   onSaved: (meeting: MeetingDto) => void;
   onCancel: () => void;
+  /** Lets the host dialog block dismissal while a save is in flight. */
+  onSubmittingChange?: (submitting: boolean) => void;
 }
 
 /**
@@ -46,6 +48,7 @@ export function ScheduleMeetingForm({
   meeting,
   onSaved,
   onCancel,
+  onSubmittingChange,
 }: ScheduleMeetingFormProps) {
   const { rows: pool, failed: poolFailed } = useMeetingParticipantPool(studentId);
   const [rows, setRows] = useState<ParticipantRow[] | null>(null);
@@ -73,7 +76,11 @@ export function ScheduleMeetingForm({
   const [videoUrl, setVideoUrl] = useState(meeting?.videoUrl ?? '');
   const [notes, setNotes] = useState(meeting?.notes ?? '');
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [submitting, setSubmittingLocal] = useState(false);
+  const setSubmitting = (value: boolean) => {
+    setSubmittingLocal(value);
+    onSubmittingChange?.(value);
+  };
 
   const toggleRow = (key: string) => {
     setRows((prev) => prev?.map((r) => (r.key === key ? { ...r, checked: !r.checked } : r)) ?? prev);

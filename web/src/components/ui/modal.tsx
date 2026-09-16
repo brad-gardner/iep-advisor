@@ -26,6 +26,12 @@ interface ModalProps {
   describedById?: string;
   /** Hide the header close (X) — used by confirmations that focus Cancel. */
   hideCloseButton?: boolean;
+  /**
+   * While `true`, Esc, backdrop clicks and the header X are inert — pass the
+   * dialog's in-flight submission flag so a request the user has already
+   * confirmed cannot be "cancelled" by a dismiss gesture and then still land.
+   */
+  preventClose?: boolean;
   children: React.ReactNode;
   "data-testid"?: string;
 }
@@ -54,12 +60,14 @@ export function Modal({
   role = "dialog",
   describedById,
   hideCloseButton = false,
+  preventClose = false,
   children,
   "data-testid": testId,
 }: ModalProps) {
+  const requestClose = preventClose ? () => {} : onClose;
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogElement(
     open,
-    onClose,
+    requestClose,
   );
   const titleId = useId();
 
@@ -91,7 +99,8 @@ export function Modal({
             {!hideCloseButton && (
               <button
                 type="button"
-                onClick={onClose}
+                onClick={requestClose}
+                disabled={preventClose}
                 aria-label="Close dialog"
                 data-testid={testId ? `${testId}-close` : undefined}
                 className="-mr-1.5 -mt-0.5 rounded-button p-1 text-brand-slate-400 transition-colors hover:bg-brand-slate-50 hover:text-brand-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"

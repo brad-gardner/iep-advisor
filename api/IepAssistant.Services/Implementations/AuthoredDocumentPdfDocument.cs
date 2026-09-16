@@ -11,6 +11,34 @@ using QuestPDF.Infrastructure;
 
 namespace IepAssistant.Services.Implementations;
 
+/// <summary>One participant line for the OH form's participants block (plan 7, decision 9) — resolved by
+/// the render service from the student's latest Held meeting; the PDF document itself does no I/O.</summary>
+public sealed record AuthoredDocumentPdfParticipant(string Name, string Role, bool? Attended);
+
+/// <summary>
+/// Everything the PDF composer needs beyond the frozen values/template tree, resolved by
+/// <see cref="AuthoredDocumentPdfService"/> (the document itself stays DB-free). <see cref="StateCode"/>
+/// selects the layout: <c>"OH"</c> renders the form-style layout (plan 7, decision 9); anything else
+/// (including null) keeps the original generic layout.
+/// </summary>
+public sealed record AuthoredDocumentPdfHeaderContext(
+    string? StateCode,
+    string DocumentTypeKey,
+    string StudentFirstName,
+    string? StudentLastName,
+    DateTime? StudentDateOfBirth,
+    string? DistrictName,
+    DateTime? IepDate,
+    DateTime? EtrDate,
+    DateTime? MeetingDate,
+    IReadOnlyList<AuthoredDocumentPdfParticipant> Participants,
+    int? AmendsVersionNumber,
+    DateTime? EffectiveDate)
+{
+    public static readonly AuthoredDocumentPdfHeaderContext Empty =
+        new(null, string.Empty, string.Empty, null, null, null, null, null, null, Array.Empty<AuthoredDocumentPdfParticipant>(), null, null);
+}
+
 /// <summary>
 /// QuestPDF document that renders a finalized <see cref="AuthoredDocumentVersion"/> against its pinned,
 /// frozen template version tree (State Document Template Engine, Phase 4). Pure layout — no I/O, no DB
@@ -22,18 +50,33 @@ namespace IepAssistant.Services.Implementations;
 /// the version's <see cref="AuthoredDocumentVersion.FinalizedAt"/> (via <see cref="GetMetadata"/>), so
 /// re-rendering the same version yields byte-identical output (identical SHA-256 checksum).</para>
 ///
-/// <para><b>Empty-field / empty-section rules (G-d.1):</b> a field is rendered only when it holds a value;
-/// an empty field is omitted (required fields always hold a value post-finalize). A checkbox counts as
-/// "empty" only when its key is absent — a present <c>true</c>/<c>false</c> is a definite Yes/No answer
-/// and is rendered. A Table is empty when it has no rows. A section that would render zero fields is
-/// omitted entirely.</para>
+/// <para><b>Generic (state-less) layout — Empty-field / empty-section rules (G-d.1):</b> a field is
+/// rendered only when it holds a value; an empty field is omitted (required fields always hold a value
+/// post-finalize). A checkbox counts as "empty" only when its key is absent — a present
+/// <c>true</c>/<c>false</c> is a definite Yes/No answer and is rendered. A Table is empty when it has no
+/// rows. A section that would render zero fields is omitted entirely.</para>
+///
+/// <para><b>OH form layout (plan 7, decision 9):</b> selected when <see cref="AuthoredDocumentPdfHeaderContext.StateCode"/>
+/// is <c>"OH"</c>. Renders an ODE-style header block, every section in template order (numbered, NEVER
+/// omitted — an entirely-empty section prints "Not addressed" instead of being skipped, and an
+/// individually-empty required field within an otherwise-populated section prints "Not addressed" for
+/// that field), goals as numbered blocks (one column-label-per-line, not a grid), services as a table,
+/// a participants block from the latest Held meeting, fixed signature blocks, and an amendment banner
+/// when this version amends another.</para>
 ///
 /// <para><b>Exhaustiveness (G-d.3):</b> the per-field <c>switch</c> throws on an unhandled
 /// <see cref="FieldType"/> so the render is marked Error rather than silently dropping content; the
 /// worker never crashes because the render service swallows the throw into a retryable Error state.</para>
+///
+/// <para><b>Outline (test seam):</b> <see cref="Outline"/> records one entry per heading/structural block
+/// emitted during <see cref="Compose"/>, in emission order, so a golden-structure test can assert layout
+/// shape without parsing PDF bytes. Populated only after <c>GeneratePdf()</c>/<c>Compose</c> has run.</para>
 /// </summary>
 public sealed class AuthoredDocumentPdfDocument : IDocument
 {
+    private const string OhStateCode = "OH";
+    private const int StudentSignatureMinAge = 14;
+
     private static readonly Regex HtmlTag = new("<[^>]+>", RegexOptions.Compiled);
     private static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
 
@@ -42,15 +85,21 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
     private readonly DateTime _finalizedAt;
     private readonly TemplateVersionDetailModel _tree;
     private readonly JsonObject _values;
+    private readonly AuthoredDocumentPdfHeaderContext _header;
+    private readonly bool _isOhForm;
+    private readonly List<string> _outline = new();
 
     public AuthoredDocumentPdfDocument(
         string documentTypeDisplayName, int versionNumber, DateTime finalizedAt,
-        TemplateVersionDetailModel tree, string? valuesJson)
+        TemplateVersionDetailModel tree, string? valuesJson,
+        AuthoredDocumentPdfHeaderContext? header = null)
     {
         _documentTypeDisplayName = string.IsNullOrWhiteSpace(documentTypeDisplayName) ? "Document" : documentTypeDisplayName;
         _versionNumber = versionNumber;
         _finalizedAt = finalizedAt;
         _tree = tree;
+        _header = header ?? AuthoredDocumentPdfHeaderContext.Empty;
+        _isOhForm = string.Equals(_header.StateCode, OhStateCode, StringComparison.OrdinalIgnoreCase);
 
         JsonObject values;
         try
@@ -65,6 +114,10 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
         }
         _values = values;
     }
+
+    /// <summary>One entry per heading/structural block emitted while composing, in order — a test seam
+    /// (see the type doc's "Outline" section). Empty until <c>Compose</c> has run.</summary>
+    public IReadOnlyList<string> Outline => _outline;
 
     /// <summary>Pin metadata dates to FinalizedAt so re-rendering the same version is byte-deterministic.</summary>
     public DocumentMetadata GetMetadata()
@@ -84,8 +137,8 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
             page.Size(PageSizes.Letter);
             page.DefaultTextStyle(t => t.FontSize(10).FontColor(Colors.Black));
 
-            page.Header().Element(ComposeHeader);
-            page.Content().Element(ComposeContent);
+            page.Header().Element(_isOhForm ? ComposeOhHeader : ComposeHeader);
+            page.Content().Element(_isOhForm ? ComposeOhContent : ComposeContent);
             page.Footer().AlignCenter().Text(text =>
             {
                 text.Span("Page ");
@@ -96,14 +149,19 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
         });
     }
 
+    // =================================================================== Generic (state-less) layout
+
     private void ComposeHeader(IContainer container)
     {
+        Note("Header");
         container.Column(col =>
         {
             col.Item().Text(_documentTypeDisplayName).FontSize(18).Bold();
             col.Item().Text($"Version {_versionNumber}").FontSize(11).SemiBold();
             col.Item().Text($"Finalized: {_finalizedAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}")
                 .FontSize(9).FontColor(Colors.Grey.Darken1);
+            if (_header.AmendsVersionNumber.HasValue)
+                col.Item().Element(c => AmendmentBanner(c));
             col.Item().PaddingTop(6).LineHorizontal(1).LineColor(Colors.Grey.Lighten1);
         });
     }
@@ -125,6 +183,7 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                 if (fields.Count == 0)
                     continue;
 
+                Note($"Section: {section.Title}");
                 col.Item().Element(c => SectionHeading(c, section.Title));
                 foreach (var field in fields)
                     col.Item().Element(c => ComposeField(c, field));
@@ -132,7 +191,203 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
         });
     }
 
-    // ---------------------------------------------------------------- Fields
+    // =================================================================== OH form layout
+
+    private void ComposeOhHeader(IContainer container)
+    {
+        Note("Header");
+        var formId = _header.DocumentTypeKey switch
+        {
+            "IEP" => "PR-07",
+            "ETR" => "PR-06",
+            _ => null
+        };
+        var studentName = string.IsNullOrWhiteSpace(_header.StudentLastName)
+            ? _header.StudentFirstName
+            : $"{_header.StudentFirstName} {_header.StudentLastName}".Trim();
+
+        container.Column(col =>
+        {
+            col.Item().Text(_documentTypeDisplayName).FontSize(18).Bold();
+            if (formId != null)
+                col.Item().Text($"Ohio Department of Education Form {formId}").FontSize(10).SemiBold();
+            col.Item().Text($"Student: {studentName}").FontSize(10);
+            col.Item().Text($"Date of birth: {FormatDate(_header.StudentDateOfBirth)}").FontSize(9);
+            col.Item().Text($"District: {_header.DistrictName ?? "—"}").FontSize(9);
+            col.Item().Text($"IEP date: {FormatDate(_header.IepDate)}   ETR date: {FormatDate(_header.EtrDate)}").FontSize(9);
+            col.Item().Text($"Meeting date: {FormatDate(_header.MeetingDate)}").FontSize(9);
+            col.Item().Text($"Version {_versionNumber} — Form version: template v{_tree.VersionNumber}").FontSize(9).FontColor(Colors.Grey.Darken1);
+            col.Item().Text($"Finalized: {FormatDate(_finalizedAt)}").FontSize(9).FontColor(Colors.Grey.Darken1);
+
+            if (_header.AmendsVersionNumber.HasValue)
+                col.Item().Element(c => AmendmentBanner(c));
+
+            col.Item().PaddingTop(6).LineHorizontal(1).LineColor(Colors.Grey.Lighten1);
+        });
+    }
+
+    private void ComposeOhContent(IContainer container)
+    {
+        container.PaddingVertical(10).Column(col =>
+        {
+            col.Spacing(14);
+
+            var sectionNumber = 0;
+            var goalNumber = 0;
+            foreach (var section in _tree.Sections.OrderBy(s => s.DisplayOrder).ThenBy(s => s.Id))
+            {
+                sectionNumber++;
+                // Seeded OH titles already read "Section 6: Measurable Annual Goals" — don't print "7. Section 6: …".
+                var heading = AlreadyNumbered.IsMatch(section.Title) ? section.Title : $"{sectionNumber}. {section.Title}";
+                Note($"Section {sectionNumber}: {section.Title}");
+                col.Item().Element(c => SectionHeading(c, heading));
+
+                var orderedFields = section.Fields.OrderBy(f => f.DisplayOrder).ThenBy(f => f.Id).ToList();
+                var rendered = 0;
+                foreach (var field in orderedFields)
+                {
+                    if (IsFieldEmpty(field))
+                    {
+                        // OH never silently omits a required field — it prints "Not addressed" in place.
+                        if (field.Required)
+                        {
+                            Note($"Not addressed: {field.Label}");
+                            col.Item().Element(c => LabeledText(c, field.Label, "Not addressed"));
+                            rendered++;
+                        }
+                        continue;
+                    }
+
+                    rendered++;
+                    if (IsGoalsField(field))
+                    {
+                        foreach (var goalBlock in ComposeGoalBlocks(field, ref goalNumber))
+                            col.Item().Element(goalBlock);
+                    }
+                    else if (field.FieldType == FieldType.Table)
+                    {
+                        Note($"Table: {field.Label}");
+                        col.Item().Element(c => ComposeTable(c, field, GetValue(field.FieldKey) as JsonArray));
+                    }
+                    else
+                    {
+                        col.Item().Element(c => ComposeField(c, field));
+                    }
+                }
+
+                // Section-level rule: an entirely-empty section still appears (never omitted), marked
+                // "Not addressed" as a whole rather than as N individual field placeholders.
+                if (rendered == 0)
+                {
+                    Note($"Not addressed: {section.Title}");
+                    col.Item().Text("Not addressed").Italic().FontColor(Colors.Grey.Darken1);
+                }
+            }
+
+            Note("Participants");
+            col.Item().Element(ComposeParticipants);
+
+            Note("Signatures");
+            col.Item().Element(ComposeSignatures);
+        });
+    }
+
+    private bool IsGoalsField(TemplateFieldModel field) =>
+        field.FieldType == FieldType.Table
+        && TemplateSemanticsReader.ReadField(field.FieldType, field.ConfigJson).Semantic == FieldSemantics.Goals;
+
+    /// <summary>Renders the Goals table as numbered blocks — one column-label-per-line — rather than the
+    /// generic grid table (plan 7, decision 9).</summary>
+    private IEnumerable<Action<IContainer>> ComposeGoalBlocks(TemplateFieldModel field, ref int goalNumber)
+    {
+        var rows = GetValue(field.FieldKey) as JsonArray;
+        var columnLabels = TemplateSemanticsReader.ReadColumnLabels(field.ConfigJson);
+        var blocks = new List<Action<IContainer>>();
+        if (rows == null)
+            return blocks;
+
+        foreach (var rowNode in rows.OfType<JsonObject>())
+        {
+            goalNumber++;
+            var n = goalNumber;
+            Note($"Goal {n}");
+            blocks.Add(container => container.Column(col =>
+            {
+                col.Item().Text($"Goal {n}").Bold().FontSize(11);
+                foreach (var (columnKey, label) in columnLabels)
+                {
+                    var cell = rowNode[columnKey.ToString()];
+                    var text = cell is JsonValue v ? v.ToString() : cell?.ToJsonString();
+                    if (string.IsNullOrWhiteSpace(text))
+                        continue;
+                    col.Item().Text($"{label}: {text}").FontSize(9);
+                }
+            }));
+        }
+        return blocks;
+    }
+
+    private void ComposeParticipants(IContainer container)
+    {
+        container.Column(col =>
+        {
+            col.Item().Text("Participants").SemiBold().FontSize(12);
+            if (_header.Participants.Count == 0)
+            {
+                col.Item().Text("Not addressed").Italic().FontColor(Colors.Grey.Darken1);
+                return;
+            }
+            foreach (var p in _header.Participants)
+            {
+                var attended = p.Attended switch { true => "Attended", false => "Did not attend", _ => "Attendance not recorded" };
+                col.Item().Text($"{p.Name} — {p.Role} — {attended}").FontSize(9);
+            }
+        });
+    }
+
+    private void ComposeSignatures(IContainer container)
+    {
+        var lines = new List<string> { "Parent/Guardian" };
+        if (IsStudentOldEnoughToSign())
+            lines.Add("Student");
+        lines.Add("District Representative");
+        lines.Add("Teacher");
+
+        container.Column(col =>
+        {
+            col.Item().Text("Signatures").SemiBold().FontSize(12);
+            foreach (var line in lines)
+            {
+                col.Item().PaddingTop(8).Text(line).FontSize(9).SemiBold();
+                col.Item().Row(row =>
+                {
+                    row.RelativeItem().Text("Name: _______________________").FontSize(9);
+                    row.RelativeItem().Text("Signature: _______________________").FontSize(9);
+                    row.RelativeItem().Text("Date: __________").FontSize(9);
+                });
+            }
+        });
+    }
+
+    private bool IsStudentOldEnoughToSign()
+    {
+        if (_header.StudentDateOfBirth is not { } dob)
+            return false;
+        var reference = _finalizedAt;
+        var age = reference.Year - dob.Year;
+        if (dob.Date > reference.AddYears(-age)) age--;
+        return age >= StudentSignatureMinAge;
+    }
+
+    private void AmendmentBanner(IContainer container)
+    {
+        Note("Amendment");
+        var effective = _header.EffectiveDate.HasValue ? $" — effective {FormatDate(_header.EffectiveDate)}" : string.Empty;
+        container.Background(Colors.Yellow.Lighten3).Padding(4)
+            .Text($"Amendment to v{_header.AmendsVersionNumber}{effective}").Bold().FontSize(10);
+    }
+
+    // =================================================================== Shared fields
 
     private void ComposeField(IContainer container, TemplateFieldModel field)
     {
@@ -255,6 +510,9 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
             : raw; // fall back to the stored string if somehow unparseable
     }
 
+    private static string FormatDate(DateTime? value) =>
+        value.HasValue ? value.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "—";
+
     private static string SelectDisplay(string? configJson, string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -318,6 +576,9 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
 
     // ---------------------------------------------------------------- QuestPDF cell helpers
 
+    private static readonly System.Text.RegularExpressions.Regex AlreadyNumbered =
+        new(@"^\s*(section\s*)?\d+[.:)]", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
     private static void SectionHeading(IContainer container, string text)
         => container.PaddingTop(4).BorderBottom(1).BorderColor(Colors.Grey.Lighten1)
             .Text(text).FontSize(14).Bold().FontColor(Colors.Blue.Darken2);
@@ -336,4 +597,8 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
 
     private static void BodyCell(TableDescriptor table, string text)
         => table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(text).FontSize(9);
+
+    // ---------------------------------------------------------------- Outline (test seam)
+
+    private void Note(string entry) => _outline.Add(entry);
 }

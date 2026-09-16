@@ -27,7 +27,7 @@ public class ObligationService : IObligationService
         if (context == null)
             return ServiceResult<List<ObligationModel>>.FailureResult("Student not found.");
 
-        return ServiceResult<List<ObligationModel>>.SuccessResult(ComputeForStudent(context, DateTime.UtcNow.Date));
+        return ServiceResult<List<ObligationModel>>.SuccessResult(await ComputeAndFilterAsync(new List<StudentObligationContext> { context }, null, ct));
     }
 
     public async Task<ServiceResult<List<ObligationModel>>> GetMineAsync(int userId, ObligationStatus? status, CancellationToken ct = default)
@@ -40,13 +40,13 @@ public class ObligationService : IObligationService
             ? await LoadScopedStudentsAsync(staffCtx, null, ct)
             : await LoadLeadStudentsAsync(userId, ct);
 
-        return ServiceResult<List<ObligationModel>>.SuccessResult(ComputeAndFilter(students, status));
+        return ServiceResult<List<ObligationModel>>.SuccessResult(await ComputeAndFilterAsync(students, status, ct));
     }
 
     public async Task<ServiceResult<List<ObligationModel>>> GetLeadOnlyAsync(int userId, CancellationToken ct = default)
     {
         var students = await LoadLeadStudentsAsync(userId, ct);
-        return ServiceResult<List<ObligationModel>>.SuccessResult(ComputeAndFilter(students, null));
+        return ServiceResult<List<ObligationModel>>.SuccessResult(await ComputeAndFilterAsync(students, null, ct));
     }
 
     public async Task<ServiceResult<List<ObligationModel>>> GetForLeadUsersAsync(IEnumerable<int> userIds, CancellationToken ct = default)
@@ -59,7 +59,7 @@ public class ObligationService : IObligationService
                 .Where(s => s.CaseManagerUserId != null && idList.Contains(s.CaseManagerUserId.Value) && s.Status == StudentStatus.Active))
             .ToListAsync(ct);
 
-        return ServiceResult<List<ObligationModel>>.SuccessResult(ComputeAndFilter(students, null));
+        return ServiceResult<List<ObligationModel>>.SuccessResult(await ComputeAndFilterAsync(students, null, ct));
     }
 
     public async Task<Dictionary<int, List<ObligationModel>>> GetForStaffDigestAsync(IEnumerable<int> userIds, CancellationToken ct = default)
@@ -73,7 +73,7 @@ public class ObligationService : IObligationService
         var leadStudents = await ProjectContext(_context.SchoolStudents.AsNoTracking()
                 .Where(s => s.CaseManagerUserId != null && idList.Contains(s.CaseManagerUserId.Value) && s.Status == StudentStatus.Active))
             .ToListAsync(ct);
-        foreach (var group in ComputeAndFilter(leadStudents, null).GroupBy(o => o.OwnerUserId!.Value))
+        foreach (var group in (await ComputeAndFilterAsync(leadStudents, null, ct)).Where(o => o.OwnerUserId.HasValue).GroupBy(o => o.OwnerUserId!.Value))
             result[group.Key] = group.ToList();
 
         // Admins: their whole scope, the same superset GetMineAsync gives them one at a time.
@@ -94,7 +94,7 @@ public class ObligationService : IObligationService
             .ToListAsync(ct);
         var scopedIds = scoped.Select(s => s.Id).ToList();
         var scopedContexts = await ProjectContext(_context.SchoolStudents.AsNoTracking().Where(s => scopedIds.Contains(s.Id))).ToListAsync(ct);
-        var obligationsByStudent = ComputeAndFilter(scopedContexts, null).GroupBy(o => o.SchoolStudentId).ToDictionary(g => g.Key, g => g.ToList());
+        var obligationsByStudent = (await ComputeAndFilterAsync(scopedContexts, null, ct)).GroupBy(o => o.SchoolStudentId).ToDictionary(g => g.Key, g => g.ToList());
         var placement = scoped.ToDictionary(s => s.Id);
 
         foreach (var admin in admins)
@@ -135,7 +135,7 @@ public class ObligationService : IObligationService
             return ServiceResult<List<ObligationModel>>.FailureResult("You do not have permission to view this school's obligations.");
 
         var students = await LoadScopedStudentsAsync(staffCtx, schoolId, ct);
-        return ServiceResult<List<ObligationModel>>.SuccessResult(ComputeAndFilter(students, status));
+        return ServiceResult<List<ObligationModel>>.SuccessResult(await ComputeAndFilterAsync(students, status, ct));
     }
 
     // ----------------------------------------------------------------- Loading
@@ -204,13 +204,203 @@ public class ObligationService : IObligationService
 
     // ----------------------------------------------------------------- Computation
 
-    private static List<ObligationModel> ComputeAndFilter(List<StudentObligationContext> students, ObligationStatus? status)
+    /// <summary>
+    /// The plan 4 date-based obligations (synchronous, from already-loaded <see cref="StudentObligationContext"/>
+    /// rows) PLUS the plan 7 additions that need their own queries: <see cref="ObligationKind.GoalObservationStale"/>
+    /// and <see cref="ObligationKind.EvaluationDetermination"/>/<see cref="ObligationKind.EvaluatorSubmission"/>
+    /// (see <see cref="LoadGoalObligationsAsync"/>/<see cref="LoadEvaluationObligationsAsync"/>). Every call
+    /// site that used to call the old synchronous <c>ComputeAndFilter</c> now awaits this instead.
+    /// </summary>
+    private async Task<List<ObligationModel>> ComputeAndFilterAsync(List<StudentObligationContext> students, ObligationStatus? status, CancellationToken ct)
     {
         var today = DateTime.UtcNow.Date;
         var result = students.SelectMany(s => ComputeForStudent(s, today)).ToList();
+
+        if (students.Count > 0)
+        {
+            var studentIds = students.Select(s => s.Id).ToList();
+            var byId = students.ToDictionary(s => s.Id);
+            result.AddRange(await LoadGoalObligationsAsync(studentIds, byId, today, ct));
+            result.AddRange(await LoadEvaluationObligationsAsync(studentIds, byId, today, ct));
+        }
+
         if (status.HasValue)
             result = result.Where(o => o.Status == status.Value).ToList();
         return result.OrderBy(o => o.DueDate ?? DateTime.MaxValue).ThenBy(o => o.StudentName).ToList();
+    }
+
+    /// <summary>
+    /// Plan 7: an <see cref="ObligationKind.GoalObservationStale"/> row per Active <see cref="GoalRecord"/>
+    /// with no observation in <see cref="GoalRecordRules.StaleAfterDays"/> days. Owner = a provider on the
+    /// student's active team (any active, non-lead <see cref="StudentTeamMember"/>, deterministically the
+    /// lowest-Id one), else the lead case manager (contract: "owner = a provider on the active team, else lead").
+    /// </summary>
+    private async Task<List<ObligationModel>> LoadGoalObligationsAsync(
+        List<int> studentIds, IReadOnlyDictionary<int, StudentObligationContext> byId, DateTime today, CancellationToken ct)
+    {
+        var activeGoals = await _context.GoalRecords.AsNoTracking()
+            .Where(g => studentIds.Contains(g.SchoolStudentId) && g.Status == GoalRecordStatus.Active)
+            .Select(g => new
+            {
+                g.Id,
+                g.SchoolStudentId,
+                g.GoalText,
+                g.ProjectedAt,
+                LastObservedAt = g.Observations.OrderByDescending(o => o.ObservedAt).Select(o => (DateTime?)o.ObservedAt).FirstOrDefault()
+            })
+            .ToListAsync(ct);
+
+        var staleGoals = activeGoals
+            .Where(g => GoalRecordRules.IsStale(g.LastObservedAt ?? g.ProjectedAt, today))
+            .ToList();
+        if (staleGoals.Count == 0)
+            return new List<ObligationModel>();
+
+        var providerOwners = await ResolveProviderOwnersAsync(staleGoals.Select(g => g.SchoolStudentId).Distinct().ToList(), ct);
+
+        var result = new List<ObligationModel>();
+        foreach (var g in staleGoals)
+        {
+            if (!byId.TryGetValue(g.SchoolStudentId, out var studentCtx))
+                continue;
+
+            var (ownerUserId, ownerName) = providerOwners.TryGetValue(g.SchoolStudentId, out var provider)
+                ? provider
+                : (studentCtx.CaseManagerUserId, studentCtx.CaseManagerName);
+
+            // The day the goal BECAME stale (last activity + the grace window) — used as the obligation's
+            // due date for sort/status purposes, mirroring how the other kinds derive a due date.
+            var dueDate = (g.LastObservedAt ?? g.ProjectedAt).Date.AddDays(GoalRecordRules.StaleAfterDays);
+
+            result.Add(new ObligationModel
+            {
+                Kind = ObligationKind.GoalObservationStale,
+                DueDate = dueDate,
+                // Always Overdue, never DueSoon/Upcoming: staleGoals is already filtered to goals that
+                // HAVE crossed the 45-day threshold, so ResolveStatus's "due today counts as DueSoon"
+                // rule would misreport day 45 itself (todos-equivalent: this obligation only ever exists
+                // once it is already true).
+                Status = ObligationStatus.Overdue,
+                SourceLabel = $"No progress observation logged for \"{g.GoalText}\" in {GoalRecordRules.StaleAfterDays}+ days",
+                OwnerUserId = ownerUserId,
+                OwnerName = ownerName,
+                SchoolStudentId = g.SchoolStudentId,
+                StudentName = studentCtx.StudentName,
+                DaysUntilDue = ObligationRules.DaysUntilDue(dueDate, today),
+                RuleProfile = ObligationRules.ResolveProfile(studentCtx.EffectiveStateCode)
+            });
+        }
+        return result;
+    }
+
+    /// <summary>The first active, non-lead <see cref="StudentTeamMember"/> per student (lowest Id — deterministic), for goal-obligation ownership.</summary>
+    private async Task<Dictionary<int, (int? UserId, string? Name)>> ResolveProviderOwnersAsync(List<int> studentIds, CancellationToken ct)
+    {
+        var rows = await _context.StudentTeamMembers.AsNoTracking()
+            .Where(m => studentIds.Contains(m.SchoolStudentId) && m.IsActive && !m.IsLead)
+            .OrderBy(m => m.Id)
+            .Select(m => new { m.SchoolStudentId, m.UserId, Name = (m.User.FirstName + " " + m.User.LastName).Trim() })
+            .ToListAsync(ct);
+
+        return rows
+            .GroupBy(r => r.SchoolStudentId)
+            .ToDictionary(g => g.Key, g => ((int?)g.First().UserId, (string?)g.First().Name));
+    }
+
+    /// <summary>
+    /// Plan 7: <see cref="ObligationKind.EvaluationDetermination"/> for every open (not Determined/Closed)
+    /// <see cref="EvaluationCase"/>, owner = lead case manager else the case creator; and
+    /// <see cref="ObligationKind.EvaluatorSubmission"/> per overdue (past due, not yet submitted)
+    /// <see cref="EvaluatorAssignment"/> on such a case, owner = the evaluator.
+    /// </summary>
+    private async Task<List<ObligationModel>> LoadEvaluationObligationsAsync(
+        List<int> studentIds, IReadOnlyDictionary<int, StudentObligationContext> byId, DateTime today, CancellationToken ct)
+    {
+        var result = new List<ObligationModel>();
+
+        var openCases = await _context.EvaluationCases.AsNoTracking()
+            .Where(c => studentIds.Contains(c.SchoolStudentId)
+                        && c.Status != EvaluationCaseStatus.Closed && c.Status != EvaluationCaseStatus.Determined)
+            .Select(c => new { c.SchoolStudentId, c.DeterminationDueDate, c.DueDateOverrideReason, c.CreatedByUserId })
+            .ToListAsync(ct);
+
+        if (openCases.Count > 0)
+        {
+            // Case-creator display names, needed only when a student has no lead case manager on file.
+            var creatorIdsNeeded = openCases
+                .Where(c => !(byId.TryGetValue(c.SchoolStudentId, out var sc) && sc.CaseManagerUserId.HasValue))
+                .Select(c => c.CreatedByUserId)
+                .Distinct()
+                .ToList();
+            var creatorNames = creatorIdsNeeded.Count == 0
+                ? new Dictionary<int, string>()
+                : await _context.Users.AsNoTracking()
+                    .Where(u => creatorIdsNeeded.Contains(u.Id))
+                    .ToDictionaryAsync(u => u.Id, u => (u.FirstName + " " + u.LastName).Trim(), ct);
+
+            foreach (var c in openCases)
+            {
+                if (!byId.TryGetValue(c.SchoolStudentId, out var studentCtx))
+                    continue;
+
+                var ownerUserId = studentCtx.CaseManagerUserId ?? c.CreatedByUserId;
+                var ownerName = studentCtx.CaseManagerUserId.HasValue ? studentCtx.CaseManagerName : creatorNames.GetValueOrDefault(c.CreatedByUserId);
+
+                result.Add(new ObligationModel
+                {
+                    Kind = ObligationKind.EvaluationDetermination,
+                    DueDate = c.DeterminationDueDate,
+                    Status = ObligationRules.ResolveStatus(c.DeterminationDueDate, today),
+                    SourceLabel = c.DueDateOverrideReason ?? "Consent received + 60 calendar days",
+                    OwnerUserId = ownerUserId,
+                    OwnerName = ownerName,
+                    SchoolStudentId = c.SchoolStudentId,
+                    StudentName = studentCtx.StudentName,
+                    DaysUntilDue = ObligationRules.DaysUntilDue(c.DeterminationDueDate, today),
+                    RuleProfile = ObligationRules.ResolveProfile(studentCtx.EffectiveStateCode)
+                });
+            }
+        }
+
+        // EvaluatorSubmission is generated only for assignments that are ALREADY overdue (contract:
+        // "EvaluatorSubmission per overdue assignment") — unlike the other kinds, an upcoming/DueSoon
+        // assignment is not surfaced as a compliance obligation.
+        var overdueAssignments = await _context.EvaluatorAssignments.AsNoTracking()
+            .Where(a => studentIds.Contains(a.EvaluationCase.SchoolStudentId)
+                        && a.SubmittedAt == null && a.DueDate != null && a.DueDate.Value.Date < today
+                        && a.EvaluationCase.Status != EvaluationCaseStatus.Closed
+                        && a.EvaluationCase.Status != EvaluationCaseStatus.Determined)
+            .Select(a => new
+            {
+                a.UserId,
+                a.Domain,
+                a.DueDate,
+                StudentId = a.EvaluationCase.SchoolStudentId,
+                DisplayName = (a.User.FirstName + " " + a.User.LastName).Trim()
+            })
+            .ToListAsync(ct);
+
+        foreach (var a in overdueAssignments)
+        {
+            if (!byId.TryGetValue(a.StudentId, out var studentCtx))
+                continue;
+
+            result.Add(new ObligationModel
+            {
+                Kind = ObligationKind.EvaluatorSubmission,
+                DueDate = a.DueDate,
+                Status = ObligationRules.ResolveStatus(a.DueDate, today),
+                SourceLabel = $"{a.Domain} evaluation not yet submitted",
+                OwnerUserId = a.UserId,
+                OwnerName = a.DisplayName,
+                SchoolStudentId = a.StudentId,
+                StudentName = studentCtx.StudentName,
+                DaysUntilDue = ObligationRules.DaysUntilDue(a.DueDate, today),
+                RuleProfile = ObligationRules.ResolveProfile(studentCtx.EffectiveStateCode)
+            });
+        }
+
+        return result;
     }
 
     private static List<ObligationModel> ComputeForStudent(StudentObligationContext s, DateTime today)

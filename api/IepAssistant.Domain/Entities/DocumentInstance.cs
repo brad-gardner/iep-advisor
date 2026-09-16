@@ -53,6 +53,16 @@ public class DocumentInstance : BaseEntity, IAuditableEntity
     public int? LastEditedByUserId { get; set; }
     public DateTime? LastEditedAt { get; set; }
 
+    /// <summary>
+    /// Plan 7, decision 5: set when this Draft instance was created by
+    /// <c>POST /api/authored-versions/{id}/amend</c> — prefilled verbatim from that version's frozen
+    /// values (every <c>_rowId</c> preserved). Finalizing this instance copies these three fields onto the
+    /// resulting <see cref="AuthoredDocumentVersion"/>.
+    /// </summary>
+    public int? AmendsVersionId { get; set; }
+    public string? AmendmentReason { get; set; }
+    public DateTime? EffectiveDate { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public int? CreatedById { get; set; }
@@ -61,4 +71,5 @@ public class DocumentInstance : BaseEntity, IAuditableEntity
     public SchoolStudent SchoolStudent { get; set; } = null!;
     public DocumentType DocumentType { get; set; } = null!;
     public DocumentTemplateVersion DocumentTemplateVersion { get; set; } = null!;
+    public AuthoredDocumentVersion? AmendsVersion { get; set; }
 }

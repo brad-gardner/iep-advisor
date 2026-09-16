@@ -86,6 +86,19 @@ public static class DependencyInjection
         services.AddScoped<IDraftQuestionService, DraftQuestionService>();
         services.AddScoped<IMeetingSummaryService, MeetingSummaryService>();
 
+        // Plan 7 phases 1-2: goal records + provider observations, evaluation case lifecycle.
+        services.AddScoped<IGoalRecordService, GoalRecordService>();
+        services.AddScoped<IEvaluationCaseService, EvaluationCaseService>();
+
+        // Plan 7 phase 3: meeting brief, decisions, offline family participation.
+        services.AddScoped<IMeetingBriefService, MeetingBriefService>();
+        services.AddScoped<IMeetingDecisionService, MeetingDecisionService>();
+        services.AddScoped<IFamilyContactService, FamilyContactService>();
+
+        // Plan 7 phase 4: signed artifacts, amendments (on IAuthoredDocumentVersionService), district export.
+        services.AddScoped<ISignedArtifactService, SignedArtifactService>();
+        services.AddScoped<IExportService, ExportService>();
+
         // Stateless JWT minting reused by create-and-sign-in flows (staff invite accept).
         services.AddScoped<JwtTokenFactory>();
 

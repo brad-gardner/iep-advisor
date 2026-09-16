@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using IepAssistant.Api.DTOs.Templates;
 
@@ -18,6 +19,15 @@ public class AuthoredDocumentVersionSummaryDto
     public DateTime FinalizedAt { get; set; }
     /// <summary>Serialized as a string (Pending | Rendered | Error); null when no PDF row exists.</summary>
     public string? PdfRenderStatus { get; set; }
+
+    // Plan 7, decisions 4-5.
+    public string SignatureStatus { get; set; } = string.Empty;
+    public int SignedArtifactCount { get; set; }
+    public int? AmendsVersionId { get; set; }
+    public int? AmendsVersionNumber { get; set; }
+    public string? AmendmentReason { get; set; }
+    public DateTime? EffectiveDate { get; set; }
+    public List<int> AmendedByVersionIds { get; set; } = new();
 }
 
 /// <summary>A finalized version plus its pinned template version tree, frozen values, and PDF status.</summary>
@@ -41,8 +51,44 @@ public class AuthoredDocumentVersionDetailDto
     public string? PdfBlobUri { get; set; }
     public DateTime? PdfRenderedAt { get; set; }
 
+    // Plan 7, decisions 4-5.
+    public string SignatureStatus { get; set; } = string.Empty;
+    public int SignedArtifactCount { get; set; }
+    public int? AmendsVersionId { get; set; }
+    public int? AmendsVersionNumber { get; set; }
+    public string? AmendmentReason { get; set; }
+    public DateTime? EffectiveDate { get; set; }
+    public List<int> AmendedByVersionIds { get; set; } = new();
+
     /// <summary>The pinned (frozen) template version's full section/field schema for rendering the document.</summary>
     public TemplateVersionDetailDto TemplateVersion { get; set; } = new();
+}
+
+// ---- Plan 7: amendments + signed artifacts ----
+
+public class AmendDocumentVersionRequest
+{
+    [Required, MaxLength(1000)]
+    public string Reason { get; set; } = string.Empty;
+    public DateTime? EffectiveDate { get; set; }
+}
+
+public class AmendResultDto
+{
+    public int InstanceId { get; set; }
+}
+
+public class SignedArtifactDto
+{
+    public int Id { get; set; }
+    public int AuthoredDocumentVersionId { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public string ContentType { get; set; } = string.Empty;
+    public long SizeBytes { get; set; }
+    public int UploadedByUserId { get; set; }
+    public string? UploadedByName { get; set; }
+    public DateTime UploadedAt { get; set; }
+    public string? SignerSummary { get; set; }
 }
 
 /// <summary>PDF render status (no URL — polled; the download URL comes from the download endpoint).</summary>

@@ -138,6 +138,32 @@ describe('Sidebar Administration async gate', () => {
     expect(links[0]).toHaveAttribute('href', '/educator/admin/compliance');
   });
 
+  it('includes an Exports link in the Administration group for a district admin only', () => {
+    useAuthMock.mockReturnValue({ user: makeUser('Educator') });
+    useEducatorProfileMock.mockReturnValue({
+      profile: makeProfile(ORG_ROLE.DistrictAdmin),
+      isLoading: false,
+    });
+
+    renderSidebar();
+
+    const links = screen.getAllByTestId('nav-educator/admin/exports');
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute('href', '/educator/admin/exports');
+  });
+
+  it('hides the Exports link for a school admin', () => {
+    useAuthMock.mockReturnValue({ user: makeUser('Educator') });
+    useEducatorProfileMock.mockReturnValue({
+      profile: makeProfile(ORG_ROLE.SchoolAdmin),
+      isLoading: false,
+    });
+
+    renderSidebar();
+
+    expect(screen.queryByTestId('nav-educator/admin/exports')).not.toBeInTheDocument();
+  });
+
   it('truncates a long name/email in the footer and exposes the full value via title', () => {
     useAuthMock.mockReturnValue({
       user: {

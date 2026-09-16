@@ -14,5 +14,11 @@ public enum NotificationKind
     DraftResponseResolved,
     /// <summary>Plan 6: a post-meeting family summary was sent.</summary>
     MeetingSummarySent,
+    /// <summary>Plan 7: a weekly-digest nudge that an Active goal has had no observation in 45 days.</summary>
+    GoalObservationRequested,
+    /// <summary>Plan 7: an <see cref="EvaluatorAssignment"/> is overdue — sent to the evaluator + case lead.</summary>
+    EvaluatorOverdue,
+    /// <summary>Plan 7: a requested <see cref="ExportJob"/> finished (Completed or Failed) — sent to the requester.</summary>
+    ExportReady,
     Generic
 }

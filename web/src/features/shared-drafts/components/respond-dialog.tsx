@@ -66,7 +66,7 @@ export function RespondDialog({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={`Respond: ${targetLabel}`} data-testid={testId}>
+    <Modal open={open} onClose={onClose} preventClose={isSubmitting} title={`Respond: ${targetLabel}`} data-testid={testId}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Notice variant="info" title="Sent to the school team">
           Your response is visible to your child's whole school team, not just one person.

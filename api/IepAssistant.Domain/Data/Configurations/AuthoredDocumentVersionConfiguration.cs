@@ -14,6 +14,10 @@ public class AuthoredDocumentVersionConfiguration : IEntityTypeConfiguration<Aut
         // DocumentInstance (DocumentInstanceService.MaxValuesJsonBytes) so it can never grow here.
         builder.Property(v => v.ValuesJson).IsRequired();
 
+        // Plan 7, decision 4: the ONE mutable column (see ImmutableVersionInterceptor.IsOnlySignatureStatusModified).
+        builder.Property(v => v.SignatureStatus).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(v => v.AmendmentReason).HasMaxLength(1000);
+
         // Restrict (not Cascade): a finalized AuthoredDocumentVersion is an immutable legal record and
         // must not be silently destroyed by deleting its SchoolStudent (mirrors IepVersion).
         builder.HasOne(v => v.SchoolStudent)
@@ -34,11 +38,22 @@ public class AuthoredDocumentVersionConfiguration : IEntityTypeConfiguration<Aut
             .HasForeignKey(v => v.DocumentTemplateVersionId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Plan 7, decision 5: the amendment chain — self-referencing, Restrict (an amended version must
+        // never be deletable while a later amendment still points to it).
+        builder.HasOne(v => v.AmendsVersion)
+            .WithMany()
+            .HasForeignKey(v => v.AmendsVersionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // UNIQUE backstop for monotonic VersionNumber per (student, docType). FinalizeAsync's
         // serializable transaction prevents the read-then-insert race on SQL Server; this index
         // guarantees the invariant even if two finalizes slip through (the loser fails with a unique
         // violation and rolls back). Also backs per-tuple listing + next-number. Scoped per
         // (student, docType) so IEP and ETR number INDEPENDENTLY for the same student.
         builder.HasIndex(v => new { v.SchoolStudentId, v.DocumentTypeId, v.VersionNumber }).IsUnique();
+        builder.HasIndex(v => v.AmendsVersionId);
+
+        // Backs HomeService's "unsigned finalized > 14 days" list and per-student signature status reads.
+        builder.HasIndex(v => new { v.SchoolStudentId, v.SignatureStatus, v.FinalizedAt });
     }
 }

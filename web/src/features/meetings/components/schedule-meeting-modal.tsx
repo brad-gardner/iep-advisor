@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Drawer } from '@/components/ui/drawer';
 import { ScheduleMeetingForm } from './schedule-meeting-form';
 import type { MeetingDto } from '../types';
@@ -28,8 +29,10 @@ export function ScheduleMeetingModal({
     ? `Reschedule meeting${studentName ? ` — ${studentName}` : ''}`
     : `Schedule meeting${studentName ? ` — ${studentName}` : ''}`;
 
+  // A save that is in flight cannot be dismissed away — it would still land and fire onSaved.
+  const [submitting, setSubmitting] = useState(false);
   return (
-    <Drawer open={open} onClose={onClose} title={title} size="lg" data-testid="schedule-meeting-modal">
+    <Drawer open={open} onClose={onClose} preventClose={submitting} title={title} size="lg" data-testid="schedule-meeting-modal">
       <ScheduleMeetingForm
         studentId={studentId}
         meeting={meeting}
@@ -38,6 +41,7 @@ export function ScheduleMeetingModal({
           onClose();
         }}
         onCancel={onClose}
+        onSubmittingChange={setSubmitting}
       />
     </Drawer>
   );

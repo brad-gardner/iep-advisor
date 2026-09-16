@@ -37,6 +37,18 @@ public class AuthoredDocumentVersion : BaseEntity, IAuditableEntity
 
     public DateTime FinalizedAt { get; set; }
 
+    /// <summary>
+    /// Print/sign status (plan 7, decision 4). The ONE mutable column on this otherwise-immutable row —
+    /// <c>ImmutableVersionInterceptor</c> allows a Modified state that touches only this (plus the audit
+    /// stamp) columns, exactly like it leaves <see cref="Pdf"/> mutable. Defaults Unsigned.
+    /// </summary>
+    public SignatureStatus SignatureStatus { get; set; } = SignatureStatus.Unsigned;
+
+    /// <summary>Plan 7, decision 5: set when this version is the RESULT of amending <see cref="AmendsVersionId"/> — the version chain.</summary>
+    public int? AmendsVersionId { get; set; }
+    public string? AmendmentReason { get; set; }
+    public DateTime? EffectiveDate { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public int? CreatedById { get; set; }
@@ -45,7 +57,10 @@ public class AuthoredDocumentVersion : BaseEntity, IAuditableEntity
     public SchoolStudent SchoolStudent { get; set; } = null!;
     public DocumentType DocumentType { get; set; } = null!;
     public DocumentTemplateVersion DocumentTemplateVersion { get; set; } = null!;
+    public AuthoredDocumentVersion? AmendsVersion { get; set; }
 
     /// <summary>The rendered-PDF tracking row (one-to-one). The ONE mutable child — the render worker updates it.</summary>
     public AuthoredDocumentPdf? Pdf { get; set; }
+
+    public ICollection<SignedArtifact> SignedArtifacts { get; set; } = new List<SignedArtifact>();
 }

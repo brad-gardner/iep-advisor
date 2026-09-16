@@ -66,7 +66,7 @@ export function ResolveResponseDialog({ open, onClose, response, onResolved }: R
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Reply and resolve" data-testid="resolve-response-dialog">
+    <Modal open={open} onClose={onClose} preventClose={isSubmitting} title="Reply and resolve" data-testid="resolve-response-dialog">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="rounded-card border border-brand-slate-200 p-3 text-sm text-brand-slate-600">
           <p className="font-medium text-brand-slate-800">

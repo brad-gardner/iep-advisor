@@ -16,7 +16,14 @@ internal static class AuthoredDocumentVersionMappers
         VersionNumber = m.VersionNumber,
         FinalizedByUserId = m.FinalizedByUserId,
         FinalizedAt = m.FinalizedAt,
-        PdfRenderStatus = m.PdfRenderStatus?.ToString()
+        PdfRenderStatus = m.PdfRenderStatus?.ToString(),
+        SignatureStatus = m.SignatureStatus.ToString(),
+        SignedArtifactCount = m.SignedArtifactCount,
+        AmendsVersionId = m.AmendsVersionId,
+        AmendsVersionNumber = m.AmendsVersionNumber,
+        AmendmentReason = m.AmendmentReason,
+        EffectiveDate = m.EffectiveDate,
+        AmendedByVersionIds = m.AmendedByVersionIds
     };
 
     public static AuthoredDocumentVersionDetailDto MapDetail(AuthoredDocumentVersionDetailModel m) => new()
@@ -34,7 +41,27 @@ internal static class AuthoredDocumentVersionMappers
         PdfRenderStatus = m.PdfRenderStatus?.ToString(),
         PdfBlobUri = m.PdfBlobUri,
         PdfRenderedAt = m.PdfRenderedAt,
+        SignatureStatus = m.SignatureStatus.ToString(),
+        SignedArtifactCount = m.SignedArtifactCount,
+        AmendsVersionId = m.AmendsVersionId,
+        AmendsVersionNumber = m.AmendsVersionNumber,
+        AmendmentReason = m.AmendmentReason,
+        EffectiveDate = m.EffectiveDate,
+        AmendedByVersionIds = m.AmendedByVersionIds,
         TemplateVersion = DocumentTemplateMappers.MapVersionDetail(m.TemplateVersion)
+    };
+
+    public static SignedArtifactDto MapSignedArtifact(SignedArtifactModel m) => new()
+    {
+        Id = m.Id,
+        AuthoredDocumentVersionId = m.AuthoredDocumentVersionId,
+        FileName = m.FileName,
+        ContentType = m.ContentType,
+        SizeBytes = m.SizeBytes,
+        UploadedByUserId = m.UploadedByUserId,
+        UploadedByName = m.UploadedByName,
+        UploadedAt = m.UploadedAt,
+        SignerSummary = m.SignerSummary
     };
 
     public static AuthoredDocumentPdfStatusDto MapPdfStatus(AuthoredDocumentPdfStatusModel m) => new()

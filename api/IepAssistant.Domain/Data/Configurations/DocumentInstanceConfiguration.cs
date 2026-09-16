@@ -28,6 +28,16 @@ public class DocumentInstanceConfiguration : IEntityTypeConfiguration<DocumentIn
         // UPDATE WHERE clause, giving DB-level protection against a concurrent write.
         builder.Property(i => i.RowVersion).IsConcurrencyToken();
 
+        // Plan 7, decision 5.
+        builder.Property(i => i.AmendmentReason).HasMaxLength(1000);
+
+        // Restrict: the amended-from version must never be deletable while a Draft instance still
+        // references it as its amendment source.
+        builder.HasOne(i => i.AmendsVersion)
+            .WithMany()
+            .HasForeignKey(i => i.AmendsVersionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Cascade: an instance is owned content of a student (mirrors IepDraft → SchoolStudent).
         builder.HasOne(i => i.SchoolStudent)
             .WithMany()

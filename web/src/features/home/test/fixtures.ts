@@ -6,6 +6,7 @@ import type {
   HomeMeetingDto,
   HomeObligationDto,
   HomeSharedDraftDto,
+  HomeUnsignedDto,
   ParentHomeDto,
   RosterAttentionDto,
   StaffHomeDto,
@@ -94,6 +95,16 @@ export function makeCaseManagerRow(overrides: Partial<CaseManagerRowDto> = {}): 
     kind: 'AnnualReview',
     dueDate: '2026-09-01',
     status: 'Overdue',
+    ...overrides,
+  };
+}
+
+export function makeUnsignedFinalized(overrides: Partial<HomeUnsignedDto> = {}): HomeUnsignedDto {
+  return {
+    versionId: 400,
+    studentId: 10,
+    studentName: 'Ada Lovelace',
+    finalizedAt: '2026-08-20T12:00:00.000Z',
     ...overrides,
   };
 }

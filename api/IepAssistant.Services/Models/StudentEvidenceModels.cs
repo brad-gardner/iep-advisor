@@ -12,7 +12,9 @@ public enum EvidenceKind
     PresentLevels,
     EtrFinding,
     StudentVoice,
-    ParentContribution
+    ParentContribution,
+    /// <summary>Plan 7, decision 7: family input recorded by staff through an offline channel.</summary>
+    OfflineFamilyInput
 }
 
 /// <summary>

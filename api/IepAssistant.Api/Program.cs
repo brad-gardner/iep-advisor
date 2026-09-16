@@ -147,6 +147,10 @@ builder.Services.AddHostedService<StaffInviteExpiryWorker>();
 builder.Services.AddHostedService<NotificationEmailWorker>();
 builder.Services.AddHostedService<MeetingReminderWorker>();
 builder.Services.AddHostedService<DigestWorker>();
+builder.Services.AddHostedService<EvaluatorOverdueWorker>();
+// Plan 7 phase 4: district/student data export — builds a ZIP off a queue, mirrors AuthoredDocumentPdfWorker.
+builder.Services.AddSingleton<ExportQueue>();
+builder.Services.AddHostedService<ExportWorker>();
 
 // Add controllers
 builder.Services.AddControllers()

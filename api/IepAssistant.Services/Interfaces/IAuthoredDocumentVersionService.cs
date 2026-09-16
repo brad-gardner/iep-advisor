@@ -51,4 +51,13 @@ public interface IAuthoredDocumentVersionService
     /// enqueue. The version itself is never modified.
     /// </summary>
     Task<ServiceResult<int>> RequestPdfRetryAsync(int versionId, int actingUserId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Plan 7, decision 5: creates a new Draft <see cref="Domain.Entities.DocumentInstance"/> prefilled
+    /// VERBATIM from the finalized version's values (every <c>_rowId</c> preserved), pinned to the same
+    /// template version, carrying <c>AmendsVersionId</c>/<c>AmendmentReason</c>/<c>EffectiveDate</c>.
+    /// Finalizing that instance copies the three fields onto the resulting version, forming the amendment
+    /// chain. Collaborator+ on the student.
+    /// </summary>
+    Task<ServiceResult<AmendResultModel>> AmendAsync(int versionId, int actingUserId, AmendDocumentVersionModel model, CancellationToken ct = default);
 }

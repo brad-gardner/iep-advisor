@@ -76,9 +76,12 @@ export function StudentTimelineCard({ studentId, onEditDates }: StudentTimelineC
 
       {!error && obligations !== null && (
         <dl className="space-y-3 text-sm" data-testid="student-timeline-list">
-          {obligations.map((o) => (
+          {obligations.map((o, i) => (
+            // Plan 7 kinds (goal-observation, evaluator submission) can produce
+            // more than one row per kind — `sourceLabel` names the specific
+            // goal/domain, with the index as a last-resort tiebreaker.
             <div
-              key={o.kind}
+              key={`${o.kind}-${o.sourceLabel}-${i}`}
               className="flex items-center justify-between gap-3"
               data-testid={`timeline-row-${o.kind}`}
             >

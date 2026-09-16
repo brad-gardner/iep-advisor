@@ -20,6 +20,10 @@ internal static class DocumentInstanceMappers
         CreatedAt = m.CreatedAt,
         LastEditedAt = m.LastEditedAt,
         LastEditedByUserId = m.LastEditedByUserId,
+        AmendsVersionId = m.AmendsVersionId,
+        AmendsVersionNumber = m.AmendsVersionNumber,
+        AmendmentReason = m.AmendmentReason,
+        EffectiveDate = m.EffectiveDate,
         TemplateVersion = DocumentTemplateMappers.MapVersionDetail(m.TemplateVersion)
     };
 
