@@ -35,4 +35,18 @@ public interface IDistrictService
     /// caller's district (no existence leak).
     /// </summary>
     Task<ServiceResult> DeactivateSchoolAsync(int userId, int schoolId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Plan 5: overdue/due-soon/unknown-date counts by school. DistrictAdmin sees the whole district
+    /// (optionally narrowed to <paramref name="schoolId"/>); SchoolAdmin is forced to their own school
+    /// regardless of <paramref name="schoolId"/>; every other role is denied. <paramref name="from"/>/
+    /// <paramref name="to"/> bound the Due30/Due60 buckets (default: today .. today+60 days).
+    /// </summary>
+    Task<ServiceResult<ComplianceBoardModel>> GetComplianceBoardAsync(int userId, int? schoolId, DateTime? from, DateTime? to, CancellationToken ct = default);
+
+    /// <summary>Plan 5: staff/draft activity in the last <paramref name="days"/> days, by school. Same scoping as <see cref="GetComplianceBoardAsync"/>.</summary>
+    Task<ServiceResult<AdoptionModel>> GetAdoptionAsync(int userId, int? schoolId, int days, CancellationToken ct = default);
+
+    /// <summary>Plan 5: family-link evidence tile, by school. Same scoping as <see cref="GetComplianceBoardAsync"/>.</summary>
+    Task<ServiceResult<EngagementModel>> GetEngagementAsync(int userId, int? schoolId, CancellationToken ct = default);
 }

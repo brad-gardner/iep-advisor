@@ -177,20 +177,24 @@ public class EducatorService : IEducatorService
             query = query.Where(s => s.SchoolId == search.SchoolId.Value);
         if (search.Grade != null)
             query = query.Where(s => s.GradeLevel == search.Grade.Value);
-        // Dashboard "needs attention" deep links: the same predicates DistrictService uses for its
-        // tiles, composed onto the role-scoped query so paging and the other filters still apply.
+        // Dashboard "needs attention" deep links: the SAME predicates (StudentAttentionRules, plan 5)
+        // the district dashboard/compliance board use, composed onto the role-scoped query so paging
+        // and the other filters still apply and a board count always matches its drilldown row count.
+        var today = DateTime.UtcNow.Date;
         if (search.Attention == StudentAttention.NoCaseManager)
-        {
-            var districtId = ctx.DistrictId;
-            query = query.Where(s => !_context.StudentTeamMembers.Any(m =>
-                m.SchoolStudentId == s.Id && m.IsActive && m.IsLead
-                && _context.StaffProfiles.Any(p => p.UserId == m.UserId && p.IsActive && p.DistrictId == districtId)));
-        }
+            query = query.Where(StudentAttentionRules.NoLead(_context, ctx.DistrictId));
         else if (search.Attention == StudentAttention.NoLinkedParent)
-        {
-            query = query.Where(s => !_context.ChildLinks.Any(l =>
-                l.SchoolStudentId == s.Id && l.IsActive && l.AcceptedAt != null && l.ChildProfileId != null));
-        }
+            query = query.Where(StudentAttentionRules.NoFamily(_context));
+        else if (search.Attention == StudentAttention.OverdueAnnual)
+            query = query.Where(StudentAttentionRules.OverdueAnnual(today));
+        else if (search.Attention == StudentAttention.OverdueReeval)
+            query = query.Where(StudentAttentionRules.OverdueReeval(today));
+        else if (search.Attention == StudentAttention.Due30)
+            query = query.Where(StudentAttentionRules.DueWithin(today, today.AddDays(30)));
+        else if (search.Attention == StudentAttention.Due60)
+            query = query.Where(StudentAttentionRules.DueWithin(today, today.AddDays(60)));
+        else if (search.Attention == StudentAttention.UnknownDates)
+            query = query.Where(StudentAttentionRules.UnknownDates());
         if (!string.IsNullOrWhiteSpace(search.Query))
         {
             // LIKE is case-insensitive under SQL Server's default collation and for ASCII on SQLite;

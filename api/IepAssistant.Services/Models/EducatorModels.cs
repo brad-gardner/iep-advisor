@@ -62,14 +62,26 @@ public class ExitStudentModel
 }
 
 /// <summary>
-/// Dashboard "needs attention" narrowing for the roster (same predicates as the district dashboard
-/// tiles): <see cref="NoCaseManager"/> = no active lead whose staff profile is still active in the
-/// district; <see cref="NoLinkedParent"/> = no accepted, active parent link.
+/// Dashboard "needs attention" narrowing for the roster — the SAME predicates
+/// (<see cref="Implementations.StudentAttentionRules"/>, plan 5) back both this roster filter and the
+/// district compliance board, so a board count and its drilldown row count can never drift apart.
+/// <see cref="NoCaseManager"/> = no active lead whose staff profile is still active in the district;
+/// <see cref="NoLinkedParent"/> = no accepted, active parent link; <see cref="OverdueAnnual"/>/
+/// <see cref="OverdueReeval"/> = the resolved annual-review/re-evaluation due date (see
+/// <see cref="Implementations.ObligationRules"/>'s fallback formulas) is in the past;
+/// <see cref="Due30"/>/<see cref="Due60"/> = either due date falls within the next 30/60 days (not
+/// overdue, cumulative — Due60 is a superset of Due30); <see cref="UnknownDates"/> = either due date is
+/// unresolvable (no due date AND no fallback source date) — Unknown never reads as healthy.
 /// </summary>
 public enum StudentAttention
 {
     NoCaseManager,
-    NoLinkedParent
+    NoLinkedParent,
+    OverdueAnnual,
+    OverdueReeval,
+    Due30,
+    Due60,
+    UnknownDates
 }
 
 /// <summary>Roster search/filter/paging input. <see cref="Status"/> null means every status ("All").</summary>

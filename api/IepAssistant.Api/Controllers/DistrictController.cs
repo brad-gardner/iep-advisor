@@ -114,6 +114,42 @@ public class DistrictController : ControllerBase
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 
+    [HttpGet("compliance")]
+    [ProducesResponseType(typeof(ApiResponse<ComplianceBoardDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetCompliance([FromQuery] int? schoolId, [FromQuery] DateTime? from, [FromQuery] DateTime? to, CancellationToken ct)
+    {
+        var result = await _districtService.GetComplianceBoardAsync(User.GetUserId(), schoolId, from, to, ct);
+        if (!result.Success)
+            return MapFailure<ComplianceBoardDto>(result.Message);
+
+        return Ok(ApiResponse<ComplianceBoardDto>.SuccessResponse(MapComplianceBoard(result.Data!)));
+    }
+
+    [HttpGet("adoption")]
+    [ProducesResponseType(typeof(ApiResponse<AdoptionDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetAdoption([FromQuery] int? schoolId, [FromQuery] int days = 30, CancellationToken ct = default)
+    {
+        var result = await _districtService.GetAdoptionAsync(User.GetUserId(), schoolId, days, ct);
+        if (!result.Success)
+            return MapFailure<AdoptionDto>(result.Message);
+
+        return Ok(ApiResponse<AdoptionDto>.SuccessResponse(MapAdoption(result.Data!)));
+    }
+
+    [HttpGet("engagement")]
+    [ProducesResponseType(typeof(ApiResponse<EngagementDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetEngagement([FromQuery] int? schoolId, CancellationToken ct)
+    {
+        var result = await _districtService.GetEngagementAsync(User.GetUserId(), schoolId, ct);
+        if (!result.Success)
+            return MapFailure<EngagementDto>(result.Message);
+
+        return Ok(ApiResponse<EngagementDto>.SuccessResponse(MapEngagement(result.Data!)));
+    }
+
     private static DistrictOverviewDto MapOverview(DistrictOverviewModel m) => new()
     {
         Id = m.Id,
@@ -171,6 +207,72 @@ public class DistrictController : ControllerBase
             LastName = s.LastName,
             SchoolName = s.SchoolName,
             ParentInvitePending = s.ParentInvitePending
+        }).ToList()
+    };
+
+    private static ComplianceSummaryDto MapComplianceSummary(ComplianceSummaryModel m) => new()
+    {
+        OverdueAnnual = m.OverdueAnnual,
+        OverdueReeval = m.OverdueReeval,
+        Due30 = m.Due30,
+        Due60 = m.Due60,
+        UnknownDates = m.UnknownDates,
+        NoLead = m.NoLead,
+        ActiveStudents = m.ActiveStudents
+    };
+
+    private static ComplianceBoardDto MapComplianceBoard(ComplianceBoardModel m) => new()
+    {
+        GeneratedAt = m.GeneratedAt,
+        From = m.From,
+        To = m.To,
+        Summary = MapComplianceSummary(m.Summary),
+        BySchool = m.BySchool.Select(s => new ComplianceSchoolRowDto
+        {
+            SchoolId = s.SchoolId,
+            SchoolName = s.SchoolName,
+            ActiveStudents = s.ActiveStudents,
+            OverdueAnnual = s.OverdueAnnual,
+            OverdueReeval = s.OverdueReeval,
+            Due30 = s.Due30,
+            Due60 = s.Due60,
+            UnknownDates = s.UnknownDates,
+            NoLead = s.NoLead
+        }).ToList(),
+        Drill = new Dictionary<string, string>(m.Drill)
+    };
+
+    private static AdoptionDto MapAdoption(AdoptionModel m) => new()
+    {
+        Days = m.Days,
+        StaffActiveLast14 = m.StaffActiveLast14,
+        StaffTotal = m.StaffTotal,
+        BySchool = m.BySchool.Select(s => new AdoptionSchoolDto
+        {
+            SchoolId = s.SchoolId,
+            SchoolName = s.SchoolName,
+            StaffActive = s.StaffActive,
+            StaffTotal = s.StaffTotal,
+            DraftsStarted = s.DraftsStarted,
+            DraftsFinalized = s.DraftsFinalized
+        }).ToList(),
+        DraftsStarted = m.DraftsStarted,
+        DraftsFinalized = m.DraftsFinalized,
+        ActiveRule = m.ActiveRule
+    };
+
+    private static EngagementDto MapEngagement(EngagementModel m) => new()
+    {
+        StudentsWithFamilyLink = m.StudentsWithFamilyLink,
+        ActiveStudents = m.ActiveStudents,
+        DraftsShared = m.DraftsShared,
+        ResponsesReceived = m.ResponsesReceived,
+        BySchool = m.BySchool.Select(s => new EngagementSchoolDto
+        {
+            SchoolId = s.SchoolId,
+            SchoolName = s.SchoolName,
+            StudentsWithFamilyLink = s.StudentsWithFamilyLink,
+            ActiveStudents = s.ActiveStudents
         }).ToList()
     };
 

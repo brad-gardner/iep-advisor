@@ -41,8 +41,9 @@ public class EducatorController : ControllerBase
     /// <summary>
     /// Paged roster. <c>status</c> = Active (default) | Exited | Archived | All; <c>query</c> matches
     /// first/last name or external student id; <c>schoolId</c>/<c>grade</c> narrow the role-scoped set;
-    /// <c>attention</c> = NoCaseManager | NoLinkedParent narrows to the dashboard's "needs attention" sets
-    /// (server-side, so paging stays exact).
+    /// <c>attention</c> = NoCaseManager | NoLinkedParent | OverdueAnnual | OverdueReeval | Due30 | Due60 |
+    /// UnknownDates narrows to the dashboard/compliance-board's "needs attention" sets (server-side, so
+    /// paging stays exact and drilldown counts match the board).
     /// </summary>
     [HttpGet("students")]
     [ProducesResponseType(typeof(ApiResponse<PagedResultDto<SchoolStudentDto>>), StatusCodes.Status200OK)]
