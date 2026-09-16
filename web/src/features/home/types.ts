@@ -40,7 +40,9 @@ export interface HomeDraftDto {
   studentName: string;
   documentTypeKey: string;
   documentTypeDisplayName: string;
-  lastEditedAt: string;
+  // Null for a draft created but never edited (mirrors the entity's nullable
+  // `LastEditedAt`) — rendered via `formatDate`'s built-in fallback.
+  lastEditedAt: string | null;
   completenessPercent: number;
   requiredMissing: number;
 }
@@ -59,7 +61,8 @@ export interface HomeProviderRequestDto {
   id: number;
   studentId: number;
   studentName: string;
-  dueDate: string;
+  // Nullable to mirror the source field — rendered via `formatDate`'s fallback.
+  dueDate: string | null;
 }
 
 // Plan 7 shape — always `[]` until finalize-signing ships.
@@ -104,8 +107,11 @@ export interface StaffHomeDto {
   providerRequestsIOwe: HomeProviderRequestDto[];
   // Admins only.
   rosterAttention?: RosterAttentionDto | null;
-  // SchoolAdmin/DistrictAdmin only.
+  // SchoolAdmin/DistrictAdmin only. Capped at 50 rows (sorted by student);
+  // `overdueByCaseManagerTotal` carries the true count so the UI can point to
+  // the full compliance board when there are more.
   overdueByCaseManager?: CaseManagerRowDto[] | null;
+  overdueByCaseManagerTotal?: number | null;
   // Empty-safe (plan 7).
   unsignedFinalized?: HomeUnsignedDto[] | null;
   // DistrictAdmin only — same numbers as the compliance board with no filters.
@@ -136,7 +142,9 @@ export interface ParentProgressReportDto {
   id: number;
   childId: number;
   childName: string;
-  title: string;
+  // Null until a file is attached (`ProgressReport.FileName` is nullable) —
+  // render with an "Untitled report" fallback rather than a blank label.
+  title: string | null;
   createdAt: string;
 }
 
@@ -163,10 +171,11 @@ export interface StudentHomeDto {
   linkedStudentId: number | null;
 }
 
-export interface HomeDto {
-  kind: HomeKind;
-  generatedAt: string;
-  staff?: StaffHomeDto | null;
-  parent?: ParentHomeDto | null;
-  student?: StudentHomeDto | null;
-}
+// A real discriminated union on `kind` — narrowing `home.kind === 'Staff'`
+// guarantees `home.staff` is present (and the other two branches absent)
+// rather than each page needing its own defensive `!home.staff` guard on top
+// of the `kind` check.
+export type HomeDto =
+  | { kind: 'Staff'; generatedAt: string; staff: StaffHomeDto }
+  | { kind: 'Parent'; generatedAt: string; parent: ParentHomeDto }
+  | { kind: 'Student'; generatedAt: string; student: StudentHomeDto };

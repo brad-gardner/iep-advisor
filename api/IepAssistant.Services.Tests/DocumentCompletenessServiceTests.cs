@@ -218,6 +218,89 @@ public sealed class DocumentCompletenessServiceTests : IDisposable
         Assert.Equal(2, result.RequiredMissing);
     }
 
+    // ----------------------------------------------------------------- Case 6: Table below minRows (server-only; mirrors AuthoredDocumentVersionService.ValidateTable's independent minRows check)
+
+    [Fact]
+    public void Compute_TableBelowMinRows_CountsRequiredMissing_EvenWhenFieldNotRequired()
+    {
+        using var ctx = CreateContext();
+        var sections = new List<TemplateSectionModel>
+        {
+            new()
+            {
+                Id = 40, Title = "Goals", DisplayOrder = 0,
+                Fields = new List<TemplateFieldModel>
+                {
+                    new()
+                    {
+                        Id = 400, FieldKey = GoalsKey, FieldType = FieldType.Table, Label = "Goals", Required = false, DisplayOrder = 0,
+                        ConfigJson = JsonSerializer.Serialize(new
+                        {
+                            minRows = 2,
+                            columns = new object[]
+                            {
+                                new { columnKey = GoalCol, type = "Text", label = "Goal", required = false }
+                            }
+                        })
+                    }
+                }
+            }
+        };
+        var values = Json(new Dictionary<string, object>
+        {
+            [GoalsKey.ToString()] = new object[]
+            {
+                new Dictionary<string, object?> { ["_rowId"] = "r1", [GoalCol.ToString()] = "Read 90 wpm" }
+            }
+        });
+        var result = CreateService(ctx).Compute(sections, values);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(1, result.FilledCount); // one row present -> the field itself isn't blank
+        Assert.Equal(1, result.RequiredMissing); // below minRows=2, even though Required=false
+        Assert.Equal(100, result.Percent);
+    }
+
+    [Fact]
+    public void Compute_TableMeetsMinRows_NoRequiredMissing()
+    {
+        using var ctx = CreateContext();
+        var sections = new List<TemplateSectionModel>
+        {
+            new()
+            {
+                Id = 41, Title = "Goals", DisplayOrder = 0,
+                Fields = new List<TemplateFieldModel>
+                {
+                    new()
+                    {
+                        Id = 401, FieldKey = GoalsKey, FieldType = FieldType.Table, Label = "Goals", Required = false, DisplayOrder = 0,
+                        ConfigJson = JsonSerializer.Serialize(new
+                        {
+                            minRows = 2,
+                            columns = new object[]
+                            {
+                                new { columnKey = GoalCol, type = "Text", label = "Goal", required = false }
+                            }
+                        })
+                    }
+                }
+            }
+        };
+        var values = Json(new Dictionary<string, object>
+        {
+            [GoalsKey.ToString()] = new object[]
+            {
+                new Dictionary<string, object?> { ["_rowId"] = "r1", [GoalCol.ToString()] = "Read 90 wpm" },
+                new Dictionary<string, object?> { ["_rowId"] = "r2", [GoalCol.ToString()] = "Write a paragraph" }
+            }
+        });
+        var result = CreateService(ctx).Compute(sections, values);
+
+        Assert.Equal(0, result.RequiredMissing);
+        Assert.Equal(100, result.Percent);
+    }
+
     // ----------------------------------------------------------------- ComputeAsync (DB-backed)
 
     [Fact]

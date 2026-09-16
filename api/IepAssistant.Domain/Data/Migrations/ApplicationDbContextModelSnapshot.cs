@@ -56,6 +56,8 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasIndex("ActorUserId");
 
+                    b.HasIndex("ActorUserId", "CreatedAt");
+
                     b.HasIndex("ActorUserId", "Id");
 
                     b.HasIndex("ResourceType", "ResourceId", "CreatedAt");

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { daysUntilFromNow } from '../lib/days-until';
+import { useEffect, useState } from 'react';
 import { Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -17,11 +18,19 @@ function countdownLabel(daysUntil: number): string {
   return `In ${daysUntil} days`;
 }
 
+// How often the live countdown re-derives from the clock. Coarse on purpose —
+// this only needs to catch a day boundary or the meeting starting, not tick
+// like a stopwatch.
+const COUNTDOWN_REFRESH_MS = 60_000;
+
 interface NextMeetingCardProps {
   meeting: HomeMeetingDto;
-  /** Precomputed by the server for the parent variant; omit for the student
-   * variant (its own next meeting has no separate countdown in the contract). */
-  daysUntil?: number;
+  /** Show the countdown badge (the parent variant); omit for the student
+   * variant, whose own next meeting has no separate countdown in the
+   * contract. The displayed value is always recomputed from
+   * `meeting.startsAtUtc` (see `daysUntilFromNow`), refreshed on a coarse
+   * interval — never trusted as a static server snapshot. */
+  showCountdown?: boolean;
   /** Whose meeting this is, e.g. a child's name for the parent variant. */
   subtitle?: string;
   /** Reflects a successful RSVP back into the caller's home state. */
@@ -34,13 +43,24 @@ interface NextMeetingCardProps {
  * basic details. Self-contained RSVP state, like `UpcomingMeetingCard`. */
 export function NextMeetingCard({
   meeting,
-  daysUntil,
+  showCountdown = false,
   subtitle,
   onUpdated,
   'data-testid': testId = 'next-meeting-card',
 }: NextMeetingCardProps) {
   const [pending, setPending] = useState<InviteStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The countdown is derived from the clock at render time; the effect only
+  // subscribes to a coarse timer that re-renders, so a tab left open across a
+  // day boundary (or past the meeting) never keeps a stale "Tomorrow" badge.
+  const [clockTick, setClockTick] = useState(0);
+  useEffect(() => {
+    if (!showCountdown) return;
+    const id = setInterval(() => setClockTick((t) => t + 1), COUNTDOWN_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [showCountdown]);
+  void clockTick; // read so the interval re-render is observed by the derived value below
+  const daysUntil = showCountdown ? daysUntilFromNow(meeting.startsAtUtc) : null;
 
   const handleRespond = async (status: InviteStatus) => {
     setPending(status);

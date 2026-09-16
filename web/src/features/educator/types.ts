@@ -232,7 +232,9 @@ export type StudentStatusFilter = StudentStatus | 'All';
 // accepted parent link / procedural-deadline buckets. `Due30`/`Due60` are due
 // within N days from today (not overdue); `UnknownDates` means the source
 // dates needed to compute a deadline are missing — never rendered as healthy.
-// Composes with the other filters and normal paging.
+// `DueInRange` is the compliance board's caller-chosen `from`/`to` window (see
+// `use-roster-query.ts`'s `from`/`to` params) — distinct from the fixed
+// `Due30`/`Due60` buckets. Composes with the other filters and normal paging.
 export const ATTENTION_FILTERS = [
   'NoCaseManager',
   'NoLinkedParent',
@@ -241,8 +243,12 @@ export const ATTENTION_FILTERS = [
   'Due30',
   'Due60',
   'UnknownDates',
+  'DueInRange',
 ] as const;
 export type AttentionFilter = (typeof ATTENTION_FILTERS)[number];
+// `DueInRange`'s label is dynamic (built from the `from`/`to` query params by
+// the roster page) — this fallback only covers a `DueInRange` deep link with
+// no date bounds attached.
 export const ATTENTION_FILTER_LABELS: Record<AttentionFilter, string> = {
   NoCaseManager: 'no case manager',
   NoLinkedParent: 'no linked parent',
@@ -251,6 +257,7 @@ export const ATTENTION_FILTER_LABELS: Record<AttentionFilter, string> = {
   Due30: 'a review due within 30 days',
   Due60: 'a review due within 60 days',
   UnknownDates: 'unknown dates',
+  DueInRange: 'a review due in the selected range',
 };
 
 export interface StudentSearchParams {
@@ -259,6 +266,9 @@ export interface StudentSearchParams {
   status?: StudentStatusFilter;
   grade?: GradeLevel;
   attention?: AttentionFilter;
+  // `yyyy-MM-dd` bounds for `attention: 'DueInRange'` only.
+  from?: string;
+  to?: string;
   page?: number;
   pageSize?: number;
 }

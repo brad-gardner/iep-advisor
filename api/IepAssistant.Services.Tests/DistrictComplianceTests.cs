@@ -114,6 +114,68 @@ public sealed class DistrictComplianceTests : IDisposable
         Assert.Equal("attention=OverdueAnnual", board.Data.Drill["overdueAnnual"]);
     }
 
+    /// <summary>Review-fix contract addition 1 (todos/073): Due30/Due60 stay anchored on TODAY no matter
+    /// what date range is requested — only the new DueInRange bucket (and its roster drilldown) moves
+    /// with the caller's from/to — so a non-default board view and its drilldown always agree.</summary>
+    [Fact]
+    public async Task ComplianceBoard_NonDefaultDateRange_Due30Due60StayTodayAnchored_DueInRangeMatchesRosterDrilldown()
+    {
+        var districtId = _db.District();
+        var schoolA = _db.School(districtId, "School A");
+        var (adminId, _) = _db.Staff("rangeadmin@example.com", districtId, null, Models.OrgRoleIds.DistrictAdmin);
+
+        var today = DateTime.UtcNow.Date;
+
+        // Due in 10 days: inside today-anchored Due30/Due60, OUTSIDE the custom [+80, +100] range below.
+        var due10Student = _db.Student(schoolA, "Ten", "DaysOut");
+        // Due in 90 days: OUTSIDE today-anchored Due30/Due60, INSIDE the custom [+80, +100] range.
+        var due90Student = _db.Student(schoolA, "Ninety", "DaysOut");
+
+        using (var seedCtx = _db.Context())
+        {
+            seedCtx.SchoolStudents.Single(s => s.Id == due10Student).AnnualReviewDueDate = today.AddDays(10);
+            seedCtx.SchoolStudents.Single(s => s.Id == due10Student).ReevaluationDueDate = today.AddDays(400);
+            seedCtx.SchoolStudents.Single(s => s.Id == due90Student).AnnualReviewDueDate = today.AddDays(90);
+            seedCtx.SchoolStudents.Single(s => s.Id == due90Student).ReevaluationDueDate = today.AddDays(400);
+            seedCtx.SaveChanges();
+        }
+
+        var from = today.AddDays(80);
+        var to = today.AddDays(100);
+
+        using var ctx = _db.Context();
+        var board = await CreateDistrictService(ctx).GetComplianceBoardAsync(adminId, null, from, to);
+        Assert.True(board.Success, board.Message);
+        var summary = board.Data!.Summary;
+
+        Assert.Equal(1, summary.Due30); // today-anchored: only due10Student
+        Assert.Equal(1, summary.Due60); // today-anchored: only due10Student
+        Assert.Equal(1, summary.DueInRange); // [from, to] = [+80, +100]: only due90Student
+
+        var educator = CreateEducatorService(ctx);
+
+        var rosterDue30 = await educator.SearchStudentsAsync(adminId, new StudentSearchQuery { Attention = StudentAttention.Due30, PageSize = 200 });
+        Assert.True(rosterDue30.Success, rosterDue30.Message);
+        Assert.Equal(summary.Due30, rosterDue30.Data!.Total);
+
+        var rosterDueInRange = await educator.SearchStudentsAsync(adminId, new StudentSearchQuery
+        {
+            Attention = StudentAttention.DueInRange,
+            From = from,
+            To = to,
+            PageSize = 200
+        });
+        Assert.True(rosterDueInRange.Success, rosterDueInRange.Message);
+        Assert.Equal(summary.DueInRange, rosterDueInRange.Data!.Total);
+        Assert.Contains(rosterDueInRange.Data.Items, s => s.Id == due90Student);
+        Assert.DoesNotContain(rosterDueInRange.Data.Items, s => s.Id == due10Student);
+
+        // Drill map carries the caller's from/to for dueInRange only; due30/due60 never carry dates.
+        Assert.Equal("attention=Due30", board.Data.Drill["due30"]);
+        Assert.Equal("attention=Due60", board.Data.Drill["due60"]);
+        Assert.Equal($"attention=DueInRange&from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}", board.Data.Drill["dueInRange"]);
+    }
+
     // ----------------------------------------------------------------- SchoolAdmin scoping
 
     [Fact]
@@ -170,6 +232,21 @@ public sealed class DistrictComplianceTests : IDisposable
         Assert.False(board.Success);
     }
 
+    /// <summary>Review-fix contract, todos/086 P3 #2/#5: a wildly out-of-range date fails cleanly (a
+    /// ServiceResult failure the controller maps to 400) instead of throwing ArgumentOutOfRangeException
+    /// out of DateTime.AddDays deep inside the query.</summary>
+    [Fact]
+    public async Task ComplianceBoard_DateFarBeyondTenYears_FailsCleanly_DoesNotThrow()
+    {
+        var districtId = _db.District();
+        var (adminId, _) = _db.Staff("outofrangeadmin@example.com", districtId, null, Models.OrgRoleIds.DistrictAdmin);
+
+        using var ctx = _db.Context();
+        var board = await CreateDistrictService(ctx).GetComplianceBoardAsync(adminId, null, DateTime.MaxValue.AddYears(-1), null);
+
+        Assert.False(board.Success);
+    }
+
     // ----------------------------------------------------------------- Adoption
 
     [Fact]
@@ -199,6 +276,22 @@ public sealed class DistrictComplianceTests : IDisposable
         Assert.Equal(2, result.Data.StaffTotal);
         Assert.Equal(1, result.Data.StaffActiveLast14);
         Assert.False(string.IsNullOrWhiteSpace(result.Data.ActiveRule));
+    }
+
+    /// <summary>Review-fix contract, todos/086 P3 #2/#5: an extreme caller-supplied <c>days</c> is clamped
+    /// to a sane upper bound instead of overflowing <c>DateTime.UtcNow.AddDays(-days)</c> into an
+    /// unhandled exception.</summary>
+    [Fact]
+    public async Task Adoption_ExtremeDays_ClampsInsteadOfThrowing()
+    {
+        var districtId = _db.District();
+        var (adminId, _) = _db.Staff("clampadmin@example.com", districtId, null, Models.OrgRoleIds.DistrictAdmin);
+
+        using var ctx = _db.Context();
+        var result = await CreateDistrictService(ctx).GetAdoptionAsync(adminId, null, days: 999_999_999);
+
+        Assert.True(result.Success, result.Message);
+        Assert.True(result.Data!.Days <= 3650);
     }
 
     // ----------------------------------------------------------------- Engagement

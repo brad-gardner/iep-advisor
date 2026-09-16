@@ -12,6 +12,11 @@ public class ComplianceSummaryModel
     public int OverdueReeval { get; set; }
     public int Due30 { get; set; }
     public int Due60 { get; set; }
+
+    /// <summary>Due within the board's caller-chosen [From, To] window (default today..today+60) — the
+    /// only bucket the optional date range affects; <see cref="Due30"/>/<see cref="Due60"/> are always
+    /// anchored on today regardless of the requested range (review-fix contract addition 1).</summary>
+    public int DueInRange { get; set; }
     public int UnknownDates { get; set; }
     public int NoLead { get; set; }
     public int ActiveStudents { get; set; }
@@ -27,16 +32,19 @@ public class ComplianceSchoolRowModel
     public int OverdueReeval { get; set; }
     public int Due30 { get; set; }
     public int Due60 { get; set; }
+    public int DueInRange { get; set; }
     public int UnknownDates { get; set; }
     public int NoLead { get; set; }
 }
 
 /// <summary>
 /// DistrictAdmin: whole district, optionally narrowed to one school. SchoolAdmin: forced to their own
-/// school regardless of a caller-supplied <c>schoolId</c>. <see cref="From"/>/<see cref="To"/> bound the
-/// Due30/Due60 "due soon" buckets (default: today .. today+60 days); overdue counts always use "today"
-/// regardless of the requested range. <see cref="Drill"/> maps each count key to the roster query string
-/// that reproduces its rows (e.g. "overdueAnnual" -> "attention=OverdueAnnual").
+/// school regardless of a caller-supplied <c>schoolId</c>. <see cref="From"/>/<see cref="To"/> (default:
+/// today .. today+60 days) bound ONLY the <see cref="ComplianceSummaryModel.DueInRange"/> bucket; Due30/
+/// Due60/overdue counts are always anchored on today regardless of the requested range, so every OTHER
+/// drill key's roster rows equal the tile count no matter what range is selected (review-fix contract
+/// addition 1). <see cref="Drill"/> maps each count key to the roster query string that reproduces its
+/// rows (e.g. "overdueAnnual" -> "attention=OverdueAnnual"; "dueInRange" carries the current from/to).
 /// </summary>
 public class ComplianceBoardModel
 {

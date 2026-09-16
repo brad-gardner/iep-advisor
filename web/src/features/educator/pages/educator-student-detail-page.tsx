@@ -31,7 +31,11 @@ export function EducatorStudentDetailPage() {
   const studentId = Number(studentIdParam);
   const record = useStudentRecord(studentId);
   const { student } = record;
-  usePageTitle(student ? `${student.firstName} ${student.lastName ?? ""}`.trim() || "Student" : "Student");
+  // Never the student's legal name — the tab title lands in browser history,
+  // OS taskbar/Alt-Tab previews, and screen-share tab pickers, all reachable
+  // by a bystander who never authenticated to the app. The full name stays in
+  // the in-page heading only (see `PageLayout title={studentName}` below).
+  usePageTitle("Student record");
 
   const [schools, setSchools] = useState<DistrictSchool[]>([]);
   const [isInviteStudentOpen, setIsInviteStudentOpen] = useState(false);

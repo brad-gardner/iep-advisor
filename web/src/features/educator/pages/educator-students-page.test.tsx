@@ -309,6 +309,16 @@ describe('EducatorStudentsPage', () => {
     );
   });
 
+  it('shows the compliance board\'s DueInRange banner with the drilled-in from/to window and sends it to the server', async () => {
+    renderPage('/educator/students?attention=DueInRange&from=2026-09-16&to=2026-11-15');
+    expect(await screen.findByTestId('attention-filter-indicator')).toHaveTextContent(
+      'due between 2026-09-16 and 2026-11-15'
+    );
+    expect(api.searchStudents).toHaveBeenCalledWith(
+      expect.objectContaining({ attention: 'DueInRange', from: '2026-09-16', to: '2026-11-15' })
+    );
+  });
+
   it('shows the roster as loading until the request resolves', async () => {
     let resolve!: (value: unknown) => void;
     api.searchStudents.mockReturnValue(new Promise((r) => (resolve = r)));

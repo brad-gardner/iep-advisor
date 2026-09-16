@@ -35,8 +35,9 @@ export function StudentHomePage() {
     interview,
   } = useStudentWorkspace();
   // Independent of the workspace fetch above — a failure here shouldn't block
-  // the workspace, and vice versa.
-  const { home } = useHome();
+  // the workspace, and vice versa. A failure renders its own error notice
+  // below rather than silently looking like "nothing scheduled".
+  const { home, error: homeError, retry: retryHome } = useHome();
   const studentHome = home?.kind === "Student" ? home.student : null;
   const [meetingOverride, setMeetingOverride] = useState<HomeMeetingDto | null>(null);
   const nextMeeting =
@@ -94,6 +95,16 @@ export function StudentHomePage() {
       title={user?.firstName ? `Welcome, ${user.firstName}` : "Your space"}
       subtitle="Add your strengths, interests, and what you want to say — then choose what to share with your team."
     >
+      {homeError && (
+        <div role="alert">
+          <Notice variant="error" title={homeError} data-testid="student-home-error">
+            <Button variant="secondary" size="sm" className="mt-2" onClick={retryHome} data-testid="student-home-retry">
+              Try again
+            </Button>
+          </Notice>
+        </div>
+      )}
+
       {studentHome?.workspaceNudge && (
         <Notice variant="info" title={studentHome.workspaceNudge} data-testid="student-home-nudge" />
       )}

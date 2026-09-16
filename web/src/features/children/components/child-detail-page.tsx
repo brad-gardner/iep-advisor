@@ -24,7 +24,11 @@ export function ChildDetailPage() {
   const navigate = useNavigate();
   const { show: showToast } = useToast();
   const [child, setChild] = useState<ChildProfile | null>(null);
-  usePageTitle(child ? `${child.firstName} ${child.lastName ?? ""}`.trim() : "Child");
+  // Never the child's legal name — the tab title lands in browser history,
+  // OS taskbar/Alt-Tab previews, and screen-share tab pickers, all reachable
+  // by a bystander who never authenticated to the app. The full name stays in
+  // the in-page heading only (see `PageLayout title=...` below).
+  usePageTitle("Child profile");
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);

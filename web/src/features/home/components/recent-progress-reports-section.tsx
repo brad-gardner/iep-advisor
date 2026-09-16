@@ -1,6 +1,5 @@
 import { formatDate } from '@/lib/format-date';
-import { EmptyHint } from './empty-hint';
-import { HomeSection } from './home-section';
+import { ListSection } from './list-section';
 import { WorkItemRow } from './work-item-row';
 import type { ParentProgressReportDto } from '../types';
 
@@ -13,24 +12,20 @@ import type { ParentProgressReportDto } from '../types';
  */
 export function RecentProgressReportsSection({ items }: { items: ParentProgressReportDto[] }) {
   return (
-    <HomeSection title="Recent progress reports" data-testid="home-progress-reports">
-      {items.length === 0 ? (
-        <EmptyHint data-testid="home-progress-reports-empty">
-          No progress reports yet.
-        </EmptyHint>
-      ) : (
-        <ul className="divide-y divide-brand-slate-100">
-          {items.map((report) => (
-            <WorkItemRow
-              key={report.id}
-              title={report.title}
-              subtitle={`${report.childName} · ${formatDate(report.createdAt)}`}
-              href={`/children/${report.childId}/ieps`}
-              data-testid={`home-progress-reports-${report.id}`}
-            />
-          ))}
-        </ul>
+    <ListSection
+      title="Recent progress reports"
+      data-testid="home-progress-reports"
+      items={items}
+      emptyHint="No progress reports yet."
+      itemKey={(report) => report.id}
+      renderRow={(report) => (
+        <WorkItemRow
+          title={report.title ?? 'Untitled report'}
+          subtitle={`${report.childName} · ${formatDate(report.createdAt)}`}
+          href={`/children/${report.childId}/ieps`}
+          data-testid={`home-progress-reports-${report.id}`}
+        />
       )}
-    </HomeSection>
+    />
   );
 }

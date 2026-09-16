@@ -2,6 +2,7 @@ import type {
   CaseManagerRowDto,
   HomeDraftDto,
   HomeDto,
+  HomeKind,
   HomeMeetingDto,
   HomeObligationDto,
   HomeSharedDraftDto,
@@ -23,6 +24,7 @@ export function makeComplianceSummary(
     unknownDates: 1,
     noLead: 2,
     activeStudents: 120,
+    dueInRange: 6,
     ...overrides,
   };
 }
@@ -147,11 +149,27 @@ export function makeStudentHome(overrides: Partial<StudentHomeDto> = {}): Studen
   };
 }
 
-export function makeHomeDto(overrides: Partial<HomeDto> = {}): HomeDto {
-  return {
-    kind: 'Staff',
-    generatedAt: '2026-09-16T00:00:00.000Z',
-    staff: makeStaffHome(),
-    ...overrides,
-  };
+// A loose override bag rather than `Partial<HomeDto>` — `HomeDto` is a real
+// discriminated union, so `Partial` of it doesn't distribute the way a test
+// fixture wants (each branch's own field would need its own partial). Pass
+// `kind` plus a full DTO for whichever branch it selects; the other two are
+// ignored (kept optional so existing `staff: undefined` call sites are unaffected).
+interface HomeDtoOverrides {
+  kind?: HomeKind;
+  generatedAt?: string;
+  staff?: StaffHomeDto;
+  parent?: ParentHomeDto;
+  student?: StudentHomeDto;
+}
+
+export function makeHomeDto(overrides: HomeDtoOverrides = {}): HomeDto {
+  const kind = overrides.kind ?? 'Staff';
+  const generatedAt = overrides.generatedAt ?? '2026-09-16T00:00:00.000Z';
+  if (kind === 'Parent') {
+    return { kind, generatedAt, parent: overrides.parent ?? makeParentHome() };
+  }
+  if (kind === 'Student') {
+    return { kind, generatedAt, student: overrides.student ?? makeStudentHome() };
+  }
+  return { kind: 'Staff', generatedAt, staff: overrides.staff ?? makeStaffHome() };
 }

@@ -6,7 +6,14 @@ import { StackedBarChart, type StackedBarRow } from '@/components/ui/charts/stac
 import { districtDrillHref } from '../lib/drill-link';
 import type { ComplianceSchoolRowDto } from '../types';
 
-type DrillColumnKey = 'overdueAnnual' | 'overdueReeval' | 'due30' | 'due60' | 'unknownDates' | 'noLead';
+type DrillColumnKey =
+  | 'overdueAnnual'
+  | 'overdueReeval'
+  | 'due30'
+  | 'due60'
+  | 'unknownDates'
+  | 'noLead'
+  | 'dueInRange';
 
 function drillColumn(key: DrillColumnKey, header: string, drill: Record<string, string>): TableColumn<ComplianceSchoolRowDto> {
   return {
@@ -66,6 +73,7 @@ export function ComplianceSchoolTable({
     drillColumn('overdueReeval', 'Overdue reeval', drill),
     drillColumn('due30', 'Due 30d', drill),
     drillColumn('due60', 'Due 60d', drill),
+    drillColumn('dueInRange', 'Due in range', drill),
     drillColumn('unknownDates', 'Unknown dates', drill),
     drillColumn('noLead', 'No case manager', drill),
   ];

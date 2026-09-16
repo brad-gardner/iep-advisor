@@ -49,11 +49,13 @@ export function ParentHomePage() {
     return (
       <PageLayout title={title}>
         <Card data-testid="parent-home-error">
-          <Notice variant="error" title={error ?? "Couldn't load your home"}>
-            <Button variant="secondary" className="mt-2" onClick={retry} data-testid="parent-home-retry">
-              Try again
-            </Button>
-          </Notice>
+          <div role="alert">
+            <Notice variant="error" title={error ?? "Couldn't load your home"}>
+              <Button variant="secondary" className="mt-2" onClick={retry} data-testid="parent-home-retry">
+                Try again
+              </Button>
+            </Notice>
+          </div>
         </Card>
       </PageLayout>
     );
@@ -86,7 +88,7 @@ export function ParentHomePage() {
         {nextMeeting ? (
           <NextMeetingCard
             meeting={nextMeeting}
-            daysUntil={nextMeeting.daysUntil}
+            showCountdown
             subtitle={nextMeeting.childName}
             onUpdated={handleMeetingUpdated}
             data-testid="parent-home-next-meeting"

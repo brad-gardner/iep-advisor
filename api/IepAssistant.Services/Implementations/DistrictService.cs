@@ -351,13 +351,16 @@ public class DistrictService : IDistrictService
 
     public async Task<ServiceResult<ComplianceBoardModel>> GetComplianceBoardAsync(int userId, int? schoolId, DateTime? from, DateTime? to, CancellationToken ct = default)
     {
+        var today = DateTime.UtcNow.Date;
+        if (!AdminQueryLimits.IsWithinRange(from, today) || !AdminQueryLimits.IsWithinRange(to, today))
+            return ServiceResult<ComplianceBoardModel>.FailureResult("The requested date range is out of bounds.");
+
         var scope = await ResolveAdminScopeAsync(userId, schoolId, ct);
         if (scope.Error != null)
             return ServiceResult<ComplianceBoardModel>.FailureResult(scope.Error);
         if (scope.Empty)
             return ServiceResult<ComplianceBoardModel>.SuccessResult(EmptyComplianceBoard());
 
-        var today = DateTime.UtcNow.Date;
         var fromDate = (from ?? today).Date;
         var toDate = (to ?? fromDate.AddDays(60)).Date;
         if (toDate < fromDate)
@@ -369,7 +372,10 @@ public class DistrictService : IDistrictService
         // One query: each row's counts are correlated COUNT subqueries against SchoolStudents (the same
         // pattern GetDashboardAsync already uses for ActiveStudentCount), so this is a single round trip
         // regardless of how many schools are in scope. Every predicate is the SAME Expression<> the
-        // roster's StudentAttention filter uses, so a board count and its drilldown always agree.
+        // roster's StudentAttention filter uses, so a board count and its drilldown always agree. Due30/
+        // Due60 are always anchored on TODAY (never on the caller's from/to) — only DueInRange uses the
+        // requested [fromDate, toDate] window — so a non-default date-range selection can never desync
+        // the Due30/Due60 tiles from their drilldowns (review-fix contract addition 1).
         var bySchool = await schoolsQuery
             .OrderBy(s => s.Name)
             .Select(s => new ComplianceSchoolRowModel
@@ -379,8 +385,9 @@ public class DistrictService : IDistrictService
                 ActiveStudents = _context.SchoolStudents.Count(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active),
                 OverdueAnnual = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.OverdueAnnual(today)),
                 OverdueReeval = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.OverdueReeval(today)),
-                Due30 = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.DueWithin(fromDate, fromDate.AddDays(30))),
-                Due60 = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.DueWithin(fromDate, toDate)),
+                Due30 = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.DueWithin(today, today.AddDays(30))),
+                Due60 = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.DueWithin(today, today.AddDays(60))),
+                DueInRange = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.DueWithin(fromDate, toDate)),
                 UnknownDates = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.UnknownDates()),
                 NoLead = _context.SchoolStudents.Where(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active).Count(StudentAttentionRules.NoLead(_context, districtId))
             })
@@ -393,6 +400,7 @@ public class DistrictService : IDistrictService
             OverdueReeval = bySchool.Sum(r => r.OverdueReeval),
             Due30 = bySchool.Sum(r => r.Due30),
             Due60 = bySchool.Sum(r => r.Due60),
+            DueInRange = bySchool.Sum(r => r.DueInRange),
             UnknownDates = bySchool.Sum(r => r.UnknownDates),
             NoLead = bySchool.Sum(r => r.NoLead)
         };
@@ -404,19 +412,20 @@ public class DistrictService : IDistrictService
             To = toDate,
             Summary = summary,
             BySchool = bySchool,
-            Drill = ComplianceDrillMap()
+            Drill = ComplianceDrillMap(fromDate, toDate)
         });
     }
 
     public async Task<ServiceResult<AdoptionModel>> GetAdoptionAsync(int userId, int? schoolId, int days, CancellationToken ct = default)
     {
+        days = AdminQueryLimits.ClampDays(days, defaultDays: 30);
+
         var scope = await ResolveAdminScopeAsync(userId, schoolId, ct);
         if (scope.Error != null)
             return ServiceResult<AdoptionModel>.FailureResult(scope.Error);
         if (scope.Empty)
-            return ServiceResult<AdoptionModel>.SuccessResult(new AdoptionModel { Days = days <= 0 ? 30 : days, ActiveRule = AdoptionActiveRule });
+            return ServiceResult<AdoptionModel>.SuccessResult(new AdoptionModel { Days = days, ActiveRule = AdoptionActiveRule });
 
-        days = days <= 0 ? 30 : days;
         var windowStart = DateTime.UtcNow.AddDays(-days);
 
         var schoolsQuery = ScopedActiveSchools(scope.DistrictId, scope.SchoolId);
@@ -529,20 +538,29 @@ public class DistrictService : IDistrictService
         return query;
     }
 
-    private static ComplianceBoardModel EmptyComplianceBoard() => new()
+    private static ComplianceBoardModel EmptyComplianceBoard()
     {
-        GeneratedAt = DateTime.UtcNow,
-        From = DateTime.UtcNow.Date,
-        To = DateTime.UtcNow.Date.AddDays(60),
-        Drill = ComplianceDrillMap()
-    };
+        var from = DateTime.UtcNow.Date;
+        var to = from.AddDays(60);
+        return new ComplianceBoardModel
+        {
+            GeneratedAt = DateTime.UtcNow,
+            From = from,
+            To = to,
+            Drill = ComplianceDrillMap(from, to)
+        };
+    }
 
-    private static Dictionary<string, string> ComplianceDrillMap() => new()
+    /// <summary>Due30/Due60/overdue drill keys never carry date params (they're always today-anchored);
+    /// only "dueInRange" carries the caller's effective [<paramref name="from"/>, <paramref name="to"/>]
+    /// window, so its roster rows always equal the tile regardless of the chosen range.</summary>
+    private static Dictionary<string, string> ComplianceDrillMap(DateTime from, DateTime to) => new()
     {
         ["overdueAnnual"] = "attention=OverdueAnnual",
         ["overdueReeval"] = "attention=OverdueReeval",
         ["due30"] = "attention=Due30",
         ["due60"] = "attention=Due60",
+        ["dueInRange"] = $"attention=DueInRange&from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}",
         ["unknownDates"] = "attention=UnknownDates",
         ["noLead"] = "attention=NoCaseManager"
     };

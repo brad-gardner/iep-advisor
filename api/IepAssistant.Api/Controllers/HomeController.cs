@@ -54,7 +54,7 @@ public class HomeController : ControllerBase
         WeekStart = m.WeekStart,
         WeekEnd = m.WeekEnd,
         MeetingsThisWeek = m.MeetingsThisWeek.Select(MapMeeting).ToList(),
-        Obligations = m.Obligations.Select(MapObligation).ToList(),
+        Obligations = m.Obligations.Select(ObligationDtoMapper.Map).ToList(),
         Drafts = m.Drafts.Select(MapDraft).ToList(),
         SharedDraftsAwaitingFamily = m.SharedDraftsAwaitingFamily.Select(MapSharedDraft).ToList(),
         FamilyResponsesToReview = m.FamilyResponsesToReview.Select(MapSharedDraft).ToList(),
@@ -77,6 +77,7 @@ public class HomeController : ControllerBase
             DueDate = r.DueDate,
             Status = r.Status
         }).ToList(),
+        OverdueByCaseManagerTotal = m.OverdueByCaseManagerTotal,
         UnsignedFinalized = m.UnsignedFinalized?.Select(u => new HomeUnsignedDto
         {
             VersionId = u.VersionId,
@@ -84,16 +85,9 @@ public class HomeController : ControllerBase
             StudentName = u.StudentName,
             FinalizedAt = u.FinalizedAt
         }).ToList(),
-        ComplianceSummary = m.ComplianceSummary == null ? null : new ComplianceSummaryDto
-        {
-            OverdueAnnual = m.ComplianceSummary.OverdueAnnual,
-            OverdueReeval = m.ComplianceSummary.OverdueReeval,
-            Due30 = m.ComplianceSummary.Due30,
-            Due60 = m.ComplianceSummary.Due60,
-            UnknownDates = m.ComplianceSummary.UnknownDates,
-            NoLead = m.ComplianceSummary.NoLead,
-            ActiveStudents = m.ComplianceSummary.ActiveStudents
-        }
+        // Shared with DistrictController.MapComplianceSummary so the DistrictAdmin home's compliance
+        // summary is mapped identically to the board's (review-fix contract, todos/078).
+        ComplianceSummary = m.ComplianceSummary == null ? null : DistrictController.MapComplianceSummary(m.ComplianceSummary)
     };
 
     private static ParentHomeDto MapParentHome(ParentHomeModel m) => new()
@@ -164,20 +158,6 @@ public class HomeController : ControllerBase
         StudentName = m.StudentName,
         MyInviteStatus = m.MyInviteStatus,
         Status = m.Status
-    };
-
-    private static ObligationDto MapObligation(ObligationModel o) => new()
-    {
-        Kind = o.Kind,
-        DueDate = o.DueDate,
-        Status = o.Status,
-        SourceLabel = o.SourceLabel,
-        OwnerUserId = o.OwnerUserId,
-        OwnerName = o.OwnerName,
-        SchoolStudentId = o.SchoolStudentId,
-        StudentName = o.StudentName,
-        DaysUntilDue = o.DaysUntilDue,
-        RuleProfile = o.RuleProfile
     };
 
     private static HomeDraftDto MapDraft(HomeDraftModel d) => new()

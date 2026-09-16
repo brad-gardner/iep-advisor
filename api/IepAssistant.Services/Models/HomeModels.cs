@@ -122,8 +122,10 @@ public class StaffHomeModel
     /// <summary>Admin variants only.</summary>
     public RosterAttentionModel? RosterAttention { get; set; }
 
-    /// <summary>Admin variants only.</summary>
+    /// <summary>Admin variants only. Capped at <c>HomeService.MaxOverdueByCaseManager</c> (50) rows,
+    /// sorted by student; <see cref="OverdueByCaseManagerTotal"/> carries the true count.</summary>
     public List<CaseManagerRowModel>? OverdueByCaseManager { get; set; }
+    public int? OverdueByCaseManagerTotal { get; set; }
 
     /// <summary>Admin variants only (plan-7 shape, always empty until plan 7 lands).</summary>
     public List<HomeUnsignedModel>? UnsignedFinalized { get; set; }

@@ -43,7 +43,10 @@ export function AdminHome({ staff, isDistrict, generatedAt }: AdminHomeProps) {
       />
 
       {staff.overdueByCaseManager && (
-        <OverdueByCaseManagerTable rows={staff.overdueByCaseManager} />
+        <OverdueByCaseManagerTable
+          rows={staff.overdueByCaseManager}
+          total={staff.overdueByCaseManagerTotal}
+        />
       )}
 
       {staff.unsignedFinalized && <UnsignedFinalizedSection items={staff.unsignedFinalized} />}

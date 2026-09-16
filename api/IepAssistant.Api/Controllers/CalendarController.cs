@@ -93,7 +93,7 @@ public class CalendarController : ControllerBase
         Kind = i.Kind,
         Date = i.Date,
         Meeting = i.Meeting == null ? null : MapMeeting(i.Meeting),
-        Obligation = i.Obligation == null ? null : MapObligation(i.Obligation)
+        Obligation = i.Obligation == null ? null : ObligationDtoMapper.Map(i.Obligation)
     };
 
     private static MeetingDto MapMeeting(MeetingModel m) => new()
@@ -133,20 +133,6 @@ public class CalendarController : ControllerBase
         }).ToList(),
         MyInviteStatus = m.MyInviteStatus,
         CanManage = m.CanManage
-    };
-
-    private static ObligationDto MapObligation(ObligationModel o) => new()
-    {
-        Kind = o.Kind,
-        DueDate = o.DueDate,
-        Status = o.Status,
-        SourceLabel = o.SourceLabel,
-        OwnerUserId = o.OwnerUserId,
-        OwnerName = o.OwnerName,
-        SchoolStudentId = o.SchoolStudentId,
-        StudentName = o.StudentName,
-        DaysUntilDue = o.DaysUntilDue,
-        RuleProfile = o.RuleProfile
     };
 
     private IActionResult MapFailure(string? message)

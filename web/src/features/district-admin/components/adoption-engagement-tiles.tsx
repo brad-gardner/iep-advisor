@@ -18,7 +18,8 @@ interface AdoptionEngagementTilesProps {
  * staff-activity bar chart.
  */
 export function AdoptionEngagementTiles({ schoolId }: AdoptionEngagementTilesProps) {
-  const { adoption, engagement, isLoading, error, retry } = useAdoptionEngagement(schoolId);
+  const { adoption, engagement, adoptionError, engagementError, isLoading, error, retry } =
+    useAdoptionEngagement(schoolId);
 
   if (isLoading) {
     return (
@@ -30,53 +31,85 @@ export function AdoptionEngagementTiles({ schoolId }: AdoptionEngagementTilesPro
     );
   }
 
-  if (error || !adoption || !engagement) {
+  // Both endpoints failed — nothing to render at all.
+  if (error) {
     return (
       <Card data-testid="adoption-engagement-error">
-        <Notice variant="error" title={error ?? 'Could not load adoption data'}>
-          <Button
-            variant="secondary"
-            className="mt-2"
-            onClick={retry}
-            data-testid="adoption-engagement-retry"
-          >
-            Try again
-          </Button>
-        </Notice>
+        <div role="alert">
+          <Notice variant="error" title={error}>
+            <Button
+              variant="secondary"
+              className="mt-2"
+              onClick={retry}
+              data-testid="adoption-engagement-retry"
+            >
+              Try again
+            </Button>
+          </Notice>
+        </div>
       </Card>
     );
   }
 
   return (
     <div className="space-y-4" data-testid="adoption-engagement-tiles">
+      {adoptionError && (
+        <div role="alert">
+          <Notice variant="error" title={adoptionError} data-testid="adoption-engagement-adoption-error">
+            <Button variant="secondary" className="mt-2" onClick={retry} data-testid="adoption-engagement-retry">
+              Try again
+            </Button>
+          </Notice>
+        </div>
+      )}
+      {engagementError && (
+        <div role="alert">
+          <Notice
+            variant="error"
+            title={engagementError}
+            data-testid="adoption-engagement-engagement-error"
+          >
+            <Button variant="secondary" className="mt-2" onClick={retry} data-testid="adoption-engagement-retry">
+              Try again
+            </Button>
+          </Notice>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile
-          label="Staff active (14 days)"
-          value={adoption.staffActiveLast14}
-          denominator={`of ${adoption.staffTotal} staff · ${adoption.activeRule}`}
-          data-testid="adoption-staff-active"
-        />
-        <StatTile
-          label="Drafts started"
-          value={adoption.draftsStarted}
-          denominator={`Last ${adoption.days} days`}
-          data-testid="adoption-drafts-started"
-        />
-        <StatTile
-          label="Drafts finalized"
-          value={adoption.draftsFinalized}
-          denominator={`Last ${adoption.days} days`}
-          data-testid="adoption-drafts-finalized"
-        />
-        <StatTile
-          label="Families linked"
-          value={engagement.studentsWithFamilyLink}
-          denominator={`of ${engagement.activeStudents} active students`}
-          data-testid="engagement-family-linked"
-        />
+        {adoption && (
+          <>
+            <StatTile
+              label="Staff active (14 days)"
+              value={adoption.staffActiveLast14}
+              denominator={`of ${adoption.staffTotal} staff · ${adoption.activeRule}`}
+              data-testid="adoption-staff-active"
+            />
+            <StatTile
+              label="Drafts started"
+              value={adoption.draftsStarted}
+              denominator={`Last ${adoption.days} days`}
+              data-testid="adoption-drafts-started"
+            />
+            <StatTile
+              label="Drafts finalized"
+              value={adoption.draftsFinalized}
+              denominator={`Last ${adoption.days} days`}
+              data-testid="adoption-drafts-finalized"
+            />
+          </>
+        )}
+        {engagement && (
+          <StatTile
+            label="Families linked"
+            value={engagement.studentsWithFamilyLink}
+            denominator={`of ${engagement.activeStudents} active students`}
+            data-testid="engagement-family-linked"
+          />
+        )}
       </div>
 
-      {adoption.bySchool.length > 1 && (
+      {adoption && adoption.bySchool.length > 1 && (
         <BarChart
           title="Active staff by school"
           data-testid="adoption-by-school-chart"

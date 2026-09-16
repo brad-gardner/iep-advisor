@@ -1,6 +1,5 @@
 import { formatDate } from '@/lib/format-date';
-import { EmptyHint } from './empty-hint';
-import { HomeSection } from './home-section';
+import { ListSection } from './list-section';
 import { WorkItemRow } from './work-item-row';
 import type { HomeProviderRequestDto } from '../types';
 
@@ -8,24 +7,20 @@ import type { HomeProviderRequestDto } from '../types';
  * The Provider variant renders this section first (see `staff-home-body.tsx`). */
 export function ProviderRequestsSection({ items }: { items: HomeProviderRequestDto[] }) {
   return (
-    <HomeSection title="Provider requests I owe" data-testid="home-provider-requests">
-      {items.length === 0 ? (
-        <EmptyHint data-testid="home-provider-requests-empty">
-          No outstanding provider requests.
-        </EmptyHint>
-      ) : (
-        <ul className="divide-y divide-brand-slate-100">
-          {items.map((item) => (
-            <WorkItemRow
-              key={item.id}
-              title={item.studentName}
-              subtitle={`Due ${formatDate(item.dueDate)}`}
-              href={`/educator/students/${item.studentId}`}
-              data-testid={`home-provider-requests-${item.id}`}
-            />
-          ))}
-        </ul>
+    <ListSection
+      title="Provider requests I owe"
+      data-testid="home-provider-requests"
+      items={items}
+      emptyHint="No outstanding provider requests."
+      itemKey={(item) => item.id}
+      renderRow={(item) => (
+        <WorkItemRow
+          title={item.studentName}
+          subtitle={`Due ${formatDate(item.dueDate)}`}
+          href={`/educator/students/${item.studentId}`}
+          data-testid={`home-provider-requests-${item.id}`}
+        />
       )}
-    </HomeSection>
+    />
   );
 }

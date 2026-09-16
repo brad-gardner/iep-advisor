@@ -11,6 +11,10 @@ public class ComplianceSummaryDto
     public int OverdueReeval { get; set; }
     public int Due30 { get; set; }
     public int Due60 { get; set; }
+
+    /// <summary>Due within the board's caller-chosen [from, to] window (defaults to today..today+60);
+    /// unlike <see cref="Due30"/>/<see cref="Due60"/>, which are always anchored on today.</summary>
+    public int DueInRange { get; set; }
     public int UnknownDates { get; set; }
     public int NoLead { get; set; }
     public int ActiveStudents { get; set; }
@@ -25,6 +29,7 @@ public class ComplianceSchoolRowDto
     public int OverdueReeval { get; set; }
     public int Due30 { get; set; }
     public int Due60 { get; set; }
+    public int DueInRange { get; set; }
     public int UnknownDates { get; set; }
     public int NoLead { get; set; }
 }

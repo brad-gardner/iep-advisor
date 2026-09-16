@@ -22,24 +22,39 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 public static class StudentAttentionRules
 {
+    /// <summary>
+    /// Split into two sargable OR-branches (populated-column vs. fallback) instead of a single
+    /// COALESCE-style expression — SQL Server can seek the plain <c>AnnualReviewDueDate</c>/
+    /// <c>ReevaluationDueDate</c> indexes on the common (populated) branch, where a COALESCE/conditional
+    /// expression would force a scan regardless of the index (review-fix contract, todos/083). Semantics
+    /// are unchanged: an unresolved effective date (no due date AND no fallback source date) never
+    /// matches "overdue" or "due within N days".
+    /// </summary>
     public static Expression<Func<SchoolStudent, bool>> OverdueAnnual(DateTime today) => s =>
-        (s.AnnualReviewDueDate ?? (s.IepDate.HasValue ? s.IepDate.Value.AddDays(ObligationRules.AnnualReviewFallbackDays) : (DateTime?)null) ?? DateTime.MaxValue) < today;
+        (s.AnnualReviewDueDate != null && s.AnnualReviewDueDate < today)
+        || (s.AnnualReviewDueDate == null && s.IepDate != null && s.IepDate.Value.AddDays(ObligationRules.AnnualReviewFallbackDays) < today);
 
     public static Expression<Func<SchoolStudent, bool>> OverdueReeval(DateTime today) => s =>
-        (s.ReevaluationDueDate ?? (s.EtrDate.HasValue ? s.EtrDate.Value.AddYears(ObligationRules.ReevaluationFallbackYears) : (DateTime?)null) ?? DateTime.MaxValue) < today;
+        (s.ReevaluationDueDate != null && s.ReevaluationDueDate < today)
+        || (s.ReevaluationDueDate == null && s.EtrDate != null && s.EtrDate.Value.AddYears(ObligationRules.ReevaluationFallbackYears) < today);
 
     /// <summary>
     /// The annual-review OR re-evaluation effective due date falls within [<paramref name="from"/>,
     /// <paramref name="to"/>] (inclusive of both ends; an unresolved date never matches). Cumulative by
     /// construction — call with a wider <paramref name="to"/> for a "due within 60 days" bucket that is
-    /// naturally a superset of a "due within 30 days" one.
+    /// naturally a superset of a "due within 30 days" one. Split into sargable branches for the same
+    /// reason as <see cref="OverdueAnnual"/>.
     /// </summary>
     public static Expression<Func<SchoolStudent, bool>> DueWithin(DateTime from, DateTime to) => s =>
-        ((s.AnnualReviewDueDate ?? (s.IepDate.HasValue ? s.IepDate.Value.AddDays(ObligationRules.AnnualReviewFallbackDays) : (DateTime?)null) ?? DateTime.MinValue) >= from
-            && (s.AnnualReviewDueDate ?? (s.IepDate.HasValue ? s.IepDate.Value.AddDays(ObligationRules.AnnualReviewFallbackDays) : (DateTime?)null) ?? DateTime.MinValue) <= to)
+        ((s.AnnualReviewDueDate != null && s.AnnualReviewDueDate >= from && s.AnnualReviewDueDate <= to)
+            || (s.AnnualReviewDueDate == null && s.IepDate != null
+                && s.IepDate.Value.AddDays(ObligationRules.AnnualReviewFallbackDays) >= from
+                && s.IepDate.Value.AddDays(ObligationRules.AnnualReviewFallbackDays) <= to))
         ||
-        ((s.ReevaluationDueDate ?? (s.EtrDate.HasValue ? s.EtrDate.Value.AddYears(ObligationRules.ReevaluationFallbackYears) : (DateTime?)null) ?? DateTime.MinValue) >= from
-            && (s.ReevaluationDueDate ?? (s.EtrDate.HasValue ? s.EtrDate.Value.AddYears(ObligationRules.ReevaluationFallbackYears) : (DateTime?)null) ?? DateTime.MinValue) <= to);
+        ((s.ReevaluationDueDate != null && s.ReevaluationDueDate >= from && s.ReevaluationDueDate <= to)
+            || (s.ReevaluationDueDate == null && s.EtrDate != null
+                && s.EtrDate.Value.AddYears(ObligationRules.ReevaluationFallbackYears) >= from
+                && s.EtrDate.Value.AddYears(ObligationRules.ReevaluationFallbackYears) <= to));
 
     /// <summary>Either obligation's effective due date is unresolvable (no due date AND no fallback
     /// source date) — surfaced as "Unknown", never as healthy.</summary>

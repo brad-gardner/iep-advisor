@@ -14,8 +14,11 @@ namespace IepAssistant.Services.Implementations;
 /// <c>web/src/features/document-authoring/lib/completeness.ts</c>'s blank/required rules: a value is
 /// blank when it is missing/JSON-null, an HTML-stripped-empty/whitespace string, or an empty array
 /// (booleans and non-empty arrays are never blank). A Table field counts as filled once it has any row
-/// at all — <see cref="RequiredMissing"/> separately counts each row's blank REQUIRED columns, on top of
-/// any blank required top-level field.
+/// at all — <c>RequiredMissing</c> separately counts each row's blank REQUIRED columns, on top of any
+/// blank required top-level field, AND flags a Table whose row count falls below its configured
+/// <c>minRows</c> even when the field itself isn't marked Required (mirrors
+/// <see cref="AuthoredDocumentVersionService.ValidateTable"/>'s independent minRows check, so this
+/// percent/count never understates what finalize will actually block on).
 /// </summary>
 public class DocumentCompletenessService : IDocumentCompletenessService
 {
@@ -50,11 +53,19 @@ public class DocumentCompletenessService : IDocumentCompletenessService
 
                 if (field.FieldType == FieldType.Table)
                 {
-                    if (field.Required && blank)
+                    var (requiredColumns, minRows) = ParseTableRequirements(field.ConfigJson);
+                    var rows = node as JsonArray;
+                    var rowCount = rows?.Count ?? 0;
+
+                    // Mirrors AuthoredDocumentVersionService.ValidateTable: minRows is an INDEPENDENT
+                    // requirement from field.Required — a Table with minRows=2 and Required=false but
+                    // only 1 row is still something finalize will reject, so it must count as
+                    // requiredMissing here too (review-fix contract, todos/086 P3 #1). At most one
+                    // increment per field regardless of how many of the two conditions fire.
+                    if ((field.Required && blank) || (minRows is int min && rowCount < min))
                         requiredMissing++;
 
-                    var requiredColumns = ParseRequiredColumnKeys(field.ConfigJson);
-                    if (requiredColumns.Count > 0 && node is JsonArray rows)
+                    if (requiredColumns.Count > 0 && rows != null)
                     {
                         foreach (var rowNode in rows)
                         {
@@ -141,18 +152,19 @@ public class DocumentCompletenessService : IDocumentCompletenessService
         }
     }
 
-    private static List<Guid> ParseRequiredColumnKeys(string? configJson)
+    private static (List<Guid> RequiredColumns, int? MinRows) ParseTableRequirements(string? configJson)
     {
         if (string.IsNullOrWhiteSpace(configJson))
-            return new List<Guid>();
+            return (new List<Guid>(), null);
         try
         {
             var cfg = JsonSerializer.Deserialize<TableFieldConfig>(configJson, TemplateFieldConfigValidator.JsonOptions);
-            return cfg?.Columns.Where(c => c.Required).Select(c => c.ColumnKey).ToList() ?? new List<Guid>();
+            var requiredColumns = cfg?.Columns.Where(c => c.Required).Select(c => c.ColumnKey).ToList() ?? new List<Guid>();
+            return (requiredColumns, cfg?.MinRows);
         }
         catch (JsonException)
         {
-            return new List<Guid>();
+            return (new List<Guid>(), null);
         }
     }
 }

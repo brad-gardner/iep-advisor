@@ -1,6 +1,5 @@
 import { formatDate } from '@/lib/format-date';
-import { EmptyHint } from './empty-hint';
-import { HomeSection } from './home-section';
+import { ListSection } from './list-section';
 import { WorkItemRow } from './work-item-row';
 import type { HomeSharedDraftDto } from '../types';
 
@@ -25,22 +24,20 @@ export function SharedDraftListSection({
   'data-testid': testId,
 }: SharedDraftListSectionProps) {
   return (
-    <HomeSection title={title} data-testid={testId}>
-      {items.length === 0 ? (
-        <EmptyHint data-testid={`${testId}-empty`}>{emptyHint}</EmptyHint>
-      ) : (
-        <ul className="divide-y divide-brand-slate-100">
-          {items.map((item) => (
-            <WorkItemRow
-              key={item.instanceId}
-              title={item.studentName}
-              subtitle={formatDate(item[dateField])}
-              href={`/educator/documents/${item.instanceId}`}
-              data-testid={`${testId}-${item.instanceId}`}
-            />
-          ))}
-        </ul>
+    <ListSection
+      title={title}
+      data-testid={testId}
+      items={items}
+      emptyHint={emptyHint}
+      itemKey={(item) => item.instanceId}
+      renderRow={(item) => (
+        <WorkItemRow
+          title={item.studentName}
+          subtitle={formatDate(item[dateField])}
+          href={`/educator/documents/${item.instanceId}`}
+          data-testid={`${testId}-${item.instanceId}`}
+        />
       )}
-    </HomeSection>
+    />
   );
 }

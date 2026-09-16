@@ -94,7 +94,10 @@ public class StaffHomeDto
     public List<HomeSharedDraftDto> FamilyResponsesToReview { get; set; } = new();
     public List<HomeProviderRequestDto> ProviderRequestsIOwe { get; set; } = new();
     public RosterAttentionDto? RosterAttention { get; set; }
+
+    /// <summary>Capped at 50 rows, sorted by student; <see cref="OverdueByCaseManagerTotal"/> carries the true count.</summary>
     public List<CaseManagerRowDto>? OverdueByCaseManager { get; set; }
+    public int? OverdueByCaseManagerTotal { get; set; }
     public List<HomeUnsignedDto>? UnsignedFinalized { get; set; }
     public ComplianceSummaryDto? ComplianceSummary { get; set; }
 }

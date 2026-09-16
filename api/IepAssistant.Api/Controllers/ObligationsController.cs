@@ -5,7 +5,6 @@ using IepAssistant.Api.DTOs.Obligations;
 using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
-using IepAssistant.Services.Models;
 
 namespace IepAssistant.Api.Controllers;
 
@@ -31,7 +30,7 @@ public class ObligationsController : ControllerBase
         if (!result.Success)
             return MapFailure<List<ObligationDto>>(result.Message);
 
-        return Ok(ApiResponse<List<ObligationDto>>.SuccessResponse(result.Data!.Select(MapObligation).ToList()));
+        return Ok(ApiResponse<List<ObligationDto>>.SuccessResponse(result.Data!.Select(ObligationDtoMapper.Map).ToList()));
     }
 
     [HttpGet("students/{studentId:int}/obligations")]
@@ -44,7 +43,7 @@ public class ObligationsController : ControllerBase
         if (!result.Success)
             return MapFailure<List<ObligationDto>>(result.Message);
 
-        return Ok(ApiResponse<List<ObligationDto>>.SuccessResponse(result.Data!.Select(MapObligation).ToList()));
+        return Ok(ApiResponse<List<ObligationDto>>.SuccessResponse(result.Data!.Select(ObligationDtoMapper.Map).ToList()));
     }
 
     [HttpGet("obligations")]
@@ -56,22 +55,8 @@ public class ObligationsController : ControllerBase
         if (!result.Success)
             return MapFailure<List<ObligationDto>>(result.Message);
 
-        return Ok(ApiResponse<List<ObligationDto>>.SuccessResponse(result.Data!.Select(MapObligation).ToList()));
+        return Ok(ApiResponse<List<ObligationDto>>.SuccessResponse(result.Data!.Select(ObligationDtoMapper.Map).ToList()));
     }
-
-    private static ObligationDto MapObligation(ObligationModel o) => new()
-    {
-        Kind = o.Kind,
-        DueDate = o.DueDate,
-        Status = o.Status,
-        SourceLabel = o.SourceLabel,
-        OwnerUserId = o.OwnerUserId,
-        OwnerName = o.OwnerName,
-        SchoolStudentId = o.SchoolStudentId,
-        StudentName = o.StudentName,
-        DaysUntilDue = o.DaysUntilDue,
-        RuleProfile = o.RuleProfile
-    };
 
     private IActionResult MapFailure<T>(string? message)
     {

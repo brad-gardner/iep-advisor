@@ -145,5 +145,47 @@ public sealed class ObligationServiceTests : IDisposable
         Assert.False(result.Success);
     }
 
+    /// <summary>Review-fix contract, todos/086 P3 #3: a SchoolAdmin still bound to a since-deactivated
+    /// school must see the SAME empty picture the compliance board shows for that school, not a stale
+    /// non-zero one — matches DistrictService.ScopedActiveSchools' School.IsActive filter.</summary>
+    [Fact]
+    public async Task GetForScopeAsync_SchoolAdmin_InactiveBoundSchool_ReturnsEmpty()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A", isActive: false);
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (schoolAdminId, _) = _db.Staff("inactive-school-admin@example.com", districtId, schoolId, Models.OrgRoleIds.SchoolAdmin);
+
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).GetForScopeAsync(schoolAdminId, null, null);
+
+        Assert.True(result.Success, result.Message);
+        Assert.DoesNotContain(result.Data!, o => o.SchoolStudentId == studentId);
+    }
+
+    /// <summary>Review-fix contract, todos/074: the StaffContext overload (used by HomeService to avoid a
+    /// re-lookup) must return the same result as the userId overload it replaces for that caller.</summary>
+    [Fact]
+    public async Task GetForScopeAsync_StaffContextOverload_MatchesUserIdOverload()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (adminId, _) = _db.Staff("ctx-overload-admin@example.com", districtId, null, Models.OrgRoleIds.DistrictAdmin);
+
+        using var ctx = _db.Context();
+        var orgAccess = new OrgAccessService(ctx);
+        var service = new ObligationService(ctx, orgAccess);
+        var staffCtx = await orgAccess.GetStaffContextAsync(adminId);
+
+        var byUserId = await service.GetForScopeAsync(adminId, null, null);
+        var byCtx = await service.GetForScopeAsync(staffCtx!, null, null);
+
+        Assert.True(byUserId.Success, byUserId.Message);
+        Assert.True(byCtx.Success, byCtx.Message);
+        Assert.Equal(byUserId.Data!.Count, byCtx.Data!.Count);
+        Assert.Contains(byCtx.Data, o => o.SchoolStudentId == studentId);
+    }
+
     public void Dispose() => _db.Dispose();
 }

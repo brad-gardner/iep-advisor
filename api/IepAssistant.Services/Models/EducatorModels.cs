@@ -70,8 +70,11 @@ public class ExitStudentModel
 /// <see cref="OverdueReeval"/> = the resolved annual-review/re-evaluation due date (see
 /// <see cref="Implementations.ObligationRules"/>'s fallback formulas) is in the past;
 /// <see cref="Due30"/>/<see cref="Due60"/> = either due date falls within the next 30/60 days (not
-/// overdue, cumulative — Due60 is a superset of Due30); <see cref="UnknownDates"/> = either due date is
-/// unresolvable (no due date AND no fallback source date) — Unknown never reads as healthy.
+/// overdue, cumulative — Due60 is a superset of Due30, both always anchored on TODAY regardless of
+/// <see cref="StudentSearchQuery.From"/>/<see cref="StudentSearchQuery.To"/>); <see cref="DueInRange"/> =
+/// either due date falls within the caller-chosen [From, To] window (the compliance board's drilldown for
+/// its date-range-bound tile — review-fix contract addition 1); <see cref="UnknownDates"/> = either due
+/// date is unresolvable (no due date AND no fallback source date) — Unknown never reads as healthy.
 /// </summary>
 public enum StudentAttention
 {
@@ -81,7 +84,8 @@ public enum StudentAttention
     OverdueReeval,
     Due30,
     Due60,
-    UnknownDates
+    UnknownDates,
+    DueInRange
 }
 
 /// <summary>Roster search/filter/paging input. <see cref="Status"/> null means every status ("All").</summary>
@@ -92,6 +96,11 @@ public class StudentSearchQuery
     public StudentStatus? Status { get; set; } = StudentStatus.Active;
     public GradeLevel? Grade { get; set; }
     public StudentAttention? Attention { get; set; }
+
+    /// <summary>Only consulted when <see cref="Attention"/> is <see cref="StudentAttention.DueInRange"/> —
+    /// defaults to today..today+60 days, mirroring the compliance board's default window.</summary>
+    public DateTime? From { get; set; }
+    public DateTime? To { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 50;
 }

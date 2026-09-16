@@ -48,9 +48,14 @@ export function EducatorStudentsPage() {
   const { query, update, clearAttention } = useRosterQuery();
   // The dashboard "needs attention" deep link: the server narrows the roster
   // (same predicate as the tiles), so filters and paging compose as usual.
-  const attentionLabel = query.attention
-    ? ATTENTION_FILTER_LABELS[query.attention]
-    : undefined;
+  // `DueInRange` carries its own caller-chosen window, so its label is built
+  // from the query's `from`/`to` rather than the static lookup table.
+  const attentionLabel =
+    query.attention === 'DueInRange' && query.from && query.to
+      ? `due between ${query.from} and ${query.to}`
+      : query.attention
+        ? ATTENTION_FILTER_LABELS[query.attention]
+        : undefined;
 
   const request = useMemo<StudentSearchParams>(
     () => ({
@@ -59,6 +64,8 @@ export function EducatorStudentsPage() {
       status: query.status,
       grade: query.grade || undefined,
       attention: query.attention ?? undefined,
+      from: query.from ?? undefined,
+      to: query.to ?? undefined,
       page: query.page,
       pageSize: query.pageSize,
     }),

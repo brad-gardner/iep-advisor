@@ -32,5 +32,12 @@ public class AccessAuditLogConfiguration : IEntityTypeConfiguration<AccessAuditL
         // independent — on SQL Server the clustered PK (Id) is silently appended to the bare (ActorUserId)
         // index above, but we don't want the read path's correctness to depend on that implicit behavior.
         builder.HasIndex(a => new { a.ActorUserId, a.Id });
+
+        // Plan 5 adoption "staff active in window" check (DistrictService.GetAdoptionAsync): a
+        // per-staff-member correlated EXISTS filtering ActorUserId AND range-restricting CreatedAt. The
+        // bare (ActorUserId) index above can only seek to the actor, then must scan that actor's full
+        // audit history to test CreatedAt; this composite index lets it seek directly into the recent
+        // slice instead (review-fix contract, todos/084).
+        builder.HasIndex(a => new { a.ActorUserId, a.CreatedAt });
     }
 }

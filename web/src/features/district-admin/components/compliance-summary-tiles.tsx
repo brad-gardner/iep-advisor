@@ -1,34 +1,28 @@
 import { StatTile } from '@/features/home/components/stat-tile';
+import { formatDate } from '@/lib/format-date';
+import { COMPLIANCE_SUMMARY_TILES } from '../lib/compliance-tiles';
 import { districtDrillHref } from '../lib/drill-link';
 import type { ComplianceSummaryDto } from '../types';
-
-const TILES: {
-  key: keyof Omit<ComplianceSummaryDto, 'activeStudents'>;
-  label: string;
-  tone?: 'warning' | 'danger';
-}[] = [
-  { key: 'overdueAnnual', label: 'Overdue annual reviews', tone: 'danger' },
-  { key: 'overdueReeval', label: 'Overdue reevaluations', tone: 'danger' },
-  { key: 'due30', label: 'Due within 30 days', tone: 'warning' },
-  { key: 'due60', label: 'Due within 60 days', tone: 'warning' },
-  { key: 'unknownDates', label: 'Unknown dates', tone: 'warning' },
-  { key: 'noLead', label: 'No case manager' },
-];
 
 interface ComplianceSummaryTilesProps {
   summary: ComplianceSummaryDto;
   drill: Record<string, string>;
   /** The currently filtered school (DistrictAdmin only); scopes every tile's link. */
   schoolId: number | null;
+  /** The board's chosen due-date window — labels the `dueInRange` tile only
+   * the board (not the home teaser) shows, since only the board has a range
+   * picker for it to describe. */
+  from: string;
+  to: string;
 }
 
 /** The compliance board's headline tiles — every one links to the roster,
  * pre-filtered by the server's `drill` map (and the current school filter). */
-export function ComplianceSummaryTiles({ summary, drill, schoolId }: ComplianceSummaryTilesProps) {
+export function ComplianceSummaryTiles({ summary, drill, schoolId, from, to }: ComplianceSummaryTilesProps) {
   const denominator = `of ${summary.activeStudents} active students`;
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="compliance-summary-tiles">
-      {TILES.map((t) => (
+      {COMPLIANCE_SUMMARY_TILES.map((t) => (
         <StatTile
           key={t.key}
           label={t.label}
@@ -39,6 +33,14 @@ export function ComplianceSummaryTiles({ summary, drill, schoolId }: ComplianceS
           data-testid={`compliance-summary-${t.key}`}
         />
       ))}
+      <StatTile
+        label="Due in selected range"
+        value={summary.dueInRange}
+        denominator={`${formatDate(from)} – ${formatDate(to)}`}
+        href={districtDrillHref(drill, 'dueInRange', schoolId)}
+        tone="warning"
+        data-testid="compliance-summary-dueInRange"
+      />
     </div>
   );
 }

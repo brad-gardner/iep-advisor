@@ -52,7 +52,7 @@ describe('StaffHomeBody', () => {
     renderBody();
 
     expect(screen.getByTestId('staff-home-error')).toBeInTheDocument();
-    expect(screen.getByText("Couldn't load your home")).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load your home");
     await user.click(screen.getByTestId('staff-home-retry'));
     expect(retry).toHaveBeenCalledTimes(1);
   });

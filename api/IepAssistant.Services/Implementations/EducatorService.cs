@@ -195,6 +195,19 @@ public class EducatorService : IEducatorService
             query = query.Where(StudentAttentionRules.DueWithin(today, today.AddDays(60)));
         else if (search.Attention == StudentAttention.UnknownDates)
             query = query.Where(StudentAttentionRules.UnknownDates());
+        else if (search.Attention == StudentAttention.DueInRange)
+        {
+            // Backs the compliance board's date-range-bound "dueInRange" drilldown (review-fix contract
+            // addition 1) — Due30/Due60 above stay anchored on today regardless of From/To.
+            if (!AdminQueryLimits.IsWithinRange(search.From, today) || !AdminQueryLimits.IsWithinRange(search.To, today))
+                return ServiceResult<PagedResult<SchoolStudentModel>>.FailureResult("The requested date range is out of bounds.");
+
+            var fromDate = (search.From ?? today).Date;
+            var toDate = (search.To ?? fromDate.AddDays(60)).Date;
+            if (toDate < fromDate)
+                toDate = fromDate;
+            query = query.Where(StudentAttentionRules.DueWithin(fromDate, toDate));
+        }
         if (!string.IsNullOrWhiteSpace(search.Query))
         {
             // LIKE is case-insensitive under SQL Server's default collation and for ASCII on SQLite;

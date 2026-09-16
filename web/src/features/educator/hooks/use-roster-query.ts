@@ -8,15 +8,20 @@ const PAGE_SIZES = new Set([25, 50, 100]);
 
 // The dashboard tiles deep-link with the short keys; the enum names are
 // accepted too so a shared link built from the API contract also works.
-const ATTENTION_PARAM_VALUES: Record<string, AttentionFilter> = {
-  'no-staff': 'NoCaseManager',
-  'no-parent': 'NoLinkedParent',
-  ...Object.fromEntries(ATTENTION_FILTERS.map((f) => [f, f])),
-};
+// A `Map` (rather than a plain object) so a raw value like `"toString"` or
+// `"constructor"` can never resolve to an inherited `Object.prototype` member.
+const ATTENTION_PARAM_VALUES: Map<string, AttentionFilter> = new Map([
+  ['no-staff', 'NoCaseManager'],
+  ['no-parent', 'NoLinkedParent'],
+  ...ATTENTION_FILTERS.map((f): [string, AttentionFilter] => [f, f]),
+]);
 
 // The roster's filter/paging state, kept in the URL so a filtered page is
 // shareable and survives back/forward. `attention` is the dashboard deep-link
 // (`?attention=no-staff|no-parent`), resolved to the server filter value.
+// `from`/`to` (`yyyy-MM-dd`) only apply to `attention: 'DueInRange'` — the
+// compliance board's own chosen date window, distinct from the fixed
+// `Due30`/`Due60` buckets.
 export interface RosterQuery {
   q: string;
   schoolId: number | null;
@@ -25,9 +30,11 @@ export interface RosterQuery {
   page: number;
   pageSize: number;
   attention: AttentionFilter | null;
+  from: string | null;
+  to: string | null;
 }
 
-export type RosterQueryPatch = Partial<Omit<RosterQuery, 'attention'>>;
+export type RosterQueryPatch = Partial<Omit<RosterQuery, 'attention' | 'from' | 'to'>>;
 
 function parseStatus(raw: string | null): StudentStatusFilter {
   if (raw === 'All') return 'All';
@@ -46,7 +53,13 @@ function parsePositiveInt(raw: string | null, fallback: number): number {
 }
 
 function parseAttention(raw: string | null): AttentionFilter | null {
-  return raw ? (ATTENTION_PARAM_VALUES[raw] ?? null) : null;
+  return raw ? (ATTENTION_PARAM_VALUES.get(raw) ?? null) : null;
+}
+
+// `yyyy-MM-dd` only — anything else (including a malformed deep link) is
+// treated as absent rather than passed through to the server.
+function parseDateParam(raw: string | null): string | null {
+  return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
 }
 
 export function useRosterQuery(): {
@@ -70,6 +83,8 @@ export function useRosterQuery(): {
       page: parsePositiveInt(searchParams.get('page'), 1),
       pageSize: PAGE_SIZES.has(pageSize) ? pageSize : DEFAULT_PAGE_SIZE,
       attention: parseAttention(searchParams.get('attention')),
+      from: parseDateParam(searchParams.get('from')),
+      to: parseDateParam(searchParams.get('to')),
     };
   }, [searchParams]);
 
@@ -99,6 +114,8 @@ export function useRosterQuery(): {
   const clearAttention = useCallback(() => {
     const params = new URLSearchParams(searchParams);
     params.delete('attention');
+    params.delete('from');
+    params.delete('to');
     params.delete('page');
     setSearchParams(params, { replace: true });
   }, [searchParams, setSearchParams]);

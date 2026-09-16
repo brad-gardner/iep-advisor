@@ -25,21 +25,29 @@ public class HomeService : IHomeService
     private const int MaxParentDocuments = 10;
     private const int MaxProgressReports = 5;
 
+    /// <summary>Sibling cap to <see cref="MaxDrafts"/>/<see cref="MaxParentDocuments"/>/
+    /// <see cref="MaxProgressReports"/> — the only home list that was previously unbounded
+    /// (review-fix contract, todos/082).</summary>
+    internal const int MaxOverdueByCaseManager = 50;
+
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
     private readonly IObligationService _obligationService;
     private readonly IDocumentCompletenessService _completeness;
+    private readonly IDistrictService _districtService;
 
     public HomeService(
         ApplicationDbContext context,
         IOrgAccessService orgAccess,
         IObligationService obligationService,
-        IDocumentCompletenessService completeness)
+        IDocumentCompletenessService completeness,
+        IDistrictService districtService)
     {
         _context = context;
         _orgAccess = orgAccess;
         _obligationService = obligationService;
         _completeness = completeness;
+        _districtService = districtService;
     }
 
     public async Task<ServiceResult<HomeModel>> GetForUserAsync(int userId, CancellationToken ct = default)
@@ -169,12 +177,31 @@ public class HomeService : IHomeService
                 .ToList();
         }
 
-        // ---- Drafts: Draft DocumentInstances where I'm on the active team or last edited, newest first. ----
-        var draftsRaw = await _context.DocumentInstances.AsNoTracking()
-            .Where(i => i.Status == DocumentInstanceStatus.Draft
-                && (i.LastEditedByUserId == userId
-                    || _context.StudentTeamMembers.Any(m => m.SchoolStudentId == i.SchoolStudentId && m.IsActive && m.UserId == userId)))
+        // ---- Drafts: Draft DocumentInstances where I currently have access — an active team member, an
+        // active SchoolStudentAccess row, or (admin variants) the student is in my scope. "I last edited
+        // it" is NOT a visibility grant on its own (a caller who is removed from a team, or whose access
+        // is superseded by a transfer, must lose the draft too, matching CanActOnStudentAsync) — it's kept
+        // only as a secondary ordering signal below (review-fix contract, todos/080). ----
+        IQueryable<DocumentInstance> draftsQuery = _context.DocumentInstances.AsNoTracking()
+            .Where(i => i.Status == DocumentInstanceStatus.Draft);
+        if (isAdmin)
+        {
+            var scopedStudentIds = ScopedActiveStudents(ctx).Select(s => s.Id);
+            draftsQuery = draftsQuery.Where(i =>
+                _context.StudentTeamMembers.Any(m => m.SchoolStudentId == i.SchoolStudentId && m.IsActive && m.UserId == userId)
+                || _context.SchoolStudentAccesses.Any(a => a.SchoolStudentId == i.SchoolStudentId && a.IsActive && a.UserId == userId)
+                || scopedStudentIds.Contains(i.SchoolStudentId));
+        }
+        else
+        {
+            draftsQuery = draftsQuery.Where(i =>
+                _context.StudentTeamMembers.Any(m => m.SchoolStudentId == i.SchoolStudentId && m.IsActive && m.UserId == userId)
+                || _context.SchoolStudentAccesses.Any(a => a.SchoolStudentId == i.SchoolStudentId && a.IsActive && a.UserId == userId));
+        }
+
+        var draftsRaw = await draftsQuery
             .OrderByDescending(i => i.LastEditedAt)
+            .ThenByDescending(i => i.LastEditedByUserId == userId)
             .Take(MaxDrafts)
             .Select(i => new
             {
@@ -222,8 +249,15 @@ public class HomeService : IHomeService
     }
 
     /// <summary>Roster attention counts, the overdue/at-risk-by-student table, and (DistrictAdmin only)
-    /// the compliance summary — all derived from ONE <see cref="IObligationService.GetForScopeAsync"/>
-    /// call plus two roster-attention counts (NoLead/NoFamily aren't obligation data).</summary>
+    /// the compliance summary. Takes the already-resolved <paramref name="ctx"/> and passes it straight
+    /// into <see cref="IObligationService.GetForScopeAsync(StaffContext, int?, ObligationStatus?, CancellationToken)"/>
+    /// (no re-lookup), and reuses that call's scoped active-student ids for the NoLead/NoFamily counts
+    /// instead of a second from-scratch scoped query (review-fix contract, todos/074). For DistrictAdmin,
+    /// ComplianceSummary is the SAME <see cref="ComplianceSummaryModel"/> instance
+    /// <see cref="IDistrictService.GetComplianceBoardAsync"/> computes with no filters — not an
+    /// independently re-derived aggregation — so the two surfaces can never numerically drift apart
+    /// (review-fix contract, todos/078); NoLead is likewise reused from that board summary rather than
+    /// counted twice.</summary>
     private async Task PopulateAdminSectionsAsync(StaffHomeModel home, int userId, StaffContext ctx, StaffHomeVariant variant, CancellationToken ct)
     {
         home.UnsignedFinalized = new List<HomeUnsignedModel>();
@@ -234,31 +268,55 @@ public class HomeService : IHomeService
         {
             home.RosterAttention = new RosterAttentionModel();
             home.OverdueByCaseManager = new List<CaseManagerRowModel>();
+            home.OverdueByCaseManagerTotal = 0;
             return;
         }
 
-        var scopeResult = await _obligationService.GetForScopeAsync(userId, null, null, ct);
+        var scopeResult = await _obligationService.GetForScopeAsync(ctx, null, null, ct);
         var obligations = scopeResult.Data ?? new List<ObligationModel>();
         var today = DateTime.UtcNow.Date;
 
         // Every active student in scope carries at least an AnnualReview + Reevaluation obligation
-        // (ObligationService.ComputeForStudent), so the distinct student count below IS the active-student count.
-        var activeStudents = obligations.Select(o => o.SchoolStudentId).Distinct().Count();
-        var overdueAnnual = obligations.Count(o => o.Kind == ObligationKind.AnnualReview && o.Status == ObligationStatus.Overdue);
-        var overdueReeval = obligations.Count(o => o.Kind == ObligationKind.Reevaluation && o.Status == ObligationStatus.Overdue);
-        var due30 = obligations
-            .Where(o => o.Kind != ObligationKind.EtrDue && o.DueDate.HasValue && o.DueDate.Value >= today && o.DueDate.Value <= today.AddDays(30))
-            .Select(o => o.SchoolStudentId).Distinct().Count();
-        var due60 = obligations
-            .Where(o => o.Kind != ObligationKind.EtrDue && o.DueDate.HasValue && o.DueDate.Value >= today && o.DueDate.Value <= today.AddDays(60))
-            .Select(o => o.SchoolStudentId).Distinct().Count();
-        var unknownDates = obligations
-            .Where(o => o.Kind != ObligationKind.EtrDue && o.Status == ObligationStatus.Unknown)
-            .Select(o => o.SchoolStudentId).Distinct().Count();
+        // (ObligationService.ComputeForStudent), so the distinct id set below IS the active-student set —
+        // reused for the NoLead/NoFamily counts instead of a second ScopedActiveStudents(ctx) query.
+        // (DistrictAdmin's ComplianceSummary.ActiveStudents comes from the board summary itself, below.)
+        var activeStudentIds = obligations.Select(o => o.SchoolStudentId).Distinct().ToHashSet();
 
-        var scopedStudents = ScopedActiveStudents(ctx);
-        var noLead = await scopedStudents.CountAsync(StudentAttentionRules.NoLead(_context, ctx.DistrictId), ct);
-        var noFamily = await scopedStudents.CountAsync(StudentAttentionRules.NoFamily(_context), ct);
+        int overdueAnnual, overdueReeval, due30, unknownDates, noLead;
+        ComplianceSummaryModel? boardSummary = null;
+
+        if (variant == StaffHomeVariant.DistrictAdmin)
+        {
+            // "Same numbers as the board with no filters" (plan 5 contract) — call the actual board
+            // computation instead of re-deriving these six counts from the obligations list, so a
+            // DistrictAdmin's home ComplianceSummary can never disagree with GetComplianceBoardAsync's
+            // Summary for the same district. Also supplies NoLead below, so PopulateAdminSectionsAsync
+            // doesn't need its own NoLead query for this variant.
+            var boardResult = await _districtService.GetComplianceBoardAsync(userId, null, null, null, ct);
+            boardSummary = boardResult.Data?.Summary ?? new ComplianceSummaryModel();
+            overdueAnnual = boardSummary.OverdueAnnual;
+            overdueReeval = boardSummary.OverdueReeval;
+            due30 = boardSummary.Due30;
+            unknownDates = boardSummary.UnknownDates;
+            noLead = boardSummary.NoLead;
+        }
+        else
+        {
+            overdueAnnual = obligations.Count(o => o.Kind == ObligationKind.AnnualReview && o.Status == ObligationStatus.Overdue);
+            overdueReeval = obligations.Count(o => o.Kind == ObligationKind.Reevaluation && o.Status == ObligationStatus.Overdue);
+            due30 = obligations
+                .Where(o => o.Kind != ObligationKind.EtrDue && o.DueDate.HasValue && o.DueDate.Value >= today && o.DueDate.Value <= today.AddDays(30))
+                .Select(o => o.SchoolStudentId).Distinct().Count();
+            unknownDates = obligations
+                .Where(o => o.Kind != ObligationKind.EtrDue && o.Status == ObligationStatus.Unknown)
+                .Select(o => o.SchoolStudentId).Distinct().Count();
+
+            var scopedByActiveIds = _context.SchoolStudents.AsNoTracking().Where(s => activeStudentIds.Contains(s.Id));
+            noLead = await scopedByActiveIds.CountAsync(StudentAttentionRules.NoLead(_context, ctx.DistrictId), ct);
+        }
+
+        var noFamilyQuery = _context.SchoolStudents.AsNoTracking().Where(s => activeStudentIds.Contains(s.Id));
+        var noFamily = await noFamilyQuery.CountAsync(StudentAttentionRules.NoFamily(_context), ct);
 
         home.RosterAttention = new RosterAttentionModel
         {
@@ -271,9 +329,15 @@ public class HomeService : IHomeService
         };
 
         // Sorted by STUDENT name — never by staff (no ranking language/per-staff scores anywhere here).
-        home.OverdueByCaseManager = obligations
+        // Capped like every sibling home list (drafts/documents/reports); OverdueByCaseManagerTotal
+        // carries the true count for a "view all in compliance board" link (review-fix contract, todos/082).
+        var overdueByCaseManagerAll = obligations
             .Where(o => o.Kind != ObligationKind.EtrDue && o.Status is ObligationStatus.Overdue or ObligationStatus.DueSoon)
             .OrderBy(o => o.StudentName)
+            .ToList();
+        home.OverdueByCaseManagerTotal = overdueByCaseManagerAll.Count;
+        home.OverdueByCaseManager = overdueByCaseManagerAll
+            .Take(MaxOverdueByCaseManager)
             .Select(o => new CaseManagerRowModel
             {
                 StudentId = o.SchoolStudentId,
@@ -286,25 +350,23 @@ public class HomeService : IHomeService
             .ToList();
 
         if (variant == StaffHomeVariant.DistrictAdmin)
-        {
-            home.ComplianceSummary = new ComplianceSummaryModel
-            {
-                OverdueAnnual = overdueAnnual,
-                OverdueReeval = overdueReeval,
-                Due30 = due30,
-                Due60 = due60,
-                UnknownDates = unknownDates,
-                NoLead = noLead,
-                ActiveStudents = activeStudents
-            };
-        }
+            home.ComplianceSummary = boardSummary;
     }
 
+    /// <summary>Active students in scope, in an ACTIVE school (matches
+    /// <see cref="DistrictService"/>'s ScopedActiveSchools filter — a SchoolAdmin still bound to a
+    /// since-deactivated school must see the same empty picture the compliance board shows for it, not a
+    /// stale non-zero one; review-fix contract, todos/086 P3 #3). A SchoolAdmin with no school binding has
+    /// nothing in scope (empty, not a throw).</summary>
     private IQueryable<SchoolStudent> ScopedActiveStudents(StaffContext ctx)
     {
-        var query = ctx.OrgRoleId == OrgRoleIds.DistrictAdmin
-            ? _context.SchoolStudents.AsNoTracking().Where(s => s.School.DistrictId == ctx.DistrictId && s.School.IsActive)
-            : _context.SchoolStudents.AsNoTracking().Where(s => s.SchoolId == ctx.SchoolId!.Value);
+        IQueryable<SchoolStudent> query;
+        if (ctx.OrgRoleId == OrgRoleIds.DistrictAdmin)
+            query = _context.SchoolStudents.AsNoTracking().Where(s => s.School.DistrictId == ctx.DistrictId && s.School.IsActive);
+        else if (ctx.SchoolId.HasValue)
+            query = _context.SchoolStudents.AsNoTracking().Where(s => s.SchoolId == ctx.SchoolId.Value && s.School.IsActive);
+        else
+            query = _context.SchoolStudents.AsNoTracking().Where(_ => false);
         return query.Where(s => s.Status == StudentStatus.Active);
     }
 

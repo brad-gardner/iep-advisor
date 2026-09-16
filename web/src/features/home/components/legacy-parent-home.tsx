@@ -1,10 +1,9 @@
 import { Link } from 'react-router-dom';
-import { Users, FileText, UserCircle, ArrowRight } from 'lucide-react';
+import { Users, FileText, UserCircle } from 'lucide-react';
 import { DashboardChildrenSection } from '@/features/children/components/dashboard-children-section';
 import { Card } from '@/components/ui/card';
-import { Notice } from '@/components/ui/notice';
-import { Button } from '@/components/ui/button';
 import type { User } from '@/types/api';
+import { AccountSetupNotices } from './account-setup-notices';
 
 interface LegacyParentHomeProps {
   user: User | null;
@@ -20,27 +19,7 @@ interface LegacyParentHomeProps {
 export function LegacyParentHome({ user }: LegacyParentHomeProps) {
   return (
     <div className="space-y-6" data-testid="parent-home-legacy">
-      {user && !user.onboardingCompleted && (
-        <div data-testid="onboarding-banner">
-          <Notice variant="info" title="Complete your setup to get the most out of IEP Advisor">
-            <Link to="/onboarding">
-              <Button variant="primary" className="mt-2 gap-1.5" data-testid="onboarding-get-started">
-                Get Started
-                <ArrowRight size={14} strokeWidth={1.8} aria-hidden="true" />
-              </Button>
-            </Link>
-          </Notice>
-        </div>
-      )}
-
-      {!user?.state && user?.onboardingCompleted && (
-        <Notice variant="warning" title="Set your state for better guidance">
-          <Link to="/profile" className="underline hover:text-brand-amber-600">
-            Update your profile
-          </Link>{' '}
-          to get jurisdiction-specific IEP guidance.
-        </Notice>
-      )}
+      <AccountSetupNotices user={user} />
 
       <DashboardChildrenSection />
 

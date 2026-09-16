@@ -122,6 +122,10 @@ export interface ComplianceSummaryDto {
   unknownDates: number;
   noLead: number;
   activeStudents: number;
+  // Due within the board's chosen `from`/`to` window (distinct from the fixed
+  // `due30`/`due60` buckets, which are always anchored on today). Present on
+  // the board's summary/rows; the home teaser doesn't show it (no range picker).
+  dueInRange: number;
 }
 
 export interface ComplianceSchoolRowDto {
@@ -134,6 +138,7 @@ export interface ComplianceSchoolRowDto {
   due60: number;
   unknownDates: number;
   noLead: number;
+  dueInRange: number;
 }
 
 // `drill` maps each summary/row count key (e.g. "overdueAnnual") to a roster

@@ -75,6 +75,25 @@ describe('AdminHome', () => {
     expect(tile).toHaveTextContent(/As of/);
   });
 
+  it('shows a "showing 50 of N" note linking to the compliance board when the overdue table is truncated', () => {
+    const rows = Array.from({ length: 50 }, (_, i) =>
+      makeCaseManagerRow({ studentId: i + 1, studentName: `Student ${i + 1}` })
+    );
+    renderAdmin({ variant: 'SchoolAdmin', overdueByCaseManager: rows, overdueByCaseManagerTotal: 73 }, false);
+
+    const note = screen.getByTestId('home-overdue-by-case-manager-more');
+    expect(note).toHaveTextContent('Showing 50 of 73');
+    expect(within(note).getByRole('link')).toHaveAttribute('href', '/educator/admin/compliance');
+  });
+
+  it('omits the "showing N of total" note when the overdue table is not truncated', () => {
+    renderAdmin(
+      { variant: 'SchoolAdmin', overdueByCaseManager: [makeCaseManagerRow()], overdueByCaseManagerTotal: 1 },
+      false
+    );
+    expect(screen.queryByTestId('home-overdue-by-case-manager-more')).not.toBeInTheDocument();
+  });
+
   it('shows unsigned finalized as an empty hint, never an error, when empty', () => {
     renderAdmin({ variant: 'SchoolAdmin', unsignedFinalized: [] }, false);
     expect(screen.getByTestId('home-unsigned-finalized-empty')).toBeInTheDocument();

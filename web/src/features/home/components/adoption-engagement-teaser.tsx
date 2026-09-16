@@ -15,7 +15,8 @@ const BOARD_LINK = '/educator/admin/compliance';
  * never blocks the rest of the home.
  */
 export function AdoptionEngagementTeaser() {
-  const { adoption, engagement, isLoading, error, retry } = useAdoptionEngagement(null);
+  const { adoption, engagement, adoptionError, engagementError, isLoading, error, retry } =
+    useAdoptionEngagement(null);
 
   return (
     <HomeSection
@@ -36,48 +37,73 @@ export function AdoptionEngagementTeaser() {
       )}
 
       {!isLoading && error && (
-        <Notice variant="error" title={error}>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={retry}
-            data-testid="home-adoption-engagement-retry"
-          >
-            Try again
-          </Button>
-        </Notice>
+        <div role="alert">
+          <Notice variant="error" title={error}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={retry}
+              data-testid="home-adoption-engagement-retry"
+            >
+              Try again
+            </Button>
+          </Notice>
+        </div>
       )}
 
-      {!isLoading && !error && adoption && engagement && (
+      {!isLoading && !error && (adoptionError || engagementError) && (
+        <div role="alert" className="mb-3">
+          <Notice variant="error" title={adoptionError ?? engagementError ?? ''}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={retry}
+              data-testid="home-adoption-engagement-retry"
+            >
+              Try again
+            </Button>
+          </Notice>
+        </div>
+      )}
+
+      {!isLoading && !error && (adoption || engagement) && (
         <div className="grid gap-3 sm:grid-cols-2">
-          <StatTile
-            label="Staff active (14 days)"
-            value={adoption.staffActiveLast14}
-            denominator={`of ${adoption.staffTotal} staff`}
-            href={BOARD_LINK}
-            data-testid="home-adoption-staff-active"
-          />
-          <StatTile
-            label="Drafts started"
-            value={adoption.draftsStarted}
-            denominator={`Last ${adoption.days} days`}
-            href={BOARD_LINK}
-            data-testid="home-adoption-drafts-started"
-          />
-          <StatTile
-            label="Families linked"
-            value={engagement.studentsWithFamilyLink}
-            denominator={`of ${engagement.activeStudents} active students`}
-            href={BOARD_LINK}
-            data-testid="home-engagement-family-linked"
-          />
-          <StatTile
-            label="Drafts shared with family"
-            value={engagement.draftsShared}
-            denominator={`of ${engagement.activeStudents} active students`}
-            href={BOARD_LINK}
-            data-testid="home-engagement-drafts-shared"
-          />
+          {adoption && (
+            <>
+              <StatTile
+                label="Staff active (14 days)"
+                value={adoption.staffActiveLast14}
+                denominator={`of ${adoption.staffTotal} staff`}
+                href={BOARD_LINK}
+                data-testid="home-adoption-staff-active"
+              />
+              <StatTile
+                label="Drafts started"
+                value={adoption.draftsStarted}
+                denominator={`Last ${adoption.days} days`}
+                href={BOARD_LINK}
+                data-testid="home-adoption-drafts-started"
+              />
+            </>
+          )}
+          {engagement && (
+            <>
+              <StatTile
+                label="Families linked"
+                value={engagement.studentsWithFamilyLink}
+                denominator={`of ${engagement.activeStudents} active students`}
+                href={BOARD_LINK}
+                data-testid="home-engagement-family-linked"
+              />
+              <StatTile
+                label="Drafts shared with family"
+                value={engagement.draftsShared}
+                denominator={`of ${engagement.activeStudents} active students`}
+                href={BOARD_LINK}
+                data-testid="home-engagement-drafts-shared"
+              />
+            </>
+          )}
         </div>
       )}
     </HomeSection>

@@ -22,7 +22,11 @@ public sealed class HomeServiceTests : IDisposable
         var orgAccess = new OrgAccessService(ctx);
         var obligationService = new ObligationService(ctx, orgAccess);
         var completeness = new DocumentCompletenessService(ctx, new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance));
-        return new HomeService(ctx, orgAccess, obligationService, completeness);
+        // Shares the same IOrgAccessService instance HomeService uses (matches production DI, where
+        // IOrgAccessService is Scoped) so its per-request staff-context memo is actually shared across
+        // HomeService/ObligationService/DistrictService, as it would be for a real request.
+        var districtService = new DistrictService(ctx, orgAccess, NullLogger<DistrictService>.Instance);
+        return new HomeService(ctx, orgAccess, obligationService, completeness, districtService);
     }
 
     /// <summary>Seeds a one-required-field Published template version and returns its id.</summary>
@@ -126,6 +130,106 @@ public sealed class HomeServiceTests : IDisposable
         Assert.Null(home.ComplianceSummary);
     }
 
+    // ----------------------------------------------------------------- Drafts: current access required (todos/080)
+
+    [Fact]
+    public async Task StaffHome_Drafts_RemovedTeamMemberNoLongerSeesDraft()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var (userId, _) = _db.Staff("removed-lead@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var studentId = _db.Student(schoolId, "Sam", "Removed");
+        _db.TeamMember(studentId, userId, TeamRole.CaseManager, isLead: true);
+
+        var fieldKey = Guid.NewGuid();
+        int templateVersionId;
+        int draftId;
+        using (var seedCtx = _db.Context())
+        {
+            templateVersionId = SeedTemplateVersion(seedCtx, docTypeId: 1, fieldKey);
+        }
+        using (var seedCtx = _db.Context())
+        {
+            draftId = SeedDraftInstance(seedCtx, studentId, templateVersionId, docTypeId: 1, lastEditedByUserId: userId);
+        }
+
+        using (var ctx = _db.Context())
+        {
+            var result = await CreateService(ctx).GetForUserAsync(userId);
+            Assert.True(result.Success, result.Message);
+            Assert.Contains(result.Data!.Staff!.Drafts, d => d.InstanceId == draftId);
+        }
+
+        // Mirrors StudentTeamWriter.DeactivateMemberAsync: both the team membership AND its access row go inactive.
+        using (var seedCtx = _db.Context())
+        {
+            var member = seedCtx.StudentTeamMembers.Single(m => m.SchoolStudentId == studentId && m.UserId == userId);
+            member.IsActive = false;
+            member.IsLead = false;
+            var access = seedCtx.SchoolStudentAccesses.Single(a => a.SchoolStudentId == studentId && a.UserId == userId);
+            access.IsActive = false;
+            seedCtx.SchoolStudents.Single(s => s.Id == studentId).CaseManagerUserId = null;
+            seedCtx.SaveChanges();
+        }
+
+        using (var ctx = _db.Context())
+        {
+            var result = await CreateService(ctx).GetForUserAsync(userId);
+            Assert.True(result.Success, result.Message);
+            // "I last edited it" is no longer a visibility grant on its own once current access is gone.
+            Assert.DoesNotContain(result.Data!.Staff!.Drafts, d => d.InstanceId == draftId);
+        }
+    }
+
+    [Fact]
+    public async Task StaffHome_Drafts_TransferredStudent_NonPortableTeacherNoLongerSeesDraft()
+    {
+        var districtId = _db.District();
+        var schoolA = _db.School(districtId, "School A");
+        var schoolB = _db.School(districtId, "School B");
+        var (teacherId, _) = _db.Staff("teacher-transfer@example.com", districtId, schoolA, Models.OrgRoleIds.Teacher);
+        var (adminId, _) = _db.Staff("transfer-admin@example.com", districtId, null, Models.OrgRoleIds.DistrictAdmin);
+        var studentId = _db.Student(schoolA, "Terry", "Transfer");
+        _db.TeamMember(studentId, teacherId, TeamRole.CaseManager, isLead: true);
+
+        var fieldKey = Guid.NewGuid();
+        int templateVersionId;
+        int draftId;
+        using (var seedCtx = _db.Context())
+        {
+            templateVersionId = SeedTemplateVersion(seedCtx, docTypeId: 1, fieldKey);
+        }
+        using (var seedCtx = _db.Context())
+        {
+            draftId = SeedDraftInstance(seedCtx, studentId, templateVersionId, docTypeId: 1, lastEditedByUserId: teacherId);
+        }
+
+        using (var ctx = _db.Context())
+        {
+            var result = await CreateService(ctx).GetForUserAsync(teacherId);
+            Assert.True(result.Success, result.Message);
+            Assert.Contains(result.Data!.Staff!.Drafts, d => d.InstanceId == draftId);
+        }
+
+        // The student transfers to a different school; the teacher (bound to School A, not portable) is
+        // deactivated off the team and loses their access row (EducatorService.TransferStudentAsync ->
+        // StudentTeamBatch.DeactivateNonPortable).
+        using (var ctx = _db.Context())
+        {
+            var orgAccess = new OrgAccessService(ctx);
+            var educatorService = new EducatorService(ctx, orgAccess, new CapturingAuditLogger(), NullLogger<EducatorService>.Instance);
+            var transferResult = await educatorService.TransferStudentAsync(adminId, studentId, schoolB);
+            Assert.True(transferResult.Success, transferResult.Message);
+        }
+
+        using (var ctx = _db.Context())
+        {
+            var result = await CreateService(ctx).GetForUserAsync(teacherId);
+            Assert.True(result.Success, result.Message);
+            Assert.DoesNotContain(result.Data!.Staff!.Drafts, d => d.InstanceId == draftId);
+        }
+    }
+
     [Fact]
     public async Task StaffHome_ProviderVariant_MapsFromRelatedServiceProviderRole()
     {
@@ -187,6 +291,130 @@ public sealed class HomeServiceTests : IDisposable
         Assert.NotNull(home.RosterAttention);
         Assert.NotNull(home.ComplianceSummary);
         Assert.True(home.ComplianceSummary!.OverdueAnnual >= 2);
+    }
+
+    /// <summary>Review-fix contract, todos/078: the DistrictAdmin home's ComplianceSummary must be the
+    /// SAME numbers as the no-filter compliance board for the same district — not an independently
+    /// re-derived aggregation that could drift from it.</summary>
+    [Fact]
+    public async Task StaffHome_DistrictAdmin_ComplianceSummaryMatchesComplianceBoardSummary()
+    {
+        var districtId = _db.District();
+        var schoolA = _db.School(districtId, "School A");
+        var schoolB = _db.School(districtId, "School B");
+        var (adminId, _) = _db.Staff("parity-admin@example.com", districtId, null, Models.OrgRoleIds.DistrictAdmin);
+        var (leadId, _) = _db.Staff("parity-lead@example.com", districtId, schoolA, Models.OrgRoleIds.Teacher);
+
+        var overdueStudent = _db.Student(schoolA, "Overdue", "Annual");
+        _db.TeamMember(overdueStudent, leadId, TeamRole.CaseManager, isLead: true);
+        var due30Student = _db.Student(schoolB, "Due", "Soon");
+        var noLeadStudent = _db.Student(schoolB, "No", "Lead");
+
+        using (var seedCtx = _db.Context())
+        {
+            var today = DateTime.UtcNow.Date;
+            seedCtx.SchoolStudents.Single(s => s.Id == overdueStudent).AnnualReviewDueDate = today.AddDays(-5);
+            seedCtx.SchoolStudents.Single(s => s.Id == overdueStudent).ReevaluationDueDate = today.AddDays(400);
+            seedCtx.SchoolStudents.Single(s => s.Id == due30Student).AnnualReviewDueDate = today.AddDays(10);
+            seedCtx.SchoolStudents.Single(s => s.Id == due30Student).ReevaluationDueDate = today.AddDays(400);
+            seedCtx.SchoolStudents.Single(s => s.Id == noLeadStudent).AnnualReviewDueDate = today.AddDays(400);
+            seedCtx.SchoolStudents.Single(s => s.Id == noLeadStudent).ReevaluationDueDate = today.AddDays(400);
+            seedCtx.SaveChanges();
+        }
+
+        using var ctx = _db.Context();
+        var homeResult = await CreateService(ctx).GetForUserAsync(adminId);
+        Assert.True(homeResult.Success, homeResult.Message);
+        var summary = homeResult.Data!.Staff!.ComplianceSummary!;
+
+        var districtService = new DistrictService(ctx, new OrgAccessService(ctx), NullLogger<DistrictService>.Instance);
+        var boardResult = await districtService.GetComplianceBoardAsync(adminId, null, null, null);
+        Assert.True(boardResult.Success, boardResult.Message);
+        var board = boardResult.Data!.Summary;
+
+        Assert.Equal(board.OverdueAnnual, summary.OverdueAnnual);
+        Assert.Equal(board.OverdueReeval, summary.OverdueReeval);
+        Assert.Equal(board.Due30, summary.Due30);
+        Assert.Equal(board.Due60, summary.Due60);
+        Assert.Equal(board.DueInRange, summary.DueInRange);
+        Assert.Equal(board.UnknownDates, summary.UnknownDates);
+        Assert.Equal(board.NoLead, summary.NoLead);
+        Assert.Equal(board.ActiveStudents, summary.ActiveStudents);
+
+        // Sanity: the buckets actually caught something (not a trivially-equal all-zero comparison).
+        Assert.True(summary.OverdueAnnual >= 1);
+        Assert.True(summary.Due30 >= 1);
+        Assert.True(summary.NoLead >= 1);
+    }
+
+    /// <summary>Review-fix contract, todos/082: OverdueByCaseManager is capped like every sibling home
+    /// list, with OverdueByCaseManagerTotal carrying the true (uncapped) count.</summary>
+    [Fact]
+    public async Task StaffHome_DistrictAdmin_OverdueByCaseManagerCappedAt50_WithTotal()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var (adminId, _) = _db.Staff("cap-admin@example.com", districtId, null, Models.OrgRoleIds.DistrictAdmin);
+        var (leadId, _) = _db.Staff("cap-lead@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+
+        const int overdueStudentCount = 55;
+        using (var seedCtx = _db.Context())
+        {
+            for (var i = 0; i < overdueStudentCount; i++)
+            {
+                var student = new SchoolStudent
+                {
+                    SchoolId = schoolId,
+                    DistrictId = districtId,
+                    FirstName = $"Student{i:D3}",
+                    LastName = "Overdue",
+                    Status = StudentStatus.Active,
+                    CaseManagerUserId = leadId,
+                    AnnualReviewDueDate = DateTime.UtcNow.Date.AddDays(-1),
+                    ReevaluationDueDate = DateTime.UtcNow.Date.AddDays(400)
+                };
+                seedCtx.SchoolStudents.Add(student);
+            }
+            seedCtx.SaveChanges();
+        }
+
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).GetForUserAsync(adminId);
+
+        Assert.True(result.Success, result.Message);
+        var home = result.Data!.Staff!;
+        Assert.Equal(50, home.OverdueByCaseManager!.Count);
+        Assert.True(home.OverdueByCaseManagerTotal >= overdueStudentCount);
+    }
+
+    /// <summary>Review-fix contract, todos/086 P3 #3: a SchoolAdmin still bound to a since-deactivated
+    /// school sees the same empty picture the compliance board would show for that school, not a stale
+    /// non-zero one (LoadScopedStudentsAsync + HomeService.ScopedActiveStudents both now exclude it).</summary>
+    [Fact]
+    public async Task StaffHome_SchoolAdmin_InactiveBoundSchool_RosterAttentionStaysEmpty()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A", isActive: false);
+        var (schoolAdminId, _) = _db.Staff("inactive-school-home-admin@example.com", districtId, schoolId, Models.OrgRoleIds.SchoolAdmin);
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        using (var seedCtx = _db.Context())
+        {
+            seedCtx.SchoolStudents.Single(s => s.Id == studentId).AnnualReviewDueDate = DateTime.UtcNow.Date.AddDays(-5);
+            seedCtx.SaveChanges();
+        }
+
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).GetForUserAsync(schoolAdminId);
+
+        Assert.True(result.Success, result.Message);
+        var home = result.Data!.Staff!;
+        Assert.Equal(StaffHomeVariant.SchoolAdmin, home.Variant);
+        Assert.NotNull(home.RosterAttention);
+        Assert.Equal(0, home.RosterAttention!.OverdueAnnual);
+        Assert.Equal(0, home.RosterAttention.NoLead);
+        Assert.Equal(0, home.RosterAttention.NoFamily);
+        Assert.Empty(home.OverdueByCaseManager!);
+        Assert.Equal(0, home.OverdueByCaseManagerTotal);
     }
 
     [Fact]
@@ -373,15 +601,17 @@ public sealed class HomeServiceTests : IDisposable
         var meetingId = _db.Meeting(studentId, leadId, DateTime.UtcNow.AddHours(3));
         _db.MeetingParticipant(meetingId, leadId);
 
-        // Admin path: profile/scope label, meetings-this-week, drafts, obligations-for-scope, noLead,
-        // noFamily (no per-draft/per-bucket N+1) — measured at 7; bounded well under the ~8 target.
+        // Admin path: profile/scope label, meetings-this-week, drafts, obligations-for-scope (shared
+        // StaffContext, no re-lookup), the no-filter compliance board (supplies NoLead too), noFamily —
+        // measured at 7 after the review-fix contract's 074/078 round-trip consolidation (was loosened to
+        // <= 9 before that; tightened back down now that it's pinned at 7).
         var counter = new DbActivityCounter();
         using (var ctx = _db.Context(counter))
         {
             var result = await CreateService(ctx).GetForUserAsync(adminId);
             Assert.True(result.Success, result.Message);
         }
-        Assert.True(counter.Queries <= 9, $"DistrictAdmin home issued {counter.Queries} queries");
+        Assert.True(counter.Queries <= 7, $"DistrictAdmin home issued {counter.Queries} queries");
 
         // Staff-tier path: profile/scope label, meetings-this-week, lead-only obligations, drafts —
         // measured at 5.

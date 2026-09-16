@@ -114,8 +114,12 @@ public class DistrictController : ControllerBase
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 
+    /// <summary><paramref name="from"/>/<paramref name="to"/> bound only the DueInRange bucket (default:
+    /// today..today+60); a value beyond ±10 years of today is rejected with a 400 instead of overflowing
+    /// date arithmetic.</summary>
     [HttpGet("compliance")]
     [ProducesResponseType(typeof(ApiResponse<ComplianceBoardDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetCompliance([FromQuery] int? schoolId, [FromQuery] DateTime? from, [FromQuery] DateTime? to, CancellationToken ct)
     {
@@ -210,12 +214,15 @@ public class DistrictController : ControllerBase
         }).ToList()
     };
 
-    private static ComplianceSummaryDto MapComplianceSummary(ComplianceSummaryModel m) => new()
+    /// <summary>Shared with <see cref="HomeController"/> so the DistrictAdmin home's compliance summary
+    /// and the board's summary are mapped identically (review-fix contract, todos/078).</summary>
+    internal static ComplianceSummaryDto MapComplianceSummary(ComplianceSummaryModel m) => new()
     {
         OverdueAnnual = m.OverdueAnnual,
         OverdueReeval = m.OverdueReeval,
         Due30 = m.Due30,
         Due60 = m.Due60,
+        DueInRange = m.DueInRange,
         UnknownDates = m.UnknownDates,
         NoLead = m.NoLead,
         ActiveStudents = m.ActiveStudents
@@ -236,6 +243,7 @@ public class DistrictController : ControllerBase
             OverdueReeval = s.OverdueReeval,
             Due30 = s.Due30,
             Due60 = s.Due60,
+            DueInRange = s.DueInRange,
             UnknownDates = s.UnknownDates,
             NoLead = s.NoLead
         }).ToList(),

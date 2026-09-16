@@ -132,6 +132,21 @@ describe("StudentHomePage", () => {
     expect(meetingsApi.rsvpToMeeting).toHaveBeenCalledWith(77, { status: "Accepted" });
   });
 
+  it("shows an error notice with retry when the home fetch fails, instead of silently hiding", async () => {
+    const user = userEvent.setup();
+    const retry = vi.fn();
+    useHomeMock.mockReturnValue({ home: null, isLoading: false, error: "Could not load your home", retry });
+    renderPage();
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Could not load your home");
+    expect(screen.queryByTestId("student-home-nudge")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("student-home-next-meeting")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("student-home-retry"));
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
   it("shows neither nudge nor meeting card when the server has nothing to say", () => {
     useHomeMock.mockReturnValue({
       home: {
