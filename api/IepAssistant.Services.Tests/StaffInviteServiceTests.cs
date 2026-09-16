@@ -104,7 +104,7 @@ public sealed class StaffInviteServiceTests : IDisposable
     private int SeedStudent(int schoolId, string firstName = "Stu", string lastName = "Dent")
     {
         using var ctx = CreateContext();
-        var s = new SchoolStudent { SchoolId = schoolId, FirstName = firstName, LastName = lastName, IsActive = true };
+        var s = new SchoolStudent { SchoolId = schoolId, DistrictId = ctx.Schools.Where(x => x.Id == schoolId).Select(x => x.DistrictId).Single(), FirstName = firstName, LastName = lastName, IsActive = true };
         ctx.SchoolStudents.Add(s);
         ctx.SaveChanges();
         return s.Id;

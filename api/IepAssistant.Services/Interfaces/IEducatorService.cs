@@ -15,17 +15,46 @@ public interface IEducatorService
     Task<ServiceResult<SchoolStudentModel>> CreateStudentAsync(int userId, CreateSchoolStudentModel model, CancellationToken ct = default);
 
     /// <summary>
-    /// Lists active SchoolStudents the caller may open, role-branched so list authz == detail authz:
-    /// Teacher = students with an active SchoolStudentAccess; SchoolAdmin = whole school;
-    /// DistrictAdmin = all active students across active schools in the district.
+    /// Lists ACTIVE SchoolStudents the caller may open (unpaged; kept for existing callers — see
+    /// <see cref="SearchStudentsAsync"/> for filters/paging). Role-branched so list authz == detail authz:
+    /// Teacher-tier = students with an active SchoolStudentAccess; SchoolAdmin = whole school;
+    /// DistrictAdmin = all students across active schools in the district.
     /// </summary>
     Task<ServiceResult<List<SchoolStudentModel>>> GetStudentsAsync(int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Roster search with the same role-branched scope as <see cref="GetStudentsAsync"/>, plus name /
+    /// external-id search, school, status (default Active; null = all) and grade filters, and paging.
+    /// </summary>
+    Task<ServiceResult<PagedResult<SchoolStudentModel>>> SearchStudentsAsync(int userId, StudentSearchQuery query, CancellationToken ct = default);
 
     /// <summary>
     /// Returns the student only if the caller may act on it at Viewer level (admins by scope, teachers by
     /// an active SchoolStudentAccess) — same authorization as <see cref="GetStudentsAsync"/>.
     /// </summary>
     Task<ServiceResult<SchoolStudentModel>> GetStudentAsync(int userId, int studentId, CancellationToken ct = default);
+
+    /// <summary>Full-replacement edit. Collaborator+ on the student, or an admin in scope.</summary>
+    Task<ServiceResult<SchoolStudentModel>> UpdateStudentAsync(int userId, int studentId, UpdateSchoolStudentModel model, CancellationToken ct = default);
+
+    /// <summary>Marks the student Exited (IsActive=false). Admin in scope only.</summary>
+    Task<ServiceResult<SchoolStudentModel>> ExitStudentAsync(int userId, int studentId, ExitStudentModel model, CancellationToken ct = default);
+
+    /// <summary>Returns an Exited/Archived student to Active and clears the exit fields. Admin in scope only.</summary>
+    Task<ServiceResult<SchoolStudentModel>> ReactivateStudentAsync(int userId, int studentId, CancellationToken ct = default);
+
+    /// <summary>Marks the student Archived (IsActive=false). Admin in scope only.</summary>
+    Task<ServiceResult<SchoolStudentModel>> ArchiveStudentAsync(int userId, int studentId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Moves the student to another active school of the district, keeping documents, links and team;
+    /// team/access rows for staff not at the new school (and not RelatedServiceProvider/DistrictAdmin) are
+    /// deactivated. DistrictAdmin only.
+    /// </summary>
+    Task<ServiceResult<SchoolStudentModel>> TransferStudentAsync(int userId, int studentId, int newSchoolId, CancellationToken ct = default);
+
+    /// <summary>Sets/replaces the lead case manager on each student. Admin only; every student must be in scope.</summary>
+    Task<ServiceResult<BulkAssignResultModel>> AssignCaseManagerBulkAsync(int userId, BulkAssignCaseManagerModel model, CancellationToken ct = default);
 
     /// <summary>Lists active staff↔student access grants for a student. Caller needs Viewer access.</summary>
     Task<ServiceResult<List<StudentStaffAccessModel>>> GetStudentStaffAccessAsync(int userId, int studentId, CancellationToken ct = default);

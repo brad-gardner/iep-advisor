@@ -1,132 +1,74 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
+import { apiErrorMessage } from "@/lib/api-error";
 import { Button } from "@/components/ui/button";
-import { Notice } from "@/components/ui/notice";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageLayout } from "@/components/ui/page-layout";
 import { DetailLayout } from "@/components/ui/detail-layout";
-import { useToast } from "@/components/ui/toast";
-import {
-  getStudent,
-  getStudentLinks,
-  inviteParent,
-  revokeStudentLink,
-} from "../api/educator-api";
-import type { ChildLink, SchoolStudent } from "../types";
-import { ORG_ROLE } from "../types";
+import { getDistrictSchools } from "@/features/district-admin/api/district-api";
+import type { DistrictSchool } from "@/features/district-admin/types";
+import { ORG_ROLE, isAdminOrgRole } from "../types";
+import type { StudentTeamMember } from "../types";
 import { useEducatorProfile } from "../hooks/use-educator-profile";
-import { InviteParentForm } from "../components/invite-parent-form";
-import { StudentLinksList } from "../components/student-links-list";
-import { StudentStaffAccessPanel } from "../components/staff-access/student-staff-access-panel";
-import { VersionHistoryList } from "@/features/iep-versions/components/version-history-list";
-import { useStudentVersions } from "@/features/iep-versions/hooks/use-version-list";
-import { StudentDocumentsSummary } from "@/features/document-authoring/components/student-documents-summary";
+import { useStudentRecord } from "../hooks/use-student-record";
+import { FamilyLinksSection } from "../components/family-links-section";
+import { StudentDetailsCard } from "../components/student-details-card";
+import { StudentDocumentsSection } from "../components/student-documents-section";
+import { EditStudentDrawer } from "../components/edit-student-drawer";
+import { StudentLifecycleActions } from "../components/lifecycle/student-lifecycle-actions";
+import { StudentTeamPanel } from "../components/team/student-team-panel";
 import { InviteStudentForm } from "@/features/student/components/invite-student-form";
 import { inviteStudentFromEducator } from "@/features/student/api/student-invite-api";
 
 export function EducatorStudentDetailPage() {
-  const { show: showToast } = useToast();
   const { studentId: studentIdParam } = useParams<{ studentId: string }>();
   const studentId = Number(studentIdParam);
+  const record = useStudentRecord(studentId);
+  const { student } = record;
 
-  const [student, setStudent] = useState<SchoolStudent | null>(null);
-  const [links, setLinks] = useState<ChildLink[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [revokingId, setRevokingId] = useState<number | null>(null);
-  const [revokeTarget, setRevokeTarget] = useState<ChildLink | null>(null);
-  const [revokeNote, setRevokeNote] = useState<string | null>(null);
-  const [isInviteParentOpen, setIsInviteParentOpen] = useState(false);
+  const [schools, setSchools] = useState<DistrictSchool[]>([]);
   const [isInviteStudentOpen, setIsInviteStudentOpen] = useState(false);
-  const { versions, isLoading: versionsLoading } =
-    useStudentVersions(studentId);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<StudentTeamMember[] | null>(null);
   const { profile } = useEducatorProfile();
-  const canManageStaffAccess =
-    profile?.orgRoleId === ORG_ROLE.DistrictAdmin ||
-    profile?.orgRoleId === ORG_ROLE.SchoolAdmin;
+  const isAdmin = isAdminOrgRole(profile?.orgRoleId);
+  const isDistrictAdmin = profile?.orgRoleId === ORG_ROLE.DistrictAdmin;
+  // PUT requires Collaborator+; a Viewer-level member (LEA rep / interpreter
+  // default) is not offered an Edit button it could only get a 403 from.
+  const currentMember = teamMembers?.find((m) => m.userId === profile?.userId) ?? null;
+  const canEdit = isAdmin || (currentMember !== null && currentMember.accessRole !== "Viewer");
+
+  // DistrictAdmin needs the school list for Transfer.
+  useEffect(() => {
+    if (!isDistrictAdmin) return;
+    let active = true;
+    (async () => {
+      try {
+        const response = await getDistrictSchools();
+        if (active && response.success && response.data) setSchools(response.data);
+      } catch {
+        if (active) setSchools([]);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [isDistrictAdmin]);
 
   const handleInviteStudent = async (email: string) => {
     try {
       const response = await inviteStudentFromEducator(studentId, email);
+      if (response.success) setIsInviteStudentOpen(false);
       return { success: response.success, message: response.message };
-    } catch {
-      return {
-        success: false,
-        message: "An error occurred sending the invitation",
-      };
+    } catch (err) {
+      return { success: false, message: apiErrorMessage(err, "An error occurred sending the invitation") };
     }
   };
 
-  const reloadLinks = useCallback(async () => {
-    try {
-      const response = await getStudentLinks(studentId);
-      if (response.success && response.data) {
-        setLinks(response.data);
-      }
-    } catch {
-      // Refetch failure keeps the existing links rather than crashing the page.
-    }
-  }, [studentId]);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const studentRes = await getStudent(studentId);
-        if (studentRes.success && studentRes.data) {
-          setStudent(studentRes.data);
-        }
-        await reloadLinks();
-      } catch {
-        // A server/network error leaves `student` null → the "not found" state
-        // renders, rather than surfacing an unhandled rejection.
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    load();
-  }, [studentId, reloadLinks]);
-
-  const handleInvite = async (email: string) => {
-    try {
-      const response = await inviteParent(studentId, { parentEmail: email });
-      if (response.success) {
-        await reloadLinks();
-        showToast({ message: "Parent invited", variant: "success" });
-        return { success: true, message: response.message };
-      }
-      return { success: false, message: response.message };
-    } catch {
-      return {
-        success: false,
-        message: "An error occurred sending the invitation",
-      };
-    }
-  };
-
-  const confirmRevoke = async () => {
-    if (!revokeTarget) return;
-    setRevokingId(revokeTarget.id);
-    setRevokeNote(null);
-    try {
-      const response = await revokeStudentLink(studentId, revokeTarget.id);
-      if (response.success) {
-        // Surface the forward-only note from the server (revoke is not retroactive).
-        setRevokeNote(
-          response.message ||
-            "Link revoked. This does not remove access already granted.",
-        );
-        await reloadLinks();
-        setRevokeTarget(null);
-      }
-    } finally {
-      setRevokingId(null);
-    }
-  };
-
-  if (isLoading) {
+  if (record.isLoading) {
     return (
       <div className="flex justify-center py-12">
         <Spinner label="Loading student…" />
@@ -158,95 +100,44 @@ export function EducatorStudentDetailPage() {
         { label: "Students", to: "/educator/students" },
         { label: studentName },
       ]}
+      actions={
+        isAdmin ? (
+          <StudentLifecycleActions
+            student={student}
+            schools={isDistrictAdmin ? schools : undefined}
+            onExit={record.exit}
+            onReactivate={record.reactivate}
+            onArchive={record.archive}
+            onTransfer={record.transfer}
+          />
+        ) : undefined
+      }
     >
       <DetailLayout
         main={
           <div className="space-y-6">
-            <section className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="font-serif text-lg">Documents</h2>
-                <Link to={`/educator/students/${studentId}/documents`} data-testid="manage-documents">
-                  <Button variant="secondary" size="sm">
-                    Manage documents
-                  </Button>
-                </Link>
-              </div>
-              <Card data-testid="documents-section">
-                <StudentDocumentsSummary studentId={studentId} />
-              </Card>
-              {/* Legacy typed IEP versions stay readable for students who had
-                  them; the section is hidden entirely for everyone else. */}
-              {!versionsLoading && versions.length > 0 && (
-                <details data-testid="legacy-iep-versions">
-                  <summary className="cursor-pointer text-sm text-brand-slate-500">
-                    Legacy IEP versions ({versions.length})
-                  </summary>
-                  <Card className="mt-2">
-                    <VersionHistoryList
-                      versions={versions}
-                      isLoading={versionsLoading}
-                      linkBase={`/educator/students/${studentId}/iep-versions`}
-                    />
-                  </Card>
-                </details>
-              )}
-            </section>
+            <StudentDocumentsSection studentId={studentId} />
 
             <section className="space-y-3">
-              <h2 className="font-serif text-lg">Assigned staff</h2>
-              <StudentStaffAccessPanel
+              <h2 className="font-serif text-lg">IEP team</h2>
+              <StudentTeamPanel
                 studentId={studentId}
                 studentSchoolId={student.schoolId}
-                canManage={canManageStaffAccess}
-              />
-            </section>
-
-            <section className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="font-serif text-lg">Parent links</h2>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setIsInviteParentOpen(true)}
-                  data-testid="invite-parent-open"
-                >
-                  Invite parent
-                </Button>
-              </div>
-              {revokeNote && (
-                <Notice variant="info" title="Link revoked">
-                  {revokeNote}
-                </Notice>
-              )}
-              <StudentLinksList
-                links={links}
-                revokingId={revokingId}
-                onRevoke={setRevokeTarget}
+                isAdmin={isAdmin}
+                currentUserId={profile?.userId}
+                onTeamChanged={record.reload}
+                onMembersChange={setTeamMembers}
+                family={<FamilyLinksSection studentId={studentId} />}
               />
             </section>
           </div>
         }
         sidebar={
           <>
-            <Card data-testid="student-info">
-              <h2 className="mb-3 font-serif text-base text-brand-slate-800">
-                Details
-              </h2>
-              <dl className="space-y-2 text-sm">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-brand-slate-500">Grade</dt>
-                  <dd className="text-brand-slate-800">
-                    {student.gradeLevel || "—"}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-brand-slate-500">Disability</dt>
-                  <dd className="text-right text-brand-slate-800">
-                    {student.disabilityCategory || "—"}
-                  </dd>
-                </div>
-              </dl>
-            </Card>
+            <StudentDetailsCard
+              student={student}
+              onEdit={canEdit ? () => setIsEditOpen(true) : undefined}
+            />
 
             <Card>
               <h2 className="mb-2 font-serif text-base text-brand-slate-800">
@@ -268,21 +159,16 @@ export function EducatorStudentDetailPage() {
         }
       />
 
-      <Modal
-        open={isInviteParentOpen}
-        onClose={() => setIsInviteParentOpen(false)}
-        title="Invite a parent"
-        data-testid="invite-parent-modal"
-      >
-        <InviteParentForm
-          embedded
-          onInvite={async (email) => {
-            const result = await handleInvite(email);
-            if (result.success) setIsInviteParentOpen(false);
-            return result;
-          }}
-        />
-      </Modal>
+      <EditStudentDrawer
+        open={isEditOpen}
+        student={student}
+        onClose={() => setIsEditOpen(false)}
+        onSubmit={async (data) => {
+          const result = await record.update(data);
+          if (result.success) setIsEditOpen(false);
+          return result;
+        }}
+      />
 
       <Modal
         open={isInviteStudentOpen}
@@ -292,25 +178,10 @@ export function EducatorStudentDetailPage() {
       >
         <InviteStudentForm
           embedded
-          onInvite={async (email) => {
-            const result = await handleInviteStudent(email);
-            if (result.success) setIsInviteStudentOpen(false);
-            return result;
-          }}
+          onInvite={handleInviteStudent}
           description={`Invite ${student.firstName} to activate their own account and take part in their IEP process.`}
         />
       </Modal>
-
-      <ConfirmDialog
-        open={revokeTarget !== null}
-        title="Revoke parent link"
-        message="This cannot be undone. The parent keeps any data already shared with them."
-        confirmLabel="Revoke link"
-        loading={revokingId !== null}
-        onConfirm={confirmRevoke}
-        onCancel={() => setRevokeTarget(null)}
-        data-testid="student-link-revoke-dialog"
-      />
     </PageLayout>
   );
 }

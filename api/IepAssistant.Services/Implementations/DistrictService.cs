@@ -62,7 +62,7 @@ public class DistrictService : IDistrictService
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
             return ServiceResult<DistrictDashboardModel>.FailureResult("Educator profile not found.");
-        if (ctx.OrgRoleId == OrgRoleIds.Teacher)
+        if (!OrgRoleIds.IsAdmin(ctx.OrgRoleId))
             return ServiceResult<DistrictDashboardModel>.FailureResult("You do not have permission to view the district dashboard.");
 
         var isDistrictAdmin = ctx.OrgRoleId == OrgRoleIds.DistrictAdmin;
@@ -87,7 +87,7 @@ public class DistrictService : IDistrictService
             {
                 Id = s.Id,
                 Name = s.Name,
-                ActiveStudentCount = _context.SchoolStudents.Count(st => st.SchoolId == s.Id && st.IsActive)
+                ActiveStudentCount = _context.SchoolStudents.Count(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active)
             })
             .ToListAsync(ct);
 
@@ -132,18 +132,19 @@ public class DistrictService : IDistrictService
         // ------- Attention lists: active students in active schools only -------
         var studentsQuery = _context.SchoolStudents
             .AsNoTracking()
-            .Where(st => st.IsActive && st.School.IsActive && st.School.DistrictId == ctx.DistrictId);
+            .Where(st => st.Status == StudentStatus.Active && st.School.IsActive && st.School.DistrictId == ctx.DistrictId);
         if (!isDistrictAdmin)
             studentsQuery = studentsQuery.Where(st => st.SchoolId == ctx.SchoolId!.Value);
 
-        // "No assigned staff" = zero access rows that are active AND whose grantee still holds an
-        // ACTIVE StaffProfile in THIS district — a student whose only grantee was deactivated MUST
-        // appear (district scope keeps a grantee's active profile elsewhere from masking that).
+        // "No case manager" (plan 3: the DTO keeps its StudentsWithoutStaff name) = no ACTIVE lead team
+        // member whose user still holds an ACTIVE StaffProfile in THIS district — a student whose lead
+        // was deactivated MUST appear (district scope keeps a grantee's active profile elsewhere from
+        // masking that).
         var studentsWithoutStaff = await studentsQuery
-            .Where(st => !_context.SchoolStudentAccesses.Any(a =>
-                a.SchoolStudentId == st.Id
-                && a.IsActive
-                && _context.StaffProfiles.Any(p => p.UserId == a.UserId && p.IsActive && p.DistrictId == ctx.DistrictId)))
+            .Where(st => !_context.StudentTeamMembers.Any(m =>
+                m.SchoolStudentId == st.Id
+                && m.IsActive && m.IsLead
+                && _context.StaffProfiles.Any(p => p.UserId == m.UserId && p.IsActive && p.DistrictId == ctx.DistrictId)))
             .OrderBy(st => st.School.Name).ThenBy(st => st.LastName).ThenBy(st => st.FirstName)
             .Select(st => new DashboardStudentModel
             {
@@ -204,7 +205,7 @@ public class DistrictService : IDistrictService
                 Id = s.Id,
                 Name = s.Name,
                 StateCode = s.StateCode,
-                ActiveStudentCount = _context.SchoolStudents.Count(st => st.SchoolId == s.Id && st.IsActive),
+                ActiveStudentCount = _context.SchoolStudents.Count(st => st.SchoolId == s.Id && st.Status == StudentStatus.Active),
                 ActiveStaffCount = _context.StaffProfiles.Count(p => p.SchoolId == s.Id && p.IsActive)
             })
             .ToListAsync(ct);
@@ -291,7 +292,7 @@ public class DistrictService : IDistrictService
 
         var activeStudentCount = await _context.SchoolStudents
             .AsNoTracking()
-            .CountAsync(st => st.SchoolId == school.Id && st.IsActive, ct);
+            .CountAsync(st => st.SchoolId == school.Id && st.Status == StudentStatus.Active, ct);
         var activeStaffCount = await _context.StaffProfiles
             .AsNoTracking()
             .CountAsync(p => p.SchoolId == school.Id && p.IsActive, ct);
@@ -325,7 +326,7 @@ public class DistrictService : IDistrictService
 
         var activeStudentCount = await _context.SchoolStudents
             .AsNoTracking()
-            .CountAsync(st => st.SchoolId == schoolId && st.IsActive, ct);
+            .CountAsync(st => st.SchoolId == schoolId && st.Status == StudentStatus.Active, ct);
         if (activeStudentCount > 0)
             return ServiceResult.FailureResult(
                 $"This school cannot be deactivated while it has {activeStudentCount} active student(s). Move or remove them first.");

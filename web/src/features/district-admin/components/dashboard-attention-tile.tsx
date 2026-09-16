@@ -76,8 +76,8 @@ function AttentionSection<T extends DashboardStudent>({
   );
 }
 
-// "Needs attention" lists: students with no assigned staff and students with no
-// linked parent. Presentational: the composing container owns the single
+// "Needs attention" lists: active students with no lead case manager and
+// students with no linked parent. Presentational: the composing container owns the single
 // dashboard fetch.
 export function DashboardAttentionTile({
   studentsWithoutStaff,
@@ -93,16 +93,16 @@ export function DashboardAttentionTile({
           className="text-sm text-brand-slate-400"
           data-testid="dashboard-attention-tile-empty"
         >
-          Once students are added, any student missing assigned staff or a
+          Once students are added, any student missing a case manager or a
           linked parent will appear here.
         </p>
       ) : (
         <div className="space-y-5">
           <AttentionSection
-            title="No assigned staff"
+            title="No case manager"
             testId="dashboard-attention-no-staff"
             students={studentsWithoutStaff}
-            emptyMessage="All students have assigned staff."
+            emptyMessage="All students have a case manager."
             viewAllTo="/educator/students?attention=no-staff"
           />
           <AttentionSection

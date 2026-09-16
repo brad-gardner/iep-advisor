@@ -34,7 +34,7 @@ public class AuditLogQueryService : IAuditLogQueryService
     {
         // ------- Authorization (actor scope) -------
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
-        if (ctx == null || ctx.OrgRoleId == OrgRoleIds.Teacher)
+        if (ctx == null || !OrgRoleIds.IsAdmin(ctx.OrgRoleId))
             return ServiceResult<AuditLogPageModel>.FailureResult("You do not have permission to view the activity log.");
 
         var isDistrictAdmin = ctx.OrgRoleId == OrgRoleIds.DistrictAdmin;

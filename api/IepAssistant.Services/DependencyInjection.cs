@@ -39,6 +39,9 @@ public static class DependencyInjection
         services.AddScoped<IOrgAccessService, OrgAccessService>();
         services.AddScoped<IDistrictService, DistrictService>();
         services.AddScoped<IEducatorService, EducatorService>();
+        services.AddScoped<IStudentTeamService, StudentTeamService>();
+        services.AddScoped<IRosterImportService, RosterImportService>();
+        services.AddScoped<IStaffImportService, StaffImportService>();
         services.AddScoped<IChildLinkService, ChildLinkService>();
         services.AddScoped<IIepDraftService, IepDraftService>();
         services.AddScoped<IDocumentTemplateService, DocumentTemplateService>();

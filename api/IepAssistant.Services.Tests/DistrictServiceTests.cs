@@ -86,12 +86,38 @@ public sealed class DistrictServiceTests : IDisposable
     private int SeedStudent(int schoolId, bool isActive = true, string firstName = "Sam", string? lastName = null)
     {
         using var ctx = CreateContext();
-        var s = new SchoolStudent { SchoolId = schoolId, FirstName = firstName, LastName = lastName, IsActive = isActive };
+        var s = new SchoolStudent { SchoolId = schoolId, DistrictId = ctx.Schools.Where(x => x.Id == schoolId).Select(x => x.DistrictId).Single(), FirstName = firstName, LastName = lastName, IsActive = isActive };
         ctx.SchoolStudents.Add(s);
         ctx.SaveChanges();
         return s.Id;
     }
 
+    /// <summary>Seeds a lead case manager (active team row with IsLead + its access row). Plan 3 changed
+    /// the dashboard's "no staff" list to mean "no active lead", so coverage is expressed as a lead.</summary>
+    private void SeedLead(int schoolStudentId, int userId, bool isActive = true)
+    {
+        using var ctx = CreateContext();
+        ctx.StudentTeamMembers.Add(new StudentTeamMember
+        {
+            SchoolStudentId = schoolStudentId,
+            UserId = userId,
+            TeamRole = TeamRole.CaseManager,
+            IsLead = isActive,
+            IsActive = isActive
+        });
+        ctx.SchoolStudentAccesses.Add(new SchoolStudentAccess
+        {
+            SchoolStudentId = schoolStudentId,
+            UserId = userId,
+            Role = AccessRole.Owner,
+            IsActive = isActive
+        });
+        if (isActive)
+            ctx.SchoolStudents.Single(st => st.Id == schoolStudentId).CaseManagerUserId = userId;
+        ctx.SaveChanges();
+    }
+
+    /// <summary>A plain access grant with NO team row — no longer counts as coverage on the dashboard.</summary>
     private void SeedAccess(int schoolStudentId, int granteeUserId, bool isActive = true)
     {
         using var ctx = CreateContext();
@@ -225,9 +251,9 @@ public sealed class DistrictServiceTests : IDisposable
         SeedStaffInvite(districtId, "revoked@x.com", OrgRoleIds.Teacher, schoolA, da, isActive: false);
         SeedStaffInvite(districtId, "accepted@x.com", OrgRoleIds.Teacher, schoolA, da, acceptedAt: DateTime.UtcNow.AddDays(-2));
 
-        // s1 is fully covered (active staff access + accepted parent link); s2 has a pending parent
-        // invite and no staff; s3 has neither.
-        SeedAccess(s1, teacher);
+        // s1 is fully covered (active lead case manager + accepted parent link); s2 has a pending parent
+        // invite and no lead; s3 has neither.
+        SeedLead(s1, teacher);
         var parent = SeedUser("parent@x.com", UserRole.Parent);
         var child = SeedChildProfile(parent);
         SeedChildLink(s1, child, acceptedAt: DateTime.UtcNow.AddDays(-3));
@@ -261,7 +287,7 @@ public sealed class DistrictServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetDashboard_StudentWhoseOnlyGranteeWasDeactivated_AppearsInNoStaffList()
+    public async Task GetDashboard_StudentWhoseLeadWasDeactivated_AppearsInNoCaseManagerList()
     {
         var districtId = SeedDistrict("D");
         var schoolId = SeedSchool(districtId, "S");
@@ -270,15 +296,19 @@ public sealed class DistrictServiceTests : IDisposable
         var deactivatedTeacher = SeedStaff("gone@x.com", districtId, schoolId, OrgRoleIds.Teacher, isActive: false);
 
         var covered = SeedStudent(schoolId, firstName: "Covered");
-        SeedAccess(covered, activeTeacher);
+        SeedLead(covered, activeTeacher);
 
-        // Access row still active, but the grantee's StaffProfile was deactivated → must appear.
+        // Lead row still active, but the lead's StaffProfile was deactivated → must appear.
         var orphaned = SeedStudent(schoolId, firstName: "Orphaned");
-        SeedAccess(orphaned, deactivatedTeacher);
+        SeedLead(orphaned, deactivatedTeacher);
 
-        // Only access row was revoked → must appear too.
+        // Lead was removed (team + access rows inactive) → must appear too.
         var revoked = SeedStudent(schoolId, firstName: "Revoked");
-        SeedAccess(revoked, activeTeacher, isActive: false);
+        SeedLead(revoked, activeTeacher, isActive: false);
+
+        // A bare access grant (legacy staff-access panel) without a team row is not a case manager.
+        var grantOnly = SeedStudent(schoolId, firstName: "GrantOnly");
+        SeedAccess(grantOnly, activeTeacher);
 
         using var ctx = CreateContext();
         var result = await CreateService(ctx).GetDashboardAsync(da);
@@ -288,6 +318,7 @@ public sealed class DistrictServiceTests : IDisposable
         Assert.DoesNotContain(covered, ids);
         Assert.Contains(orphaned, ids);
         Assert.Contains(revoked, ids);
+        Assert.Contains(grantOnly, ids);
     }
 
     [Fact]
@@ -417,7 +448,7 @@ public sealed class DistrictServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetDashboard_GranteeActiveInAnotherDistrictOnly_StudentStillAppearsInNoStaffList()
+    public async Task GetDashboard_LeadActiveInAnotherDistrictOnly_StudentStillAppearsInNoCaseManagerList()
     {
         var districtId = SeedDistrict("D");
         var schoolId = SeedSchool(districtId, "S");
@@ -443,7 +474,7 @@ public sealed class DistrictServiceTests : IDisposable
         }
 
         var student = SeedStudent(schoolId, firstName: "Orphaned");
-        SeedAccess(student, grantee);
+        SeedLead(student, grantee);
 
         using var ctx = CreateContext();
         var result = await CreateService(ctx).GetDashboardAsync(da);

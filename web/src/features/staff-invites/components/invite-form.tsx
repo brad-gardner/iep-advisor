@@ -20,20 +20,21 @@ interface InviteFormProps {
   ) => Promise<{ success: boolean; error?: string; invite?: StaffInvite }>;
 }
 
-// Roles a caller may invite. DistrictAdmin can invite all three; SchoolAdmin can
-// invite SchoolAdmin/Teacher only.
+// School-bound roles either admin tier may invite.
+const SCHOOL_ROLES: { id: number; label: string }[] = [
+  { id: ORG_ROLE.SchoolAdmin, label: 'School Admin' },
+  { id: ORG_ROLE.Teacher, label: 'Teacher' },
+  { id: ORG_ROLE.RelatedServiceProvider, label: 'Related service provider' },
+  { id: ORG_ROLE.GeneralEducator, label: 'General educator' },
+];
+
+// Roles a caller may invite. DistrictAdmin can also invite DistrictAdmins;
+// SchoolAdmin is limited to the school-bound roles.
 function invitableRoles(callerOrgRoleId: number): { id: number; label: string }[] {
   if (callerOrgRoleId === ORG_ROLE.DistrictAdmin) {
-    return [
-      { id: ORG_ROLE.DistrictAdmin, label: 'District Admin' },
-      { id: ORG_ROLE.SchoolAdmin, label: 'School Admin' },
-      { id: ORG_ROLE.Teacher, label: 'Teacher' },
-    ];
+    return [{ id: ORG_ROLE.DistrictAdmin, label: 'District Admin' }, ...SCHOOL_ROLES];
   }
-  return [
-    { id: ORG_ROLE.SchoolAdmin, label: 'School Admin' },
-    { id: ORG_ROLE.Teacher, label: 'Teacher' },
-  ];
+  return SCHOOL_ROLES;
 }
 
 export function InviteForm({

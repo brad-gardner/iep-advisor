@@ -24,12 +24,83 @@ public class CreateSchoolStudentModel
     public string? LastName { get; set; }
     public DateTime? DateOfBirth { get; set; }
     public string? StateCode { get; set; }
-    public string? GradeLevel { get; set; }
-    public string? DisabilityCategory { get; set; }
+    public string? ExternalStudentId { get; set; }
+    public GradeLevel? GradeLevel { get; set; }
+    public DisabilityCategory? DisabilityCategory { get; set; }
+    public string? HomeLanguage { get; set; }
+    public DateTime? IepDate { get; set; }
+    public DateTime? AnnualReviewDueDate { get; set; }
+    public DateTime? EtrDate { get; set; }
+    public DateTime? ReevaluationDueDate { get; set; }
 
     /// <summary>The school the student belongs to. REQUIRED for a DistrictAdmin (no implicit school);
     /// optional for SchoolAdmin/Teacher (must be absent or equal their own school).</summary>
     public int? SchoolId { get; set; }
+}
+
+/// <summary>Full-replacement edit of a student's record (PUT semantics: a null clears an optional field).</summary>
+public class UpdateSchoolStudentModel
+{
+    public string FirstName { get; set; } = string.Empty;
+    public string? LastName { get; set; }
+    public DateTime? DateOfBirth { get; set; }
+    public string? StateCode { get; set; }
+    public string? ExternalStudentId { get; set; }
+    public GradeLevel? GradeLevel { get; set; }
+    public DisabilityCategory? DisabilityCategory { get; set; }
+    public string? HomeLanguage { get; set; }
+    public DateTime? IepDate { get; set; }
+    public DateTime? AnnualReviewDueDate { get; set; }
+    public DateTime? EtrDate { get; set; }
+    public DateTime? ReevaluationDueDate { get; set; }
+}
+
+public class ExitStudentModel
+{
+    public ExitReason ExitReason { get; set; } = ExitReason.Other;
+    public DateTime? ExitedAt { get; set; }
+}
+
+/// <summary>
+/// Dashboard "needs attention" narrowing for the roster (same predicates as the district dashboard
+/// tiles): <see cref="NoCaseManager"/> = no active lead whose staff profile is still active in the
+/// district; <see cref="NoLinkedParent"/> = no accepted, active parent link.
+/// </summary>
+public enum StudentAttention
+{
+    NoCaseManager,
+    NoLinkedParent
+}
+
+/// <summary>Roster search/filter/paging input. <see cref="Status"/> null means every status ("All").</summary>
+public class StudentSearchQuery
+{
+    public string? Query { get; set; }
+    public int? SchoolId { get; set; }
+    public StudentStatus? Status { get; set; } = StudentStatus.Active;
+    public GradeLevel? Grade { get; set; }
+    public StudentAttention? Attention { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 50;
+}
+
+public class PagedResult<T>
+{
+    public List<T> Items { get; set; } = new();
+    public int Total { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+}
+
+public class BulkAssignCaseManagerModel
+{
+    public List<int> StudentIds { get; set; } = new();
+    public int UserId { get; set; }
+}
+
+public class BulkAssignResultModel
+{
+    public int Updated { get; set; }
 }
 
 public class SchoolStudentModel
@@ -44,8 +115,22 @@ public class SchoolStudentModel
     public string? LastName { get; set; }
     public DateTime? DateOfBirth { get; set; }
     public string? StateCode { get; set; }
-    public string? GradeLevel { get; set; }
-    public string? DisabilityCategory { get; set; }
+    public string? ExternalStudentId { get; set; }
+    public GradeLevel? GradeLevel { get; set; }
+    public DisabilityCategory? DisabilityCategory { get; set; }
+    public string? LegacyDisabilityText { get; set; }
+    public string? HomeLanguage { get; set; }
+    public StudentStatus Status { get; set; }
+    public DateTime? ExitedAt { get; set; }
+    public ExitReason? ExitReason { get; set; }
+    public int? CaseManagerUserId { get; set; }
+    public string? CaseManagerName { get; set; }
+    public DateTime? IepDate { get; set; }
+    public DateTime? AnnualReviewDueDate { get; set; }
+    public DateTime? EtrDate { get; set; }
+    public DateTime? ReevaluationDueDate { get; set; }
+
+    /// <summary>Equals <c>Status == Active</c>; kept for existing callers.</summary>
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
 }

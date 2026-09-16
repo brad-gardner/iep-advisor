@@ -4,7 +4,12 @@ import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import type { DistrictSchool } from "@/features/district-admin/types";
-import type { CreateSchoolStudentRequest } from "../types";
+import type {
+  CreateSchoolStudentRequest,
+  DisabilityCategory,
+  GradeLevel,
+} from "../types";
+import { DisabilityCategorySelect, GradeLevelSelect } from "./student-enum-selects";
 
 interface CreateStudentFormProps {
   onSubmit: (
@@ -25,6 +30,8 @@ export function CreateStudentForm({
   const requiresSchool = schools !== undefined;
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [externalStudentId, setExternalStudentId] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [gradeLevel, setGradeLevel] = useState("");
   const [disabilityCategory, setDisabilityCategory] = useState("");
   const [schoolId, setSchoolId] = useState("");
@@ -45,14 +52,18 @@ export function CreateStudentForm({
     const result = await onSubmit({
       firstName: firstName.trim(),
       lastName: lastName.trim() || undefined,
-      gradeLevel: gradeLevel.trim() || undefined,
-      disabilityCategory: disabilityCategory.trim() || undefined,
+      externalStudentId: externalStudentId.trim() || undefined,
+      dateOfBirth: dateOfBirth || undefined,
+      gradeLevel: (gradeLevel as GradeLevel) || undefined,
+      disabilityCategory: (disabilityCategory as DisabilityCategory) || undefined,
       schoolId: requiresSchool ? Number(schoolId) : undefined,
     });
 
     if (result.success) {
       setFirstName("");
       setLastName("");
+      setExternalStudentId("");
+      setDateOfBirth("");
       setGradeLevel("");
       setDisabilityCategory("");
       setSchoolId("");
@@ -69,7 +80,11 @@ export function CreateStudentForm({
       className="space-y-4"
       data-testid="create-student-form"
     >
-      {error && <Notice variant="error" title={error} />}
+      {error && (
+        <div role="alert">
+          <Notice variant="error" title={error} />
+        </div>
+      )}
 
       {requiresSchool && (
         <Select
@@ -106,20 +121,33 @@ export function CreateStudentForm({
       />
 
       <Input
-        label="Grade Level"
-        placeholder="e.g. 3rd, 7th, 10th"
-        value={gradeLevel}
-        onChange={(e) => setGradeLevel(e.target.value)}
-        maxLength={50}
-        data-testid="student-grade-level"
+        label="Student ID"
+        placeholder="District student ID"
+        value={externalStudentId}
+        onChange={(e) => setExternalStudentId(e.target.value)}
+        maxLength={64}
+        data-testid="student-external-id"
       />
 
       <Input
-        label="Disability Category"
-        placeholder="e.g. Autism, SLD"
+        label="Date of birth"
+        type="date"
+        value={dateOfBirth}
+        onChange={(e) => setDateOfBirth(e.target.value)}
+        data-testid="student-date-of-birth"
+      />
+
+      <GradeLevelSelect
+        id="student-grade-level"
+        value={gradeLevel}
+        onChange={setGradeLevel}
+        data-testid="student-grade-level"
+      />
+
+      <DisabilityCategorySelect
+        id="student-disability-category"
         value={disabilityCategory}
-        onChange={(e) => setDisabilityCategory(e.target.value)}
-        maxLength={100}
+        onChange={setDisabilityCategory}
         data-testid="student-disability-category"
       />
 

@@ -19,6 +19,7 @@ public sealed class EducatorServiceTests : IDisposable
 {
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<ApplicationDbContext> _options;
+    private readonly CapturingAuditLogger _audit = new();
 
     public EducatorServiceTests()
     {
@@ -35,7 +36,7 @@ public sealed class EducatorServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private EducatorService CreateService(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), NullLogger<EducatorService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), _audit, NullLogger<EducatorService>.Instance);
 
     private int SeedUser(string email)
     {
@@ -91,7 +92,7 @@ public sealed class EducatorServiceTests : IDisposable
     private int SeedStudent(int schoolId, string firstName = "Stu", string lastName = "Dent")
     {
         using var ctx = CreateContext();
-        var s = new SchoolStudent { SchoolId = schoolId, FirstName = firstName, LastName = lastName, IsActive = true };
+        var s = new SchoolStudent { SchoolId = schoolId, DistrictId = ctx.Schools.Where(x => x.Id == schoolId).Select(x => x.DistrictId).Single(), FirstName = firstName, LastName = lastName, IsActive = true };
         ctx.SchoolStudents.Add(s);
         ctx.SaveChanges();
         return s.Id;
@@ -126,7 +127,7 @@ public sealed class EducatorServiceTests : IDisposable
             {
                 FirstName = "Sam",
                 LastName = "Student",
-                GradeLevel = "5"
+                GradeLevel = GradeLevel.G5
             });
 
             Assert.True(result.Success);

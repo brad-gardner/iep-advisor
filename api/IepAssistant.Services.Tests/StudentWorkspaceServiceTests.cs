@@ -111,7 +111,7 @@ public sealed class StudentWorkspaceServiceTests : IDisposable
         ctx.StaffProfiles.Add(new StaffProfile { UserId = educator.Id, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher });
         ctx.SaveChanges();
 
-        var student = new SchoolStudent { SchoolId = school.Id, FirstName = "Sam", IsActive = true };
+        var student = new SchoolStudent { SchoolId = school.Id, DistrictId = district.Id, FirstName = "Sam", IsActive = true };
         ctx.SchoolStudents.Add(student);
         ctx.SaveChanges();
 

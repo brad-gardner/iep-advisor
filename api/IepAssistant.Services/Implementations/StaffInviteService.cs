@@ -14,10 +14,10 @@ namespace IepAssistant.Services.Implementations;
 /// (32-byte raw token emailed, SHA-256 hash stored, single-use, email-bound, 14-day). Org authorization
 /// is resolved per-request from the caller's active <see cref="StaffContext"/>:
 /// <list type="bullet">
-///   <item>DistrictAdmin invites any of the 3 roles (DistrictAdmin invite ⇒ SchoolId null;
-///         SchoolAdmin/Teacher invite ⇒ SchoolId required, active, in caller's district).</item>
-///   <item>SchoolAdmin invites SchoolAdmin/Teacher into their OWN school only.</item>
-///   <item>Teacher: denied.</item>
+///   <item>DistrictAdmin invites any role (DistrictAdmin invite ⇒ SchoolId null; every other role ⇒
+///         SchoolId required, active, in caller's district — RelatedServiceProviders keep a home school).</item>
+///   <item>SchoolAdmin invites non-DistrictAdmin roles into their OWN school only.</item>
+///   <item>Teacher-tier (Teacher/RelatedServiceProvider/GeneralEducator): denied.</item>
 /// </list>
 /// Accept is anonymous, transactional (claim-first), and mints a JWT.
 /// </summary>
@@ -65,7 +65,7 @@ public class StaffInviteService : IStaffInviteService
         if (email.Length > 256)
             return ServiceResult<StaffInviteModel>.FailureResult("Email must be 256 characters or fewer.");
 
-        if (model.OrgRoleId is not (OrgRoleIds.DistrictAdmin or OrgRoleIds.SchoolAdmin or OrgRoleIds.Teacher))
+        if (!OrgRoleIds.IsKnown(model.OrgRoleId))
             return ServiceResult<StaffInviteModel>.FailureResult("Invalid org role.");
 
         // ------- Caller role gate + school resolution -------
@@ -194,7 +194,7 @@ public class StaffInviteService : IStaffInviteService
         if (caller == null)
             return ServiceResult<StaffListModel>.FailureResult("Staff profile not found.");
 
-        if (caller.OrgRoleId == OrgRoleIds.Teacher)
+        if (!OrgRoleIds.IsAdmin(caller.OrgRoleId))
             return ServiceResult<StaffListModel>.FailureResult("You do not have permission to view the staff list.");
 
         var isDistrictAdmin = caller.OrgRoleId == OrgRoleIds.DistrictAdmin;

@@ -45,8 +45,8 @@ public sealed class OrgAccessServiceTests : IDisposable
         ctx.Database.EnsureCreated();
 
         // Sanity: the OrgRoles seed (HasData) must be present, otherwise the FK on StaffProfile.OrgRoleId
-        // would silently break every test below.
-        Assert.Equal(3, ctx.OrgRoles.Count());
+        // would silently break every test below. 5 roles since plan 3 (RelatedServiceProvider, GeneralEducator).
+        Assert.Equal(5, ctx.OrgRoles.Count());
     }
 
     private ApplicationDbContext CreateContext() => new(_options);
@@ -101,7 +101,7 @@ public sealed class OrgAccessServiceTests : IDisposable
     private int SeedStudent(int schoolId, string first = "Sam")
     {
         using var ctx = CreateContext();
-        var s = new SchoolStudent { SchoolId = schoolId, FirstName = first, IsActive = true };
+        var s = new SchoolStudent { SchoolId = schoolId, DistrictId = ctx.Schools.Where(x => x.Id == schoolId).Select(x => x.DistrictId).Single(), FirstName = first, IsActive = true };
         ctx.SchoolStudents.Add(s);
         ctx.SaveChanges();
         return s.Id;

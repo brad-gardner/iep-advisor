@@ -87,7 +87,7 @@ public sealed class AuditLogQueryServiceTests : IDisposable
     private int SeedStudent(int schoolId, string firstName = "Sam", string? lastName = "Student", bool isActive = true)
     {
         using var ctx = CreateContext();
-        var s = new SchoolStudent { SchoolId = schoolId, FirstName = firstName, LastName = lastName, IsActive = isActive };
+        var s = new SchoolStudent { SchoolId = schoolId, DistrictId = ctx.Schools.Where(x => x.Id == schoolId).Select(x => x.DistrictId).Single(), FirstName = firstName, LastName = lastName, IsActive = isActive };
         ctx.SchoolStudents.Add(s);
         ctx.SaveChanges();
         return s.Id;

@@ -47,7 +47,21 @@ interface TableProps<T> {
   loadingRows?: number;
   /** Rendered (spanning all columns) when there are no rows and not loading. */
   empty?: React.ReactNode;
+  /**
+   * Opt-in row selection: a leading checkbox column plus a header "select all
+   * on this page" checkbox. The consumer owns the selected-key set so it can
+   * survive paging/refetches; `rowLabel` names each checkbox for AT.
+   */
+  selection?: TableSelection<T>;
   "data-testid"?: string;
+}
+
+export interface TableSelection<T> {
+  selectedKeys: ReadonlySet<string | number>;
+  onToggle: (row: T) => void;
+  /** Called with the currently visible rows (select all / clear all). */
+  onToggleAll: (rows: T[], select: boolean) => void;
+  rowLabel: (row: T) => string;
 }
 
 /**
@@ -55,6 +69,9 @@ interface TableProps<T> {
  * sort. Exported so callers can guard against overfeeding the table.
  */
 export const CLIENT_SORT_ROW_CEILING = 500;
+
+const checkboxStyles =
+  "h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400";
 
 function compare(a: string | number, b: string | number): number {
   if (typeof a === "number" && typeof b === "number") return a - b;
@@ -85,6 +102,7 @@ export function Table<T>({
   loading = false,
   loadingRows = 5,
   empty,
+  selection,
   "data-testid": testId,
 }: TableProps<T>) {
   const [sort, setSort] = useState<
@@ -92,7 +110,9 @@ export function Table<T>({
   >(defaultSort);
 
   const hasActions = Boolean(rowActions);
-  const totalCols = columns.length + (hasActions ? 1 : 0);
+  const hasSelection = Boolean(selection);
+  const totalCols =
+    columns.length + (hasActions ? 1 : 0) + (hasSelection ? 1 : 0);
 
   const sortedRows = useMemo(() => {
     if (!sort) return rows;
@@ -108,6 +128,12 @@ export function Table<T>({
       })
       .map((entry) => entry.row);
   }, [rows, sort, columns]);
+
+  const selectedOnPage = selection
+    ? sortedRows.filter((row) => selection.selectedKeys.has(rowKey(row))).length
+    : 0;
+  const allSelected = sortedRows.length > 0 && selectedOnPage === sortedRows.length;
+  const someSelected = selectedOnPage > 0;
 
   const toggleSort = (key: string) => {
     setSort((prev) => {
@@ -138,6 +164,23 @@ export function Table<T>({
       <table className="w-full border-collapse text-sm" aria-label={label}>
         <thead>
           <tr className="border-b border-brand-slate-200 bg-brand-slate-50">
+            {selection && (
+              <th scope="col" className="w-10 px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  className={checkboxStyles}
+                  aria-label="Select all rows on this page"
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected && !allSelected;
+                  }}
+                  onChange={(e) =>
+                    selection.onToggleAll(sortedRows, e.target.checked)
+                  }
+                  data-testid={testId ? `${testId}-select-all` : undefined}
+                />
+              </th>
+            )}
             {columns.map((col) => {
               const isActive = sort?.key === col.key;
               const sortable = Boolean(col.sortValue);
@@ -212,6 +255,7 @@ export function Table<T>({
           {loading ? (
             Array.from({ length: loadingRows }).map((_, rowIndex) => (
               <tr key={`skeleton-${rowIndex}`}>
+                {hasSelection && <td className="px-3 py-3" />}
                 {columns.map((col) => (
                   <td
                     key={col.key}
@@ -245,6 +289,22 @@ export function Table<T>({
                     href && "hover:bg-brand-slate-50",
                   )}
                 >
+                  {selection && (
+                    // `relative z-10` lifts the checkbox above the row's
+                    // stretched link overlay so toggling never navigates.
+                    <td className="relative z-10 px-3 py-3">
+                      <input
+                        type="checkbox"
+                        className={checkboxStyles}
+                        aria-label={`Select ${selection.rowLabel(row)}`}
+                        checked={selection.selectedKeys.has(rowKey(row))}
+                        onChange={() => selection.onToggle(row)}
+                        data-testid={
+                          testId ? `${testId}-select-${rowKey(row)}` : undefined
+                        }
+                      />
+                    </td>
+                  )}
                   {columns.map((col, colIndex) => (
                     <td
                       key={col.key}

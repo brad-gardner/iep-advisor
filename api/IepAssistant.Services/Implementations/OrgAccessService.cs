@@ -48,7 +48,15 @@ public class OrgAccessService : IOrgAccessService
                 .AnyAsync(s => s.Id == schoolId && s.DistrictId == ctx.DistrictId && s.IsActive, ct);
         }
 
-        // SchoolAdmin / Teacher: only their own school.
+        if (ctx.OrgRoleId == OrgRoleIds.RelatedServiceProvider)
+        {
+            // Multi-building provider (plan 3): any ACTIVE school in their district.
+            return await _context.Schools
+                .AsNoTracking()
+                .AnyAsync(s => s.Id == schoolId && s.DistrictId == ctx.DistrictId && s.IsActive, ct);
+        }
+
+        // SchoolAdmin / Teacher / GeneralEducator: only their own school.
         return ctx.SchoolId != null && ctx.SchoolId.Value == schoolId;
     }
 
@@ -93,9 +101,22 @@ public class OrgAccessService : IOrgAccessService
             return ctx.SchoolId != null && ctx.SchoolId.Value == studentSchoolId.Value;
         }
 
-        // Teacher: must be in their own school AND hold an active SchoolStudentAccess >= minRole.
-        if (ctx.SchoolId == null || ctx.SchoolId.Value != studentSchoolId.Value)
+        if (ctx.OrgRoleId == OrgRoleIds.RelatedServiceProvider)
+        {
+            // Multi-building provider (plan 3): the student's school must be an ACTIVE school of the
+            // provider's district; an active SchoolStudentAccess >= minRole is still required below.
+            var inDistrict = await _context.Schools
+                .AsNoTracking()
+                .AnyAsync(s => s.Id == studentSchoolId.Value && s.DistrictId == ctx.DistrictId && s.IsActive, ct);
+            if (!inDistrict)
+                return false;
+        }
+        else if (ctx.SchoolId == null || ctx.SchoolId.Value != studentSchoolId.Value)
+        {
+            // Teacher / GeneralEducator: must be in their own school AND hold an active
+            // SchoolStudentAccess >= minRole.
             return false;
+        }
 
         // AccessRole is persisted as a string (HasConversion<string>); a SQL-side `>= minRole` would
         // compare alphabetically ("Collaborator" < "Viewer"), not by enum rank. Materialize the role

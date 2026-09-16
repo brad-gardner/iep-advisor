@@ -1,73 +1,73 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { GraduationCap, Plus } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { GraduationCap, Plus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
+import { Notice } from "@/components/ui/notice";
 import { PageLayout } from "@/components/ui/page-layout";
-import { Table, type TableColumn } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
+import { Table } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
-import { createStudent, getStudents } from "../api/educator-api";
-import {
-  getDistrictSchools,
-  getDistrictDashboard,
-} from "@/features/district-admin/api/district-api";
+import { apiErrorMessage } from "@/lib/api-error";
+import { assignCaseManagerBulk, createStudent } from "../api/educator-api";
+import { getDistrictSchools } from "@/features/district-admin/api/district-api";
 import type { DistrictSchool } from "@/features/district-admin/types";
-import type { CreateSchoolStudentRequest, SchoolStudent } from "../types";
-import { ORG_ROLE } from "../types";
+import type { CreateSchoolStudentRequest, StudentSearchParams } from "../types";
+import {
+  ATTENTION_FILTER_LABELS,
+  ORG_ROLE,
+  isAdminOrgRole,
+  isCaseloadOrgRole,
+} from "../types";
 import { useEducatorProfile } from "../hooks/use-educator-profile";
+import { useRosterQuery } from "../hooks/use-roster-query";
+import { useStudentSearch } from "../hooks/use-student-search";
+import { useRosterSelection } from "../hooks/use-roster-selection";
 import { CreateStudentForm } from "../components/create-student-form";
-import { SchoolFilter } from "../components/school-filter";
+import { RosterFilters } from "../components/roster/roster-filters";
+import { RosterBulkBar } from "../components/roster/roster-bulk-bar";
+import { AssignCaseManagerModal } from "../components/roster/assign-case-manager-modal";
+import {
+  rosterColumns,
+  studentDisplayName,
+} from "../components/roster/roster-columns";
 
-const TEACHER_EMPTY =
-  "No students assigned to you yet — your school admin can assign students, or create one.";
-
-// Dashboard "needs attention" tiles deep-link here with ?attention=<key>. The
-// roster payload carries no assigned-staff / linked-parent signal, so the ID
-// set is sourced from the dashboard aggregate (admins only).
-const ATTENTION_LABELS: Record<string, string> = {
-  "no-staff": "no assigned staff",
-  "no-parent": "no linked parent",
-};
+const CASELOAD_EMPTY =
+  "No students on your caseload yet — your school admin can add you to a student's IEP team, or create one.";
 
 export function EducatorStudentsPage() {
   const { show: showToast } = useToast();
   const { profile } = useEducatorProfile();
   const isDistrictAdmin = profile?.orgRoleId === ORG_ROLE.DistrictAdmin;
-  const isSchoolAdmin = profile?.orgRoleId === ORG_ROLE.SchoolAdmin;
-  const isAdmin = isDistrictAdmin || isSchoolAdmin;
-  const isTeacher = profile?.orgRoleId === ORG_ROLE.Teacher;
+  const isAdmin = isAdminOrgRole(profile?.orgRoleId);
+  const isCaseload = isCaseloadOrgRole(profile?.orgRoleId);
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const attention = searchParams.get("attention");
-  const attentionLabel = attention ? ATTENTION_LABELS[attention] : undefined;
+  const { query, update, clearAttention } = useRosterQuery();
+  // The dashboard "needs attention" deep link: the server narrows the roster
+  // (same predicate as the tiles), so filters and paging compose as usual.
+  const attentionLabel = query.attention
+    ? ATTENTION_FILTER_LABELS[query.attention]
+    : undefined;
 
-  const [students, setStudents] = useState<SchoolStudent[]>([]);
+  const request = useMemo<StudentSearchParams>(
+    () => ({
+      query: query.q.trim() || undefined,
+      schoolId: isDistrictAdmin && query.schoolId ? query.schoolId : undefined,
+      status: query.status,
+      grade: query.grade || undefined,
+      attention: query.attention ?? undefined,
+      page: query.page,
+      pageSize: query.pageSize,
+    }),
+    [query, isDistrictAdmin],
+  );
+  const { page, isLoading, failed, refresh } = useStudentSearch(request);
+  const selection = useRosterSelection();
+
   const [schools, setSchools] = useState<DistrictSchool[]>([]);
-  const [schoolFilter, setSchoolFilter] = useState("");
-  const [attentionIds, setAttentionIds] = useState<Set<number> | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isAddOpen, setIsAddOpen] = useState(false);
-
-  const reload = useCallback(async () => {
-    try {
-      const response = await getStudents();
-      if (response.success && response.data) {
-        setStudents(response.data);
-      }
-    } catch {
-      // Leave the list empty on a server/network error rather than surfacing
-      // an unhandled rejection; the empty state communicates "no students".
-      setStudents([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    reload();
-  }, [reload]);
+  const [isAssignOpen, setIsAssignOpen] = useState(false);
 
   // DistrictAdmin needs the district's schools for both the create-form picker
   // and the roster filter. Other roles never see a school picker.
@@ -89,164 +89,179 @@ export function EducatorStudentsPage() {
     };
   }, [isDistrictAdmin]);
 
-  // Resolve the attention filter's ID set from the dashboard aggregate whenever
-  // an admin arrives with ?attention=<key>. A recognised key with no matching
-  // dashboard data yields an empty set (filters to nothing), not an unfiltered
-  // roster, so the deep-link never silently shows everyone. When the param is
-  // absent the memo below ignores any lingering set, so no reset is needed here.
-  useEffect(() => {
-    if (!isAdmin || !attentionLabel) return;
-    let active = true;
-    (async () => {
-      try {
-        const response = await getDistrictDashboard();
-        if (!active) return;
-        const data = response.success ? response.data : null;
-        const source =
-          attention === "no-staff"
-            ? data?.studentsWithoutStaff
-            : data?.studentsWithoutParent;
-        setAttentionIds(new Set((source ?? []).map((s) => s.schoolStudentId)));
-      } catch {
-        if (active) setAttentionIds(new Set());
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [isAdmin, attention, attentionLabel]);
-
-  const clearAttention = () => {
-    searchParams.delete("attention");
-    setSearchParams(searchParams, { replace: true });
-  };
-
   const handleCreate = async (data: CreateSchoolStudentRequest) => {
     try {
       const response = await createStudent(data);
       if (response.success) {
-        await reload();
+        refresh();
         setIsAddOpen(false);
         showToast({ message: "Student added", variant: "success" });
         return { success: true };
       }
-      return {
-        success: false,
-        error: response.message || "Failed to add student",
-      };
-    } catch {
-      return { success: false, error: "An error occurred" };
+      return { success: false, error: response.message || "Failed to add student" };
+    } catch (err) {
+      return { success: false, error: apiErrorMessage(err, "Failed to add student") };
     }
   };
 
-  const visibleStudents = useMemo(() => {
-    let result = students;
-    if (isDistrictAdmin && schoolFilter) {
-      result = result.filter((s) => String(s.schoolId) === schoolFilter);
+  const handleAssignCaseManager = async (userId: number) => {
+    try {
+      const response = await assignCaseManagerBulk({
+        studentIds: [...selection.selectedIds],
+        userId,
+      });
+      if (response.success) {
+        const updated = response.data?.updated ?? selection.selectedIds.size;
+        selection.clear();
+        setIsAssignOpen(false);
+        refresh();
+        showToast({
+          message: `Case manager assigned to ${updated} ${updated === 1 ? "student" : "students"}`,
+          variant: "success",
+        });
+        return { success: true };
+      }
+      return {
+        success: false,
+        error: response.message || "Could not assign the case manager",
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: apiErrorMessage(err, "Could not assign the case manager"),
+      };
     }
-    if (attentionLabel && attentionIds) {
-      result = result.filter((s) => attentionIds.has(s.id));
-    }
-    return result;
-  }, [students, isDistrictAdmin, schoolFilter, attentionLabel, attentionIds]);
+  };
 
-  const columns: TableColumn<SchoolStudent>[] = [
-    {
-      key: "name",
-      header: "Student",
-      cell: (s) => `${s.firstName} ${s.lastName ?? ""}`.trim(),
-      sortValue: (s) => `${s.firstName} ${s.lastName ?? ""}`.toLowerCase(),
-    },
-    ...(isDistrictAdmin
-      ? [
-          {
-            key: "school",
-            header: "School",
-            hideBelow: "md" as const,
-            cell: (s: SchoolStudent) =>
-              s.schoolName ? (
-                <Badge variant="neutral">{s.schoolName}</Badge>
-              ) : (
-                "—"
-              ),
-            sortValue: (s: SchoolStudent) => s.schoolName ?? "",
-          },
-        ]
-      : []),
-    {
-      key: "grade",
-      header: "Grade",
-      align: "right",
-      hideBelow: "md",
-      cell: (s) => s.gradeLevel || "—",
-      sortValue: (s) => s.gradeLevel ?? "",
-    },
-  ];
+  const columns = useMemo(
+    () => rosterColumns({ showSchool: isDistrictAdmin }),
+    [isDistrictAdmin],
+  );
 
   return (
     <PageLayout
       title="Students"
       data-testid="educator-students-page"
       actions={
-        <Button
-          onClick={() => setIsAddOpen(true)}
-          data-testid="educator-students-add"
-        >
-          <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-          Add student
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Link to="/educator/admin/imports" data-testid="educator-students-import">
+              <Button variant="secondary">
+                <Upload className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+                Import
+              </Button>
+            </Link>
+          )}
+          <Button
+            onClick={() => setIsAddOpen(true)}
+            data-testid="educator-students-add"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+            Add student
+          </Button>
+        </div>
       }
     >
-      {(isDistrictAdmin || (isAdmin && attentionLabel)) && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {isDistrictAdmin ? (
-            <SchoolFilter
-              schools={schools}
-              value={schoolFilter}
-              onChange={setSchoolFilter}
-            />
-          ) : (
-            <span />
-          )}
+      <RosterFilters
+        value={query}
+        onChange={(patch) => {
+          // A new filter set invalidates any cross-page selection.
+          if (Object.keys(patch).some((k) => k !== "page")) selection.clear();
+          update(patch);
+        }}
+        schools={isDistrictAdmin ? schools : undefined}
+      />
 
-          {isAdmin && attentionLabel && (
-            <div
-              className="flex items-center justify-between gap-3 rounded-card border border-brand-amber-100 bg-brand-amber-50 px-4 py-2 text-sm"
-              data-testid="attention-filter-indicator"
-            >
-              <span className="text-brand-amber-600">
-                Showing students with {attentionLabel}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearAttention}
-                data-testid="attention-filter-clear"
-              >
-                Clear
-              </Button>
-            </div>
-          )}
+      {attentionLabel && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-card border border-brand-amber-100 bg-brand-amber-50 px-4 py-2 text-sm"
+          data-testid="attention-filter-indicator"
+        >
+          <span className="text-brand-amber-600">
+            Showing students with {attentionLabel}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearAttention}
+            data-testid="attention-filter-clear"
+          >
+            Clear
+          </Button>
         </div>
+      )}
+
+      {failed && (
+        <Notice variant="error" title="Couldn't load students">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-2"
+            onClick={refresh}
+            data-testid="educator-students-retry"
+          >
+            Try again
+          </Button>
+        </Notice>
+      )}
+
+      {isAdmin && (
+        <>
+          {/* Always mounted so AT announces the very first selection too. */}
+          <p className="sr-only" aria-live="polite" data-testid="roster-selection-status">
+            {selection.selectedIds.size > 0
+              ? `${selection.selectedIds.size} selected`
+              : ""}
+          </p>
+          <RosterBulkBar
+            selectedCount={selection.selectedIds.size}
+            onAssignCaseManager={() => setIsAssignOpen(true)}
+            onClear={selection.clear}
+          />
+        </>
       )}
 
       <Table
         label="Students"
         data-testid="student-list"
         columns={columns}
-        rows={visibleStudents}
+        rows={page.items}
         rowKey={(s) => s.id}
         rowHref={(s) => `/educator/students/${s.id}`}
         loading={isLoading}
         defaultSort={{ key: "name", direction: "asc" }}
+        selection={
+          isAdmin
+            ? {
+                selectedKeys: selection.selectedIds,
+                onToggle: selection.toggle,
+                onToggleAll: selection.toggleAll,
+                rowLabel: studentDisplayName,
+              }
+            : undefined
+        }
         empty={
           <EmptyState
             data-testid="student-list-empty"
             icon={GraduationCap}
-            title="No students yet"
-            description={isTeacher ? TEACHER_EMPTY : "Add one to get started."}
+            title="No students found"
+            description={
+              isCaseload
+                ? CASELOAD_EMPTY
+                : "Adjust the filters, add a student, or import a roster."
+            }
           />
         }
+      />
+
+      <Pagination
+        label="Students pagination"
+        page={query.page}
+        pageSize={query.pageSize}
+        total={page.total}
+        onPageChange={(next) => update({ page: next })}
+        onPageSizeChange={(size) => update({ pageSize: size })}
+        data-testid="student-list-pagination"
       />
 
       <Modal
@@ -261,6 +276,13 @@ export function EducatorStudentsPage() {
           embedded
         />
       </Modal>
+
+      <AssignCaseManagerModal
+        open={isAssignOpen}
+        studentCount={selection.selectedIds.size}
+        onClose={() => setIsAssignOpen(false)}
+        onAssign={handleAssignCaseManager}
+      />
     </PageLayout>
   );
 }
