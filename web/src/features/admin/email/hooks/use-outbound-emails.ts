@@ -26,10 +26,21 @@ export function useOutboundEmails(status: OutboundEmailStatusFilter): UseOutboun
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const emailsRef = useRef<OutboundEmailDto[]>([]);
+  const queuedRef = useRef(0);
   const reloadRef = useRef<() => void>(() => {});
+
+  // A filter switch is a fresh load: show the loading state at once (adjust-state-during-render
+  // idiom) rather than the previous filter's rows under the new filter's label.
+  const [loadedStatus, setLoadedStatus] = useState(status);
+  if (status !== loadedStatus) {
+    setLoadedStatus(status);
+    setIsLoading(true);
+    setEmails([]);
+  }
 
   useEffect(() => {
     let active = true;
+    emailsRef.current = []; // the previous filter's rows must not drive this filter's polling
     // Latest request wins: a slow poll (or a filter switch) that resolves
     // after a newer one must not roll the table back to a stale snapshot.
     // Every setState below runs inside `load`'s async body, never
@@ -51,7 +62,10 @@ export function useOutboundEmails(status: OutboundEmailStatusFilter): UseOutboun
         } else {
           setError(listRes.message ?? 'Could not load outbound emails.');
         }
-        if (statusRes.success && statusRes.data) setEmailStatus(statusRes.data);
+        if (statusRes.success && statusRes.data) {
+          queuedRef.current = statusRes.data.queued;
+          setEmailStatus(statusRes.data);
+        }
       } catch (err) {
         if (active && mine === generation) setError(apiErrorMessage(err, 'Could not load outbound emails.'));
       } finally {
@@ -62,8 +76,10 @@ export function useOutboundEmails(status: OutboundEmailStatusFilter): UseOutboun
     reloadRef.current = () => void load();
 
     void load();
+    // Poll while anything is in flight anywhere in the queue — judged from the unfiltered
+    // status counts, not the filtered rows (the default "Failed" tab never contains a Queued row).
     const interval = setInterval(() => {
-      if (emailsRef.current.some((e) => IN_FLIGHT_EMAIL_STATUSES.has(e.status))) {
+      if (queuedRef.current > 0 || emailsRef.current.some((e) => IN_FLIGHT_EMAIL_STATUSES.has(e.status))) {
         void load();
       }
     }, POLL_INTERVAL_MS);

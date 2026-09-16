@@ -80,6 +80,15 @@ jobs:
       contents: read
     env:
       ASPNETCORE_ENVIRONMENT: CI
+      # `appsettings.*.json` is git-ignored, so the startup path's required settings are supplied
+      # here as placeholders (double-underscore = configuration section separator). None is real:
+      # the model check never opens a connection.
+      ConnectionStrings__DefaultConnection: "Server=(local);Database=IepAssistantCI;User Id=sa;Password=CiOnly!NotReal1;TrustServerCertificate=True;"
+      ConnectionStrings__BlobStorage: "DefaultEndpointsProtocol=https;AccountName=ciplaceholder;AccountKey=cGxhY2Vob2xkZXItbm90LXJlYWw=;EndpointSuffix=core.windows.net"
+      Jwt__Key: "ci-only-placeholder-signing-key-not-used-for-anything-real-0123456789"
+      Jwt__Issuer: "IepAssistant.Api"
+      Jwt__Audience: "IepAssistant.Client"
+      Jwt__ExpiryInDays: "7"
     steps:
       - uses: actions/checkout@v4
       - name: Set up .NET Core

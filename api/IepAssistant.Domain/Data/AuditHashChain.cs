@@ -41,15 +41,18 @@ public static class AuditHashChain
         DateTime createdAtUtc,
         string? prevHash)
     {
+        // Every field is formatted invariantly: the writer and the daily integrity check may run
+        // under different cultures, and a digit-shape difference would read as tampering.
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
         var input = string.Join(
             '|',
-            id,
-            action,
-            actorUserId,
+            id.ToString(inv),
+            action.ToString(),
+            actorUserId.ToString(inv),
             resourceType,
-            resourceId,
-            recipientUserId?.ToString() ?? string.Empty,
-            DateTime.SpecifyKind(createdAtUtc, DateTimeKind.Utc).ToString("O"),
+            resourceId.ToString(inv),
+            recipientUserId?.ToString(inv) ?? string.Empty,
+            DateTime.SpecifyKind(createdAtUtc, DateTimeKind.Utc).ToString("O", inv),
             prevHash ?? string.Empty);
 
         var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));

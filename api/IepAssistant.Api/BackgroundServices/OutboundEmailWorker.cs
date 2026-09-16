@@ -63,6 +63,10 @@ public class OutboundEmailWorker : BackgroundService
         }
     }
 
+    /// <summary>A row left in Sending this long was abandoned mid-send (a deploy stopped the host
+    /// between the claim and the final save) — hand it back to the queue for another attempt.</summary>
+    private static readonly TimeSpan StaleSendingAfter = TimeSpan.FromMinutes(10);
+
     private async Task RunCycleAsync(CancellationToken stoppingToken)
     {
         IReadOnlyList<int> candidateIds;
@@ -71,6 +75,17 @@ public class OutboundEmailWorker : BackgroundService
             using var scanScope = _scopeFactory.CreateScope();
             var context = scanScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var now = DateTime.UtcNow;
+
+            var staleCutoff = now - StaleSendingAfter;
+            var reclaimed = await context.OutboundEmails
+                .Where(e => e.Status == OutboundEmailStatus.Sending && e.UpdatedAt <= staleCutoff)
+                .ExecuteUpdateAsync(u => u
+                    .SetProperty(e => e.Status, OutboundEmailStatus.Queued)
+                    .SetProperty(e => e.NextAttemptAt, now)
+                    .SetProperty(e => e.UpdatedAt, now), stoppingToken);
+            if (reclaimed > 0)
+                _logger.LogWarning("Re-queued {Count} outbound email(s) abandoned in Sending", reclaimed);
+
             candidateIds = await context.OutboundEmails.AsNoTracking()
                 .Where(e => e.Status == OutboundEmailStatus.Queued && e.NextAttemptAt <= now)
                 .OrderBy(e => e.NextAttemptAt)
@@ -108,6 +123,7 @@ public class OutboundEmailWorker : BackgroundService
             return; // a concurrent cycle or admin action already resolved this row
 
         email.Status = OutboundEmailStatus.Sending;
+        email.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync(ct); // claim
 
         var transport = services.GetRequiredService<IEmailTransport>();
@@ -119,6 +135,17 @@ public class OutboundEmailWorker : BackgroundService
             email.Status = OutboundEmailStatus.Sent;
             email.SentAt = DateTime.UtcNow;
             email.LastError = null;
+            email.Attempts++;
+        }
+        catch (OperationCanceledException)
+        {
+            // Host shutdown mid-send: hand the row straight back rather than leaving it in Sending
+            // (the stale-Sending reclaim above is the backstop if even this save cannot run).
+            email.Status = OutboundEmailStatus.Queued;
+            email.NextAttemptAt = DateTime.UtcNow;
+            email.UpdatedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken.None);
+            throw;
         }
         catch (EmailDeliveryException ex)
         {
@@ -138,7 +165,24 @@ public class OutboundEmailWorker : BackgroundService
             }
         }
 
+        email.UpdatedAt = DateTime.UtcNow;
+        RedactSecretsIfTerminal(email);
         await context.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Emails that carry a one-time link (sign-in, password reset, cancel-deletion, invites) must not
+    /// keep the live secret at rest once they reach a terminal state: the body is replaced by a marker.
+    /// Such rows cannot be re-sent; the admin page says to request a fresh link instead.
+    /// </summary>
+    internal static void RedactSecretsIfTerminal(OutboundEmail email)
+    {
+        if (email.Status is not (OutboundEmailStatus.Sent or OutboundEmailStatus.Failed or OutboundEmailStatus.Cancelled))
+            return;
+        if (!OutboundEmailKinds.CarriesOneTimeSecret(email.Kind))
+            return;
+        email.HtmlBody = OutboundEmailKinds.RedactedBody;
+        email.TextBody = null;
     }
 
     private static string Truncate(string message) => message.Length <= MaxErrorLength ? message : message[..MaxErrorLength];

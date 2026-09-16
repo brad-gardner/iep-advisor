@@ -8,10 +8,12 @@ namespace IepAssistant.Api.BackgroundServices;
 /// <summary>
 /// Drains the singleton <see cref="AuditLogger"/> channel and persists queued events as
 /// <see cref="AccessAuditLog"/> rows, in batches of up to <see cref="MaxBatchSize"/> (pilot-gates plan,
-/// phase 1). This is the ONLY writer of <see cref="AccessAuditLog"/> rows, which is what lets it keep an
-/// in-memory hash-chain tip (<see cref="_lastHash"/>) without a lock: a single <see cref="BackgroundService.ExecuteAsync"/>
-/// loop is inherently single-threaded, and <see cref="StopAsync"/> only reads the channel after that loop
-/// has fully returned.
+/// phase 1).
+///
+/// <para><b>Chain tip lives in the database, not in memory.</b> Every batch resolves the current tip
+/// inside its own SERIALIZABLE transaction (the latest row by Id), so two API instances writing at
+/// once — a rolling deploy, an autoscale — serialize on the tip instead of forking the chain; the
+/// loser's transaction fails and is retried. Nothing about the chain depends on a single process.</para>
 ///
 /// <para><b>Durability (decision 1):</b> a batch that still fails after <see cref="MaxAttempts"/> retries
 /// (backoff 1s/5s/30s) is staged into <see cref="PendingAuditEvent"/> instead of being dropped; on host
@@ -40,19 +42,27 @@ public class AccessAuditLogWorker : BackgroundService
     private readonly AuditLogger _auditLogger;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<AccessAuditLogWorker> _logger;
-
-    /// <summary>In-memory chain tip. See class remarks — safe without a lock because this worker is the
-    /// sole writer and its own processing loop is single-threaded.</summary>
-    private string? _lastHash;
+    private readonly IReadOnlyList<TimeSpan> _retryBackoffs;
 
     public AccessAuditLogWorker(
         AuditLogger auditLogger,
         IServiceScopeFactory scopeFactory,
         ILogger<AccessAuditLogWorker> logger)
+        : this(auditLogger, scopeFactory, logger, RetryBackoffs)
+    {
+    }
+
+    /// <summary>Test seam: the backoff schedule between persist attempts (production uses 1s/5s/30s).</summary>
+    internal AccessAuditLogWorker(
+        AuditLogger auditLogger,
+        IServiceScopeFactory scopeFactory,
+        ILogger<AccessAuditLogWorker> logger,
+        IReadOnlyList<TimeSpan> retryBackoffs)
     {
         _auditLogger = auditLogger;
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _retryBackoffs = retryBackoffs;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -126,11 +136,9 @@ public class AccessAuditLogWorker : BackgroundService
                 using var scope = _scopeFactory.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-                await using var transaction = await context.Database.BeginTransactionAsync(stoppingToken);
-                var newTip = await InsertRowsAsync(context, batch, stoppingToken);
+                await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, stoppingToken);
+                await InsertRowsAsync(context, batch, stoppingToken);
                 await transaction.CommitAsync(stoppingToken);
-
-                _lastHash = newTip;
                 return;
             }
             catch (Exception ex)
@@ -144,7 +152,7 @@ public class AccessAuditLogWorker : BackgroundService
                 {
                     try
                     {
-                        await Task.Delay(RetryBackoffs[attempt - 1], stoppingToken);
+                        await Task.Delay(_retryBackoffs[attempt - 1], stoppingToken);
                     }
                     catch (OperationCanceledException)
                     {
@@ -207,13 +215,12 @@ public class AccessAuditLogWorker : BackgroundService
                     .Select(p => new AuditEntry(p.ActionValue, p.ActorUserId, p.ResourceType, p.ResourceId, p.RecipientUserId, p.OccurredAt))
                     .ToList();
 
-                await using var transaction = await context.Database.BeginTransactionAsync(stoppingToken);
-                var newTip = await InsertRowsAsync(context, entries, stoppingToken);
+                await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, stoppingToken);
+                await InsertRowsAsync(context, entries, stoppingToken);
                 context.PendingAuditEvents.RemoveRange(pending);
                 await context.SaveChangesAsync(stoppingToken);
                 await transaction.CommitAsync(stoppingToken);
 
-                _lastHash = newTip;
                 replayed += pending.Count;
             }
 
@@ -229,9 +236,8 @@ public class AccessAuditLogWorker : BackgroundService
     /// <summary>
     /// Backfills <see cref="AccessAuditLog.Hash"/>/<see cref="AccessAuditLog.PrevHash"/> for historical
     /// rows left null by the migration that introduced them, in Id order, paging so a large table is
-    /// never loaded at once. Always resyncs <see cref="_lastHash"/> from the database's actual state
-    /// afterward — even on partial failure — so a bug here can never desync the in-memory tip from what
-    /// is actually persisted (which would otherwise corrupt every hash computed after it).
+    /// never loaded at once. A partial failure is harmless: the next batch reads the real tip from the
+    /// database, and the next restart resumes the backfill where it stopped.
     /// </summary>
     private async Task BackfillHashesAsync()
     {
@@ -247,16 +253,20 @@ public class AccessAuditLogWorker : BackgroundService
                 .FirstOrDefaultAsync();
 
             var backfilled = 0;
+            // Keyset paging: hashed rows are never re-scanned, and a fully-hashed table costs one
+            // indexed probe per restart instead of a full scan.
+            var lastId = 0;
             while (true)
             {
                 var page = await context.AccessAuditLogs
-                    .Where(a => a.Hash == null)
+                    .Where(a => a.Hash == null && a.Id > lastId)
                     .OrderBy(a => a.Id)
                     .Take(HashBackfillPageSize)
                     .ToListAsync();
 
                 if (page.Count == 0)
                     break;
+                lastId = page[^1].Id;
 
                 foreach (var row in page)
                 {
@@ -279,29 +289,23 @@ public class AccessAuditLogWorker : BackgroundService
             _logger.LogError(ex, "Audit hash-chain backfill failed at startup; unhashed rows (if any) will be retried on the next restart");
         }
 
-        try
-        {
-            _lastHash = await context.AccessAuditLogs
-                .OrderByDescending(a => a.Id)
-                .Select(a => a.Hash)
-                .FirstOrDefaultAsync();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to resolve the current audit hash-chain tip at startup; new events will chain from null");
-        }
+
     }
 
     /// <summary>
-    /// Inserts <paramref name="entries"/> as <see cref="AccessAuditLog"/> rows (assigning Ids), then
-    /// computes and saves their chained Hash/PrevHash starting from <see cref="_lastHash"/>. Issues
-    /// exactly two <c>SaveChangesAsync</c> calls; the caller is responsible for wrapping both in a
-    /// transaction and for committing <see cref="_lastHash"/> to the returned value only after that
-    /// transaction commits (never before — a failed commit must never leave the in-memory tip pointing
-    /// at a hash that was never actually persisted).
+    /// Inside the caller's SERIALIZABLE transaction: reads the current chain tip from the database
+    /// (the latest row by Id), inserts <paramref name="entries"/> (assigning Ids), then computes and
+    /// saves their chained Hash/PrevHash. Two <c>SaveChangesAsync</c> calls, one transaction — a
+    /// failure between them can never leave an unhashed row behind, and a concurrent writer that
+    /// read the same tip fails at commit and retries against the new tip.
     /// </summary>
-    private async Task<string?> InsertRowsAsync(ApplicationDbContext context, List<AuditEntry> entries, CancellationToken ct)
+    private static async Task InsertRowsAsync(ApplicationDbContext context, List<AuditEntry> entries, CancellationToken ct)
     {
+        var tip = await context.AccessAuditLogs.AsNoTracking()
+            .OrderByDescending(a => a.Id)
+            .Select(a => a.Hash)
+            .FirstOrDefaultAsync(ct);
+
         var rows = entries.Select(entry => new AccessAuditLog
         {
             Action = entry.Action,
@@ -315,7 +319,6 @@ public class AccessAuditLogWorker : BackgroundService
         context.AccessAuditLogs.AddRange(rows);
         await context.SaveChangesAsync(ct); // assigns Ids
 
-        var tip = _lastHash;
         foreach (var row in rows)
         {
             var hash = AuditHashChain.ComputeHash(
@@ -326,7 +329,6 @@ public class AccessAuditLogWorker : BackgroundService
         }
 
         await context.SaveChangesAsync(ct); // null-to-non-null Hash/PrevHash update — permitted by the trigger carve-out
-        return tip;
     }
 
     private static PendingAuditEvent ToPendingEvent(AuditEntry entry) => new()

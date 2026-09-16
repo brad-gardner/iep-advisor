@@ -205,7 +205,7 @@
         <li><strong>A human approves every word.</strong> AI drafts suggestions, explanations, briefs and summaries; nothing is written to a record or sent to a family without a person accepting or editing it.</li>
         <li><strong>Sources are shown.</strong> Suggestions cite the evidence they came from (prior versions, evaluations, family input); answers to parents cite the draft. Ids the model references are checked by the server — unknown citations are dropped.</li>
         <li><strong>Data sent to the model is bounded.</strong> Only the document or draft in question and evidence the user is already allowed to see; family questions never include other students or staff-only notes. Document text is not written to application logs.</li>
-        <li><strong>No training on customer data</strong> as configured: our model provider is used under API terms that exclude training on submitted content.</li>
+        <li><strong>No training on customer data.</strong> This is a contractual guarantee, not an application setting: we use our model provider (Anthropic) through its commercial API, whose terms exclude training on content submitted through it. We will name the governing terms in the data-processing agreement.</li>
         <li><strong>Billing.</strong> AI use by families on a district's shared drafts is billed to the district, never gated by a parent's subscription.</li>
       </ul>
     </section>
@@ -219,7 +219,7 @@
           </thead>
           <tbody class="divide-y divide-brand-slate-100">
             <tr><td class="py-2 pr-4">Microsoft Azure</td><td class="py-2 pr-4">Hosting, database, file storage, email delivery (Communication Services)</td><td class="py-2">All application data; email addresses and message content</td></tr>
-            <tr><td class="py-2 pr-4">Anthropic</td><td class="py-2 pr-4">AI drafting, explanations, briefs</td><td class="py-2">The document/draft and evidence in scope for the request; no training on content</td></tr>
+            <tr><td class="py-2 pr-4">Anthropic</td><td class="py-2 pr-4">AI drafting, explanations, briefs</td><td class="py-2">The document/draft and evidence in scope for the request; commercial API terms exclude training on content</td></tr>
             <tr><td class="py-2 pr-4">Stripe</td><td class="py-2 pr-4">Parent subscription billing</td><td class="py-2">Parent name, email, payment details (held by Stripe)</td></tr>
             <tr><td class="py-2 pr-4">Sentry</td><td class="py-2 pr-4">Error monitoring</td><td class="py-2">Technical error data with a numeric user id; no email, no request bodies</td></tr>
           </tbody>

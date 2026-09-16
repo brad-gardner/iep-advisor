@@ -51,8 +51,27 @@ public sealed class AccountPurgeServiceTests : IDisposable
             => Entries.Add((action, actorUserId, resourceType, resourceId));
     }
 
-    private AccountPurgeService CreateService(ApplicationDbContext ctx, RecordingBlobStorage blobs, RecordingAuditLogger audit) =>
-        new(ctx, blobs, audit, NullLogger<AccountPurgeService>.Instance);
+    private sealed class RecordingStripe : IStripeAccountCleanup
+    {
+        public List<string> CancelledSubscriptions { get; } = new();
+        public List<string> DeletedCustomers { get; } = new();
+        public bool Fail { get; set; }
+        public Task CancelSubscriptionAsync(string subscriptionId, CancellationToken ct = default)
+        {
+            if (Fail) throw new InvalidOperationException("stripe down");
+            CancelledSubscriptions.Add(subscriptionId); return Task.CompletedTask;
+        }
+        public Task DeleteCustomerAsync(string customerId, CancellationToken ct = default)
+        {
+            if (Fail) throw new InvalidOperationException("stripe down");
+            DeletedCustomers.Add(customerId); return Task.CompletedTask;
+        }
+    }
+
+    private readonly RecordingStripe _stripe = new();
+
+    private AccountPurgeService CreateService(ApplicationDbContext ctx, IBlobStorageService blobs, RecordingAuditLogger audit) =>
+        new(ctx, blobs, audit, _stripe, NullLogger<AccountPurgeService>.Instance);
 
     [Fact]
     public async Task PurgeAsync_Parent_DeletesChildGraphAndBlobs_AndTheUserRow_ButLeavesSchoolRecords()
@@ -60,7 +79,7 @@ public sealed class AccountPurgeServiceTests : IDisposable
         int parentId, childId, schoolStudentId, documentInstanceId;
         using (var ctx = CreateContext())
         {
-            var parent = new User { Email = "parent@example.com", PasswordHash = "x", FirstName = "Pat", LastName = "Parent", Role = UserRole.Parent, DeletionRequestedAt = DateTime.UtcNow.AddDays(-31) };
+            var parent = new User { Email = "parent@example.com", PasswordHash = "x", FirstName = "Pat", LastName = "Parent", Role = UserRole.Parent, DeletionRequestedAt = DateTime.UtcNow.AddDays(-31), StripeCustomerId = "cus_123", StripeSubscriptionId = "sub_456" };
             ctx.Users.Add(parent);
             ctx.SaveChanges();
             parentId = parent.Id;
@@ -225,6 +244,7 @@ public sealed class AccountPurgeServiceTests : IDisposable
             var school = new School { DistrictId = district.Id, Name = "S3" };
             ctx.Schools.Add(school); ctx.SaveChanges();
             ctx.StaffProfiles.Add(new StaffProfile { UserId = staffUserId, DistrictId = district.Id, SchoolId = school.Id, OrgRoleId = OrgRoleIds.Teacher, IsActive = true });
+            ctx.UserRecoveryCodes.Add(new UserRecoveryCode { UserId = staffUserId, CodeHash = "hash" });
             var schoolStudent = new SchoolStudent { SchoolId = school.Id, DistrictId = district.Id, FirstName = "Kid3" };
             ctx.SchoolStudents.Add(schoolStudent);
             ctx.SaveChanges();
@@ -268,6 +288,7 @@ public sealed class AccountPurgeServiceTests : IDisposable
         Assert.False(staffProfile.IsActive);
         Assert.Empty(verify.StudentTeamMembers.Where(m => m.UserId == staffUserId));
         Assert.Empty(verify.SchoolStudentAccesses.Where(a => a.UserId == staffUserId));
+        Assert.Empty(verify.UserRecoveryCodes.Where(c => c.UserId == staffUserId)); // MFA recovery codes are credentials too
 
         // School records referencing this staff member by id keep working, unchanged.
         var version = verify.AuthoredDocumentVersions.Find(versionId);
@@ -300,6 +321,63 @@ public sealed class AccountPurgeServiceTests : IDisposable
         using var verify = CreateContext();
         Assert.NotNull(verify.Users.Find(userId)); // still there — only 5 days in, not eligible
         Assert.Empty(audit.Entries);
+    }
+
+    [Fact]
+    public async Task PurgeAsync_Parent_CancelsStripeFirst_AndAbortsWhenStripeFails()
+    {
+        int parentId;
+        using (var ctx = CreateContext())
+        {
+            var parent = new User { Email = "billed@example.com", PasswordHash = "x", FirstName = "B", LastName = "P", Role = UserRole.Parent, DeletionRequestedAt = DateTime.UtcNow.AddDays(-31), StripeCustomerId = "cus_A", StripeSubscriptionId = "sub_A" };
+            ctx.Users.Add(parent); ctx.SaveChanges(); parentId = parent.Id;
+        }
+
+        // Stripe down: the local row must survive so the next cycle retries — a billed customer is never orphaned.
+        _stripe.Fail = true;
+        using (var ctx = CreateContext())
+            await Assert.ThrowsAsync<InvalidOperationException>(() => CreateService(ctx, new RecordingBlobStorage(), new RecordingAuditLogger()).PurgeAsync(parentId));
+        using (var ctx = CreateContext())
+            Assert.NotNull(ctx.Users.Find(parentId));
+
+        _stripe.Fail = false;
+        using (var ctx = CreateContext())
+            await CreateService(ctx, new RecordingBlobStorage(), new RecordingAuditLogger()).PurgeAsync(parentId);
+        Assert.Equal(new[] { "sub_A" }, _stripe.CancelledSubscriptions);
+        Assert.Equal(new[] { "cus_A" }, _stripe.DeletedCustomers);
+        using (var ctx = CreateContext())
+            Assert.Null(ctx.Users.Find(parentId));
+    }
+
+    [Fact]
+    public async Task PurgeAsync_Parent_ABlobDeleteFailure_AbortsBeforeAnyRowIsDeleted()
+    {
+        int parentId, childId;
+        using (var ctx = CreateContext())
+        {
+            var parent = new User { Email = "blobfail@example.com", PasswordHash = "x", FirstName = "B", LastName = "F", Role = UserRole.Parent, DeletionRequestedAt = DateTime.UtcNow.AddDays(-31) };
+            ctx.Users.Add(parent); ctx.SaveChanges(); parentId = parent.Id;
+            var child = new ChildProfile { UserId = parentId, FirstName = "Kid" };
+            ctx.ChildProfiles.Add(child); ctx.SaveChanges(); childId = child.Id;
+            ctx.IepDocuments.Add(new IepDocument { ChildProfileId = childId, BlobUri = "iep/keep.pdf", FileName = "iep.pdf" });
+            ctx.SaveChanges();
+        }
+
+        var blobs = new FailingBlobStorage();
+        using (var ctx = CreateContext())
+            await Assert.ThrowsAsync<IOException>(() => CreateService(ctx, blobs, new RecordingAuditLogger()).PurgeAsync(parentId));
+
+        using var verify = CreateContext();
+        Assert.NotNull(verify.Users.Find(parentId));
+        Assert.Single(verify.IepDocuments.Where(d => d.ChildProfileId == childId)); // the row still points at the blob, so a retry can find it
+    }
+
+    private sealed class FailingBlobStorage : IBlobStorageService
+    {
+        public Task<string> UploadAsync(string blobPath, Stream content, string contentType, CancellationToken cancellationToken = default) => Task.FromResult(blobPath);
+        public Task<Stream> DownloadAsync(string blobPath, CancellationToken cancellationToken = default) => Task.FromResult<Stream>(new MemoryStream());
+        public Task DeleteAsync(string blobPath, CancellationToken cancellationToken = default) => throw new IOException("storage unreachable");
+        public Task<string> GetDownloadUrlAsync(string blobPath, TimeSpan? expiry = null) => Task.FromResult(blobPath);
     }
 
     public void Dispose() => _connection.Dispose();

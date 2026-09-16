@@ -39,10 +39,12 @@ public sealed class OutboundEmailWorkerTests : IDisposable
         public bool ShouldThrow { get; set; }
         public bool IsConfigured { get; set; } = true;
         public int CallCount { get; private set; }
+        public string? LastHtml { get; private set; }
 
         public Task SendAsync(string toEmail, string subject, string htmlBody, string? textBody, IReadOnlyList<OutboundEmailAttachmentDraft>? attachments, CancellationToken ct = default)
         {
             CallCount++;
+            LastHtml = htmlBody;
             if (ShouldThrow)
                 throw new EmailDeliveryException(toEmail, subject, new InvalidOperationException("simulated ACS outage"));
             return Task.CompletedTask;
@@ -71,21 +73,62 @@ public sealed class OutboundEmailWorkerTests : IDisposable
             .GetMethod("ProcessOneAsync", BindingFlags.NonPublic | BindingFlags.Instance)!
             .Invoke(WorkerInstance, new object[] { provider, id, CancellationToken.None })!;
 
-    private int SeedQueuedEmail()
+    /// <summary>Drives one full worker cycle (stale-Sending reclaim, scan, per-row processing) against a
+    /// worker whose scope factory resolves the test's own DbContext + transport.</summary>
+    private Task RunCycleAsync(IServiceProvider provider)
+    {
+        var worker = new OutboundEmailWorker(provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<OutboundEmailWorker>.Instance);
+        return (Task)typeof(OutboundEmailWorker)
+            .GetMethod("RunCycleAsync", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(worker, new object[] { CancellationToken.None })!;
+    }
+
+    private int SeedQueuedEmail(string kind = "Notification", string html = "<p>hi</p>", OutboundEmailStatus status = OutboundEmailStatus.Queued, DateTime? updatedAt = null)
     {
         using var ctx = CreateContext();
         var email = new OutboundEmail
         {
             ToEmail = "parent@example.com",
             Subject = "Test",
-            HtmlBody = "<p>hi</p>",
-            Kind = "Notification",
-            Status = OutboundEmailStatus.Queued,
-            NextAttemptAt = DateTime.UtcNow.AddMinutes(-1)
+            HtmlBody = html,
+            Kind = kind,
+            Status = status,
+            NextAttemptAt = DateTime.UtcNow.AddMinutes(-1),
+            UpdatedAt = updatedAt ?? DateTime.UtcNow
         };
         ctx.OutboundEmails.Add(email);
         ctx.SaveChanges();
         return email.Id;
+    }
+
+    [Fact]
+    public async Task ProcessOne_OneTimeLinkEmail_IsRedactedOnceSent()
+    {
+        var id = SeedQueuedEmail(kind: "MagicLink", html: "<a href=\"https://app/auth/magic?token=SECRET\">Sign in</a>");
+        var transport = new FakeTransport { ShouldThrow = false };
+
+        await ProcessOneAsync(BuildProvider(transport), id);
+
+        using var ctx = CreateContext();
+        var email = ctx.OutboundEmails.Find(id)!;
+        Assert.Equal(OutboundEmailStatus.Sent, email.Status);
+        Assert.DoesNotContain("SECRET", email.HtmlBody);          // the live token does not stay at rest
+        Assert.True(OutboundEmailKinds.IsRedacted(email));
+        Assert.Contains("SECRET", transport.LastHtml ?? "");       // …but it was delivered intact
+    }
+
+    [Fact]
+    public async Task RunCycle_ReclaimsARowAbandonedInSending()
+    {
+        var stale = SeedQueuedEmail(status: OutboundEmailStatus.Sending, updatedAt: DateTime.UtcNow.AddMinutes(-30));
+        var fresh = SeedQueuedEmail(status: OutboundEmailStatus.Sending, updatedAt: DateTime.UtcNow.AddMinutes(-1));
+        var transport = new FakeTransport { ShouldThrow = false };
+
+        await RunCycleAsync(BuildProvider(transport));
+
+        using var ctx = CreateContext();
+        Assert.Equal(OutboundEmailStatus.Sent, ctx.OutboundEmails.Find(stale)!.Status);     // re-queued, then delivered in the same cycle
+        Assert.Equal(OutboundEmailStatus.Sending, ctx.OutboundEmails.Find(fresh)!.Status);  // a live claim is left alone
     }
 
     [Fact]

@@ -244,5 +244,41 @@ public sealed class AccountServiceTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task CancelDeletionByToken_ExpiresWithTheGracePeriod_EvenIfThePurgeWorkerNeverRan()
+    {
+        var provider = DataProtectionProvider.Create("shared-test-app");
+        int userId; string token;
+        using (var ctx = CreateContext())
+            userId = SeedActiveParent(ctx);
+        using (var ctx = CreateContext())
+        {
+            var (service, email) = CreateService(ctx, provider);
+            await service.ScheduleDeletionAsync(userId, "Password1!", mfaCode: null);
+            token = ExtractToken(email.LastCancelUrl!);
+        }
+
+        // Simulate a purge worker that fell behind: the request is now 45 days old but the row is still there.
+        using (var ctx = CreateContext())
+        {
+            var user = ctx.Users.Find(userId)!;
+            var aged = user.DeletionRequestedAt!.Value.AddDays(-45);
+            user.DeletionRequestedAt = aged;
+            ctx.SaveChanges();
+            // Re-mint a token bound to the aged timestamp so only the age (not a ticks mismatch) is under test.
+            token = TokenFor(provider, userId, aged);
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var (service, _) = CreateService(ctx, provider);
+            var result = await service.CancelDeletionByTokenAsync(token);
+            Assert.False(result.Success);
+        }
+    }
+
+    private static string TokenFor(IDataProtectionProvider provider, int userId, DateTime requestedAt) =>
+        provider.CreateProtector(AccountService.DeletionTokenPurpose).Protect($"{userId}|{requestedAt.Ticks}");
+
     public void Dispose() => _connection.Dispose();
 }

@@ -41,17 +41,33 @@ export function MagicLinkConsumePage() {
   const [phase, setPhase] = useState<Phase>(token ? 'loading' : 'error');
   const [mfaSetupMessage, setMfaSetupMessage] = useState(DEFAULT_MFA_SETUP_MESSAGE);
   const [showRequestForm, setShowRequestForm] = useState(false);
+  // Start the single-use POST exactly once (StrictMode double-invokes effects in dev), but track
+  // "still mounted" with a ref that EVERY invocation re-arms — a per-invocation local would be
+  // zeroed by StrictMode's synthetic cleanup and the one real response would then be discarded,
+  // leaving the page on the spinner while the backend had already consumed the token.
   const consumedRef = useRef(false);
+  const mountedRef = useRef(true);
+  // The token is read once and then removed from the address bar (and from history), so it
+  // never reaches Sentry breadcrumbs, browser history, or a shoulder-surfer.
+  const tokenRef = useRef(token);
 
   useEffect(() => {
-    if (!token || consumedRef.current) return;
+    mountedRef.current = true;
+    const currentToken = tokenRef.current;
+    if (!currentToken || consumedRef.current) {
+      return () => {
+        mountedRef.current = false;
+      };
+    }
     consumedRef.current = true;
-    let active = true;
+    if (window.location.search.includes('token=')) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
 
     (async () => {
       try {
-        const response = await consumeMagicLink(token);
-        if (!active) return;
+        const response = await consumeMagicLink(currentToken);
+        if (!mountedRef.current) return;
         const data = response.data;
 
         if (data?.mfaSetupRequired) {
@@ -73,16 +89,16 @@ export function MagicLinkConsumePage() {
 
         setPhase('error');
       } catch {
-        // An invalid/expired token answers 401 (see `consumeMagicLink`), which
+        // An invalid/expired token answers 400 (see `consumeMagicLink`), which
         // lands here — never revealing more than "invalid or expired".
-        if (active) setPhase('error');
+        if (mountedRef.current) setPhase('error');
       }
     })();
 
     return () => {
-      active = false;
+      mountedRef.current = false;
     };
-  }, [token, navigate, applySession]);
+  }, [navigate, applySession]);
 
   if (phase === 'loading') {
     return (
@@ -97,7 +113,9 @@ export function MagicLinkConsumePage() {
       <div className="w-full text-center">
         <h2 className="text-2xl font-serif font-semibold mb-4 text-brand-slate-800">Sign-in link</h2>
         <div className="mb-4">
-          <Notice variant="info" title={mfaSetupMessage} data-testid="magic-consume-mfa-setup" />
+          <div role="status">
+            <Notice variant="info" title={mfaSetupMessage} data-testid="magic-consume-mfa-setup" />
+          </div>
         </div>
         <Link to="/login" className="text-sm text-brand-teal-500 hover:text-brand-teal-600" data-testid="magic-consume-go-password">
           Sign in with your password
@@ -110,7 +128,9 @@ export function MagicLinkConsumePage() {
     <div className="w-full text-center">
       <h2 className="text-2xl font-serif font-semibold mb-4 text-brand-slate-800">Sign-in link</h2>
       <div className="mb-4">
-        <Notice variant="error" title="This link is invalid or has expired" data-testid="magic-consume-error" />
+        <div role="alert">
+          <Notice variant="error" title="This link is invalid or has expired" data-testid="magic-consume-error" />
+        </div>
       </div>
       {showRequestForm ? (
         <MagicLinkRequestForm />

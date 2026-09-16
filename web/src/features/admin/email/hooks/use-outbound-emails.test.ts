@@ -64,15 +64,13 @@ describe('useOutboundEmails', () => {
 
     // First poll fires because the loaded row was Queued.
     await act(async () => {
-      vi.advanceTimersByTime(15_000);
-      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(15_000);
     });
     expect(api.listOutboundEmails).toHaveBeenCalledTimes(2);
 
     // The second load resolved to an all-Sent snapshot, so the next tick polls no more.
     await act(async () => {
-      vi.advanceTimersByTime(15_000);
-      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(15_000);
     });
     expect(api.listOutboundEmails).toHaveBeenCalledTimes(2);
   });

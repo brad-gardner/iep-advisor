@@ -25,17 +25,29 @@ export function CancelDeletionPage() {
   const token = searchParams.get('token');
   const [phase, setPhase] = useState<Phase>(token ? 'loading' : 'error');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Same shape as MagicLinkConsumePage: submit exactly once, track "mounted" with a ref every
+  // effect invocation re-arms (StrictMode-safe), and scrub the token from the address bar.
   const submittedRef = useRef(false);
+  const mountedRef = useRef(true);
+  const tokenRef = useRef(token);
 
   useEffect(() => {
-    if (!token || submittedRef.current) return;
+    mountedRef.current = true;
+    const currentToken = tokenRef.current;
+    if (!currentToken || submittedRef.current) {
+      return () => {
+        mountedRef.current = false;
+      };
+    }
     submittedRef.current = true;
-    let active = true;
+    if (window.location.search.includes('token=')) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
 
     (async () => {
       try {
-        const response = await cancelDeletionByToken(token);
-        if (!active) return;
+        const response = await cancelDeletionByToken(currentToken);
+        if (!mountedRef.current) return;
         if (response.success) {
           setPhase('success');
         } else {
@@ -43,7 +55,7 @@ export function CancelDeletionPage() {
           setErrorMessage(response.message ?? DEFAULT_ERROR);
         }
       } catch (err) {
-        if (active) {
+        if (mountedRef.current) {
           setPhase('error');
           setErrorMessage(apiErrorMessage(err, DEFAULT_ERROR));
         }
@@ -51,9 +63,9 @@ export function CancelDeletionPage() {
     })();
 
     return () => {
-      active = false;
+      mountedRef.current = false;
     };
-  }, [token]);
+  }, []);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-brand-slate-50 px-4 py-12">
@@ -69,15 +81,19 @@ export function CancelDeletionPage() {
         )}
 
         {phase === 'success' && (
-          <Notice
-            variant="success"
-            title="Your deletion request was cancelled — you can sign in again"
-            data-testid="cancel-deletion-success"
-          />
+          <div role="status">
+            <Notice
+              variant="success"
+              title="Your deletion request was cancelled — you can sign in again"
+              data-testid="cancel-deletion-success"
+            />
+          </div>
         )}
 
         {phase === 'error' && (
-          <Notice variant="error" title={errorMessage ?? DEFAULT_ERROR} data-testid="cancel-deletion-error" />
+          <div role="alert">
+            <Notice variant="error" title={errorMessage ?? DEFAULT_ERROR} data-testid="cancel-deletion-error" />
+          </div>
         )}
 
         {phase !== 'loading' && (

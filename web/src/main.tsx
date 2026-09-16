@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import * as Sentry from '@sentry/react';
 import { App } from '@/app';
-import { scrubSentryEvent } from '@/lib/sentry-scrub';
+import { scrubSentryBreadcrumb, scrubSentryEvent } from '@/lib/sentry-scrub';
 import './index.css';
 
 // Initialize Sentry for frontend error tracking
@@ -21,6 +21,8 @@ if (sentryDsn) {
     // whatever does get sent (see `sentry-scrub.ts`).
     sendDefaultPii: false,
     beforeSend: scrubSentryEvent,
+    // Navigation/fetch breadcrumbs carry URLs; one-time tokens ride in query strings.
+    beforeBreadcrumb: scrubSentryBreadcrumb,
   });
 }
 

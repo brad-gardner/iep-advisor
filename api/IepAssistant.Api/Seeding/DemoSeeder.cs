@@ -22,7 +22,7 @@ public class DemoSeeder : IDemoSeeder
 {
     public const string DemoPassword = "Demo!2026pw";
     private const string DistrictName = "Maple Ridge Local Schools";
-    private const string EmailDomain = "mapleridge.demo";
+    private const string EmailDomain = "mapleridge.example";
 
     private readonly ApplicationDbContext _context;
     private readonly IAuthService _authService;
@@ -1002,7 +1002,7 @@ public class DemoSeeder : IDemoSeeder
     }
 
     /// <summary>
-    /// When no demo district exists, still sweep any lingering "@mapleridge.demo" account left behind by
+    /// When no demo district exists, still sweep any lingering "@mapleridge.example" account left behind by
     /// an interrupted prior <c>SeedAsync</c> run (e.g. it crashed partway through
     /// <see cref="CreateFamilyEngagementAsync"/> after minting the account but before linking it to a
     /// student — nothing scoped to a district catches that). A true no-op only when none exist either.

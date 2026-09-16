@@ -33,17 +33,20 @@ public class AccountPurgeService : IAccountPurgeService
     private readonly ApplicationDbContext _context;
     private readonly IBlobStorageService _blobStorage;
     private readonly IAuditLogger _auditLogger;
+    private readonly IStripeAccountCleanup _stripe;
     private readonly ILogger<AccountPurgeService> _logger;
 
     public AccountPurgeService(
         ApplicationDbContext context,
         IBlobStorageService blobStorage,
         IAuditLogger auditLogger,
+        IStripeAccountCleanup stripe,
         ILogger<AccountPurgeService> logger)
     {
         _context = context;
         _blobStorage = blobStorage;
         _auditLogger = auditLogger;
+        _stripe = stripe;
         _logger = logger;
     }
 
@@ -67,6 +70,22 @@ public class AccountPurgeService : IAccountPurgeService
 
     private async Task PurgeParentAsync(User user, CancellationToken ct)
     {
+        // Billing first, and blocking: the local row must never disappear while Stripe still holds the
+        // card and keeps charging it. A Stripe failure throws, the worker logs it, and the purge is retried
+        // on the next cycle with the user still intact.
+        if (!string.IsNullOrWhiteSpace(user.StripeSubscriptionId))
+        {
+            await _stripe.CancelSubscriptionAsync(user.StripeSubscriptionId, ct);
+            user.StripeSubscriptionId = null;
+            await _context.SaveChangesAsync(ct);
+        }
+        if (!string.IsNullOrWhiteSpace(user.StripeCustomerId))
+        {
+            await _stripe.DeleteCustomerAsync(user.StripeCustomerId, ct);
+            user.StripeCustomerId = null;
+            await _context.SaveChangesAsync(ct);
+        }
+
         var children = await _context.ChildProfiles.Where(c => c.UserId == user.Id).ToListAsync(ct);
         var childIds = children.Select(c => c.Id).ToList();
 
@@ -165,6 +184,7 @@ public class AccountPurgeService : IAccountPurgeService
 
         _auditLogger.Record(AuditAction.Delete, actorUserId: user.Id, resourceType: "User", resourceId: user.Id);
 
+        await RemoveCredentialArtifactsAsync(user.Id, ct);
         _context.Users.Remove(user);
         await _context.SaveChangesAsync(ct);
 
@@ -194,6 +214,7 @@ public class AccountPurgeService : IAccountPurgeService
         user.LastTotpTimestamp = null;
         user.IsActive = false;
         user.SecurityStamp++;
+        await RemoveCredentialArtifactsAsync(user.Id, ct);
 
         // No row is deleted, so nothing would ever stop the hourly scan from re-selecting this user —
         // clearing DeletionRequestedAt is what marks the purge complete (IsActive=false + the
@@ -220,13 +241,28 @@ public class AccountPurgeService : IAccountPurgeService
             {
                 await _blobStorage.DeleteAsync(blobUri, ct);
             }
+            catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+            {
+                // Already gone (e.g. a retried purge after a mid-run crash) — that is the outcome we want.
+            }
             catch (Exception ex)
             {
-                // A missing/already-deleted blob (e.g. a retried purge after a mid-run crash) must never
-                // block the rest of the purge — log and continue.
-                _logger.LogError(ex, "Failed to delete blob {BlobUri} while purging a parent account", blobUri);
+                // Anything else must NOT be swallowed: the rows that reference this blob are deleted
+                // right after this loop, and without them nothing could ever find the blob again. Throwing
+                // leaves the user intact so the hourly worker retries the whole purge.
+                _logger.LogError(ex, "Failed to delete blob {BlobUri} while purging a parent account; purge will be retried", blobUri);
+                throw;
             }
         }
+    }
+
+    /// <summary>MFA recovery codes, password-reset tokens and magic-link tokens are credentials too —
+    /// an anonymised or purged account keeps none of them.</summary>
+    private async Task RemoveCredentialArtifactsAsync(int userId, CancellationToken ct)
+    {
+        _context.UserRecoveryCodes.RemoveRange(await _context.UserRecoveryCodes.Where(c => c.UserId == userId).ToListAsync(ct));
+        _context.PasswordResetTokens.RemoveRange(await _context.PasswordResetTokens.Where(t => t.UserId == userId).ToListAsync(ct));
+        _context.MagicLinkTokens.RemoveRange(await _context.MagicLinkTokens.Where(t => t.UserId == userId).ToListAsync(ct));
     }
 
     private async Task<User> GetOrCreateDeletedUserSentinelAsync(CancellationToken ct)

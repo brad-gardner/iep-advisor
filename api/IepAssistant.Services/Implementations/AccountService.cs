@@ -16,7 +16,7 @@ public class AccountService : IAccountService
     /// the signed link's implicit validity window, and the worker's eligibility check can never drift.</summary>
     public const int DeletionGraceDays = 30;
 
-    private const string DeletionTokenPurpose = "account-deletion";
+    internal const string DeletionTokenPurpose = "account-deletion";
 
     private readonly IUserRepository _userRepository;
     private readonly ApplicationDbContext _context;
@@ -269,6 +269,12 @@ public class AccountService : IAccountService
         // purged (parent: user gone entirely; staff: DeletionRequestedAt cleared by the purge worker) —
         // which is what makes an old token stop working without needing a separate hard expiry.
         if (user == null || user.DeletionRequestedAt == null || user.DeletionRequestedAt.Value.Ticks != requestedAtTicks)
+            return ServiceResult.FailureResult("Invalid or expired cancellation link.");
+
+        // Hard expiry independent of the purge worker: the link is good for the grace period only, so a
+        // delayed purge never leaves an old email able to reactivate an account months later.
+        var requestedAt = new DateTime(requestedAtTicks, DateTimeKind.Utc);
+        if (DateTime.UtcNow - requestedAt > TimeSpan.FromDays(DeletionGraceDays))
             return ServiceResult.FailureResult("Invalid or expired cancellation link.");
 
         user.DeletionRequestedAt = null;

@@ -18,6 +18,7 @@ public static class DependencyInjection
         services.AddScoped<IEmailTransport, AcsEmailTransport>();
         services.AddScoped<IAuditIntegrityService, AuditIntegrityService>();
         services.AddScoped<IAccountPurgeService, AccountPurgeService>();
+        services.AddScoped<IStripeAccountCleanup, StripeAccountCleanup>();
         services.AddScoped<IPasswordResetService, PasswordResetService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IMagicLinkService, MagicLinkService>();

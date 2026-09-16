@@ -150,5 +150,51 @@ public sealed class AccessAuditLogWorkerTests : IDisposable
         Assert.Equal(rows[0].Hash, rows[1].PrevHash);
     }
 
+    /// <summary>A scope factory whose DbContext fails the first N SaveChanges calls (a transient
+    /// outage), then behaves normally — so the retry loop can be driven with zero backoff.</summary>
+    private sealed class FlakyScopeFactory : IServiceScopeFactory
+    {
+        private readonly IServiceScopeFactory _inner;
+        public int FailuresLeft;
+        public FlakyScopeFactory(IServiceScopeFactory inner, int failures) { _inner = inner; FailuresLeft = failures; }
+        public IServiceScope CreateScope()
+        {
+            var scope = _inner.CreateScope();
+            if (FailuresLeft > 0)
+            {
+                FailuresLeft--;
+                var ctx = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                ctx.Database.CloseConnection(); // the next command on this scope's connection fails
+                ctx.Dispose();
+            }
+            return scope;
+        }
+    }
+
+    [Fact]
+    public async Task PersistBatchWithRetry_TransientFailuresThenSuccess_LeavesOneValidChainAndNoOrphans()
+    {
+        var inner = CreateScopeFactory();
+        var flaky = new FlakyScopeFactory(inner, failures: 2);
+        var worker = new AccessAuditLogWorker(new AuditLogger(), flaky, NullLogger<AccessAuditLogWorker>.Instance,
+            new[] { TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero });
+
+        await InvokePrivateAsync(worker, "PersistBatchWithRetryAsync", new List<AuditEntry> { Entry(1), Entry(2) }, CancellationToken.None);
+        await InvokePrivateAsync(worker, "PersistBatchWithRetryAsync", new List<AuditEntry> { Entry(3) }, CancellationToken.None);
+
+        using var ctx = CreateContext();
+        var rows = ctx.AccessAuditLogs.OrderBy(a => a.Id).ToList();
+        Assert.Equal(3, rows.Count);                     // the two failed attempts left no orphaned rows
+        Assert.Empty(ctx.PendingAuditEvents.ToList());   // and nothing was staged — the third attempt succeeded
+        Assert.Equal(0, flaky.FailuresLeft);
+        string? prev = null;
+        foreach (var row in rows)
+        {
+            Assert.Equal(prev, row.PrevHash);            // each batch chained from the DB tip, not a stale memory tip
+            Assert.Equal(AuditHashChain.ComputeHash(row.Id, row.Action, row.ActorUserId, row.ResourceType, row.ResourceId, row.RecipientUserId, row.CreatedAt, prev), row.Hash);
+            prev = row.Hash;
+        }
+    }
+
     public void Dispose() => _connection.Dispose();
 }

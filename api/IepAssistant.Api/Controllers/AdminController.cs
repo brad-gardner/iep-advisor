@@ -117,6 +117,8 @@ public class AdminController : ControllerBase
 
         if (email.Status is not (OutboundEmailStatus.Failed or OutboundEmailStatus.Cancelled))
             return BadRequest(ApiResponse<object>.Error($"Only a Failed or Cancelled email can be resent (current status: {email.Status})."));
+        if (OutboundEmailKinds.IsRedacted(email) || OutboundEmailKinds.CarriesOneTimeSecret(email.Kind))
+            return BadRequest(ApiResponse<object>.Error("This message carried a one-time link and its content is not kept; ask the user to request a new link instead."));
 
         email.Status = OutboundEmailStatus.Queued;
         email.Attempts = 0;
@@ -142,6 +144,7 @@ public class AdminController : ControllerBase
             return BadRequest(ApiResponse<object>.Error("A sent email cannot be cancelled."));
 
         email.Status = OutboundEmailStatus.Cancelled;
+        IepAssistant.Api.BackgroundServices.OutboundEmailWorker.RedactSecretsIfTerminal(email);
         await _db.SaveChangesAsync(ct);
 
         return Ok(ApiResponse<object>.SuccessResponse(null, "Email cancelled"));
@@ -154,6 +157,7 @@ public class AdminController : ControllerBase
     {
         var queued = await _db.OutboundEmails.AsNoTracking().CountAsync(e => e.Status == OutboundEmailStatus.Queued, ct);
         var failed = await _db.OutboundEmails.AsNoTracking().CountAsync(e => e.Status == OutboundEmailStatus.Failed, ct);
+        var sending = await _db.OutboundEmails.AsNoTracking().CountAsync(e => e.Status == OutboundEmailStatus.Sending, ct);
         var lastSentAt = await _db.OutboundEmails.AsNoTracking()
             .Where(e => e.SentAt != null)
             .OrderByDescending(e => e.SentAt)
@@ -165,6 +169,7 @@ public class AdminController : ControllerBase
             Configured = _emailTransport.IsConfigured,
             Queued = queued,
             Failed = failed,
+            Sending = sending,
             LastSentAt = lastSentAt
         };
         return Ok(ApiResponse<OutboundEmailStatusDto>.SuccessResponse(dto));

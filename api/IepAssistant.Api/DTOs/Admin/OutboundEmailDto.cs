@@ -20,5 +20,7 @@ public class OutboundEmailStatusDto
     public bool Configured { get; set; }
     public int Queued { get; set; }
     public int Failed { get; set; }
+    /// <summary>Rows claimed by the worker right now; a persistently non-zero value means a stuck send.</summary>
+    public int Sending { get; set; }
     public DateTime? LastSentAt { get; set; }
 }

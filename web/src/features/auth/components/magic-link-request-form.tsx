@@ -37,7 +37,9 @@ export function MagicLinkRequestForm() {
   if (submitted) {
     return (
       <div data-testid="magic-link-message">
-        <Notice variant="success" title={CONFIRMATION_MESSAGE} />
+        <div role="status">
+          <Notice variant="success" title={CONFIRMATION_MESSAGE} />
+        </div>
       </div>
     );
   }
