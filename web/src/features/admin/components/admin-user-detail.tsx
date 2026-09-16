@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/input";
 import { PageLayout } from "@/components/ui/page-layout";
 import { DetailLayout } from "@/components/ui/detail-layout";
 import { useToast } from "@/components/ui/toast";
+import { usePageTitle } from "@/hooks/use-page-title";
 import type { AdminUser } from "@/types/api";
 import { getUser, updateUser } from "../api/admin-api";
 
@@ -17,6 +18,7 @@ export function AdminUserDetail() {
   const { id } = useParams<{ id: string }>();
   const { show: showToast } = useToast();
   const [user, setUser] = useState<AdminUser | null>(null);
+  usePageTitle(user ? `${user.firstName} ${user.lastName}` : "User");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Which mutation is in flight, so only the pressed button shows its spinner

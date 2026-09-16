@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { ORG_ROLE, type EducatorProfile } from '../types';
+import { ORG_ROLE, type EducatorProfile } from '@/features/educator/types';
 
 const useEducatorProfileMock = vi.fn();
 
-vi.mock('../hooks/use-educator-profile', () => ({
+vi.mock('@/features/educator/hooks/use-educator-profile', () => ({
   useEducatorProfile: () => useEducatorProfileMock(),
 }));
-vi.mock('../components/educator-dashboard', () => ({
-  EducatorDashboard: () => <div data-testid="educator-dashboard-body" />,
+vi.mock('../components/staff-home-body', () => ({
+  StaffHomeBody: () => <div data-testid="staff-home-body" />,
 }));
 
-import { EducatorHomePage } from './educator-home-page';
+import { StaffHomePage } from './staff-home-page';
 
 function makeProfile(overrides: Partial<EducatorProfile> = {}): EducatorProfile {
   return {
@@ -35,12 +35,12 @@ function makeProfile(overrides: Partial<EducatorProfile> = {}): EducatorProfile 
 function renderPage() {
   return render(
     <MemoryRouter>
-      <EducatorHomePage />
+      <StaffHomePage />
     </MemoryRouter>
   );
 }
 
-describe('EducatorHomePage', () => {
+describe('StaffHomePage', () => {
   beforeEach(() => {
     useEducatorProfileMock.mockReset();
   });
@@ -50,24 +50,24 @@ describe('EducatorHomePage', () => {
     renderPage();
 
     expect(screen.getByRole('status', { name: /loading your home/i })).toBeInTheDocument();
-    expect(screen.queryByTestId('educator-dashboard-body')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('staff-home-body')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
+    expect(document.title).toBe('Home · IEP Advisor');
   });
 
-  it('puts the org identity in the header and "View students" as the header action', () => {
+  it('puts the org identity in the header, sets the tab title, and shows the home body', () => {
     useEducatorProfileMock.mockReturnValue({
       profile: makeProfile({ orgRoleName: 'DistrictAdmin', stateCode: 'OH' }),
       isLoading: false,
     });
     renderPage();
 
-    expect(
-      screen.getByRole('heading', { level: 1, name: 'Test District' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Test District' })).toBeInTheDocument();
     expect(screen.getByText('District administrator · OH')).toBeInTheDocument();
     const action = screen.getByTestId('educator-students-link');
     expect(action.closest('a')).toHaveAttribute('href', '/educator/students');
-    expect(screen.getByTestId('educator-dashboard-body')).toBeInTheDocument();
+    expect(screen.getByTestId('staff-home-body')).toBeInTheDocument();
+    expect(document.title).toBe('Test District · IEP Advisor');
   });
 
   it('prefers the school name in the header for school-scoped staff', () => {
@@ -81,9 +81,7 @@ describe('EducatorHomePage', () => {
     });
     renderPage();
 
-    expect(
-      screen.getByRole('heading', { level: 1, name: 'Lincoln Elementary' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Lincoln Elementary' })).toBeInTheDocument();
   });
 
   it('keeps the no-profile support notice intact', () => {
@@ -101,7 +99,7 @@ describe('EducatorHomePage', () => {
     });
     renderPage();
 
-    expect(screen.queryByTestId('educator-dashboard-body')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('staff-home-body')).not.toBeInTheDocument();
     expect(screen.queryByTestId('educator-students-link')).not.toBeInTheDocument();
   });
 });

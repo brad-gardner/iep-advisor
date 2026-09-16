@@ -4,8 +4,10 @@ import { useAuth } from '../hooks/use-auth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 export function LoginPage() {
+  usePageTitle('Sign in');
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();

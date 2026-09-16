@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { apiErrorMessage } from '@/lib/api-error';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { getMeetingByToken, submitTokenRsvp } from '../api/meetings-api';
 import { formatMeetingWhen } from '../lib/meeting-time';
 import { INVITE_STATUS_LABELS } from '../types';
@@ -17,6 +18,7 @@ import type { InviteStatus, TokenRsvpResult } from '../types';
  * Accept/Decline/mark Tentative without logging in.
  */
 export function MeetingRsvpPage() {
+  usePageTitle('Meeting RSVP');
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
   const [result, setResult] = useState<TokenRsvpResult | null>(null);

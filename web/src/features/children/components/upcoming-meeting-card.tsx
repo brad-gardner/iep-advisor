@@ -7,6 +7,7 @@ import { Notice } from '@/components/ui/notice';
 import { apiErrorMessage } from '@/lib/api-error';
 import { listChildMeetings, rsvpToMeeting } from '@/features/meetings/api/meetings-api';
 import { formatMeetingWhen } from '@/features/meetings/lib/meeting-time';
+import { RsvpButtonGroup } from '@/features/meetings/components/rsvp-button-group';
 import { INVITE_STATUS_LABELS } from '@/features/meetings/types';
 import type { InviteStatus, MeetingDto } from '@/features/meetings/types';
 
@@ -125,37 +126,7 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          onClick={() => handleRsvp('Accepted')}
-          loading={responding === 'Accepted'}
-          disabled={responding !== null}
-          data-testid="upcoming-meeting-accept"
-        >
-          Accept
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => handleRsvp('Tentative')}
-          loading={responding === 'Tentative'}
-          disabled={responding !== null}
-          data-testid="upcoming-meeting-tentative"
-        >
-          Tentative
-        </Button>
-        <Button
-          size="sm"
-          variant="danger"
-          onClick={() => handleRsvp('Declined')}
-          loading={responding === 'Declined'}
-          disabled={responding !== null}
-          data-testid="upcoming-meeting-decline"
-        >
-          Decline
-        </Button>
-      </div>
+      <RsvpButtonGroup onRespond={handleRsvp} pending={responding} testIdPrefix="upcoming-meeting" />
     </Card>
   );
 }

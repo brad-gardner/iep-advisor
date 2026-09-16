@@ -7,11 +7,13 @@ import { PageLayout } from '@/components/ui/page-layout';
 import { Table, type TableColumn } from '@/components/ui/table';
 import { apiErrorMessage } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { listNotificationFailures } from '../api/notifications-api';
 import type { NotificationDto } from '../types';
 
 /** Platform admin: notifications where the email send failed, newest first. */
 export function AdminNotificationFailuresPage() {
+  usePageTitle('Notification email failures');
   const [items, setItems] = useState<NotificationDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Bumped by the "Try again" button to re-run the load effect below.

@@ -7,6 +7,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { PageLayout } from "@/components/ui/page-layout";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { DetailLayout } from "@/components/ui/detail-layout";
 import { getDistrictSchools } from "@/features/district-admin/api/district-api";
 import type { DistrictSchool } from "@/features/district-admin/types";
@@ -30,6 +31,7 @@ export function EducatorStudentDetailPage() {
   const studentId = Number(studentIdParam);
   const record = useStudentRecord(studentId);
   const { student } = record;
+  usePageTitle(student ? `${student.firstName} ${student.lastName ?? ""}`.trim() || "Student" : "Student");
 
   const [schools, setSchools] = useState<DistrictSchool[]>([]);
   const [isInviteStudentOpen, setIsInviteStudentOpen] = useState(false);

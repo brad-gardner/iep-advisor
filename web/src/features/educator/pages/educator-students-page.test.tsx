@@ -291,6 +291,24 @@ describe('EducatorStudentsPage', () => {
     expect(screen.queryByTestId('attention-filter-indicator')).not.toBeInTheDocument();
   });
 
+  it('shows plan-5 compliance banner labels for the new attention values', async () => {
+    renderPage('/educator/students?attention=OverdueAnnual');
+    expect(await screen.findByTestId('attention-filter-indicator')).toHaveTextContent(
+      'an overdue annual review'
+    );
+    expect(api.searchStudents).toHaveBeenCalledWith(
+      expect.objectContaining({ attention: 'OverdueAnnual' })
+    );
+  });
+
+  it('shows the "unknown dates" banner label, never as a healthy status', async () => {
+    renderPage('/educator/students?attention=UnknownDates');
+    expect(await screen.findByTestId('attention-filter-indicator')).toHaveTextContent('unknown dates');
+    expect(api.searchStudents).toHaveBeenCalledWith(
+      expect.objectContaining({ attention: 'UnknownDates' })
+    );
+  });
+
   it('shows the roster as loading until the request resolves', async () => {
     let resolve!: (value: unknown) => void;
     api.searchStudents.mockReturnValue(new Promise((r) => (resolve = r)));

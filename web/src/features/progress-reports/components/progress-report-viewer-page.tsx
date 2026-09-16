@@ -5,6 +5,7 @@ import { Notice } from "@/components/ui/notice";
 import { Spinner } from "@/components/ui/spinner";
 import { PageLayout } from "@/components/ui/page-layout";
 import { PdfViewer } from "@/components/ui/pdf-viewer";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { getById, getDownloadUrl } from "../api/progress-reports-api";
 import { ProgressReportAnalysisTab } from "./progress-report-analysis-tab";
 import type { ProgressReport } from "../types";
@@ -35,6 +36,7 @@ function formatPeriod(
 }
 
 export function ProgressReportViewerPage() {
+  usePageTitle("Progress report");
   const { childId, id, prId } = useParams<{
     childId: string;
     id: string;

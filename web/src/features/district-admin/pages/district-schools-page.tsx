@@ -7,6 +7,7 @@ import { Modal } from "@/components/ui/modal";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { reloadEducatorProfile } from "@/features/educator/hooks/use-educator-profile";
 import {
   createSchool,
@@ -18,6 +19,7 @@ import { SchoolForm } from "../components/school-form";
 import type { DistrictSchool, SaveSchoolRequest } from "../types";
 
 export function DistrictSchoolsPage() {
+  usePageTitle("Schools");
   const { show: showToast } = useToast();
   const [schools, setSchools] = useState<DistrictSchool[]>([]);
   const [isLoading, setIsLoading] = useState(true);

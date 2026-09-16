@@ -29,6 +29,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { PdfViewer } from "@/components/ui/pdf-viewer";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { ProgressReportsTab } from "@/features/progress-reports/components/progress-reports-tab";
 
 const MEETING_TYPE_LABELS: Record<string, string> = {
@@ -39,6 +40,7 @@ const MEETING_TYPE_LABELS: Record<string, string> = {
 };
 
 export function IepViewerPage() {
+  usePageTitle("IEP");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const documentId = Number(id);

@@ -4,6 +4,7 @@ import { Logo } from '@/components/ui/logo';
 import { Notice } from '@/components/ui/notice';
 import { ProgressDots } from '@/components/ui/progress-dots';
 import { useAuth } from '@/features/auth/hooks/use-auth';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { WelcomeStep } from './welcome-step';
 import { StateStep } from './state-step';
 import { ChildStep } from './child-step';
@@ -13,6 +14,7 @@ const TOTAL_STEPS = 4;
 const STEP_LABELS = ['Welcome', 'Set State', 'Add Child', 'Next Steps'];
 
 export function OnboardingFlow() {
+  usePageTitle('Get started');
   const [step, setStep] = useState(0);
   const [error, setError] = useState('');
   const navigate = useNavigate();

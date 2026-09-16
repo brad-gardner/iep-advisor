@@ -123,4 +123,48 @@ describe('Sidebar Administration async gate', () => {
     expect(screen.queryByTestId('district-admin-nav-loading')).not.toBeInTheDocument();
     expect(screen.queryByTestId('district-admin-nav')).not.toBeInTheDocument();
   });
+
+  it('includes a Compliance link in the Administration group for a district admin', () => {
+    useAuthMock.mockReturnValue({ user: makeUser('Educator') });
+    useEducatorProfileMock.mockReturnValue({
+      profile: makeProfile(ORG_ROLE.DistrictAdmin),
+      isLoading: false,
+    });
+
+    renderSidebar();
+
+    const links = screen.getAllByTestId('nav-educator/admin/compliance');
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute('href', '/educator/admin/compliance');
+  });
+
+  it('truncates a long name/email in the footer and exposes the full value via title', () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        ...makeUser('Educator'),
+        firstName: 'Bartholomew-Christopher',
+        lastName: 'Featherstonehaugh-Worthington',
+        email: 'bartholomew.christopher.featherstonehaugh@a-very-long-district-domain.example.com',
+      },
+    });
+    useEducatorProfileMock.mockReturnValue({ profile: null, isLoading: false });
+
+    renderSidebar();
+
+    const [name] = screen.getAllByText('Bartholomew-Christopher Featherstonehaugh-Worthington');
+    expect(name.className).toContain('truncate');
+    expect(name).toHaveAttribute(
+      'title',
+      'Bartholomew-Christopher Featherstonehaugh-Worthington'
+    );
+
+    const [email] = screen.getAllByText(
+      'bartholomew.christopher.featherstonehaugh@a-very-long-district-domain.example.com'
+    );
+    expect(email.className).toContain('truncate');
+    expect(email).toHaveAttribute(
+      'title',
+      'bartholomew.christopher.featherstonehaugh@a-very-long-district-domain.example.com'
+    );
+  });
 });

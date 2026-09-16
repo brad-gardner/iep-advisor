@@ -1,29 +1,30 @@
-import { Link } from "react-router-dom";
-import { Users, FileText, UserCircle, ArrowRight } from "lucide-react";
-import { useAuth } from "../hooks/use-auth";
-import { DashboardChildrenSection } from "@/features/children/components/dashboard-children-section";
-import { Card } from "@/components/ui/card";
-import { Notice } from "@/components/ui/notice";
-import { Button } from "@/components/ui/button";
-import { PageLayout } from "@/components/ui/page-layout";
+import { Link } from 'react-router-dom';
+import { Users, FileText, UserCircle, ArrowRight } from 'lucide-react';
+import { DashboardChildrenSection } from '@/features/children/components/dashboard-children-section';
+import { Card } from '@/components/ui/card';
+import { Notice } from '@/components/ui/notice';
+import { Button } from '@/components/ui/button';
+import type { User } from '@/types/api';
 
-export function DashboardPage() {
-  const { user } = useAuth();
+interface LegacyParentHomeProps {
+  user: User | null;
+}
 
+/**
+ * "Mode C" parent home — a standalone consumer parent with no school-linked
+ * child. None of the new operational sections have anything to show for this
+ * mode (no meetings, no school-issued documents), so this renders exactly the
+ * previous `DashboardPage` body, unchanged: onboarding/state setup notices,
+ * children, account, and quick actions.
+ */
+export function LegacyParentHome({ user }: LegacyParentHomeProps) {
   return (
-    <PageLayout title={`Welcome, ${user?.firstName ?? ""}`.trim()}>
+    <div className="space-y-6" data-testid="parent-home-legacy">
       {user && !user.onboardingCompleted && (
         <div data-testid="onboarding-banner">
-          <Notice
-            variant="info"
-            title="Complete your setup to get the most out of IEP Advisor"
-          >
+          <Notice variant="info" title="Complete your setup to get the most out of IEP Advisor">
             <Link to="/onboarding">
-              <Button
-                variant="primary"
-                className="mt-2 gap-1.5"
-                data-testid="onboarding-get-started"
-              >
+              <Button variant="primary" className="mt-2 gap-1.5" data-testid="onboarding-get-started">
                 Get Started
                 <ArrowRight size={14} strokeWidth={1.8} aria-hidden="true" />
               </Button>
@@ -36,7 +37,7 @@ export function DashboardPage() {
         <Notice variant="warning" title="Set your state for better guidance">
           <Link to="/profile" className="underline hover:text-brand-amber-600">
             Update your profile
-          </Link>{" "}
+          </Link>{' '}
           to get jurisdiction-specific IEP guidance.
         </Notice>
       )}
@@ -50,16 +51,14 @@ export function DashboardPage() {
             <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
               Email
             </p>
-            <p className="text-sm font-medium text-brand-slate-800 mt-1">
-              {user?.email}
-            </p>
+            <p className="text-sm font-medium text-brand-slate-800 mt-1">{user?.email}</p>
           </div>
           <div className="bg-brand-slate-50 rounded-card p-4 border-[0.5px] border-brand-slate-200">
             <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
               State
             </p>
             <p className="text-sm font-medium text-brand-slate-800 mt-1">
-              {user?.state || "Not set"}
+              {user?.state || 'Not set'}
             </p>
           </div>
         </div>
@@ -72,61 +71,34 @@ export function DashboardPage() {
             to="/children"
             className="flex items-center gap-3 p-4 rounded-card border-[0.5px] border-brand-slate-200 hover:bg-brand-teal-50 hover:border-brand-teal-100 transition-colors"
           >
-            <Users
-              className="text-brand-teal-500 shrink-0"
-              size={20}
-              strokeWidth={1.8}
-              aria-hidden="true"
-            />
+            <Users className="text-brand-teal-500 shrink-0" size={20} strokeWidth={1.8} aria-hidden="true" />
             <div>
-              <p className="text-sm font-medium text-brand-slate-800">
-                Add Child Profile
-              </p>
-              <p className="text-[11px] text-brand-slate-400">
-                Create a profile for your child
-              </p>
+              <p className="text-sm font-medium text-brand-slate-800">Add Child Profile</p>
+              <p className="text-[11px] text-brand-slate-400">Create a profile for your child</p>
             </div>
           </Link>
           <Link
             to="/children"
             className="flex items-center gap-3 p-4 rounded-card border-[0.5px] border-brand-slate-200 hover:bg-brand-teal-50 hover:border-brand-teal-100 transition-colors"
           >
-            <FileText
-              className="text-brand-teal-500 shrink-0"
-              size={20}
-              strokeWidth={1.8}
-              aria-hidden="true"
-            />
+            <FileText className="text-brand-teal-500 shrink-0" size={20} strokeWidth={1.8} aria-hidden="true" />
             <div>
-              <p className="text-sm font-medium text-brand-slate-800">
-                Upload an IEP
-              </p>
-              <p className="text-[11px] text-brand-slate-400">
-                Select a child to upload
-              </p>
+              <p className="text-sm font-medium text-brand-slate-800">Upload an IEP</p>
+              <p className="text-[11px] text-brand-slate-400">Select a child to upload</p>
             </div>
           </Link>
           <Link
             to="/profile"
             className="flex items-center gap-3 p-4 rounded-card border-[0.5px] border-brand-slate-200 hover:bg-brand-teal-50 hover:border-brand-teal-100 transition-colors"
           >
-            <UserCircle
-              className="text-brand-teal-500 shrink-0"
-              size={20}
-              strokeWidth={1.8}
-              aria-hidden="true"
-            />
+            <UserCircle className="text-brand-teal-500 shrink-0" size={20} strokeWidth={1.8} aria-hidden="true" />
             <div>
-              <p className="text-sm font-medium text-brand-slate-800">
-                Edit Profile
-              </p>
-              <p className="text-[11px] text-brand-slate-400">
-                Update your information
-              </p>
+              <p className="text-sm font-medium text-brand-slate-800">Edit Profile</p>
+              <p className="text-[11px] text-brand-slate-400">Update your information</p>
             </div>
           </Link>
         </div>
       </Card>
-    </PageLayout>
+    </div>
   );
 }

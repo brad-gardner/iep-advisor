@@ -4,7 +4,7 @@ import { MainLayout } from '@/components/layouts/main-layout';
 import { AuthLayout } from '@/components/layouts/auth-layout';
 import { LoginPage } from '@/features/auth/components/login-page';
 import { RegisterPage } from '@/features/auth/components/register-page';
-import { DashboardPage } from '@/features/auth/components/dashboard-page';
+import { ParentHomePage } from '@/features/home/pages/parent-home-page';
 import { ProfilePage } from '@/features/auth/components/profile-page';
 import { MfaVerifyPage } from '@/features/auth/components/mfa-verify-page';
 import { MfaSetupPage } from '@/features/auth/components/mfa-setup-page';
@@ -39,10 +39,11 @@ import { AdminUsersPage } from '@/features/admin/components/admin-users-page';
 import { AdminUserDetail } from '@/features/admin/components/admin-user-detail';
 import { TemplateListPage } from '@/features/admin/templates/template-list-page';
 import { TemplateBuilderPage } from '@/features/admin/templates/template-builder-page';
-import { EducatorHomePage } from '@/features/educator/pages/educator-home-page';
+import { StaffHomePage } from '@/features/home/pages/staff-home-page';
 import { EducatorStudentsPage } from '@/features/educator/pages/educator-students-page';
 import { EducatorStudentDetailPage } from '@/features/educator/pages/educator-student-detail-page';
 import { DistrictSchoolsPage } from '@/features/district-admin/pages/district-schools-page';
+import { ComplianceBoardPage } from '@/features/district-admin/pages/compliance-board-page';
 import { DistrictAuditLogPage } from '@/features/district-admin/pages/district-audit-log-page';
 import { DistrictSetupWizard } from '@/features/district-admin/pages/district-setup-wizard';
 import { DistrictStaffPage } from '@/features/staff-invites/pages/district-staff-page';
@@ -180,7 +181,7 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <MainLayout>
-              <DashboardPage />
+              <ParentHomePage />
             </MainLayout>
           </ProtectedRoute>
         }
@@ -352,7 +353,7 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <EducatorHomePage />
+                <StaffHomePage />
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -377,6 +378,18 @@ export function AppRouter() {
             <RoleRoute allow={['Educator']}>
               <MainLayout>
                 <DistrictSchoolsPage />
+              </MainLayout>
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/admin/compliance"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allow={['Educator']}>
+              <MainLayout>
+                <ComplianceBoardPage />
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>

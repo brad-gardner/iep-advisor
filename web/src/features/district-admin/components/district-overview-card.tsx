@@ -48,7 +48,11 @@ export function DistrictOverviewCard() {
 
   return (
     <Card className="max-w-lg" accent data-testid="district-overview-card">
-      <h2 className="font-serif text-xl mb-4">{overview.name}</h2>
+      {/* The district/school name already renders as the page's <h1> (see
+          `StaffHomePage`) — repeating it here as an <h2> would duplicate the
+          same text at two heading levels, so this card's heading names the
+          card's own content instead. */}
+      <h2 className="font-serif text-xl mb-4">District snapshot</h2>
       <dl className="grid grid-cols-2 gap-4 text-sm">
         {overview.stateCode && (
           <div>

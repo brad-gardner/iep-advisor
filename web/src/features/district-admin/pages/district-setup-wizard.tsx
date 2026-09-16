@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { Logo } from '@/components/ui/logo';
 import { ProgressDots } from '@/components/ui/progress-dots';
 import { Spinner } from '@/components/ui/spinner';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { ORG_ROLE } from '@/features/educator/types';
 import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
 import { SetupWelcomeStep } from '../components/setup/setup-welcome-step';
@@ -19,6 +20,7 @@ const DONE_STEP = TOTAL_STEPS - 1;
 // other staff are redirected to the dashboard. Every step is skippable — the
 // dashboard checklist nudges anything left undone.
 export function DistrictSetupWizard() {
+  usePageTitle('Set up your district');
   const { profile, isLoading } = useEducatorProfile();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);

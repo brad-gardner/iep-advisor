@@ -1,11 +1,14 @@
 import { apiClient } from '@/lib/api-client';
 import type { ApiResponse } from '@/types/api';
 import type {
+  AdoptionDto,
   AuditLogFilters,
   AuditLogPage,
+  ComplianceBoardDto,
   DistrictDashboard,
   DistrictOverview,
   DistrictSchool,
+  EngagementDto,
   SaveSchoolRequest,
 } from '../types';
 
@@ -73,5 +76,44 @@ export async function deactivateSchool(schoolId: number): Promise<ApiResponse<nu
   const response = await apiClient.delete<ApiResponse<null>>(
     `/api/district/schools/${schoolId}`
   );
+  return response.data;
+}
+
+// Compliance board (plan 5). SchoolAdmin's `schoolId` is ignored/forced server-side
+// to their own school — only DistrictAdmin's picker sends one.
+export async function getComplianceBoard(
+  params: { schoolId?: number; from?: string; to?: string } = {}
+): Promise<ApiResponse<ComplianceBoardDto>> {
+  const query: Record<string, string> = {};
+  if (params.schoolId != null) query.schoolId = String(params.schoolId);
+  if (params.from) query.from = params.from;
+  if (params.to) query.to = params.to;
+  const response = await apiClient.get<ApiResponse<ComplianceBoardDto>>(
+    '/api/district/compliance',
+    { params: query }
+  );
+  return response.data;
+}
+
+export async function getAdoption(
+  params: { schoolId?: number; days?: number } = {}
+): Promise<ApiResponse<AdoptionDto>> {
+  const query: Record<string, string> = {};
+  if (params.schoolId != null) query.schoolId = String(params.schoolId);
+  if (params.days != null) query.days = String(params.days);
+  const response = await apiClient.get<ApiResponse<AdoptionDto>>('/api/district/adoption', {
+    params: query,
+  });
+  return response.data;
+}
+
+export async function getEngagement(
+  params: { schoolId?: number } = {}
+): Promise<ApiResponse<EngagementDto>> {
+  const query: Record<string, string> = {};
+  if (params.schoolId != null) query.schoolId = String(params.schoolId);
+  const response = await apiClient.get<ApiResponse<EngagementDto>>('/api/district/engagement', {
+    params: query,
+  });
   return response.data;
 }

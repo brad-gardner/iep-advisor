@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home, ScrollText, FileText, Upload, Calendar, Bell, MailWarning } from 'lucide-react';
+import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home, ScrollText, FileText, Upload, Calendar, Bell, MailWarning, ClipboardCheck } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -44,6 +44,7 @@ const adminNavItems: {
 }[] = [
   { to: '/educator/admin/schools', label: 'Schools', Icon: School, schoolAdmin: false },
   { to: '/educator/admin/staff', label: 'Staff', Icon: Users, schoolAdmin: true },
+  { to: '/educator/admin/compliance', label: 'Compliance', Icon: ClipboardCheck, schoolAdmin: true },
   { to: '/educator/admin/imports', label: 'Import', Icon: Upload, schoolAdmin: true },
   { to: '/educator/admin/activity', label: 'Activity log', Icon: ScrollText, schoolAdmin: true },
 ];
@@ -239,10 +240,22 @@ export function Sidebar({ onLogout }: SidebarProps) {
         </div>
       )}
 
-      <div className="p-4 border-t border-brand-slate-700">
-        <p className="text-sm text-brand-slate-300 truncate mb-2">
-          {user?.firstName} {user?.lastName}
-        </p>
+      {/* `min-w-0`: this footer is a flex item of the column-flex `<aside>`,
+          whose default `min-width: auto` can hold it to its text's natural
+          (unwrapped) width and defeat `truncate` below for a long name/email —
+          overriding it lets the block actually shrink to the rail's width. */}
+      <div className="min-w-0 border-t border-brand-slate-700 p-4">
+        <div className="mb-2 min-w-0">
+          <p
+            className="truncate text-sm text-brand-slate-300"
+            title={`${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || undefined}
+          >
+            {user?.firstName} {user?.lastName}
+          </p>
+          <p className="truncate text-xs text-brand-slate-500" title={user?.email || undefined}>
+            {user?.email}
+          </p>
+        </div>
         <button
           onClick={onLogout}
           data-testid="sidebar-sign-out"

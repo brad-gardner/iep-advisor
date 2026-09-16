@@ -4,8 +4,10 @@ import { forgotPassword } from '../api/auth-api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 export function ForgotPasswordPage() {
+  usePageTitle('Forgot password');
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);

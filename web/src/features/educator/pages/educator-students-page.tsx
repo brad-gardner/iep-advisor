@@ -7,6 +7,7 @@ import { Modal } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Pagination } from "@/components/ui/pagination";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Table } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { apiErrorMessage } from "@/lib/api-error";
@@ -37,6 +38,7 @@ const CASELOAD_EMPTY =
   "No students on your caseload yet — your school admin can add you to a student's IEP team, or create one.";
 
 export function EducatorStudentsPage() {
+  usePageTitle("Students");
   const { show: showToast } = useToast();
   const { profile } = useEducatorProfile();
   const isDistrictAdmin = profile?.orgRoleId === ORG_ROLE.DistrictAdmin;

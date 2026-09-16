@@ -109,3 +109,79 @@ export interface AuditLogFilters {
   cursor?: number;
   pageSize?: number;
 }
+
+// Compliance board (plan 5). Mirrors api/IepAssistant.Api/DTOs/District/ComplianceBoardDto.cs.
+// `due30`/`due60` = due within N days from today (not overdue); overdue
+// buckets apply regardless of the selected date range.
+
+export interface ComplianceSummaryDto {
+  overdueAnnual: number;
+  overdueReeval: number;
+  due30: number;
+  due60: number;
+  unknownDates: number;
+  noLead: number;
+  activeStudents: number;
+}
+
+export interface ComplianceSchoolRowDto {
+  schoolId: number;
+  schoolName: string;
+  activeStudents: number;
+  overdueAnnual: number;
+  overdueReeval: number;
+  due30: number;
+  due60: number;
+  unknownDates: number;
+  noLead: number;
+}
+
+// `drill` maps each summary/row count key (e.g. "overdueAnnual") to a roster
+// query string fragment (e.g. "attention=OverdueAnnual") — see
+// `lib/drill-link.ts` for how the UI turns that into a roster link.
+export interface ComplianceBoardDto {
+  generatedAt: string;
+  from: string;
+  to: string;
+  summary: ComplianceSummaryDto;
+  bySchool: ComplianceSchoolRowDto[];
+  drill: Record<string, string>;
+}
+
+export interface AdoptionSchoolRow {
+  schoolId: number;
+  schoolName: string;
+  staffActive: number;
+  staffTotal: number;
+  draftsStarted: number;
+  draftsFinalized: number;
+}
+
+export interface AdoptionDto {
+  days: number;
+  staffActiveLast14: number;
+  staffTotal: number;
+  bySchool: AdoptionSchoolRow[];
+  draftsStarted: number;
+  draftsFinalized: number;
+  // States the server's "active" predicate for display, e.g. "Notification
+  // read, document edit, meeting created/RSVP'd in the window".
+  activeRule: string;
+}
+
+export interface EngagementSchoolRow {
+  schoolId: number;
+  schoolName: string;
+  studentsWithFamilyLink: number;
+  activeStudents: number;
+}
+
+// Plan 6 numbers (`draftsShared`/`responsesReceived`) are 0 until family
+// sharing ships; the shape is fixed now.
+export interface EngagementDto {
+  studentsWithFamilyLink: number;
+  activeStudents: number;
+  draftsShared: number;
+  responsesReceived: number;
+  bySchool: EngagementSchoolRow[];
+}

@@ -34,6 +34,17 @@ describe('useRosterQuery', () => {
     expect(at('')).toBeNull();
   });
 
+  it('accepts the plan-5 compliance attention values (home/board drilldowns)', () => {
+    const at = (search: string) =>
+      renderHook(() => useRosterQuery(), { wrapper: wrapper(`/educator/students?${search}`) }).result.current
+        .query.attention;
+    expect(at('attention=OverdueAnnual')).toBe('OverdueAnnual');
+    expect(at('attention=OverdueReeval')).toBe('OverdueReeval');
+    expect(at('attention=Due30')).toBe('Due30');
+    expect(at('attention=Due60')).toBe('Due60');
+    expect(at('attention=UnknownDates')).toBe('UnknownDates');
+  });
+
   it('parses school as a positive integer', () => {
     const { result } = renderHook(() => useRosterQuery(), {
       wrapper: wrapper('/educator/students?school=12'),

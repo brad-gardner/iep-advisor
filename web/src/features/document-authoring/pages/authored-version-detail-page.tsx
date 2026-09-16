@@ -5,6 +5,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { AuthoredPdfDownload } from '../components/authored-pdf-download';
 import { AuthoredVersionSnapshot } from '../components/authored-version-snapshot';
 import { useAuthoredVersion } from '../hooks/use-authored-version';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 // Educator read-only view of a finalized authored version: the frozen snapshot
 // plus a download-with-status (retry allowed for educators).
@@ -16,6 +17,7 @@ export function AuthoredVersionDetailPage() {
   const studentId = Number(studentIdParam);
   const versionId = Number(versionIdParam);
   const { version, isLoading, error } = useAuthoredVersion(versionId);
+  usePageTitle(version ? `${version.documentTypeDisplayName} v${version.versionNumber}` : 'Document version');
 
   const backTo = `/educator/students/${studentId}/documents`;
 

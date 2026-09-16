@@ -9,6 +9,7 @@ import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Table, type TableColumn } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { relativeTime } from '@/lib/relative-time';
 import { deleteDocument } from '../api/documents-api';
 import { useDocumentList } from '../hooks/use-document-list';
@@ -28,6 +29,7 @@ const statusVariant: Record<DocumentInstanceStatus, 'neutral' | 'warning' | 'suc
 };
 
 export function DocumentListPage() {
+  usePageTitle('Documents');
   const { studentId: studentIdParam } = useParams<{ studentId: string }>();
   const studentId = Number(studentIdParam);
   const navigate = useNavigate();

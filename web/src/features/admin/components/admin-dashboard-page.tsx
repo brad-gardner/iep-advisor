@@ -15,11 +15,13 @@ import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageLayout } from '@/components/ui/page-layout';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { getDashboardStats, getRecentUsers } from '../api/admin-api';
 import type { AdminDashboardStats, AdminUser } from '@/types/api';
 import type { LucideIcon } from 'lucide-react';
 
 export function AdminDashboardPage() {
+  usePageTitle('Admin Dashboard');
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [recentUsers, setRecentUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);

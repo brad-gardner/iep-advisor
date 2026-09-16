@@ -11,11 +11,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { apiErrorMessage } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { listNotifications, markAllNotificationsRead, markNotificationRead } from '../api/notifications-api';
 import { useNotificationsContext } from '../hooks/use-notifications-context';
 import type { NotificationDto } from '../types';
 
 export function NotificationsPage() {
+  usePageTitle('Notifications');
   const { show: showToast } = useToast();
   // The sidebar bell shares this same count (see `NotificationsProvider`) —
   // refreshed below after a successful mark-read/mark-all so the badge in

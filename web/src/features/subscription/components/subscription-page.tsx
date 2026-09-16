@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
 import { PageLayout } from '@/components/ui/page-layout';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { SubscriptionStatusCard } from './subscription-status';
 
 export function SubscriptionPage() {
+  usePageTitle('Subscription');
   return (
     <PageLayout title="Subscription">
       <div className="max-w-lg">

@@ -11,10 +11,12 @@ import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageLayout } from "@/components/ui/page-layout";
 import { useToast } from "@/components/ui/toast";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { SharedBadge } from "@/features/sharing/components/shared-badge";
 import type { CreateChildProfileRequest } from "@/types/api";
 
 export function ChildrenListPage() {
+  usePageTitle("Your Children");
   const { children, isLoading, reload } = useChildren();
   const { show: showToast } = useToast();
   const [isAddOpen, setIsAddOpen] = useState(false);

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { orgRoleLabel } from '@/lib/org-role-label';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { acceptStaffInvite, previewStaffInvite } from '../api/staff-invites-api';
 import { AcceptInviteForm } from '../components/accept-invite-form';
@@ -12,6 +13,7 @@ import type { StaffInvitePreview } from '../types';
 type Phase = 'loading' | 'ready' | 'error';
 
 export function StaffAcceptInvitePage() {
+  usePageTitle('Accept invite');
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const navigate = useNavigate();

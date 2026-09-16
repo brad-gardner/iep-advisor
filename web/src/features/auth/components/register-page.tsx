@@ -3,10 +3,12 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { ParentRegisterForm } from './parent-register-form';
 import { DistrictRegisterForm } from './district-register-form';
 import { RegisterPathCard } from './register-path-card';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 type RegisterPath = 'parent' | 'district';
 
 export function RegisterPage() {
+  usePageTitle('Create your account');
   const [searchParams] = useSearchParams();
   const codeFromUrl = searchParams.get('code') ?? '';
   const typeFromUrl = searchParams.get('type');

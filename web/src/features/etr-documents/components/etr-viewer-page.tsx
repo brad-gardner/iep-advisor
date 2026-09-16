@@ -22,12 +22,14 @@ import { EtrProcessingBanner } from './etr-processing-banner';
 import { EtrErrorBanner } from './etr-error-banner';
 import { EtrSectionsList } from './etr-sections-list';
 import { EtrAnalysisTab } from './etr-analysis-tab';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 type TabKey = 'overview' | 'sections' | 'analysis';
 
 const IN_FLIGHT = new Set(['uploaded', 'processing']);
 
 export function EtrViewerPage() {
+  usePageTitle('ETR');
   const { id } = useParams<{ id: string }>();
   const documentId = Number(id);
   const { etr: initialEtr, isLoading } = useEtrDocument(documentId);
