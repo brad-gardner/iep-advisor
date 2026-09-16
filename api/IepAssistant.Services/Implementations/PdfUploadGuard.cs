@@ -39,9 +39,32 @@ public static class PdfUploadGuard
     /// </summary>
     public static string SafeFileName(string? fileName, string fallback)
     {
-        var name = Path.GetFileName((fileName ?? string.Empty).Trim());
-        // Strip until stable: removing an invalid character can re-form a ".." or a separator
-        // (e.g. "." + NUL + "."), so a single pass is not enough for the result to be a bare name.
+        var name = Strip(Path.GetFileName((fileName ?? string.Empty).Trim()));
+        if (string.IsNullOrWhiteSpace(name))
+            return fallback;
+        if (name.Length > MaxFileNameLength)
+        {
+            // A multipart file name has no filesystem behind it, so it can be arbitrarily long —
+            // keep the extension (it is what viewers key on) and trim the stem on a code-point
+            // boundary, then strip again: the seam can re-form ".." ("…a." + ".pdf").
+            var ext = Path.GetExtension(name);
+            if (ext.Length > 16) ext = string.Empty;
+            var cut = MaxFileNameLength - ext.Length;
+            if (char.IsLowSurrogate(name[cut])) cut--; // never split a surrogate pair
+            name = Strip(name[..cut].TrimEnd('.') + ext);
+            if (string.IsNullOrWhiteSpace(name))
+                return fallback;
+        }
+        return name;
+    }
+
+    /// <summary>
+    /// Strips separators, traversal segments and invalid characters until stable: removing an
+    /// invalid character can re-form a ".." (e.g. "." + NUL + "."), so one pass is not enough.
+    /// Every step only removes characters, so the loop always terminates.
+    /// </summary>
+    private static string Strip(string name)
+    {
         string previous;
         do
         {
@@ -50,16 +73,6 @@ public static class PdfUploadGuard
             foreach (var c in Path.GetInvalidFileNameChars())
                 name = name.Replace(c.ToString(), "");
         } while (name != previous);
-        if (string.IsNullOrWhiteSpace(name))
-            return fallback;
-        if (name.Length > MaxFileNameLength)
-        {
-            // A multipart file name has no filesystem behind it, so it can be arbitrarily long —
-            // keep the extension (it is what viewers key on) and trim the stem.
-            var ext = Path.GetExtension(name);
-            if (ext.Length > 16) ext = string.Empty;
-            name = name[..(MaxFileNameLength - ext.Length)] + ext;
-        }
         return name;
     }
 }

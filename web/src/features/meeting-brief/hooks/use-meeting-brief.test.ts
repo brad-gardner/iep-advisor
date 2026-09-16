@@ -56,4 +56,30 @@ describe('useMeetingBrief', () => {
     expect(result.current.generateError).toBeNull();
     expect(result.current.isGenerating).toBe(false);
   });
+
+  it('lets only the newest regenerate for a meeting win after a switch-away-and-back re-armed the button', async () => {
+    briefApi.getBrief.mockImplementation(async (id: number) => ({ success: true, data: brief(id, `Brief for ${id}`) }));
+    let finishOld!: (v: unknown) => void;
+    let finishNew!: (v: unknown) => void;
+    briefApi.generateBrief
+      .mockReturnValueOnce(new Promise((r) => (finishOld = r)))
+      .mockReturnValueOnce(new Promise((r) => (finishNew = r)));
+
+    const { result, rerender } = renderHook(({ id }) => useMeetingBrief(id), { initialProps: { id: 1 } });
+    await waitFor(() => expect(result.current.brief?.summary).toBe('Brief for 1'));
+
+    act(() => void result.current.regenerate()); // old request for meeting 1
+    rerender({ id: 2 });
+    rerender({ id: 1 }); // back before it settles — the button is re-armed
+    await waitFor(() => expect(result.current.isGenerating).toBe(false));
+    act(() => void result.current.regenerate()); // new request for meeting 1
+    expect(result.current.isGenerating).toBe(true);
+
+    await act(async () => finishNew({ success: true, data: brief(1, 'Newest') }));
+    expect(result.current.brief?.summary).toBe('Newest');
+    expect(result.current.isGenerating).toBe(false);
+
+    await act(async () => finishOld({ success: true, data: brief(1, 'Stale') }));
+    expect(result.current.brief?.summary).toBe('Newest'); // the older result is dropped
+  });
 });

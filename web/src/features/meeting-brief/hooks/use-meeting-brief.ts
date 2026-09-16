@@ -71,12 +71,18 @@ export function useMeetingBrief(meetingId: number): UseMeetingBriefResult {
     };
   }, [meetingId]);
 
+  // Only the most recently started regenerate may apply its result or clear the spinner: a
+  // switch-away-and-back re-arms the button (see the render-time reset above), so an older
+  // request for the same meeting can still be outstanding when a newer one starts.
+  const regenerateTokenRef = useRef(0);
   const regenerate = useCallback(async () => {
+    const token = ++regenerateTokenRef.current;
+    const isCurrent = () => currentMeetingRef.current === meetingId && regenerateTokenRef.current === token;
     setIsGenerating(true);
     setGenerateError(null);
     try {
       const res = await generateBrief(meetingId);
-      if (currentMeetingRef.current !== meetingId) return; // superseded by a meeting switch
+      if (!isCurrent()) return; // superseded by a meeting switch or a newer regenerate
       if (res.success && res.data) {
         setBrief(res.data);
         setNotFound(false);
@@ -85,10 +91,10 @@ export function useMeetingBrief(meetingId: number): UseMeetingBriefResult {
         setGenerateError(res.message ?? 'Could not generate the brief.');
       }
     } catch (err) {
-      if (currentMeetingRef.current !== meetingId) return;
+      if (!isCurrent()) return;
       setGenerateError(apiErrorMessage(err, 'Could not generate the brief.'));
     } finally {
-      if (currentMeetingRef.current === meetingId) setIsGenerating(false);
+      if (isCurrent()) setIsGenerating(false);
     }
   }, [meetingId]);
 

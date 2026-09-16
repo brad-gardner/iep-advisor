@@ -32,6 +32,28 @@ public class PdfUploadGuardTests
     }
 
     [Fact]
+    public void SafeFileName_TruncationNeverReformsTraversalOrSplitsASurrogatePair()
+    {
+        // A '.' landing at the cut would meet the ".pdf" seam and re-form "..".
+        var seam = PdfUploadGuard.SafeFileName(new string('a', 255) + "." + new string('z', 5) + ".pdf", "fallback.pdf");
+        Assert.DoesNotContain("..", seam);
+        Assert.True(seam.Length <= PdfUploadGuard.MaxFileNameLength);
+        Assert.EndsWith(".pdf", seam);
+
+        // An emoji straddling the cut must not leave a lone surrogate behind.
+        var emoji = PdfUploadGuard.SafeFileName("a" + string.Concat(Enumerable.Repeat("\U0001F600", 200)) + ".pdf", "fallback.pdf");
+        Assert.True(emoji.Length <= PdfUploadGuard.MaxFileNameLength);
+        for (var i = 0; i < emoji.Length; i++)
+        {
+            if (char.IsHighSurrogate(emoji[i]))
+                Assert.True(i + 1 < emoji.Length && char.IsLowSurrogate(emoji[i + 1]), "lone high surrogate");
+            else
+                Assert.False(char.IsLowSurrogate(emoji[i]) && (i == 0 || !char.IsHighSurrogate(emoji[i - 1])), "lone low surrogate");
+        }
+        Assert.Equal(emoji, System.Text.Encoding.UTF8.GetString(System.Text.Encoding.UTF8.GetBytes(emoji))); // UTF-8 round trip intact
+    }
+
+    [Fact]
     public async Task LooksLikePdf_ChecksTheMagicBytes_AndRewinds()
     {
         using var pdf = new MemoryStream(System.Text.Encoding.ASCII.GetBytes("%PDF-1.7 ..."));

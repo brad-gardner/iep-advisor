@@ -26,9 +26,14 @@ interface NewDocumentModalProps {
  * hook starts fresh each time (no reset-on-open effect).
  */
 export function NewDocumentModal({ studentId, open, onClose, onCreated }: NewDocumentModalProps) {
+  // The create request outlives a dismiss gesture, so while it is in flight the dialog cannot be
+  // closed — otherwise a "cancelled" create would still land and navigate to the new document.
+  const [creating, setCreating] = useState(false);
   return (
-    <Modal open={open} onClose={onClose} title="New document" data-testid="new-document-modal">
-      {open && <NewDocumentForm studentId={studentId} onClose={onClose} onCreated={onCreated} />}
+    <Modal open={open} onClose={onClose} preventClose={creating} title="New document" data-testid="new-document-modal">
+      {open && (
+        <NewDocumentForm studentId={studentId} onClose={onClose} onCreated={onCreated} onCreatingChange={setCreating} />
+      )}
     </Modal>
   );
 }
@@ -37,10 +42,15 @@ function NewDocumentForm({
   studentId,
   onClose,
   onCreated,
-}: Omit<NewDocumentModalProps, 'open'>) {
+  onCreatingChange,
+}: Omit<NewDocumentModalProps, 'open'> & { onCreatingChange: (creating: boolean) => void }) {
   const { types, isLoading, error } = useDocumentTypes();
   const [selectedId, setSelectedId] = useState<number | ''>('');
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreatingLocal] = useState(false);
+  const setCreating = (value: boolean) => {
+    setCreatingLocal(value);
+    onCreatingChange(value);
+  };
   const [createError, setCreateError] = useState<string | null>(null);
 
   // Default to the first type until the user picks one — derived, so no effect.
