@@ -70,7 +70,7 @@ export function ShareWithFamilyModal({ open, onClose, instanceId, onShared }: Sh
   const canShare = Boolean(preview) && preview!.policyEnabled && preview!.recipients.length > 0;
 
   return (
-    <Modal open={open} onClose={onClose} title="Share with family" data-testid="share-with-family-modal">
+    <Modal open={open} onClose={onClose} preventClose={isSharing} title="Share with family" data-testid="share-with-family-modal">
       <div className="space-y-4">
         {loadError && (
           <div role="alert">

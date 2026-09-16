@@ -149,7 +149,7 @@ export function FinalizeDocumentSection({
     <div className="space-y-3">
       <Modal
         open={isOpen}
-        onClose={closeDialog}
+        onClose={closeDialog} preventClose={isSubmitting}
         title={`Finalize this ${documentTypeDisplayName}`}
         size="md"
         data-testid="finalize-document-dialog"
