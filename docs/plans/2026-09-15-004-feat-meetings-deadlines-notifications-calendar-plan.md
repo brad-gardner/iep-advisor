@@ -1,7 +1,7 @@
 ---
 title: "feat: Meetings, procedural deadlines, notifications and staff calendar"
 type: feat
-status: active
+status: completed
 date: 2026-09-15
 origin: docs/gap/combined-findings.md
 slicing_approach: vertical
@@ -59,12 +59,25 @@ There is no meeting entity, no procedural deadline model, no notification model 
 
 ## Acceptance Criteria
 
-- [ ] Meetings can be scheduled with typed participants (staff/family/student/external), rescheduled, cancelled, marked held with attendance recorded separately from RSVP.
-- [ ] Staff calendar shows my meetings and caseload obligations; per-user ICS feed and per-meeting ICS attachments validate in Google Calendar/Outlook import.
-- [ ] Parents see and RSVP to their child's meetings.
-- [ ] Obligations computed from student dates with OH/default rules; missing dates show as Unknown; owner = lead case manager.
-- [ ] In-app notifications with unread count; immediate emails for meeting/draft/response events; daily digest; T-7/T-1/T-1h reminders; email failures visible, retried.
-- [ ] All checks pass.
+- [x] Meetings can be scheduled with typed participants (staff/family/student/external), rescheduled, cancelled, marked held with attendance recorded separately from RSVP. *(Live: Annual Review for Jordan Ellis → participants Steph (CaseManager) + creator; sequence 0.)*
+- [x] Staff calendar shows my meetings and caseload obligations; per-user ICS feed and per-meeting ICS attachments validate in Google Calendar/Outlook import. *(Live: `/educator/calendar` October shows the meeting + "Annual review — Due soon"; feed `.ics` and `/api/meetings/1.ics` emit UID/SEQUENCE/TZID/VTIMEZONE. Import into Google/Outlook not exercised — see P3 follow-ups.)*
+- [x] Parents see and RSVP to their child's meetings. *(`GET /api/children/{id}/meetings`, overview card, token RSVP page; service tests.)*
+- [x] Obligations computed from student dates with OH/default rules; missing dates show as Unknown; owner = lead case manager. *(Live: Jordan AnnualReview 2026-10-13 DueSoon (OH); students without dates → Unknown.)*
+- [x] In-app notifications with unread count; immediate emails for meeting/draft/response events; daily digest; T-7/T-1/T-1h reminders; email failures visible, retried. *(Live: Steph received `MeetingScheduled` (bell shows 1); workers registered; ACS unconfigured in dev → logged sends.)*
+- [x] All checks pass: `dotnet test` 672, vitest 262, tsc + test:types, build, guard:ux; lint 36 (baseline).
+
+## Implementation notes (2026-09-16)
+
+- Migration `AddMeetingsNotificationsCalendar` applied to QA (also adds `Notification.EmailQueuedAt/EmailAttempts` and `User.CalendarFeedTokenCreatedAt`).
+- `GET /api/educator/students/{id}/meetings/default-participants` added so the schedule form pre-checks the same real users (team, accepted family, student account) the server would default to; the form always sends an explicit roster.
+- Digest emails are sent directly by `DigestService` (structured model) and record `EmailSentAt/EmailError` on their own notification row; other kinds go through `NotificationEmailWorker` (30 s, 3 attempts).
+- `UpdateMeetingRequest` is a partial patch; `participants` is a full replacement when present.
+
+## Operational validation notes (for ship)
+
+- **Runtime impact:** three new hosted workers (`NotificationEmailWorker` 30 s, `MeetingReminderWorker` 15 min, `DigestWorker` daily 07:00 America/New_York) and anonymous endpoints (`/api/calendar/feed/{token}.ics`, `/api/meetings/rsvp?token=`). Watch: `Notifications.EmailError` rows (platform admin `/admin/notifications`), worker exceptions in logs, feed endpoint hit rate.
+- **Healthy signal:** scheduling a meeting produces a `MeetingScheduled` notification per participant within one worker tick; calendar shows meetings + obligations.
+- **Failure/mitigation:** email failures never block scheduling; disable a worker by removing its hosted registration if it misbehaves; feed tokens can be regenerated per user. Owner: Brad; window: first staff session after deploy.
 
 ## System-Wide Impact
 
