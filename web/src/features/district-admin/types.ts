@@ -6,6 +6,12 @@ export interface DistrictOverview {
   stateCode?: string | null;
   activeSchoolCount: number;
   activeStaffCount: number;
+  // Plan 6: gates the staff "Share with family" action district-wide.
+  familyDraftSharingEnabled: boolean;
+}
+
+export interface UpdateDistrictRequest {
+  familyDraftSharingEnabled: boolean;
 }
 
 export interface DistrictSchool {

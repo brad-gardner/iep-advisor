@@ -15,6 +15,7 @@ import {
   getDistrictSchools,
   updateSchool,
 } from "../api/district-api";
+import { FamilyDraftSharingToggle } from "../components/family-draft-sharing-toggle";
 import { SchoolForm } from "../components/school-form";
 import type { DistrictSchool, SaveSchoolRequest } from "../types";
 
@@ -155,6 +156,10 @@ export function DistrictSchoolsPage() {
         </Button>
       }
     >
+      <div className="mb-6">
+        <FamilyDraftSharingToggle />
+      </div>
+
       <Table
         label="Schools"
         data-testid="district-schools-table"

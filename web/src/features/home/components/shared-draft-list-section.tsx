@@ -14,8 +14,8 @@ interface SharedDraftListSectionProps {
 }
 
 /** Generic list for the two plan-6 shared-draft sections ("Shared drafts
- * awaiting family" / "Family responses to review") — same DTO shape, always
- * `[]` until plan 6 ships, so this renders empty-safe by construction. */
+ * awaiting family" / "Family responses to review") — same DTO shape. Both link
+ * to the document's Converge tab, where staff reply/resolve family responses. */
 export function SharedDraftListSection({
   title,
   emptyHint,
@@ -34,7 +34,7 @@ export function SharedDraftListSection({
         <WorkItemRow
           title={item.studentName}
           subtitle={formatDate(item[dateField])}
-          href={`/educator/documents/${item.instanceId}`}
+          href={`/educator/documents/${item.instanceId}?tab=converge`}
           data-testid={`${testId}-${item.instanceId}`}
         />
       )}

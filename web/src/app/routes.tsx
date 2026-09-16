@@ -58,6 +58,9 @@ import { StudentHomePage } from '@/features/student/pages/student-home-page';
 import { StudentAcceptInvitePage } from '@/features/student/components/student-accept-invite-page';
 import { ParentVersionDetailPage } from '@/features/iep-versions/components/parent-version-detail-page';
 import { ParentAuthoredVersionPage } from '@/features/document-authoring/pages/parent-authored-version-page';
+import { SharedDraftsListPage } from '@/features/shared-drafts/pages/shared-drafts-list-page';
+import { SharedDraftReviewPage } from '@/features/shared-drafts/pages/shared-draft-review-page';
+import { MeetingSummaryPage } from '@/features/shared-drafts/pages/meeting-summary-page';
 import { RoleHome, RoleRoute } from '@/app/role-routing';
 import { roleHome } from '@/app/role-home';
 import { Spinner } from '@/components/ui/spinner';
@@ -534,6 +537,37 @@ export function AppRouter() {
           <ProtectedRoute>
             <MainLayout>
               <ParentAuthoredVersionPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* Parent surface — plan 6: draft sharing/review, and post-meeting summaries. */}
+      <Route
+        path="/children/:childId/shared-drafts"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <SharedDraftsListPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/children/:childId/shared-drafts/:rev"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <SharedDraftReviewPage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/children/:childId/meetings/:meetingId/summary"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <MeetingSummaryPage />
             </MainLayout>
           </ProtectedRoute>
         }

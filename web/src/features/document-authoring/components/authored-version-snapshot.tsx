@@ -7,20 +7,26 @@ import {
 import type {
   TemplateFieldDto,
   TemplateSectionDto,
+  TemplateVersionDetailDto,
 } from '@/features/admin/templates/types';
-import type { AuthoredDocumentVersionDetailDto, TableRowValue } from '../types';
+import type { TableRowValue } from '../types';
 
 interface AuthoredVersionSnapshotProps {
-  version: AuthoredDocumentVersionDetailDto;
+  /** The pinned template tree the frozen values were captured against. Any
+   *  frozen document shares this shape — an `AuthoredDocumentVersionDetailDto`
+   *  and a `SharedDraftRevisionDetailDto` both structurally satisfy it. */
+  templateVersion: TemplateVersionDetailDto;
+  /** Frozen value-document keyed by `FieldKey` (guid). */
+  values: Record<string, unknown>;
 }
 
-// Read-only render of a frozen authored version: walks the pinned template tree
-// in order and shows each field's stored value. Immutable — no inputs. Small,
-// labeled, per-`FieldType` display (mirrors iep-versions/version-snapshot).
-export function AuthoredVersionSnapshot({ version }: AuthoredVersionSnapshotProps) {
-  const sections = [...version.templateVersion.sections].sort(
-    (a, b) => a.displayOrder - b.displayOrder
-  );
+// Read-only render of a frozen document snapshot: walks the pinned template
+// tree in order and shows each field's stored value. Immutable — no inputs.
+// Small, labeled, per-`FieldType` display (mirrors iep-versions/version-snapshot).
+// Shared by the educator authored-version pages and the parent shared-draft
+// review page (see `FieldValueDisplay`, exported for a custom per-field layout).
+export function AuthoredVersionSnapshot({ templateVersion, values }: AuthoredVersionSnapshotProps) {
+  const sections = [...templateVersion.sections].sort((a, b) => a.displayOrder - b.displayOrder);
 
   if (sections.length === 0) {
     return <p className="text-sm text-brand-slate-400">This template has no sections.</p>;
@@ -29,7 +35,7 @@ export function AuthoredVersionSnapshot({ version }: AuthoredVersionSnapshotProp
   return (
     <div className="space-y-6" data-testid="authored-version-snapshot">
       {sections.map((section) => (
-        <SectionBlock key={section.id} section={section} values={version.values} />
+        <SectionBlock key={section.id} section={section} values={values} />
       ))}
     </div>
   );
@@ -53,7 +59,7 @@ function SectionBlock({
           <p className="text-sm text-brand-slate-400">No fields.</p>
         ) : (
           fields.map((field) => (
-            <FieldValue key={field.id} field={field} value={values[field.fieldKey]} />
+            <FieldValueDisplay key={field.id} field={field} value={values[field.fieldKey]} />
           ))
         )}
       </Card>
@@ -61,7 +67,10 @@ function SectionBlock({
   );
 }
 
-function FieldValue({ field, value }: { field: TemplateFieldDto; value: unknown }) {
+/** One field's frozen value, per `FieldType`. Exported so a consumer that needs
+ *  a custom section layout (e.g. the parent draft review's semantic-row cards)
+ *  can still render "everything else" generically. */
+export function FieldValueDisplay({ field, value }: { field: TemplateFieldDto; value: unknown }) {
   if (field.fieldType === 'Table') {
     return <TableValue field={field} value={value} />;
   }
@@ -147,6 +156,12 @@ function TableValue({ field, value }: { field: TemplateFieldDto; value: unknown 
       )}
     </div>
   );
+}
+
+/** Exported so a custom table-row layout (the parent draft review's semantic
+ *  cards) can render a non-primary column the same way this snapshot does. */
+export function CellValue({ column, value }: { column: TableColumn; value: unknown }) {
+  return <>{renderCell(column, value)}</>;
 }
 
 function renderCell(column: TableColumn, value: unknown): React.ReactNode {

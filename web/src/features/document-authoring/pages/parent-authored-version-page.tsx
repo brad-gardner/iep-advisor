@@ -56,7 +56,7 @@ export function ParentAuthoredVersionPage() {
         It is read-only. Your private notes and analysis are never visible to the school.
       </Notice>
       <div className="mt-6">
-        <AuthoredVersionSnapshot version={version} />
+        <AuthoredVersionSnapshot templateVersion={version.templateVersion} values={version.values} />
       </div>
     </PageLayout>
   );
