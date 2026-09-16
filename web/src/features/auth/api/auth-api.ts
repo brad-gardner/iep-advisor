@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { apiClient } from '@/lib/api-client';
 import type {
   ApiResponse,
@@ -111,17 +110,11 @@ export async function requestMagicLink(email: string): Promise<ApiResponse<null>
 
 // Same response shape as `login` (an existing-MFA challenge or a full
 // session), plus a district-requires-MFA-setup refusal unique to this
-// endpoint — see `LoginResponse.mfaSetupRequired`.
-//
-// Deliberately bypasses `apiClient`: an invalid/expired token answers 401
-// (`AuthController.ConsumeMagicLink`), unlike every other public-token
-// endpoint in this app (reset-password, staff-invite accept both answer
-// 400) — `apiClient`'s shared response interceptor treats ANY 401 as "this
-// session died," clearing the stored token and hard-navigating to /login
-// before the caller ever gets to show its own recovery UI. This endpoint is
-// anonymous, so there's no Authorization header to lose by skipping it.
+// endpoint — see `LoginResponse.mfaSetupRequired`. An invalid/expired token
+// answers 400 like the other public-token endpoints, so the shared client
+// (and its 401 → "session died" interceptor) is safe to use here.
 export async function consumeMagicLink(token: string): Promise<ApiResponse<LoginResponse>> {
-  const response = await axios.post<ApiResponse<LoginResponse>>('/api/auth/magic-link/consume', { token });
+  const response = await apiClient.post<ApiResponse<LoginResponse>>('/api/auth/magic-link/consume', { token });
   return response.data;
 }
 

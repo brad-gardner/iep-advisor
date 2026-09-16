@@ -1,0 +1,93 @@
+name: Checks
+
+# Reusable via `uses: ./.github/workflows/checks.yml` (see deploy-api.yml/deploy-web.yml) AND runs
+# directly on every PR and every push to main, so a change gets gated even before a deploy workflow
+# would otherwise run it (pilot-gates plan, phase 3, decision 6).
+on:
+  workflow_call:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.x"
+      - name: Build
+        run: dotnet build api/IepAssistant.sln --configuration Release
+      - name: Run backend tests
+        run: dotnet test api/IepAssistant.Services.Tests/IepAssistant.Services.Tests.csproj --configuration Release --verbosity minimal
+
+  web-checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        run: npm ci
+        working-directory: web
+      - name: Type-check (build project references)
+        run: npx tsc -b --noEmit
+        working-directory: web
+      - name: Type-check (test project)
+        run: npm run test:types
+        working-directory: web
+      - name: Unit tests
+        run: npx vitest run
+        working-directory: web
+      - name: Lint (baseline-gated — known pre-existing errors don't fail the build, growth beyond the baseline does)
+        working-directory: web
+        run: |
+          npm run lint -- --format json --output-file eslint-report.json || true
+          node -e "
+            const fs = require('fs');
+            const baseline = 36;
+            const report = JSON.parse(fs.readFileSync('eslint-report.json', 'utf8'));
+            const errorCount = report.reduce((sum, file) => sum + file.errorCount, 0);
+            console.log('ESLint errors:', errorCount, '(baseline: ' + baseline + ')');
+            if (errorCount > baseline) {
+              console.error('Lint errors (' + errorCount + ') exceed the baseline (' + baseline + ') — fix new errors or lower the baseline deliberately.');
+              process.exit(1);
+            }
+          "
+      - name: Build
+        run: npm run build
+        working-directory: web
+      - name: UX guard
+        run: npm run guard:ux
+        working-directory: web
+
+  migrations-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ASPNETCORE_ENVIRONMENT: CI
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.x"
+      - name: Install dotnet-ef
+        run: dotnet tool install --global dotnet-ef --version 9.*
+      - name: Check for pending model changes
+        working-directory: api
+        run: dotnet ef migrations has-pending-model-changes --project IepAssistant.Domain --startup-project IepAssistant.Api
