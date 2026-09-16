@@ -9,6 +9,7 @@ import { AccessList } from "@/features/sharing/components/access-list";
 import { SchoolIepsCard } from "@/features/iep-versions/components/school-ieps-card";
 import { AboutMyChildCard } from "@/features/contributions/components/about-my-child-card";
 import { SharedDraftsCard } from "@/features/shared-drafts/components/shared-drafts-card";
+import { ChildProgressCard } from "@/features/goals/components/child-progress-card";
 import { UpcomingMeetingCard } from "./upcoming-meeting-card";
 import { InviteStudentForm } from "@/features/student/components/invite-student-form";
 import { inviteStudentFromParent } from "@/features/student/api/student-invite-api";
@@ -65,6 +66,8 @@ export function ChildOverviewTab() {
       <UpcomingMeetingCard childId={childId} />
 
       <SharedDraftsCard childId={childId} />
+
+      <ChildProgressCard childId={childId} />
 
       <SchoolIepsCard childId={childId} />
 

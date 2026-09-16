@@ -25,6 +25,8 @@ import { InviteStudentForm } from "@/features/student/components/invite-student-
 import { inviteStudentFromEducator } from "@/features/student/api/student-invite-api";
 import { StudentMeetingsCard } from "@/features/meetings/components/student-meetings-card";
 import { StudentTimelineCard } from "@/features/obligations/components/student-timeline-card";
+import { GoalsCard } from "@/features/goals/components/goals-card";
+import { EvaluationCard } from "@/features/evaluation/components/evaluation-card";
 
 export function EducatorStudentDetailPage() {
   const { studentId: studentIdParam } = useParams<{ studentId: string }>();
@@ -127,6 +129,10 @@ export function EducatorStudentDetailPage() {
             <StudentDocumentsSection studentId={studentId} />
 
             <StudentMeetingsCard studentId={studentId} studentName={studentName} />
+
+            <GoalsCard studentId={studentId} />
+
+            <EvaluationCard studentId={studentId} />
 
             <section className="space-y-3">
               <h2 className="font-serif text-lg">IEP team</h2>
