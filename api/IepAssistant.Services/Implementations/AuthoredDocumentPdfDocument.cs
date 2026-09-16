@@ -237,7 +237,8 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
             foreach (var section in _tree.Sections.OrderBy(s => s.DisplayOrder).ThenBy(s => s.Id))
             {
                 sectionNumber++;
-                var heading = $"{sectionNumber}. {section.Title}";
+                // Seeded OH titles already read "Section 6: Measurable Annual Goals" — don't print "7. Section 6: …".
+                var heading = AlreadyNumbered.IsMatch(section.Title) ? section.Title : $"{sectionNumber}. {section.Title}";
                 Note($"Section {sectionNumber}: {section.Title}");
                 col.Item().Element(c => SectionHeading(c, heading));
 
@@ -574,6 +575,9 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
     }
 
     // ---------------------------------------------------------------- QuestPDF cell helpers
+
+    private static readonly System.Text.RegularExpressions.Regex AlreadyNumbered =
+        new(@"^\s*(section\s*)?\d+[.:)]", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
     private static void SectionHeading(IContainer container, string text)
         => container.PaddingTop(4).BorderBottom(1).BorderColor(Colors.Grey.Lighten1)
