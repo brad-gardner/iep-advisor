@@ -5,6 +5,7 @@ import { disableMfa } from '../api/auth-api';
 import { StateSelector } from './state-selector';
 import { AccountDeletionSection } from './account-deletion-section';
 import { SubscriptionStatusCard } from '@/features/subscription/components/subscription-status';
+import { CalendarSubscriptionCard } from '@/features/calendar/components/calendar-subscription-card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -208,6 +209,8 @@ export function ProfilePage() {
           Redeem Invite Code
         </Link>
       </div>
+
+      <CalendarSubscriptionCard />
 
       <Card className="max-w-lg" data-testid="mfa-section">
         <h2 className="text-lg font-serif font-semibold text-brand-slate-800 mb-4">

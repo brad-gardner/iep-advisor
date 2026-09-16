@@ -65,6 +65,16 @@ public static class DependencyInjection
         services.AddScoped<IStaffInviteExpiryService, StaffInviteExpiryService>();
         services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
 
+        // Plan 4: meetings, deadlines, notifications, calendar.
+        services.AddSingleton<IIcsBuilder, IcsBuilder>();
+        services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<INotificationEmailService, NotificationEmailService>();
+        services.AddScoped<IMeetingService, MeetingService>();
+        services.AddScoped<IObligationService, ObligationService>();
+        services.AddScoped<ICalendarService, CalendarService>();
+        services.AddScoped<IMeetingReminderService, MeetingReminderService>();
+        services.AddScoped<IDigestService, DigestService>();
+
         // Stateless JWT minting reused by create-and-sign-in flows (staff invite accept).
         services.AddScoped<JwtTokenFactory>();
 

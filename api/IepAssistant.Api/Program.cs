@@ -140,6 +140,13 @@ builder.Services.AddHostedService<AccessAuditLogWorker>();
 // per-invite processing). All decision logic lives in IStaffInviteExpiryService; single-instance assumption
 // is documented on the worker.
 builder.Services.AddHostedService<StaffInviteExpiryWorker>();
+// Plan 4: meetings, deadlines, notifications, calendar. All three workers push their scheduling-only
+// shell down to a scoped service (INotificationEmailService/IMeetingReminderService/IDigestService) so
+// the actual decision logic is unit-testable without a timer; single-instance assumption documented on
+// NotificationEmailWorker mirrors StaffInviteExpiryWorker's.
+builder.Services.AddHostedService<NotificationEmailWorker>();
+builder.Services.AddHostedService<MeetingReminderWorker>();
+builder.Services.AddHostedService<DigestWorker>();
 
 // Add controllers
 builder.Services.AddControllers()

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ORG_ROLE, type EducatorProfile } from '@/features/educator/types';
+import { NotificationsProvider } from '@/features/notifications/stores/notifications-context';
 import type { User, UserRole } from '@/types/api';
 
 const useAuthMock = vi.fn();
@@ -12,6 +13,10 @@ vi.mock('@/features/auth/hooks/use-auth', () => ({
 }));
 vi.mock('@/features/educator/hooks/use-educator-profile', () => ({
   useEducatorProfile: () => useEducatorProfileMock(),
+}));
+vi.mock('@/features/notifications/api/notifications-api', () => ({
+  listNotifications: vi.fn().mockResolvedValue({ success: true, data: { items: [], unreadCount: 0 } }),
+  markNotificationRead: vi.fn(),
 }));
 
 import { Sidebar } from './sidebar';
@@ -50,7 +55,9 @@ function makeProfile(orgRoleId: number): EducatorProfile {
 function renderSidebar() {
   return render(
     <MemoryRouter>
-      <Sidebar onLogout={() => {}} />
+      <NotificationsProvider>
+        <Sidebar onLogout={() => {}} />
+      </NotificationsProvider>
     </MemoryRouter>
   );
 }

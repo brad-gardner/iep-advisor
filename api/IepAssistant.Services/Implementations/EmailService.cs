@@ -1,7 +1,9 @@
+using System.Net;
 using Azure.Communication.Email;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
@@ -388,6 +390,219 @@ You're receiving this because you signed up for the beta.";
         {
             _logger.LogError(ex, "Failed to send email to {Email}: {Subject}", toEmail, subject);
             // Don't throw — email failure should not break the calling flow
+        }
+    }
+
+    // ----------------------------------------------------------------- Plan 4 additions (throw on failure)
+
+    public Task SendMeetingInvitationAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
+        => SendMeetingEmailAsync(toEmail, "Meeting scheduled", "A meeting has been scheduled", model, ics, ct);
+
+    public Task SendMeetingUpdatedAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
+        => SendMeetingEmailAsync(toEmail, "Meeting updated", "A meeting has been updated", model, ics, ct);
+
+    public Task SendMeetingCancelledAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
+        => SendMeetingEmailAsync(toEmail, "Meeting cancelled", "A meeting has been cancelled", model, ics, ct);
+
+    private async Task SendMeetingEmailAsync(string toEmail, string subjectPrefix, string introText, MeetingEmailModel model, byte[] ics, CancellationToken ct)
+    {
+        var subject = $"{subjectPrefix}: {model.Title} for {model.StudentFirstName}";
+        var whenLine = $"{model.StartsAtUtc:MMMM d, yyyy} at {model.StartsAtUtc:h:mm tt} ({model.TimeZoneId})";
+
+        var rsvpPlain = string.Empty;
+        if (!string.IsNullOrWhiteSpace(model.RsvpAcceptUrl) && !string.IsNullOrWhiteSpace(model.RsvpDeclineUrl))
+            rsvpPlain = $"\nAccept: {model.RsvpAcceptUrl}\nDecline: {model.RsvpDeclineUrl}\n";
+
+        var html = RenderMeetingHtml(introText, model);
+        var plainText = $"{introText}\n\n{model.Title} for {model.StudentFirstName}, organized by {model.OrganizerName}.\n{whenLine} - {model.DurationMinutes} minutes{(string.IsNullOrWhiteSpace(model.Location) ? "" : $" - {model.Location}")}\n{rsvpPlain}\nDetails: {model.DetailUrl}\nA calendar invite (.ics) is attached.";
+
+        var attachment = new EmailAttachment("meeting.ics", "text/calendar", new BinaryData(ics));
+        await SendEmailOrThrowAsync(toEmail, subject, html, plainText, new[] { attachment }, ct);
+    }
+
+    /// <summary>Renders <see cref="SendMeetingEmailAsync"/>'s HTML body. Every interpolated value that
+    /// originates from staff/attacker-controllable input (title, location, organizer/student names, and
+    /// the app-constructed URLs) is HTML-encoded — a meeting Title containing markup must not execute in
+    /// the recipient's mail client (todos/049). Internal + static so it is unit-testable without a live
+    /// ACS connection.</summary>
+    internal static string RenderMeetingHtml(string introText, MeetingEmailModel model)
+    {
+        var title = WebUtility.HtmlEncode(model.Title);
+        var studentFirstName = WebUtility.HtmlEncode(model.StudentFirstName);
+        var organizerName = WebUtility.HtmlEncode(model.OrganizerName);
+        var timeZoneId = WebUtility.HtmlEncode(model.TimeZoneId);
+        var location = string.IsNullOrWhiteSpace(model.Location) ? null : WebUtility.HtmlEncode(model.Location);
+        var detailUrl = WebUtility.HtmlEncode(model.DetailUrl);
+        var whenLine = $"{model.StartsAtUtc:MMMM d, yyyy} at {model.StartsAtUtc:h:mm tt} ({timeZoneId})";
+
+        var rsvpHtml = string.Empty;
+        if (!string.IsNullOrWhiteSpace(model.RsvpAcceptUrl) && !string.IsNullOrWhiteSpace(model.RsvpDeclineUrl))
+        {
+            var acceptUrl = WebUtility.HtmlEncode(model.RsvpAcceptUrl);
+            var declineUrl = WebUtility.HtmlEncode(model.RsvpDeclineUrl);
+            rsvpHtml = $@"
+                <div style=""text-align: center; margin: 24px 0;"">
+                    <a href=""{acceptUrl}"" style=""display: inline-block; margin: 0 8px; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">Accept</a>
+                    <a href=""{declineUrl}"" style=""display: inline-block; margin: 0 8px; padding: 12px 24px; background-color: #E8ECEC; color: #1E2A2A; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">Decline</a>
+                </div>";
+        }
+
+        return $@"
+            <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
+                <div style=""text-align: center; margin-bottom: 24px;"">
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
+                </div>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">{WebUtility.HtmlEncode(introText)}</h1>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
+                    <strong>{title}</strong> for {studentFirstName}, organized by {organizerName}.
+                </p>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
+                    {whenLine} &middot; {model.DurationMinutes} minutes{(location == null ? "" : $" &middot; {location}")}
+                </p>
+                {rsvpHtml}
+                <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
+                    A calendar invite (.ics) is attached. <a href=""{detailUrl}"" style=""color: #1A9478;"">View meeting details</a>.
+                </p>
+                <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
+                <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
+                    IEP Advisor — Navigate with confidence
+                </p>
+            </div>";
+    }
+
+    public async Task SendNotificationAsync(string toEmail, string title, string body, string linkUrl, CancellationToken ct = default)
+    {
+        var html = RenderNotificationHtml(title, body, linkUrl);
+        var plainText = $"{title}\n\n{body}\n\nView in IEP Advisor: {linkUrl}";
+
+        await SendEmailOrThrowAsync(toEmail, title, html, plainText, null, ct);
+    }
+
+    /// <summary>Renders <see cref="SendNotificationAsync"/>'s HTML body. <paramref name="title"/>/
+    /// <paramref name="body"/> ultimately derive from a staff-supplied meeting Title (MeetingService builds
+    /// them as e.g. "Meeting updated: {meeting.Title}") and must be HTML-encoded (todos/049).</summary>
+    internal static string RenderNotificationHtml(string title, string body, string linkUrl)
+    {
+        var safeTitle = WebUtility.HtmlEncode(title);
+        var safeBody = WebUtility.HtmlEncode(body);
+        var safeLink = WebUtility.HtmlEncode(linkUrl);
+
+        return $@"
+            <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
+                <div style=""text-align: center; margin-bottom: 24px;"">
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
+                </div>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">{safeTitle}</h1>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">{safeBody}</p>
+                <div style=""text-align: center; margin: 24px 0;"">
+                    <a href=""{safeLink}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                        View in IEP Advisor
+                    </a>
+                </div>
+                <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
+                <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
+                    IEP Advisor — Navigate with confidence
+                </p>
+            </div>";
+    }
+
+    public async Task SendDigestAsync(string toEmail, DigestEmailModel model, CancellationToken ct = default)
+    {
+        var subject = "Your daily IEP Advisor digest";
+        var html = RenderDigestHtml(model);
+
+        var plainText = $"Good morning, {model.RecipientFirstName}\n\nDeadlines:\n" +
+            (model.Obligations.Count == 0 ? "No overdue or upcoming deadlines.\n" : string.Concat(model.Obligations.Select(o => $"- {o.Status}: {o.Kind} for {o.StudentName}{(o.DueDate.HasValue ? $" (due {o.DueDate.Value:MMM d, yyyy})" : "")}\n"))) +
+            "\nMeetings in the next 7 days:\n" +
+            (model.UpcomingMeetings.Count == 0 ? "No meetings in the next 7 days.\n" : string.Concat(model.UpcomingMeetings.Select(m => $"- {m.Title} for {m.StudentName} - {m.StartsAtUtc:MMM d, h:mm tt} ({m.TimeZoneId})\n"))) +
+            $"\nOpen IEP Advisor: {model.DetailUrl}";
+
+        await SendEmailOrThrowAsync(toEmail, subject, html, plainText, null, ct);
+    }
+
+    /// <summary>Renders <see cref="SendDigestAsync"/>'s HTML body. Obligation/meeting StudentName and
+    /// meeting Title are staff-supplied and must be HTML-encoded (todos/049); Kind/Status are enums and
+    /// need no encoding, but are included via <see cref="object.ToString"/> either way.</summary>
+    internal static string RenderDigestHtml(DigestEmailModel model)
+    {
+        var recipientFirstName = WebUtility.HtmlEncode(model.RecipientFirstName);
+        var detailUrl = WebUtility.HtmlEncode(model.DetailUrl);
+
+        var obligationRows = model.Obligations.Count == 0
+            ? "<p style=\"font-size: 13px; color: #A8B5B5;\">No overdue or upcoming deadlines. Nice work.</p>"
+            : string.Concat(model.Obligations.Select(o =>
+                $"<li style=\"font-size: 13px; color: #5A6F6F; margin-bottom: 4px;\"><strong>{o.Status}</strong> — {o.Kind} for {WebUtility.HtmlEncode(o.StudentName)}{(o.DueDate.HasValue ? $" (due {o.DueDate.Value:MMM d, yyyy})" : "")}</li>"));
+        var meetingRows = model.UpcomingMeetings.Count == 0
+            ? "<p style=\"font-size: 13px; color: #A8B5B5;\">No meetings in the next 7 days.</p>"
+            : string.Concat(model.UpcomingMeetings.Select(m =>
+                $"<li style=\"font-size: 13px; color: #5A6F6F; margin-bottom: 4px;\">{WebUtility.HtmlEncode(m.Title)} for {WebUtility.HtmlEncode(m.StudentName)} — {m.StartsAtUtc:MMM d, h:mm tt} ({WebUtility.HtmlEncode(m.TimeZoneId)})</li>"));
+
+        return $@"
+            <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
+                <div style=""text-align: center; margin-bottom: 24px;"">
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
+                </div>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">Good morning, {recipientFirstName}</h1>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6; font-weight: 500;"">Deadlines</p>
+                <ul style=""padding-left: 18px; margin: 0 0 16px;"">{obligationRows}</ul>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6; font-weight: 500;"">Meetings in the next 7 days</p>
+                <ul style=""padding-left: 18px; margin: 0 0 16px;"">{meetingRows}</ul>
+                <div style=""text-align: center; margin: 24px 0;"">
+                    <a href=""{detailUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                        Open IEP Advisor
+                    </a>
+                </div>
+                <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
+                <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
+                    IEP Advisor — Navigate with confidence
+                </p>
+            </div>";
+    }
+
+    /// <summary>
+    /// Plan 4's throwing counterpart to <see cref="SendEmailAsync"/>: the dev-mode (no ACS connection
+    /// string) path still logs-and-returns success, but a real send failure is logged AND rethrown so the
+    /// caller (a background worker/service) can record it rather than have it silently disappear.
+    /// </summary>
+    private async Task SendEmailOrThrowAsync(string toEmail, string subject, string htmlContent, string plainTextContent, IReadOnlyList<EmailAttachment>? attachments, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(_connectionString))
+        {
+            // No recipient/subject in the log line (subject embeds a student/meeting title) — plan 4's
+            // "no PII in logs" constraint applies to this new throwing path even though the pre-existing
+            // swallowing SendEmailAsync above still logs both (unchanged, out of scope for this plan).
+            _logger.LogInformation("Email (dev mode, not sent): {Length} chars HTML", htmlContent.Length);
+            return;
+        }
+
+        var client = new EmailClient(_connectionString);
+        var emailMessage = new EmailMessage(
+            senderAddress: _senderAddress,
+            recipientAddress: toEmail,
+            content: new EmailContent(subject)
+            {
+                Html = htmlContent,
+                PlainText = plainTextContent
+            });
+
+        if (attachments != null)
+        {
+            foreach (var attachment in attachments)
+                emailMessage.Attachments.Add(attachment);
+        }
+
+        try
+        {
+            var operation = await client.SendAsync(Azure.WaitUntil.Started, emailMessage, ct);
+            _logger.LogInformation("Email sent (OperationId: {OperationId})", operation.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send email (OperationId unavailable — send threw before completion)");
+            throw;
         }
     }
 }

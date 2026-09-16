@@ -22,6 +22,8 @@ import { StudentLifecycleActions } from "../components/lifecycle/student-lifecyc
 import { StudentTeamPanel } from "../components/team/student-team-panel";
 import { InviteStudentForm } from "@/features/student/components/invite-student-form";
 import { inviteStudentFromEducator } from "@/features/student/api/student-invite-api";
+import { StudentMeetingsCard } from "@/features/meetings/components/student-meetings-card";
+import { StudentTimelineCard } from "@/features/obligations/components/student-timeline-card";
 
 export function EducatorStudentDetailPage() {
   const { studentId: studentIdParam } = useParams<{ studentId: string }>();
@@ -118,6 +120,8 @@ export function EducatorStudentDetailPage() {
           <div className="space-y-6">
             <StudentDocumentsSection studentId={studentId} />
 
+            <StudentMeetingsCard studentId={studentId} studentName={studentName} />
+
             <section className="space-y-3">
               <h2 className="font-serif text-lg">IEP team</h2>
               <StudentTeamPanel
@@ -137,6 +141,11 @@ export function EducatorStudentDetailPage() {
             <StudentDetailsCard
               student={student}
               onEdit={canEdit ? () => setIsEditOpen(true) : undefined}
+            />
+
+            <StudentTimelineCard
+              studentId={studentId}
+              onEditDates={canEdit ? () => setIsEditOpen(true) : undefined}
             />
 
             <Card>

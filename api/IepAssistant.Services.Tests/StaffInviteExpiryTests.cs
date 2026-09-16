@@ -410,46 +410,32 @@ public sealed class StaffInviteExpiryTests : IDisposable
 
     /// <summary>Runs a callback when the expiry reminder is sent, to simulate a concurrent DB mutation
     /// landing between the send and the guarded stamp.</summary>
-    private sealed class MutatingEmailService : IEmailService
+    private sealed class MutatingEmailService : TestSupport.TestEmailServiceBase
     {
         private readonly Action _onSend;
         public int SendCount { get; private set; }
 
         public MutatingEmailService(Action onSend) => _onSend = onSend;
 
-        public Task SendStaffInviteExpiringEmailAsync(string toEmail, string inviteeEmail, string districtName, string? schoolName, DateTime expiresAt, CancellationToken ct = default)
+        public override Task SendStaffInviteExpiringEmailAsync(string toEmail, string inviteeEmail, string districtName, string? schoolName, DateTime expiresAt, CancellationToken ct = default)
         {
             SendCount++;
             _onSend();
             return Task.CompletedTask;
         }
-
-        public Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendShareInviteEmailAsync(string toEmail, string inviterName, string childName, string role, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendSchoolLinkInviteEmailAsync(string toEmail, string educatorName, string schoolName, string studentName, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendStudentInviteEmailAsync(string toEmail, string inviterName, string context, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendStaffInviteEmailAsync(string toEmail, string districtName, string? schoolName, string roleName, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendBetaInviteEmailAsync(string toEmail, string inviteCode, CancellationToken ct = default) => Task.CompletedTask;
     }
 
     /// <summary>Records every expiry-reminder send so recipient + idempotency can be asserted.</summary>
-    private sealed class CapturingEmailService : IEmailService
+    private sealed class CapturingEmailService : TestSupport.TestEmailServiceBase
     {
         public sealed record Reminder(string ToEmail, string InviteeEmail, string DistrictName, string? SchoolName, DateTime ExpiresAt);
 
         public List<Reminder> Sent { get; } = new();
 
-        public Task SendStaffInviteExpiringEmailAsync(string toEmail, string inviteeEmail, string districtName, string? schoolName, DateTime expiresAt, CancellationToken ct = default)
+        public override Task SendStaffInviteExpiringEmailAsync(string toEmail, string inviteeEmail, string districtName, string? schoolName, DateTime expiresAt, CancellationToken ct = default)
         {
             Sent.Add(new Reminder(toEmail, inviteeEmail, districtName, schoolName, expiresAt));
             return Task.CompletedTask;
         }
-
-        public Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendShareInviteEmailAsync(string toEmail, string inviterName, string childName, string role, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendSchoolLinkInviteEmailAsync(string toEmail, string educatorName, string schoolName, string studentName, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendStudentInviteEmailAsync(string toEmail, string inviterName, string context, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendStaffInviteEmailAsync(string toEmail, string districtName, string? schoolName, string roleName, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendBetaInviteEmailAsync(string toEmail, string inviteCode, CancellationToken ct = default) => Task.CompletedTask;
     }
 }
