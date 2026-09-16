@@ -10,6 +10,7 @@ import { SharedBanner } from '@/features/draft-sharing/components/shared-banner'
 import { ShareWithFamilyButton } from '@/features/draft-sharing/components/share-with-family-button';
 import { useFlushRegistry } from '@/hooks/use-flush-registry';
 import { useFlushOnNavigate } from '@/hooks/use-flush-on-navigate';
+import { formatDate } from '@/lib/format-date';
 import type { DocumentInstance } from '../hooks/use-document-instance';
 import { DocumentFlushContext } from '../hooks/flush-registry-context';
 import { DocumentEditorContext, type ActiveFieldTarget } from '../hooks/document-editor-context';
@@ -24,6 +25,7 @@ import type { DocumentInstanceDetailDto, DocumentInstanceStatus } from '../types
 import { DocumentField } from './field-renderers/document-field';
 import { FinalizeDocumentSection } from './finalize-document-section';
 import { ChatPanel } from './chat/chat-panel';
+import { ProposedEditsPanel } from './proposed-edits-panel';
 import { SectionNavigator } from './section-navigator';
 import { CompletenessPanel } from './completeness-panel';
 
@@ -153,6 +155,15 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
           </div>
 
           <SharedBanner key={shareVersion} instanceId={detail.id} />
+
+          {detail.amendsVersionId != null && (
+            <Notice variant="info" title={`Amendment of v${detail.amendsVersionNumber ?? detail.amendsVersionId}`}>
+              {detail.amendmentReason}
+              {detail.effectiveDate ? ` · Effective ${formatDate(detail.effectiveDate)}` : ''}
+            </Notice>
+          )}
+
+          <ProposedEditsPanel instanceId={detail.id} templateVersion={detail.templateVersion} />
 
           {conflict && (
             <div role="alert">

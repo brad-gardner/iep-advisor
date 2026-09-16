@@ -193,3 +193,57 @@ export interface DefaultParticipantDto {
   isFamily: boolean;
   isStudent: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Plan 7, decision 3 — attendance & decisions
+// ---------------------------------------------------------------------------
+
+export const MEETING_DECISION_OUTCOMES = ['Agreed', 'Disagreed', 'Deferred'] as const;
+export type MeetingDecisionOutcome = (typeof MEETING_DECISION_OUTCOMES)[number];
+export const MEETING_DECISION_OUTCOME_LABELS: Record<MeetingDecisionOutcome, string> = {
+  Agreed: 'Agreed',
+  Disagreed: 'Disagreed',
+  Deferred: 'Deferred',
+};
+
+export interface MeetingDecisionDto {
+  id: number;
+  meetingId: number;
+  targetFieldKey: string | null;
+  targetRowId: string | null;
+  targetLabel: string | null;
+  text: string;
+  outcome: MeetingDecisionOutcome;
+  recordedByUserId: number;
+  recordedByName: string | null;
+  createdAt: string;
+  appliedAt: string | null;
+}
+
+export interface CreateMeetingDecisionRequest {
+  targetFieldKey?: string;
+  targetRowId?: string;
+  targetLabel?: string;
+  text: string;
+  outcome: MeetingDecisionOutcome;
+}
+
+export interface UpdateMeetingDecisionRequest {
+  text: string;
+  outcome: MeetingDecisionOutcome;
+}
+
+/** A decision surfaced on the linked (or same-student, recent) draft's editor
+ *  as a proposed edit — never auto-applied; a human marks it applied. */
+export interface ProposedEditDto {
+  decisionId: number;
+  meetingId: number;
+  meetingTitle: string;
+  targetFieldKey: string | null;
+  targetRowId: string | null;
+  targetLabel: string | null;
+  text: string;
+  outcome: MeetingDecisionOutcome;
+  recordedAt: string;
+  appliedAt: string | null;
+}

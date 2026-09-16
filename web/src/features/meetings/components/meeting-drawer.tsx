@@ -11,6 +11,7 @@ import { recordAttendance, rsvpToMeeting } from '../api/meetings-api';
 import { formatMeetingWhen, timeZoneLabel } from '../lib/meeting-time';
 import { INVITE_STATUS_LABELS, MEETING_STATUS_LABELS, MEETING_TYPE_LABELS } from '../types';
 import type { AttendanceEntry, InviteStatus, MeetingDto } from '../types';
+import { DecisionsPanel } from './decisions-panel';
 import { MeetingManagerActions } from './meeting-manager-actions';
 import { ParticipantList } from './participant-list';
 import { ScheduleMeetingModal } from './schedule-meeting-modal';
@@ -175,7 +176,14 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
                 {meeting.studentName}
               </Link>
             </div>
-            <Badge variant={statusBadgeVariant[meeting.status]}>{MEETING_STATUS_LABELS[meeting.status]}</Badge>
+            <div className="flex flex-col items-end gap-2">
+              <Badge variant={statusBadgeVariant[meeting.status]}>{MEETING_STATUS_LABELS[meeting.status]}</Badge>
+              <Link to={`/educator/meetings/${meeting.id}/brief`} data-testid="meeting-brief-link">
+                <Button size="sm" variant="secondary">
+                  Brief
+                </Button>
+              </Link>
+            </div>
           </div>
 
           {meeting.myInviteStatus && meeting.status !== 'Cancelled' && (
@@ -251,6 +259,19 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
               {/* Keyed so a meeting switch remounts the panel: its draft text must never be
                   saved or sent under the next meeting's id (see the drawer's own state reset). */}
               <FamilySummaryPanel key={meeting.id} meetingId={meeting.id} />
+            </div>
+          )}
+
+          {(meeting.status === 'Held' || meeting.status === 'Continued') && (
+            <div className="rounded-card border border-brand-slate-200 p-4">
+              {/* Keyed so a meeting switch remounts the panel with a fresh fetch,
+                  never showing the previous meeting's decisions mid-swap. */}
+              <DecisionsPanel
+                key={meeting.id}
+                meetingId={meeting.id}
+                documentInstanceId={meeting.documentInstanceId}
+                canManage={meeting.canManage}
+              />
             </div>
           )}
 

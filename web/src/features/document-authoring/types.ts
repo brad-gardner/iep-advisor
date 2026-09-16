@@ -42,6 +42,13 @@ export interface DocumentInstanceDetailDto {
   createdAt: string;
   lastEditedAt: string | null;
   lastEditedByUserId: number | null;
+
+  // Plan 7, decision 5: present when this draft amends a finalized version.
+  amendsVersionId: number | null;
+  amendsVersionNumber: number | null;
+  amendmentReason: string | null;
+  effectiveDate: string | null;
+
   templateVersion: TemplateVersionDetailDto;
 }
 
@@ -81,6 +88,17 @@ export interface DocumentValuesResponseDto {
 /** PDF render lifecycle for a finalized authored version. */
 export type PdfRenderStatus = 'Pending' | 'Rendered' | 'Error';
 
+// Plan 7, decision 4: print/sign status of a finalized version. Typed-name
+// e-sign is explicitly not claimed — this reflects whether a scanned/uploaded
+// signed copy has been attached.
+export const SIGNATURE_STATUSES = ['Unsigned', 'PartiallySigned', 'Signed'] as const;
+export type SignatureStatus = (typeof SIGNATURE_STATUSES)[number];
+export const SIGNATURE_STATUS_LABELS: Record<SignatureStatus, string> = {
+  Unsigned: 'Unsigned',
+  PartiallySigned: 'Partially signed',
+  Signed: 'Signed',
+};
+
 /** An immutable finalized version of an authored document (summary row). */
 export interface AuthoredDocumentVersionSummaryDto {
   id: number;
@@ -93,6 +111,15 @@ export interface AuthoredDocumentVersionSummaryDto {
   finalizedByUserId: number | null;
   finalizedAt: string;
   pdfRenderStatus: PdfRenderStatus | null;
+
+  // Plan 7, decisions 4-5: signatures + amendment chain.
+  signatureStatus: SignatureStatus;
+  signedArtifactCount: number;
+  amendsVersionId: number | null;
+  amendsVersionNumber: number | null;
+  amendmentReason: string | null;
+  effectiveDate: string | null;
+  amendedByVersionIds: number[];
 }
 
 /** Full frozen snapshot: the summary plus the pinned template tree + values. */
@@ -119,3 +146,34 @@ export interface AuthoredDocumentPdfStatusDto {
 export interface AuthoredDocumentPdfDownloadDto {
   url: string;
 }
+
+// ---------------------------------------------------------------------------
+// Plan 7 — amendments + signed artifacts
+// ---------------------------------------------------------------------------
+
+export interface AmendDocumentVersionRequest {
+  reason: string;
+  effectiveDate?: string;
+}
+
+export interface AmendResultDto {
+  instanceId: number;
+}
+
+export interface SignedArtifactDto {
+  id: number;
+  authoredDocumentVersionId: number;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedByUserId: number;
+  uploadedByName: string | null;
+  uploadedAt: string;
+  signerSummary: string | null;
+}
+
+/** The status recorded alongside a signed-artifact upload (never `Unsigned` — that's the default absent any upload). */
+export const UPLOADABLE_SIGNATURE_STATUSES = ['PartiallySigned', 'Signed'] as const;
+export type UploadableSignatureStatus = (typeof UPLOADABLE_SIGNATURE_STATUSES)[number];
+
+export const MAX_SIGNED_ARTIFACT_BYTES = 20 * 1024 * 1024;

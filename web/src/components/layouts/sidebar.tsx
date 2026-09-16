@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home, ScrollText, FileText, Upload, Calendar, Bell, MailWarning, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home, ScrollText, FileText, Upload, Calendar, Bell, MailWarning, ClipboardCheck, Download } from 'lucide-react';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/logo';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,6 +47,9 @@ const adminNavItems: {
   { to: '/educator/admin/compliance', label: 'Compliance', Icon: ClipboardCheck, schoolAdmin: true },
   { to: '/educator/admin/imports', label: 'Import', Icon: Upload, schoolAdmin: true },
   { to: '/educator/admin/activity', label: 'Activity log', Icon: ScrollText, schoolAdmin: true },
+  // District-scoped export jobs span every school, so — like Schools — this is
+  // DistrictAdmin-only, not offered to a SchoolAdmin.
+  { to: '/educator/admin/exports', label: 'Exports', Icon: Download, schoolAdmin: false },
 ];
 
 interface SidebarProps {

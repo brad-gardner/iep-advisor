@@ -68,6 +68,8 @@ import { EducatorCalendarPage } from '@/features/calendar/pages/educator-calenda
 import { NotificationsPage } from '@/features/notifications/pages/notifications-page';
 import { AdminNotificationFailuresPage } from '@/features/notifications/pages/admin-notification-failures-page';
 import { MeetingRsvpPage } from '@/features/meetings/pages/meeting-rsvp-page';
+import { MeetingBriefPage } from '@/features/meeting-brief/pages/meeting-brief-page';
+import { ExportsAdminPage } from '@/features/exports/pages/exports-admin-page';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -399,6 +401,18 @@ export function AppRouter() {
         }
       />
       <Route
+        path="/educator/admin/exports"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allow={['Educator']}>
+              <MainLayout>
+                <ExportsAdminPage />
+              </MainLayout>
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/educator/admin/staff"
         element={
           <ProtectedRoute>
@@ -441,6 +455,18 @@ export function AppRouter() {
             <RoleRoute allow={['Educator']}>
               <MainLayout>
                 <EducatorCalendarPage />
+              </MainLayout>
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/educator/meetings/:meetingId/brief"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allow={['Educator']}>
+              <MainLayout>
+                <MeetingBriefPage />
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>

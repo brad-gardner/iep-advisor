@@ -8,6 +8,7 @@ import {
   makeHomeMeeting,
   makeRosterAttention,
   makeStaffHome,
+  makeUnsignedFinalized,
 } from '../test/fixtures';
 
 vi.mock('@/features/district-admin/components/district-dashboard-tiles', () => ({
@@ -98,6 +99,17 @@ describe('AdminHome', () => {
     renderAdmin({ variant: 'SchoolAdmin', unsignedFinalized: [] }, false);
     expect(screen.getByTestId('home-unsigned-finalized-empty')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('lists an unsigned finalized document linking to its version detail page', () => {
+    renderAdmin(
+      { variant: 'SchoolAdmin', unsignedFinalized: [makeUnsignedFinalized({ versionId: 401, studentId: 12 })] },
+      false
+    );
+
+    const row = screen.getByTestId('home-unsigned-finalized-401');
+    expect(row).toHaveTextContent('Ada Lovelace');
+    expect(row.closest('a')).toHaveAttribute('href', '/educator/students/12/authored-versions/401');
   });
 
   it('DistrictAdmin: adds the setup checklist, overview, compliance summary, and adoption teaser', () => {

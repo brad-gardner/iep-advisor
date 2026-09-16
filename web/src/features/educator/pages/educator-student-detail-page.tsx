@@ -27,6 +27,8 @@ import { StudentMeetingsCard } from "@/features/meetings/components/student-meet
 import { StudentTimelineCard } from "@/features/obligations/components/student-timeline-card";
 import { GoalsCard } from "@/features/goals/components/goals-card";
 import { EvaluationCard } from "@/features/evaluation/components/evaluation-card";
+import { FamilyContactCard } from "@/features/family-contact/components/family-contact-card";
+import { ExportRecordButton } from "@/features/exports/components/export-record-button";
 
 export function EducatorStudentDetailPage() {
   const { studentId: studentIdParam } = useParams<{ studentId: string }>();
@@ -134,6 +136,8 @@ export function EducatorStudentDetailPage() {
 
             <EvaluationCard studentId={studentId} />
 
+            <FamilyContactCard studentId={studentId} />
+
             <section className="space-y-3">
               <h2 className="font-serif text-lg">IEP team</h2>
               <StudentTeamPanel
@@ -159,6 +163,15 @@ export function EducatorStudentDetailPage() {
               studentId={studentId}
               onEditDates={canEdit ? () => setIsEditOpen(true) : undefined}
             />
+
+            <Card>
+              <h2 className="mb-2 font-serif text-base text-brand-slate-800">Export record</h2>
+              <p className="mb-3 text-sm text-brand-slate-600">
+                Build a ZIP of this student's finalized documents, signed artifacts, goals, meetings and
+                contact history.
+              </p>
+              <ExportRecordButton studentId={studentId} />
+            </Card>
 
             <Card>
               <h2 className="mb-2 font-serif text-base text-brand-slate-800">

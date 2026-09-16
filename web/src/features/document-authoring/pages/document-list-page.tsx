@@ -16,6 +16,7 @@ import { useDocumentList } from '../hooks/use-document-list';
 import { useAuthoredVersions } from '../hooks/use-authored-versions';
 import { NewDocumentModal } from '../components/new-document-modal';
 import { AuthoredPdfDownload } from '../components/authored-pdf-download';
+import { SignatureStatusBadge } from '../components/signature-status-badge';
 import type {
   AuthoredDocumentVersionSummaryDto,
   DocumentInstanceStatus,
@@ -123,6 +124,22 @@ export function DocumentListPage() {
       cell: (v) => relativeTime(v.finalizedAt),
       sortValue: (v) => v.finalizedAt,
       hideBelow: 'md',
+    },
+    {
+      key: 'amendment',
+      header: 'Amendment',
+      cell: (v) =>
+        v.amendsVersionId != null ? (
+          <span className="text-xs text-brand-slate-500">Amends v{v.amendsVersionNumber ?? v.amendsVersionId}</span>
+        ) : (
+          '—'
+        ),
+      hideBelow: 'lg',
+    },
+    {
+      key: 'signature',
+      header: 'Signature',
+      cell: (v) => <SignatureStatusBadge status={v.signatureStatus} data-testid={`version-signature-${v.id}`} />,
     },
     {
       key: 'pdf',

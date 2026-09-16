@@ -2,6 +2,8 @@ import { apiClient } from '@/lib/api-client';
 import type { ApiResponse } from '@/types/api';
 import type { DocumentTypeDto } from '@/features/admin/templates/types';
 import type {
+  AmendDocumentVersionRequest,
+  AmendResultDto,
   AuthoredDocumentPdfDownloadDto,
   AuthoredDocumentPdfStatusDto,
   AuthoredDocumentVersionDetailDto,
@@ -10,6 +12,8 @@ import type {
   DocumentInstanceSummaryDto,
   DocumentValuePatch,
   DocumentValuesResponseDto,
+  SignedArtifactDto,
+  UploadableSignatureStatus,
 } from '../types';
 
 // Thin async wrappers over apiClient for the educator document-authoring
@@ -162,6 +166,59 @@ export async function retryAuthoredPdf(
   const res = await apiClient.post<ApiResponse<AuthoredDocumentPdfStatusDto>>(
     `/api/authored-versions/${versionId}/pdf/retry`,
     {}
+  );
+  return res.data;
+}
+
+// ---------------------------------------------------------------------------
+// Plan 7 — amendments + signed artifacts
+// ---------------------------------------------------------------------------
+
+/** Amend a finalized version: creates a new Draft instance prefilled from it
+ *  (every `_rowId` preserved) and returns the new draft's id to navigate to. */
+export async function amendVersion(
+  versionId: number,
+  request: AmendDocumentVersionRequest
+): Promise<ApiResponse<AmendResultDto>> {
+  const res = await apiClient.post<ApiResponse<AmendResultDto>>(
+    `/api/authored-versions/${versionId}/amend`,
+    request
+  );
+  return res.data;
+}
+
+/** Attach a scanned/uploaded signed PDF to a finalized version (multipart). */
+export async function uploadSignedArtifact(
+  versionId: number,
+  file: File,
+  signatureStatus: UploadableSignatureStatus,
+  signerSummary?: string
+): Promise<ApiResponse<SignedArtifactDto>> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('signatureStatus', signatureStatus);
+  if (signerSummary) formData.append('signerSummary', signerSummary);
+  const res = await apiClient.post<ApiResponse<SignedArtifactDto>>(
+    `/api/authored-versions/${versionId}/signed-artifacts`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return res.data;
+}
+
+export async function listSignedArtifacts(versionId: number): Promise<ApiResponse<SignedArtifactDto[]>> {
+  const res = await apiClient.get<ApiResponse<SignedArtifactDto[]>>(
+    `/api/authored-versions/${versionId}/signed-artifacts`
+  );
+  return res.data;
+}
+
+/** A fresh short-lived URL for a signed artifact's original upload. */
+export async function getSignedArtifactDownloadUrl(
+  artifactId: number
+): Promise<ApiResponse<AuthoredDocumentPdfDownloadDto>> {
+  const res = await apiClient.get<ApiResponse<AuthoredDocumentPdfDownloadDto>>(
+    `/api/signed-artifacts/${artifactId}/download`
   );
   return res.data;
 }

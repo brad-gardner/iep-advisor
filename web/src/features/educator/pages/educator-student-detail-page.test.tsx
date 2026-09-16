@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { ToastProvider } from "@/components/ui/toast";
 import { ORG_ROLE, type EducatorProfile } from "../types";
 import { makeStudent } from "../test/fixtures";
 
@@ -72,11 +73,13 @@ function makeProfile(overrides: Partial<EducatorProfile> = {}): EducatorProfile 
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={["/educator/students/10"]}>
-      <Routes>
-        <Route path="/educator/students/:studentId" element={<EducatorStudentDetailPage />} />
-      </Routes>
-    </MemoryRouter>
+    <ToastProvider>
+      <MemoryRouter initialEntries={["/educator/students/10"]}>
+        <Routes>
+          <Route path="/educator/students/:studentId" element={<EducatorStudentDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    </ToastProvider>
   );
 }
 
