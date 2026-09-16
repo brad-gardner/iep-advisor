@@ -50,6 +50,12 @@ public class DocumentInstanceDetailDto
     public DateTime? LastEditedAt { get; set; }
     public int? LastEditedByUserId { get; set; }
 
+    /// <summary>Plan 7: present when this draft amends a finalized version (the editor shows a banner).</summary>
+    public int? AmendsVersionId { get; set; }
+    public int? AmendsVersionNumber { get; set; }
+    public string? AmendmentReason { get; set; }
+    public DateTime? EffectiveDate { get; set; }
+
     /// <summary>The pinned template version's full section/field schema for rendering the form.</summary>
     public TemplateVersionDetailDto TemplateVersion { get; set; } = new();
 }

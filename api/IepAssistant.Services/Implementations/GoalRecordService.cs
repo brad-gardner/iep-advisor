@@ -280,17 +280,34 @@ public class GoalRecordService : IGoalRecordService
             .Where(predicate)
             .Where(g => g.Status == GoalRecordStatus.Active || g.Status == GoalRecordStatus.Met || g.Status == GoalRecordStatus.NotMet)
             .Include(g => g.AuthoredDocumentVersion).ThenInclude(v => v.DocumentType)
-            .Include(g => g.Observations)
             .OrderBy(g => g.Domain).ThenBy(g => g.GoalText)
             .ToListAsync(ct);
+        if (records.Count == 0)
+            return new List<GoalRecordModel>();
+
+        // A goal's progress belongs to its LINEAGE, not to the record a particular finalize produced:
+        // observations logged against the goal before it was carried into an amendment or a new IEP
+        // stay on its trajectory. One query over every record of the lineages in view.
+        var lineageKeys = records.Select(g => (g.SchoolStudentId, g.LineageId)).ToHashSet();
+        var studentIds = lineageKeys.Select(k => k.SchoolStudentId).Distinct().ToList();
+        var lineageIds = lineageKeys.Select(k => k.LineageId).Distinct().ToList();
+        var observations = await _context.GoalObservations.AsNoTracking()
+            .Where(o => studentIds.Contains(o.GoalRecord.SchoolStudentId) && lineageIds.Contains(o.GoalRecord.LineageId))
+            .Select(o => new { o.GoalRecord.SchoolStudentId, o.GoalRecord.LineageId, Observation = o })
+            .ToListAsync(ct);
+        var byLineage = observations
+            .Where(x => lineageKeys.Contains((x.SchoolStudentId, x.LineageId)))
+            .ToLookup(x => (x.SchoolStudentId, x.LineageId), x => x.Observation);
 
         var today = DateTime.UtcNow.Date;
-        return records.Select(g => MapRecord(g, today)).ToList();
+        return records.Select(g => MapRecord(g, today, byLineage[(g.SchoolStudentId, g.LineageId)].ToList())).ToList();
     }
 
-    private static GoalRecordModel MapRecord(GoalRecord g, DateTime today)
+    private static GoalRecordModel MapRecord(GoalRecord g, DateTime today) => MapRecord(g, today, g.Observations.ToList());
+
+    private static GoalRecordModel MapRecord(GoalRecord g, DateTime today, List<GoalObservation> lineageObservations)
     {
-        var orderedObservations = g.Observations.OrderBy(o => o.ObservedAt).ToList();
+        var orderedObservations = lineageObservations.OrderBy(o => o.ObservedAt).ToList();
         var lastObservedAt = orderedObservations.Count > 0 ? orderedObservations[^1].ObservedAt : (DateTime?)null;
         var referenceDate = lastObservedAt ?? g.ProjectedAt;
         var numericPoints = orderedObservations

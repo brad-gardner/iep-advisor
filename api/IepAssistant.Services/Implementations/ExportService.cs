@@ -91,7 +91,9 @@ public class ExportService : IExportService
             return ServiceResult<List<ExportJobModel>>.FailureResult(PermissionMessage);
 
         var rows = await MapQuery(_context.ExportJobs.AsNoTracking()
-                .Where(j => j.DistrictId == ctx.DistrictId && j.Scope == ExportScope.District))
+                // Both scopes: a "Export record" from a student page lands here too, so the admin
+                // page is the one place every archive for the district can be found and downloaded.
+                .Where(j => j.DistrictId == ctx.DistrictId))
             .OrderByDescending(j => j.RequestedAt)
             .ToListAsync(ct);
 

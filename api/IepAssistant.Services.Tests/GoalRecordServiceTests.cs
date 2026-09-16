@@ -197,6 +197,33 @@ public sealed class GoalRecordServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetForStudentAsync_CarriedGoal_KeepsTheLineagesObservationsOnItsTrajectory()
+    {
+        var s = Seed(nameof(GetForStudentAsync_CarriedGoal_KeepsTheLineagesObservationsOnItsTrajectory));
+        var rowId = Guid.NewGuid();
+        await SetValuesAndFinalizeAsync(s, BuildGoalsJson(s, (rowId, "Read at grade level", "42 wpm")));
+
+        using (var ctx = CreateContext())
+        {
+            var firstId = await ctx.GoalRecords.Where(g => g.SchoolStudentId == s.StudentId).Select(g => g.Id).SingleAsync();
+            Assert.True((await CreateGoalService(ctx).AddObservationAsync(s.TeacherId, firstId, new CreateGoalObservationModel { Value = 45m })).Success);
+            Assert.True((await CreateGoalService(ctx).AddObservationAsync(s.TeacherId, firstId, new CreateGoalObservationModel { Value = 50m })).Success);
+        }
+
+        // Re-finalize (an annual review / amendment) carries the goal into a new record.
+        await SetValuesAndFinalizeAsync(s, BuildGoalsJson(s, (rowId, "Read at grade level", "50 wpm")));
+
+        using var verify = CreateContext();
+        var result = await CreateGoalService(verify).GetForStudentAsync(s.TeacherId, s.StudentId);
+        Assert.True(result.Success, result.Message);
+        var goal = Assert.Single(result.Data!); // only the current record is listed …
+        Assert.Equal(GoalRecordStatus.Active, goal.Status);
+        Assert.Equal(2, goal.Observations.Count); // … but it keeps the lineage's progress history
+        Assert.False(goal.Trajectory.InsufficientData);
+        Assert.NotNull(goal.LastObservedAt);
+    }
+
+    [Fact]
     public async Task FinalizeAsync_DroppedLineageWithRecordedReason_PriorRecordRetiredWithReason()
     {
         var s = Seed(nameof(FinalizeAsync_DroppedLineageWithRecordedReason_PriorRecordRetiredWithReason));

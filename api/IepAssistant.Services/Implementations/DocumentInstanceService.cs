@@ -544,7 +544,13 @@ public class DocumentInstanceService : IDocumentInstanceService
                 i.RowVersion,
                 i.CreatedAt,
                 i.LastEditedAt,
-                i.LastEditedByUserId
+                i.LastEditedByUserId,
+                i.AmendsVersionId,
+                AmendsVersionNumber = i.AmendsVersionId == null
+                    ? (int?)null
+                    : _context.AuthoredDocumentVersions.Where(v => v.Id == i.AmendsVersionId).Select(v => (int?)v.VersionNumber).FirstOrDefault(),
+                i.AmendmentReason,
+                i.EffectiveDate
             })
             .FirstOrDefaultAsync(ct);
 
@@ -570,6 +576,10 @@ public class DocumentInstanceService : IDocumentInstanceService
             CreatedAt = instance.CreatedAt,
             LastEditedAt = instance.LastEditedAt,
             LastEditedByUserId = instance.LastEditedByUserId,
+            AmendsVersionId = instance.AmendsVersionId,
+            AmendsVersionNumber = instance.AmendsVersionNumber,
+            AmendmentReason = instance.AmendmentReason,
+            EffectiveDate = instance.EffectiveDate,
             TemplateVersion = tree.Data!
         });
     }

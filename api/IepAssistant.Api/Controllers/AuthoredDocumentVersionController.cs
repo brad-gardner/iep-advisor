@@ -195,7 +195,7 @@ public class AuthoredDocumentVersionController : ControllerBase
             return BadRequest(ApiResponse<object>.Error("signatureStatus must be PartiallySigned or Signed."));
 
         await using var stream = file.OpenReadStream();
-        var result = await _signedArtifacts.UploadAsync(versionId, User.GetUserId(), new IepAssistant.Services.Models.UploadSignedArtifactModel
+        var result = await _signedArtifacts.UploadAsync(User.GetUserId(), versionId, new IepAssistant.Services.Models.UploadSignedArtifactModel
         {
             FileStream = stream,
             FileName = file.FileName,
