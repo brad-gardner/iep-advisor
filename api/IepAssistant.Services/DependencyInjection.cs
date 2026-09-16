@@ -86,6 +86,10 @@ public static class DependencyInjection
         services.AddScoped<IDraftQuestionService, DraftQuestionService>();
         services.AddScoped<IMeetingSummaryService, MeetingSummaryService>();
 
+        // Plan 7 phases 1-2: goal records + provider observations, evaluation case lifecycle.
+        services.AddScoped<IGoalRecordService, GoalRecordService>();
+        services.AddScoped<IEvaluationCaseService, EvaluationCaseService>();
+
         // Stateless JWT minting reused by create-and-sign-in flows (staff invite accept).
         services.AddScoped<JwtTokenFactory>();
 

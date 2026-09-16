@@ -147,6 +147,7 @@ builder.Services.AddHostedService<StaffInviteExpiryWorker>();
 builder.Services.AddHostedService<NotificationEmailWorker>();
 builder.Services.AddHostedService<MeetingReminderWorker>();
 builder.Services.AddHostedService<DigestWorker>();
+builder.Services.AddHostedService<EvaluatorOverdueWorker>();
 
 // Add controllers
 builder.Services.AddControllers()

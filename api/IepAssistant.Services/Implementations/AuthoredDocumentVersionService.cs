@@ -43,6 +43,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
     private readonly ITemplateAuthoringService _authoring;
     private readonly IBlobStorageService _blob;
     private readonly IAuditLogger _audit;
+    private readonly IGoalRecordService _goalRecords;
     private readonly ILogger<AuthoredDocumentVersionService> _logger;
 
     public AuthoredDocumentVersionService(
@@ -52,6 +53,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         ITemplateAuthoringService authoring,
         IBlobStorageService blob,
         IAuditLogger audit,
+        IGoalRecordService goalRecords,
         ILogger<AuthoredDocumentVersionService> logger)
     {
         _context = context;
@@ -60,6 +62,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         _authoring = authoring;
         _blob = blob;
         _audit = audit;
+        _goalRecords = goalRecords;
         _logger = logger;
     }
 
@@ -193,6 +196,10 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
                 _logger.LogError(ex, "Finalize failed persisting AuthoredDocumentVersion for instance {InstanceId}.", instanceId);
                 throw;
             }
+
+            // 7b. Plan 7 phase 1: project the Goals table (if any) into first-class GoalRecord rows,
+            //     carrying forward/retiring the prior version's lineage — same transaction as the snapshot.
+            await _goalRecords.ProjectOnFinalizeAsync(instance, version, ct);
 
             // 8. Instance returns to Draft so it stays editable; re-finalize creates the next version.
             instance.Status = DocumentInstanceStatus.Draft;

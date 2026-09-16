@@ -61,6 +61,7 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
             new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance),
             blob ?? new SuccessBlobStorageFake(),
             _audit,
+            new GoalRecordService(ctx, new OrgAccessService(ctx), new AccessService(ctx), NullLogger<GoalRecordService>.Instance),
             NullLogger<AuthoredDocumentVersionService>.Instance);
 
     private AuthoredDocumentPdfService CreatePdfService(ApplicationDbContext ctx, IBlobStorageService blob)
