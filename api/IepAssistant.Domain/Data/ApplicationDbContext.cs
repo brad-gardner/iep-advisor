@@ -108,6 +108,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<AuditIntegrityRun> AuditIntegrityRuns => Set<AuditIntegrityRun>();
     public DbSet<OutboundEmail> OutboundEmails => Set<OutboundEmail>();
 
+    // Pilot-gates plan, phase 3: magic-link sign-in tokens.
+    public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         // Suppress warning about pending model changes

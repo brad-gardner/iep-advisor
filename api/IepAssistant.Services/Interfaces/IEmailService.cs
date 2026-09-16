@@ -37,4 +37,8 @@ public interface IEmailService
 
     /// <summary>Daily obligations + upcoming-meetings digest.</summary>
     Task SendDigestAsync(string toEmail, DigestEmailModel model, CancellationToken ct = default);
+
+    /// <summary>Pilot-gates plan, phase 3 (C11 adoption slice): the 15-minute magic sign-in link for a
+    /// staff member eligible for magic-link sign-in.</summary>
+    Task SendMagicLinkEmailAsync(string toEmail, string firstName, string magicLinkUrl, CancellationToken ct = default);
 }

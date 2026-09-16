@@ -399,6 +399,41 @@ You're receiving this because you signed up for the beta.";
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "AccountDeletionCancelLink", null, ct);
     }
 
+    public async Task SendMagicLinkEmailAsync(string toEmail, string firstName, string magicLinkUrl, CancellationToken ct = default)
+    {
+        var safeFirstName = WebUtility.HtmlEncode(firstName);
+        var safeMagicLinkUrl = WebUtility.HtmlEncode(magicLinkUrl);
+
+        var subject = "Your IEP Advisor sign-in link";
+        var html = $@"
+            <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
+                <div style=""text-align: center; margin-bottom: 24px;"">
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
+                    <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
+                </div>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">Sign In to IEP Advisor</h1>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
+                    Hi {safeFirstName}, click below to sign in. This link expires in 15 minutes and can only be used once.
+                </p>
+                <div style=""text-align: center; margin: 24px 0;"">
+                    <a href=""{safeMagicLinkUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                        Sign In
+                    </a>
+                </div>
+                <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
+                    If you didn't request this link, you can safely ignore this email — no one can sign in without it.
+                </p>
+                <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
+                <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
+                    IEP Advisor — Navigate with confidence
+                </p>
+            </div>";
+
+        var plainText = $"Hi {firstName}, use the link below to sign in to IEP Advisor. This link expires in 15 minutes and can only be used once.\n\nSign in: {magicLinkUrl}\n\nIf you didn't request this link, you can safely ignore this email.";
+
+        await EnqueueEmailAsync(toEmail, subject, html, plainText, "MagicLink", null, ct);
+    }
+
     // ----------------------------------------------------------------- Plan 4 additions (throw on failure)
 
     public Task SendMeetingInvitationAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)

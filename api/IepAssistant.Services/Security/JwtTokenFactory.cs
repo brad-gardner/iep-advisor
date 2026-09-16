@@ -70,4 +70,35 @@ public sealed class JwtTokenFactory
             }
         };
     }
+
+    /// <summary>
+    /// Mints a 5-minute "MFA pending" token — identical to <c>AuthService.GenerateMfaPendingToken</c>
+    /// (kept in sync intentionally, same pattern as <see cref="CreateAuthResult"/> vs.
+    /// <c>AuthService.GenerateJwtToken</c>). Used by the magic-link consume flow so an MFA-enrolled user
+    /// completes sign-in through the exact same <c>/api/auth/mfa/verify</c> step a password login would.
+    /// </summary>
+    public string CreateMfaPendingToken(User user)
+    {
+        var key = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
+        var issuer = _configuration["Jwt:Issuer"] ?? "IepAssistant.Api";
+        var audience = _configuration["Jwt:Audience"] ?? "IepAssistant.Client";
+
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim("token_type", "mfa_pending")
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: issuer,
+            audience: audience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(5),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
 }

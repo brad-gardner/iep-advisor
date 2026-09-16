@@ -13,9 +13,13 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddDomain(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<ApplicationDbContext>(options =>
+        // Pilot-gates plan, phase 3: the (sp, options) overload resolves ImmutabilityGuardBypass from the
+        // SAME scope as the DbContext it is baked into (the simple Action<DbContextOptionsBuilder> overload
+        // used before had no service-provider access, so the interceptor could never see a scoped switch).
+        services.AddScoped<ImmutabilityGuardBypass>();
+        services.AddDbContext<ApplicationDbContext>((sp, options) =>
             options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
-                .AddInterceptors(new ImmutableVersionInterceptor()));
+                .AddInterceptors(new ImmutableVersionInterceptor(sp.GetRequiredService<ImmutabilityGuardBypass>())));
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IChildProfileRepository, ChildProfileRepository>();

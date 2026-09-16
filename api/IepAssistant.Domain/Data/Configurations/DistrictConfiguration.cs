@@ -16,6 +16,11 @@ public class DistrictConfiguration : IEntityTypeConfiguration<District>
         // not just newly-constructed C# entities (plan 6, decision 2).
         builder.Property(d => d.FamilyDraftSharingEnabled).HasDefaultValue(true);
 
+        // Pilot-gates plan, phase 3: explicit SQL-side defaults so existing districts backfill correctly.
+        builder.Property(d => d.IsDemo).HasDefaultValue(false);
+        builder.Property(d => d.MagicLinkEnabled).HasDefaultValue(true);
+        builder.Property(d => d.RequireMfaForMagicLink).HasDefaultValue(true);
+
         builder.HasMany(d => d.Schools)
             .WithOne(s => s.District)
             .HasForeignKey(s => s.DistrictId)

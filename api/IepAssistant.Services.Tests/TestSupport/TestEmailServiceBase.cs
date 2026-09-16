@@ -28,4 +28,7 @@ public class TestEmailServiceBase : IEmailService
     public virtual Task SendMeetingCancelledAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default) => Task.CompletedTask;
     public virtual Task SendNotificationAsync(string toEmail, string title, string body, string linkUrl, CancellationToken ct = default) => Task.CompletedTask;
     public virtual Task SendDigestAsync(string toEmail, DigestEmailModel model, CancellationToken ct = default) => Task.CompletedTask;
+
+    // Pilot-gates plan, phase 3.
+    public virtual Task SendMagicLinkEmailAsync(string toEmail, string firstName, string magicLinkUrl, CancellationToken ct = default) => Task.CompletedTask;
 }

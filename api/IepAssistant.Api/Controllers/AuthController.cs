@@ -17,13 +17,20 @@ public class AuthController : ControllerBase
     private readonly IMfaService _mfaService;
     private readonly IPasswordResetService _passwordResetService;
     private readonly IAccountService _accountService;
+    private readonly IMagicLinkService _magicLinkService;
 
-    public AuthController(IAuthService authService, IMfaService mfaService, IPasswordResetService passwordResetService, IAccountService accountService)
+    public AuthController(
+        IAuthService authService,
+        IMfaService mfaService,
+        IPasswordResetService passwordResetService,
+        IAccountService accountService,
+        IMagicLinkService magicLinkService)
     {
         _authService = authService;
         _mfaService = mfaService;
         _passwordResetService = passwordResetService;
         _accountService = accountService;
+        _magicLinkService = magicLinkService;
     }
 
     /// <summary>
@@ -330,6 +337,86 @@ public class AuthController : ControllerBase
         if (authResult == null)
             return Unauthorized(ApiResponse<object>.Error("Login failed"));
 
+        var response = new LoginResponse
+        {
+            Token = authResult.Token,
+            ExpiresAt = authResult.ExpiresAt,
+            User = new UserDto
+            {
+                Id = authResult.User.Id,
+                Email = authResult.User.Email,
+                FirstName = authResult.User.FirstName,
+                LastName = authResult.User.LastName,
+                State = authResult.User.State,
+                Role = authResult.User.Role,
+                IsActive = authResult.User.IsActive,
+                OnboardingCompleted = authResult.User.OnboardingCompleted,
+                CreatedAt = authResult.User.CreatedAt
+            }
+        };
+
+        return Ok(ApiResponse<LoginResponse>.SuccessResponse(response));
+    }
+
+    /// <summary>
+    /// Request a magic sign-in link (staff invited as RelatedServiceProvider/GeneralEducator only —
+    /// see <see cref="IMagicLinkService"/>). Always 202, regardless of whether the email is eligible, to
+    /// avoid enumeration.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("magic-link")]
+    [EnableRateLimiting("magic-link")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    public async Task<IActionResult> RequestMagicLink([FromBody] MagicLinkRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        await _magicLinkService.RequestAsync(request.Email, cancellationToken);
+
+        return Accepted(ApiResponse<object>.SuccessResponse(null, "If that email is eligible for a sign-in link, one has been sent."));
+    }
+
+    /// <summary>
+    /// Consume a magic sign-in link token. Returns the same response shape as <see cref="Login"/> — a
+    /// full JWT, an MFA-pending token (user already has MFA enrolled), or a setup-required indicator
+    /// (district requires MFA and none is enrolled — the magic-link shortcut is refused; a password
+    /// login is unaffected).
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("magic-link/consume")]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ConsumeMagicLink([FromBody] MagicLinkConsumeRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var result = await _magicLinkService.ConsumeAsync(request.Token, cancellationToken);
+
+        if (!result.Success)
+            // 400, not 401: this is a business refusal of a public token (like reset-password / invite accept),
+            // and the web client treats a 401 as "the session died" and logs the visitor out.
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Invalid or expired sign-in link."));
+
+        if (result.RequiresMfa)
+        {
+            return Ok(ApiResponse<object>.SuccessResponse(new
+            {
+                requiresMfa = true,
+                mfaPendingToken = result.MfaPendingToken
+            }));
+        }
+
+        if (result.MfaSetupRequired)
+        {
+            return Ok(ApiResponse<object>.SuccessResponse(new
+            {
+                requiresMfa = true,
+                mfaSetupRequired = true
+            }, "This district requires multi-factor authentication. Please sign in with your password to finish setting it up."));
+        }
+
+        var authResult = result.AuthResult!;
         var response = new LoginResponse
         {
             Token = authResult.Token,

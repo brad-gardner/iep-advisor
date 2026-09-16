@@ -14,6 +14,7 @@ using Elastic.Ingest.Elasticsearch.DataStreams;
 using Elastic.Serilog.Sinks;
 using Elastic.Transport;
 using IepAssistant.Api.Middleware;
+using IepAssistant.Api.Seeding;
 using IepAssistant.Domain;
 using IepAssistant.Domain.Data;
 using IepAssistant.Api.BackgroundServices;
@@ -172,6 +173,9 @@ builder.Services.AddHostedService<EvaluatorOverdueWorker>();
 // Plan 7 phase 4: district/student data export — builds a ZIP off a queue, mirrors AuthoredDocumentPdfWorker.
 builder.Services.AddSingleton<ExportQueue>();
 builder.Services.AddHostedService<ExportWorker>();
+// Pilot-gates plan, phase 3: `dotnet run --project IepAssistant.Api -- seed-demo [--reset]` — see the
+// args check below, after the host is built.
+builder.Services.AddScoped<IDemoSeeder, DemoSeeder>();
 
 // Add controllers
 builder.Services.AddControllers()
@@ -296,6 +300,21 @@ builder.Services.AddRateLimiter(options =>
                     SegmentsPerWindow = 6
                 }));
 
+    // Pilot-gates plan, phase 3: defense-in-depth IP cap on magic-link requests, on top of
+    // IMagicLinkService's own per-user 5-per-15-min limit (the built-in limiter partitions by
+    // connection, not request-body email, so it can't enforce the per-email limit itself).
+    options.AddPolicy("magic-link", context =>
+        disableRateLimiting
+            ? RateLimitPartition.GetNoLimiter<string>("")
+            : RateLimitPartition.GetSlidingWindowLimiter(
+                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(15),
+                    SegmentsPerWindow = 3
+                }));
+
     // todos/P2-02: caps how fast one authenticated user can create analysis runs. Every run is a fully-
     // billed Claude call regardless of outcome (including an InvalidResponse from a document engineered
     // to make Claude's output unparseable), and the per-child quota alone does not stop the same user
@@ -347,6 +366,54 @@ builder.Services.AddHealthChecks()
     .AddSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")!);
 
 var app = builder.Build();
+
+// Pilot-gates plan, phase 3: `dotnet run --project IepAssistant.Api -- seed-demo [--reset]`. Handled
+// right after the host is built (so the full DI graph — every real service DemoSeeder drives — is
+// available) and before the normal request pipeline is configured; the process exits here instead of
+// falling through to app.Run(). Refused in Production (fictional PII-shaped data has no business there).
+if (args.Length > 0 && string.Equals(args[0], "seed-demo", StringComparison.OrdinalIgnoreCase))
+{
+    if (app.Environment.IsProduction())
+    {
+        Console.Error.WriteLine("seed-demo is refused in Production.");
+        Environment.Exit(1);
+    }
+
+    var reset = args.Skip(1).Any(a => string.Equals(a, "--reset", StringComparison.OrdinalIgnoreCase));
+
+    // Hosted services (PDF render worker, outbound email worker, audit worker, …) must actually be
+    // running during the seed so a finalized IEP's PDF really gets queued and rendered, exactly as it
+    // would from a live request — StartAsync/StopAsync brackets the CLI run the same way a normal
+    // request's background processing would happen around it, and StopAsync's graceful shutdown flush
+    // (e.g. AccessAuditLogWorker) still runs before the process exits.
+    await app.StartAsync();
+
+    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+    DemoSeedResult seedResult;
+    using (var scope = app.Services.CreateScope())
+    {
+        var seeder = scope.ServiceProvider.GetRequiredService<IDemoSeeder>();
+        seedResult = reset ? await seeder.ResetAsync() : await seeder.SeedAsync();
+    }
+    stopwatch.Stop();
+
+    await app.StopAsync();
+
+    Console.WriteLine();
+    Console.WriteLine(seedResult.Message);
+    Console.WriteLine($"Elapsed: {stopwatch.Elapsed.TotalSeconds:F1}s");
+
+    if (seedResult.Logins.Count > 0)
+    {
+        Console.WriteLine();
+        Console.WriteLine("Demo logins:");
+        Console.WriteLine($"{"Role",-24}{"Email",-42}Password");
+        foreach (var login in seedResult.Logins)
+            Console.WriteLine($"{login.Role,-24}{login.Email,-42}{login.Password}");
+    }
+
+    Environment.Exit(seedResult.Success ? 0 : 1);
+}
 
 // Pilot-gates plan, phase 1, decision 2: outside Development, sending must be genuinely configured —
 // an empty Email:ConnectionString there means every queued email will fail (see AcsEmailTransport),

@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<IAccountPurgeService, AccountPurgeService>();
         services.AddScoped<IPasswordResetService, PasswordResetService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IMagicLinkService, MagicLinkService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IChildProfileService, ChildProfileService>();
         services.AddScoped<IIepDocumentService, IepDocumentService>();
