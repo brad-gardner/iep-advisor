@@ -75,6 +75,14 @@ public class ApplicationDbContext : DbContext
     public DbSet<MeetingReminder> MeetingReminders => Set<MeetingReminder>();
     public DbSet<Notification> Notifications => Set<Notification>();
 
+    // Plan 6: family draft sharing, review, AI explanations/questions, responses, converge, meeting summaries.
+    public DbSet<SharedDraftRevision> SharedDraftRevisions => Set<SharedDraftRevision>();
+    public DbSet<SharedDraftExplanation> SharedDraftExplanations => Set<SharedDraftExplanation>();
+    public DbSet<ParentDraftNote> ParentDraftNotes => Set<ParentDraftNote>();
+    public DbSet<DraftResponse> DraftResponses => Set<DraftResponse>();
+    public DbSet<DraftAcknowledgement> DraftAcknowledgements => Set<DraftAcknowledgement>();
+    public DbSet<MeetingSummary> MeetingSummaries => Set<MeetingSummary>();
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         // Suppress warning about pending model changes

@@ -7,6 +7,9 @@ public class DistrictOverviewModel
     public string? StateCode { get; set; }
     public int ActiveSchoolCount { get; set; }
     public int ActiveStaffCount { get; set; }
+
+    /// <summary>Plan 6, decision 2: whether staff may share a whole draft with the family.</summary>
+    public bool FamilyDraftSharingEnabled { get; set; }
 }
 
 public class DistrictSchoolModel

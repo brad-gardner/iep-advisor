@@ -34,7 +34,7 @@ public class DistrictService : IDistrictService
         var district = await _context.Districts
             .AsNoTracking()
             .Where(d => d.Id == ctx.DistrictId)
-            .Select(d => new { d.Id, d.Name, d.StateCode })
+            .Select(d => new { d.Id, d.Name, d.StateCode, d.FamilyDraftSharingEnabled })
             .FirstOrDefaultAsync(ct);
         if (district == null)
             return ServiceResult<DistrictOverviewModel>.FailureResult("District not found.");
@@ -53,8 +53,28 @@ public class DistrictService : IDistrictService
             Name = district.Name,
             StateCode = district.StateCode,
             ActiveSchoolCount = activeSchoolCount,
-            ActiveStaffCount = activeStaffCount
+            ActiveStaffCount = activeStaffCount,
+            FamilyDraftSharingEnabled = district.FamilyDraftSharingEnabled
         });
+    }
+
+    public async Task<ServiceResult<DistrictOverviewModel>> UpdateFamilyDraftSharingAsync(int userId, bool enabled, CancellationToken ct = default)
+    {
+        var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
+        if (ctx == null)
+            return ServiceResult<DistrictOverviewModel>.FailureResult("Educator profile not found.");
+        if (ctx.OrgRoleId != OrgRoleIds.DistrictAdmin)
+            return ServiceResult<DistrictOverviewModel>.FailureResult("You do not have permission to change district settings.");
+
+        var district = await _context.Districts.FirstOrDefaultAsync(d => d.Id == ctx.DistrictId, ct);
+        if (district == null)
+            return ServiceResult<DistrictOverviewModel>.FailureResult("District not found.");
+
+        district.FamilyDraftSharingEnabled = enabled;
+        district.UpdatedById = userId;
+        await _context.SaveChangesAsync(ct);
+
+        return await GetOverviewAsync(userId, ct);
     }
 
     public async Task<ServiceResult<DistrictDashboardModel>> GetDashboardAsync(int userId, CancellationToken ct = default)

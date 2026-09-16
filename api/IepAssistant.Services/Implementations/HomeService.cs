@@ -25,6 +25,9 @@ public class HomeService : IHomeService
     private const int MaxParentDocuments = 10;
     private const int MaxProgressReports = 5;
 
+    /// <summary>Plan 6: sibling cap to <see cref="MaxDrafts"/> for the two shared-draft home lists.</summary>
+    private const int MaxSharedDrafts = 10;
+
     /// <summary>Sibling cap to <see cref="MaxDrafts"/>/<see cref="MaxParentDocuments"/>/
     /// <see cref="MaxProgressReports"/> — the only home list that was previously unbounded
     /// (review-fix contract, todos/082).</summary>
@@ -241,6 +244,57 @@ public class HomeService : IHomeService
                 };
             }).ToList();
         }
+
+        // ---- Plan 6: shared drafts awaiting a family acknowledgement/response, and open family
+        // responses to review — same "my students" scoping as Drafts above (team member, active access
+        // grant, or — for admin variants — anywhere in scope). ----
+        IQueryable<SharedDraftRevision> myActiveRevisions = _context.SharedDraftRevisions.AsNoTracking()
+            .Where(r => r.Status == SharedDraftStatus.Active);
+        if (isAdmin)
+        {
+            var scopedStudentIds = ScopedActiveStudents(ctx).Select(s => s.Id);
+            myActiveRevisions = myActiveRevisions.Where(r =>
+                _context.StudentTeamMembers.Any(m => m.SchoolStudentId == r.DocumentInstance.SchoolStudentId && m.IsActive && m.UserId == userId)
+                || _context.SchoolStudentAccesses.Any(a => a.SchoolStudentId == r.DocumentInstance.SchoolStudentId && a.IsActive && a.UserId == userId)
+                || scopedStudentIds.Contains(r.DocumentInstance.SchoolStudentId));
+        }
+        else
+        {
+            myActiveRevisions = myActiveRevisions.Where(r =>
+                _context.StudentTeamMembers.Any(m => m.SchoolStudentId == r.DocumentInstance.SchoolStudentId && m.IsActive && m.UserId == userId)
+                || _context.SchoolStudentAccesses.Any(a => a.SchoolStudentId == r.DocumentInstance.SchoolStudentId && a.IsActive && a.UserId == userId));
+        }
+
+        home.SharedDraftsAwaitingFamily = await myActiveRevisions
+            .Where(r => !_context.DraftAcknowledgements.Any(a => a.SharedDraftRevisionId == r.Id)
+                     && !_context.DraftResponses.Any(x => x.SharedDraftRevisionId == r.Id))
+            .OrderByDescending(r => r.SharedAt)
+            .Take(MaxSharedDrafts)
+            .Select(r => new HomeSharedDraftModel
+            {
+                InstanceId = r.DocumentInstanceId,
+                StudentId = r.DocumentInstance.SchoolStudentId,
+                StudentName = (r.DocumentInstance.SchoolStudent.FirstName + " " + r.DocumentInstance.SchoolStudent.LastName).Trim(),
+                SharedAt = r.SharedAt,
+                RespondedAt = null
+            })
+            .ToListAsync(ct);
+
+        home.FamilyResponsesToReview = await myActiveRevisions
+            .Where(r => _context.DraftResponses.Any(x => x.SharedDraftRevisionId == r.Id && x.Status == DraftResponseStatus.Open))
+            .OrderByDescending(r => r.SharedAt)
+            .Take(MaxSharedDrafts)
+            .Select(r => new HomeSharedDraftModel
+            {
+                InstanceId = r.DocumentInstanceId,
+                StudentId = r.DocumentInstance.SchoolStudentId,
+                StudentName = (r.DocumentInstance.SchoolStudent.FirstName + " " + r.DocumentInstance.SchoolStudent.LastName).Trim(),
+                SharedAt = r.SharedAt,
+                RespondedAt = _context.DraftResponses
+                    .Where(x => x.SharedDraftRevisionId == r.Id && x.Status == DraftResponseStatus.Open)
+                    .Max(x => (DateTime?)x.CreatedAt)
+            })
+            .ToListAsync(ct);
 
         if (isAdmin)
             await PopulateAdminSectionsAsync(home, userId, ctx, variant, ct);
@@ -470,7 +524,7 @@ public class HomeService : IHomeService
                 })
                 .ToListAsync(ct);
 
-            home.DocumentsToReview = finalizedDocs
+            var finalizedItems = finalizedDocs
                 .Where(d => childInfoByStudentId.ContainsKey(d.SchoolStudentId))
                 .Select(d =>
                 {
@@ -486,7 +540,49 @@ public class HomeService : IHomeService
                         Date = d.FinalizedAt,
                         LinkPath = $"/children/{docChild.ChildId}/authored-versions/{d.Id}"
                     };
+                });
+
+            // Plan 6: Active shared-draft revisions this parent has not yet acknowledged — the family's
+            // "review this" queue is Finalized versions AND unacknowledged shared drafts together, newest
+            // first, under the same overall cap.
+            var sharedDraftRows = await _context.SharedDraftRevisions.AsNoTracking()
+                .Where(r => linkedStudentIds.Contains(r.DocumentInstance.SchoolStudentId)
+                         && r.Status == SharedDraftStatus.Active
+                         && !_context.DraftAcknowledgements.Any(a => a.SharedDraftRevisionId == r.Id && a.UserId == userId))
+                .OrderByDescending(r => r.SharedAt)
+                .Take(MaxParentDocuments)
+                .Select(r => new
+                {
+                    r.Id,
+                    SchoolStudentId = r.DocumentInstance.SchoolStudentId,
+                    r.RevisionNumber,
+                    r.SharedAt,
+                    DocumentTypeDisplayName = r.DocumentInstance.DocumentType.DisplayName
                 })
+                .ToListAsync(ct);
+
+            var sharedDraftItems = sharedDraftRows
+                .Where(d => childInfoByStudentId.ContainsKey(d.SchoolStudentId))
+                .Select(d =>
+                {
+                    var docChild = childInfoByStudentId[d.SchoolStudentId];
+                    return new ParentDocumentModel
+                    {
+                        Kind = ParentDocumentKind.SharedDraft,
+                        Id = d.Id,
+                        ChildId = docChild.ChildId,
+                        ChildName = docChild.ChildName,
+                        DocumentTypeDisplayName = d.DocumentTypeDisplayName,
+                        VersionNumber = d.RevisionNumber,
+                        Date = d.SharedAt,
+                        LinkPath = $"/children/{docChild.ChildId}/shared-drafts/{d.RevisionNumber}"
+                    };
+                });
+
+            home.DocumentsToReview = finalizedItems
+                .Concat(sharedDraftItems)
+                .OrderByDescending(d => d.Date)
+                .Take(MaxParentDocuments)
                 .ToList();
         }
 

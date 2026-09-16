@@ -20,10 +20,12 @@ namespace IepAssistant.Api.Controllers;
 public class MeetingsController : ControllerBase
 {
     private readonly IMeetingService _meetingService;
+    private readonly IMeetingSummaryService _summaryService;
 
-    public MeetingsController(IMeetingService meetingService)
+    public MeetingsController(IMeetingService meetingService, IMeetingSummaryService summaryService)
     {
         _meetingService = meetingService;
+        _summaryService = summaryService;
     }
 
     [HttpPost("educator/students/{studentId:int}/meetings")]
@@ -220,6 +222,66 @@ public class MeetingsController : ControllerBase
         return Ok(ApiResponse<List<MeetingDto>>.SuccessResponse(result.Data!.Select(MapMeeting).ToList()));
     }
 
+    // ----------------------------------------------------------------- Plan 6: post-meeting family summary
+
+    [HttpPost("meetings/{id:int}/summary/draft")]
+    [ProducesResponseType(typeof(ApiResponse<FamilyMeetingSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DraftSummary(int id, CancellationToken ct)
+    {
+        var result = await _summaryService.DraftAsync(User.GetUserId(), id, ct);
+        if (!result.Success)
+            return MapFailure<FamilyMeetingSummaryDto>(result.Message);
+
+        return Ok(ApiResponse<FamilyMeetingSummaryDto>.SuccessResponse(MapFamilySummary(result.Data!)));
+    }
+
+    [HttpPut("meetings/{id:int}/summary")]
+    [ProducesResponseType(typeof(ApiResponse<FamilyMeetingSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateSummary(int id, [FromBody] UpdateMeetingSummaryRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+
+        var result = await _summaryService.UpdateAsync(User.GetUserId(), id, request.Body, ct);
+        if (!result.Success)
+            return MapFailure<FamilyMeetingSummaryDto>(result.Message);
+
+        return Ok(ApiResponse<FamilyMeetingSummaryDto>.SuccessResponse(MapFamilySummary(result.Data!)));
+    }
+
+    [HttpPost("meetings/{id:int}/summary/send")]
+    [ProducesResponseType(typeof(ApiResponse<FamilyMeetingSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SendSummary(int id, CancellationToken ct)
+    {
+        var result = await _summaryService.SendAsync(User.GetUserId(), id, ct);
+        if (!result.Success)
+            return MapFailure<FamilyMeetingSummaryDto>(result.Message);
+
+        return Ok(ApiResponse<FamilyMeetingSummaryDto>.SuccessResponse(MapFamilySummary(result.Data!)));
+    }
+
+    [HttpGet("meetings/{id:int}/summary")]
+    [ProducesResponseType(typeof(ApiResponse<FamilyMeetingSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetSummary(int id, CancellationToken ct)
+    {
+        var result = await _summaryService.GetAsync(User.GetUserId(), id, ct);
+        if (!result.Success)
+            return MapFailure<FamilyMeetingSummaryDto>(result.Message);
+
+        return Ok(ApiResponse<FamilyMeetingSummaryDto>.SuccessResponse(MapFamilySummary(result.Data!)));
+    }
+
     // ----------------------------------------------------------------- Anonymous email-link RSVP
 
     [AllowAnonymous]
@@ -321,6 +383,19 @@ public class MeetingsController : ControllerBase
     {
         Meeting = MapMeetingSummary(m.Meeting),
         Status = m.Status
+    };
+
+    private static FamilyMeetingSummaryDto MapFamilySummary(FamilyMeetingSummaryModel m) => new()
+    {
+        Id = m.Id,
+        MeetingId = m.MeetingId,
+        Status = m.Status,
+        Body = m.Body,
+        GeneratedAt = m.GeneratedAt,
+        EditedAt = m.EditedAt,
+        SentAt = m.SentAt,
+        SentByName = m.SentByName,
+        Recipients = m.Recipients.Select(r => new FamilyMeetingSummaryRecipientDto { DisplayName = r.DisplayName, Email = r.Email }).ToList()
     };
 
     private IActionResult MapFailure<T>(string? message)

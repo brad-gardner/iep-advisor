@@ -10,6 +10,16 @@ public class DistrictOverviewDto
     public string? StateCode { get; set; }
     public int ActiveSchoolCount { get; set; }
     public int ActiveStaffCount { get; set; }
+
+    /// <summary>Plan 6, decision 2: whether staff may share a whole draft with the family.</summary>
+    public bool FamilyDraftSharingEnabled { get; set; }
+}
+
+/// <summary>Plan 6: district-level policy update. DistrictAdmin only.</summary>
+public class UpdateDistrictRequest
+{
+    [Required]
+    public bool FamilyDraftSharingEnabled { get; set; }
 }
 
 /// <summary>A school in the caller's district, with active student/staff counts (directory + picker).</summary>

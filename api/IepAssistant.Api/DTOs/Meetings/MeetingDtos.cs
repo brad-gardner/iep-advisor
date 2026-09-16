@@ -196,3 +196,32 @@ public class MeetingRsvpPreviewDto
     public MeetingSummaryDto Meeting { get; set; } = null!;
     public InviteStatus Status { get; set; }
 }
+
+// ---------------------------------------------------------------- Plan 6: post-meeting family summary
+//
+// Named "Family…" (not MeetingSummaryDto) to avoid colliding with the anonymous-RSVP MeetingSummaryDto above.
+
+public class FamilyMeetingSummaryRecipientDto
+{
+    public string DisplayName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+}
+
+public class FamilyMeetingSummaryDto
+{
+    public int Id { get; set; }
+    public int MeetingId { get; set; }
+    public MeetingSummaryStatus Status { get; set; }
+    public string Body { get; set; } = string.Empty;
+    public DateTime? GeneratedAt { get; set; }
+    public DateTime? EditedAt { get; set; }
+    public DateTime? SentAt { get; set; }
+    public string? SentByName { get; set; }
+    public List<FamilyMeetingSummaryRecipientDto> Recipients { get; set; } = new();
+}
+
+public class UpdateMeetingSummaryRequest
+{
+    [Required]
+    public string Body { get; set; } = string.Empty;
+}

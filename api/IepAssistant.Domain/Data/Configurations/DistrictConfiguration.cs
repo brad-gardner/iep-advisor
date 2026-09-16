@@ -12,6 +12,10 @@ public class DistrictConfiguration : IEntityTypeConfiguration<District>
         builder.Property(d => d.Name).HasMaxLength(200).IsRequired();
         builder.Property(d => d.StateCode).HasMaxLength(2);
 
+        // Explicit SQL-side DEFAULT (true) so existing districts are backfilled enabled by the migration,
+        // not just newly-constructed C# entities (plan 6, decision 2).
+        builder.Property(d => d.FamilyDraftSharingEnabled).HasDefaultValue(true);
+
         builder.HasMany(d => d.Schools)
             .WithOne(s => s.District)
             .HasForeignKey(s => s.DistrictId)

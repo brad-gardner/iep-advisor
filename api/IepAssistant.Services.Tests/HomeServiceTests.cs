@@ -66,6 +66,24 @@ public sealed class HomeServiceTests : IDisposable
         return instance.Id;
     }
 
+    /// <summary>Plan 6: seeds an Active (by default) SharedDraftRevision directly, bypassing DraftSharingService.</summary>
+    private int SeedSharedDraftRevision(Domain.Data.ApplicationDbContext ctx, int instanceId, int templateVersionId, int sharedByUserId, SharedDraftStatus status = SharedDraftStatus.Active, int revisionNumber = 1)
+    {
+        var revision = new SharedDraftRevision
+        {
+            DocumentInstanceId = instanceId,
+            RevisionNumber = revisionNumber,
+            ValuesJson = "{}",
+            DocumentTemplateVersionId = templateVersionId,
+            SharedByUserId = sharedByUserId,
+            SharedAt = DateTime.UtcNow,
+            Status = status
+        };
+        ctx.SharedDraftRevisions.Add(revision);
+        ctx.SaveChanges();
+        return revision.Id;
+    }
+
     // ----------------------------------------------------------------- Staff home scoping
 
     [Fact]
@@ -246,6 +264,95 @@ public sealed class HomeServiceTests : IDisposable
         Assert.Empty(result.Data.Staff.SharedDraftsAwaitingFamily);
         Assert.Empty(result.Data.Staff.FamilyResponsesToReview);
         Assert.Empty(result.Data.Staff.ProviderRequestsIOwe);
+    }
+
+    [Fact]
+    public async Task StaffHome_PopulatesSharedDraftsAwaitingFamily_AndFamilyResponsesToReview()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var (teacherId, _) = _db.Staff("sharer@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var studentAwaiting = _db.Student(schoolId, "Awaiting", "Family");
+        var studentResponded = _db.Student(schoolId, "Responded", "Family");
+        _db.TeamMember(studentAwaiting, teacherId, TeamRole.CaseManager, isLead: true);
+        _db.TeamMember(studentResponded, teacherId, TeamRole.CaseManager, isLead: true);
+
+        var fieldKey = Guid.NewGuid();
+        int templateVersionId;
+        int awaitingInstanceId, respondedInstanceId;
+        using (var seedCtx = _db.Context())
+        {
+            templateVersionId = SeedTemplateVersion(seedCtx, docTypeId: 1, fieldKey);
+        }
+        using (var seedCtx = _db.Context())
+        {
+            awaitingInstanceId = SeedDraftInstance(seedCtx, studentAwaiting, templateVersionId, docTypeId: 1, lastEditedByUserId: teacherId);
+            respondedInstanceId = SeedDraftInstance(seedCtx, studentResponded, templateVersionId, docTypeId: 1, lastEditedByUserId: teacherId);
+        }
+
+        int respondedRevisionId;
+        using (var seedCtx = _db.Context())
+        {
+            SeedSharedDraftRevision(seedCtx, awaitingInstanceId, templateVersionId, teacherId);
+            respondedRevisionId = SeedSharedDraftRevision(seedCtx, respondedInstanceId, templateVersionId, teacherId);
+        }
+
+        var parentUserId = _db.SeedUser("familyresp@example.com", UserRole.Parent, "Res", "Ponder");
+        using (var seedCtx = _db.Context())
+        {
+            seedCtx.Set<DraftResponse>().Add(new DraftResponse
+            {
+                SharedDraftRevisionId = respondedRevisionId,
+                ParentUserId = parentUserId,
+                Kind = DraftResponseKind.Question,
+                Text = "Why 30 minutes?",
+                Status = DraftResponseStatus.Open
+            });
+            seedCtx.SaveChanges();
+        }
+
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).GetForUserAsync(teacherId);
+        Assert.True(result.Success, result.Message);
+
+        Assert.Contains(result.Data!.Staff!.SharedDraftsAwaitingFamily, d => d.InstanceId == awaitingInstanceId);
+        Assert.DoesNotContain(result.Data.Staff.SharedDraftsAwaitingFamily, d => d.InstanceId == respondedInstanceId);
+
+        Assert.Contains(result.Data.Staff.FamilyResponsesToReview, d => d.InstanceId == respondedInstanceId);
+        Assert.DoesNotContain(result.Data.Staff.FamilyResponsesToReview, d => d.InstanceId == awaitingInstanceId);
+    }
+
+    [Fact]
+    public async Task ParentHome_DocumentsToReview_IncludesUnacknowledgedActiveSharedDraft()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var (teacherId, _) = _db.Staff("teacher@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var studentId = _db.Student(schoolId, "Jordan", "Ellis");
+        var parentUserId = _db.SeedUser("parentdocs@example.com", UserRole.Parent, "Dana", "Parent");
+        var childId = _db.ChildProfile(parentUserId, "Jordan", "Ellis");
+        _db.ChildLink(studentId, childId);
+
+        var fieldKey = Guid.NewGuid();
+        int templateVersionId;
+        int instanceId;
+        using (var seedCtx = _db.Context())
+        {
+            templateVersionId = SeedTemplateVersion(seedCtx, docTypeId: 1, fieldKey);
+        }
+        using (var seedCtx = _db.Context())
+        {
+            instanceId = SeedDraftInstance(seedCtx, studentId, templateVersionId, docTypeId: 1, lastEditedByUserId: teacherId);
+        }
+        using (var seedCtx = _db.Context())
+        {
+            SeedSharedDraftRevision(seedCtx, instanceId, templateVersionId, teacherId);
+        }
+
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).GetForUserAsync(parentUserId);
+        Assert.True(result.Success, result.Message);
+        Assert.Contains(result.Data!.Parent!.DocumentsToReview, d => d.Kind == ParentDocumentKind.SharedDraft && d.ChildId == childId);
     }
 
     // ----------------------------------------------------------------- Admin home: sorted by student, not staff
@@ -601,20 +708,20 @@ public sealed class HomeServiceTests : IDisposable
         var meetingId = _db.Meeting(studentId, leadId, DateTime.UtcNow.AddHours(3));
         _db.MeetingParticipant(meetingId, leadId);
 
-        // Admin path: profile/scope label, meetings-this-week, drafts, obligations-for-scope (shared
+        // Admin path: profile/scope label, meetings-this-week, drafts, the two plan-6 shared-draft queries
+        // (sharedDraftsAwaitingFamily, familyResponsesToReview), obligations-for-scope (shared
         // StaffContext, no re-lookup), the no-filter compliance board (supplies NoLead too), noFamily —
-        // measured at 7 after the review-fix contract's 074/078 round-trip consolidation (was loosened to
-        // <= 9 before that; tightened back down now that it's pinned at 7).
+        // measured at 9 after plan 6 added the two shared-draft home queries (was pinned at 7 before that).
         var counter = new DbActivityCounter();
         using (var ctx = _db.Context(counter))
         {
             var result = await CreateService(ctx).GetForUserAsync(adminId);
             Assert.True(result.Success, result.Message);
         }
-        Assert.True(counter.Queries <= 7, $"DistrictAdmin home issued {counter.Queries} queries");
+        Assert.True(counter.Queries <= 9, $"DistrictAdmin home issued {counter.Queries} queries");
 
-        // Staff-tier path: profile/scope label, meetings-this-week, lead-only obligations, drafts —
-        // measured at 5.
+        // Staff-tier path: profile/scope label, meetings-this-week, lead-only obligations, drafts, plus
+        // the same two plan-6 shared-draft queries — measured at 7 (was 5 before plan 6).
         counter.Reset();
         using (var ctx = _db.Context(counter))
         {
@@ -623,7 +730,8 @@ public sealed class HomeServiceTests : IDisposable
         }
         Assert.True(counter.Queries <= 7, $"CaseManager home issued {counter.Queries} queries");
 
-        // Parent and student paths are lighter still (no obligation/roster computation at all).
+        // Parent and student paths are lighter still (no obligation/roster computation at all). Parent
+        // gains one plan-6 query (unacknowledged Active shared-draft revisions) — measured at 7 (was 6).
         var parentUserId = _db.SeedUser("boundsparent@example.com", UserRole.Parent, "Pat", "Parent");
         var childId = _db.ChildProfile(parentUserId, "Kid", "Bounds");
         _db.ChildLink(studentId, childId);
@@ -634,7 +742,7 @@ public sealed class HomeServiceTests : IDisposable
             var result = await CreateService(ctx).GetForUserAsync(parentUserId);
             Assert.True(result.Success, result.Message);
         }
-        Assert.True(counter.Queries <= 6, $"Parent home issued {counter.Queries} queries");
+        Assert.True(counter.Queries <= 7, $"Parent home issued {counter.Queries} queries");
 
         var studentUserId = _db.SeedUser("boundsstudent@example.com", UserRole.Student, "Stu", "Dent");
         _db.StudentProfile(studentId, studentUserId);

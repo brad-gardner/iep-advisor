@@ -198,44 +198,31 @@ public sealed class DocumentAssistService : IDocumentAssistService
     /// </summary>
     private static AssistResultModel ParseGrounded(string raw, IReadOnlyList<EvidenceItem> evidence, bool missingBaseline)
     {
-        var text = raw.Trim();
-        // Strip a ```json fence if the model added one.
-        if (text.StartsWith("```", StringComparison.Ordinal))
+        using var docJson = TolerantJsonParser.TryParseObject(raw);
+        if (docJson != null)
         {
-            var firstNl = text.IndexOf('\n');
-            if (firstNl > 0) text = text[(firstNl + 1)..];
-            if (text.EndsWith("```", StringComparison.Ordinal)) text = text[..^3];
-            text = text.Trim();
-        }
-        if (text.StartsWith('{'))
-        {
-            try
+            var root = docJson.RootElement;
+            if (root.TryGetProperty("suggestion", out var sug) && sug.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(sug.GetString()))
             {
-                using var docJson = JsonDocument.Parse(RepairJsonStrings(text));
-                var root = docJson.RootElement;
-                if (root.TryGetProperty("suggestion", out var sug) && sug.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(sug.GetString()))
+                var byId = evidence.ToDictionary(e => e.Id, StringComparer.OrdinalIgnoreCase);
+                var citations = new List<AssistCitation>();
+                if (root.TryGetProperty("citations", out var cits) && cits.ValueKind == JsonValueKind.Array)
                 {
-                    var byId = evidence.ToDictionary(e => e.Id, StringComparer.OrdinalIgnoreCase);
-                    var citations = new List<AssistCitation>();
-                    if (root.TryGetProperty("citations", out var cits) && cits.ValueKind == JsonValueKind.Array)
+                    foreach (var c in cits.EnumerateArray())
                     {
-                        foreach (var c in cits.EnumerateArray())
-                        {
-                            var id = c.ValueKind == JsonValueKind.String ? c.GetString() : c.ValueKind == JsonValueKind.Object && c.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
-                            if (id != null && byId.TryGetValue(id.Trim(), out var item) && citations.All(x => x.EvidenceId != item.Id))
-                                citations.Add(new AssistCitation { EvidenceId = item.Id, SourceLabel = item.SourceLabel, Excerpt = Truncate(item.Text, 200) });
-                        }
+                        var id = c.ValueKind == JsonValueKind.String ? c.GetString() : c.ValueKind == JsonValueKind.Object && c.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+                        if (id != null && byId.TryGetValue(id.Trim(), out var item) && citations.All(x => x.EvidenceId != item.Id))
+                            citations.Add(new AssistCitation { EvidenceId = item.Id, SourceLabel = item.SourceLabel, Excerpt = Truncate(item.Text, 200) });
                     }
-                    return new AssistResultModel
-                    {
-                        Suggestion = sug.GetString()!.Trim(),
-                        Rationale = root.TryGetProperty("rationale", out var r) && r.ValueKind == JsonValueKind.String ? r.GetString()?.Trim() : null,
-                        Citations = citations,
-                        MissingBaseline = missingBaseline
-                    };
                 }
+                return new AssistResultModel
+                {
+                    Suggestion = sug.GetString()!.Trim(),
+                    Rationale = root.TryGetProperty("rationale", out var r) && r.ValueKind == JsonValueKind.String ? r.GetString()?.Trim() : null,
+                    Citations = citations,
+                    MissingBaseline = missingBaseline
+                };
             }
-            catch (JsonException) { /* fall through to plain text */ }
         }
 
         // Prose with inline [E3] markers: keep the text, resolve the markers into citations.
@@ -250,27 +237,6 @@ public sealed class DocumentAssistService : IDocumentAssistService
     }
 
     private static readonly Regex InlineCitation = new(@"\[(E\d+)\]", RegexOptions.Compiled);
-
-    /// <summary>Models often emit raw line breaks inside JSON string literals; escape control characters
-    /// that appear between quotes so the document parses. Leaves already-escaped sequences alone.</summary>
-    private static string RepairJsonStrings(string json)
-    {
-        var sb = new StringBuilder(json.Length + 16);
-        var inString = false;
-        for (var i = 0; i < json.Length; i++)
-        {
-            var c = json[i];
-            if (c == '"' && (i == 0 || json[i - 1] != '\\'))
-                inString = !inString;
-            if (inString && c is '\n' or '\r' or '\t')
-            {
-                sb.Append(c switch { '\n' => "\\n", '\r' => "\\r", _ => "\\t" });
-                continue;
-            }
-            sb.Append(c);
-        }
-        return sb.ToString();
-    }
 
     // ---------------------------------------------------------------- Chat
 
