@@ -490,21 +490,14 @@ public sealed class ChildLinkServiceTests : IDisposable
     public void Dispose() => _connection.Dispose();
 
     /// <summary>Captures the raw token passed to the email so tests can exercise the accept path.</summary>
-    private sealed class CapturingEmailService : IEmailService
+    private sealed class CapturingEmailService : TestSupport.TestEmailServiceBase
     {
         public string? LastRawToken { get; private set; }
 
-        public Task SendSchoolLinkInviteEmailAsync(string toEmail, string educatorName, string schoolName, string studentName, string inviteToken, CancellationToken ct = default)
+        public override Task SendSchoolLinkInviteEmailAsync(string toEmail, string educatorName, string schoolName, string studentName, string inviteToken, CancellationToken ct = default)
         {
             LastRawToken = inviteToken;
             return Task.CompletedTask;
         }
-
-        public Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendShareInviteEmailAsync(string toEmail, string inviterName, string childName, string role, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendStudentInviteEmailAsync(string toEmail, string inviterName, string context, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendStaffInviteEmailAsync(string toEmail, string districtName, string? schoolName, string roleName, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendStaffInviteExpiringEmailAsync(string toEmail, string inviteeEmail, string districtName, string? schoolName, DateTime expiresAt, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SendBetaInviteEmailAsync(string toEmail, string inviteCode, CancellationToken ct = default) => Task.CompletedTask;
     }
 }

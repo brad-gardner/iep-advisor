@@ -32,6 +32,13 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.StripeSubscriptionId).HasMaxLength(256);
         builder.Property(u => u.SubscriptionStatus).HasMaxLength(20).HasDefaultValue("none");
 
+        // Plan 4: revocable ICS calendar subscription token. Filtered unique index (bracket-quoted so both
+        // SQL Server and SQLite/EnsureCreated accept it) — null until a user first requests a feed URL.
+        builder.Property(u => u.CalendarFeedToken).HasMaxLength(32);
+        builder.HasIndex(u => u.CalendarFeedToken)
+            .IsUnique()
+            .HasFilter("[CalendarFeedToken] IS NOT NULL");
+
         // Ignore computed property
         builder.Ignore(u => u.FullName);
     }

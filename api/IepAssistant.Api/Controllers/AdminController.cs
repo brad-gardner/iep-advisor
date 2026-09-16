@@ -4,8 +4,10 @@ using Microsoft.EntityFrameworkCore;
 using IepAssistant.Api.DTOs.Admin;
 using IepAssistant.Api.DTOs.Auth;
 using IepAssistant.Api.DTOs.Common;
+using IepAssistant.Api.DTOs.Notifications;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Services.Interfaces;
 
 namespace IepAssistant.Api.Controllers;
 
@@ -15,10 +17,35 @@ namespace IepAssistant.Api.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly INotificationService _notificationService;
 
-    public AdminController(ApplicationDbContext db)
+    public AdminController(ApplicationDbContext db, INotificationService notificationService)
     {
         _db = db;
+        _notificationService = notificationService;
+    }
+
+    /// <summary>Plan 4: rows with a recorded email send failure, newest first — platform-admin visibility
+    /// into <c>NotificationEmailWorker</c>/<c>DigestService</c> send errors (never silently dropped).</summary>
+    [HttpGet("notifications/failures")]
+    [ProducesResponseType(typeof(ApiResponse<List<NotificationDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetNotificationFailures(CancellationToken ct)
+    {
+        var result = await _notificationService.GetFailuresAsync(200, ct);
+        var items = (result.Data ?? new List<Services.Models.NotificationModel>()).Select(n => new NotificationDto
+        {
+            Id = n.Id,
+            Kind = n.Kind,
+            Title = n.Title,
+            Body = n.Body,
+            LinkPath = n.LinkPath,
+            CreatedAt = n.CreatedAt,
+            ReadAt = n.ReadAt,
+            EmailSentAt = n.EmailSentAt,
+            EmailError = n.EmailError
+        }).ToList();
+
+        return Ok(ApiResponse<List<NotificationDto>>.SuccessResponse(items));
     }
 
     [HttpGet("dashboard")]

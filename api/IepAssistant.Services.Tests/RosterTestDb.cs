@@ -108,6 +108,103 @@ public sealed class RosterTestDb : IDisposable
         return m.Id;
     }
 
+    // ----------------------------------------------------------------- plan 4 (meetings/notifications/calendar)
+
+    /// <summary>Plain user row (parent/student/etc.), no org membership.</summary>
+    public int SeedUser(string email, UserRole role = UserRole.Parent, string first = "First", string last = "Last")
+    {
+        using var ctx = Context();
+        var u = new User { Email = email, PasswordHash = "x", FirstName = first, LastName = last, Role = role };
+        ctx.Users.Add(u);
+        ctx.SaveChanges();
+        return u.Id;
+    }
+
+    /// <summary>A ChildProfile owned by <paramref name="ownerUserId"/>, with an accepted Owner ChildAccess row.</summary>
+    public int ChildProfile(int ownerUserId, string first = "Kid", string? last = "Student")
+    {
+        using var ctx = Context();
+        var child = new ChildProfile { UserId = ownerUserId, FirstName = first, LastName = last, IsActive = true };
+        ctx.ChildProfiles.Add(child);
+        ctx.SaveChanges();
+        ctx.ChildAccesses.Add(new ChildAccess { ChildProfileId = child.Id, UserId = ownerUserId, Role = AccessRole.Owner, IsActive = true, AcceptedAt = DateTime.UtcNow });
+        ctx.SaveChanges();
+        return child.Id;
+    }
+
+    /// <summary>An active school&lt;-&gt;child link (the parent-facing side of a SchoolStudent).</summary>
+    public int ChildLink(int studentId, int childProfileId, bool accepted = true)
+    {
+        using var ctx = Context();
+        var link = new ChildLink
+        {
+            SchoolStudentId = studentId,
+            ChildProfileId = childProfileId,
+            IsActive = true,
+            AcceptedAt = accepted ? DateTime.UtcNow : null,
+            LinkedAt = accepted ? DateTime.UtcNow : null,
+            InviteExpiresAt = DateTime.UtcNow.AddDays(14)
+        };
+        ctx.ChildLinks.Add(link);
+        ctx.SaveChanges();
+        return link.Id;
+    }
+
+    /// <summary>Links a user account as the student's own login (<see cref="StudentProfile.SchoolStudentId"/>).</summary>
+    public int StudentProfile(int studentId, int userId)
+    {
+        using var ctx = Context();
+        var profile = new StudentProfile { UserId = userId, SchoolStudentId = studentId, ConsentAcceptedAt = DateTime.UtcNow };
+        ctx.StudentProfiles.Add(profile);
+        ctx.SaveChanges();
+        return profile.Id;
+    }
+
+    /// <summary>Seeds a meeting directly (bypassing MeetingService) for tests that only need a row to exist.</summary>
+    public int Meeting(int studentId, int createdByUserId, DateTime startsAtUtc, string title = "Annual Review",
+        MeetingType type = MeetingType.AnnualReview, MeetingStatus status = MeetingStatus.Scheduled,
+        string timeZoneId = "America/New_York", int durationMinutes = 60, int sequence = 0)
+    {
+        using var ctx = Context();
+        var m = new Meeting
+        {
+            SchoolStudentId = studentId,
+            Type = type,
+            Title = title,
+            StartsAtUtc = DateTime.SpecifyKind(startsAtUtc, DateTimeKind.Utc),
+            TimeZoneId = timeZoneId,
+            DurationMinutes = durationMinutes,
+            Status = status,
+            Sequence = sequence,
+            CreatedByUserId = createdByUserId
+        };
+        ctx.Meetings.Add(m);
+        ctx.SaveChanges();
+        return m.Id;
+    }
+
+    /// <summary>Seeds a meeting participant row directly.</summary>
+    public int MeetingParticipant(int meetingId, int? userId, TeamRole role = TeamRole.Other,
+        InviteStatus inviteStatus = InviteStatus.Pending, bool isRequired = true, string? rsvpToken = null,
+        string? externalName = null, string? externalEmail = null)
+    {
+        using var ctx = Context();
+        var p = new MeetingParticipant
+        {
+            MeetingId = meetingId,
+            UserId = userId,
+            ExternalName = externalName,
+            ExternalEmail = externalEmail,
+            TeamRole = role,
+            InviteStatus = inviteStatus,
+            IsRequired = isRequired,
+            RsvpToken = rsvpToken ?? Guid.NewGuid().ToString("N")
+        };
+        ctx.MeetingParticipants.Add(p);
+        ctx.SaveChanges();
+        return p.Id;
+    }
+
     public void Dispose() => _connection.Dispose();
 }
 

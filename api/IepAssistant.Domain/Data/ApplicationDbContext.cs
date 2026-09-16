@@ -70,6 +70,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<DocumentInstance> DocumentInstances => Set<DocumentInstance>();
     public DbSet<AuthoredDocumentVersion> AuthoredDocumentVersions => Set<AuthoredDocumentVersion>();
     public DbSet<AuthoredDocumentPdf> AuthoredDocumentPdfs => Set<AuthoredDocumentPdf>();
+    public DbSet<Meeting> Meetings => Set<Meeting>();
+    public DbSet<MeetingParticipant> MeetingParticipants => Set<MeetingParticipant>();
+    public DbSet<MeetingReminder> MeetingReminders => Set<MeetingReminder>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
