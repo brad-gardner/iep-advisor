@@ -19,6 +19,16 @@ public class AccessAuditLogConfiguration : IEntityTypeConfiguration<AccessAuditL
             .HasMaxLength(50)
             .IsRequired();
 
+        // Hash-chain columns (pilot-gates plan, phase 1). Nullable: a freshly-migrated historical row
+        // has neither until AccessAuditLogWorker's startup backfill pass computes them, in Id order.
+        builder.Property(a => a.PrevHash)
+            .HasMaxLength(64)
+            .IsFixedLength();
+
+        builder.Property(a => a.Hash)
+            .HasMaxLength(64)
+            .IsFixedLength();
+
         // Primary access-history lookup: "everything that touched this resource, in order."
         builder.HasIndex(a => new { a.ResourceType, a.ResourceId, a.CreatedAt });
 

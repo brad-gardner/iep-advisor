@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Anthropic.SDK.Messaging;
 
 namespace IepAssistant.Services.Models;
 
@@ -36,17 +37,19 @@ public sealed class AnthropicOptions
     public string Model { get; set; } = "claude-opus-5";
 
     /// <summary>
-    /// Adaptive-thinking effort level, mapped by the SDK onto <c>output_config.effort</c>.
-    /// Bounds how many tokens the model spends thinking before it answers.
+    /// Adaptive-thinking effort level, mapped by the SDK onto <c>output_config.effort</c>. Bounds how
+    /// many tokens the model spends thinking before it answers.
     /// </summary>
-    // Anthropic.SDK 5.10.0's ThinkingEffort enum exposes exactly these four levels — it has no
-    // "xhigh" — so anything outside this set could not be transmitted and fails fast at startup
-    // rather than silently degrading to a different effort than the one configured.
-    // MinLength is not redundant with the regex: RegularExpressionAttribute passes on an empty
-    // string by design, so without this an operator who blanked the setting would sail past
-    // validation and silently land on the ResolveEffort fallback.
-    [MinLength(1, ErrorMessage = "Anthropic:Effort must not be blank.")]
-    [RegularExpression("^(low|medium|high|max)$",
-        ErrorMessage = "Anthropic:Effort must be one of: low, medium, high, max.")]
-    public string Effort { get; set; } = "medium";
+    /// <remarks>
+    /// Bound directly as <see cref="ThinkingEffort"/> (todos/P3-01 #4) rather than as a string
+    /// validated by a regex duplicating the SDK's own member list. <c>ConfigurationBinder</c> parses
+    /// enum names case-insensitively and throws on any name that isn't one of
+    /// <see cref="ThinkingEffort"/>'s members (Anthropic.SDK 5.10.0 declares exactly low/medium/high/
+    /// max — no "xhigh" — so a typo or an unsupported level fails at boot the same way a blank or
+    /// misspelled value used to via the deleted regex), which surfaces during
+    /// <c>ValidateOnStart()</c> exactly as a bad value did before. There is deliberately no
+    /// string-based fallback/resolver any more: a value the type system cannot represent cannot be
+    /// silently coerced to a default at runtime.
+    /// </remarks>
+    public ThinkingEffort Effort { get; set; } = ThinkingEffort.medium;
 }

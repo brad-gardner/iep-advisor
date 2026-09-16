@@ -34,4 +34,31 @@ public class AuditLogger : IAuditLogger
 
     public IAsyncEnumerable<AuditEntry> DequeueAllAsync(CancellationToken cancellationToken)
         => _channel.Reader.ReadAllAsync(cancellationToken);
+
+    /// <summary>Blocks until at least one entry is available (or the channel completes), then reads
+    /// everything immediately available up to <paramref name="maxBatchSize"/>. Used by
+    /// <c>AccessAuditLogWorker</c> to batch persistence (pilot-gates plan, phase 1). Returns an empty list
+    /// only when the channel has completed with nothing left to read.</summary>
+    public async Task<List<AuditEntry>> ReadBatchAsync(int maxBatchSize, CancellationToken cancellationToken)
+    {
+        var batch = new List<AuditEntry>();
+        if (!await _channel.Reader.WaitToReadAsync(cancellationToken))
+            return batch; // channel completed, nothing left
+
+        while (batch.Count < maxBatchSize && _channel.Reader.TryRead(out var entry))
+            batch.Add(entry);
+
+        return batch;
+    }
+
+    /// <summary>Non-blocking drain of whatever is immediately sitting in the channel — used on host
+    /// shutdown (<c>AccessAuditLogWorker.StopAsync</c>) to sweep up entries the main loop never got to
+    /// read before the host's shutdown grace period ended.</summary>
+    public List<AuditEntry> DrainImmediately()
+    {
+        var drained = new List<AuditEntry>();
+        while (_channel.Reader.TryRead(out var entry))
+            drained.Add(entry);
+        return drained;
+    }
 }

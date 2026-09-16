@@ -27,6 +27,7 @@ public class DocumentInstanceService : IDocumentInstanceService
     private const string NotDraftEditMessage = "This document can no longer be edited.";
     private const string NotDraftDeleteMessage = "Only a draft document can be deleted.";
     private const string ConcurrencyMessage = "This document was changed by someone else. Please reload and try again.";
+    private const string SharedDraftBlocksDeleteMessage = "This document has been shared with the family and cannot be deleted. Withdraw the share first.";
     private const string TooLargeMessage = "This document is too large to save. Please reduce its content.";
 
     private static readonly JsonSerializerOptions ConfigJsonOptions = TemplateFieldConfigValidator.JsonOptions;
@@ -278,6 +279,15 @@ public class DocumentInstanceService : IDocumentInstanceService
             // RowVersion is in the DELETE WHERE clause; a concurrent edit surfaces the same friendly
             // concurrency message rather than a 500 (consistent with SaveValuesAsync).
             return ServiceResult.FailureResult(ConcurrencyMessage);
+        }
+        catch (DbUpdateException)
+        {
+            // Pilot-gates plan, phase 1: SharedDraftRevision -> DocumentInstance is Restrict, not
+            // Cascade (SQL Server disallows an immutability trigger on a table with any cascading FK
+            // touching it). A Draft-status instance CAN have been shared with the family before
+            // someone tries to delete it (sharing is allowed at Draft/Finalizing) — that now surfaces
+            // as a friendly refusal instead of silently destroying the family's shared history.
+            return ServiceResult.FailureResult(SharedDraftBlocksDeleteMessage);
         }
 
         _logger.LogInformation("User {UserId} deleted document instance {InstanceId}.", actingUserId, instanceId);

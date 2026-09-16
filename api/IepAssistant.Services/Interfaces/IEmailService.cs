@@ -12,13 +12,16 @@ public interface IEmailService
     Task SendStaffInviteExpiringEmailAsync(string toEmail, string inviteeEmail, string districtName, string? schoolName, DateTime expiresAt, CancellationToken ct = default);
     Task SendBetaInviteEmailAsync(string toEmail, string inviteCode, CancellationToken ct = default);
 
+    /// <summary>Pilot-gates plan, phase 2: sent once, at deletion-request time, carrying the signed
+    /// <c>cancelUrl</c> that is the only way to cancel once the request has deactivated the account.</summary>
+    Task SendAccountDeletionCancelLinkEmailAsync(string toEmail, string firstName, string cancelUrl, DateTime purgeDate, CancellationToken ct = default);
+
     // ----------------------------------------------------------------- Plan 4 additions
     //
-    // Unlike every method above (which swallows an ACS send failure and logs it — see EmailService's
-    // private SendEmailAsync), these THROW on failure. The callers are background workers/services that
-    // must record the failure on a Notification row rather than have it silently disappear. The dev-mode
-    // (no ACS connection string configured) path still logs-and-returns success, matching the existing
-    // methods' local/CI behavior.
+    // Historically these methods threw on an ACS send failure while the ones above swallowed it. As of
+    // the pilot-gates plan (phase 1, decision 2), EVERY Send* method — these included — only composes
+    // and enqueues (see EmailService.EnqueueEmailAsync); none of them talk to ACS any more. The real
+    // send, retry, and failure recording now happen entirely in OutboundEmailWorker/IEmailTransport.
 
     /// <summary>New meeting invitation. <paramref name="ics"/> is attached as a .ics file (METHOD:REQUEST).</summary>
     Task SendMeetingInvitationAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default);

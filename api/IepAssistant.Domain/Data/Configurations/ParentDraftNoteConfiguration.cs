@@ -14,10 +14,15 @@ public class ParentDraftNoteConfiguration : IEntityTypeConfiguration<ParentDraft
         builder.Property(n => n.Answer).IsRequired();
         builder.Property(n => n.TargetRowId).HasMaxLength(64);
 
+        // Restrict, not Cascade (pilot-gates plan, phase 1): SQL Server refuses to create an INSTEAD
+        // OF UPDATE/DELETE trigger on a table that has an incoming cascading FK, and
+        // SharedDraftRevisions needs exactly such a trigger for its own immutability. A revision is
+        // never actually deleted by application code (it is superseded/withdrawn, not removed), so
+        // this changes no real runtime behavior.
         builder.HasOne(n => n.SharedDraftRevision)
             .WithMany()
             .HasForeignKey(n => n.SharedDraftRevisionId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Restrict: a parent's account is deactivated rather than deleted; never cascade-destroy their notes' FK path unexpectedly.
         builder.HasOne(n => n.ParentUser)

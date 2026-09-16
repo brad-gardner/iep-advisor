@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Api.DTOs.AnalysisRuns;
 using IepAssistant.Api.DTOs.Common;
@@ -26,6 +27,7 @@ public class AnalysisRunController : ControllerBase
     }
 
     [HttpPost("api/children/{childId}/analysis-runs")]
+    [EnableRateLimiting("analysis-run")]
     [ProducesResponseType(typeof(ApiResponse<AnalysisRunDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status402PaymentRequired)]

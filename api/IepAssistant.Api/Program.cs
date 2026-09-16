@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
@@ -65,6 +66,12 @@ builder.Host.UseSerilog();
 builder.Services.AddDomain(builder.Configuration);
 builder.Services.AddServices();
 
+// Pilot-gates plan, phase 2: backs the signed account-deletion-cancellation link (AccountService /
+// POST /api/account/cancel-deletion). SetApplicationName pins the key ring's discriminator explicitly
+// rather than relying on ASP.NET Core's default (derived from ContentRootPath), which can differ across
+// deploy slots/hosts and would otherwise make a token minted on one instance fail to validate on another.
+builder.Services.AddDataProtection().SetApplicationName("IepAssistant");
+
 // Email:ExposeLinksForTesting gate (e2e/testing convenience). Enabling it surfaces raw invite URLs in
 // API responses, so it is allowed ONLY in Development AND only when no real ACS connection string is set.
 // Startup is the one place IHostEnvironment is in scope, so any attempt to enable it outside Development
@@ -103,6 +110,13 @@ builder.Services.AddOptions<AnthropicOptions>()
 // Timeout is generous because long-document (30+ page ETR/IEP) non-streaming responses with
 // large output token budgets can take several minutes. Consider switching to streaming if this
 // becomes a sustained issue.
+//
+// todos/P3-01 #11: Anthropic.SDK stamps the API key onto this client's DefaultRequestHeaders
+// (x-api-key) rather than passing it per-request, so any resilience/logging handler added to this
+// HttpClientBuilder later must NOT log request headers — that would put the API key in every log
+// line for every Claude call. Separately: Anthropic.SDK ships an opt-in LoggingRequestInterceptor
+// that logs full request bodies (IEP/ETR content, child names). ClaudeClient correctly uses the
+// 2-arg AnthropicClient(apiKey, httpClient) constructor, which does not attach it — keep it that way.
 builder.Services.AddHttpClient("Claude", client =>
 {
     client.Timeout = TimeSpan.FromMinutes(15);
@@ -136,6 +150,13 @@ builder.Services.AddHostedService<DefaultIepTemplateSeederHostedService>();
 builder.Services.AddSingleton<AuditLogger>();
 builder.Services.AddSingleton<IAuditLogger>(sp => sp.GetRequiredService<AuditLogger>());
 builder.Services.AddHostedService<AccessAuditLogWorker>();
+// Pilot-gates plan, phase 1: nightly (+ on-demand) audit hash-chain integrity walk.
+builder.Services.AddHostedService<AuditIntegrityWorker>();
+// Pilot-gates plan, phase 1: outbound email queue — IEmailService only composes and enqueues now;
+// this worker is the only real sender (see IEmailTransport/AcsEmailTransport).
+builder.Services.AddHostedService<OutboundEmailWorker>();
+// Pilot-gates plan, phase 2: purges parent/staff accounts 30+ days past DeletionRequestedAt.
+builder.Services.AddHostedService<AccountPurgeWorker>();
 // Phase 3: warns the inviting admin ~3 days before a pending staff invite expires (daily timer; scoped
 // per-invite processing). All decision logic lives in IStaffInviteExpiryService; single-instance assumption
 // is documented on the worker.
@@ -275,6 +296,23 @@ builder.Services.AddRateLimiter(options =>
                     SegmentsPerWindow = 6
                 }));
 
+    // todos/P2-02: caps how fast one authenticated user can create analysis runs. Every run is a fully-
+    // billed Claude call regardless of outcome (including an InvalidResponse from a document engineered
+    // to make Claude's output unparseable), and the per-child quota alone does not stop the same user
+    // from spraying create requests across many children. Partitions on user id (not IP) since this is
+    // an authenticated-only endpoint.
+    options.AddPolicy("analysis-run", context =>
+        disableRateLimiting
+            ? RateLimitPartition.GetNoLimiter<string>("")
+            : RateLimitPartition.GetSlidingWindowLimiter(
+                partitionKey: context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = 20,
+                    Window = TimeSpan.FromMinutes(15),
+                    SegmentsPerWindow = 3
+                }));
+
     // Unauthenticated district self-serve signup — very tight per-IP cap (3 / hour, fixed window) since
     // each success provisions a brand-new District + DistrictAdmin. Depends on UseForwardedHeaders to see
     // the real client IP behind the App Service front end.
@@ -309,6 +347,15 @@ builder.Services.AddHealthChecks()
     .AddSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")!);
 
 var app = builder.Build();
+
+// Pilot-gates plan, phase 1, decision 2: outside Development, sending must be genuinely configured —
+// an empty Email:ConnectionString there means every queued email will fail (see AcsEmailTransport),
+// not silently "succeed" the way the Development fake-send path does. One WARN banner at startup, not
+// per-email, so it is visible in a deploy's logs without spamming them per send attempt.
+if (!app.Environment.IsDevelopment() && string.IsNullOrEmpty(builder.Configuration["Email:ConnectionString"]))
+{
+    Log.Warning("Email delivery is not configured (Email:ConnectionString is empty) outside Development — outbound emails will be queued but will fail to send until it is set.");
+}
 
 // Initialize database (only in development)
 if (app.Environment.IsDevelopment())

@@ -81,6 +81,13 @@ public class AnalysisRunWorker : BackgroundService
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var service = scope.ServiceProvider.GetRequiredService<IAnalysisRunService>();
 
+            // todos/P3-01 #2: .Select(r => r.Id) here is load-bearing, not a style choice. This scope
+            // (context/service) is shared across every iteration of the foreach loop below, and
+            // FailRunAsync calls context.ChangeTracker.Clear() on every call. Projecting to a plain
+            // List<int> BEFORE the loop means Clear() has nothing of this query's to detach; if this
+            // were ever changed to materialize AnalysisRun entities instead and iterate over THOSE,
+            // the first Clear() would detach every remaining entity mid-loop and the sweep would
+            // silently stop refunding for every run after the first.
             var orphanedIds = await context.AnalysisRuns
                 .Where(r => r.Status == AnalysisRunStatus.Running || r.Status == AnalysisRunStatus.Pending)
                 .Select(r => r.Id)

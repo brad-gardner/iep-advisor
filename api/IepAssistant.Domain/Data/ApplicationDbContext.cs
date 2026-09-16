@@ -103,6 +103,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<SignatureEvent> SignatureEvents => Set<SignatureEvent>();
     public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
 
+    // Pilot-gates plan, phase 1: durable audit + outbound email queue.
+    public DbSet<PendingAuditEvent> PendingAuditEvents => Set<PendingAuditEvent>();
+    public DbSet<AuditIntegrityRun> AuditIntegrityRuns => Set<AuditIntegrityRun>();
+    public DbSet<OutboundEmail> OutboundEmails => Set<OutboundEmail>();
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         // Suppress warning about pending model changes
