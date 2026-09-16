@@ -52,11 +52,17 @@ public class AuthoredDocumentPdfService : IAuthoredDocumentPdfService
             .Select(v => new
             {
                 v.Id,
+                v.SchoolStudentId,
                 v.VersionNumber,
                 v.FinalizedAt,
                 v.DocumentTemplateVersionId,
                 v.ValuesJson,
-                DocumentTypeDisplayName = v.DocumentType.DisplayName
+                DocumentTypeKey = v.DocumentType.Key,
+                DocumentTypeDisplayName = v.DocumentType.DisplayName,
+                StateCode = v.DocumentTemplateVersion.DocumentTemplate.StateCode,
+                v.AmendsVersionId,
+                v.EffectiveDate,
+                AmendsVersionNumber = v.AmendsVersion != null ? (int?)v.AmendsVersion.VersionNumber : null
             })
             .FirstOrDefaultAsync(ct);
 
@@ -90,8 +96,10 @@ public class AuthoredDocumentPdfService : IAuthoredDocumentPdfService
             if (!tree.Success)
                 throw new InvalidOperationException(tree.Message ?? "The pinned template version could not be loaded.");
 
+            var header = await BuildHeaderContextAsync(version.SchoolStudentId, version.DocumentTypeKey, version.StateCode, version.AmendsVersionNumber, version.EffectiveDate, ct);
+
             var document = new AuthoredDocumentPdfDocument(
-                version.DocumentTypeDisplayName, version.VersionNumber, version.FinalizedAt, tree.Data!, version.ValuesJson);
+                version.DocumentTypeDisplayName, version.VersionNumber, version.FinalizedAt, tree.Data!, version.ValuesJson, header);
             var bytes = document.GeneratePdf();
 
             var checksum = Convert.ToBase64String(SHA256.HashData(bytes));
@@ -130,5 +138,53 @@ public class AuthoredDocumentPdfService : IAuthoredDocumentPdfService
                 _logger.LogError(saveEx, "Failed to persist Error render status for AuthoredDocumentVersion {VersionId}", versionId);
             }
         }
+    }
+
+    /// <summary>
+    /// Resolves everything the OH form layout needs beyond the frozen values (plan 7, decision 9): the
+    /// student/district/date facts, the latest Held meeting's date and participants, and the amendment
+    /// banner fields. Cheap for a generic (state-less) template too — the document simply ignores it.
+    /// </summary>
+    private async Task<AuthoredDocumentPdfHeaderContext> BuildHeaderContextAsync(
+        int schoolStudentId, string documentTypeKey, string? stateCode, int? amendsVersionNumber, DateTime? effectiveDate, CancellationToken ct)
+    {
+        var student = await _context.SchoolStudents.AsNoTracking()
+            .Where(s => s.Id == schoolStudentId)
+            .Select(s => new
+            {
+                s.FirstName, s.LastName, s.DateOfBirth, s.IepDate, s.EtrDate,
+                DistrictName = s.District.Name
+            })
+            .FirstOrDefaultAsync(ct);
+
+        var latestHeldMeeting = await _context.Meetings.AsNoTracking()
+            .Where(m => m.SchoolStudentId == schoolStudentId && m.Status == MeetingStatus.Held)
+            .OrderByDescending(m => m.StartsAtUtc)
+            .Select(m => new { m.Id, m.StartsAtUtc })
+            .FirstOrDefaultAsync(ct);
+
+        var participants = latestHeldMeeting == null
+            ? new List<AuthoredDocumentPdfParticipant>()
+            : await _context.MeetingParticipants.AsNoTracking()
+                .Where(p => p.MeetingId == latestHeldMeeting.Id)
+                .Select(p => new AuthoredDocumentPdfParticipant(
+                    p.UserId != null ? (p.User!.FirstName + " " + p.User!.LastName).Trim() : (p.ExternalName ?? "Unknown"),
+                    p.TeamRole.ToString(),
+                    p.Attended))
+                .ToListAsync(ct);
+
+        return new AuthoredDocumentPdfHeaderContext(
+            StateCode: stateCode,
+            DocumentTypeKey: documentTypeKey,
+            StudentFirstName: student?.FirstName ?? string.Empty,
+            StudentLastName: student?.LastName,
+            StudentDateOfBirth: student?.DateOfBirth,
+            DistrictName: student?.DistrictName,
+            IepDate: student?.IepDate,
+            EtrDate: student?.EtrDate,
+            MeetingDate: latestHeldMeeting?.StartsAtUtc,
+            Participants: participants,
+            AmendsVersionNumber: amendsVersionNumber,
+            EffectiveDate: effectiveDate);
     }
 }

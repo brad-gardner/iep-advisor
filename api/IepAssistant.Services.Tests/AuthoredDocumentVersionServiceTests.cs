@@ -1046,5 +1046,182 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
         return drained;
     }
 
+    // ---------------------------------------------------------------- Plan 7: amendments
+
+    private SignedArtifactService CreateSignedArtifactService(ApplicationDbContext ctx, IBlobStorageService blob)
+        => new(ctx, new OrgAccessService(ctx), new AccessService(ctx), blob, _audit);
+
+    [Fact]
+    public async Task Amend_Then_Finalize_CreatesAmendmentChain_PreservingRowIds()
+    {
+        var s = SeedSchoolWithStudent("amend");
+        var keys = SeedTemplate(IepTypeId);
+        var rowId1 = Guid.NewGuid();
+        var rowId2 = Guid.NewGuid();
+        var valuesWithRowIds = $$"""
+        {
+          "{{keys.TextKey}}": "Alice",
+          "{{keys.SelectKey}}": "Yes",
+          "{{keys.TableKey}}": [
+            { "_rowId": "{{rowId1}}", "{{keys.Col1Key}}": "Speech", "{{keys.Col2Key}}": "2026-02-01" },
+            { "_rowId": "{{rowId2}}", "{{keys.Col1Key}}": "OT" }
+          ]
+        }
+        """;
+        var instanceId = SeedInstance(s, keys, IepTypeId, valuesWithRowIds);
+
+        int originalVersionId;
+        using (var ctx = CreateContext())
+        {
+            var result = await CreateService(ctx).FinalizeAsync(instanceId, s.CollaboratorUserId);
+            Assert.True(result.Success, result.Message);
+            originalVersionId = result.Data!.Id;
+        }
+
+        int newInstanceId;
+        using (var ctx = CreateContext())
+        {
+            var amendResult = await CreateService(ctx).AmendAsync(originalVersionId, s.CollaboratorUserId, new AmendDocumentVersionModel
+            {
+                Reason = "Change in services",
+                EffectiveDate = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc)
+            });
+            Assert.True(amendResult.Success, amendResult.Message);
+            newInstanceId = amendResult.Data!.InstanceId;
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var newInstance = ctx.DocumentInstances.Single(i => i.Id == newInstanceId);
+            Assert.Equal(originalVersionId, newInstance.AmendsVersionId);
+            Assert.Equal("Change in services", newInstance.AmendmentReason);
+            Assert.Equal(DocumentInstanceStatus.Draft, newInstance.Status);
+            // Prefilled VERBATIM — every _rowId survives the copy.
+            Assert.Contains(rowId1.ToString(), newInstance.ValuesJson);
+            Assert.Contains(rowId2.ToString(), newInstance.ValuesJson);
+        }
+
+        int amendedVersionId;
+        using (var ctx = CreateContext())
+        {
+            var finalizeResult = await CreateService(ctx).FinalizeAsync(newInstanceId, s.CollaboratorUserId);
+            Assert.True(finalizeResult.Success, finalizeResult.Message);
+            amendedVersionId = finalizeResult.Data!.Id;
+            Assert.Equal(originalVersionId, finalizeResult.Data!.AmendsVersionId);
+            Assert.Equal("Change in services", finalizeResult.Data!.AmendmentReason);
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var amendedVersion = ctx.AuthoredDocumentVersions.Single(v => v.Id == amendedVersionId);
+            Assert.Contains(rowId1.ToString(), amendedVersion.ValuesJson);
+            Assert.Contains(rowId2.ToString(), amendedVersion.ValuesJson);
+
+            var detail = await CreateService(ctx).GetVersionAsync(originalVersionId, s.CollaboratorUserId);
+            Assert.True(detail.Success, detail.Message);
+            Assert.Contains(amendedVersionId, detail.Data!.AmendedByVersionIds);
+        }
+    }
+
+    [Fact]
+    public async Task Amend_BlankReason_IsRejected()
+    {
+        var s = SeedSchoolWithStudent("amend-blank");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered);
+
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).AmendAsync(versionId, s.CollaboratorUserId, new AmendDocumentVersionModel { Reason = "  " });
+        Assert.False(result.Success);
+    }
+
+    // ---------------------------------------------------------------- Plan 7: signed artifacts
+
+    [Fact]
+    public async Task SignedArtifactUpload_TransitionsSignatureStatus_AndIsListedAndDownloadable()
+    {
+        var s = SeedSchoolWithStudent("sig");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered);
+
+        using (var ctx = CreateContext())
+            Assert.Equal(SignatureStatus.Unsigned, ctx.AuthoredDocumentVersions.Single().SignatureStatus);
+
+        var blob = new SuccessBlobStorageFake();
+        int artifactId;
+        using (var ctx = CreateContext())
+        {
+            var service = CreateSignedArtifactService(ctx, blob);
+            var upload = await service.UploadAsync(s.CollaboratorUserId, versionId, new UploadSignedArtifactModel
+            {
+                FileStream = new MemoryStream(new byte[] { 1, 2, 3 }),
+                FileName = "signed.pdf",
+                ContentType = "application/pdf",
+                SizeBytes = 3,
+                SignerSummary = "Parent + case manager",
+                SignatureStatus = SignatureStatus.PartiallySigned
+            });
+            Assert.True(upload.Success, upload.Message);
+            artifactId = upload.Data!.Id;
+        }
+
+        using (var ctx = CreateContext())
+            Assert.Equal(SignatureStatus.PartiallySigned, ctx.AuthoredDocumentVersions.Single().SignatureStatus);
+
+        using (var ctx = CreateContext())
+        {
+            var service = CreateSignedArtifactService(ctx, blob);
+            var list = await service.ListAsync(s.CollaboratorUserId, versionId);
+            Assert.True(list.Success, list.Message);
+            Assert.Single(list.Data!);
+            Assert.Equal("signed.pdf", list.Data![0].FileName);
+
+            var url = await service.GetDownloadUrlAsync(s.CollaboratorUserId, artifactId);
+            Assert.True(url.Success, url.Message);
+            Assert.Contains("sas=token", url.Data!);
+        }
+
+        // A second upload declaring fully Signed moves the version past PartiallySigned.
+        using (var ctx = CreateContext())
+        {
+            var service = CreateSignedArtifactService(ctx, blob);
+            var upload = await service.UploadAsync(s.CollaboratorUserId, versionId, new UploadSignedArtifactModel
+            {
+                FileStream = new MemoryStream(new byte[] { 4, 5 }),
+                FileName = "signed2.pdf",
+                ContentType = "application/pdf",
+                SizeBytes = 2,
+                SignatureStatus = SignatureStatus.Signed
+            });
+            Assert.True(upload.Success, upload.Message);
+        }
+
+        using (var ctx = CreateContext())
+        {
+            Assert.Equal(SignatureStatus.Signed, ctx.AuthoredDocumentVersions.Single().SignatureStatus);
+            Assert.Equal(2, ctx.SignedArtifacts.Count());
+        }
+    }
+
+    [Fact]
+    public async Task SignedArtifactUpload_UnsignedStatus_IsRejected()
+    {
+        var s = SeedSchoolWithStudent("sig-bad");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered);
+
+        using var ctx = CreateContext();
+        var service = CreateSignedArtifactService(ctx, new SuccessBlobStorageFake());
+        var upload = await service.UploadAsync(s.CollaboratorUserId, versionId, new UploadSignedArtifactModel
+        {
+            FileStream = new MemoryStream(new byte[] { 1 }),
+            FileName = "x.pdf",
+            ContentType = "application/pdf",
+            SizeBytes = 1,
+            SignatureStatus = SignatureStatus.Unsigned
+        });
+        Assert.False(upload.Success);
+    }
+
     public void Dispose() => _connection.Dispose();
 }

@@ -92,6 +92,17 @@ public class ApplicationDbContext : DbContext
     public DbSet<EvaluationCase> EvaluationCases => Set<EvaluationCase>();
     public DbSet<EvaluatorAssignment> EvaluatorAssignments => Set<EvaluatorAssignment>();
 
+    // Plan 7 phase 3: meeting brief, attendance decisions, offline family participation.
+    public DbSet<MeetingBrief> MeetingBriefs => Set<MeetingBrief>();
+    public DbSet<MeetingDecision> MeetingDecisions => Set<MeetingDecision>();
+    public DbSet<FamilyContactAttempt> FamilyContactAttempts => Set<FamilyContactAttempt>();
+    public DbSet<OfflineFamilyInput> OfflineFamilyInputs => Set<OfflineFamilyInput>();
+
+    // Plan 7 phase 4: signed artifacts, amendments, district export.
+    public DbSet<SignedArtifact> SignedArtifacts => Set<SignedArtifact>();
+    public DbSet<SignatureEvent> SignatureEvents => Set<SignatureEvent>();
+    public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         // Suppress warning about pending model changes

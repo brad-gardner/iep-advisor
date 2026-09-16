@@ -17,6 +17,15 @@ public class AuthoredDocumentVersionSummaryModel
     public int FinalizedByUserId { get; set; }
     public DateTime FinalizedAt { get; set; }
     public PdfRenderStatus? PdfRenderStatus { get; set; }
+
+    // Plan 7, decisions 4-5.
+    public SignatureStatus SignatureStatus { get; set; } = SignatureStatus.Unsigned;
+    public int SignedArtifactCount { get; set; }
+    public int? AmendsVersionId { get; set; }
+    public int? AmendsVersionNumber { get; set; }
+    public string? AmendmentReason { get; set; }
+    public DateTime? EffectiveDate { get; set; }
+    public List<int> AmendedByVersionIds { get; set; } = new();
 }
 
 /// <summary>
@@ -42,8 +51,30 @@ public class AuthoredDocumentVersionDetailModel
     public string? PdfBlobUri { get; set; }
     public DateTime? PdfRenderedAt { get; set; }
 
+    // Plan 7, decisions 4-5.
+    public SignatureStatus SignatureStatus { get; set; } = SignatureStatus.Unsigned;
+    public int SignedArtifactCount { get; set; }
+    public int? AmendsVersionId { get; set; }
+    public int? AmendsVersionNumber { get; set; }
+    public string? AmendmentReason { get; set; }
+    public DateTime? EffectiveDate { get; set; }
+    public List<int> AmendedByVersionIds { get; set; } = new();
+
     /// <summary>The pinned template version's full section/field tree, so the client can render the finalized form.</summary>
     public TemplateVersionDetailModel TemplateVersion { get; set; } = new();
+}
+
+/// <summary>Input to <c>POST /api/authored-versions/{id}/amend</c> (plan 7, decision 5).</summary>
+public class AmendDocumentVersionModel
+{
+    public string Reason { get; set; } = string.Empty;
+    public DateTime? EffectiveDate { get; set; }
+}
+
+/// <summary>Result of a successful amend: the new Draft instance's id, ready to open in the editor.</summary>
+public class AmendResultModel
+{
+    public int InstanceId { get; set; }
 }
 
 /// <summary>

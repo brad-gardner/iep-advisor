@@ -33,6 +33,13 @@ public class HomeService : IHomeService
     /// (review-fix contract, todos/082).</summary>
     internal const int MaxOverdueByCaseManager = 50;
 
+    /// <summary>Plan 7, decision 4: sibling cap for the "unsigned finalized documents" list.</summary>
+    internal const int MaxUnsignedFinalized = 20;
+
+    /// <summary>Plan 7, decision 4: a finalized version counts as "unsigned finalized" once it has been
+    /// finalized this many days without a signed artifact being attached.</summary>
+    internal const int UnsignedFinalizedAfterDays = 14;
+
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
     private readonly IObligationService _obligationService;
@@ -296,10 +303,40 @@ public class HomeService : IHomeService
             })
             .ToListAsync(ct);
 
+        // Plan 7, decision 4: unsigned finalized documents — school admins get theirs from
+        // PopulateAdminSectionsAsync (scoped to the school); case managers get their own lead-scoped list
+        // here (never for Provider/GeneralEducator/DistrictAdmin, per the plan-7 contract).
+        if (variant == StaffHomeVariant.CaseManager)
+        {
+            var myStudentIds = _context.SchoolStudents.AsNoTracking()
+                .Where(s => s.CaseManagerUserId == userId)
+                .Select(s => s.Id);
+            home.UnsignedFinalized = await LoadUnsignedFinalizedAsync(myStudentIds, ct);
+        }
+
         if (isAdmin)
             await PopulateAdminSectionsAsync(home, userId, ctx, variant, ct);
 
         return home;
+    }
+
+    /// <summary>Finalized > 14 days ago, still Unsigned, scoped to <paramref name="studentIds"/> — capped
+    /// at <see cref="MaxUnsignedFinalized"/> rows, oldest first (the most overdue-to-sign first).</summary>
+    private async Task<List<HomeUnsignedModel>> LoadUnsignedFinalizedAsync(IQueryable<int> studentIds, CancellationToken ct)
+    {
+        var cutoff = DateTime.UtcNow.AddDays(-UnsignedFinalizedAfterDays);
+        return await _context.AuthoredDocumentVersions.AsNoTracking()
+            .Where(v => studentIds.Contains(v.SchoolStudentId) && v.SignatureStatus == SignatureStatus.Unsigned && v.FinalizedAt <= cutoff)
+            .OrderBy(v => v.FinalizedAt)
+            .Take(MaxUnsignedFinalized)
+            .Select(v => new HomeUnsignedModel
+            {
+                VersionId = v.Id,
+                StudentId = v.SchoolStudentId,
+                StudentName = (v.SchoolStudent.FirstName + " " + v.SchoolStudent.LastName).Trim(),
+                FinalizedAt = v.FinalizedAt
+            })
+            .ToListAsync(ct);
     }
 
     /// <summary>Roster attention counts, the overdue/at-risk-by-student table, and (DistrictAdmin only)
@@ -314,7 +351,12 @@ public class HomeService : IHomeService
     /// counted twice.</summary>
     private async Task PopulateAdminSectionsAsync(StaffHomeModel home, int userId, StaffContext ctx, StaffHomeVariant variant, CancellationToken ct)
     {
-        home.UnsignedFinalized = new List<HomeUnsignedModel>();
+        // Plan 7, decision 4: school admins see their school's unsigned finalized documents; DistrictAdmin
+        // does not get this list (per the plan-7 contract — "visible to school admins and case managers").
+        home.UnsignedFinalized = variant == StaffHomeVariant.SchoolAdmin && ctx.SchoolId.HasValue
+            ? await LoadUnsignedFinalizedAsync(
+                _context.SchoolStudents.AsNoTracking().Where(s => s.SchoolId == ctx.SchoolId.Value).Select(s => s.Id), ct)
+            : new List<HomeUnsignedModel>();
 
         // SchoolAdmin with no school binding has nothing to oversee — a valid empty payload (mirrors
         // DistrictService.GetDashboardAsync for the same case), not an error.

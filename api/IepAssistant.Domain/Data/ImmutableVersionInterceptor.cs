@@ -20,6 +20,11 @@ namespace IepAssistant.Domain.Data;
 /// Its <see cref="AuthoredDocumentPdf"/> is deliberately NOT guarded; the authored-document render worker
 /// legitimately updates it after rendering (same split as IepVersion / IepVersionPdf).</para>
 ///
+/// <para><b>SignatureStatus (plan 7, decision 4):</b> the ONE column on <see cref="AuthoredDocumentVersion"/>
+/// itself that is allowed to change after finalize — a Modified entry is let through when every modified
+/// property is <see cref="AuthoredDocumentVersion.SignatureStatus"/> or an audit stamp
+/// (<c>UpdatedAt</c>/<c>UpdatedById</c>); any other modified property still throws.</para>
+///
 /// <para><b>Template family:</b> immutability is <em>state-dependent</em> — a Draft version and its
 /// sections/fields must stay editable, only a <b>Published</b> version freezes. The publish transition
 /// itself (Status Draft→Published) is allowed by checking the version's <em>original</em> status.
@@ -63,7 +68,7 @@ public sealed class ImmutableVersionInterceptor : SaveChangesInterceptor
             if (IsImmutableVersionEntity(entry.Entity))
                 throw new InvalidOperationException("IepVersion records are immutable.");
 
-            if (entry.Entity is AuthoredDocumentVersion)
+            if (entry.Entity is AuthoredDocumentVersion && !IsOnlySignatureStatusModified(entry))
                 throw new InvalidOperationException("AuthoredDocumentVersion records are immutable.");
 
             if (IsFrozenTemplateEntity(context, entry))
@@ -105,6 +110,21 @@ public sealed class ImmutableVersionInterceptor : SaveChangesInterceptor
             default:
                 return false;
         }
+    }
+
+    /// <summary>True for a Modified <see cref="AuthoredDocumentVersion"/> entry when every modified
+    /// property is <see cref="AuthoredDocumentVersion.SignatureStatus"/>/<c>UpdatedAt</c>/<c>UpdatedById</c>
+    /// — i.e. a signature status update, never a content edit. Deleted entries are never exempted.</summary>
+    private static bool IsOnlySignatureStatusModified(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry)
+    {
+        if (entry.State != EntityState.Modified)
+            return false;
+
+        return entry.Properties
+            .Where(p => p.IsModified)
+            .All(p => p.Metadata.Name is nameof(AuthoredDocumentVersion.SignatureStatus)
+                or nameof(AuthoredDocumentVersion.UpdatedAt)
+                or nameof(AuthoredDocumentVersion.UpdatedById));
     }
 
     private static bool VersionIsPublished(DbContext context, int versionId)

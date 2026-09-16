@@ -291,6 +291,21 @@ public sealed class StudentEvidenceService : IStudentEvidenceService
             }
         }
 
+        // ---- Offline family input (plan 7, decision 7) — recorded by staff outside the app.
+        var offlineInput = await _context.OfflineFamilyInputs.AsNoTracking()
+            .Where(o => o.SchoolStudentId == schoolStudentId)
+            .OrderByDescending(o => o.ReceivedAt)
+            .Select(o => new { o.Id, o.ReceivedAt, o.Summary })
+            .ToListAsync(ct);
+        foreach (var o in offlineInput)
+        {
+            items.Add(new EvidenceItem
+            {
+                Id = NextId(), Kind = EvidenceKind.OfflineFamilyInput, SourceType = "OfflineFamilyInput", SourceId = o.Id,
+                SourceLabel = $"Family input (offline, {o.ReceivedAt:yyyy-MM-dd})", SourceDate = o.ReceivedAt, AuthorRole = "family", Text = o.Summary
+            });
+        }
+
         // Access trail (FERPA): the bundle is an aggregate read of the student record and of every
         // finalized version whose content it carries — record it the same way the direct reads do.
         _audit.Record(AuditAction.View, userId, "StudentEvidence", schoolStudentId);

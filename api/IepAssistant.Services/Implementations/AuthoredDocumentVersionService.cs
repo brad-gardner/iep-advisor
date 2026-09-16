@@ -1,5 +1,6 @@
 using System.Data;
 using System.Globalization;
+using System.Linq.Expressions;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
@@ -153,6 +154,13 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
                 ValuesJson = instance.ValuesJson,
                 FinalizedByUserId = actingUserId,
                 FinalizedAt = now,
+                // Plan 7, decision 5: an instance created by AmendAsync carries its amendment fields onto
+                // every version finalized from it, forming the amendment chain. Set here (not as a later
+                // mutation) — AuthoredDocumentVersion is immutable once inserted, so these must land in
+                // the SAME insert as everything else.
+                AmendsVersionId = instance.AmendsVersionId,
+                AmendmentReason = instance.AmendmentReason,
+                EffectiveDate = instance.EffectiveDate,
                 CreatedById = actingUserId,
                 UpdatedById = actingUserId,
                 // The render worker flips this Pending -> Rendered/Error.
@@ -209,6 +217,13 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             await transaction.CommitAsync(ct);
             transactionSettled = true;
 
+            int? amendsVersionNumber = version.AmendsVersionId.HasValue
+                ? await _context.AuthoredDocumentVersions.AsNoTracking()
+                    .Where(v => v.Id == version.AmendsVersionId.Value)
+                    .Select(v => (int?)v.VersionNumber)
+                    .FirstOrDefaultAsync(ct)
+                : null;
+
             summary = new AuthoredDocumentVersionSummaryModel
             {
                 Id = version.Id,
@@ -217,7 +232,12 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
                 VersionNumber = version.VersionNumber,
                 FinalizedByUserId = actingUserId,
                 FinalizedAt = version.FinalizedAt,
-                PdfRenderStatus = PdfRenderStatus.Pending
+                PdfRenderStatus = PdfRenderStatus.Pending,
+                SignatureStatus = version.SignatureStatus,
+                AmendsVersionId = version.AmendsVersionId,
+                AmendsVersionNumber = amendsVersionNumber,
+                AmendmentReason = version.AmendmentReason,
+                EffectiveDate = version.EffectiveDate
             };
         }
         catch
@@ -252,7 +272,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             .AsNoTracking()
             .Where(v => v.SchoolStudentId == studentId)
             .OrderByDescending(v => v.VersionNumber)
-            .Select(SummaryProjection)
+            .Select(SummaryProjection())
             .ToListAsync(ct);
 
         return ServiceResult<List<AuthoredDocumentVersionSummaryModel>>.SuccessResult(rows);
@@ -274,7 +294,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             .AsNoTracking()
             .Where(v => linkedStudentIds.Contains(v.SchoolStudentId))
             .OrderByDescending(v => v.VersionNumber)
-            .Select(SummaryProjection)
+            .Select(SummaryProjection())
             .ToListAsync(ct);
 
         return ServiceResult<List<AuthoredDocumentVersionSummaryModel>>.SuccessResult(rows);
@@ -307,7 +327,13 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
                 v.ValuesJson,
                 PdfRenderStatus = v.Pdf != null ? (PdfRenderStatus?)v.Pdf.RenderStatus : null,
                 PdfBlobUri = v.Pdf != null ? v.Pdf.BlobUri : null,
-                PdfRenderedAt = v.Pdf != null ? v.Pdf.RenderedAt : null
+                PdfRenderedAt = v.Pdf != null ? v.Pdf.RenderedAt : null,
+                v.SignatureStatus,
+                SignedArtifactCount = v.SignedArtifacts.Count,
+                v.AmendsVersionId,
+                AmendsVersionNumber = v.AmendsVersion != null ? (int?)v.AmendsVersion.VersionNumber : null,
+                v.AmendmentReason,
+                v.EffectiveDate
             })
             .FirstOrDefaultAsync(ct);
 
@@ -319,6 +345,11 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         if (!tree.Success)
             return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(
                 tree.Message ?? "The pinned template version could not be loaded.");
+
+        var amendedByVersionIds = await _context.AuthoredDocumentVersions.AsNoTracking()
+            .Where(v => v.AmendsVersionId == versionId)
+            .Select(v => v.Id)
+            .ToListAsync(ct);
 
         _audit.Record(AuditAction.View, actingUserId, "AuthoredDocumentVersion", versionId);
 
@@ -337,8 +368,61 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             PdfRenderStatus = version.PdfRenderStatus,
             PdfBlobUri = version.PdfBlobUri,
             PdfRenderedAt = version.PdfRenderedAt,
+            SignatureStatus = version.SignatureStatus,
+            SignedArtifactCount = version.SignedArtifactCount,
+            AmendsVersionId = version.AmendsVersionId,
+            AmendsVersionNumber = version.AmendsVersionNumber,
+            AmendmentReason = version.AmendmentReason,
+            EffectiveDate = version.EffectiveDate,
+            AmendedByVersionIds = amendedByVersionIds,
             TemplateVersion = tree.Data!
         });
+    }
+
+    // ---------------------------------------------------------------- Amend (plan 7, decision 5)
+
+    public async Task<ServiceResult<AmendResultModel>> AmendAsync(int versionId, int actingUserId, AmendDocumentVersionModel model, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(model.Reason))
+            return ServiceResult<AmendResultModel>.FailureResult("An amendment reason is required.");
+        var reason = model.Reason.Trim();
+        if (reason.Length > 1000)
+            return ServiceResult<AmendResultModel>.FailureResult("Amendment reason must be 1000 characters or fewer.");
+
+        var version = await _context.AuthoredDocumentVersions.AsNoTracking()
+            .Where(v => v.Id == versionId)
+            .Select(v => new { v.Id, v.SchoolStudentId, v.DocumentTypeId, v.DocumentTemplateVersionId, v.ValuesJson })
+            .FirstOrDefaultAsync(ct);
+        if (version == null)
+            return ServiceResult<AmendResultModel>.FailureResult(VersionNotFoundMessage);
+
+        if (!await _orgAccess.CanActOnStudentAsync(actingUserId, version.SchoolStudentId, AccessRole.Collaborator, ct))
+            return ServiceResult<AmendResultModel>.FailureResult(PermissionMessage);
+
+        // Prefilled VERBATIM — the frozen ValuesJson is copied as-is, so every `_rowId` (goal/service/
+        // accommodation lineage) is preserved exactly as it was at finalize time.
+        var now = DateTime.UtcNow;
+        var instance = new DocumentInstance
+        {
+            SchoolStudentId = version.SchoolStudentId,
+            DocumentTypeId = version.DocumentTypeId,
+            DocumentTemplateVersionId = version.DocumentTemplateVersionId,
+            Status = DocumentInstanceStatus.Draft,
+            ValuesJson = version.ValuesJson,
+            AmendsVersionId = version.Id,
+            AmendmentReason = reason,
+            EffectiveDate = model.EffectiveDate,
+            LastEditedByUserId = actingUserId,
+            LastEditedAt = now,
+            CreatedById = actingUserId,
+            UpdatedById = actingUserId
+        };
+        await _context.DocumentInstances.AddAsync(instance, ct);
+        await _context.SaveChangesAsync(ct);
+
+        _audit.Record(AuditAction.Edit, actingUserId, "DocumentInstance", instance.Id);
+
+        return ServiceResult<AmendResultModel>.SuccessResult(new AmendResultModel { InstanceId = instance.Id });
     }
 
     // ---------------------------------------------------------------- PDF status + retry
@@ -672,8 +756,10 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
 
     // ---------------------------------------------------------------- Mappers
 
-    // EF-translatable projection (PdfRenderStatus + DocumentType lookup join via nav properties).
-    private static readonly System.Linq.Expressions.Expression<Func<AuthoredDocumentVersion, AuthoredDocumentVersionSummaryModel>> SummaryProjection =
+    // EF-translatable projection (PdfRenderStatus + DocumentType lookup join via nav properties). An
+    // instance method (not a static field) so the AmendedByVersionIds correlated subquery can close over
+    // `_context` — EF translates the closure to a correlated SELECT, not an in-memory round trip.
+    private Expression<Func<AuthoredDocumentVersion, AuthoredDocumentVersionSummaryModel>> SummaryProjection() =>
         v => new AuthoredDocumentVersionSummaryModel
         {
             Id = v.Id,
@@ -684,6 +770,13 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             VersionNumber = v.VersionNumber,
             FinalizedByUserId = v.FinalizedByUserId,
             FinalizedAt = v.FinalizedAt,
-            PdfRenderStatus = v.Pdf != null ? v.Pdf.RenderStatus : (PdfRenderStatus?)null
+            PdfRenderStatus = v.Pdf != null ? v.Pdf.RenderStatus : (PdfRenderStatus?)null,
+            SignatureStatus = v.SignatureStatus,
+            SignedArtifactCount = v.SignedArtifacts.Count,
+            AmendsVersionId = v.AmendsVersionId,
+            AmendsVersionNumber = v.AmendsVersion != null ? (int?)v.AmendsVersion.VersionNumber : null,
+            AmendmentReason = v.AmendmentReason,
+            EffectiveDate = v.EffectiveDate,
+            AmendedByVersionIds = _context.AuthoredDocumentVersions.Where(v2 => v2.AmendsVersionId == v.Id).Select(v2 => v2.Id).ToList()
         };
 }

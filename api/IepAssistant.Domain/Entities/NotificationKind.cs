@@ -18,5 +18,7 @@ public enum NotificationKind
     GoalObservationRequested,
     /// <summary>Plan 7: an <see cref="EvaluatorAssignment"/> is overdue — sent to the evaluator + case lead.</summary>
     EvaluatorOverdue,
+    /// <summary>Plan 7: a requested <see cref="ExportJob"/> finished (Completed or Failed) — sent to the requester.</summary>
+    ExportReady,
     Generic
 }
