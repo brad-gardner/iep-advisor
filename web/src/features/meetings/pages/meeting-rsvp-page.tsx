@@ -8,6 +8,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { apiErrorMessage } from '@/lib/api-error';
 import { getMeetingByToken, submitTokenRsvp } from '../api/meetings-api';
 import { formatMeetingWhen } from '../lib/meeting-time';
+import { INVITE_STATUS_LABELS } from '../types';
 import type { InviteStatus, TokenRsvpResult } from '../types';
 
 /**
@@ -21,7 +22,25 @@ export function MeetingRsvpPage() {
   const [result, setResult] = useState<TokenRsvpResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<InviteStatus | null>(null);
-  const [confirmedStatus, setConfirmedStatus] = useState<InviteStatus | null>(null);
+  // Whether the invitee is actively (re-)choosing a response, overriding the
+  // "already responded" view derived below. Reset on every fresh token load
+  // (see `seenToken`) and after a successful submit, so a revisit — the whole
+  // point of an emailed link — always starts on the recorded-answer view
+  // rather than defaulting back to the prompt.
+  const [changing, setChanging] = useState(false);
+  const [seenToken, setSeenToken] = useState<string | null>(null);
+  if (token !== seenToken) {
+    setSeenToken(token);
+    setChanging(false);
+  }
+  // Bumped by the "Try again" button to re-run the token load effect below.
+  const [retryToken, setRetryToken] = useState(0);
+
+  // The server's own record of this invitee's response — not a "did I submit
+  // in this page session" flag — so reopening the same link later shows the
+  // true recorded answer instead of a fresh, unanswered-looking prompt.
+  const respondedStatus = result && result.status !== 'Pending' ? result.status : null;
+  const showPrompt = !respondedStatus || changing;
 
   // A missing token is a pure function of the URL — derived directly rather
   // than written into `error` state from an effect.
@@ -34,8 +53,12 @@ export function MeetingRsvpPage() {
       try {
         const response = await getMeetingByToken(token);
         if (!active) return;
-        if (response.success && response.data) setResult(response.data);
-        else setError(response.message ?? 'This invitation link is no longer valid.');
+        if (response.success && response.data) {
+          setResult(response.data);
+          setError(null);
+        } else {
+          setError(response.message ?? 'This invitation link is no longer valid.');
+        }
       } catch (err) {
         if (active) setError(apiErrorMessage(err, 'This invitation link is no longer valid.'));
       }
@@ -43,7 +66,7 @@ export function MeetingRsvpPage() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [token, retryToken]);
 
   const displayError = missingTokenError ?? error;
 
@@ -54,7 +77,7 @@ export function MeetingRsvpPage() {
       const response = await submitTokenRsvp({ token, status });
       if (response.success && response.data) {
         setResult(response.data);
-        setConfirmedStatus(status);
+        setChanging(false);
       } else {
         setError(response.message ?? 'Could not record your response.');
       }
@@ -72,7 +95,13 @@ export function MeetingRsvpPage() {
 
         {displayError && (
           <div role="alert">
-            <Notice variant="error" title={displayError} />
+            <Notice variant="error" title={displayError}>
+              {!missingTokenError && (
+                <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
+                  Try again
+                </Button>
+              )}
+            </Notice>
           </div>
         )}
 
@@ -96,15 +125,25 @@ export function MeetingRsvpPage() {
               )}
             </div>
 
-            {confirmedStatus ? (
+            {!showPrompt && respondedStatus ? (
               <Notice variant="success" title="Thanks — your response was recorded">
-                You responded: {confirmedStatus}.
+                <p>You responded: {INVITE_STATUS_LABELS[respondedStatus]}.</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => setChanging(true)}
+                  data-testid="rsvp-change-response"
+                >
+                  Change response
+                </Button>
               </Notice>
             ) : (
               <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={() => handleRespond('Accepted')}
                   loading={submitting === 'Accepted'}
+                  disabled={submitting !== null}
                   data-testid="rsvp-accept"
                 >
                   <CheckCircle2 className="mr-1.5 h-4 w-4" aria-hidden="true" />
@@ -114,6 +153,7 @@ export function MeetingRsvpPage() {
                   variant="secondary"
                   onClick={() => handleRespond('Tentative')}
                   loading={submitting === 'Tentative'}
+                  disabled={submitting !== null}
                   data-testid="rsvp-tentative"
                 >
                   <HelpCircle className="mr-1.5 h-4 w-4" aria-hidden="true" />
@@ -123,6 +163,7 @@ export function MeetingRsvpPage() {
                   variant="danger"
                   onClick={() => handleRespond('Declined')}
                   loading={submitting === 'Declined'}
+                  disabled={submitting !== null}
                   data-testid="rsvp-decline"
                 >
                   <XCircle className="mr-1.5 h-4 w-4" aria-hidden="true" />

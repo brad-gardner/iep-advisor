@@ -105,9 +105,26 @@ public class AttendanceItemModel
     public string? ExcusalNote { get; set; }
 }
 
+/// <summary>Minimal, non-participant view of a meeting for the anonymous token RSVP endpoints
+/// (review-fix contract addition 1): a single participant's forwarded RSVP link must never expose other
+/// people's names/emails/attendance (<see cref="MeetingModel.Participants"/>), the meeting's private
+/// <see cref="MeetingModel.Notes"/>, or its <see cref="MeetingModel.VideoUrl"/>.</summary>
+public class MeetingSummaryModel
+{
+    public int Id { get; set; }
+    public string StudentFirstName { get; set; } = string.Empty;
+    public MeetingType Type { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public DateTime StartsAtUtc { get; set; }
+    public string TimeZoneId { get; set; } = string.Empty;
+    public int DurationMinutes { get; set; }
+    public string? Location { get; set; }
+    public MeetingStatus Status { get; set; }
+}
+
 /// <summary>The result of a token RSVP lookup: a minimal view of the meeting plus the caller's current status.</summary>
 public class MeetingRsvpPreviewModel
 {
-    public MeetingModel Meeting { get; set; } = null!;
+    public MeetingSummaryModel Meeting { get; set; } = null!;
     public InviteStatus Status { get; set; }
 }

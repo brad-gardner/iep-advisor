@@ -133,6 +133,86 @@ public sealed class NotificationEmailServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessNotificationAsync_Failure_SetsNextAttemptAtBackoff()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var (userId, _) = _db.Staff("u3b@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var id = SeedQueuedNotification(userId);
+
+        var email = new CapturingEmailService { ThrowMessage = "boom" };
+        var before = DateTime.UtcNow;
+        using var ctx = _db.Context();
+        await CreateService(ctx, email).ProcessNotificationAsync(id);
+
+        using var assertCtx = _db.Context();
+        var row = await assertCtx.Set<Notification>().SingleAsync(n => n.Id == id);
+        Assert.Equal(1, row.EmailAttempts);
+        Assert.NotNull(row.NextAttemptAt);
+        // ~1 minute backoff after the first failed attempt.
+        Assert.InRange(row.NextAttemptAt!.Value, before.AddSeconds(50), before.AddMinutes(2));
+    }
+
+    [Fact]
+    public async Task ProcessNotificationAsync_Success_ClearsAnyPriorNextAttemptAt()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var (userId, _) = _db.Staff("u3c@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var id = SeedQueuedNotification(userId);
+
+        var failing = new CapturingEmailService { ThrowMessage = "boom" };
+        using (var ctx = _db.Context())
+            await CreateService(ctx, failing).ProcessNotificationAsync(id);
+
+        var succeeding = new CapturingEmailService();
+        using (var ctx = _db.Context())
+            await CreateService(ctx, succeeding).ProcessNotificationAsync(id);
+
+        using var assertCtx = _db.Context();
+        var row = await assertCtx.Set<Notification>().SingleAsync(n => n.Id == id);
+        Assert.NotNull(row.EmailSentAt);
+        Assert.Null(row.NextAttemptAt);
+    }
+
+    [Fact]
+    public async Task FindQueuedIdsAsync_RowWithFutureNextAttemptAt_IsExcludedUntilItElapses()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var (userId, _) = _db.Staff("u3d@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var backedOffId = SeedQueuedNotification(userId);
+        var readyId = SeedQueuedNotification(userId);
+        using (var ctx = _db.Context())
+        {
+            ctx.Set<Notification>().Single(n => n.Id == backedOffId).NextAttemptAt = DateTime.UtcNow.AddMinutes(5);
+            ctx.Set<Notification>().Single(n => n.Id == readyId).NextAttemptAt = DateTime.UtcNow.AddSeconds(-1);
+            ctx.SaveChanges();
+        }
+
+        using var ctx2 = _db.Context();
+        var ids = await CreateService(ctx2, new CapturingEmailService()).FindQueuedIdsAsync();
+
+        Assert.DoesNotContain(backedOffId, ids);
+        Assert.Contains(readyId, ids);
+    }
+
+    [Fact]
+    public async Task FindQueuedIdsAsync_MoreThanBatchSizeQueued_ReturnsOnlyTheCap()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var (userId, _) = _db.Staff("u3e@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        for (var i = 0; i < 205; i++)
+            SeedQueuedNotification(userId);
+
+        using var ctx = _db.Context();
+        var ids = await CreateService(ctx, new CapturingEmailService()).FindQueuedIdsAsync();
+
+        Assert.Equal(200, ids.Count);
+    }
+
+    [Fact]
     public async Task ProcessNotificationAsync_MeetingScheduled_SendsIcsAttachedInvitation_NotGeneric()
     {
         var districtId = _db.District();
@@ -151,6 +231,29 @@ public sealed class NotificationEmailServiceTests : IDisposable
         Assert.Equal(0, email.GenericSendCount);
         Assert.NotNull(email.LastIcsBytes);
         Assert.True(email.LastIcsBytes!.Length > 0);
+    }
+
+    [Fact]
+    public async Task ProcessNotificationAsync_MeetingCancelled_EmailedIcsCarriesRealBumpedSequence()
+    {
+        // MeetingService.CancelAsync bumps Sequence on every cancel; the emailed .ics must reflect that
+        // real value rather than a hardcoded 0 (todos/051, todos/064).
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (userId, _) = _db.Staff("u5b@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var meetingId = _db.Meeting(studentId, userId, DateTime.UtcNow.AddDays(3), status: MeetingStatus.Cancelled, sequence: 2);
+        _db.MeetingParticipant(meetingId, userId);
+        var notificationId = SeedQueuedNotification(userId, NotificationKind.MeetingCancelled, $"/meetings/{meetingId}");
+
+        var email = new CapturingEmailService();
+        using var ctx = _db.Context();
+        await CreateService(ctx, email).ProcessNotificationAsync(notificationId);
+
+        Assert.Equal(1, email.CancelSendCount);
+        Assert.NotNull(email.LastIcsBytes);
+        var ics = System.Text.Encoding.UTF8.GetString(email.LastIcsBytes!);
+        Assert.Contains("SEQUENCE:2", ics);
     }
 
     [Fact]
@@ -206,6 +309,7 @@ public sealed class NotificationEmailServiceTests : IDisposable
     {
         public int GenericSendCount { get; private set; }
         public int InvitationSendCount { get; private set; }
+        public int CancelSendCount { get; private set; }
         public byte[]? LastIcsBytes { get; private set; }
         public string? ThrowMessage { get; set; }
 
@@ -222,6 +326,15 @@ public sealed class NotificationEmailServiceTests : IDisposable
             if (ThrowMessage != null)
                 throw new InvalidOperationException(ThrowMessage);
             InvitationSendCount++;
+            LastIcsBytes = ics;
+            return Task.CompletedTask;
+        }
+
+        public override Task SendMeetingCancelledAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
+        {
+            if (ThrowMessage != null)
+                throw new InvalidOperationException(ThrowMessage);
+            CancelSendCount++;
             LastIcsBytes = ics;
             return Task.CompletedTask;
         }

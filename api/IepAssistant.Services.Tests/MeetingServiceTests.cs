@@ -480,5 +480,161 @@ public sealed class MeetingServiceTests : IDisposable
         Assert.Contains("permission", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    // ----------------------------------------------------------------- token RSVP minimal summary (todos/048)
+
+    [Fact]
+    public async Task GetByRsvpTokenAsync_ReturnsMinimalSummary_NoParticipantsNotesOrVideoUrl()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (creatorUserId, _) = _db.Staff("summary@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.TeamMember(studentId, creatorUserId, TeamRole.CaseManager, isLead: true);
+        var (otherUserId, _) = _db.Staff("othersummary@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+
+        int meetingId;
+        using (var ctx = _db.Context())
+        {
+            var participants = new List<ParticipantInputModel>
+            {
+                new() { UserId = creatorUserId, TeamRole = TeamRole.CaseManager },
+                new() { UserId = otherUserId, TeamRole = TeamRole.Other }
+            };
+            var created = await CreateService(ctx).CreateAsync(creatorUserId, studentId, BasicMeeting(DateTime.UtcNow.AddDays(5), participants));
+            meetingId = created.Data!.Id;
+        }
+        using (var ctx = _db.Context())
+        {
+            var meeting = ctx.Meetings.Single(m => m.Id == meetingId);
+            meeting.Notes = "Confidential discussion notes.";
+            meeting.VideoUrl = "https://video.example.com/secret-room";
+            ctx.SaveChanges();
+        }
+
+        string token;
+        using (var ctx = _db.Context())
+            token = ctx.MeetingParticipants.Single(p => p.MeetingId == meetingId && p.UserId == creatorUserId).RsvpToken;
+
+        using var rsvpCtx = _db.Context();
+        var result = await CreateService(rsvpCtx).GetByRsvpTokenAsync(token);
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal("Sam", result.Data!.Meeting.StudentFirstName);
+
+        // Structural guarantee, not just "these fields happen to be unset": MeetingSummaryModel must never
+        // grow a Participants/Notes/VideoUrl property, or a forwarded single-participant RSVP link would
+        // expose everyone else's roster and the meeting's private notes again.
+        var summaryType = result.Data.Meeting.GetType();
+        Assert.Null(summaryType.GetProperty("Participants"));
+        Assert.Null(summaryType.GetProperty("Notes"));
+        Assert.Null(summaryType.GetProperty("VideoUrl"));
+    }
+
+    // ----------------------------------------------------------------- list endpoints (todos/050, todos/052)
+
+    [Fact]
+    public async Task GetForStudentAsync_TwentyMeetings_StaysUnderSixQueries()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (creatorUserId, _) = _db.Staff("listcreator@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.TeamMember(studentId, creatorUserId, TeamRole.CaseManager, isLead: true);
+        var (viewerUserId, _) = _db.Staff("listviewer@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.Access(studentId, viewerUserId, AccessRole.Viewer);
+
+        for (var i = 0; i < 20; i++)
+            _db.Meeting(studentId, creatorUserId, DateTime.UtcNow.AddDays(i + 1));
+
+        var counter = new DbActivityCounter();
+        using var ctx = _db.Context(counter);
+        var result = await CreateService(ctx).GetForStudentAsync(viewerUserId, studentId);
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal(20, result.Data!.Count);
+        // One main query (with Includes) + a handful of authz/case-manager lookups, resolved once per
+        // call rather than per meeting — not the old id-then-loop N+1 (1 + up to 3*20 round trips).
+        Assert.True(counter.Queries < 6, $"Queries = {counter.Queries}");
+    }
+
+    [Fact]
+    public async Task GetForStudentAsync_MoreThanTwoHundredMeetings_ReturnsMostRecentTwoHundredOnly()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (creatorUserId, _) = _db.Staff("historycreator@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.TeamMember(studentId, creatorUserId, TeamRole.CaseManager, isLead: true);
+
+        var baseline = DateTime.UtcNow.AddYears(-5);
+        for (var i = 0; i < 205; i++)
+            _db.Meeting(studentId, creatorUserId, baseline.AddDays(i));
+
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).GetForStudentAsync(creatorUserId, studentId);
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal(200, result.Data!.Count);
+        // Newest-first, capped to the most recent 200 -> the oldest 5 seeded meetings are excluded.
+        Assert.Equal(baseline.AddDays(204), result.Data[0].StartsAtUtc);
+        Assert.Equal(baseline.AddDays(5), result.Data[^1].StartsAtUtc);
+    }
+
+    // ----------------------------------------------------------------- input validation (todos/065)
+
+    [Fact]
+    public async Task CreateAsync_TitleWithControlCharacter_IsRejected()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (creatorUserId, _) = _db.Staff("ctrlchar@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.TeamMember(studentId, creatorUserId, TeamRole.CaseManager, isLead: true);
+
+        using var ctx = _db.Context();
+        var model = BasicMeeting(DateTime.UtcNow.AddDays(1));
+        model.Title = "Annual Review\r\nBcc: attacker@evil.com";
+        var result = await CreateService(ctx).CreateAsync(creatorUserId, studentId, model);
+
+        Assert.False(result.Success);
+        Assert.Contains("invalid characters", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ExternalParticipantWithMalformedEmail_IsRejected()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (creatorUserId, _) = _db.Staff("bademail@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.TeamMember(studentId, creatorUserId, TeamRole.CaseManager, isLead: true);
+
+        using var ctx = _db.Context();
+        var participants = new List<ParticipantInputModel>
+        {
+            new() { ExternalName = "Guest", ExternalEmail = "not-an-email", TeamRole = TeamRole.Other }
+        };
+        var result = await CreateService(ctx).CreateAsync(creatorUserId, studentId, BasicMeeting(DateTime.UtcNow.AddDays(1), participants));
+
+        Assert.False(result.Success);
+        Assert.Contains("invalid", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateAsync_StartsAtUtcBeforeYear2000_IsRejected()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (creatorUserId, _) = _db.Staff("badyear@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.TeamMember(studentId, creatorUserId, TeamRole.CaseManager, isLead: true);
+
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).CreateAsync(creatorUserId, studentId, BasicMeeting(new DateTime(1, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+
+        Assert.False(result.Success);
+        Assert.Contains("startsAtUtc", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     public void Dispose() => _db.Dispose();
 }

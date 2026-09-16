@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { apiRejection } from '@/test/axios-rejection';
@@ -69,6 +69,46 @@ describe('MeetingRsvpPage', () => {
     renderPage('');
     expect(await screen.findByRole('alert')).toHaveTextContent('missing its invitation token');
     expect(meetingsApi.getMeetingByToken).not.toHaveBeenCalled();
+  });
+
+  it('shows the recorded answer (not the prompt) when revisiting a link already responded to', async () => {
+    meetingsApi.getMeetingByToken.mockResolvedValue({
+      success: true,
+      data: { meeting: makeMeeting({ title: 'Annual review' }), status: 'Accepted' },
+    });
+    renderPage();
+
+    expect(await screen.findByText(/your response was recorded/i)).toBeInTheDocument();
+    expect(screen.getByText(/You responded: Accepted/)).toBeInTheDocument();
+    expect(screen.queryByTestId('rsvp-accept')).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('rsvp-change-response'));
+    expect(screen.getByTestId('rsvp-accept')).toBeInTheDocument();
+    expect(screen.queryByText(/your response was recorded/i)).not.toBeInTheDocument();
+  });
+
+  it('disables the whole RSVP group while one response is in flight', async () => {
+    const user = userEvent.setup();
+    meetingsApi.getMeetingByToken.mockResolvedValue({
+      success: true,
+      data: { meeting: makeMeeting(), status: 'Pending' },
+    });
+    let resolveSubmit: (value: unknown) => void = () => {};
+    meetingsApi.submitTokenRsvp.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSubmit = resolve;
+      })
+    );
+    renderPage();
+    await screen.findByTestId('rsvp-accept');
+
+    await user.click(screen.getByTestId('rsvp-accept'));
+    expect(screen.getByTestId('rsvp-tentative')).toBeDisabled();
+    expect(screen.getByTestId('rsvp-decline')).toBeDisabled();
+
+    resolveSubmit({ success: true, data: { meeting: makeMeeting(), status: 'Accepted' } });
+    await waitFor(() => expect(screen.queryByTestId('rsvp-accept')).not.toBeInTheDocument());
   });
 
   it('surfaces a failed RSVP submission inline', async () => {

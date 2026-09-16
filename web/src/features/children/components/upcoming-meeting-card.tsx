@@ -35,6 +35,8 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
   const [meeting, setMeeting] = useState<MeetingDto | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [responding, setResponding] = useState<InviteStatus | null>(null);
+  // Bumped by the "Try again" button to re-run the load effect below.
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -42,8 +44,12 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
       try {
         const response = await listChildMeetings(childId);
         if (!active) return;
-        if (response.success && response.data) setMeeting(nextUpcoming(response.data));
-        else setError(response.message ?? 'Could not load upcoming meetings');
+        if (response.success && response.data) {
+          setMeeting(nextUpcoming(response.data));
+          setError(null);
+        } else {
+          setError(response.message ?? 'Could not load upcoming meetings');
+        }
       } catch (err) {
         if (active) setError(apiErrorMessage(err, 'Could not load upcoming meetings'));
       }
@@ -51,7 +57,7 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
     return () => {
       active = false;
     };
-  }, [childId]);
+  }, [childId, retryToken]);
 
   const handleRsvp = async (status: InviteStatus) => {
     if (!meeting) return;
@@ -71,7 +77,11 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
     return (
       <Card data-testid="upcoming-meeting-error">
         <div role="alert">
-          <Notice variant="error" title={error} />
+          <Notice variant="error" title={error}>
+            <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
+              Try again
+            </Button>
+          </Notice>
         </div>
       </Card>
     );
@@ -98,13 +108,33 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
       )}
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => handleRsvp('Accepted')} loading={responding === 'Accepted'} data-testid="upcoming-meeting-accept">
+        <Button
+          size="sm"
+          onClick={() => handleRsvp('Accepted')}
+          loading={responding === 'Accepted'}
+          disabled={responding !== null}
+          data-testid="upcoming-meeting-accept"
+        >
           Accept
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => handleRsvp('Tentative')} loading={responding === 'Tentative'} data-testid="upcoming-meeting-tentative">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => handleRsvp('Tentative')}
+          loading={responding === 'Tentative'}
+          disabled={responding !== null}
+          data-testid="upcoming-meeting-tentative"
+        >
           Tentative
         </Button>
-        <Button size="sm" variant="danger" onClick={() => handleRsvp('Declined')} loading={responding === 'Declined'} data-testid="upcoming-meeting-decline">
+        <Button
+          size="sm"
+          variant="danger"
+          onClick={() => handleRsvp('Declined')}
+          loading={responding === 'Declined'}
+          disabled={responding !== null}
+          data-testid="upcoming-meeting-decline"
+        >
           Decline
         </Button>
       </div>

@@ -17,6 +17,8 @@ export function CalendarSubscriptionCard() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [regenerateError, setRegenerateError] = useState<string | null>(null);
+  // Bumped by the "Try again" button to re-run the load effect below.
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -24,8 +26,12 @@ export function CalendarSubscriptionCard() {
       try {
         const response = await getCalendarFeed();
         if (!active) return;
-        if (response.success && response.data) setUrl(response.data.url);
-        else setError(response.message ?? 'Could not load your calendar link');
+        if (response.success && response.data) {
+          setUrl(response.data.url);
+          setError(null);
+        } else {
+          setError(response.message ?? 'Could not load your calendar link');
+        }
       } catch (err) {
         if (active) setError(apiErrorMessage(err, 'Could not load your calendar link'));
       }
@@ -33,7 +39,7 @@ export function CalendarSubscriptionCard() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [retryToken]);
 
   const handleCopy = async () => {
     if (!url) return;
@@ -73,7 +79,11 @@ export function CalendarSubscriptionCard() {
 
       {error && (
         <div role="alert">
-          <Notice variant="error" title={error} />
+          <Notice variant="error" title={error}>
+            <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
+              Try again
+            </Button>
+          </Notice>
         </div>
       )}
 

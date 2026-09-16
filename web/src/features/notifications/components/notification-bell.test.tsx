@@ -9,12 +9,15 @@ const notificationsApi = vi.hoisted(() => ({
 }));
 vi.mock('../api/notifications-api', () => notificationsApi);
 
+import { NotificationsProvider } from '../stores/notifications-context';
 import { NotificationBell } from './notification-bell';
 
 function renderBell() {
   return render(
     <MemoryRouter>
-      <NotificationBell />
+      <NotificationsProvider>
+        <NotificationBell />
+      </NotificationsProvider>
     </MemoryRouter>
   );
 }
@@ -69,6 +72,33 @@ describe('NotificationBell', () => {
     await user.click(screen.getByTestId('notification-bell-item-1'));
 
     await waitFor(() => expect(notificationsApi.markNotificationRead).toHaveBeenCalledWith(1));
+  });
+
+  it('focuses the first item on open and closes on Escape, returning focus to the trigger', async () => {
+    const user = userEvent.setup();
+    renderBell();
+    await waitFor(() => expect(screen.getByTestId('notification-bell-badge')).toBeInTheDocument());
+
+    await user.click(screen.getByTestId('notification-bell'));
+    const firstItem = await screen.findByTestId('notification-bell-item-1');
+    await waitFor(() => expect(firstItem).toHaveFocus());
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByTestId('notification-bell-menu')).not.toBeInTheDocument();
+    expect(screen.getByTestId('notification-bell')).toHaveFocus();
+  });
+
+  it('moves focus between items with arrow keys', async () => {
+    const user = userEvent.setup();
+    renderBell();
+    await waitFor(() => expect(screen.getByTestId('notification-bell-badge')).toBeInTheDocument());
+
+    await user.click(screen.getByTestId('notification-bell'));
+    await screen.findByTestId('notification-bell-item-1');
+    await waitFor(() => expect(screen.getByTestId('notification-bell-item-1')).toHaveFocus());
+
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: 'See all' })).toHaveFocus();
   });
 
   describe('polling', () => {

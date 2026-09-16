@@ -14,6 +14,7 @@ import { CalendarAgendaList } from '../components/calendar-agenda-list';
 import { CalendarMonthGrid } from '../components/calendar-month-grid';
 import { StudentPickerModal } from '../components/student-picker-modal';
 import { useCalendarRange } from '../hooks/use-calendar-range';
+import { calendarItemLocalDateIso } from '../lib/calendar-item-date';
 import type { CalendarItemDto } from '../types';
 
 export function EducatorCalendarPage() {
@@ -25,6 +26,13 @@ export function EducatorCalendarPage() {
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingDto | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [schedulingStudent, setSchedulingStudent] = useState<SchoolStudent | null>(null);
+  // Bumped instead of firing a second, unguarded fetch (see the "Schedule
+  // meeting" `onSaved` below) so every calendar refetch — range navigation or
+  // a post-schedule refresh — goes through the one effect below and its
+  // `active` staleness guard. Without this, a slow refetch for a range the
+  // user has since navigated away from could land after (and overwrite) a
+  // faster fetch for the range they're now looking at.
+  const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -32,8 +40,12 @@ export function EducatorCalendarPage() {
       try {
         const response = await listCalendarItems({ from: rangeFromIso, to: rangeToIso });
         if (!active) return;
-        if (response.success && response.data) setItems(response.data);
-        else setError(response.message ?? 'Could not load the calendar');
+        if (response.success && response.data) {
+          setItems(response.data);
+          setError(null);
+        } else {
+          setError(response.message ?? 'Could not load the calendar');
+        }
       } catch (err) {
         if (active) setError(apiErrorMessage(err, 'Could not load the calendar'));
       }
@@ -41,10 +53,25 @@ export function EducatorCalendarPage() {
     return () => {
       active = false;
     };
-  }, [rangeFromIso, rangeToIso]);
+  }, [rangeFromIso, rangeToIso, refreshToken]);
+
+  // A day selected in one month can't exist in another — clear it whenever
+  // the visible range changes, so the agenda doesn't get stuck rendering an
+  // empty "Selected day" filter for a date that isn't in the new range.
+  // Computed during render (the same "adjust state in response to a change"
+  // idiom `meeting-drawer.tsx`/`schedule-meeting-form.tsx` use for the same
+  // reason: no synchronous setState-in-effect, no extra render pass), keyed
+  // on the range rather than `refreshToken` so a post-schedule refresh of the
+  // same range doesn't discard the user's current selection.
+  const [seenRange, setSeenRange] = useState(`${rangeFromIso}|${rangeToIso}`);
+  const currentRange = `${rangeFromIso}|${rangeToIso}`;
+  if (currentRange !== seenRange) {
+    setSeenRange(currentRange);
+    setSelectedIso(null);
+  }
 
   const visibleItems = selectedIso
-    ? (items ?? []).filter((item) => item.date.slice(0, 10) === selectedIso)
+    ? (items ?? []).filter((item) => calendarItemLocalDateIso(item) === selectedIso)
     : (items ?? []);
 
   return (
@@ -58,7 +85,16 @@ export function EducatorCalendarPage() {
     >
       {error && (
         <div role="alert">
-          <Notice variant="error" title={error} />
+          <Notice variant="error" title={error}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setRefreshToken((t) => t + 1)}
+              data-testid="calendar-retry"
+            >
+              Try again
+            </Button>
+          </Notice>
         </div>
       )}
 
@@ -131,13 +167,13 @@ export function EducatorCalendarPage() {
           studentName={`${schedulingStudent.firstName} ${schedulingStudent.lastName ?? ''}`.trim()}
           onSaved={() => {
             setSchedulingStudent(null);
-            // Cheap refresh: refetch the current range so the new meeting appears.
+            // Refetch the current range so the new meeting appears — routed
+            // through the range effect above (via `refreshToken`) rather than
+            // a second ad hoc fetch, so it shares that effect's `active`
+            // staleness guard and can never overwrite a range the user has
+            // since navigated away from.
             setItems(null);
-            listCalendarItems({ from: rangeFromIso, to: rangeToIso })
-              .then((response) => {
-                if (response.success && response.data) setItems(response.data);
-              })
-              .catch(() => undefined);
+            setRefreshToken((t) => t + 1);
           }}
         />
       )}
@@ -147,7 +183,12 @@ export function EducatorCalendarPage() {
         meeting={selectedMeeting}
         onClose={() => setSelectedMeeting(null)}
         onUpdated={(updated) => {
-          setSelectedMeeting(updated);
+          // A mutation started before the user closed the drawer (or opened a
+          // different meeting) can still resolve afterward — only reopen/update
+          // the drawer if it's still showing this same meeting; the functional
+          // updater reads the *current* selection, not the one captured when
+          // the mutation started. The list merge below applies regardless.
+          setSelectedMeeting((prev) => (prev && prev.id === updated.id ? updated : prev));
           setItems((prev) =>
             prev?.map((item) =>
               item.kind === 'Meeting' && item.meeting?.id === updated.id

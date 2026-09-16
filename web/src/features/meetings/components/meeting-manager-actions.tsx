@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { apiErrorMessage } from '@/lib/api-error';
 import { cancelMeeting, meetingIcsUrl, setMeetingStatus } from '../api/meetings-api';
 import { MEETING_STATUS_LABELS, SETTABLE_MEETING_STATUSES } from '../types';
-import type { MeetingDto, SettableMeetingStatus } from '../types';
+import type { MeetingDto, MeetingStatus, SettableMeetingStatus } from '../types';
 
 interface MeetingManagerActionsProps {
   meeting: MeetingDto;
@@ -91,7 +91,11 @@ export function MeetingManagerActions({ meeting, onUpdated, onReschedule }: Meet
         <Select
           id="meeting-status-select"
           label="Status"
-          value={SETTABLE_MEETING_STATUSES.includes(meeting.status as SettableMeetingStatus) ? meeting.status : 'Scheduled'}
+          value={
+            (SETTABLE_MEETING_STATUSES as readonly MeetingStatus[]).includes(meeting.status)
+              ? meeting.status
+              : 'Scheduled'
+          }
           disabled={statusSaving}
           onChange={(e) => handleStatusChange(e.target.value as SettableMeetingStatus)}
         >

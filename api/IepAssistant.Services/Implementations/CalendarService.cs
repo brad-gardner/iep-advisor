@@ -108,7 +108,11 @@ public class CalendarService : ICalendarService
             Sequence = m.Sequence
         }).ToList();
 
-        var obligationsResult = await _obligationService.GetMineAsync(user.Id, null, ct);
+        // Anonymous, non-expiring token: unlike the authenticated GET /api/calendar/mine (which reuses
+        // ObligationService.GetMineAsync and gives an admin their whole scope), this feed must carry only
+        // obligations where the user is personally the lead — never a School/District admin's full scope
+        // of every active student (review-fix contract addition 2, todos/066).
+        var obligationsResult = await _obligationService.GetLeadOnlyAsync(user.Id, ct);
         if (obligationsResult.Success)
         {
             events.AddRange(obligationsResult.Data!
@@ -139,29 +143,7 @@ public class CalendarService : ICalendarService
         if (!await AuthorizeMeetingReadAsync(userId, meeting, ct))
             return ServiceResult<byte[]>.FailureResult("You do not have permission to view this meeting.");
 
-        var input = new IcsMeetingInput
-        {
-            MeetingId = meeting.Id,
-            Title = meeting.Title,
-            StartsAtUtc = meeting.StartsAtUtc,
-            TimeZoneId = meeting.TimeZoneId,
-            DurationMinutes = meeting.DurationMinutes,
-            Location = meeting.Location,
-            VideoUrl = meeting.VideoUrl,
-            Notes = meeting.Notes,
-            Sequence = meeting.Sequence,
-            IsCancelled = meeting.Status == MeetingStatus.Cancelled,
-            OrganizerName = meeting.CreatedByUser != null ? $"{meeting.CreatedByUser.FirstName} {meeting.CreatedByUser.LastName}".Trim() : "Organizer",
-            OrganizerEmail = meeting.CreatedByUser?.Email ?? "no-reply@iep-advisor.com",
-            Attendees = meeting.Participants.Select(p => new IcsAttendee
-            {
-                Name = p.User != null ? $"{p.User.FirstName} {p.User.LastName}".Trim() : p.ExternalName,
-                Email = p.User != null ? p.User.Email : (p.ExternalEmail ?? string.Empty),
-                IsRequired = p.IsRequired,
-                InviteStatus = p.InviteStatus
-            }).Where(a => !string.IsNullOrWhiteSpace(a.Email)).ToList()
-        };
-
+        var input = IcsMeetingInputMapper.Map(meeting);
         var ics = _icsBuilder.BuildMeetingEvent(input, meeting.Status == MeetingStatus.Cancelled ? "CANCEL" : "REQUEST");
         return ServiceResult<byte[]>.SuccessResult(ics);
     }

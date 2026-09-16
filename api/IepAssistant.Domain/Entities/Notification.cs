@@ -27,5 +27,10 @@ public class Notification : BaseEntity
     public int EmailAttempts { get; set; }
     public string? EmailError { get; set; }
 
+    /// <summary>Backoff gate for a failed send: null (never attempted, or already sent) means eligible
+    /// immediately; otherwise <c>NotificationEmailService.FindQueuedIdsAsync</c> excludes the row until
+    /// this time (1m/5m/30m after attempts 1/2/3) so a burst of failures doesn't retry every 30s tick.</summary>
+    public DateTime? NextAttemptAt { get; set; }
+
     public User User { get; set; } = null!;
 }

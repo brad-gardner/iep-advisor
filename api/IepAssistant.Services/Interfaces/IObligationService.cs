@@ -13,4 +13,16 @@ public interface IObligationService
 
     /// <summary>Admin-only: obligations across the caller's district (optionally narrowed to one school).</summary>
     Task<ServiceResult<List<ObligationModel>>> GetForScopeAsync(int userId, int? schoolId, ObligationStatus? status, CancellationToken ct = default);
+
+    /// <summary>Obligations for students where <paramref name="userId"/> is personally the lead case
+    /// manager — regardless of admin scope. Unlike <see cref="GetMineAsync"/>, a School/District admin gets
+    /// no scope superset here: used by the anonymous per-user calendar feed token
+    /// (<c>CalendarService.GetFeedByTokenAsync</c>), which must never carry an admin's whole scope over a
+    /// non-expiring, unauthenticated link (review-fix contract addition 2, todos/066).</summary>
+    Task<ServiceResult<List<ObligationModel>>> GetLeadOnlyAsync(int userId, CancellationToken ct = default);
+
+    /// <summary>Batched form of <see cref="GetLeadOnlyAsync"/> for many staff at once: every DueSoon/Overdue-
+    /// eligible obligation across all students led by any of <paramref name="userIds"/>, in one query,
+    /// distinguished by <see cref="ObligationModel.OwnerUserId"/> (todos/067).</summary>
+    Task<ServiceResult<List<ObligationModel>>> GetForLeadUsersAsync(IEnumerable<int> userIds, CancellationToken ct = default);
 }

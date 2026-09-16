@@ -77,16 +77,48 @@ function utcOffsetMinutesAt(instant: Date, timeZone: string): number {
 
 /**
  * Convert a wall-clock `date` (`YYYY-MM-DD`) + `time` (`HH:mm`) in `timeZone`
- * to a UTC ISO instant. Correct across DST: we guess the instant by treating
- * the wall clock as UTC, read that zone's actual offset at the guessed
- * instant, then apply it.
+ * to a UTC ISO instant. Self-correcting across DST: a single guess (treating
+ * the wall clock as UTC, then reading the zone's real offset at that guessed
+ * instant) can land on the wrong side of a transition for wall-clock times in
+ * the hour or two right after it — the guessed *instant* is in the old
+ * regime even though the wall-clock *value* the caller means is in the new
+ * one, or vice versa. So we re-derive the offset at the first candidate and
+ * refine:
+ *  - If the re-derived offset agrees with the first guess, we've converged —
+ *    this also correctly resolves an ambiguous fall-back wall-clock time
+ *    (one that occurs twice) to its *earlier* occurrence, since the initial
+ *    guess always lands before the transition for the early-morning wall
+ *    times where these transitions happen.
+ *  - If it disagrees, recompute a second candidate from the new offset. If
+ *    *that* candidate's own offset is self-consistent, it's the unique
+ *    correct answer (a wall-clock time near, but not on, a transition).
+ *  - If neither candidate is self-consistent, the wall-clock time falls in a
+ *    spring-forward gap and never existed; we resolve it by shifting forward
+ *    to the later candidate, landing on the first real instant after the
+ *    gap (consistent with how calendar UIs generally treat a "missing" time).
  */
 export function zonedDateTimeToUtcIso(date: string, time: string, timeZone: string): string {
   const [year, month, day] = date.split('-').map(Number);
   const [hour, minute] = time.split(':').map(Number);
-  const guessUtcMs = Date.UTC(year, (month || 1) - 1, day || 1, hour || 0, minute || 0, 0);
-  const offsetMinutes = utcOffsetMinutesAt(new Date(guessUtcMs), timeZone);
-  return new Date(guessUtcMs - offsetMinutes * 60000).toISOString();
+  const wallUtcMs = Date.UTC(year, (month || 1) - 1, day || 1, hour || 0, minute || 0, 0);
+
+  const offsetA = utcOffsetMinutesAt(new Date(wallUtcMs), timeZone);
+  const candidateA = wallUtcMs - offsetA * 60000;
+
+  const offsetB = utcOffsetMinutesAt(new Date(candidateA), timeZone);
+  if (offsetB === offsetA) {
+    return new Date(candidateA).toISOString();
+  }
+
+  const candidateB = wallUtcMs - offsetB * 60000;
+  const offsetAtCandidateB = utcOffsetMinutesAt(new Date(candidateB), timeZone);
+  if (offsetAtCandidateB === offsetB) {
+    return new Date(candidateB).toISOString();
+  }
+
+  // Neither candidate is self-consistent: a spring-forward gap. Shift
+  // forward rather than back.
+  return new Date(Math.max(candidateA, candidateB)).toISOString();
 }
 
 /** Split a UTC ISO instant into wall-clock `{ date, time }` strings for

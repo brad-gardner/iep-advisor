@@ -161,6 +161,39 @@ describe('ScheduleMeetingModal', () => {
     );
   });
 
+  it('disables submit while the participant pool is still loading, so it can never send an empty participants array', async () => {
+    const user = userEvent.setup();
+    let resolvePool: (value: unknown) => void = () => {};
+    meetingsApi.getDefaultParticipants.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePool = resolve;
+      })
+    );
+    renderModal();
+
+    await user.type(screen.getByLabelText('Date'), '2026-01-15');
+    await user.type(screen.getByLabelText('Time'), '14:00');
+    expect(screen.getByTestId('schedule-meeting-submit')).toBeDisabled();
+
+    await user.click(screen.getByTestId('schedule-meeting-submit'));
+    expect(meetingsApi.createMeeting).not.toHaveBeenCalled();
+
+    resolvePool({ success: true, data: defaults });
+    await screen.findByTestId('participant-row-team-7');
+    expect(screen.getByTestId('schedule-meeting-submit')).not.toBeDisabled();
+  });
+
+  it('rejects a malformed external participant email instead of silently adding it', async () => {
+    const user = userEvent.setup();
+    renderModal();
+    await screen.findByTestId('participant-row-team-7');
+
+    await user.type(screen.getByLabelText('External participant name'), 'Guest Advocate');
+    await user.type(screen.getByLabelText('Email'), 'not-an-email');
+    expect(screen.getByTestId('add-external-participant')).toBeDisabled();
+    expect(screen.getByText('Enter a valid email address')).toBeInTheDocument();
+  });
+
   it('requires a date and time before submitting', async () => {
     const user = userEvent.setup();
     renderModal();

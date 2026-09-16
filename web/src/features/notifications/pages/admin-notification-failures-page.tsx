@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
@@ -13,6 +14,8 @@ import type { NotificationDto } from '../types';
 export function AdminNotificationFailuresPage() {
   const [items, setItems] = useState<NotificationDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by the "Try again" button to re-run the load effect below.
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -20,8 +23,12 @@ export function AdminNotificationFailuresPage() {
       try {
         const response = await listNotificationFailures();
         if (!active) return;
-        if (response.success && response.data) setItems(response.data);
-        else setError(response.message ?? 'Could not load email failures');
+        if (response.success && response.data) {
+          setItems(response.data);
+          setError(null);
+        } else {
+          setError(response.message ?? 'Could not load email failures');
+        }
       } catch (err) {
         if (active) setError(apiErrorMessage(err, 'Could not load email failures'));
       }
@@ -29,7 +36,7 @@ export function AdminNotificationFailuresPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [retryToken]);
 
   const columns: TableColumn<NotificationDto>[] = [
     { key: 'kind', header: 'Kind', cell: (n) => n.kind, sortValue: (n) => n.kind },
@@ -52,7 +59,11 @@ export function AdminNotificationFailuresPage() {
     <PageLayout title="Notification email failures" subtitle="Notifications where the email send failed.">
       {error && (
         <div role="alert">
-          <Notice variant="error" title={error} />
+          <Notice variant="error" title={error}>
+            <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
+              Try again
+            </Button>
+          </Notice>
         </div>
       )}
       {!error && (

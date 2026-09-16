@@ -126,7 +126,7 @@ public class IcsBuilder : IIcsBuilder
         if (descriptionParts.Count > 0)
             lines.Add($"DESCRIPTION:{EscapeText(string.Join("\\n", descriptionParts))}");
 
-        lines.Add($"ORGANIZER;CN={QuoteParam(meeting.OrganizerName)}:mailto:{meeting.OrganizerEmail}");
+        lines.Add($"ORGANIZER;CN={QuoteParam(meeting.OrganizerName)}:mailto:{SanitizeAddress(meeting.OrganizerEmail)}");
 
         foreach (var attendee in meeting.Attendees)
         {
@@ -135,7 +135,7 @@ public class IcsBuilder : IIcsBuilder
             var role = attendee.IsRequired ? "REQ-PARTICIPANT" : "OPT-PARTICIPANT";
             var partstat = ToPartStat(attendee.InviteStatus);
             var cn = string.IsNullOrWhiteSpace(attendee.Name) ? attendee.Email : attendee.Name;
-            lines.Add($"ATTENDEE;CN={QuoteParam(cn!)};ROLE={role};PARTSTAT={partstat}:mailto:{attendee.Email}");
+            lines.Add($"ATTENDEE;CN={QuoteParam(cn!)};ROLE={role};PARTSTAT={partstat}:mailto:{SanitizeAddress(attendee.Email)}");
         }
 
         lines.Add("END:VEVENT");
@@ -169,39 +169,24 @@ public class IcsBuilder : IIcsBuilder
 
     private static List<string> BuildVTimeZoneLines(TimeZoneInfo tz, string tzId)
     {
-        var lines = new List<string> { "BEGIN:VTIMEZONE", $"TZID:{tzId}" };
-
         if (!tz.SupportsDaylightSavingTime)
-        {
-            lines.Add("BEGIN:STANDARD");
-            lines.Add("DTSTART:19700101T000000");
-            lines.Add($"TZOFFSETFROM:{FormatOffset(tz.BaseUtcOffset)}");
-            lines.Add($"TZOFFSETTO:{FormatOffset(tz.BaseUtcOffset)}");
-            lines.Add("TZNAME:STD");
-            lines.Add("END:STANDARD");
-            lines.Add("END:VTIMEZONE");
-            return lines;
-        }
+            return BuildStandardOnlyVTimezone(tz, tzId);
+
+        var rules = tz.GetAdjustmentRules();
+
+        // Some zones carry adjustment rules for DST they no longer observe (e.g. America/Phoenix's last
+        // rule ended in 1967, but SupportsDaylightSavingTime is still true because it observed DST
+        // historically). Only treat DST as currently active when some rule actually covers a year near
+        // "now" — otherwise the stale historical rule would produce a bogus DAYLIGHT/STANDARD pair.
+        var currentYear = DateTime.UtcNow.Year;
+        var activeRule = rules.FirstOrDefault(r => r.DateStart.Year <= currentYear && r.DateEnd.Year >= currentYear - 1);
+        if (activeRule == null)
+            return BuildStandardOnlyVTimezone(tz, tzId);
 
         // Anchor the recurring rule far enough back that a feed spanning "past 30 days" never needs a
         // transition date earlier than DTSTART (RRULE only recurs forward from DTSTART).
-        var anchorYear = DateTime.UtcNow.Year - 1;
-        var rule = tz.GetAdjustmentRules()
-            .FirstOrDefault(r => r.DateStart.Year <= anchorYear && r.DateEnd.Year >= anchorYear)
-            ?? tz.GetAdjustmentRules().LastOrDefault();
-
-        if (rule == null)
-        {
-            // SupportsDaylightSavingTime but no adjustment rules resolved for any year — treat as standard-only.
-            lines.Add("BEGIN:STANDARD");
-            lines.Add("DTSTART:19700101T000000");
-            lines.Add($"TZOFFSETFROM:{FormatOffset(tz.BaseUtcOffset)}");
-            lines.Add($"TZOFFSETTO:{FormatOffset(tz.BaseUtcOffset)}");
-            lines.Add("TZNAME:STD");
-            lines.Add("END:STANDARD");
-            lines.Add("END:VTIMEZONE");
-            return lines;
-        }
+        var anchorYear = currentYear - 1;
+        var rule = rules.FirstOrDefault(r => r.DateStart.Year <= anchorYear && r.DateEnd.Year >= anchorYear) ?? activeRule;
 
         var standardOffset = tz.BaseUtcOffset;
         var daylightOffset = tz.BaseUtcOffset + rule.DaylightDelta;
@@ -209,11 +194,13 @@ public class IcsBuilder : IIcsBuilder
         var daylightStart = ComputeTransitionDate(anchorYear, rule.DaylightTransitionStart);
         var daylightEnd = ComputeTransitionDate(anchorYear, rule.DaylightTransitionEnd);
 
+        var lines = new List<string> { "BEGIN:VTIMEZONE", $"TZID:{tzId}" };
+
         lines.Add("BEGIN:DAYLIGHT");
         lines.Add($"DTSTART:{daylightStart:yyyyMMdd\\THHmmss}");
         lines.Add($"TZOFFSETFROM:{FormatOffset(standardOffset)}");
         lines.Add($"TZOFFSETTO:{FormatOffset(daylightOffset)}");
-        lines.Add($"RRULE:FREQ=YEARLY;BYMONTH={rule.DaylightTransitionStart.Month};BYDAY={ToByDay(rule.DaylightTransitionStart)}");
+        lines.Add($"RRULE:FREQ=YEARLY;BYMONTH={daylightStart.Month};BYDAY={ToByDay(daylightStart)}");
         lines.Add("TZNAME:DST");
         lines.Add("END:DAYLIGHT");
 
@@ -221,7 +208,7 @@ public class IcsBuilder : IIcsBuilder
         lines.Add($"DTSTART:{daylightEnd:yyyyMMdd\\THHmmss}");
         lines.Add($"TZOFFSETFROM:{FormatOffset(daylightOffset)}");
         lines.Add($"TZOFFSETTO:{FormatOffset(standardOffset)}");
-        lines.Add($"RRULE:FREQ=YEARLY;BYMONTH={rule.DaylightTransitionEnd.Month};BYDAY={ToByDay(rule.DaylightTransitionEnd)}");
+        lines.Add($"RRULE:FREQ=YEARLY;BYMONTH={daylightEnd.Month};BYDAY={ToByDay(daylightEnd)}");
         lines.Add("TZNAME:STD");
         lines.Add("END:STANDARD");
 
@@ -229,26 +216,54 @@ public class IcsBuilder : IIcsBuilder
         return lines;
     }
 
+    /// <summary>The no-DST VTIMEZONE shape, shared by the "zone never observes DST" and "zone's DST rules
+    /// are historical/stale" cases so the two branches can't drift out of sync.</summary>
+    private static List<string> BuildStandardOnlyVTimezone(TimeZoneInfo tz, string tzId) => new()
+    {
+        "BEGIN:VTIMEZONE",
+        $"TZID:{tzId}",
+        "BEGIN:STANDARD",
+        "DTSTART:19700101T000000",
+        $"TZOFFSETFROM:{FormatOffset(tz.BaseUtcOffset)}",
+        $"TZOFFSETTO:{FormatOffset(tz.BaseUtcOffset)}",
+        "TZNAME:STD",
+        "END:STANDARD",
+        "END:VTIMEZONE"
+    };
+
     /// <summary>Resolves a .NET <see cref="TimeZoneInfo.TransitionTime"/> to an actual calendar date/time
     /// in <paramref name="year"/> (week-of-month rules are "the Nth <c>DayOfWeek</c> in <c>Month</c>",
-    /// with week 5 meaning "the last one").</summary>
+    /// with week 5 meaning "the last one"). The time-of-day is rounded to the nearest second: tzdata-derived
+    /// rules on non-Windows runtimes can carry a transition documented as "2:00 AM" as 01:59:59.999, which
+    /// would otherwise render as a wrong-looking DTSTART.</summary>
     private static DateTime ComputeTransitionDate(int year, TimeZoneInfo.TransitionTime t)
     {
+        var timeOfDay = RoundToNearestSecond(t.TimeOfDay.TimeOfDay);
         if (t.IsFixedDateRule)
-            return new DateTime(year, t.Month, t.Day) + t.TimeOfDay.TimeOfDay;
+            return new DateTime(year, t.Month, t.Day) + timeOfDay;
 
         var firstOfMonth = new DateTime(year, t.Month, 1);
         var daysToFirstMatch = ((int)t.DayOfWeek - (int)firstOfMonth.DayOfWeek + 7) % 7;
         var candidate = firstOfMonth.AddDays(daysToFirstMatch + (t.Week - 1) * 7);
         if (candidate.Month != t.Month)
             candidate = candidate.AddDays(-7); // week 5 overflowed past month end -> back up to the last occurrence
-        return candidate.Date + t.TimeOfDay.TimeOfDay;
+        return candidate.Date + timeOfDay;
     }
 
-    private static string ToByDay(TimeZoneInfo.TransitionTime t)
+    private static TimeSpan RoundToNearestSecond(TimeSpan value)
+        => TimeSpan.FromSeconds(Math.Round(value.TotalSeconds, MidpointRounding.AwayFromZero));
+
+    /// <summary>Derives RRULE's BYDAY (ordinal + weekday, e.g. "2SU" or the last-occurrence "-1SU") from the
+    /// already-resolved transition date rather than the raw <see cref="TimeZoneInfo.TransitionTime"/>: a
+    /// fixed-date rule (what tzdata-derived rules on non-Windows runtimes report even for a genuinely
+    /// floating "Nth weekday" rule) carries a meaningless default Week/DayOfWeek, so deriving from the
+    /// concrete resolved date is the only form that is correct for both fixed and floating rules alike.</summary>
+    private static string ToByDay(DateTime resolvedDate)
     {
-        var week = t.Week >= 5 ? -1 : t.Week;
-        var day = t.DayOfWeek switch
+        var daysInMonth = DateTime.DaysInMonth(resolvedDate.Year, resolvedDate.Month);
+        var isLastOccurrence = resolvedDate.Day + 7 > daysInMonth;
+        var ordinal = isLastOccurrence ? -1 : (resolvedDate.Day - 1) / 7 + 1;
+        var day = resolvedDate.DayOfWeek switch
         {
             DayOfWeek.Sunday => "SU",
             DayOfWeek.Monday => "MO",
@@ -258,7 +273,7 @@ public class IcsBuilder : IIcsBuilder
             DayOfWeek.Friday => "FR",
             _ => "SA"
         };
-        return $"{week}{day}";
+        return $"{ordinal}{day}";
     }
 
     private static string FormatOffset(TimeSpan offset)
@@ -278,14 +293,22 @@ public class IcsBuilder : IIcsBuilder
         .Replace(";", "\\;")
         .Replace(",", "\\,")
         .Replace("\r\n", "\\n")
+        .Replace("\r", "\\n")
         .Replace("\n", "\\n");
 
-    /// <summary>Quotes a CN/param value per RFC 5545 §3.2 when it contains a colon, semicolon or comma.</summary>
+    /// <summary>Quotes a CN/param value per RFC 5545 §3.2 when it contains a colon, semicolon or comma.
+    /// Also strips CR/LF first: an unvalidated external participant name could otherwise inject new
+    /// content lines into the rendered .ics (defense-in-depth alongside the service-level input
+    /// validation that rejects control characters outright).</summary>
     private static string QuoteParam(string value)
     {
-        var cleaned = value.Replace("\"", "'");
+        var cleaned = SanitizeAddress(value).Replace("\"", "'");
         return cleaned.IndexOfAny(new[] { ':', ';', ',' }) >= 0 ? $"\"{cleaned}\"" : cleaned;
     }
+
+    /// <summary>Strips CR/LF from a value bound for an unquoted ICS position (a mailto: address, or ahead
+    /// of <see cref="QuoteParam"/>) so it cannot inject new content lines.</summary>
+    private static string SanitizeAddress(string value) => value.Replace("\r\n", " ").Replace("\r", " ").Replace("\n", " ");
 
     private static byte[] RenderAsBytes(IEnumerable<string> logicalLines)
     {
@@ -304,10 +327,10 @@ public class IcsBuilder : IIcsBuilder
     private static string FoldLine(string line)
     {
         const int maxOctets = 75;
-        var bytes = Encoding.UTF8.GetBytes(line);
-        if (bytes.Length <= maxOctets)
+        if (Encoding.UTF8.GetByteCount(line) <= maxOctets)
             return line;
 
+        var bytes = Encoding.UTF8.GetBytes(line);
         var result = new StringBuilder();
         var pos = 0;
         var first = true;

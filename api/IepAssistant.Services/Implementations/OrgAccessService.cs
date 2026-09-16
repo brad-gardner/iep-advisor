@@ -18,6 +18,10 @@ public class OrgAccessService : IOrgAccessService
     // that each re-check the same (user, student, role), which is up to 3 queries apiece. A request is
     // short-lived and access rows do not change under it, so the first answer is reused.
     private readonly Dictionary<(int UserId, int SchoolStudentId, AccessRole MinRole), bool> _studentDecisions = new();
+    // Same per-request memo idea as _studentDecisions: GetStaffContextAsync backs every CanManage/authz
+    // check, so a caller resolving it once per meeting/document/etc. in a loop was issuing a fresh
+    // StaffProfiles query each time for the very same (scoped-service-lifetime) user.
+    private readonly Dictionary<int, StaffContext?> _staffContexts = new();
 
     public OrgAccessService(ApplicationDbContext context)
     {
@@ -26,11 +30,16 @@ public class OrgAccessService : IOrgAccessService
 
     public async Task<StaffContext?> GetStaffContextAsync(int userId, CancellationToken ct = default)
     {
-        return await _context.StaffProfiles
+        if (_staffContexts.TryGetValue(userId, out var cached))
+            return cached;
+
+        var ctx = await _context.StaffProfiles
             .AsNoTracking()
             .Where(p => p.UserId == userId && p.IsActive)
             .Select(p => new StaffContext(p.Id, p.UserId, p.DistrictId, p.SchoolId, p.OrgRoleId))
             .FirstOrDefaultAsync(ct);
+        _staffContexts[userId] = ctx;
+        return ctx;
     }
 
     public async Task<bool> CanActOnSchoolAsync(int userId, int schoolId, CancellationToken ct = default)

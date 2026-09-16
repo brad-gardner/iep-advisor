@@ -157,5 +157,50 @@ public sealed class CalendarServiceTests : IDisposable
         Assert.False(result.Success);
     }
 
+    [Fact]
+    public async Task GetFeedByTokenAsync_DistrictAdmin_ExcludesObligationsForStudentsWhereNotLead()
+    {
+        // todos/066: the anonymous, non-expiring feed token must never carry an admin's whole scope of
+        // obligations — only ones where the admin is personally the lead case manager.
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var (adminUserId, _) = _db.Staff("districtadmin@example.com", districtId, null, Models.OrgRoleIds.DistrictAdmin);
+
+        var leadStudentId = _db.Student(schoolId, "Lead", "Student");
+        _db.TeamMember(leadStudentId, adminUserId, TeamRole.CaseManager, isLead: true);
+        using (var ctx = _db.Context())
+        {
+            ctx.SchoolStudents.Single(s => s.Id == leadStudentId).AnnualReviewDueDate = DateTime.UtcNow.Date.AddDays(10);
+            ctx.SaveChanges();
+        }
+
+        // A second student in the admin's district/scope where the admin is NOT the lead.
+        var otherStudentId = _db.Student(schoolId, "Other", "Student");
+        var (otherLeadUserId, _) = _db.Staff("otherlead@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.TeamMember(otherStudentId, otherLeadUserId, TeamRole.CaseManager, isLead: true);
+        using (var ctx = _db.Context())
+        {
+            ctx.SchoolStudents.Single(s => s.Id == otherStudentId).AnnualReviewDueDate = DateTime.UtcNow.Date.AddDays(10);
+            ctx.SaveChanges();
+        }
+
+        using var feedCtx = _db.Context();
+        var feed = await CreateService(feedCtx).GetOrCreateFeedAsync(adminUserId);
+
+        using var readCtx = _db.Context();
+        var icsResult = await CreateService(readCtx).GetFeedByTokenAsync(feed.Data!.Token);
+
+        Assert.True(icsResult.Success);
+        var ics = Encoding.UTF8.GetString(icsResult.Data!);
+        Assert.Contains("Lead", ics);
+        Assert.DoesNotContain("Other", ics);
+
+        // Sanity check: the authenticated GET /api/educator/obligations/mine equivalent keeps giving the
+        // admin their full scope (both students) — only the anonymous feed is narrowed.
+        var obligationService = new ObligationService(readCtx, new OrgAccessService(readCtx));
+        var mine = await obligationService.GetMineAsync(adminUserId, null);
+        Assert.Contains(mine.Data!, o => o.StudentName.Contains("Other"));
+    }
+
     public void Dispose() => _db.Dispose();
 }

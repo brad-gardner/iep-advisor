@@ -22,6 +22,8 @@ interface StudentTimelineCardProps {
 export function StudentTimelineCard({ studentId, onEditDates }: StudentTimelineCardProps) {
   const [obligations, setObligations] = useState<ObligationDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by the "Try again" button to re-run the load effect below.
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -29,8 +31,12 @@ export function StudentTimelineCard({ studentId, onEditDates }: StudentTimelineC
       try {
         const response = await listStudentObligations(studentId);
         if (!active) return;
-        if (response.success && response.data) setObligations(response.data);
-        else setError(response.message ?? 'Could not load the timeline');
+        if (response.success && response.data) {
+          setObligations(response.data);
+          setError(null);
+        } else {
+          setError(response.message ?? 'Could not load the timeline');
+        }
       } catch (err) {
         if (active) setError(apiErrorMessage(err, 'Could not load the timeline'));
       }
@@ -38,7 +44,7 @@ export function StudentTimelineCard({ studentId, onEditDates }: StudentTimelineC
     return () => {
       active = false;
     };
-  }, [studentId]);
+  }, [studentId, retryToken]);
 
   return (
     <Card data-testid="student-timeline-card">
@@ -53,7 +59,11 @@ export function StudentTimelineCard({ studentId, onEditDates }: StudentTimelineC
 
       {error && (
         <div role="alert">
-          <Notice variant="error" title={error} />
+          <Notice variant="error" title={error}>
+            <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
+              Try again
+            </Button>
+          </Notice>
         </div>
       )}
 

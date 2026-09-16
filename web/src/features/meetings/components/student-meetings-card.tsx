@@ -42,6 +42,8 @@ export function StudentMeetingsCard({ studentId, studentName }: StudentMeetingsC
   const [error, setError] = useState<string | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [selected, setSelected] = useState<MeetingDto | null>(null);
+  // Bumped by the "Try again" button to re-run the load effect below.
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -49,8 +51,12 @@ export function StudentMeetingsCard({ studentId, studentName }: StudentMeetingsC
       try {
         const response = await listStudentMeetings(studentId);
         if (!active) return;
-        if (response.success && response.data) setMeetings(response.data);
-        else setError(response.message ?? 'Could not load meetings');
+        if (response.success && response.data) {
+          setMeetings(response.data);
+          setError(null);
+        } else {
+          setError(response.message ?? 'Could not load meetings');
+        }
       } catch (err) {
         if (active) setError(apiErrorMessage(err, 'Could not load meetings'));
       }
@@ -58,7 +64,7 @@ export function StudentMeetingsCard({ studentId, studentName }: StudentMeetingsC
     return () => {
       active = false;
     };
-  }, [studentId]);
+  }, [studentId, retryToken]);
 
   const upcoming = (meetings ?? [])
     .filter(isUpcoming)
@@ -103,7 +109,11 @@ export function StudentMeetingsCard({ studentId, studentName }: StudentMeetingsC
 
       {error && (
         <div role="alert">
-          <Notice variant="error" title={error} />
+          <Notice variant="error" title={error}>
+            <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
+              Try again
+            </Button>
+          </Notice>
         </div>
       )}
 
@@ -168,7 +178,11 @@ export function StudentMeetingsCard({ studentId, studentName }: StudentMeetingsC
         meeting={selected}
         onClose={() => setSelected(null)}
         onUpdated={(updated) => {
-          setSelected(updated);
+          // See educator-calendar-page.tsx's `onUpdated` for why this is a
+          // functional update: a mutation started before the drawer was
+          // closed (or re-opened for a different meeting) can resolve after
+          // the fact, and must not reopen/overwrite whatever is showing now.
+          setSelected((prev) => (prev && prev.id === updated.id ? updated : prev));
           setMeetings((prev) => prev?.map((m) => (m.id === updated.id ? updated : m)) ?? prev);
         }}
       />

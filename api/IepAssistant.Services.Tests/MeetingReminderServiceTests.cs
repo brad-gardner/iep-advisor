@@ -137,5 +137,52 @@ public sealed class MeetingReminderServiceTests : IDisposable
         Assert.Empty(assertCtx.MeetingReminders.Where(r => r.MeetingId == meetingId));
     }
 
+    [Fact]
+    public async Task RunOnceAsync_TenMeetingsAlreadyFullySent_UsesBatchedQueriesRegardlessOfMeetingCount()
+    {
+        // todos/069: participants + already-sent reminders must be loaded once per run (not once per
+        // (meeting, offset)), and a pair that is already fully sent must cost nothing beyond that —
+        // otherwise 10 meetings x 3 open offsets would keep re-querying both every 15-minute tick forever.
+        var (_, _, studentId, userId) = SeedMeetingParticipant();
+        var meetingIds = new List<int>();
+        for (var i = 0; i < 10; i++)
+        {
+            var meetingId = _db.Meeting(studentId, userId, DateTime.UtcNow.AddMinutes(30 + i));
+            _db.MeetingParticipant(meetingId, userId);
+            meetingIds.Add(meetingId);
+        }
+        using (var seedCtx = _db.Context())
+        {
+            foreach (var meetingId in meetingIds)
+            {
+                foreach (var offset in new[] { ReminderOffset.SevenDays, ReminderOffset.OneDay, ReminderOffset.OneHour })
+                    seedCtx.MeetingReminders.Add(new MeetingReminder { MeetingId = meetingId, UserId = userId, Offset = offset, SentAt = DateTime.UtcNow });
+            }
+            seedCtx.SaveChanges();
+        }
+
+        var counter = new DbActivityCounter();
+        using var ctx = _db.Context(counter);
+        await CreateService(ctx).RunOnceAsync(DateTime.UtcNow);
+
+        // Candidates + participants + already-sent reminders = 3 SELECTs total, independent of meeting
+        // count, and zero further work since every (meeting, offset) pair is already complete.
+        Assert.True(counter.Queries <= 4, $"Queries = {counter.Queries}");
+    }
+
+    // ----------------------------------------------------------------- DbUpdateException classification (todos/053)
+
+    [Fact]
+    public void IsReminderUniqueIndexCollision_MatchesOnlyTheExpectedIndexName()
+    {
+        var collision = new DbUpdateException("update failed",
+            new InvalidOperationException("SQLite Error 19: 'UNIQUE constraint failed: IX_MeetingReminders_MeetingId_UserId_Offset'"));
+        var unrelated = new DbUpdateException("update failed",
+            new InvalidOperationException("SQLite Error 19: 'FOREIGN KEY constraint failed'"));
+
+        Assert.True(MeetingReminderService.IsReminderUniqueIndexCollision(collision));
+        Assert.False(MeetingReminderService.IsReminderUniqueIndexCollision(unrelated));
+    }
+
     public void Dispose() => _db.Dispose();
 }

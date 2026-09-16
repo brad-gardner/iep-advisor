@@ -15,6 +15,13 @@ const educatorApi = vi.hoisted(() => ({
 }));
 vi.mock('@/features/educator/api/educator-api', () => educatorApi);
 
+const meetingsApi = vi.hoisted(() => ({
+  rsvpToMeeting: vi.fn(),
+  createMeeting: vi.fn(),
+  getDefaultParticipants: vi.fn().mockResolvedValue({ success: true, data: [] }),
+}));
+vi.mock('@/features/meetings/api/meetings-api', () => meetingsApi);
+
 import { EducatorCalendarPage } from './educator-calendar-page';
 
 function renderPage() {
@@ -127,6 +134,85 @@ describe('EducatorCalendarPage', () => {
     expect(await screen.findByTestId('schedule-meeting-modal')).toHaveTextContent('Ada Lovelace');
   });
 
+  it('does not let a slow post-schedule refetch overwrite a month the user has since navigated to', async () => {
+    const user = userEvent.setup();
+    const octoberItem: CalendarItemDto = {
+      kind: 'Meeting',
+      date: '2026-10-05T15:00:00.000Z',
+      meeting: makeMeeting({ id: 300, title: 'October meeting', startsAtUtc: '2026-10-05T15:00:00.000Z' }),
+    };
+    let resolveSlowRefetch: (value: unknown) => void = () => {};
+    calendarApi.listCalendarItems
+      .mockResolvedValueOnce({ success: true, data: [meetingItem, obligationItem] }) // initial mount
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSlowRefetch = resolve;
+          })
+      ) // post-schedule refetch of the (still) current month — deliberately slow
+      .mockResolvedValueOnce({ success: true, data: [octoberItem] }); // the user's own Next-month fetch — fast
+
+    educatorApi.searchStudents.mockResolvedValue({
+      success: true,
+      data: { items: [{ id: 5, firstName: 'Ada', lastName: 'Lovelace' }], total: 1, page: 1, pageSize: 25 },
+    });
+    meetingsApi.createMeeting.mockResolvedValue({ success: true, data: makeMeeting({ id: 999 }) });
+
+    renderPage();
+    await screen.findByText('IEP check-in');
+
+    await user.click(screen.getByTestId('calendar-schedule-meeting'));
+    await user.click(await screen.findByTestId('student-picker-option-5'));
+    await screen.findByTestId('schedule-meeting-modal');
+
+    await user.type(screen.getByLabelText('Date'), '2026-09-20');
+    await user.type(screen.getByLabelText('Time'), '10:00');
+    await waitFor(() => expect(screen.getByTestId('schedule-meeting-submit')).not.toBeDisabled());
+    await user.click(screen.getByTestId('schedule-meeting-submit'));
+
+    // The post-schedule refetch (same month, slow) is now in flight.
+    await waitFor(() => expect(calendarApi.listCalendarItems).toHaveBeenCalledTimes(2));
+
+    // Before it resolves, the user navigates to next month — a fast, independent fetch.
+    await user.click(screen.getByTestId('calendar-next-month'));
+    await waitFor(() => expect(screen.getByText('October meeting')).toBeInTheDocument());
+
+    // The slow refetch finally resolves — it must not clobber the now-current October view.
+    resolveSlowRefetch({ success: true, data: [meetingItem, obligationItem] });
+    await waitFor(() => expect(calendarApi.listCalendarItems).toHaveBeenCalledTimes(3));
+    expect(screen.getByText('October meeting')).toBeInTheDocument();
+    expect(screen.queryByText('IEP check-in')).not.toBeInTheDocument();
+  });
+
+  it('does not reopen the drawer when a mutation resolves after it was closed', async () => {
+    const user = userEvent.setup();
+    let resolveRsvp: (value: unknown) => void = () => {};
+    meetingsApi.rsvpToMeeting.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRsvp = resolve;
+      })
+    );
+    calendarApi.listCalendarItems.mockResolvedValue({
+      success: true,
+      data: [{ ...meetingItem, meeting: makeMeeting({ id: 200, title: 'IEP check-in', myInviteStatus: 'Pending' }) }],
+    });
+    renderPage();
+    await screen.findByText('IEP check-in');
+
+    await user.click(screen.getByTestId('calendar-item-meeting-200'));
+    await screen.findByTestId('meeting-drawer');
+    await user.click(screen.getByTestId('meeting-rsvp-accept'));
+
+    // Close the drawer while the RSVP request is still in flight.
+    await user.click(screen.getByLabelText(/close/i));
+    await waitFor(() => expect(screen.queryByTestId('meeting-drawer')).not.toBeInTheDocument());
+
+    // The RSVP response arrives after the close — it must not reopen the drawer.
+    resolveRsvp({ success: true, data: makeMeeting({ id: 200, title: 'IEP check-in', myInviteStatus: 'Accepted' }) });
+    await waitFor(() => expect(meetingsApi.rsvpToMeeting).toHaveBeenCalled());
+    expect(screen.queryByTestId('meeting-drawer')).not.toBeInTheDocument();
+  });
+
   it('shows a keyboard-navigable grid where arrow keys move the active day', async () => {
     const user = userEvent.setup();
     renderPage();
@@ -136,5 +222,30 @@ describe('EducatorCalendarPage', () => {
     firstDay.focus();
     await user.keyboard('{ArrowRight}');
     expect(screen.getByTestId('calendar-day-2026-09-16')).toHaveFocus();
+  });
+
+  it('gives each day cell a full-date accessible name and keeps native button semantics', async () => {
+    renderPage();
+    await screen.findByText('IEP check-in');
+
+    const day = screen.getByTestId('calendar-day-2026-09-15');
+    expect(day.tagName).toBe('BUTTON');
+    expect(day).toHaveAccessibleName(/September 15, 2026/);
+    expect(day).toHaveAccessibleName(/1 item/);
+    // role="gridcell" lives on a wrapper, not on the button itself.
+    expect(day.closest('[role="gridcell"]')).not.toBeNull();
+    expect(day).not.toHaveAttribute('role', 'gridcell');
+  });
+
+  it('clears the selected-day filter when navigating to a different month', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText('IEP check-in');
+
+    await user.click(screen.getByTestId('calendar-day-2026-09-15'));
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Selected day');
+
+    await user.click(screen.getByTestId('calendar-next-month'));
+    await waitFor(() => expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('This month'));
   });
 });

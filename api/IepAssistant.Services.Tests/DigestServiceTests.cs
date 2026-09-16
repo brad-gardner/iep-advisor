@@ -134,6 +134,41 @@ public sealed class DigestServiceTests : IDisposable
         Assert.NotNull(notification.EmailError);
     }
 
+    [Fact]
+    public async Task RunForDateAsync_TwentyStaffWithContent_UsesBatchedQueriesNotPerStaffRoundTrips()
+    {
+        // todos/067: obligations, meetings and the dedup check must each be one query for the whole run,
+        // not one (or several) per staff user — otherwise 20 staff would be ~40-140 round trips.
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+
+        for (var i = 0; i < 20; i++)
+        {
+            var (leadUserId, _) = _db.Staff($"digeststaff{i}@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+            var studentId = _db.Student(schoolId, "Student", i.ToString());
+            _db.TeamMember(studentId, leadUserId, TeamRole.CaseManager, isLead: true);
+            using (var ctx = _db.Context())
+            {
+                ctx.SchoolStudents.Single(s => s.Id == studentId).AnnualReviewDueDate = DateTime.UtcNow.Date.AddDays(-1);
+                ctx.SaveChanges();
+            }
+            var meetingId = _db.Meeting(studentId, leadUserId, DateTime.UtcNow.AddDays(2));
+            _db.MeetingParticipant(meetingId, leadUserId);
+        }
+
+        var counter = new DbActivityCounter();
+        var email = new CapturingDigestEmailService();
+        using var ctx2 = _db.Context(counter);
+        await CreateService(ctx2, email).RunForDateAsync(DateOnly.FromDateTime(DateTime.UtcNow));
+
+        Assert.Equal(20, email.SendCount);
+        // staff ids + dedup check + obligations + meetings + user lookup = 5 SELECTs total, regardless of
+        // staff count.
+        Assert.True(counter.Queries < 10, $"Queries = {counter.Queries}");
+        // One batched insert (notification rows) + one batched update (email outcomes), not one pair per user.
+        Assert.True(counter.SaveChanges <= 3, $"SaveChanges = {counter.SaveChanges}");
+    }
+
     private sealed class CapturingDigestEmailService : TestSupport.TestEmailServiceBase
     {
         public DigestEmailModel? LastModel { get; private set; }

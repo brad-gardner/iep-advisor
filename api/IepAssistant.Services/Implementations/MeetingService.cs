@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
@@ -20,6 +21,12 @@ public class MeetingService : IMeetingService
     public const int MaxDurationMinutes = 480;
     public const int DefaultDurationMinutes = 60;
     public const string DefaultTimeZoneId = "America/New_York";
+
+    /// <summary>GetForStudentAsync is unbounded career history; cap it so a long-enrolled student's meeting
+    /// list stays a single bounded query (todos/050).</summary>
+    private const int MaxStudentMeetingHistory = 200;
+
+    private const int MinPlausibleYear = 2000;
 
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
@@ -55,6 +62,9 @@ public class MeetingService : IMeetingService
         if (student == null)
             return ServiceResult<MeetingModel>.FailureResult("Student not found.");
 
+        if (model.StartsAtUtc.Year < MinPlausibleYear)
+            return ServiceResult<MeetingModel>.FailureResult("startsAtUtc is invalid.");
+
         var timeZoneId = string.IsNullOrWhiteSpace(model.TimeZoneId) ? DefaultTimeZoneId : model.TimeZoneId.Trim();
         if (!IsValidTimeZone(timeZoneId))
             return ServiceResult<MeetingModel>.FailureResult("Invalid time zone.");
@@ -62,6 +72,11 @@ public class MeetingService : IMeetingService
         var duration = model.DurationMinutes ?? DefaultDurationMinutes;
         if (duration < MinDurationMinutes || duration > MaxDurationMinutes)
             return ServiceResult<MeetingModel>.FailureResult($"Duration must be between {MinDurationMinutes} and {MaxDurationMinutes} minutes.");
+
+        if (HasControlCharacters(model.Title))
+            return ServiceResult<MeetingModel>.FailureResult("Title contains invalid characters.");
+        if (HasControlCharacters(model.Location))
+            return ServiceResult<MeetingModel>.FailureResult("Location contains invalid characters.");
 
         var title = string.IsNullOrWhiteSpace(model.Title) ? $"{model.Type.ToDisplay()} Meeting" : model.Title.Trim();
 
@@ -87,8 +102,9 @@ public class MeetingService : IMeetingService
         await _context.Meetings.AddAsync(meeting, ct);
         await _context.SaveChangesAsync(ct);
 
-        var participants = model.Participants ?? await BuildDefaultParticipantInputsAsync(studentId, userId, ct);
-        var participantError = await ReplaceParticipantsAsync(meeting, participants, studentId, userId, ct);
+        var membership = await LoadMembershipContextAsync(studentId, ct);
+        var participants = model.Participants ?? await BuildDefaultParticipantInputsAsync(studentId, userId, membership, ct);
+        var participantError = await ReplaceParticipantsAsync(meeting, participants, membership, userId, ct);
         if (participantError != null)
         {
             _context.Meetings.Remove(meeting);
@@ -110,13 +126,9 @@ public class MeetingService : IMeetingService
         if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Collaborator, ct))
             return ServiceResult<List<DefaultParticipantModel>>.FailureResult("You do not have permission to schedule meetings for this student.");
 
-        var inputs = await BuildDefaultParticipantInputsAsync(studentId, userId, ct);
+        var membership = await LoadMembershipContextAsync(studentId, ct);
+        var inputs = await BuildDefaultParticipantInputsAsync(studentId, userId, membership, ct);
         var userIds = inputs.Where(i => i.UserId.HasValue).Select(i => i.UserId!.Value).ToList();
-        var familyUserIds = (await LoadFamilyUserIdsAsync(studentId, ct)).ToHashSet();
-        var studentAccountUserId = await _context.StudentProfiles.AsNoTracking()
-            .Where(sp => sp.SchoolStudentId == studentId)
-            .Select(sp => (int?)sp.UserId)
-            .FirstOrDefaultAsync(ct);
         var users = await _context.Users.AsNoTracking()
             .Where(u => userIds.Contains(u.Id))
             .Select(u => new { u.Id, u.FirstName, u.LastName, u.Email })
@@ -133,8 +145,8 @@ public class MeetingService : IMeetingService
                     DisplayName = $"{u.FirstName} {u.LastName}".Trim(),
                     Email = u.Email,
                     TeamRole = i.TeamRole,
-                    IsFamily = familyUserIds.Contains(u.Id),
-                    IsStudent = studentAccountUserId.HasValue && u.Id == studentAccountUserId.Value
+                    IsFamily = membership.FamilyUserIds.Contains(u.Id),
+                    IsStudent = membership.StudentAccountUserId.HasValue && u.Id == membership.StudentAccountUserId.Value
                 };
             })
             .OrderBy(m => m.IsStudent).ThenBy(m => m.IsFamily).ThenBy(m => m.DisplayName)
@@ -147,15 +159,15 @@ public class MeetingService : IMeetingService
         if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
             return ServiceResult<List<MeetingModel>>.FailureResult("You do not have permission to view this student's meetings.");
 
-        var ids = await _context.Meetings.AsNoTracking()
+        var meetings = await _context.Meetings.AsNoTracking()
+            .Include(m => m.Participants).ThenInclude(p => p.User)
+            .Include(m => m.SchoolStudent)
             .Where(m => m.SchoolStudentId == studentId)
             .OrderByDescending(m => m.StartsAtUtc)
-            .Select(m => m.Id)
+            .Take(MaxStudentMeetingHistory)
             .ToListAsync(ct);
 
-        var models = new List<MeetingModel>(ids.Count);
-        foreach (var id in ids)
-            models.Add(await LoadMeetingModelAsync(id, userId, ct));
+        var models = await MapMeetingsAsync(meetings, userId, ct);
         return ServiceResult<List<MeetingModel>>.SuccessResult(models);
     }
 
@@ -179,15 +191,14 @@ public class MeetingService : IMeetingService
         var fromUtc = from.HasValue ? DateTime.SpecifyKind(from.Value, DateTimeKind.Utc) : DateTime.UtcNow;
         var toUtc = to.HasValue ? DateTime.SpecifyKind(to.Value, DateTimeKind.Utc) : DateTime.UtcNow.AddDays(90);
 
-        var ids = await _context.Meetings.AsNoTracking()
+        var meetings = await _context.Meetings.AsNoTracking()
+            .Include(m => m.Participants).ThenInclude(p => p.User)
+            .Include(m => m.SchoolStudent)
             .Where(m => m.StartsAtUtc >= fromUtc && m.StartsAtUtc <= toUtc && m.Participants.Any(p => p.UserId == userId))
             .OrderBy(m => m.StartsAtUtc)
-            .Select(m => m.Id)
             .ToListAsync(ct);
 
-        var models = new List<MeetingModel>(ids.Count);
-        foreach (var id in ids)
-            models.Add(await LoadMeetingModelAsync(id, userId, ct));
+        var models = await MapMeetingsAsync(meetings, userId, ct);
         return ServiceResult<List<MeetingModel>>.SuccessResult(models);
     }
 
@@ -204,15 +215,14 @@ public class MeetingService : IMeetingService
         if (studentIds.Count == 0)
             return ServiceResult<List<MeetingModel>>.SuccessResult(new List<MeetingModel>());
 
-        var ids = await _context.Meetings.AsNoTracking()
+        var meetings = await _context.Meetings.AsNoTracking()
+            .Include(m => m.Participants).ThenInclude(p => p.User)
+            .Include(m => m.SchoolStudent)
             .Where(m => studentIds.Contains(m.SchoolStudentId))
             .OrderBy(m => m.StartsAtUtc)
-            .Select(m => m.Id)
             .ToListAsync(ct);
 
-        var models = new List<MeetingModel>(ids.Count);
-        foreach (var id in ids)
-            models.Add(await LoadMeetingModelAsync(id, parentUserId, ct));
+        var models = await MapMeetingsAsync(meetings, parentUserId, ct);
         return ServiceResult<List<MeetingModel>>.SuccessResult(models);
     }
 
@@ -227,6 +237,13 @@ public class MeetingService : IMeetingService
             return ServiceResult<MeetingModel>.FailureResult("You do not have permission to update this meeting.");
         if (meeting.Status == MeetingStatus.Cancelled)
             return ServiceResult<MeetingModel>.FailureResult("Cannot update a cancelled meeting.");
+
+        if (model.StartsAtUtc.HasValue && model.StartsAtUtc.Value.Year < MinPlausibleYear)
+            return ServiceResult<MeetingModel>.FailureResult("startsAtUtc is invalid.");
+        if (HasControlCharacters(model.Title))
+            return ServiceResult<MeetingModel>.FailureResult("Title contains invalid characters.");
+        if (HasControlCharacters(model.Location))
+            return ServiceResult<MeetingModel>.FailureResult("Location contains invalid characters.");
 
         var scheduleChanged = false;
 
@@ -273,7 +290,8 @@ public class MeetingService : IMeetingService
 
         if (model.Participants != null)
         {
-            var participantError = await ReplaceParticipantsAsync(meeting, model.Participants, meeting.SchoolStudentId, meeting.CreatedByUserId, ct);
+            var membership = await LoadMembershipContextAsync(meeting.SchoolStudentId, ct);
+            var participantError = await ReplaceParticipantsAsync(meeting, model.Participants, membership, meeting.CreatedByUserId, ct);
             if (participantError != null)
                 return ServiceResult<MeetingModel>.FailureResult(participantError);
             await _context.SaveChangesAsync(ct);
@@ -393,10 +411,10 @@ public class MeetingService : IMeetingService
         if (error != null)
             return ServiceResult<MeetingRsvpPreviewModel>.FailureResult(error);
 
-        var meetingModel = await LoadMeetingModelAsync(participant!.MeetingId, participant.UserId ?? 0, ct);
+        var summary = await LoadMeetingSummaryAsync(participant!.MeetingId, ct);
         return ServiceResult<MeetingRsvpPreviewModel>.SuccessResult(new MeetingRsvpPreviewModel
         {
-            Meeting = meetingModel,
+            Meeting = summary,
             Status = participant.InviteStatus
         });
     }
@@ -410,10 +428,10 @@ public class MeetingService : IMeetingService
         participant!.InviteStatus = status;
         await _context.SaveChangesAsync(ct);
 
-        var meetingModel = await LoadMeetingModelAsync(participant.MeetingId, participant.UserId ?? 0, ct);
+        var summary = await LoadMeetingSummaryAsync(participant.MeetingId, ct);
         return ServiceResult<MeetingRsvpPreviewModel>.SuccessResult(new MeetingRsvpPreviewModel
         {
-            Meeting = meetingModel,
+            Meeting = summary,
             Status = participant.InviteStatus
         });
     }
@@ -455,47 +473,67 @@ public class MeetingService : IMeetingService
 
     // ----------------------------------------------------------------- Participants
 
+    /// <summary>The facts "who counts as family/student/district-admin for this student" — computed once
+    /// per logical operation (create, or an explicit participant replacement) and threaded through, instead
+    /// of each of <see cref="BuildDefaultParticipantInputsAsync"/>/<see cref="GetDefaultParticipantsAsync"/>/
+    /// <see cref="ReplaceParticipantsAsync"/> independently re-querying the identical rows (todos/071 #3).</summary>
+    private sealed class MembershipContext
+    {
+        public HashSet<int> FamilyUserIds { get; init; } = new();
+        public int? StudentAccountUserId { get; init; }
+        public HashSet<int> DistrictAdminUserIds { get; init; } = new();
+    }
+
+    private async Task<MembershipContext> LoadMembershipContextAsync(int studentId, CancellationToken ct)
+    {
+        var familyUserIds = await LoadFamilyUserIdsAsync(studentId, ct);
+        var studentAccountUserId = await _context.StudentProfiles.AsNoTracking()
+            .Where(sp => sp.SchoolStudentId == studentId)
+            .Select(sp => (int?)sp.UserId)
+            .FirstOrDefaultAsync(ct);
+        var districtAdminUserIds = await _context.StaffProfiles.AsNoTracking()
+            .Where(p => p.IsActive && p.OrgRoleId == OrgRoleIds.DistrictAdmin)
+            .Select(p => p.UserId)
+            .ToListAsync(ct);
+
+        return new MembershipContext
+        {
+            FamilyUserIds = familyUserIds.ToHashSet(),
+            StudentAccountUserId = studentAccountUserId,
+            DistrictAdminUserIds = districtAdminUserIds.ToHashSet()
+        };
+    }
+
     /// <summary>Default roster: active team members (their TeamRole), accepted family links (isFamily),
     /// the student's own account if one exists (isStudent). The creator is added separately by
     /// <see cref="ReplaceParticipantsAsync"/>. DistrictAdmins are excluded unless they are the creator.</summary>
-    private async Task<List<ParticipantInputModel>> BuildDefaultParticipantInputsAsync(int studentId, int creatorUserId, CancellationToken ct)
+    private async Task<List<ParticipantInputModel>> BuildDefaultParticipantInputsAsync(int studentId, int creatorUserId, MembershipContext membership, CancellationToken ct)
     {
         var teamMembers = await _context.StudentTeamMembers.AsNoTracking()
             .Where(m => m.SchoolStudentId == studentId && m.IsActive)
             .Select(m => new { m.UserId, m.TeamRole })
             .ToListAsync(ct);
 
-        var districtAdminUserIds = await _context.StaffProfiles.AsNoTracking()
-            .Where(p => p.IsActive && p.OrgRoleId == OrgRoleIds.DistrictAdmin)
-            .Select(p => p.UserId)
-            .ToListAsync(ct);
-        var districtAdminSet = districtAdminUserIds.ToHashSet();
-
         var byUserId = new Dictionary<int, ParticipantInputModel>();
         foreach (var m in teamMembers)
         {
-            if (districtAdminSet.Contains(m.UserId) && m.UserId != creatorUserId)
+            if (membership.DistrictAdminUserIds.Contains(m.UserId) && m.UserId != creatorUserId)
                 continue;
             byUserId[m.UserId] = new ParticipantInputModel { UserId = m.UserId, TeamRole = m.TeamRole, IsRequired = true };
         }
 
-        var familyUserIds = await LoadFamilyUserIdsAsync(studentId, ct);
-        foreach (var uid in familyUserIds)
+        foreach (var uid in membership.FamilyUserIds)
         {
-            if (districtAdminSet.Contains(uid) && uid != creatorUserId)
+            if (membership.DistrictAdminUserIds.Contains(uid) && uid != creatorUserId)
                 continue;
             if (!byUserId.ContainsKey(uid))
                 byUserId[uid] = new ParticipantInputModel { UserId = uid, TeamRole = TeamRole.Other, IsRequired = true };
         }
 
-        var studentAccountUserId = await _context.StudentProfiles.AsNoTracking()
-            .Where(sp => sp.SchoolStudentId == studentId)
-            .Select(sp => (int?)sp.UserId)
-            .FirstOrDefaultAsync(ct);
-        if (studentAccountUserId.HasValue && !byUserId.ContainsKey(studentAccountUserId.Value)
-            && !(districtAdminSet.Contains(studentAccountUserId.Value) && studentAccountUserId.Value != creatorUserId))
+        if (membership.StudentAccountUserId.HasValue && !byUserId.ContainsKey(membership.StudentAccountUserId.Value)
+            && !(membership.DistrictAdminUserIds.Contains(membership.StudentAccountUserId.Value) && membership.StudentAccountUserId.Value != creatorUserId))
         {
-            byUserId[studentAccountUserId.Value] = new ParticipantInputModel { UserId = studentAccountUserId.Value, TeamRole = TeamRole.Other, IsRequired = true };
+            byUserId[membership.StudentAccountUserId.Value] = new ParticipantInputModel { UserId = membership.StudentAccountUserId.Value, TeamRole = TeamRole.Other, IsRequired = true };
         }
 
         return byUserId.Values.ToList();
@@ -524,7 +562,7 @@ public class MeetingService : IMeetingService
     /// RsvpToken/InviteStatus/attendance; unmatched existing rows are removed; new rows get a fresh token.
     /// Returns a user-facing error, or null on success.
     /// </summary>
-    private async Task<string?> ReplaceParticipantsAsync(Meeting meeting, List<ParticipantInputModel> inputs, int studentId, int creatorUserId, CancellationToken ct)
+    private async Task<string?> ReplaceParticipantsAsync(Meeting meeting, List<ParticipantInputModel> inputs, MembershipContext membership, int creatorUserId, CancellationToken ct)
     {
         var normalized = new List<ParticipantInputModel>(inputs);
         if (!normalized.Any(i => i.UserId == creatorUserId))
@@ -534,16 +572,17 @@ public class MeetingService : IMeetingService
         {
             if (input.UserId == null && string.IsNullOrWhiteSpace(input.ExternalEmail))
                 return "Each participant must have either a user or an external email address.";
+            if (HasControlCharacters(input.ExternalName) || HasControlCharacters(input.ExternalEmail))
+                return "Participant contains invalid characters.";
+            if (!string.IsNullOrWhiteSpace(input.ExternalEmail) && !IsValidEmail(input.ExternalEmail))
+                return "Participant email address is invalid.";
         }
         var dupUserIds = normalized.Where(i => i.UserId != null).GroupBy(i => i.UserId!.Value).Where(g => g.Count() > 1);
         if (dupUserIds.Any())
             return "A participant was listed more than once.";
 
-        var familyUserIds = (await LoadFamilyUserIdsAsync(studentId, ct)).ToHashSet();
-        var studentAccountUserId = await _context.StudentProfiles.AsNoTracking()
-            .Where(sp => sp.SchoolStudentId == studentId)
-            .Select(sp => (int?)sp.UserId)
-            .FirstOrDefaultAsync(ct);
+        var familyUserIds = membership.FamilyUserIds;
+        var studentAccountUserId = membership.StudentAccountUserId;
 
         var existing = await _context.MeetingParticipants
             .Where(p => p.MeetingId == meeting.Id)
@@ -644,6 +683,60 @@ public class MeetingService : IMeetingService
         return MapMeeting(meeting, viewerUserId, canManage);
     }
 
+    /// <summary>Minimal, non-participant projection for the anonymous token RSVP endpoints — see
+    /// <see cref="MeetingSummaryModel"/> (todos/048).</summary>
+    private Task<MeetingSummaryModel> LoadMeetingSummaryAsync(int meetingId, CancellationToken ct) =>
+        _context.Meetings.AsNoTracking()
+            .Where(m => m.Id == meetingId)
+            .Select(m => new MeetingSummaryModel
+            {
+                Id = m.Id,
+                StudentFirstName = m.SchoolStudent.FirstName,
+                Type = m.Type,
+                Title = m.Title,
+                StartsAtUtc = m.StartsAtUtc,
+                TimeZoneId = m.TimeZoneId,
+                DurationMinutes = m.DurationMinutes,
+                Location = m.Location,
+                Status = m.Status
+            })
+            .FirstAsync(ct);
+
+    /// <summary>Maps a batch of already-loaded meetings (Participants.User + SchoolStudent included) to
+    /// <see cref="MeetingModel"/>s, resolving <c>CanManage</c> with the viewer's staff context fetched once
+    /// and the lead case manager for every distinct student batch-loaded in one query — instead of
+    /// <see cref="CanManageAsync"/>'s per-meeting <c>GetStaffContextAsync</c> + <c>SchoolStudents</c> lookup
+    /// (todos/050, todos/052).</summary>
+    private async Task<List<MeetingModel>> MapMeetingsAsync(List<Meeting> meetings, int viewerUserId, CancellationToken ct)
+    {
+        if (meetings.Count == 0)
+            return new List<MeetingModel>();
+
+        var staffCtx = await _orgAccess.GetStaffContextAsync(viewerUserId, ct);
+        var isAdmin = staffCtx != null && OrgRoleIds.IsAdmin(staffCtx.OrgRoleId);
+
+        var studentIds = meetings.Select(m => m.SchoolStudentId).Distinct().ToList();
+        var caseManagerByStudent = await _context.SchoolStudents.AsNoTracking()
+            .Where(s => studentIds.Contains(s.Id))
+            .Select(s => new { s.Id, s.CaseManagerUserId })
+            .ToDictionaryAsync(s => s.Id, s => s.CaseManagerUserId, ct);
+
+        var models = new List<MeetingModel>(meetings.Count);
+        foreach (var meeting in meetings)
+        {
+            bool canManage;
+            if (meeting.CreatedByUserId == viewerUserId)
+                canManage = true;
+            else if (isAdmin && await _orgAccess.CanActOnStudentAsync(viewerUserId, meeting.SchoolStudentId, AccessRole.Viewer, ct))
+                canManage = true;
+            else
+                canManage = caseManagerByStudent.TryGetValue(meeting.SchoolStudentId, out var leadId) && leadId.HasValue && leadId.Value == viewerUserId;
+
+            models.Add(MapMeeting(meeting, viewerUserId, canManage));
+        }
+        return models;
+    }
+
     private static MeetingModel MapMeeting(Meeting m, int viewerUserId, bool canManage) => new()
     {
         Id = m.Id,
@@ -699,4 +792,12 @@ public class MeetingService : IMeetingService
     }
 
     private static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    // ----------------------------------------------------------------- Input validation (todos/065)
+
+    private static readonly EmailAddressAttribute EmailValidator = new();
+
+    private static bool HasControlCharacters(string? value) => value != null && value.Any(char.IsControl);
+
+    private static bool IsValidEmail(string value) => EmailValidator.IsValid(value);
 }

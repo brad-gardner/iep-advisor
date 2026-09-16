@@ -63,6 +63,7 @@ public class ParticipantInputRequest
     public string? ExternalName { get; set; }
 
     [MaxLength(256)]
+    [EmailAddress]
     public string? ExternalEmail { get; set; }
 
     public TeamRole TeamRole { get; set; } = TeamRole.Other;
@@ -77,7 +78,7 @@ public class CreateMeetingRequest
     public string? Title { get; set; }
 
     [Required]
-    public DateTime StartsAtUtc { get; set; }
+    public DateTime? StartsAtUtc { get; set; }
 
     [MaxLength(64)]
     public string? TimeZoneId { get; set; }
@@ -175,8 +176,23 @@ public class AttendanceRequest
     public List<AttendanceItemRequest> Attendance { get; set; } = new();
 }
 
+/// <summary>Minimal, non-participant view of a meeting returned by the anonymous token RSVP endpoints
+/// (review-fix contract addition 1) — no participants, notes, or video URL.</summary>
+public class MeetingSummaryDto
+{
+    public int Id { get; set; }
+    public string StudentFirstName { get; set; } = string.Empty;
+    public MeetingType Type { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public DateTime StartsAtUtc { get; set; }
+    public string TimeZoneId { get; set; } = string.Empty;
+    public int DurationMinutes { get; set; }
+    public string? Location { get; set; }
+    public MeetingStatus Status { get; set; }
+}
+
 public class MeetingRsvpPreviewDto
 {
-    public MeetingDto Meeting { get; set; } = null!;
+    public MeetingSummaryDto Meeting { get; set; } = null!;
     public InviteStatus Status { get; set; }
 }

@@ -19,6 +19,16 @@ public class NotificationEmailService : INotificationEmailService
     public const int MaxAttempts = 3;
     private const int MaxErrorLength = 500;
 
+    /// <summary>Caps FindQueuedIdsAsync so a burst (bulk reschedule, ACS outage, mass meeting creation)
+    /// is bounded, predictable work per 30s cycle rather than draining the entire queue in one pass
+    /// (todos/068).</summary>
+    private const int BatchSize = 200;
+
+    /// <summary>Backoff after attempt 1/2/3 respectively (index = attempts-1, clamped) — spreads the 3
+    /// allowed attempts over up to ~36 minutes instead of ~90 seconds of fixed 30s-tick retries, so a
+    /// transient outage doesn't burn through every attempt before it clears (todos/068).</summary>
+    private static readonly TimeSpan[] RetryBackoffs = { TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(30) };
+
     private readonly ApplicationDbContext _context;
     private readonly IEmailService _emailService;
     private readonly IIcsBuilder _icsBuilder;
@@ -41,9 +51,12 @@ public class NotificationEmailService : INotificationEmailService
 
     public async Task<IReadOnlyList<int>> FindQueuedIdsAsync(CancellationToken ct = default)
     {
+        var now = DateTime.UtcNow;
         return await _context.Notifications.AsNoTracking()
-            .Where(n => n.EmailQueuedAt != null && n.EmailSentAt == null && n.EmailAttempts < MaxAttempts)
+            .Where(n => n.EmailQueuedAt != null && n.EmailSentAt == null && n.EmailAttempts < MaxAttempts
+                     && (n.NextAttemptAt == null || n.NextAttemptAt <= now))
             .OrderBy(n => n.EmailQueuedAt)
+            .Take(BatchSize)
             .Select(n => n.Id)
             .ToListAsync(ct);
     }
@@ -65,6 +78,7 @@ public class NotificationEmailService : INotificationEmailService
         {
             notification.EmailAttempts++;
             notification.EmailError = Truncate("Recipient has no email on file.");
+            notification.NextAttemptAt = ComputeNextAttemptAt(notification.EmailAttempts);
             await _context.SaveChangesAsync(ct);
             return;
         }
@@ -79,15 +93,24 @@ public class NotificationEmailService : INotificationEmailService
 
             notification.EmailSentAt = DateTime.UtcNow;
             notification.EmailError = null;
+            notification.NextAttemptAt = null;
         }
         catch (Exception ex)
         {
             notification.EmailAttempts++;
             notification.EmailError = Truncate(ex.Message);
+            notification.NextAttemptAt = ComputeNextAttemptAt(notification.EmailAttempts);
             _logger.LogError(ex, "Failed to send notification email {NotificationId} (attempt {Attempt})", notification.Id, notification.EmailAttempts);
         }
 
         await _context.SaveChangesAsync(ct);
+    }
+
+    /// <summary>1 min after attempt 1, 5 min after attempt 2, 30 min after attempt 3+ (todos/068).</summary>
+    private static DateTime ComputeNextAttemptAt(int attemptsSoFar)
+    {
+        var index = Math.Clamp(attemptsSoFar - 1, 0, RetryBackoffs.Length - 1);
+        return DateTime.UtcNow + RetryBackoffs[index];
     }
 
     /// <summary>Resolves the meeting id from <see cref="Notification.LinkPath"/> (of the form
@@ -100,61 +123,39 @@ public class NotificationEmailService : INotificationEmailService
             return false;
 
         var meeting = await _context.Meetings.AsNoTracking()
-            .Where(m => m.Id == meetingId.Value)
-            .Select(m => new
-            {
-                m.Id,
-                m.Title,
-                m.StartsAtUtc,
-                m.TimeZoneId,
-                m.DurationMinutes,
-                m.Location,
-                m.VideoUrl,
-                m.Status,
-                StudentFirstName = m.SchoolStudent.FirstName,
-                OrganizerName = m.CreatedByUser != null ? (m.CreatedByUser.FirstName + " " + m.CreatedByUser.LastName).Trim() : "Your school team",
-                OrganizerEmail = m.CreatedByUser != null ? m.CreatedByUser.Email : null
-            })
-            .FirstOrDefaultAsync(ct);
+            .Include(m => m.Participants).ThenInclude(p => p.User)
+            .Include(m => m.SchoolStudent)
+            .Include(m => m.CreatedByUser)
+            .FirstOrDefaultAsync(m => m.Id == meetingId.Value, ct);
         if (meeting == null)
             return false;
 
-        var participant = await _context.MeetingParticipants.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.MeetingId == meetingId.Value && p.UserId == notification.UserId, ct);
+        var participant = meeting.Participants.FirstOrDefault(p => p.UserId == notification.UserId);
         if (participant == null)
             return false;
 
         var frontendUrl = FrontendUrl();
+        var organizerName = meeting.CreatedByUser != null
+            ? $"{meeting.CreatedByUser.FirstName} {meeting.CreatedByUser.LastName}".Trim()
+            : "Your school team";
         var model = new MeetingEmailModel
         {
-            StudentFirstName = meeting.StudentFirstName,
+            StudentFirstName = meeting.SchoolStudent.FirstName,
             Title = meeting.Title,
             StartsAtUtc = meeting.StartsAtUtc,
             TimeZoneId = meeting.TimeZoneId,
             DurationMinutes = meeting.DurationMinutes,
             Location = meeting.Location,
             VideoUrl = meeting.VideoUrl,
-            OrganizerName = meeting.OrganizerName,
+            OrganizerName = organizerName,
             RsvpAcceptUrl = $"{frontendUrl}/meetings/rsvp?token={participant.RsvpToken}&status=Accepted",
             RsvpDeclineUrl = $"{frontendUrl}/meetings/rsvp?token={participant.RsvpToken}&status=Declined",
             DetailUrl = $"{frontendUrl}/meetings/{meeting.Id}"
         };
 
-        var icsInput = new IcsMeetingInput
-        {
-            MeetingId = meeting.Id,
-            Title = meeting.Title,
-            StartsAtUtc = meeting.StartsAtUtc,
-            TimeZoneId = meeting.TimeZoneId,
-            DurationMinutes = meeting.DurationMinutes,
-            Location = meeting.Location,
-            VideoUrl = meeting.VideoUrl,
-            Sequence = 0, // Sequence is not needed on this best-effort re-render for email; the authoritative
-                          // .ics (with the real SEQUENCE) is available via GET /api/meetings/{id}.ics.
-            IsCancelled = meeting.Status == MeetingStatus.Cancelled,
-            OrganizerName = meeting.OrganizerName,
-            OrganizerEmail = meeting.OrganizerEmail ?? recipientEmail
-        };
+        // Shared with CalendarService's authoritative GET /api/meetings/{id}.ics mapping (todos/051,
+        // todos/064) so this best-effort emailed .ics carries the real (possibly bumped) Sequence.
+        var icsInput = IcsMeetingInputMapper.Map(meeting);
         var ics = _icsBuilder.BuildMeetingEvent(icsInput, meeting.Status == MeetingStatus.Cancelled ? "CANCEL" : "REQUEST");
 
         switch (notification.Kind)

@@ -104,6 +104,15 @@ export function ScheduleMeetingForm({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+    if (rows === null) {
+      // Belt-and-suspenders: the submit button is disabled while the pool is
+      // still loading, but a keyboard Enter inside a text field submits the
+      // form directly without going through the (disabled) button, so this
+      // guards against ever sending an explicit `participants: []` that the
+      // server would take literally instead of computing its own defaults.
+      setError('The participant list is still loading — try again in a moment.');
+      return;
+    }
     if (!date || !time) {
       setError('Choose a date and time for the meeting');
       return;
@@ -111,9 +120,7 @@ export function ScheduleMeetingForm({
     setSubmitting(true);
     try {
       const startsAtUtc = zonedDateTimeToUtcIso(date, time, timeZoneId);
-      const participants: ParticipantInput[] = (rows ?? [])
-        .filter((r) => r.checked)
-        .map(rowToParticipantInput);
+      const participants: ParticipantInput[] = rows.filter((r) => r.checked).map(rowToParticipantInput);
       const payload = {
         type,
         title: title.trim() || undefined,
@@ -259,7 +266,12 @@ export function ScheduleMeetingForm({
         <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>
           Cancel
         </Button>
-        <Button type="submit" loading={submitting} data-testid="schedule-meeting-submit">
+        <Button
+          type="submit"
+          loading={submitting}
+          disabled={rows === null}
+          data-testid="schedule-meeting-submit"
+        >
           {meeting ? 'Save changes' : 'Schedule meeting'}
         </Button>
       </div>

@@ -13,13 +13,16 @@ const notificationsApi = vi.hoisted(() => ({
 }));
 vi.mock('../api/notifications-api', () => notificationsApi);
 
+import { NotificationsProvider } from '../stores/notifications-context';
 import { NotificationsPage } from './notifications-page';
 
 function renderPage() {
   return render(
     <ToastProvider>
       <MemoryRouter>
-        <NotificationsPage />
+        <NotificationsProvider>
+          <NotificationsPage />
+        </NotificationsProvider>
       </MemoryRouter>
     </ToastProvider>
   );
@@ -77,6 +80,22 @@ describe('NotificationsPage', () => {
     await waitFor(() => expect(screen.getByTestId('notification-1')).not.toHaveTextContent('New'));
   });
 
+  it('refreshes the shared unread count after marking a notification read', async () => {
+    const user = userEvent.setup();
+    notificationsApi.markNotificationRead.mockResolvedValue({ success: true, data: null });
+    renderPage();
+    await screen.findByTestId('notification-1');
+    // The provider's own initial poll, plus the page's own list load.
+    const callsBeforeClick = notificationsApi.listNotifications.mock.calls.length;
+
+    await user.click(screen.getByTestId('notification-1'));
+    await waitFor(() => expect(notificationsApi.markNotificationRead).toHaveBeenCalledWith(1));
+    // `refresh()` fires an extra unread-count fetch beyond the initial poll/load.
+    await waitFor(() =>
+      expect(notificationsApi.listNotifications.mock.calls.length).toBeGreaterThan(callsBeforeClick)
+    );
+  });
+
   it('marks all as read', async () => {
     const user = userEvent.setup();
     notificationsApi.markAllNotificationsRead.mockResolvedValue({ success: true, data: { marked: 1 } });
@@ -94,9 +113,16 @@ describe('NotificationsPage', () => {
     expect(await screen.findByText('No notifications yet')).toBeInTheDocument();
   });
 
-  it('surfaces a load failure as an inline alert', async () => {
-    notificationsApi.listNotifications.mockRejectedValue(apiRejection('Could not load notifications'));
+  it('surfaces a load failure as an inline alert with a retry affordance', async () => {
+    notificationsApi.listNotifications.mockRejectedValueOnce(apiRejection('Could not load notifications'));
     renderPage();
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load notifications');
+
+    const user = userEvent.setup();
+    notificationsApi.listNotifications.mockResolvedValue({ success: true, data: { items, unreadCount: 1 } });
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+
+    await screen.findByTestId('notification-1');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

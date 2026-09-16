@@ -33,11 +33,11 @@ export function CalendarAgendaList({ items, onSelectMeeting }: CalendarAgendaLis
 
   return (
     <ul className="divide-y divide-brand-slate-100 rounded-card border border-brand-slate-200" data-testid="calendar-agenda-list">
-      {sorted.map((item, index) => {
+      {sorted.map((item) => {
         if (item.kind === 'Meeting' && item.meeting) {
           const meeting = item.meeting;
           return (
-            <li key={`meeting-${meeting.id}-${index}`}>
+            <li key={`meeting-${meeting.id}`}>
               <button
                 type="button"
                 onClick={() => onSelectMeeting(meeting)}
@@ -61,7 +61,7 @@ export function CalendarAgendaList({ items, onSelectMeeting }: CalendarAgendaLis
         if (item.kind === 'Obligation' && item.obligation) {
           const obligation = item.obligation;
           return (
-            <li key={`obligation-${obligation.schoolStudentId}-${obligation.kind}-${index}`}>
+            <li key={`obligation-${obligation.schoolStudentId}-${obligation.kind}`}>
               <Link
                 to={`/educator/students/${obligation.schoolStudentId}`}
                 className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-brand-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-teal-400"

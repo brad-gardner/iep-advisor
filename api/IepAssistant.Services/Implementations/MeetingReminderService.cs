@@ -34,27 +34,41 @@ public class MeetingReminderService : IMeetingReminderService
             .Where(m => m.Status == MeetingStatus.Scheduled && m.StartsAtUtc > utcNow && m.StartsAtUtc <= utcNow.AddDays(7))
             .Select(m => new { m.Id, m.Title, m.StartsAtUtc, StudentName = m.SchoolStudent.FirstName + " " + m.SchoolStudent.LastName })
             .ToListAsync(ct);
+        if (candidates.Count == 0)
+            return;
+
+        var meetingIds = candidates.Select(m => m.Id).ToList();
+
+        // One batched query for every candidate meeting's participants, and one for every reminder already
+        // sent for those meetings — instead of re-querying both per (meeting, offset) on every 15-minute
+        // tick, which re-does the same work for offsets that are already fully sent (todos/069).
+        var participantsByMeeting = (await _context.MeetingParticipants.AsNoTracking()
+                .Where(p => meetingIds.Contains(p.MeetingId) && p.UserId != null)
+                .Select(p => new { p.MeetingId, UserId = p.UserId!.Value })
+                .Distinct()
+                .ToListAsync(ct))
+            .GroupBy(p => p.MeetingId)
+            .ToDictionary(g => g.Key, g => g.Select(p => p.UserId).ToList());
+
+        var sentByMeetingOffset = (await _context.MeetingReminders.AsNoTracking()
+                .Where(r => meetingIds.Contains(r.MeetingId))
+                .Select(r => new { r.MeetingId, r.Offset, r.UserId })
+                .ToListAsync(ct))
+            .GroupBy(r => (r.MeetingId, r.Offset))
+            .ToDictionary(g => g.Key, g => g.Select(r => r.UserId).ToHashSet());
 
         foreach (var meeting in candidates)
         {
+            if (!participantsByMeeting.TryGetValue(meeting.Id, out var participantUserIds) || participantUserIds.Count == 0)
+                continue;
+
             foreach (var (offset, span) in OffsetSpans)
             {
                 if (utcNow < meeting.StartsAtUtc - span)
                     continue; // this offset's window hasn't opened yet
 
-                var participantUserIds = await _context.MeetingParticipants.AsNoTracking()
-                    .Where(p => p.MeetingId == meeting.Id && p.UserId != null)
-                    .Select(p => p.UserId!.Value)
-                    .Distinct()
-                    .ToListAsync(ct);
-                if (participantUserIds.Count == 0)
-                    continue;
-
-                var alreadySent = await _context.MeetingReminders.AsNoTracking()
-                    .Where(r => r.MeetingId == meeting.Id && r.Offset == offset && participantUserIds.Contains(r.UserId))
-                    .Select(r => r.UserId)
-                    .ToListAsync(ct);
-                var pending = participantUserIds.Except(alreadySent).ToList();
+                var sent = sentByMeetingOffset.TryGetValue((meeting.Id, offset), out var s) ? s : new HashSet<int>();
+                var pending = participantUserIds.Where(id => !sent.Contains(id)).ToList();
 
                 foreach (var userId in pending)
                     await SendOneReminderAsync(meeting.Id, meeting.Title, meeting.StudentName, userId, offset, utcNow, ct);
@@ -70,7 +84,7 @@ public class MeetingReminderService : IMeetingReminderService
         {
             await _context.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (IsReminderUniqueIndexCollision(ex))
         {
             // Unique-index collision: another pass (or a concurrent instance) already claimed this
             // (meeting, user, offset) — the idempotency guard doing its job. Detach and move on.
@@ -90,4 +104,11 @@ public class MeetingReminderService : IMeetingReminderService
             _logger.LogError(ex, "Failed to queue reminder notification for meeting {MeetingId}, user {UserId}, offset {Offset}", meetingId, userId, offset);
         }
     }
+
+    /// <summary>True when the failure is genuinely the (MeetingId, UserId, Offset) unique-index collision
+    /// this idempotency guard expects — mirrors <c>EducatorService.IsExternalIdCollision</c>. Any other
+    /// <see cref="DbUpdateException"/> (a transient connection failure, an FK violation, etc.) must not be
+    /// silently treated as "already sent" (todos/053).</summary>
+    internal static bool IsReminderUniqueIndexCollision(DbUpdateException ex)
+        => ex.InnerException?.Message.Contains("IX_MeetingReminders_MeetingId_UserId_Offset", StringComparison.OrdinalIgnoreCase) == true;
 }

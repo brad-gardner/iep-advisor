@@ -43,6 +43,25 @@ public class ObligationService : IObligationService
         return ServiceResult<List<ObligationModel>>.SuccessResult(ComputeAndFilter(students, status));
     }
 
+    public async Task<ServiceResult<List<ObligationModel>>> GetLeadOnlyAsync(int userId, CancellationToken ct = default)
+    {
+        var students = await LoadLeadStudentsAsync(userId, ct);
+        return ServiceResult<List<ObligationModel>>.SuccessResult(ComputeAndFilter(students, null));
+    }
+
+    public async Task<ServiceResult<List<ObligationModel>>> GetForLeadUsersAsync(IEnumerable<int> userIds, CancellationToken ct = default)
+    {
+        var idList = userIds.Distinct().ToList();
+        if (idList.Count == 0)
+            return ServiceResult<List<ObligationModel>>.SuccessResult(new List<ObligationModel>());
+
+        var students = await ProjectContext(_context.SchoolStudents.AsNoTracking()
+                .Where(s => s.CaseManagerUserId != null && idList.Contains(s.CaseManagerUserId.Value) && s.Status == StudentStatus.Active))
+            .ToListAsync(ct);
+
+        return ServiceResult<List<ObligationModel>>.SuccessResult(ComputeAndFilter(students, null));
+    }
+
     public async Task<ServiceResult<List<ObligationModel>>> GetForScopeAsync(int userId, int? schoolId, ObligationStatus? status, CancellationToken ct = default)
     {
         var staffCtx = await _orgAccess.GetStaffContextAsync(userId, ct);

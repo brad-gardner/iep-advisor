@@ -39,7 +39,7 @@ public class MeetingsController : ControllerBase
         {
             Type = request.Type,
             Title = request.Title,
-            StartsAtUtc = request.StartsAtUtc,
+            StartsAtUtc = request.StartsAtUtc!.Value,
             TimeZoneId = request.TimeZoneId,
             DurationMinutes = request.DurationMinutes,
             Location = request.Location,
@@ -304,9 +304,22 @@ public class MeetingsController : ControllerBase
         IsStudent = p.IsStudent
     };
 
+    private static MeetingSummaryDto MapMeetingSummary(MeetingSummaryModel m) => new()
+    {
+        Id = m.Id,
+        StudentFirstName = m.StudentFirstName,
+        Type = m.Type,
+        Title = m.Title,
+        StartsAtUtc = m.StartsAtUtc,
+        TimeZoneId = m.TimeZoneId,
+        DurationMinutes = m.DurationMinutes,
+        Location = m.Location,
+        Status = m.Status
+    };
+
     private static MeetingRsvpPreviewDto MapRsvpPreview(MeetingRsvpPreviewModel m) => new()
     {
-        Meeting = MapMeeting(m.Meeting),
+        Meeting = MapMeetingSummary(m.Meeting),
         Status = m.Status
     };
 

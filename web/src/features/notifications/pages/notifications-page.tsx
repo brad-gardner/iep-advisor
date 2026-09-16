@@ -12,13 +12,21 @@ import { useToast } from '@/components/ui/toast';
 import { apiErrorMessage } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
 import { listNotifications, markAllNotificationsRead, markNotificationRead } from '../api/notifications-api';
+import { useNotificationsContext } from '../hooks/use-notifications-context';
 import type { NotificationDto } from '../types';
 
 export function NotificationsPage() {
   const { show: showToast } = useToast();
+  // The sidebar bell shares this same count (see `NotificationsProvider`) —
+  // refreshed below after a successful mark-read/mark-all so the badge in
+  // this same viewport updates immediately instead of waiting for the next
+  // 60s poll tick.
+  const { refresh: refreshUnreadCount } = useNotificationsContext();
   const [items, setItems] = useState<NotificationDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+  // Bumped by the "Try again" button to re-run the load effect below.
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -26,8 +34,12 @@ export function NotificationsPage() {
       try {
         const response = await listNotifications({ limit: 100 });
         if (!active) return;
-        if (response.success && response.data) setItems(response.data.items);
-        else setError(response.message ?? 'Could not load notifications');
+        if (response.success && response.data) {
+          setItems(response.data.items);
+          setError(null);
+        } else {
+          setError(response.message ?? 'Could not load notifications');
+        }
       } catch (err) {
         if (active) setError(apiErrorMessage(err, 'Could not load notifications'));
       }
@@ -35,7 +47,7 @@ export function NotificationsPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [retryToken]);
 
   const handleMarkRead = async (notification: NotificationDto) => {
     if (notification.readAt) return;
@@ -45,6 +57,7 @@ export function NotificationsPage() {
         (prev) =>
           prev?.map((n) => (n.id === notification.id ? { ...n, readAt: new Date().toISOString() } : n)) ?? prev
       );
+      refreshUnreadCount();
     } catch (err) {
       showToast({ message: apiErrorMessage(err, 'Could not mark as read'), variant: 'error' });
     }
@@ -57,6 +70,7 @@ export function NotificationsPage() {
       if (response.success) {
         setItems((prev) => prev?.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })) ?? prev);
         showToast({ message: 'All notifications marked read', variant: 'success' });
+        refreshUnreadCount();
       } else {
         showToast({ message: response.message ?? 'Could not mark all as read', variant: 'error' });
       }
@@ -87,7 +101,11 @@ export function NotificationsPage() {
     >
       {error && (
         <div role="alert">
-          <Notice variant="error" title={error} />
+          <Notice variant="error" title={error}>
+            <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
+              Try again
+            </Button>
+          </Notice>
         </div>
       )}
 

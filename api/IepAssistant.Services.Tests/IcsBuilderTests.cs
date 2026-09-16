@@ -159,6 +159,73 @@ public class IcsBuilderTests
         Assert.StartsWith(" ", lines[summaryLineIndex + 1]);
     }
 
+    // ----------------------------------------------------------------- VTIMEZONE (todos/044)
+
+    [Fact]
+    public void BuildMeetingEvent_AmericaNewYork_EmitsSecondSundayMarchAndFirstSundayNovemberByDay()
+    {
+        var input = Meeting();
+        input.TimeZoneId = "America/New_York";
+        var ics = Unfold(Text(_builder.BuildMeetingEvent(input, "REQUEST")));
+
+        Assert.Contains("BEGIN:DAYLIGHT", ics);
+        Assert.Contains("RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU", ics);
+        Assert.Contains("BEGIN:STANDARD", ics);
+        Assert.Contains("RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU", ics);
+    }
+
+    [Fact]
+    public void BuildMeetingEvent_EuropeLondon_EmitsLastSundayMarchAndLastSundayOctoberByDay()
+    {
+        var input = Meeting();
+        input.TimeZoneId = "Europe/London";
+        var ics = Unfold(Text(_builder.BuildMeetingEvent(input, "REQUEST")));
+
+        Assert.Contains("RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU", ics);
+        Assert.Contains("RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU", ics);
+    }
+
+    [Fact]
+    public void BuildMeetingEvent_AmericaPhoenix_NoDstZone_EmitsStandardOnly()
+    {
+        // Phoenix's TimeZoneInfo reports SupportsDaylightSavingTime=true because it observed DST until
+        // 1967, but it observes none today — the stale historical rule must not produce a bogus
+        // DAYLIGHT/STANDARD pair (todos/044).
+        var input = Meeting();
+        input.TimeZoneId = "America/Phoenix";
+        var ics = Text(_builder.BuildMeetingEvent(input, "REQUEST"));
+
+        Assert.Contains("BEGIN:STANDARD", ics);
+        Assert.DoesNotContain("BEGIN:DAYLIGHT", ics);
+        Assert.DoesNotContain("RRULE", ics);
+    }
+
+    [Fact]
+    public void BuildMeetingEvent_StandardTransition_DtStartIsCleanTwoAM_NotOneFiftyNine()
+    {
+        // tzdata-derived rules on non-Windows runtimes can carry the "fall back" transition's TimeOfDay as
+        // 01:59:59.999 rather than a clean 02:00:00; the rendered DTSTART must not show that artifact.
+        var input = Meeting();
+        input.TimeZoneId = "America/New_York";
+        var ics = Unfold(Text(_builder.BuildMeetingEvent(input, "REQUEST")));
+
+        var standardBlockStart = ics.IndexOf("BEGIN:STANDARD", StringComparison.Ordinal);
+        var standardDtStartLine = ics.Substring(standardBlockStart).Split("\r\n").Single(l => l.StartsWith("DTSTART:"));
+        Assert.EndsWith("T020000", standardDtStartLine);
+    }
+
+    [Fact]
+    public void BuildMeetingEvent_TitleWithBareCarriageReturn_IsEscaped()
+    {
+        var input = Meeting(title: "Line one\rLine two");
+        var ics = Unfold(Text(_builder.BuildMeetingEvent(input, "REQUEST")));
+
+        Assert.Contains("SUMMARY:Line one\\nLine two", ics);
+        // No raw CR left unescaped in the rendered content.
+        var summaryLine = ics.Split("\r\n").Single(l => l.StartsWith("SUMMARY:"));
+        Assert.DoesNotContain("\r", summaryLine);
+    }
+
     [Fact]
     public void BuildFeed_ContainsAllDayObligationAndTimedMeetingEvents()
     {

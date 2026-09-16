@@ -27,7 +27,8 @@ public class NotificationConfiguration : IEntityTypeConfiguration<Notification>
         builder.HasIndex(n => new { n.UserId, n.ReadAt });
         // Required by deliverable A: NotifyAsync's 24h dedup lookup.
         builder.HasIndex(n => new { n.UserId, n.Kind, n.DedupKey, n.CreatedAt });
-        // Additive: NotificationEmailWorker's drain query filters on exactly these three columns.
-        builder.HasIndex(n => new { n.EmailQueuedAt, n.EmailSentAt, n.EmailAttempts });
+        // Additive: NotificationEmailWorker's drain query filters on exactly these four columns
+        // (NextAttemptAt added for the backoff gate — todos/068).
+        builder.HasIndex(n => new { n.EmailQueuedAt, n.EmailSentAt, n.EmailAttempts, n.NextAttemptAt });
     }
 }

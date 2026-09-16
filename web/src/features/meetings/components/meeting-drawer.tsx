@@ -177,13 +177,33 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
                 </div>
               )}
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => handleRsvp('Accepted')} loading={rsvpSaving === 'Accepted'} data-testid="meeting-rsvp-accept">
+                <Button
+                  size="sm"
+                  onClick={() => handleRsvp('Accepted')}
+                  loading={rsvpSaving === 'Accepted'}
+                  disabled={rsvpSaving !== null}
+                  data-testid="meeting-rsvp-accept"
+                >
                   Accept
                 </Button>
-                <Button size="sm" variant="secondary" onClick={() => handleRsvp('Tentative')} loading={rsvpSaving === 'Tentative'} data-testid="meeting-rsvp-tentative">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleRsvp('Tentative')}
+                  loading={rsvpSaving === 'Tentative'}
+                  disabled={rsvpSaving !== null}
+                  data-testid="meeting-rsvp-tentative"
+                >
                   Tentative
                 </Button>
-                <Button size="sm" variant="danger" onClick={() => handleRsvp('Declined')} loading={rsvpSaving === 'Declined'} data-testid="meeting-rsvp-decline">
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => handleRsvp('Declined')}
+                  loading={rsvpSaving === 'Declined'}
+                  disabled={rsvpSaving !== null}
+                  data-testid="meeting-rsvp-decline"
+                >
                   Decline
                 </Button>
               </div>

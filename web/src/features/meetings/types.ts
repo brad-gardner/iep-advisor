@@ -156,8 +156,26 @@ export interface AttendanceRequest {
   attendance: AttendanceEntry[];
 }
 
+/**
+ * The minimal meeting summary returned by the anonymous token-RSVP endpoints
+ * (`GET/POST /api/meetings/rsvp`) — deliberately narrower than `MeetingDto`:
+ * no participants, notes, or video URL, since the invitee isn't authenticated
+ * and shouldn't see other people's data. See plan4-fix-contract.md item 1.
+ */
+export interface MeetingSummaryDto {
+  id: number;
+  studentFirstName: string;
+  type: MeetingType;
+  title: string;
+  startsAtUtc: string;
+  timeZoneId: string;
+  durationMinutes: number;
+  location: string | null;
+  status: MeetingStatus;
+}
+
 export interface TokenRsvpResult {
-  meeting: MeetingDto;
+  meeting: MeetingSummaryDto;
   status: InviteStatus;
 }
 

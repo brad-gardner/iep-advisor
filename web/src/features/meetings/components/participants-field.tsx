@@ -80,6 +80,11 @@ function ParticipantRowItem({
  * external guest by name/email. The parent owns the row state so it can be
  * merged with an existing meeting's participants on reschedule.
  */
+// Deliberately permissive (shape only, not full RFC 5322) — good enough to
+// catch a plain typo before it silently becomes an invite nobody receives;
+// the server still validates for real (plan4-fix-contract.md item 3).
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function ParticipantsField({
   rows,
   onToggle,
@@ -89,11 +94,17 @@ export function ParticipantsField({
 }: ParticipantsFieldProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const canAdd = name.trim() !== '' || email.trim() !== '';
+  const trimmedEmail = email.trim();
+  // An external guest can only ever be reached (and invited) by email, so —
+  // unlike the pool's real-user rows — a valid email is required, not just
+  // "some text in one of the two fields."
+  const emailInvalid = trimmedEmail !== '' && !EMAIL_PATTERN.test(trimmedEmail);
+  const canAdd = trimmedEmail !== '' && !emailInvalid;
+  const emailErrorId = 'external-participant-email-error';
 
   const handleAdd = () => {
     if (!canAdd) return;
-    onAddExternal({ name: name.trim(), email: email.trim() });
+    onAddExternal({ name: name.trim(), email: trimmedEmail });
     setName('');
     setEmail('');
   };
@@ -127,7 +138,7 @@ export function ParticipantsField({
         )}
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
         <Input
           id="external-participant-name"
           label="External participant name"
@@ -135,14 +146,23 @@ export function ParticipantsField({
           onChange={(e) => setName(e.target.value)}
           placeholder="Optional"
         />
-        <Input
-          id="external-participant-email"
-          label="Email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="name@example.com"
-        />
+        <div className="flex-1">
+          <Input
+            id="external-participant-email"
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="name@example.com"
+            aria-invalid={emailInvalid || undefined}
+            aria-describedby={emailInvalid ? emailErrorId : undefined}
+          />
+          {emailInvalid && (
+            <p id={emailErrorId} className="mt-1 text-xs text-brand-danger-600">
+              Enter a valid email address
+            </p>
+          )}
+        </div>
         <Button
           type="button"
           variant="secondary"
