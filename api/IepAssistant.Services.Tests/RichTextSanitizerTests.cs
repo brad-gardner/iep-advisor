@@ -233,6 +233,9 @@ public sealed class RichTextSanitizerTests
     [InlineData(@"[x](javascript:alert(1) ""ti(tle"")", "javascript:")]
     [InlineData(@"[x](javascript:alert(1) 'ti)tle')", "javascript:")]
     [InlineData(@"![x](javascript:alert(1) ""t(t"")", "javascript:")]
+    [InlineData("[x](javascript:alert(1) \"a\nb\")", "javascript:")]
+    [InlineData("[x](javascript:alert(1)\n\"t\")", "javascript:")]
+    [InlineData("[x](javascript:alert(1)\r\n  't')", "javascript:")]
     public void Sanitize_MarkdownLink_UnsafeScheme_WithBackslashEscapes_IsNeutralized(string input, string forbidden)
     {
         var result = RichTextSanitizer.Sanitize(input);
@@ -244,12 +247,23 @@ public sealed class RichTextSanitizerTests
     [Theory]
     [InlineData("[la\\]bel]: javascript:alert(1)\n\n[x][la\\]bel]")]
     [InlineData("[r]: javascript:a\\(b\n\n[x][r]")]
+    [InlineData("[r]: javascript:alert(1) \"a\nb\"\n\n[x][r]")]
     public void Sanitize_ReferenceDefinition_UnsafeScheme_WithBackslashEscapes_IsRemoved(string input)
     {
         var result = RichTextSanitizer.Sanitize(input);
 
         Assert.DoesNotContain("javascript:", result);
         Assert.Contains("[x]", result);
+    }
+
+    [Fact]
+    public void Sanitize_MarkdownLink_UnsafeScheme_TitleInterruptedByBlankLine_IsNotALinkAndIsLeftAlone()
+    {
+        // Markdig does not resolve a title across a blank line, so this is not a link; the text is
+        // left as-is and the sanitizer must not throw or loop.
+        var input = "[x](javascript:alert(1) \"a\n\nb\")";
+
+        Assert.Equal(input, RichTextSanitizer.Sanitize(input));
     }
 
     [Fact]

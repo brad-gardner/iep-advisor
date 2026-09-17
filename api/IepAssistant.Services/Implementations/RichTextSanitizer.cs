@@ -151,8 +151,10 @@ public static class RichTextSanitizer
     /// any depth resolves the same destination Markdig itself would resolve (reviewer pass2 P2). A safe
     /// destination's whole matched span is preserved byte-for-byte; an unsafe one collapses to its plain
     /// link text.</summary>
-    /// <summary>Index of the quote that closes the one at <paramref name="openIndex"/> on the same
-    /// line, skipping backslash-escaped characters; -1 when the line ends first.</summary>
+    /// <summary>Index of the quote that closes the one at <paramref name="openIndex"/>, skipping
+    /// backslash-escaped characters. CommonMark lets a title span lines (Markdig 1.3.2 resolves
+    /// <c>"a\nb"</c> as a title) but not a blank line, so the search continues across a single line
+    /// ending and returns -1 at a blank line or end of input.</summary>
     private static int FindClosingQuote(string s, int openIndex)
     {
         var quote = s[openIndex];
@@ -160,7 +162,18 @@ public static class RichTextSanitizer
         {
             var c = s[i];
             if (c is '\n' or '\r')
-                return -1;
+            {
+                // Consume this line ending, then any inline whitespace; another line ending = blank line.
+                var j = i + 1;
+                if (c == '\r' && j < s.Length && s[j] == '\n')
+                    j++;
+                while (j < s.Length && (s[j] == ' ' || s[j] == '\t'))
+                    j++;
+                if (j >= s.Length || s[j] is '\n' or '\r')
+                    return -1;
+                i = j - 1;
+                continue;
+            }
             if (c == '\\')
             {
                 i++;
@@ -196,7 +209,21 @@ public static class RichTextSanitizer
             {
                 var c = s[cursor];
                 if (c is '\n' or '\r')
+                {
+                    // CommonMark allows one line ending between the destination and a title
+                    // (Markdig resolves `[x](url\n"t")` as a link); anything else ends the scan.
+                    var j = cursor + 1;
+                    if (c == '\r' && j < s.Length && s[j] == '\n')
+                        j++;
+                    while (j < s.Length && (s[j] == ' ' || s[j] == '\t'))
+                        j++;
+                    if (j < s.Length && s[j] is '"' or '\'')
+                    {
+                        cursor = j;
+                        continue;
+                    }
                     break;
+                }
                 if (c == '\\' && cursor + 1 < s.Length && s[cursor + 1] is not ('\n' or '\r'))
                 {
                     cursor += 2; // an escaped character never opens or closes the destination
