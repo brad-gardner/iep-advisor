@@ -151,6 +151,27 @@ public static class RichTextSanitizer
     /// any depth resolves the same destination Markdig itself would resolve (reviewer pass2 P2). A safe
     /// destination's whole matched span is preserved byte-for-byte; an unsafe one collapses to its plain
     /// link text.</summary>
+    /// <summary>Index of the quote that closes the one at <paramref name="openIndex"/> on the same
+    /// line, skipping backslash-escaped characters; -1 when the line ends first.</summary>
+    private static int FindClosingQuote(string s, int openIndex)
+    {
+        var quote = s[openIndex];
+        for (var i = openIndex + 1; i < s.Length; i++)
+        {
+            var c = s[i];
+            if (c is '\n' or '\r')
+                return -1;
+            if (c == '\\')
+            {
+                i++;
+                continue;
+            }
+            if (c == quote)
+                return i;
+        }
+        return -1;
+    }
+
     private static string NeutralizeUnsafeMarkdownLinks(string s)
     {
         var sb = new StringBuilder(s.Length);
@@ -179,6 +200,16 @@ public static class RichTextSanitizer
                 if (c == '\\' && cursor + 1 < s.Length && s[cursor + 1] is not ('\n' or '\r'))
                 {
                     cursor += 2; // an escaped character never opens or closes the destination
+                    continue;
+                }
+                if (c is '"' or '\'' && cursor > destStart && char.IsWhiteSpace(s[cursor - 1]))
+                {
+                    // A quoted title: parens inside it are literal. Skip to its closing quote
+                    // (respecting escapes); an unterminated title on this line is not a link.
+                    var titleEnd = FindClosingQuote(s, cursor);
+                    if (titleEnd < 0)
+                        break;
+                    cursor = titleEnd + 1;
                     continue;
                 }
                 if (c == '(')
@@ -330,8 +361,7 @@ public static class RichTextSanitizer
         cursor = SkipInlineWhitespaceAndOneLineEnding(s, cursor);
         if (cursor < s.Length && s[cursor] is '"' or '\'')
         {
-            var quote = s[cursor];
-            var close = s.IndexOf(quote, cursor + 1);
+            var close = FindClosingQuote(s, cursor);
             if (close < 0)
                 return null;
             cursor = close + 1;

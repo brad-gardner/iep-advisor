@@ -230,6 +230,9 @@ public sealed class RichTextSanitizerTests
     [InlineData(@"[x la\]bel](javascript:alert(1))", "javascript:")]
     [InlineData(@"[x](javascript:a\(b)", "javascript:")]
     [InlineData(@"[x](javascript:a\)b)", "javascript:")]
+    [InlineData(@"[x](javascript:alert(1) ""ti(tle"")", "javascript:")]
+    [InlineData(@"[x](javascript:alert(1) 'ti)tle')", "javascript:")]
+    [InlineData(@"![x](javascript:alert(1) ""t(t"")", "javascript:")]
     public void Sanitize_MarkdownLink_UnsafeScheme_WithBackslashEscapes_IsNeutralized(string input, string forbidden)
     {
         var result = RichTextSanitizer.Sanitize(input);
@@ -247,6 +250,14 @@ public sealed class RichTextSanitizerTests
 
         Assert.DoesNotContain("javascript:", result);
         Assert.Contains("[x]", result);
+    }
+
+    [Fact]
+    public void Sanitize_MarkdownLink_SafeScheme_WithParensInTitle_SurvivesByteForByte()
+    {
+        var input = @"[x](https://example.com ""a (b) title"")";
+
+        Assert.Equal(input, RichTextSanitizer.Sanitize(input));
     }
 
     [Fact]
