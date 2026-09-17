@@ -32,19 +32,26 @@ internal static class MarkdownLinkAst
             return markdown;
 
         // CommonMark forbids a link inside a link label, so `[[z](javascript:a)](javascript:b)` parses
-        // as ONE link (the inner) and literal brackets; collapsing it exposes a fresh outer link. Run to a
-        // fixed point. Each pass that changes anything strictly shortens the text, so the loop terminates
-        // within `Length` iterations; the bound only guards against a future edit that does not shorten.
+        // as ONE link (the inner) and literal brackets; collapsing it exposes a fresh outer link, so the
+        // pass repeats. Each pass re-parses the whole document and Markdig's cost on deep bracket chains
+        // is super-linear (review pass 7: 3 000 levels ≈ 75 s when bounded by input length), so the
+        // repeat count is a small constant (each pass on a 60 KB chain costs ~100–300 ms). Real content never nests links; if an adversarial paste is
+        // still changing at the cap, every remaining `](` is escaped so no inline link can form at all —
+        // degraded text, never a live unsafe link.
         var current = markdown;
-        for (var i = 0; i <= markdown.Length; i++)
+        for (var i = 0; i < MaxPasses; i++)
         {
             var next = NeutralizeOnce(current, isSafeUrl);
             if (next == current)
                 return current;
             current = next;
         }
-        return current;
+        return NeutralizeOnce(current, isSafeUrl) == current ? current : current.Replace("](", "]\\(");
     }
+
+    /// <summary>Upper bound on full re-parses per call; far above any legitimate nesting (each level is
+    /// a link inside a link's label, which CommonMark itself forbids as a resolved link).</summary>
+    internal const int MaxPasses = 4;
 
     private static string NeutralizeOnce(string markdown, Func<string, bool> isSafeUrl)
     {

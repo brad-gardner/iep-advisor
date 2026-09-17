@@ -86,9 +86,29 @@ public sealed class MarkdownLinkAstTests
     }
 
     [Theory]
-    [InlineData(17)]
-    [InlineData(40)]
-    public void DeeplyChainedLinks_CollapseCompletely_AndTheOutputReparsesWithNoLink(int depth)
+    [InlineData(MarkdownLinkAst.MaxPasses + 1)]
+    [InlineData(3000)]
+    public void ChainsBeyondThePassCap_AreBrokenCheaplyAndReparseWithNoLink(int depth)
+    {
+        var input = "z";
+        for (var i = depth; i >= 1; i--)
+            input = $"[{input}](javascript:e{i})";
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var result = Run(input);
+        sw.Stop();
+
+        // ~0.5 s alone, a few seconds under a loaded parallel run; the point is that it is not 75 s.
+        Assert.True(sw.ElapsedMilliseconds < 15000, $"took {sw.ElapsedMilliseconds} ms");
+        var doc = Markdig.Markdown.Parse(result, new Markdig.MarkdownPipelineBuilder().UseAdvancedExtensions().Build());
+        Assert.Empty(doc.Descendants<Markdig.Syntax.Inlines.LinkInline>());
+        Assert.Empty(doc.Descendants<Markdig.Syntax.LinkReferenceDefinition>());
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(MarkdownLinkAst.MaxPasses)]
+    public void ChainedLinks_UpToThePassCap_CollapseCompletely_AndTheOutputReparsesWithNoLink(int depth)
     {
         var input = "z";
         for (var i = depth; i >= 1; i--)
