@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ComponentType } from 'react';
+import { lazy, Suspense, useState, type ComponentType } from 'react';
 import type { Editor } from '@tiptap/react';
 
 /**
@@ -68,6 +68,12 @@ const RichTextEditorImpl = lazy(loadImpl);
 // first render, which costs a fallback frame plus a re-render of the host form.
 let LoadedImpl: ComponentType<RichTextEditorProps> | null = null;
 
+/** Test seam: whether the warm-up has populated the direct-render path. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function isRichTextEditorWarm(): boolean {
+  return LoadedImpl !== null;
+}
+
 let warmed = false;
 /**
  * Pay the editor's one-time cost while the app is idle instead of on the
@@ -133,7 +139,13 @@ export function RichTextEditorFallback({
  * rich-text-editor-impl.tsx for the implementation.
  */
 export function RichTextEditor(props: RichTextEditorProps) {
-  if (LoadedImpl) return <LoadedImpl {...props} />;
+  // Decide the render path ONCE per instance. Re-reading `LoadedImpl` on
+  // every render would swap element type (Suspense → direct) the moment the
+  // warm-up lands, which remounts a field someone is typing in — losing
+  // focus, caret and undo history. An instance that mounted through Suspense
+  // stays on that path for its lifetime; only later mounts go direct.
+  const [Impl] = useState(() => LoadedImpl);
+  if (Impl) return <Impl {...props} />;
   return (
     <Suspense
       fallback={

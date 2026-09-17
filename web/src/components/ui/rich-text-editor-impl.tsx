@@ -291,6 +291,12 @@ function RichTextEditorImpl({
   // reset the doc/cursor mid-edit.
   const lastValueRef = useRef(value);
   const [markdownForCount, setMarkdownForCount] = useState(value);
+  // `content` is read only when the editor is constructed; passing the live
+  // `value` would make TipTap's option comparison see a change on every
+  // keystroke and run setOptions()/updateState() needlessly. State (not a
+  // ref) because it is read during render; it never changes after mount and
+  // later external values are applied by the sync effect below.
+  const [initialValue] = useState(value);
 
   // Memoized so `useEditor`'s own option-comparison (it recreates
   // ProseMirror plugins / calls `view.updateState()` whenever the identity
@@ -331,7 +337,7 @@ function RichTextEditorImpl({
     // costs a single placeholder frame instead.
     immediatelyRender: false,
     extensions,
-    content: value,
+    content: initialValue,
     contentType: 'markdown',
     editable: !disabled,
     onUpdate: ({ editor }) => {
@@ -373,41 +379,19 @@ function RichTextEditorImpl({
   // Imperative rather than via `editorProps.attributes` (which is only read
   // when the editor is constructed): `overLimit` changes on nearly every
   // keystroke, and rebuilding editorProps that often would churn `useEditor`
-  // far more than the memoized object above already avoids.
-  //
-  // Reading `editor.view.dom` here is guarded because — behind this
-  // component's `React.lazy`/`Suspense` boundary — TipTap's `useEditor` can
-  // briefly hand back an `editor` whose view is mid-(re)attach (observed
-  // during the Suspense fallback→content swap): accessing `.view.dom` in
-  // that window throws "The editor view is not available", and an effect
-  // that throws with no error boundary above it unmounts the whole tree. The
-  // `editor.on('transaction', ...)` listener re-applies the attribute once a
-  // transaction actually flows through a live view, so the state introduced
-  // by ANY momentarily-unready editor still lands correctly once it settles.
+  // far more than the memoized object above already avoids. With the editor
+  // created after commit (`immediatelyRender: false`) its view is mounted by
+  // `EditorContent` before this effect runs, so `editor.view.dom` is safe.
   useEffect(() => {
-    if (!editor) return;
-    const apply = () => {
-      if (editor.isDestroyed) return;
-      let dom: HTMLElement;
-      try {
-        dom = editor.view.dom;
-      } catch {
-        return;
-      }
-      if (overLimit) {
-        dom.setAttribute('aria-invalid', 'true');
-        if (counterId) dom.setAttribute('aria-describedby', counterId);
-      } else {
-        dom.removeAttribute('aria-invalid');
-        if (counterId) dom.removeAttribute('aria-describedby');
-      }
-    };
-
-    apply();
-    editor.on('transaction', apply);
-    return () => {
-      editor.off('transaction', apply);
-    };
+    if (!editor || editor.isDestroyed) return;
+    const dom = editor.view.dom;
+    if (overLimit) {
+      dom.setAttribute('aria-invalid', 'true');
+      if (counterId) dom.setAttribute('aria-describedby', counterId);
+    } else {
+      dom.removeAttribute('aria-invalid');
+      if (counterId) dom.removeAttribute('aria-describedby');
+    }
   }, [editor, overLimit, counterId]);
 
   if (!editor) {
