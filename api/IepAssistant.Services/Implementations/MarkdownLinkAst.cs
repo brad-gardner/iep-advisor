@@ -33,9 +33,10 @@ internal static class MarkdownLinkAst
 
         // CommonMark forbids a link inside a link label, so `[[z](javascript:a)](javascript:b)` parses
         // as ONE link (the inner) and literal brackets; collapsing it exposes a fresh outer link. Run to a
-        // fixed point (each pass strictly shortens the text, so this terminates; the cap is belt-and-braces).
+        // fixed point. Each pass that changes anything strictly shortens the text, so the loop terminates
+        // within `Length` iterations; the bound only guards against a future edit that does not shorten.
         var current = markdown;
-        for (var i = 0; i < 16; i++)
+        for (var i = 0; i <= markdown.Length; i++)
         {
             var next = NeutralizeOnce(current, isSafeUrl);
             if (next == current)

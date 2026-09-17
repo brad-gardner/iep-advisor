@@ -1,4 +1,6 @@
 using IepAssistant.Services.Implementations;
+using Markdig;
+using Markdig.Syntax;
 using Xunit;
 
 namespace IepAssistant.Services.Tests;
@@ -81,6 +83,22 @@ public sealed class MarkdownLinkAstTests
 
         Assert.Equal(expected, result);
         Assert.DoesNotContain("javascript:", result);
+    }
+
+    [Theory]
+    [InlineData(17)]
+    [InlineData(40)]
+    public void DeeplyChainedLinks_CollapseCompletely_AndTheOutputReparsesWithNoLink(int depth)
+    {
+        var input = "z";
+        for (var i = depth; i >= 1; i--)
+            input = $"[{input}](javascript:e{i})";
+
+        var result = Run(input);
+
+        Assert.Equal("z", result);
+        var doc = Markdig.Markdown.Parse(result, new Markdig.MarkdownPipelineBuilder().UseAdvancedExtensions().Build());
+        Assert.Empty(doc.Descendants<Markdig.Syntax.Inlines.LinkInline>());
     }
 
     [Fact]
