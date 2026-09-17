@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, type ComponentType } from 'react';
 import type { Editor } from '@tiptap/react';
 
 /**
@@ -61,9 +61,45 @@ export interface RichTextEditorProps {
 // pull in). Code-splitting it behind `React.lazy` means pages that only ever
 // display stored markdown (via `Markdown`) — parent/student read-only
 // views, login, the district admin screens — never fetch any of it.
-const RichTextEditorImpl = lazy(() => import('./rich-text-editor-impl'));
+const loadImpl = () => import('./rich-text-editor-impl');
+const RichTextEditorImpl = lazy(loadImpl);
+// Once the chunk is in hand (from the idle warm-up or an earlier mount) render
+// it directly: `React.lazy` would otherwise still suspend for a tick on its
+// first render, which costs a fallback frame plus a re-render of the host form.
+let LoadedImpl: ComponentType<RichTextEditorProps> | null = null;
 
-function RichTextEditorFallback({
+let warmed = false;
+/**
+ * Pay the editor's one-time cost while the app is idle instead of on the
+ * first field a person opens: fetch + evaluate the TipTap chunk and run one
+ * throwaway editor through creation so the ProseMirror/TipTap code paths are
+ * already JIT-warm. Measured on a cold session the first mount otherwise
+ * carries the whole stack's first execution (several times the warm cost).
+ * Safe to call repeatedly; only signed-in surfaces should call it, since it
+ * downloads ~150 kB gzip that public pages never need.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function warmRichTextEditor(): void {
+  if (warmed) return;
+  warmed = true;
+  const run = () => {
+    void loadImpl()
+      .then((m) => {
+        LoadedImpl = m.default;
+        m.warmEditor();
+      })
+      .catch(() => {
+        warmed = false; // let a later call retry after a transient chunk-load failure
+      });
+  };
+  if (typeof window === 'undefined') return;
+  // Safari has no requestIdleCallback; a short timer is the usual stand-in.
+  const idle = (window as Window & { requestIdleCallback?: typeof requestIdleCallback }).requestIdleCallback;
+  if (idle) idle(run, { timeout: 5000 });
+  else window.setTimeout(run, 2000);
+}
+
+export function RichTextEditorFallback({
   label,
   required,
   minRows = 3,
@@ -97,6 +133,7 @@ function RichTextEditorFallback({
  * rich-text-editor-impl.tsx for the implementation.
  */
 export function RichTextEditor(props: RichTextEditorProps) {
+  if (LoadedImpl) return <LoadedImpl {...props} />;
   return (
     <Suspense
       fallback={

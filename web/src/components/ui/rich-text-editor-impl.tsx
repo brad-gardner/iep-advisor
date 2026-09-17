@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { EditorContent, useEditor, type Editor } from '@tiptap/react';
+import { Editor, EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extension-placeholder';
 import { Markdown } from '@tiptap/markdown';
@@ -17,7 +17,7 @@ import {
   Redo2 as RedoIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { isMarkdownOverLimit, type RichTextEditorProps } from './rich-text-editor';
+import { isMarkdownOverLimit, RichTextEditorFallback, type RichTextEditorProps } from './rich-text-editor';
 import { MarkdownLimit } from './rich-text-editor-limit';
 
 // Rows-to-height conversion mirrors the plain `<textarea>` sizing model
@@ -228,6 +228,25 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled?: boolean }) {
   );
 }
 
+/** The production extension set — shared by the mounted editor and `warmEditor`. */
+function buildExtensions({ placeholder, maxLength }: { placeholder: string; maxLength?: number }) {
+  return [
+    StarterKit.configure({
+      heading: { levels: [2, 3] },
+      link: { openOnClick: false },
+      // Markdown has no underline syntax. StarterKit's bundled Underline
+      // extension falls back to a non-standard `++text++` marker that this
+      // app's `Markdown` display component (react-markdown + remark-gfm)
+      // doesn't understand, so it's disabled outright — not just hidden
+      // from the toolbar — which also removes its Ctrl/Cmd+U shortcut.
+      underline: false,
+    }),
+    Placeholder.configure({ placeholder }),
+    Markdown.configure({ markedOptions: { gfm: true } }),
+    ...(maxLength ? [MarkdownLimit.configure({ limit: maxLength })] : []),
+  ];
+}
+
 function RichTextEditorImpl({
   id,
   label,
@@ -279,21 +298,7 @@ function RichTextEditorImpl({
   // re-render — only when something that actually changes editor behavior
   // changes.
   const extensions = useMemo(
-    () => [
-      StarterKit.configure({
-        heading: { levels: [2, 3] },
-        link: { openOnClick: false },
-        // Markdown has no underline syntax. StarterKit's bundled Underline
-        // extension falls back to a non-standard `++text++` marker that this
-        // app's `Markdown` display component (react-markdown + remark-gfm)
-        // doesn't understand, so it's disabled outright — not just hidden
-        // from the toolbar — which also removes its Ctrl/Cmd+U shortcut.
-        underline: false,
-      }),
-      Placeholder.configure({ placeholder: placeholder ?? '' }),
-      Markdown.configure({ markedOptions: { gfm: true } }),
-      ...(maxLength ? [MarkdownLimit.configure({ limit: maxLength })] : []),
-    ],
+    () => buildExtensions({ placeholder: placeholder ?? '', maxLength }),
     [placeholder, maxLength]
   );
 
@@ -318,6 +323,13 @@ function RichTextEditorImpl({
   );
 
   const editor = useEditor({
+    // Create the editor in an effect after commit rather than during render.
+    // With the editor built inside render, every render attempt React
+    // discards (an API response landing mid-render, a Suspense retry) leaves
+    // an orphaned Editor whose view never attaches — profiled at several
+    // createEditor calls per cold open of a busy form. One deferred creation
+    // costs a single placeholder frame instead.
+    immediatelyRender: false,
     extensions,
     content: value,
     contentType: 'markdown',
@@ -335,13 +347,13 @@ function RichTextEditorImpl({
 
   // Fire onReady exactly once, when the editor instance is created.
   useEffect(() => {
-    onReadyRef.current?.(editor);
+    if (editor) onReadyRef.current?.(editor);
   }, [editor]);
 
   // Keep TipTap's own editable state in sync with `disabled` without
   // recreating the editor (which would drop undo history and reset content).
   useEffect(() => {
-    editor.setEditable(!disabled);
+    editor?.setEditable(!disabled);
   }, [editor, disabled]);
 
   // External sync: only reset the doc when the parent hands back markdown
@@ -350,7 +362,7 @@ function RichTextEditorImpl({
   // a successful submit, while a save round-trip that echoes back the same
   // markdown this editor just emitted is a no-op (no cursor jump).
   useEffect(() => {
-    if (value === lastValueRef.current) return;
+    if (!editor || value === lastValueRef.current) return;
     lastValueRef.current = value;
     editor.commands.setContent(value, { contentType: 'markdown', emitUpdate: false });
     setMarkdownForCount(value);
@@ -373,6 +385,7 @@ function RichTextEditorImpl({
   // transaction actually flows through a live view, so the state introduced
   // by ANY momentarily-unready editor still lands correctly once it settles.
   useEffect(() => {
+    if (!editor) return;
     const apply = () => {
       if (editor.isDestroyed) return;
       let dom: HTMLElement;
@@ -396,6 +409,10 @@ function RichTextEditorImpl({
       editor.off('transaction', apply);
     };
   }, [editor, overLimit, counterId]);
+
+  if (!editor) {
+    return <RichTextEditorFallback label={label} required={required} minRows={minRows} className={className} />;
+  }
 
   return (
     <div className={className}>
@@ -451,6 +468,25 @@ function RichTextEditorImpl({
       )}
     </div>
   );
+}
+
+/**
+ * Create and immediately destroy one headless editor with the production
+ * extension set so the first real mount finds the code paths warm. See
+ * `warmRichTextEditor` in rich-text-editor.tsx.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function warmEditor(): void {
+  // A detached element so the view/DOM mount path is exercised too, not just
+  // schema and extension setup.
+  const editor = new Editor({
+    element: document.createElement('div'),
+    extensions: buildExtensions({ placeholder: '' }),
+    content: '**warm** _up_\n\n- list',
+    contentType: 'markdown',
+  });
+  editor.getMarkdown();
+  editor.destroy();
 }
 
 export default RichTextEditorImpl;

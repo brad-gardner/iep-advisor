@@ -79,5 +79,6 @@ vi.mock('@/components/ui/rich-text-editor', async () => {
     );
   }
 
-  return { ...actual, RichTextEditor };
+  // The idle warm-up would pull the real TipTap chunk into every routed test; it is a no-op here.
+  return { ...actual, RichTextEditor, warmRichTextEditor: () => {} };
 });
