@@ -3,8 +3,10 @@ import { Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Select, Textarea } from '@/components/ui/input';
+import { Select } from '@/components/ui/input';
+import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import {
@@ -165,7 +167,7 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
               </option>
             ))}
           </Select>
-          <Textarea id="contribution-text" label="Note" rows={3} value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} />
+          <RichTextEditor id="contribution-text" label="Note" minRows={3} value={text} onChange={setText} maxLength={2000} />
           <label className="flex items-center gap-2 text-[13px] font-medium text-brand-slate-600">
             <input
               type="checkbox"
@@ -211,7 +213,7 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
                   {item.isShared ? 'Visible to the school team' : 'Private to your family'}
                 </span>
               </div>
-              <p className="whitespace-pre-wrap text-sm text-brand-slate-800">{item.text}</p>
+              <Markdown content={item.text} data-testid={`contribution-${item.id}-text`} />
             </div>
             {canEdit && (
               <div className="flex shrink-0 items-center gap-1">

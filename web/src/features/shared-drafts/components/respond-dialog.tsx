@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
-import { Textarea } from '@/components/ui/input';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { createDraftResponse } from '../api/shared-drafts-api';
 import { useDraftReviewContext } from '../hooks/draft-review-context';
@@ -97,12 +97,12 @@ export function RespondDialog({
           </div>
         </fieldset>
 
-        <Textarea
+        <RichTextEditor
           label="Message"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={setText}
           maxLength={MAX_TEXT_LENGTH}
-          rows={4}
+          minRows={4}
           required
           data-testid={`${testId}-text`}
         />

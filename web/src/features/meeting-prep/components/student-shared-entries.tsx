@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MessageSquareQuote } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Markdown } from '@/components/ui/markdown';
 import { getChildShareableEntries } from '@/features/student/api/shareable-entries-api';
 import { entryKindLabel } from '@/features/student/lib/entry-kinds';
 import type { StudentWorkspaceEntryDto } from '@/features/student/types';
@@ -59,9 +60,11 @@ export function StudentSharedEntries({ childId }: StudentSharedEntriesProps) {
             <span className="block text-[11px] font-medium uppercase tracking-wide text-brand-teal-600">
               {entryKindLabel(entry.entryKind)}
             </span>
-            <span className="mt-0.5 block whitespace-pre-wrap text-sm text-brand-slate-800">
-              {entry.content}
-            </span>
+            <Markdown
+              content={entry.content}
+              className="mt-0.5"
+              data-testid={`student-shared-entry-${entry.id}-content`}
+            />
           </li>
         ))}
       </ul>

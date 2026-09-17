@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/input';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 
 interface EntryEditorProps {
   // Pre-fill when editing an existing entry; empty when adding.
@@ -43,10 +43,10 @@ export function EntryEditor({
 
   return (
     <div className="space-y-2" data-testid={`${testIdPrefix}-editor`}>
-      <Textarea
-        rows={3}
+      <RichTextEditor
+        minRows={3}
         value={content}
-        onChange={(e) => setContent(e.target.value)}
+        onChange={setContent}
         placeholder={placeholder}
         aria-label="Entry content"
         data-testid={`${testIdPrefix}-content`}

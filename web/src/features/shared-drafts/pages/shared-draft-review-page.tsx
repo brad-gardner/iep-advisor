@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Spinner } from '@/components/ui/spinner';
@@ -105,7 +106,7 @@ export function SharedDraftReviewPage() {
             {detail.message ? (
               <div>
                 <p className="text-xs font-medium text-brand-slate-500">Note from the school</p>
-                <p className="mt-1 text-sm text-brand-slate-700">{detail.message}</p>
+                <Markdown content={detail.message} className="mt-1" data-testid="shared-draft-message" />
               </div>
             ) : (
               <span />
