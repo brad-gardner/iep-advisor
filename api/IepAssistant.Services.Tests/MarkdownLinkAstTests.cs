@@ -66,6 +66,33 @@ public sealed class MarkdownLinkAstTests
         Assert.DoesNotContain("javascript:", result);
     }
 
+    // CommonMark: a link label cannot contain a link, so chained brackets expose a new link each time
+    // the inner one collapses — the pass runs to a fixed point (review pass 5, agent-smith).
+    [Theory]
+    [InlineData("[[in](javascript:a)](javascript:b)", "in")]
+    [InlineData("[[[z](javascript:e3)](javascript:e2)](javascript:e1)", "z")]
+    [InlineData("[[[[w](javascript:e4)](javascript:e3)](javascript:e2)](javascript:e1)", "w")]
+    [InlineData("[outer [in](javascript:a) text](javascript:b)", "outer in text")]
+    [InlineData("[a *b* c &amp; <b>d</b>](javascript:x)", "a *b* c &amp; <b>d</b>")]
+    [InlineData("[see <https://ok.example>](javascript:x)", "see <https://ok.example>")]
+    public void NestedAndRichLabels_CollapseUntilNoLinkRemains(string input, string expected)
+    {
+        var result = Run(input);
+
+        Assert.Equal(expected, result);
+        Assert.DoesNotContain("javascript:", result);
+    }
+
+    [Fact]
+    public void BracketsAroundASafeLink_AreNotALinkAndStayUnchanged()
+    {
+        // The outer brackets never form a link (a label cannot contain a link), so Markdig resolves
+        // only the safe inner link; the trailing `(javascript:b)` is plain text and stays as written.
+        var input = "[outer [in](https://ok.example) text](javascript:b)";
+
+        Assert.Equal(input, Run(input));
+    }
+
     [Fact]
     public void ImageInsideUnsafeLink_CollapsesOnce()
     {
