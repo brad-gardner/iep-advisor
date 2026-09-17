@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
 import { Markdown } from '@/components/ui/markdown';
-import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { resolveResponse } from '../api/draft-sharing-api';
 import { DRAFT_RESPONSE_KIND_LABELS, type DraftResponseDto } from '../types';
@@ -41,7 +41,7 @@ export function ResolveResponseDialog({ open, onClose, response, onResolved }: R
 
   if (!response) return null;
 
-  const canSubmit = reply.trim().length > 0 || resolvedInDraft;
+  const canSubmit = (reply.trim().length > 0 || resolvedInDraft) && !isMarkdownOverLimit(reply, MAX_REPLY_LENGTH);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

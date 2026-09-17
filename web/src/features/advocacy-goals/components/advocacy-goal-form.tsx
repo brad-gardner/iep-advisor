@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Select } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
-import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
+
+const GOAL_TEXT_MAX_LENGTH = 500;
 
 const CATEGORIES = [
   { value: '', label: 'No category' },
@@ -39,6 +41,10 @@ export function AdvocacyGoalForm({
       setError('Goal must be at least 10 characters.');
       return;
     }
+    if (isMarkdownOverLimit(goalText, GOAL_TEXT_MAX_LENGTH)) {
+      setError(`Goal must be ${GOAL_TEXT_MAX_LENGTH} characters or fewer.`);
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -70,7 +76,7 @@ export function AdvocacyGoalForm({
         onChange={setGoalText}
         placeholder="Describe your priority for your child (e.g., 'Improve reading fluency to grade level')"
         minRows={3}
-        maxLength={500}
+        maxLength={GOAL_TEXT_MAX_LENGTH}
         data-testid="goal-text-input"
       />
 
@@ -100,7 +106,7 @@ export function AdvocacyGoalForm({
           <Button
             type="submit"
             loading={isSubmitting}
-            disabled={goalText.trim().length < 10}
+            disabled={goalText.trim().length < 10 || isMarkdownOverLimit(goalText, GOAL_TEXT_MAX_LENGTH)}
             data-testid="goal-form-submit"
           >
             {submitLabel}

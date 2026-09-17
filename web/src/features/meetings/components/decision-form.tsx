@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
-import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { createDecision } from '../api/meeting-decisions-api';
 import { MEETING_DECISION_OUTCOMES, MEETING_DECISION_OUTCOME_LABELS } from '../types';
@@ -11,6 +11,7 @@ import type { DecisionTargetOption } from '../lib/decision-targets';
 
 const NO_TARGET = '';
 const CUSTOM_TARGET = '__custom__';
+const TEXT_MAX_LENGTH = 2000;
 
 interface DecisionFormProps {
   meetingId: number;
@@ -33,7 +34,10 @@ export function DecisionForm({ meetingId, targetOptions, onAdded, onCancel }: De
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = text.trim().length > 0 && (targetKey !== CUSTOM_TARGET || customLabel.trim().length > 0);
+  const canSubmit =
+    text.trim().length > 0 &&
+    (targetKey !== CUSTOM_TARGET || customLabel.trim().length > 0) &&
+    !isMarkdownOverLimit(text, TEXT_MAX_LENGTH);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -101,7 +105,7 @@ export function DecisionForm({ meetingId, targetOptions, onAdded, onCancel }: De
         value={text}
         onChange={setText}
         minRows={3}
-        maxLength={2000}
+        maxLength={TEXT_MAX_LENGTH}
         required
         data-testid="decision-text"
       />

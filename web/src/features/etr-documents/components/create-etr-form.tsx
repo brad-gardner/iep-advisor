@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Input, Select } from '@/components/ui/input';
-import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { create as createEtr } from '../api/etr-documents-api';
@@ -24,6 +24,8 @@ interface CreateEtrFormProps {
   onCancel: () => void;
 }
 
+const NOTES_MAX_LENGTH = 2000;
+
 export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormProps) {
   const [evaluationDate, setEvaluationDate] = useState('');
   const [evaluationType, setEvaluationType] = useState<EvaluationType | ''>('');
@@ -35,6 +37,7 @@ export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormPro
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!evaluationDate || !evaluationType) return;
+    if (isMarkdownOverLimit(notes, NOTES_MAX_LENGTH)) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -126,7 +129,7 @@ export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormPro
         value={notes}
         onChange={setNotes}
         minRows={3}
-        maxLength={2000}
+        maxLength={NOTES_MAX_LENGTH}
         data-testid="etr-notes"
       />
 
@@ -134,7 +137,7 @@ export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormPro
         <Button
           type="submit"
           loading={isSubmitting}
-          disabled={!evaluationDate || !evaluationType}
+          disabled={!evaluationDate || !evaluationType || isMarkdownOverLimit(notes, NOTES_MAX_LENGTH)}
           data-testid="etr-create-submit"
         >
           Create ETR

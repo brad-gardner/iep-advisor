@@ -52,4 +52,16 @@ describe('Markdown', () => {
     const el = screen.getByTestId('note-markdown');
     expect(el).toHaveClass('prose-iep', 'extra');
   });
+
+  it('renders links as plain text when disableLinks is set, for use inside an already-interactive element', () => {
+    render(<Markdown content="[a resource](https://example.com/doc)" disableLinks />);
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getByText('a resource').tagName).toBe('SPAN');
+  });
+
+  it('still renders non-link formatting when disableLinks is set', () => {
+    render(<Markdown content="**bold** and [a link](https://example.com)" disableLinks />);
+    expect(screen.getByText('bold').tagName).toBe('STRONG');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
 });

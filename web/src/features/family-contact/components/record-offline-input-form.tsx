@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
-import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { useDocumentList } from '@/features/document-authoring/hooks/use-document-list';
 import { apiErrorMessage } from '@/lib/api-error';
 import { toDateInputValue } from '@/lib/format-date';
@@ -16,6 +16,8 @@ interface RecordOfflineInputFormProps {
   onCancel: () => void;
 }
 
+const SUMMARY_MAX_LENGTH = 4000;
+
 /** Record family input received outside the app: method, date, a summary, and
  *  an optional link to the draft it pertains to (plan 7, decision 7). */
 export function RecordOfflineInputForm({ studentId, onLogged, onCancel }: RecordOfflineInputFormProps) {
@@ -27,7 +29,7 @@ export function RecordOfflineInputForm({ studentId, onLogged, onCancel }: Record
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = summary.trim().length > 0;
+  const canSubmit = summary.trim().length > 0 && !isMarkdownOverLimit(summary, SUMMARY_MAX_LENGTH);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -101,7 +103,7 @@ export function RecordOfflineInputForm({ studentId, onLogged, onCancel }: Record
         value={summary}
         onChange={setSummary}
         minRows={3}
-        maxLength={4000}
+        maxLength={SUMMARY_MAX_LENGTH}
         required
         data-testid="offline-input-summary"
       />

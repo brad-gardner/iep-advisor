@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
-import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 
 const MIN_REASON_LENGTH = 10;
+const REASON_MAX_LENGTH = 1000;
 
 interface RemoveGoalDialogProps {
   open: boolean;
@@ -27,7 +28,7 @@ interface RemoveGoalDialogProps {
 export function RemoveGoalDialog({ open, goalLabel, loading = false, error, onConfirm, onCancel }: RemoveGoalDialogProps) {
   const [reason, setReason] = useState('');
   const trimmed = reason.trim();
-  const canSubmit = trimmed.length >= MIN_REASON_LENGTH;
+  const canSubmit = trimmed.length >= MIN_REASON_LENGTH && !isMarkdownOverLimit(reason, REASON_MAX_LENGTH);
 
   const handleCancel = () => {
     setReason('');
@@ -82,7 +83,7 @@ export function RemoveGoalDialog({ open, goalLabel, loading = false, error, onCo
           value={reason}
           onChange={setReason}
           minRows={3}
-          maxLength={1000}
+          maxLength={REASON_MAX_LENGTH}
           required
           data-testid="remove-goal-dialog-reason"
         />

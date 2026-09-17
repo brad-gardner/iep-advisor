@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
-import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { useAuthoredVersions } from '@/features/document-authoring/hooks/use-authored-versions';
 import { apiErrorMessage } from '@/lib/api-error';
 import { determineEvaluation } from '../api/evaluation-api';
@@ -16,6 +16,8 @@ interface DetermineDialogProps {
   onClose: () => void;
   onDetermined: (updated: EvaluationCaseDto) => void;
 }
+
+const RATIONALE_MAX_LENGTH = 4000;
 
 /** Record the determination: outcome, date, rationale, and — when eligible —
  *  optionally the finalized ETR version the determination is based on. */
@@ -30,7 +32,10 @@ export function DetermineDialog({ open, studentId, onClose, onDetermined }: Dete
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = determinationDate !== '' && rationale.trim().length > 0;
+  const canSubmit =
+    determinationDate !== '' &&
+    rationale.trim().length > 0 &&
+    !isMarkdownOverLimit(rationale, RATIONALE_MAX_LENGTH);
 
   const reset = () => {
     setOutcome('Eligible');
@@ -144,7 +149,7 @@ export function DetermineDialog({ open, studentId, onClose, onDetermined }: Dete
           value={rationale}
           onChange={setRationale}
           minRows={4}
-          maxLength={4000}
+          maxLength={RATIONALE_MAX_LENGTH}
           required
           data-testid="determine-dialog-rationale"
         />

@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { Input, Select } from '@/components/ui/input';
-import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { createIep } from '../api/iep-documents-api';
+
+const ATTENDEES_MAX_LENGTH = 1000;
+const NOTES_MAX_LENGTH = 2000;
 
 const MEETING_TYPES = [
   { value: 'initial', label: 'Initial IEP' },
@@ -29,6 +32,7 @@ export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormPro
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!iepDate || !meetingType) return;
+    if (isMarkdownOverLimit(attendees, ATTENDEES_MAX_LENGTH) || isMarkdownOverLimit(notes, NOTES_MAX_LENGTH)) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -87,7 +91,7 @@ export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormPro
         value={attendees}
         onChange={setAttendees}
         minRows={2}
-        maxLength={1000}
+        maxLength={ATTENDEES_MAX_LENGTH}
         data-testid="iep-attendees"
       />
 
@@ -97,12 +101,22 @@ export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormPro
         value={notes}
         onChange={setNotes}
         minRows={3}
-        maxLength={2000}
+        maxLength={NOTES_MAX_LENGTH}
         data-testid="iep-notes"
       />
 
       <div className="flex gap-2">
-        <Button type="submit" disabled={isSubmitting || !iepDate || !meetingType} data-testid="iep-create-submit">
+        <Button
+          type="submit"
+          disabled={
+            isSubmitting ||
+            !iepDate ||
+            !meetingType ||
+            isMarkdownOverLimit(attendees, ATTENDEES_MAX_LENGTH) ||
+            isMarkdownOverLimit(notes, NOTES_MAX_LENGTH)
+          }
+          data-testid="iep-create-submit"
+        >
           {isSubmitting ? 'Creating...' : 'Create IEP'}
         </Button>
         <Button type="button" variant="ghost" onClick={onCancel} data-testid="iep-create-cancel">

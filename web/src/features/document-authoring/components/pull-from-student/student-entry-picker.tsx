@@ -69,7 +69,11 @@ export function StudentEntryPicker({
             <span className="block text-[11px] font-medium uppercase tracking-wide text-brand-teal-600">
               {entryKindLabel(entry.entryKind)}
             </span>
-            <Markdown content={entry.content} className="mt-0.5 block text-sm text-brand-slate-800" />
+            <Markdown
+              content={entry.content}
+              className="mt-0.5 block text-sm text-brand-slate-800"
+              disableLinks
+            />
           </button>
         ))}
     </div>

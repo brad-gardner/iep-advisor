@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { Notice } from '@/components/ui/notice';
 import { Markdown } from '@/components/ui/markdown';
-import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { askDraftQuestion } from '../api/shared-drafts-api';
 import { useDraftReviewContext } from '../hooks/draft-review-context';
@@ -107,7 +107,11 @@ export function AskQuestionDrawer({
             {thread.map((note) => (
               <li key={note.id} className="rounded-card border border-brand-slate-200 p-3">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-medium text-brand-slate-800">{note.question}</p>
+                  <Markdown
+                    content={note.question}
+                    className="text-sm font-medium text-brand-slate-800"
+                    data-testid={`note-question-${note.id}`}
+                  />
                   <button
                     type="button"
                     onClick={() => handleDelete(note.id)}
@@ -157,9 +161,15 @@ export function AskQuestionDrawer({
             onChange={setQuestion}
             maxLength={MAX_QUESTION_LENGTH}
             minRows={3}
+            disabled={isAsking}
             data-testid={`${testId}-input`}
           />
-          <Button type="submit" loading={isAsking} disabled={!question.trim()} data-testid={`${testId}-submit`}>
+          <Button
+            type="submit"
+            loading={isAsking}
+            disabled={!question.trim() || isMarkdownOverLimit(question, MAX_QUESTION_LENGTH)}
+            data-testid={`${testId}-submit`}
+          >
             Ask
           </Button>
         </form>

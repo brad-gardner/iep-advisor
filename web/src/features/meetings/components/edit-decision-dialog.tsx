@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
 import { Select } from '@/components/ui/input';
-import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { updateDecision } from '../api/meeting-decisions-api';
 import { MEETING_DECISION_OUTCOMES, MEETING_DECISION_OUTCOME_LABELS } from '../types';
@@ -14,6 +14,8 @@ interface EditDecisionDialogProps {
   onClose: () => void;
   onUpdated: (decision: MeetingDecisionDto) => void;
 }
+
+const TEXT_MAX_LENGTH = 2000;
 
 /** Edit a decision's text/outcome (the target is fixed once recorded). */
 export function EditDecisionDialog({ decision, onClose, onUpdated }: EditDecisionDialogProps) {
@@ -33,7 +35,7 @@ export function EditDecisionDialog({ decision, onClose, onUpdated }: EditDecisio
   }
 
   const handleSubmit = async () => {
-    if (!decision || text.trim().length === 0) return;
+    if (!decision || text.trim().length === 0 || isMarkdownOverLimit(text, TEXT_MAX_LENGTH)) return;
     setIsSubmitting(true);
     setError(null);
     try {
@@ -66,7 +68,7 @@ export function EditDecisionDialog({ decision, onClose, onUpdated }: EditDecisio
           <Button
             onClick={handleSubmit}
             loading={isSubmitting}
-            disabled={text.trim().length === 0}
+            disabled={text.trim().length === 0 || isMarkdownOverLimit(text, TEXT_MAX_LENGTH)}
             data-testid="edit-decision-submit"
           >
             Save changes
@@ -85,7 +87,7 @@ export function EditDecisionDialog({ decision, onClose, onUpdated }: EditDecisio
           value={text}
           onChange={setText}
           minRows={3}
-          maxLength={2000}
+          maxLength={TEXT_MAX_LENGTH}
           required
           data-testid="edit-decision-text"
         />

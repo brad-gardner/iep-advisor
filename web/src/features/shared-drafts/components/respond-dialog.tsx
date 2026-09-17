@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
-import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { createDraftResponse } from '../api/shared-drafts-api';
 import { useDraftReviewContext } from '../hooks/draft-review-context';
@@ -111,7 +111,12 @@ export function RespondDialog({
           <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" loading={isSubmitting} disabled={!text.trim()} data-testid={`${testId}-submit`}>
+          <Button
+            type="submit"
+            loading={isSubmitting}
+            disabled={!text.trim() || isMarkdownOverLimit(text, MAX_TEXT_LENGTH)}
+            data-testid={`${testId}-submit`}
+          >
             Send
           </Button>
         </div>

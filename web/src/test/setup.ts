@@ -12,6 +12,23 @@ if (!('scrollTo' in window) || typeof window.scrollTo !== 'function') {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
 }
 
+// jsdom implements Element.getClientRects/getBoundingClientRect but not
+// Range's — ProseMirror's `coordsAtPos` (used by the real RichTextEditor's
+// `.focus()` command, which scrolls the new selection into view) measures a
+// Range when the target position falls inside a text node. Without this,
+// jsdom throws "target.getClientRects is not a function" from an async
+// requestAnimationFrame callback, surfacing as test-run noise (occasionally
+// after the test that triggered it has already finished).
+if (typeof Range !== 'undefined' && typeof Range.prototype.getClientRects !== 'function') {
+  Range.prototype.getClientRects = () => ({
+    length: 0,
+    item: () => null,
+    [Symbol.iterator]: function* () {},
+  }) as unknown as DOMRectList;
+  Range.prototype.getBoundingClientRect = () =>
+    ({ x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, toJSON: () => ({}) }) as DOMRect;
+}
+
 // Global stand-in for the TipTap-backed RichTextEditor. jsdom doesn't run a
 // real contenteditable/ProseMirror well enough for the hundreds of existing
 // feature tests that drive these fields with
