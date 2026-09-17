@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Select, Textarea } from '@/components/ui/input';
+import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { toDateInputValue } from '@/lib/format-date';
 import { recordContactAttempt } from '../api/family-contact-api';
@@ -92,11 +93,11 @@ export function LogContactAttemptForm({ studentId, onLogged, onCancel }: LogCont
           data-testid="contact-attempt-date"
         />
       </div>
-      <Textarea
+      <RichTextEditor
         label="Note (optional)"
         value={note}
-        onChange={(e) => setNote(e.target.value)}
-        rows={2}
+        onChange={setNote}
+        minRows={2}
         maxLength={1000}
         data-testid="contact-attempt-note"
       />

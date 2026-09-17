@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Textarea } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { useToast } from '@/components/ui/toast';
 import { addGoalObservation } from '../api/goals-api';
@@ -86,12 +87,12 @@ export function LogProgressForm({ goalRecordId, onLogged, onCancel, 'data-testid
           data-testid={testId ? `${testId}-unit` : undefined}
         />
       </div>
-      <Textarea
+      <RichTextEditor
         label="Note"
-        rows={2}
+        minRows={2}
         maxLength={2000}
         value={note}
-        onChange={(e) => setNote(e.target.value)}
+        onChange={setNote}
         data-testid={testId ? `${testId}-note` : undefined}
       />
       <div className="flex justify-end gap-2">

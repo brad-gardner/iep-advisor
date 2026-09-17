@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
-import { Textarea } from '@/components/ui/input';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { updateGoalStatus } from '../api/goals-api';
 import type { GoalRecordDto, SettableGoalRecordStatus } from '../types';
@@ -108,11 +108,11 @@ export function GoalStatusDialog({ open, goal, onClose, onChanged }: GoalStatusD
           </div>
         </fieldset>
 
-        <Textarea
+        <RichTextEditor
           label={reasonRequired ? 'Reason *' : 'Reason'}
           value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={3}
+          onChange={setReason}
+          minRows={3}
           maxLength={1000}
           required={reasonRequired}
           data-testid="goal-status-dialog-reason"

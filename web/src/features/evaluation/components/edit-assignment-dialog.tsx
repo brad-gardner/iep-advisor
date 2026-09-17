@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Textarea } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { toDateInputValue } from '@/lib/format-date';
 import { updateEvaluatorAssignment } from '../api/evaluation-api';
@@ -76,11 +77,11 @@ export function EditAssignmentDialog({ studentId, assignment, onClose, onChanged
           onChange={(e) => setDueDate(e.target.value)}
           data-testid="edit-assignment-due-date"
         />
-        <Textarea
+        <RichTextEditor
           label="Notes"
           value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
+          onChange={setNotes}
+          minRows={3}
           maxLength={2000}
           data-testid="edit-assignment-notes"
         />

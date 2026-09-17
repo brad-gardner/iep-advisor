@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Markdown } from "@/components/ui/markdown";
 import { Notice } from "@/components/ui/notice";
 import { Spinner } from "@/components/ui/spinner";
 import { PageLayout } from "@/components/ui/page-layout";
@@ -113,9 +114,10 @@ export function ProgressReportViewerPage() {
           </span>
         </div>
         {report.notes && (
-          <p className="text-sm text-brand-slate-600 whitespace-pre-wrap bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-            {report.notes}
-          </p>
+          <Markdown
+            content={report.notes}
+            className="text-sm text-brand-slate-600 bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200"
+          />
         )}
       </div>
 

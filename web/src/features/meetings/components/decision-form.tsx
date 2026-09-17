@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Select, Textarea } from '@/components/ui/input';
+import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { createDecision } from '../api/meeting-decisions-api';
 import { MEETING_DECISION_OUTCOMES, MEETING_DECISION_OUTCOME_LABELS } from '../types';
@@ -95,11 +96,11 @@ export function DecisionForm({ meetingId, targetOptions, onAdded, onCancel }: De
         />
       )}
 
-      <Textarea
+      <RichTextEditor
         label="Decision *"
         value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={3}
+        onChange={setText}
+        minRows={3}
         maxLength={2000}
         required
         data-testid="decision-text"

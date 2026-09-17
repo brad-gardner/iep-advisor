@@ -1,6 +1,7 @@
 import { ChevronUp, ChevronDown, Pencil, Trash2 } from 'lucide-react';
 import type { AdvocacyGoal } from '@/types/api';
 import { Badge } from '@/components/ui/badge';
+import { Markdown } from '@/components/ui/markdown';
 
 interface AdvocacyGoalCardProps {
   goal: AdvocacyGoal;
@@ -54,7 +55,7 @@ export function AdvocacyGoalCard({
             </Badge>
           </div>
         )}
-        <p className="text-sm text-brand-slate-800">{goal.goalText}</p>
+        <Markdown content={goal.goalText} className="text-sm text-brand-slate-800" />
       </div>
 
       {(onEdit || onDelete) && (

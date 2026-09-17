@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Select, Textarea } from '@/components/ui/input';
+import { Input, Select } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { useAuthoredVersions } from '@/features/document-authoring/hooks/use-authored-versions';
 import { apiErrorMessage } from '@/lib/api-error';
 import { determineEvaluation } from '../api/evaluation-api';
@@ -138,11 +139,11 @@ export function DetermineDialog({ open, studentId, onClose, onDetermined }: Dete
           </Select>
         )}
 
-        <Textarea
+        <RichTextEditor
           label="Rationale *"
           value={rationale}
-          onChange={(e) => setRationale(e.target.value)}
-          rows={4}
+          onChange={setRationale}
+          minRows={4}
           maxLength={4000}
           required
           data-testid="determine-dialog-rationale"

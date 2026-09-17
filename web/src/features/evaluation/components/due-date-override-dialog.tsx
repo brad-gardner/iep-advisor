@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Textarea } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { toDateInputValue } from '@/lib/format-date';
 import { overrideDueDate } from '../api/evaluation-api';
@@ -84,11 +85,11 @@ export function DueDateOverrideDialog({ open, studentId, evaluation, onClose, on
           onChange={(e) => setDueDate(e.target.value)}
           data-testid="due-date-override-date"
         />
-        <Textarea
+        <RichTextEditor
           label="Reason *"
           value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={3}
+          onChange={setReason}
+          minRows={3}
           maxLength={1000}
           required
           data-testid="due-date-override-reason"

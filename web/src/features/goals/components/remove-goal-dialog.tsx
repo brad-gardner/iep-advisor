@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
-import { Textarea } from '@/components/ui/input';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 
 const MIN_REASON_LENGTH = 10;
 
@@ -77,11 +77,11 @@ export function RemoveGoalDialog({ open, goalLabel, loading = false, error, onCo
           </div>
         )}
 
-        <Textarea
+        <RichTextEditor
           label="Reason for removing this goal *"
           value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={3}
+          onChange={setReason}
+          minRows={3}
           maxLength={1000}
           required
           data-testid="remove-goal-dialog-reason"

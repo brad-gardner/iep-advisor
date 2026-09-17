@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Copy, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Select, Textarea } from '@/components/ui/input';
+import { Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { useToast } from '@/components/ui/toast';
 import { apiErrorMessage } from '@/lib/api-error';
 import { cancelMeeting, meetingIcsUrl, setMeetingStatus } from '../api/meetings-api';
@@ -131,13 +132,13 @@ export function MeetingManagerActions({ meeting, onUpdated, onReschedule }: Meet
         message={
           <div className="space-y-3">
             <p>Participants will be notified. This cannot be undone.</p>
-            <Textarea
+            <RichTextEditor
               id="meeting-cancel-reason"
               label="Reason"
               value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
+              onChange={setCancelReason}
               placeholder="Optional"
-              rows={2}
+              minRows={2}
             />
           </div>
         }

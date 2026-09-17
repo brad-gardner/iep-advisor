@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ObligationStatusChip } from '@/features/obligations/components/obligation-status-chip';
@@ -172,7 +173,7 @@ export function EvaluationCard({ studentId }: EvaluationCardProps) {
                 {evaluation.determinationDate ? ` · ${formatDate(evaluation.determinationDate)}` : ''}
               </p>
               {evaluation.determinationRationale && (
-                <p className="mt-1 text-brand-slate-600">{evaluation.determinationRationale}</p>
+                <Markdown content={evaluation.determinationRationale} className="mt-1 text-brand-slate-600" />
               )}
             </div>
           )}

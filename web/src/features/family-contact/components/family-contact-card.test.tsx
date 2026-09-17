@@ -90,4 +90,28 @@ describe('FamilyContactCard', () => {
       'Family sent a note about transportation.'
     );
   });
+
+  it('renders a stored markdown contact attempt note as formatted HTML', async () => {
+    familyContactApi.getContactAttempts.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: 3,
+          schoolStudentId: 10,
+          attemptedAt: '2026-09-15T00:00:00.000Z',
+          method: 'Phone',
+          outcome: 'Reached',
+          note: 'Family **confirmed** the meeting time.',
+          recordedByUserId: 1,
+          recordedByName: 'Casey Manager',
+        },
+      ],
+    });
+
+    render(<FamilyContactCard studentId={10} />);
+
+    expect(await screen.findByTestId('contact-attempt-3')).toBeInTheDocument();
+    const strong = screen.getByText('confirmed');
+    expect(strong.tagName).toBe('STRONG');
+  });
 });

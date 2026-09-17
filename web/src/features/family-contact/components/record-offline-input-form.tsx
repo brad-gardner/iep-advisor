@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Select, Textarea } from '@/components/ui/input';
+import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { useDocumentList } from '@/features/document-authoring/hooks/use-document-list';
 import { apiErrorMessage } from '@/lib/api-error';
 import { toDateInputValue } from '@/lib/format-date';
@@ -95,11 +96,11 @@ export function RecordOfflineInputForm({ studentId, onLogged, onCancel }: Record
           ))}
         </Select>
       )}
-      <Textarea
+      <RichTextEditor
         label="Summary *"
         value={summary}
-        onChange={(e) => setSummary(e.target.value)}
-        rows={3}
+        onChange={setSummary}
+        minRows={3}
         maxLength={4000}
         required
         data-testid="offline-input-summary"
