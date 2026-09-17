@@ -75,7 +75,8 @@ public static class RichTextSanitizer
     // (reviewer pass2 P2: a fixed "one balanced pair" regex missed deeper nesting that Markdig itself
     // resolves just fine). The label group intentionally allows any non-`]` character including a
     // newline (CommonMark link text may soft-wrap across lines); only the destination scan bails at one.
-    private static readonly Regex MarkdownLinkOpen = new("\\[([^\\]]*)\\]\\(", RegexOptions.Compiled);
+    // A backslash escapes the next character (CommonMark), so `\]` inside the label does not end it.
+    private static readonly Regex MarkdownLinkOpen = new("\\[((?:\\\\[\\s\\S]|[^\\]\\\\])*)\\]\\(", RegexOptions.Compiled);
 
     // An optional trailing `"title"`/`'title'` at the very end of an already-extracted destination+title
     // span, preceded by whitespace -- used to split a link/reference destination from its title.
@@ -93,7 +94,7 @@ public static class RichTextSanitizer
     // to start on the next line -- confirmed against the installed Markdig 1.3.2 that `[r]:\n  url`
     // resolves the same as `[r]: url`) and more inline whitespace, landing right at the destination.
     private static readonly Regex ReferenceDefinitionOpen = new(
-        "^[ ]{0,3}\\[[^\\]\r\n]{1,999}\\]:[ \\t]*(?:\\r\\n|\\n)?[ \\t]*",
+        "^[ ]{0,3}\\[(?:\\\\[^\r\n]|[^\\]\\\\\r\n]){1,999}\\]:[ \\t]*(?:\\r\\n|\\n)?[ \\t]*",
         RegexOptions.Multiline | RegexOptions.Compiled);
 
     public static string Sanitize(string? html)
@@ -175,6 +176,11 @@ public static class RichTextSanitizer
                 var c = s[cursor];
                 if (c is '\n' or '\r')
                     break;
+                if (c == '\\' && cursor + 1 < s.Length && s[cursor + 1] is not ('\n' or '\r'))
+                {
+                    cursor += 2; // an escaped character never opens or closes the destination
+                    continue;
+                }
                 if (c == '(')
                     depth++;
                 else if (c == ')')
@@ -293,6 +299,11 @@ public static class RichTextSanitizer
             while (cursor < s.Length)
             {
                 var c = s[cursor];
+                if (c == '\\' && cursor + 1 < s.Length && !char.IsWhiteSpace(s[cursor + 1]))
+                {
+                    cursor += 2; // escaped character: part of the destination, never a paren
+                    continue;
+                }
                 if (c == '(')
                 {
                     depth++;

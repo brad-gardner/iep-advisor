@@ -222,4 +222,38 @@ public sealed class RichTextSanitizerTests
         Assert.Contains("[s]: https://example.com", result);
         Assert.DoesNotContain("javascript:", result);
     }
+
+    // CommonMark backslash escapes: `\]` inside a label does not end it, and `\(`/`\)` inside a
+    // destination are literal characters -- Markdig resolves all of these as real links, so the gate
+    // must see through them (review pass 3, agent-smith + test-reviewer).
+    [Theory]
+    [InlineData(@"[x la\]bel](javascript:alert(1))", "javascript:")]
+    [InlineData(@"[x](javascript:a\(b)", "javascript:")]
+    [InlineData(@"[x](javascript:a\)b)", "javascript:")]
+    public void Sanitize_MarkdownLink_UnsafeScheme_WithBackslashEscapes_IsNeutralized(string input, string forbidden)
+    {
+        var result = RichTextSanitizer.Sanitize(input);
+
+        Assert.DoesNotContain(forbidden, result, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("x", result);
+    }
+
+    [Theory]
+    [InlineData("[la\\]bel]: javascript:alert(1)\n\n[x][la\\]bel]")]
+    [InlineData("[r]: javascript:a\\(b\n\n[x][r]")]
+    public void Sanitize_ReferenceDefinition_UnsafeScheme_WithBackslashEscapes_IsRemoved(string input)
+    {
+        var result = RichTextSanitizer.Sanitize(input);
+
+        Assert.DoesNotContain("javascript:", result);
+        Assert.Contains("[x]", result);
+    }
+
+    [Fact]
+    public void Sanitize_MarkdownLink_SafeScheme_WithEscapedParens_SurvivesByteForByte()
+    {
+        var input = @"[wiki](https://example.com/a\(b\))";
+
+        Assert.Equal(input, RichTextSanitizer.Sanitize(input));
+    }
 }
