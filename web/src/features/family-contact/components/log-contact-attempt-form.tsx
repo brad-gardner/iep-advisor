@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Select, Textarea } from '@/components/ui/input';
+import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { toDateInputValue } from '@/lib/format-date';
 import { recordContactAttempt } from '../api/family-contact-api';
@@ -18,6 +19,8 @@ interface LogContactAttemptFormProps {
   onLogged: (attempt: FamilyContactAttemptDto) => void;
   onCancel: () => void;
 }
+
+const NOTE_MAX_LENGTH = 1000;
 
 /** Log an attempt to reach the family: method, outcome, date, and an optional
  *  note (plan 7, decision 7). */
@@ -92,19 +95,25 @@ export function LogContactAttemptForm({ studentId, onLogged, onCancel }: LogCont
           data-testid="contact-attempt-date"
         />
       </div>
-      <Textarea
+      <RichTextEditor
         label="Note (optional)"
         value={note}
-        onChange={(e) => setNote(e.target.value)}
-        rows={2}
-        maxLength={1000}
+        onChange={setNote}
+        minRows={2}
+        maxLength={NOTE_MAX_LENGTH}
         data-testid="contact-attempt-note"
       />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={isSubmitting}>
           Cancel
         </Button>
-        <Button type="submit" size="sm" loading={isSubmitting} data-testid="contact-attempt-submit">
+        <Button
+          type="submit"
+          size="sm"
+          loading={isSubmitting}
+          disabled={isMarkdownOverLimit(note, NOTE_MAX_LENGTH)}
+          data-testid="contact-attempt-submit"
+        >
           Log attempt
         </Button>
       </div>

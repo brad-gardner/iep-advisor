@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Input, Select, Textarea } from '@/components/ui/input';
+import { Input, Select } from '@/components/ui/input';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { create as createEtr } from '../api/etr-documents-api';
@@ -23,6 +24,8 @@ interface CreateEtrFormProps {
   onCancel: () => void;
 }
 
+const NOTES_MAX_LENGTH = 2000;
+
 export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormProps) {
   const [evaluationDate, setEvaluationDate] = useState('');
   const [evaluationType, setEvaluationType] = useState<EvaluationType | ''>('');
@@ -34,6 +37,7 @@ export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormPro
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!evaluationDate || !evaluationType) return;
+    if (isMarkdownOverLimit(notes, NOTES_MAX_LENGTH)) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -119,24 +123,21 @@ export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormPro
         </div>
       </div>
 
-      <div>
-        <Textarea
-          label="Notes"
-          placeholder="Any notes about this evaluation..."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-          maxLength={2000}
-          data-testid="etr-notes"
-        />
-        <p className="text-[11px] text-brand-slate-300 mt-1">{notes.length}/2000 characters</p>
-      </div>
+      <RichTextEditor
+        label="Notes"
+        placeholder="Any notes about this evaluation..."
+        value={notes}
+        onChange={setNotes}
+        minRows={3}
+        maxLength={NOTES_MAX_LENGTH}
+        data-testid="etr-notes"
+      />
 
       <div className="flex gap-2">
         <Button
           type="submit"
           loading={isSubmitting}
-          disabled={!evaluationDate || !evaluationType}
+          disabled={!evaluationDate || !evaluationType || isMarkdownOverLimit(notes, NOTES_MAX_LENGTH)}
           data-testid="etr-create-submit"
         >
           Create ETR

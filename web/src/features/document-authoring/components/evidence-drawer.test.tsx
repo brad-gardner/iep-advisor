@@ -56,6 +56,20 @@ describe('EvidenceDrawer', () => {
     expect(screen.getByRole('button', { name: 'Insert Family — Strength into Present Levels' })).toBeInTheDocument();
   });
 
+  it('renders stored markdown evidence text as formatted HTML', async () => {
+    const markdownBundle: StudentEvidenceBundle = {
+      ...bundle,
+      items: [
+        { ...bundle.items[1], text: 'Read **90 wpm** in the fall assessment.' },
+      ],
+    };
+    getStudentEvidence.mockResolvedValue({ success: true, data: markdownBundle });
+    render(<EvidenceDrawer open onClose={() => {}} studentId={21} activeField={null} />);
+
+    const item = await screen.findByTestId('evidence-E2');
+    expect(item.querySelector('strong')).toHaveTextContent('90 wpm');
+  });
+
   it('shows the error and retries when reopened', async () => {
     getStudentEvidence.mockResolvedValueOnce({ success: false, message: 'boom' }).mockResolvedValueOnce({ success: true, data: bundle });
     const { rerender } = render(<EvidenceDrawer open onClose={() => {}} studentId={21} activeField={null} />);

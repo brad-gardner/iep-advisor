@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { FileText } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Spinner } from '@/components/ui/spinner';
@@ -90,9 +91,7 @@ export function MeetingSummaryPage() {
       data-testid="meeting-summary-page"
     >
       <Card>
-        <p className="whitespace-pre-wrap text-sm text-brand-slate-800" data-testid="meeting-summary-body">
-          {summary.body}
-        </p>
+        <Markdown content={summary.body} data-testid="meeting-summary-body" />
       </Card>
     </PageLayout>
   );

@@ -1,4 +1,5 @@
 import { Card } from '@/components/ui/card';
+import { Markdown } from '@/components/ui/markdown';
 import {
   parseConfig,
   readColumnOptions,
@@ -102,7 +103,10 @@ function renderScalar(field: TemplateFieldDto, value: unknown): React.ReactNode 
       const match = options.find((o) => o.value === value);
       return match?.label?.trim() || match?.value || value;
     }
-    case 'RichText':
+    case 'RichText': {
+      if (typeof value !== 'string' || !value) return empty;
+      return <Markdown content={value} />;
+    }
     case 'Text':
     default: {
       if (typeof value !== 'string' || !value) return empty;

@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { Markdown } from '@/components/ui/markdown';
 import { formatDate } from '@/lib/format-date';
 import { DRAFT_RESPONSE_KIND_LABELS, type DraftResponseDto } from '../types';
 
@@ -31,13 +32,17 @@ export function MyResponsesSection({ responses }: MyResponsesSectionProps) {
                 </div>
                 <span className="text-xs text-brand-slate-400">{formatDate(response.createdAt)}</span>
               </div>
-              <p className="text-sm text-brand-slate-700">{response.text}</p>
+              <Markdown content={response.text} data-testid={`my-response-${response.id}-text`} />
               {response.staffReply && (
                 <div className="rounded-card bg-brand-slate-50 p-3">
                   <p className="text-xs font-medium text-brand-slate-500">
                     {response.resolvedByName ? `${response.resolvedByName} replied` : 'School reply'}
                   </p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-brand-slate-700">{response.staffReply}</p>
+                  <Markdown
+                    content={response.staffReply}
+                    className="mt-1"
+                    data-testid={`my-response-${response.id}-staff-reply`}
+                  />
                 </div>
               )}
               {response.status === 'Resolved' && !response.staffReply && (

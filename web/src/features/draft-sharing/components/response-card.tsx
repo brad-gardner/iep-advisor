@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Markdown } from '@/components/ui/markdown';
 import { formatDate } from '@/lib/format-date';
 import { DRAFT_RESPONSE_KIND_LABELS, type DraftResponseDto } from '../types';
 
@@ -40,14 +41,18 @@ export function ResponseCard({ response, onJump, onResolve }: ResponseCardProps)
         response.targetLabel && <p className="text-sm text-brand-slate-500">{response.targetLabel}</p>
       )}
 
-      <p className="text-sm text-brand-slate-700">{response.text}</p>
+      <Markdown content={response.text} data-testid={`response-card-${response.id}-text`} />
 
       {response.staffReply && (
         <div className="rounded-card bg-brand-slate-50 p-3">
           <p className="text-xs font-medium text-brand-slate-500">
             {response.resolvedByName ? `${response.resolvedByName} replied` : 'Reply'}
           </p>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-brand-slate-700">{response.staffReply}</p>
+          <Markdown
+            content={response.staffReply}
+            className="mt-1"
+            data-testid={`response-card-${response.id}-staff-reply`}
+          />
         </div>
       )}
 

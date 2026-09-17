@@ -3,8 +3,10 @@ import { Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Select, Textarea } from '@/components/ui/input';
+import { Select } from '@/components/ui/input';
+import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import {
@@ -24,6 +26,8 @@ interface AboutMyChildCardProps {
   /** Owners/collaborators can write; viewers only read. */
   canEdit: boolean;
 }
+
+const NOTE_TEXT_MAX_LENGTH = 2000;
 
 /**
  * The family's "about my child at home" notes. Each note is private until the
@@ -67,7 +71,7 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
   }, [childId]);
 
   const submit = async () => {
-    if (!text.trim()) return;
+    if (!text.trim() || isMarkdownOverLimit(text, NOTE_TEXT_MAX_LENGTH)) return;
     setSaving(true);
     try {
       const res = await createContribution(childId, { kind, text: text.trim(), isShared: shared });
@@ -165,7 +169,14 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
               </option>
             ))}
           </Select>
-          <Textarea id="contribution-text" label="Note" rows={3} value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} />
+          <RichTextEditor
+            id="contribution-text"
+            label="Note"
+            minRows={3}
+            value={text}
+            onChange={setText}
+            maxLength={NOTE_TEXT_MAX_LENGTH}
+          />
           <label className="flex items-center gap-2 text-[13px] font-medium text-brand-slate-600">
             <input
               type="checkbox"
@@ -180,7 +191,13 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
             <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>
               Cancel
             </Button>
-            <Button size="sm" loading={saving} disabled={!text.trim()} onClick={() => void submit()} data-testid="contribution-save">
+            <Button
+              size="sm"
+              loading={saving}
+              disabled={!text.trim() || isMarkdownOverLimit(text, NOTE_TEXT_MAX_LENGTH)}
+              onClick={() => void submit()}
+              data-testid="contribution-save"
+            >
               Save
             </Button>
           </div>
@@ -211,7 +228,7 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
                   {item.isShared ? 'Visible to the school team' : 'Private to your family'}
                 </span>
               </div>
-              <p className="whitespace-pre-wrap text-sm text-brand-slate-800">{item.text}</p>
+              <Markdown content={item.text} data-testid={`contribution-${item.id}-text`} />
             </div>
             {canEdit && (
               <div className="flex shrink-0 items-center gap-1">

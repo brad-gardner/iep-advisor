@@ -97,6 +97,22 @@ describe('FamilySummaryPanel', () => {
     expect(screen.getByTestId('family-summary-send-open')).not.toBeDisabled();
   });
 
+  it('renders the sent summary markdown as formatted HTML', async () => {
+    sharedDraftsApi.getMeetingSummary.mockResolvedValue(
+      makeSummary({
+        status: 'Sent',
+        body: 'The team **agreed** to update the reading goal.',
+        sentAt: '2026-09-11T00:00:00.000Z',
+        sentByName: 'Case Manager',
+      })
+    );
+    renderPanel();
+
+    const body = await screen.findByTestId('family-summary-sent-body');
+    expect(body.querySelector('strong')).toHaveTextContent('agreed');
+    expect(body).toHaveTextContent('The team agreed to update the reading goal.');
+  });
+
   it('surfaces a server refusal from a failed send', async () => {
     const user = userEvent.setup();
     sharedDraftsApi.getMeetingSummary.mockResolvedValue(makeSummary());

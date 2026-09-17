@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Notice } from '@/components/ui/notice';
-import { Textarea } from '@/components/ui/input';
+import { Markdown } from '@/components/ui/markdown';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/components/ui/toast';
 import { apiErrorMessage } from '@/lib/api-error';
@@ -140,11 +141,11 @@ export function FamilySummaryPanel({ meetingId }: FamilySummaryPanelProps) {
 
       {summary && summary.status === 'Draft' && (
         <div className="space-y-2">
-          <Textarea
+          <RichTextEditor
             label="Summary for the family"
             value={draftText}
-            onChange={(e) => setDraftText(e.target.value)}
-            rows={6}
+            onChange={setDraftText}
+            minRows={6}
             data-testid="family-summary-textarea"
           />
           <div className="flex flex-wrap gap-2">
@@ -172,9 +173,11 @@ export function FamilySummaryPanel({ meetingId }: FamilySummaryPanelProps) {
 
       {summary && summary.status === 'Sent' && (
         <div className="space-y-1" data-testid="family-summary-sent">
-          <p className="whitespace-pre-wrap rounded-card border border-brand-slate-200 bg-brand-slate-50 p-3 text-sm text-brand-slate-700">
-            {summary.body}
-          </p>
+          <Markdown
+            content={summary.body}
+            className="rounded-card border border-brand-slate-200 bg-brand-slate-50 p-3"
+            data-testid="family-summary-sent-body"
+          />
           <p className="text-xs text-brand-slate-400">
             Sent {summary.sentAt ? formatDate(summary.sentAt) : ''}
             {summary.sentByName ? ` by ${summary.sentByName}` : ''}

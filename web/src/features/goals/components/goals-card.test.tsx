@@ -70,6 +70,19 @@ describe('GoalsCard', () => {
     expect(screen.getByTestId('goal-trajectory-sparkline')).toBeInTheDocument();
   });
 
+  it('renders a stored markdown status reason as formatted HTML', async () => {
+    goalsApi.getStudentGoals.mockResolvedValue({
+      success: true,
+      data: [makeGoal({ status: 'NotMet', statusReason: 'Progress **stalled** after the winter break.' })],
+    });
+
+    renderCard();
+
+    await screen.findByText('Read grade-level text with 90% accuracy');
+    const strong = screen.getByText('stalled');
+    expect(strong.tagName).toBe('STRONG');
+  });
+
   it('shows "Insufficient data" honestly when the trajectory has fewer than two points', async () => {
     goalsApi.getStudentGoals.mockResolvedValue({
       success: true,

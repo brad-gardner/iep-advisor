@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Drawer } from '@/components/ui/drawer';
+import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
 import { AutosaveIndicator } from '@/features/admin/templates/components/autosave-indicator';
 import { SharedBanner } from '@/features/draft-sharing/components/shared-banner';
@@ -158,8 +159,8 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
 
           {detail.amendsVersionId != null && (
             <Notice variant="info" title={`Amendment of v${detail.amendsVersionNumber ?? detail.amendsVersionId}`}>
-              {detail.amendmentReason}
-              {detail.effectiveDate ? ` · Effective ${formatDate(detail.effectiveDate)}` : ''}
+              <Markdown content={detail.amendmentReason ?? ''} />
+              {detail.effectiveDate && <p className="mt-1">Effective {formatDate(detail.effectiveDate)}</p>}
             </Notice>
           )}
 

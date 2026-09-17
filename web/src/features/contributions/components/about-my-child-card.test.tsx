@@ -51,6 +51,18 @@ describe('AboutMyChildCard', () => {
     expect(api.updateContribution).toHaveBeenCalledWith(2, expect.objectContaining({ isShared: true }));
   });
 
+  it('renders stored markdown in a note as formatted HTML', async () => {
+    api.listContributions.mockResolvedValue({
+      success: true,
+      data: [{ ...note(1, true), text: 'Loves **dinosaurs** and reading.' }],
+    });
+    render(<AboutMyChildCard childId={4} childName="Jordan" canEdit />);
+
+    const text = await screen.findByTestId('contribution-1-text');
+    expect(text.querySelector('strong')).toHaveTextContent('dinosaurs');
+    expect(text).toHaveTextContent('Loves dinosaurs and reading.');
+  });
+
   it('is read-only for viewers', async () => {
     render(<AboutMyChildCard childId={4} childName="Jordan" canEdit={false} />);
     await waitFor(() => expect(screen.getByTestId('contribution-1')).toBeInTheDocument());

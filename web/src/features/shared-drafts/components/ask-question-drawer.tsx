@@ -3,7 +3,8 @@ import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { Notice } from '@/components/ui/notice';
-import { Textarea } from '@/components/ui/input';
+import { Markdown } from '@/components/ui/markdown';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { askDraftQuestion } from '../api/shared-drafts-api';
 import { useDraftReviewContext } from '../hooks/draft-review-context';
@@ -106,7 +107,11 @@ export function AskQuestionDrawer({
             {thread.map((note) => (
               <li key={note.id} className="rounded-card border border-brand-slate-200 p-3">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-medium text-brand-slate-800">{note.question}</p>
+                  <Markdown
+                    content={note.question}
+                    className="text-sm font-medium text-brand-slate-800"
+                    data-testid={`note-question-${note.id}`}
+                  />
                   <button
                     type="button"
                     onClick={() => handleDelete(note.id)}
@@ -117,7 +122,11 @@ export function AskQuestionDrawer({
                     <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-brand-slate-600">{note.answer}</p>
+                <Markdown
+                  content={note.answer}
+                  className="mt-1 text-sm text-brand-slate-600"
+                  data-testid={`note-answer-${note.id}`}
+                />
                 {note.citations.length > 0 && (
                   <ul className="mt-2 space-y-1 border-t border-brand-slate-100 pt-2" data-testid={`note-citations-${note.id}`}>
                     {note.citations.map((c, i) => (
@@ -146,15 +155,21 @@ export function AskQuestionDrawer({
         )}
 
         <form onSubmit={handleAsk} className="space-y-2">
-          <Textarea
+          <RichTextEditor
             label="Your question"
             value={question}
-            onChange={(e) => setQuestion(e.target.value)}
+            onChange={setQuestion}
             maxLength={MAX_QUESTION_LENGTH}
-            rows={3}
+            minRows={3}
+            disabled={isAsking}
             data-testid={`${testId}-input`}
           />
-          <Button type="submit" loading={isAsking} disabled={!question.trim()} data-testid={`${testId}-submit`}>
+          <Button
+            type="submit"
+            loading={isAsking}
+            disabled={!question.trim() || isMarkdownOverLimit(question, MAX_QUESTION_LENGTH)}
+            data-testid={`${testId}-submit`}
+          >
             Ask
           </Button>
         </form>

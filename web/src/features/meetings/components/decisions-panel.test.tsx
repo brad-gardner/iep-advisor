@@ -100,4 +100,16 @@ describe('DecisionsPanel', () => {
     expect(screen.queryByTestId('decision-edit-1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('decision-delete-1')).not.toBeInTheDocument();
   });
+
+  it('renders a stored markdown decision text as formatted HTML', async () => {
+    decisionsApi.getDecisions.mockResolvedValue({
+      success: true,
+      data: [makeDecision({ text: 'Team agreed to **increase** the reading fluency target.' })],
+    });
+    render(<DecisionsPanel meetingId={100} documentInstanceId={null} canManage />);
+
+    await screen.findByTestId('decision-1');
+    const strong = screen.getByText('increase');
+    expect(strong.tagName).toBe('STRONG');
+  });
 });

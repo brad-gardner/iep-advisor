@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Input, Textarea } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { useToast } from "@/components/ui/toast";
 import { create } from "../api/progress-reports-api";
 
@@ -72,11 +73,11 @@ export function CreateProgressReportForm({
         />
       </div>
 
-      <Textarea
+      <RichTextEditor
         label="Notes (optional)"
         value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        rows={3}
+        onChange={setNotes}
+        minRows={3}
         placeholder="Anything worth flagging about this report..."
         data-testid="pr-notes"
       />

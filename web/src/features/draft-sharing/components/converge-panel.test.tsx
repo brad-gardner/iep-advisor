@@ -91,6 +91,22 @@ describe('ConvergePanel', () => {
     expect(screen.getByTestId('resolve-response-submit')).not.toBeDisabled();
   });
 
+  it('renders stored markdown in a response as formatted HTML', async () => {
+    draftSharingApi.getConverge.mockResolvedValue({
+      success: true,
+      data: makeConverge({ openResponses: [makeResponse({ text: 'This is **great** news.' })] }),
+    });
+
+    render(
+      <ToastProvider>
+        <ConvergePanel instanceId={7} status="Draft" templateVersion={templateVersion} />
+      </ToastProvider>
+    );
+
+    const text = await screen.findByTestId('response-card-9-text');
+    expect(text.querySelector('strong')).toHaveTextContent('great');
+  });
+
   it('resolves a response and moves it to the resolved list', async () => {
     const user = userEvent.setup();
     draftSharingApi.getConverge.mockResolvedValue({ success: true, data: makeConverge({ openResponses: [makeResponse()] }) });

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -158,9 +159,9 @@ export function EtrViewerPage() {
             Notes
           </Button>
           {notesExpanded && (
-            <p className="mt-1 text-sm text-brand-slate-600 whitespace-pre-wrap bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-              {etr.notes}
-            </p>
+            <div className="mt-1 bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+              <Markdown content={etr.notes ?? ''} className="text-sm text-brand-slate-600" />
+            </div>
           )}
         </div>
       )}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Drawer } from '@/components/ui/drawer';
+import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/lib/format-date';
@@ -95,7 +96,9 @@ export function GoalHistoryDrawer({ open, onClose, studentId, lineageId, goalTex
                 <GoalStatusBadge status={r.status} />
               </div>
               <p className="text-sm text-brand-slate-800">{r.goalText}</p>
-              {r.statusReason && <p className="mt-1 text-xs text-brand-slate-500">{r.statusReason}</p>}
+              {r.statusReason && (
+                <Markdown content={r.statusReason} className="mt-1 text-xs text-brand-slate-500" />
+              )}
             </li>
           ))}
         </ol>

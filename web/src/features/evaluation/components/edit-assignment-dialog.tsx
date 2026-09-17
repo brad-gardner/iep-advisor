@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Textarea } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { toDateInputValue } from '@/lib/format-date';
 import { updateEvaluatorAssignment } from '../api/evaluation-api';
@@ -15,6 +16,8 @@ interface EditAssignmentDialogProps {
   onChanged: (updated: EvaluatorAssignmentDto) => void;
 }
 
+const NOTES_MAX_LENGTH = 2000;
+
 /** Edit an evaluator assignment's due date and notes. */
 export function EditAssignmentDialog({ studentId, assignment, onClose, onChanged }: EditAssignmentDialogProps) {
   const [dueDate, setDueDate] = useState(() => toDateInputValue(assignment.dueDate));
@@ -24,6 +27,7 @@ export function EditAssignmentDialog({ studentId, assignment, onClose, onChanged
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isMarkdownOverLimit(notes, NOTES_MAX_LENGTH)) return;
     setIsSubmitting(true);
     setError(null);
     try {
@@ -57,7 +61,12 @@ export function EditAssignmentDialog({ studentId, assignment, onClose, onChanged
           <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} loading={isSubmitting} data-testid="edit-assignment-submit">
+          <Button
+            onClick={handleSubmit}
+            loading={isSubmitting}
+            disabled={isMarkdownOverLimit(notes, NOTES_MAX_LENGTH)}
+            data-testid="edit-assignment-submit"
+          >
             Save
           </Button>
         </>
@@ -76,12 +85,12 @@ export function EditAssignmentDialog({ studentId, assignment, onClose, onChanged
           onChange={(e) => setDueDate(e.target.value)}
           data-testid="edit-assignment-due-date"
         />
-        <Textarea
+        <RichTextEditor
           label="Notes"
           value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-          maxLength={2000}
+          onChange={setNotes}
+          minRows={3}
+          maxLength={NOTES_MAX_LENGTH}
           data-testid="edit-assignment-notes"
         />
       </form>

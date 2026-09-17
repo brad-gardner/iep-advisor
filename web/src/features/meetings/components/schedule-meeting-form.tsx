@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Select, Textarea } from '@/components/ui/input';
+import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api-error';
 import { createMeeting, updateMeeting } from '../api/meetings-api';
@@ -240,12 +241,12 @@ export function ScheduleMeetingForm({
         onChange={(e) => setVideoUrl(e.target.value)}
         placeholder="Optional"
       />
-      <Textarea
+      <RichTextEditor
         id="meeting-notes"
         label="Notes"
         value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        rows={3}
+        onChange={setNotes}
+        minRows={3}
         placeholder="Optional"
       />
 

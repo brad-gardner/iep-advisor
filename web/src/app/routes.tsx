@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/use-auth';
+import { warmRichTextEditor } from '@/components/ui/rich-text-editor';
 import { MainLayout } from '@/components/layouts/main-layout';
 import { AuthLayout } from '@/components/layouts/auth-layout';
 import { LoginPage } from '@/features/auth/components/login-page';
@@ -90,6 +92,17 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
+  return <WarmEditorOnIdle>{children}</WarmEditorOnIdle>;
+}
+
+// Every signed-in surface can reach a rich text field (notes, questions,
+// document narratives), so warm the editor once the first protected page is
+// idle rather than on the first field someone opens. Public pages never
+// trigger the download.
+function WarmEditorOnIdle({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    warmRichTextEditor();
+  }, []);
   return <>{children}</>;
 }
 

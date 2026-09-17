@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Spinner } from '@/components/ui/spinner';
@@ -99,8 +100,8 @@ export function AuthoredVersionDetailPage() {
       {version.amendmentReason && (
         <div className="mb-4">
           <Notice variant="info" title="Amendment reason">
-            {version.amendmentReason}
-            {version.effectiveDate ? ` · Effective ${formatDate(version.effectiveDate)}` : ''}
+            <Markdown content={version.amendmentReason} />
+            {version.effectiveDate && <p className="mt-1">Effective {formatDate(version.effectiveDate)}</p>}
           </Notice>
         </div>
       )}

@@ -145,4 +145,22 @@ describe('EvaluationCard lifecycle', () => {
     await screen.findByText('Document editor');
     expect(evaluationApi.createIepFromEtr).toHaveBeenCalledWith(5);
   });
+
+  it('renders a stored markdown determination rationale as formatted HTML', async () => {
+    evaluationApi.getEvaluationCase.mockResolvedValue({
+      success: true,
+      data: baseCase({
+        status: 'Determined',
+        eligibilityOutcome: 'Eligible',
+        determinationDate: '2026-02-01T00:00:00.000Z',
+        determinationRationale: 'Meets criteria **under IDEA**.',
+      }),
+    });
+
+    renderCard();
+
+    await screen.findByTestId('evaluation-determination-summary');
+    const strong = screen.getByText('under IDEA');
+    expect(strong.tagName).toBe('STRONG');
+  });
 });

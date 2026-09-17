@@ -1,4 +1,5 @@
 import { Card } from '@/components/ui/card';
+import { Markdown } from '@/components/ui/markdown';
 import type { IepVersionDto } from '../types';
 
 interface VersionSnapshotProps {
@@ -32,9 +33,11 @@ function SectionsBlock({ sections }: { sections: IepVersionDto['sections'] }) {
       {sections.map((s) => (
         <Card key={s.id}>
           <h3 className="text-sm font-medium text-brand-slate-700 mb-1">{s.sectionKind}</h3>
-          <p className="text-sm text-brand-slate-600 whitespace-pre-wrap">
-            {s.richText || <span className="text-brand-slate-400">—</span>}
-          </p>
+          {s.richText ? (
+            <Markdown content={s.richText} className="text-sm text-brand-slate-600" />
+          ) : (
+            <p className="text-sm text-brand-slate-400">—</p>
+          )}
         </Card>
       ))}
     </section>

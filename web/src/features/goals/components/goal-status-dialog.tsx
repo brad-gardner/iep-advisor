@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
-import { Textarea } from '@/components/ui/input';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { updateGoalStatus } from '../api/goals-api';
 import type { GoalRecordDto, SettableGoalRecordStatus } from '../types';
@@ -15,6 +15,7 @@ interface GoalStatusDialogProps {
 }
 
 const MIN_REASON_LENGTH = 1;
+const REASON_MAX_LENGTH = 1000;
 
 /** Mark a goal Met or Not met (or reopen it to Active). The server requires a
  *  reason for Not met; the dialog mirrors that so a blank reason never
@@ -26,7 +27,9 @@ export function GoalStatusDialog({ open, goal, onClose, onChanged }: GoalStatusD
   const [error, setError] = useState<string | null>(null);
 
   const reasonRequired = status === 'NotMet';
-  const canSubmit = !reasonRequired || reason.trim().length >= MIN_REASON_LENGTH;
+  const canSubmit =
+    (!reasonRequired || reason.trim().length >= MIN_REASON_LENGTH) &&
+    !isMarkdownOverLimit(reason, REASON_MAX_LENGTH);
 
   const reset = () => {
     setStatus('Met');
@@ -108,12 +111,12 @@ export function GoalStatusDialog({ open, goal, onClose, onChanged }: GoalStatusD
           </div>
         </fieldset>
 
-        <Textarea
+        <RichTextEditor
           label={reasonRequired ? 'Reason *' : 'Reason'}
           value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={3}
-          maxLength={1000}
+          onChange={setReason}
+          minRows={3}
+          maxLength={REASON_MAX_LENGTH}
           required={reasonRequired}
           data-testid="goal-status-dialog-reason"
         />

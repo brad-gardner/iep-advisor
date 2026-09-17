@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api-error';
@@ -112,7 +113,7 @@ export function DecisionsPanel({ meetingId, documentInstanceId, canManage }: Dec
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   {d.targetLabel && <p className="text-xs font-medium text-brand-slate-500">{d.targetLabel}</p>}
-                  <p className="text-sm text-brand-slate-800">{d.text}</p>
+                  <Markdown content={d.text} className="text-sm text-brand-slate-800" />
                   <p className="mt-1 text-xs text-brand-slate-400">
                     {d.recordedByName ?? 'Staff'} · {formatDate(d.createdAt)}
                     {d.appliedAt ? ' · Applied to draft' : ''}

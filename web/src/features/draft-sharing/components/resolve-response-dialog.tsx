@@ -2,7 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
-import { Textarea } from '@/components/ui/input';
+import { Markdown } from '@/components/ui/markdown';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { resolveResponse } from '../api/draft-sharing-api';
 import { DRAFT_RESPONSE_KIND_LABELS, type DraftResponseDto } from '../types';
@@ -40,7 +41,7 @@ export function ResolveResponseDialog({ open, onClose, response, onResolved }: R
 
   if (!response) return null;
 
-  const canSubmit = reply.trim().length > 0 || resolvedInDraft;
+  const canSubmit = (reply.trim().length > 0 || resolvedInDraft) && !isMarkdownOverLimit(reply, MAX_REPLY_LENGTH);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -72,7 +73,7 @@ export function ResolveResponseDialog({ open, onClose, response, onResolved }: R
           <p className="font-medium text-brand-slate-800">
             {response.parentName} · {DRAFT_RESPONSE_KIND_LABELS[response.kind]}
           </p>
-          <p className="mt-1 whitespace-pre-wrap">{response.text}</p>
+          <Markdown content={response.text} className="mt-1" data-testid="resolve-response-quoted-text" />
         </div>
 
         {error && (
@@ -81,12 +82,12 @@ export function ResolveResponseDialog({ open, onClose, response, onResolved }: R
           </div>
         )}
 
-        <Textarea
+        <RichTextEditor
           label="Reply (sent to the family)"
           value={reply}
-          onChange={(e) => setReply(e.target.value)}
+          onChange={setReply}
           maxLength={MAX_REPLY_LENGTH}
-          rows={4}
+          minRows={4}
           data-testid="resolve-reply-input"
         />
 

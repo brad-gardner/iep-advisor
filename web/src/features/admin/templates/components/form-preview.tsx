@@ -1,4 +1,5 @@
 import { Card } from '@/components/ui/card';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import type { TemplateFieldDto, TemplateSectionDto } from '../types';
 import { parseConfig, readColumnOptions, type TableColumn } from '../template-config';
 
@@ -71,7 +72,14 @@ function PreviewField({ field }: { field: TemplateFieldDto }) {
       {labelNode}
       {config.kind === 'Text' && <input id={fieldId} type="text" disabled className={inputClass} />}
       {config.kind === 'RichText' && (
-        <textarea id={fieldId} disabled rows={3} className={`${inputClass} resize-none`} />
+        <RichTextEditor
+          id={fieldId}
+          value=""
+          onChange={() => {}}
+          disabled
+          minRows={3}
+          aria-label={field.label || 'Untitled field'}
+        />
       )}
       {config.kind === 'Date' && <input id={fieldId} type="date" disabled className={inputClass} />}
       {config.kind === 'Select' && (

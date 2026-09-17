@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
-import { Textarea } from '@/components/ui/input';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { Spinner } from '@/components/ui/spinner';
 import { apiErrorMessage } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
@@ -67,7 +67,11 @@ export function ShareWithFamilyModal({ open, onClose, instanceId, onShared }: Sh
     }
   };
 
-  const canShare = Boolean(preview) && preview!.policyEnabled && preview!.recipients.length > 0;
+  const canShare =
+    Boolean(preview) &&
+    preview!.policyEnabled &&
+    preview!.recipients.length > 0 &&
+    !isMarkdownOverLimit(message, MAX_MESSAGE_LENGTH);
 
   return (
     <Modal open={open} onClose={onClose} preventClose={isSharing} title="Share with family" data-testid="share-with-family-modal">
@@ -122,12 +126,12 @@ export function ShareWithFamilyModal({ open, onClose, instanceId, onShared }: Sh
               </Notice>
             )}
 
-            <Textarea
+            <RichTextEditor
               label="Note to the family (optional)"
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={setMessage}
               maxLength={MAX_MESSAGE_LENGTH}
-              rows={3}
+              minRows={3}
               data-testid="share-message-input"
             />
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Markdown } from '@/components/ui/markdown';
 import type { StudentWorkspaceEntryDto } from '../types';
 import { EntryEditor } from './entry-editor';
 import { ShareToggle } from './share-toggle';
@@ -44,9 +45,7 @@ export function EntryCard({
 
   return (
     <Card className="space-y-3" data-testid={testId}>
-      <p className="whitespace-pre-wrap text-sm text-brand-slate-800" data-testid={`${testId}-content`}>
-        {entry.content}
-      </p>
+      <Markdown content={entry.content} data-testid={`${testId}-content`} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <ShareToggle entry={entry} onToggle={onSetShareable} testIdPrefix={testId} />
         <div className="flex items-center gap-1">

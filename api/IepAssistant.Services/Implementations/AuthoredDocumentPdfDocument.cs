@@ -1,8 +1,6 @@
 using System.Globalization;
-using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Models;
 using QuestPDF.Fluent;
@@ -76,9 +74,6 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
 {
     private const string OhStateCode = "OH";
     private const int StudentSignatureMinAge = 14;
-
-    private static readonly Regex HtmlTag = new("<[^>]+>", RegexOptions.Compiled);
-    private static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
 
     private readonly string _documentTypeDisplayName;
     private readonly int _versionNumber;
@@ -400,8 +395,10 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                 break;
 
             case FieldType.RichText:
-                // Render as plain, sanitized text — never execute markup (G-d.3 / defense-in-depth).
-                LabeledText(container, field.Label, ToPlainText(AsString(node)));
+                // Render the stored markdown structurally (bold/italic/strike, headings, lists, quotes,
+                // links) rather than flattening it to one line of "**"/"- " syntax (G-d.3 / defense in
+                // depth: unknown/HTML nodes still degrade to plain text — see MarkdownPdfPlanBuilder).
+                RichTextBlock(container, field.Label, AsString(node));
                 break;
 
             case FieldType.Date:
@@ -535,15 +532,6 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
         };
     }
 
-    private static string ToPlainText(string? html)
-    {
-        if (string.IsNullOrWhiteSpace(html))
-            return string.Empty;
-        var noTags = HtmlTag.Replace(html, " ");
-        var decoded = WebUtility.HtmlDecode(noTags);
-        return Whitespace.Replace(decoded, " ").Trim();
-    }
-
     private static List<SelectOption> ParseSelectOptions(string? configJson)
     {
         if (string.IsNullOrWhiteSpace(configJson))
@@ -590,6 +578,125 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
             col.Item().Text(label).SemiBold().FontSize(11);
             col.Item().Text(value);
         });
+    }
+
+    // ---------------------------------------------------------------- Markdown (RichText) rendering
+    //
+    // Renders from a MarkdownPdfPlan (MarkdownPdfPlan.cs) rather than walking the Markdig AST directly:
+    // MarkdownPdfPlanBuilder.Build does the "what does this markdown mean" work (paragraphs/headings/
+    // lists/quotes, bold/italic/strike flags, link-scheme validation, nesting-depth capping) as a pure,
+    // unit-testable step; this class only turns that plan into QuestPDF elements. Any block/inline type
+    // the plan builder doesn't specifically recognize (including a GFM table, or raw HTML that slipped
+    // past RichTextSanitizer) still degrades to plain text there — defense in depth, never a dropped
+    // field (G-d.3) — and list/quote nesting beyond MarkdownPdfPlanBuilder.MaxNestingDepth renders flat
+    // instead of compounding indentation/padding without bound.
+
+    private static void RichTextBlock(IContainer container, string label, string? markdown)
+    {
+        container.Column(col =>
+        {
+            col.Item().Text(label).SemiBold().FontSize(11);
+            col.Item().Element(c => ComposeMarkdown(c, markdown));
+        });
+    }
+
+    private static void ComposeMarkdown(IContainer container, string? markdown)
+    {
+        var plan = MarkdownPdfPlanBuilder.Build(markdown);
+        if (plan.Blocks.Count == 0)
+        {
+            container.Text(string.Empty);
+            return;
+        }
+
+        container.Column(col =>
+        {
+            col.Spacing(4);
+            RenderPlanBlocks(col, plan.Blocks);
+        });
+    }
+
+    private static void RenderPlanBlocks(ColumnDescriptor col, IReadOnlyList<MarkdownPdfBlock> blocks)
+    {
+        foreach (var block in blocks)
+        {
+            switch (block)
+            {
+                case MarkdownPdfParagraph paragraph:
+                    col.Item().Text(text => RenderRuns(text, paragraph.Runs));
+                    break;
+
+                case MarkdownPdfHeading heading:
+                {
+                    var size = heading.Level switch { 1 => 15f, 2 => 14f, _ => 12f };
+                    col.Item().Text(text =>
+                    {
+                        text.DefaultTextStyle(s => s.FontSize(size).SemiBold());
+                        RenderRuns(text, heading.Runs);
+                    });
+                    break;
+                }
+
+                case MarkdownPdfQuote quote:
+                    // At most MaxNestingDepth of these actually get nested (see MarkdownPdfPlanBuilder),
+                    // so this fixed-per-level padding can never compound into an impossible constraint.
+                    col.Item().PaddingLeft(4).BorderLeft(2).BorderColor(Colors.Grey.Lighten1).PaddingLeft(8)
+                        .Column(inner =>
+                        {
+                            inner.Spacing(2);
+                            RenderPlanBlocks(inner, quote.Blocks);
+                        });
+                    break;
+
+                case MarkdownPdfListItem item:
+                    // Flat: one Column item per list item at every depth, indent-only via PaddingLeft —
+                    // no Row/Column nested per nesting level (see MarkdownPdfPlanBuilder's remarks on the
+                    // exponential-time defect this replaces).
+                    col.Item().PaddingLeft(item.Depth * 14).Text(text =>
+                    {
+                        text.Span(item.Marker + " ");
+                        RenderRuns(text, item.Runs);
+                    });
+                    break;
+            }
+        }
+    }
+
+    private static void RenderRuns(TextDescriptor text, IReadOnlyList<MarkdownPdfRun> runs)
+    {
+        foreach (var run in runs)
+        {
+            if (run.Href != null)
+                EmitMarkdownLink(text, run);
+            else
+                EmitMarkdownSpan(text, run);
+        }
+    }
+
+    private static void EmitMarkdownSpan(TextDescriptor text, MarkdownPdfRun run)
+    {
+        if (string.IsNullOrEmpty(run.Text))
+            return;
+        var span = text.Span(run.Text);
+        if (run.Bold) span.Bold();
+        if (run.Italic) span.Italic();
+        if (run.Strike) span.Strikethrough();
+    }
+
+    private static void EmitMarkdownLink(TextDescriptor text, MarkdownPdfRun run)
+    {
+        if (string.IsNullOrEmpty(run.Text))
+            return;
+
+        // Defense in depth: MarkdownPdfPlanBuilder already checked RichTextSanitizer.IsSafeUrl before
+        // setting Href, but this is the sink that actually makes a url actionable (QuestPDF's
+        // Hyperlink() annotation), so re-validate here too — a disallowed scheme renders as a plain,
+        // non-linked span rather than ever reaching Hyperlink() (reviewer pass1 P1: link scheme bypass).
+        var span = RichTextSanitizer.IsSafeUrl(run.Href!) ? text.Hyperlink(run.Text, run.Href!) : text.Span(run.Text);
+        span.Underline();
+        if (run.Bold) span.Bold();
+        if (run.Italic) span.Italic();
+        if (run.Strike) span.Strikethrough();
     }
 
     private static void HeaderCell(TableCellDescriptor header, string text)

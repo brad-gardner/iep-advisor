@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { Textarea, Select } from '@/components/ui/input';
+import { Select } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
+
+const GOAL_TEXT_MAX_LENGTH = 500;
 
 const CATEGORIES = [
   { value: '', label: 'No category' },
@@ -38,6 +41,10 @@ export function AdvocacyGoalForm({
       setError('Goal must be at least 10 characters.');
       return;
     }
+    if (isMarkdownOverLimit(goalText, GOAL_TEXT_MAX_LENGTH)) {
+      setError(`Goal must be ${GOAL_TEXT_MAX_LENGTH} characters or fewer.`);
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -62,19 +69,16 @@ export function AdvocacyGoalForm({
     <form onSubmit={handleSubmit} className="space-y-3" data-testid="goal-form">
       {error && <div data-testid="goal-form-error"><Notice variant="error" title={error} /></div>}
 
-      <div>
-        <Textarea
-          label="Advocacy Goal"
-          id="goal-text"
-          value={goalText}
-          onChange={(e) => setGoalText(e.target.value)}
-          placeholder="Describe your priority for your child (e.g., 'Improve reading fluency to grade level')"
-          rows={3}
-          maxLength={500}
-          data-testid="goal-text-input"
-        />
-        <p className="text-[11px] text-brand-slate-300 mt-1">{goalText.length}/500 characters</p>
-      </div>
+      <RichTextEditor
+        label="Advocacy Goal"
+        id="goal-text"
+        value={goalText}
+        onChange={setGoalText}
+        placeholder="Describe your priority for your child (e.g., 'Improve reading fluency to grade level')"
+        minRows={3}
+        maxLength={GOAL_TEXT_MAX_LENGTH}
+        data-testid="goal-text-input"
+      />
 
       <div className="flex gap-3 items-end">
         <div className="flex-1">
@@ -102,7 +106,7 @@ export function AdvocacyGoalForm({
           <Button
             type="submit"
             loading={isSubmitting}
-            disabled={goalText.trim().length < 10}
+            disabled={goalText.trim().length < 10 || isMarkdownOverLimit(goalText, GOAL_TEXT_MAX_LENGTH)}
             data-testid="goal-form-submit"
           >
             {submitLabel}

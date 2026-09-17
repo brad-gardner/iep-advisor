@@ -34,3 +34,105 @@
   h2 { font-size: 1.375rem; }
   h3 { font-size: 1.0625rem; }
 }
+
+/*
+ * Shared markdown typography for the `Markdown` display component
+ * (`.prose-iep`) and the TipTap editor's contenteditable (`.ProseMirror`,
+ * the class TipTap adds automatically). Both selectors carry the same rules
+ * so a note looks the same while being typed as it does once rendered.
+ * `@tailwindcss/typography` isn't installed, so this is hand-written.
+ */
+@layer components {
+  .prose-iep,
+  .ProseMirror {
+    @apply text-sm leading-relaxed text-brand-slate-800;
+  }
+
+  .prose-iep p,
+  .ProseMirror p {
+    @apply my-2;
+  }
+
+  .prose-iep p:first-child,
+  .ProseMirror p:first-child {
+    @apply mt-0;
+  }
+
+  .prose-iep p:last-child,
+  .ProseMirror p:last-child {
+    @apply mb-0;
+  }
+
+  .prose-iep h2,
+  .ProseMirror h2 {
+    @apply mb-2 mt-4 text-[1.125rem];
+  }
+
+  .prose-iep h3,
+  .ProseMirror h3 {
+    @apply mb-1.5 mt-3 text-[1rem];
+  }
+
+  .prose-iep ul,
+  .ProseMirror ul {
+    @apply my-2 list-disc pl-5;
+  }
+
+  .prose-iep ol,
+  .ProseMirror ol {
+    @apply my-2 list-decimal pl-5;
+  }
+
+  .prose-iep li,
+  .ProseMirror li {
+    @apply my-1;
+  }
+
+  /* TipTap wraps each list item's text in a <p>; without this a bullet list
+     gets double the vertical rhythm of its own list spacing. */
+  .prose-iep li > p,
+  .ProseMirror li > p {
+    @apply my-0;
+  }
+
+  .prose-iep blockquote,
+  .ProseMirror blockquote {
+    @apply my-2 border-l-[3px] border-brand-slate-200 pl-3 italic text-brand-slate-600;
+  }
+
+  .prose-iep strong,
+  .ProseMirror strong {
+    @apply font-semibold text-brand-slate-800;
+  }
+
+  .prose-iep code,
+  .ProseMirror code {
+    @apply rounded bg-brand-slate-100 px-1 py-0.5 font-mono text-[0.85em] text-brand-slate-700;
+  }
+
+  .prose-iep a,
+  .ProseMirror a {
+    @apply text-brand-teal-600 underline underline-offset-2;
+  }
+
+  .prose-iep a:hover,
+  .ProseMirror a:hover {
+    @apply text-brand-teal-700;
+  }
+
+  /* The editor never shows a focus ring on the contenteditable itself — the
+     wrapper's `focus-within` ring (rich-text-editor.tsx) carries that. */
+  .ProseMirror:focus {
+    outline: none;
+  }
+
+  /* @tiptap/extension-placeholder marks the empty first paragraph with
+     `is-editor-empty` and the placeholder text in `data-placeholder`. */
+  .ProseMirror p.is-editor-empty:first-child::before {
+    @apply text-brand-slate-300;
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+}

@@ -20,6 +20,7 @@ import {
 import { getChild, setCurrentIep } from "@/features/children/api/children-api";
 import { usePolling } from "@/hooks/use-polling";
 import { Badge } from "@/components/ui/badge";
+import { Markdown } from "@/components/ui/markdown";
 import { useIepAnalysis } from "../hooks/use-iep-analysis";
 import { useAdvocacyGoals } from "@/features/advocacy-goals/hooks/use-advocacy-goals";
 import { AnalysisTab } from "./analysis-tab";
@@ -341,9 +342,9 @@ export function IepViewerPage() {
             Notes
           </Button>
           {notesExpanded && (
-            <p className="mt-1 text-sm text-brand-slate-600 whitespace-pre-wrap bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-              {document.notes}
-            </p>
+            <div className="mt-1 bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+              <Markdown content={document.notes ?? ''} className="text-sm text-brand-slate-600" />
+            </div>
           )}
         </div>
       )}

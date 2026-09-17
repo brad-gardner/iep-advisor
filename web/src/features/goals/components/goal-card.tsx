@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Markdown } from '@/components/ui/markdown';
 import { formatDate } from '@/lib/format-date';
 import { GoalHistoryDrawer } from './goal-history-drawer';
 import { GoalStatusBadge } from './goal-status-badge';
@@ -74,7 +75,7 @@ export function GoalCard({
       </dl>
 
       {goal.statusReason && (goal.status === 'NotMet' || goal.status === 'Retired') && (
-        <p className="text-xs text-brand-slate-500">{goal.statusReason}</p>
+        <Markdown content={goal.statusReason} className="text-xs text-brand-slate-500" />
       )}
 
       <div>

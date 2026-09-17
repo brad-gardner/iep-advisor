@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Textarea } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
 import { useToast } from '@/components/ui/toast';
 import { addGoalObservation } from '../api/goals-api';
@@ -13,6 +14,8 @@ interface LogProgressFormProps {
   onCancel: () => void;
   'data-testid'?: string;
 }
+
+const NOTE_MAX_LENGTH = 2000;
 
 /**
  * The C11 provider slice: a sub-60-second progress log — value, unit, note
@@ -34,6 +37,10 @@ export function LogProgressForm({ goalRecordId, onLogged, onCancel, 'data-testid
     const trimmedNote = note.trim();
     if (!trimmedValue && !trimmedNote) {
       setError('Enter a value or a note.');
+      return;
+    }
+    if (isMarkdownOverLimit(note, NOTE_MAX_LENGTH)) {
+      setError(`Note must be ${NOTE_MAX_LENGTH} characters or fewer.`);
       return;
     }
     const parsedValue = trimmedValue ? Number(trimmedValue) : undefined;
@@ -86,19 +93,25 @@ export function LogProgressForm({ goalRecordId, onLogged, onCancel, 'data-testid
           data-testid={testId ? `${testId}-unit` : undefined}
         />
       </div>
-      <Textarea
+      <RichTextEditor
         label="Note"
-        rows={2}
-        maxLength={2000}
+        minRows={2}
+        maxLength={NOTE_MAX_LENGTH}
         value={note}
-        onChange={(e) => setNote(e.target.value)}
+        onChange={setNote}
         data-testid={testId ? `${testId}-note` : undefined}
       />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={isSubmitting}>
           Cancel
         </Button>
-        <Button type="submit" size="sm" loading={isSubmitting} data-testid={testId ? `${testId}-submit` : undefined}>
+        <Button
+          type="submit"
+          size="sm"
+          loading={isSubmitting}
+          disabled={isMarkdownOverLimit(note, NOTE_MAX_LENGTH)}
+          data-testid={testId ? `${testId}-submit` : undefined}
+        >
           Log progress
         </Button>
       </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/lib/format-date';
@@ -77,7 +78,7 @@ export function FamilyContactCard({ studentId }: FamilyContactCardProps) {
                       {FAMILY_CONTACT_METHOD_LABELS[a.method]} · {FAMILY_CONTACT_OUTCOME_LABELS[a.outcome]} ·{' '}
                       {formatDate(a.attemptedAt)}
                     </p>
-                    {a.note && <p className="text-xs text-brand-slate-500">{a.note}</p>}
+                    {a.note && <Markdown content={a.note} className="text-xs text-brand-slate-500" />}
                   </li>
                 ))}
               </ul>
@@ -116,7 +117,7 @@ export function FamilyContactCard({ studentId }: FamilyContactCardProps) {
                     <p className="text-brand-slate-700">
                       {FAMILY_CONTACT_METHOD_LABELS[i.method]} · {formatDate(i.receivedAt)}
                     </p>
-                    <p className="text-xs text-brand-slate-500">{i.summary}</p>
+                    <Markdown content={i.summary} className="text-xs text-brand-slate-500" />
                   </li>
                 ))}
               </ul>

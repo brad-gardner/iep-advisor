@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Textarea } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
+import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
 import { apiErrorMessage } from '@/lib/api-error';
 import { amendVersion } from '../api/documents-api';
 
 const MIN_REASON_LENGTH = 10;
+const REASON_MAX_LENGTH = 1000;
 
 interface AmendDialogProps {
   open: boolean;
@@ -29,7 +31,7 @@ export function AmendDialog({ open, versionId, onClose, onAmended }: AmendDialog
   const [error, setError] = useState<string | null>(null);
 
   const trimmedReason = reason.trim();
-  const canSubmit = trimmedReason.length >= MIN_REASON_LENGTH;
+  const canSubmit = trimmedReason.length >= MIN_REASON_LENGTH && !isMarkdownOverLimit(reason, REASON_MAX_LENGTH);
 
   const reset = () => {
     setReason('');
@@ -100,12 +102,12 @@ export function AmendDialog({ open, versionId, onClose, onAmended }: AmendDialog
           </div>
         )}
 
-        <Textarea
-          label="Reason for the amendment *"
+        <RichTextEditor
+          label="Reason for the amendment"
           value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={3}
-          maxLength={1000}
+          onChange={setReason}
+          minRows={3}
+          maxLength={REASON_MAX_LENGTH}
           required
           data-testid="amend-dialog-reason"
         />
