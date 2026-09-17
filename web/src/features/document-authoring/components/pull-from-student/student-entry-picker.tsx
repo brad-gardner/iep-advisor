@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Markdown } from '@/components/ui/markdown';
 import { entryKindLabel } from '@/features/student/lib/entry-kinds';
 import type { StudentWorkspaceEntryDto } from '@/features/student/types';
 
@@ -68,9 +69,7 @@ export function StudentEntryPicker({
             <span className="block text-[11px] font-medium uppercase tracking-wide text-brand-teal-600">
               {entryKindLabel(entry.entryKind)}
             </span>
-            <span className="mt-0.5 block whitespace-pre-wrap text-sm text-brand-slate-800">
-              {entry.content}
-            </span>
+            <Markdown content={entry.content} className="mt-0.5 block text-sm text-brand-slate-800" />
           </button>
         ))}
     </div>

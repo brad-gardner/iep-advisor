@@ -36,6 +36,8 @@ vi.mock('@/components/ui/rich-text-editor', async () => {
     maxLength,
     required,
     className,
+    onFocus,
+    onBlur,
     'data-testid': dataTestId,
     'aria-label': ariaLabel,
   }: RichTextEditorProps) {
@@ -53,6 +55,8 @@ vi.mock('@/components/ui/rich-text-editor', async () => {
         required,
         'aria-label': ariaLabel,
         'data-testid': dataTestId,
+        onFocus,
+        onBlur,
         onChange: (e: ChangeEvent<HTMLTextAreaElement>) => onChange(e.target.value),
       })
     );
