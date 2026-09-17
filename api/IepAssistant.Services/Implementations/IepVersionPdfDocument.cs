@@ -80,7 +80,10 @@ public sealed class IepVersionPdfDocument : IDocument
             col.Item().Column(inner =>
             {
                 inner.Item().Text(s.SectionKind.ToString()).Bold().FontSize(11);
-                inner.Item().Text(s.RichText ?? string.Empty);
+                // s.RichText is markdown (same TipTap editors as the authored-document RichText field) —
+                // flatten it structurally rather than printing raw "**"/"- " syntax. This legacy document
+                // keeps its plain label/value look, so plain text (not the styled block renderer) fits.
+                inner.Item().Text(MarkdownText.ToPlainText(s.RichText));
             });
         }
     }

@@ -197,4 +197,71 @@ public sealed class AuthoredDocumentPdfDocumentTests
         Assert.DoesNotContain("Amendment", doc.Outline);
         Assert.Contains("Participants", doc.Outline);
     }
+
+    [Fact]
+    public void GenericLayout_RichTextField_RendersMarkdownStructurally_WithoutThrowing()
+    {
+        // This file asserts the composed Outline rather than PDF bytes (see the class doc) — there is no
+        // PDF-text-extraction dependency here to also assert "**"/"- " never appear in the rendered
+        // output. This proves the markdown AST walk (ComposeMarkdownBlocks/ComposeMarkdownInline) runs
+        // end to end for a realistic mix — bold, a list, a link — without throwing, which is the failure
+        // mode a regression here would actually produce (an unhandled Markdig node, a null Inline, etc.);
+        // MarkdownTextTests separately proves the text itself comes out free of markdown syntax.
+        var richKey = Guid.NewGuid();
+        var tree = new TemplateVersionDetailModel
+        {
+            VersionNumber = 1,
+            Sections = new List<TemplateSectionModel>
+            {
+                new()
+                {
+                    Id = 1, Title = "Present Levels", DisplayOrder = 0,
+                    Fields = new List<TemplateFieldModel>
+                    {
+                        new() { Id = 1, FieldKey = richKey, FieldType = FieldType.RichText, Label = "Summary", Required = true, DisplayOrder = 0 }
+                    }
+                }
+            }
+        };
+        var markdown = "Reads at **grade level** with _some_ support.\n\n" +
+            "- Strength: phonics\n- Strength: fluency\n\n" +
+            "See [progress report](https://example.com/report) for detail.";
+        var markdownJson = JsonSerializer.Serialize(markdown);
+        var values = $$"""{ "{{richKey}}": {{markdownJson}} }""";
+
+        var doc = new AuthoredDocumentPdfDocument("IEP", 1, new DateTime(2026, 1, 1), tree, values);
+        var bytes = doc.GeneratePdf();
+
+        Assert.NotEmpty(bytes);
+        Assert.Equal(new[] { "Header", "Section: Present Levels" }, doc.Outline);
+    }
+
+    [Fact]
+    public void GenericLayout_EmptyRichTextField_OmitsSection()
+    {
+        // Emptiness for RichText still checks the raw stored string (whitespace-only), independent of
+        // markdown parsing — matches the pre-existing empty-field/empty-section rule (G-d.1).
+        var richKey = Guid.NewGuid();
+        var tree = new TemplateVersionDetailModel
+        {
+            VersionNumber = 1,
+            Sections = new List<TemplateSectionModel>
+            {
+                new()
+                {
+                    Id = 1, Title = "Present Levels", DisplayOrder = 0,
+                    Fields = new List<TemplateFieldModel>
+                    {
+                        new() { Id = 1, FieldKey = richKey, FieldType = FieldType.RichText, Label = "Summary", Required = false, DisplayOrder = 0 }
+                    }
+                }
+            }
+        };
+        var values = $$"""{ "{{richKey}}": "   " }""";
+
+        var doc = new AuthoredDocumentPdfDocument("IEP", 1, new DateTime(2026, 1, 1), tree, values);
+        doc.GeneratePdf();
+
+        Assert.Equal(new[] { "Header" }, doc.Outline);
+    }
 }

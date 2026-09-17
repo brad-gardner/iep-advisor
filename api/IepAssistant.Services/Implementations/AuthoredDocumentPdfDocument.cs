@@ -1,10 +1,10 @@
 using System.Globalization;
-using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Models;
+using Markdig.Syntax;
+using Markdig.Syntax.Inlines;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -76,9 +76,6 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
 {
     private const string OhStateCode = "OH";
     private const int StudentSignatureMinAge = 14;
-
-    private static readonly Regex HtmlTag = new("<[^>]+>", RegexOptions.Compiled);
-    private static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
 
     private readonly string _documentTypeDisplayName;
     private readonly int _versionNumber;
@@ -400,8 +397,10 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                 break;
 
             case FieldType.RichText:
-                // Render as plain, sanitized text — never execute markup (G-d.3 / defense-in-depth).
-                LabeledText(container, field.Label, ToPlainText(AsString(node)));
+                // Render the stored markdown structurally (bold/italic/strike, headings, lists, quotes,
+                // links) rather than flattening it to one line of "**"/"- " syntax (G-d.3 / defense in
+                // depth: unknown/HTML nodes still degrade to plain text — see ComposeMarkdownBlocks).
+                RichTextBlock(container, field.Label, AsString(node));
                 break;
 
             case FieldType.Date:
@@ -535,15 +534,6 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
         };
     }
 
-    private static string ToPlainText(string? html)
-    {
-        if (string.IsNullOrWhiteSpace(html))
-            return string.Empty;
-        var noTags = HtmlTag.Replace(html, " ");
-        var decoded = WebUtility.HtmlDecode(noTags);
-        return Whitespace.Replace(decoded, " ").Trim();
-    }
-
     private static List<SelectOption> ParseSelectOptions(string? configJson)
     {
         if (string.IsNullOrWhiteSpace(configJson))
@@ -590,6 +580,216 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
             col.Item().Text(label).SemiBold().FontSize(11);
             col.Item().Text(value);
         });
+    }
+
+    // ---------------------------------------------------------------- Markdown (RichText) rendering
+    //
+    // Walks the Markdig AST (parsed via the shared MarkdownText.Parse pipeline) instead of flattening
+    // the stored markdown to one line: paragraphs each get their own Text item, emphasis becomes real
+    // Bold()/Italic()/Strikethrough() spans, headings render SemiBold and slightly larger, lists render
+    // as marker + content rows (nesting indents naturally through the row/column structure), blockquotes
+    // get a left border, and links render underlined with "(url)" appended when the link text differs
+    // from the url. Any block/inline type this doesn't recognize (including raw HTML that slipped past
+    // RichTextSanitizer) falls back to MarkdownText's plain-text flattening — defense in depth, never a
+    // dropped field (G-d.3).
+
+    private static void RichTextBlock(IContainer container, string label, string? markdown)
+    {
+        container.Column(col =>
+        {
+            col.Item().Text(label).SemiBold().FontSize(11);
+            col.Item().Element(c => ComposeMarkdown(c, markdown));
+        });
+    }
+
+    private static void ComposeMarkdown(IContainer container, string? markdown)
+    {
+        if (string.IsNullOrWhiteSpace(markdown))
+        {
+            container.Text(string.Empty);
+            return;
+        }
+
+        var document = MarkdownText.Parse(markdown);
+        container.Column(col =>
+        {
+            col.Spacing(4);
+            ComposeMarkdownBlocks(col, document);
+        });
+    }
+
+    private static void ComposeMarkdownBlocks(ColumnDescriptor col, ContainerBlock container)
+    {
+        foreach (var block in container)
+        {
+            switch (block)
+            {
+                case ParagraphBlock paragraph when paragraph.Inline != null:
+                    col.Item().Text(text => ComposeMarkdownInline(text, paragraph.Inline, false, false, false));
+                    break;
+
+                case HeadingBlock heading when heading.Inline != null:
+                {
+                    var size = heading.Level switch { 1 => 15f, 2 => 14f, _ => 12f };
+                    col.Item().Text(text =>
+                    {
+                        text.DefaultTextStyle(s => s.FontSize(size).SemiBold());
+                        ComposeMarkdownInline(text, heading.Inline, false, false, false);
+                    });
+                    break;
+                }
+
+                case QuoteBlock quote:
+                    col.Item().PaddingLeft(4).BorderLeft(2).BorderColor(Colors.Grey.Lighten1).PaddingLeft(8)
+                        .Column(inner =>
+                        {
+                            inner.Spacing(2);
+                            ComposeMarkdownBlocks(inner, quote);
+                        });
+                    break;
+
+                case ListBlock list:
+                    ComposeMarkdownList(col, list);
+                    break;
+
+                // Unknown/HTML node (e.g. a stray HtmlBlock or code block) — never dropped silently,
+                // falls back to flattened plain text (defense in depth, G-d.3).
+                case LeafBlock leaf:
+                {
+                    var fallback = leaf.Inline != null
+                        ? MarkdownText.InlineToPlainText(leaf.Inline)
+                        : MarkdownText.ToPlainText(leaf.Lines.ToString());
+                    if (!string.IsNullOrWhiteSpace(fallback))
+                        col.Item().Text(fallback);
+                    break;
+                }
+            }
+        }
+    }
+
+    private static void ComposeMarkdownList(ColumnDescriptor col, ListBlock list)
+    {
+        var counter = int.TryParse(list.OrderedStart, out var start) ? start : 1;
+
+        foreach (var child in list)
+        {
+            if (child is not ListItemBlock item)
+                continue;
+
+            var marker = list.IsOrdered ? $"{counter}." : "•";
+            counter++;
+
+            col.Item().Row(row =>
+            {
+                row.ConstantItem(16).Text(marker);
+                row.RelativeItem().Column(itemCol =>
+                {
+                    itemCol.Spacing(2);
+                    foreach (var itemChild in item)
+                    {
+                        if (itemChild is ListBlock nested)
+                            ComposeMarkdownList(itemCol, nested);
+                        else if (itemChild is LeafBlock { Inline: { } inline })
+                            itemCol.Item().Text(text => ComposeMarkdownInline(text, inline, false, false, false));
+                    }
+                });
+            });
+        }
+    }
+
+    /// <summary>Walks an inline run, emitting styled QuestPDF spans. Emphasis nesting accumulates the
+    /// bold/italic/strikethrough flags rather than resetting them, so e.g. bold text inside a list item
+    /// inside a blockquote still renders bold.</summary>
+    private static void ComposeMarkdownInline(TextDescriptor text, Inline? inline, bool bold, bool italic, bool strike)
+    {
+        for (var current = inline; current != null; current = current.NextSibling)
+        {
+            switch (current)
+            {
+                case LiteralInline literal:
+                    EmitMarkdownSpan(text, literal.Content.ToString(), bold, italic, strike);
+                    break;
+
+                case LineBreakInline:
+                    EmitMarkdownSpan(text, " ", bold, italic, strike);
+                    break;
+
+                case CodeInline code:
+                    EmitMarkdownSpan(text, code.Content, bold, italic, strike);
+                    break;
+
+                case AutolinkInline autolink:
+                    EmitMarkdownLink(text, autolink.Url ?? string.Empty, autolink.Url ?? string.Empty, bold, italic, strike);
+                    break;
+
+                case LinkInline { IsImage: true } image:
+                {
+                    var alt = MarkdownText.InlineToPlainText(image.FirstChild);
+                    if (!string.IsNullOrWhiteSpace(alt))
+                        EmitMarkdownSpan(text, alt, bold, italic, strike);
+                    break;
+                }
+
+                case LinkInline link:
+                {
+                    var label = MarkdownText.InlineToPlainText(link.FirstChild);
+                    var url = link.Url ?? string.Empty;
+                    EmitMarkdownLink(text, string.IsNullOrWhiteSpace(label) ? url : label, url, bold, italic, strike);
+                    break;
+                }
+
+                case EmphasisInline { DelimiterChar: '~' } strikethrough:
+                    ComposeMarkdownInline(text, strikethrough.FirstChild, bold, italic, strike: true);
+                    break;
+
+                case EmphasisInline { DelimiterCount: >= 2 } strongEmphasis:
+                    ComposeMarkdownInline(text, strongEmphasis.FirstChild, true, italic || strongEmphasis.DelimiterCount == 3, strike);
+                    break;
+
+                case EmphasisInline emphasis:
+                    ComposeMarkdownInline(text, emphasis.FirstChild, bold, true, strike);
+                    break;
+
+                case HtmlEntityInline entity:
+                    EmitMarkdownSpan(text, entity.Transcoded.ToString(), bold, italic, strike);
+                    break;
+
+                case HtmlInline:
+                    // Raw markup that slipped past RichTextSanitizer — dropped (defense in depth).
+                    break;
+
+                case ContainerInline container:
+                    if (container.FirstChild != null)
+                        ComposeMarkdownInline(text, container.FirstChild, bold, italic, strike);
+                    break;
+            }
+        }
+    }
+
+    private static void EmitMarkdownSpan(TextDescriptor text, string content, bool bold, bool italic, bool strike)
+    {
+        if (string.IsNullOrEmpty(content))
+            return;
+        var span = text.Span(content);
+        if (bold) span.Bold();
+        if (italic) span.Italic();
+        if (strike) span.Strikethrough();
+    }
+
+    private static void EmitMarkdownLink(TextDescriptor text, string display, string url, bool bold, bool italic, bool strike)
+    {
+        if (string.IsNullOrEmpty(display))
+            return;
+
+        var span = string.IsNullOrWhiteSpace(url) ? text.Span(display) : text.Hyperlink(display, url);
+        span.Underline();
+        if (bold) span.Bold();
+        if (italic) span.Italic();
+        if (strike) span.Strikethrough();
+
+        // Only spell out the url when it adds information — a bare autolink already displays it once.
+        if (!string.IsNullOrEmpty(url) && !string.Equals(display.Trim(), url.Trim(), StringComparison.Ordinal))
+            EmitMarkdownSpan(text, $" ({url})", bold, italic, false);
     }
 
     private static void HeaderCell(TableCellDescriptor header, string text)
