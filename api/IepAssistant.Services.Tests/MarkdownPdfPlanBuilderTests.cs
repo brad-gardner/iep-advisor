@@ -190,6 +190,65 @@ public sealed class MarkdownPdfPlanBuilderTests
         });
     }
 
+    // ------------------------------------------------------------ Reviewer pass2 P1: Markdig's own
+    // internal depth-limit guard (default 128) throws inside Markdown.Parse itself, before this builder's
+    // own MaxNestingDepth cap (which operates on an already-parsed AST) ever runs. MarkdownText.Parse
+    // catches it and falls back to a single literal paragraph -- confirm Build never throws either, since
+    // it shares that same Parse call.
+
+    [Fact]
+    public void Build_TwoHundredDeepBlockquote_DoesNotThrow_AndProducesNonEmptyBlocks()
+    {
+        var markdown = new string('>', 200) + " leafword";
+
+        var plan = MarkdownPdfPlanBuilder.Build(markdown);
+
+        Assert.NotEmpty(plan.Blocks);
+        var allText = string.Join(" ", CollectAllRuns(plan.Blocks).Select(r => r.Text));
+        Assert.Contains("leafword", allText);
+    }
+
+    [Fact]
+    public void Build_OneHundredFiftyLevelAlternatingListAndQuote_DoesNotThrow()
+    {
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < 150; i++)
+        {
+            var indent = new string(' ', i * 2);
+            sb.Append(indent).Append(i % 2 == 0 ? "- item" + i : "> quote" + i).Append('\n');
+        }
+        sb.Append(new string(' ', 150 * 2)).Append("leafword");
+
+        var plan = MarkdownPdfPlanBuilder.Build(sb.ToString());
+
+        Assert.NotEmpty(plan.Blocks);
+    }
+
+    // ------------------------------------------------------------ Reviewer pass2 P2/#3: a reference-style
+    // link's URL is resolved entirely from a separate definition line -- confirm the render-time
+    // Markdig-AST-based safety check (independent of RichTextSanitizer's persist-time regex/scanner) still
+    // nulls an unsafe scheme reached this way.
+
+    [Fact]
+    public void Build_ReferenceStyleLink_UnsafeScheme_HrefIsNull()
+    {
+        var plan = MarkdownPdfPlanBuilder.Build("[click here][r]\n\n[r]: javascript:alert(1)");
+
+        var paragraph = Assert.IsType<MarkdownPdfParagraph>(Assert.Single(plan.Blocks));
+        var run = Assert.Single(paragraph.Runs, r => r.Text == "click here");
+        Assert.Null(run.Href);
+    }
+
+    [Fact]
+    public void Build_ReferenceStyleLink_SafeScheme_SetsHref()
+    {
+        var plan = MarkdownPdfPlanBuilder.Build("[our site][r]\n\n[r]: https://example.com");
+
+        var paragraph = Assert.IsType<MarkdownPdfParagraph>(Assert.Single(plan.Blocks));
+        var run = Assert.Single(paragraph.Runs, r => r.Text == "our site");
+        Assert.Equal("https://example.com", run.Href);
+    }
+
     private static List<MarkdownPdfRun> CollectAllRuns(IReadOnlyList<MarkdownPdfBlock> blocks)
     {
         var runs = new List<MarkdownPdfRun>();

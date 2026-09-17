@@ -218,4 +218,39 @@ public sealed class MarkdownTextTests
 
         Assert.Contains("deep quote text", result);
     }
+
+    // ------------------------------------------------------------ Reviewer pass2 P1: Markdig's own
+    // internal MaximumNestingDepth guard (default 128) throws a bare ArgumentException from inside
+    // Markdown.Parse itself -- before this class's or MarkdownPdfPlanBuilder's own AST-level depth caps
+    // ever get a chance to run -- once parsed nesting crosses that threshold. Reachable via pure
+    // blockquote/list nesting, and at an even shallower depth via alternating list/quote nesting (a shape
+    // plausible for a pasted long reply chain that also has bullet points).
+
+    [Fact]
+    public void ToPlainText_TwoHundredDeepBlockquote_DoesNotThrow_AndKeepsLeafText()
+    {
+        var markdown = new string('>', 200) + " leafword";
+
+        var result = MarkdownText.ToPlainText(markdown);
+
+        Assert.NotEmpty(result);
+        Assert.Contains("leafword", result);
+    }
+
+    [Fact]
+    public void ToPlainText_OneHundredFiftyLevelAlternatingListAndQuote_DoesNotThrow_AndKeepsLeafText()
+    {
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < 150; i++)
+        {
+            var indent = new string(' ', i * 2);
+            sb.Append(indent).Append(i % 2 == 0 ? "- item" + i : "> quote" + i).Append('\n');
+        }
+        sb.Append(new string(' ', 150 * 2)).Append("leafword");
+
+        var result = MarkdownText.ToPlainText(sb.ToString());
+
+        Assert.NotEmpty(result);
+        Assert.Contains("leafword", result);
+    }
 }

@@ -153,4 +153,73 @@ public sealed class RichTextSanitizerTests
     {
         Assert.Equal(input, RichTextSanitizer.Sanitize(input));
     }
+
+    // ------------------------------------------------------------ Reviewer pass2 P2: nested parens and
+    // reference-style links. The old MarkdownLink regex only matched one balanced `(...)` pair inside a
+    // bare destination and had no awareness of `[label]: url` definitions at all, so both forms persisted
+    // completely unmodified even though Markdig resolves both to a real, hyperlink-able URL.
+
+    [Fact]
+    public void Sanitize_MarkdownLink_UnsafeScheme_NestedParens_RewritesToPlainText()
+    {
+        var result = RichTextSanitizer.Sanitize("[x](javascript:alert((1)))");
+
+        Assert.Equal("x", result);
+        Assert.DoesNotContain("javascript:", result);
+    }
+
+    [Fact]
+    public void Sanitize_MarkdownLink_UnsafeScheme_WithTitle_RewritesToPlainText()
+    {
+        var result = RichTextSanitizer.Sanitize("[x](javascript:a \"t\")");
+
+        Assert.Equal("x", result);
+        Assert.DoesNotContain("javascript:", result);
+    }
+
+    [Fact]
+    public void Sanitize_ReferenceStyleLink_UnsafeDefinition_RemovesDefinitionLine()
+    {
+        var result = RichTextSanitizer.Sanitize("[x][r]\n\n[r]: javascript:alert(1)");
+
+        Assert.DoesNotContain("javascript:", result);
+        Assert.Contains("[x][r]", result); // usage left untouched -- Markdig can no longer resolve it
+    }
+
+    [Fact]
+    public void Sanitize_ReferenceDefinition_UppercaseUnsafeScheme_IsRemoved()
+    {
+        var result = RichTextSanitizer.Sanitize("[r]: JAVASCRIPT:x");
+
+        Assert.DoesNotContain("JAVASCRIPT:", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Sanitize_ReferenceDefinition_DestinationOnNextLine_UnsafeScheme_IsRemoved()
+    {
+        // CommonMark (confirmed against the installed Markdig 1.3.2) allows the destination to start on
+        // the line after the colon.
+        var result = RichTextSanitizer.Sanitize("[r]:\n  javascript:x");
+
+        Assert.DoesNotContain("javascript:", result);
+    }
+
+    [Fact]
+    public void Sanitize_ReferenceDefinition_SafeScheme_SurvivesByteForByte()
+    {
+        var input = "[x][r]\n\n[r]: https://example.com";
+
+        Assert.Equal(input, RichTextSanitizer.Sanitize(input));
+    }
+
+    [Fact]
+    public void Sanitize_MixedSafeAndUnsafeReferenceDefinitions_KeepsSafeOne_RemovesUnsafeOne()
+    {
+        var input = "[a][s]\n[b][u]\n\n[s]: https://example.com\n[u]: javascript:alert(1)";
+
+        var result = RichTextSanitizer.Sanitize(input);
+
+        Assert.Contains("[s]: https://example.com", result);
+        Assert.DoesNotContain("javascript:", result);
+    }
 }

@@ -29,8 +29,48 @@ public static class MarkdownText
     private static readonly Regex ExcessBlankLines = new(@"\n{3,}", RegexOptions.Compiled);
 
     /// <summary>The shared Markdig pipeline (GFM basics + advanced extensions) used to parse a stored
-    /// markdown value — exposed so the PDF composer parses identically instead of re-declaring a pipeline.</summary>
-    public static MarkdownDocument Parse(string markdown) => Markdown.Parse(markdown, Pipeline);
+    /// markdown value — exposed so the PDF composer parses identically instead of re-declaring a pipeline.
+    ///
+    /// <para><b>Never throws (reviewer pass2 P1):</b> Markdig's own parser enforces an internal
+    /// <c>MarkdownPipeline.MaximumNestingDepth</c> guard (default 128, decompiled/confirmed against the
+    /// installed Markdig 1.3.2 — <c>MarkdownPipelineBuilder.MaximumNestingDepth</c> is a public settable
+    /// property, but lowering it only moves the threshold earlier; it does not remove the guard, so it
+    /// cannot eliminate the throw for arbitrarily deep input) and throws a bare <see cref="ArgumentException"/>
+    /// from deep inside <c>Markdig.Parsers.MarkdownParser.ProcessInlines</c> once parsed nesting exceeds
+    /// it — reachable via pure blockquote/list nesting or, at an even shallower depth, alternating
+    /// list/quote nesting (e.g. a pasted long reply chain that also has bullet points). This runs entirely
+    /// inside <c>Markdown.Parse</c>, before <see cref="MarkdownPdfPlanBuilder"/>'s own
+    /// <c>MaxNestingDepth</c> AST-level cap ever gets a chance to run (that cap only bounds an
+    /// already-successfully-parsed tree). Because the frozen document version this is called for never
+    /// changes, an uncaught throw here means the PDF for that version can never be generated, on any
+    /// retry — so this method degrades instead: on the depth-limit exception, it falls back to a
+    /// single-paragraph document whose one <see cref="LiteralInline"/> is the raw, unparsed text (markdown
+    /// markers rendered as literal characters). Degraded rendering beats a permanently failed PDF.</para>
+    /// </summary>
+    public static MarkdownDocument Parse(string markdown)
+    {
+        try
+        {
+            return Markdown.Parse(markdown, Pipeline);
+        }
+        catch (ArgumentException)
+        {
+            // Markdig's internal depth-limit guard (see remarks above) — degrade to the raw text as a
+            // single literal paragraph rather than let this propagate to the PDF services' generic catch
+            // and permanently strand that document version in a retryable-but-never-succeeding Error state.
+            return BuildFallbackDocument(markdown);
+        }
+    }
+
+    private static MarkdownDocument BuildFallbackDocument(string markdown)
+    {
+        var inline = new ContainerInline();
+        inline.AppendChild(new LiteralInline(markdown));
+
+        var document = new MarkdownDocument();
+        document.Add(new ParagraphBlock { Inline = inline });
+        return document;
+    }
 
     /// <summary>
     /// Markdown → readable plain text: paragraphs separated by a blank line; list items as "• item" /

@@ -303,6 +303,39 @@ public sealed class AuthoredDocumentPdfDocumentTests
             $"Expected 30-deep nested list to render in well under 5s, took {stopwatch.Elapsed}.");
     }
 
+    [Fact]
+    public void GenericLayout_RichTextField_TwoHundredDeepBlockquote_RendersWithoutThrowing()
+    {
+        // Reviewer pass2 P1: Markdig's own internal depth-limit guard (default 128) throws a bare
+        // ArgumentException from inside Markdown.Parse itself -- well before MarkdownPdfPlanBuilder's
+        // MaxNestingDepth=8 AST-level cap (which only bounds an already-parsed tree) ever runs. The 60-deep
+        // case above stays safely under Markdig's own ceiling, so it never exercised this path.
+        // MarkdownText.Parse now catches it and degrades to a single literal-text paragraph instead.
+        var markdown = new string('>', 200) + " deep quote text";
+        var bytes = BuildSingleRichTextFieldPdf(markdown, out _);
+
+        Assert.NotEmpty(bytes);
+    }
+
+    [Fact]
+    public void GenericLayout_RichTextField_OneHundredFiftyLevelAlternatingListAndQuote_RendersWithoutThrowing()
+    {
+        // Reviewer pass2 P1: alternating list/quote nesting trips Markdig's own depth guard at a much
+        // shallower total depth than either pure block type alone -- a shape plausible for a pasted long
+        // reply chain that also has bullet points.
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < 150; i++)
+        {
+            var indent = new string(' ', i * 2);
+            sb.Append(indent).Append(i % 2 == 0 ? "- item" + i : "> quote" + i).Append('\n');
+        }
+        sb.Append(new string(' ', 150 * 2)).Append("leafword");
+
+        var bytes = BuildSingleRichTextFieldPdf(sb.ToString(), out _);
+
+        Assert.NotEmpty(bytes);
+    }
+
     private static byte[] BuildSingleRichTextFieldPdf(string markdown, out AuthoredDocumentPdfDocument doc)
     {
         var richKey = Guid.NewGuid();
