@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Input, Select, Textarea } from '@/components/ui/input';
+import { Input, Select } from '@/components/ui/input';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { create as createEtr } from '../api/etr-documents-api';
@@ -119,18 +120,15 @@ export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormPro
         </div>
       </div>
 
-      <div>
-        <Textarea
-          label="Notes"
-          placeholder="Any notes about this evaluation..."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-          maxLength={2000}
-          data-testid="etr-notes"
-        />
-        <p className="text-[11px] text-brand-slate-300 mt-1">{notes.length}/2000 characters</p>
-      </div>
+      <RichTextEditor
+        label="Notes"
+        placeholder="Any notes about this evaluation..."
+        value={notes}
+        onChange={setNotes}
+        minRows={3}
+        maxLength={2000}
+        data-testid="etr-notes"
+      />
 
       <div className="flex gap-2">
         <Button

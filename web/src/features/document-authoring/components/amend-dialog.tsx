@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Textarea } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
 import { apiErrorMessage } from '@/lib/api-error';
@@ -100,11 +101,11 @@ export function AmendDialog({ open, versionId, onClose, onAmended }: AmendDialog
           </div>
         )}
 
-        <Textarea
-          label="Reason for the amendment *"
+        <RichTextEditor
+          label="Reason for the amendment"
           value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={3}
+          onChange={setReason}
+          minRows={3}
           maxLength={1000}
           required
           data-testid="amend-dialog-reason"

@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
+import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getStudentEvidence, type EvidenceItem, type EvidenceKind, type StudentEvidenceBundle } from '../api/evidence-api';
@@ -122,7 +123,7 @@ export function EvidenceDrawer({ open, onClose, studentId, activeField }: Eviden
                         {item.sourceDate && <span>{new Date(item.sourceDate).toLocaleDateString()}</span>}
                         <span className="ml-auto rounded-full border border-brand-slate-200 px-1.5">{ROLE_LABEL[item.authorRole]}</span>
                       </div>
-                      <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-brand-slate-700">{item.text}</p>
+                      <Markdown content={item.text} className="text-[13px] text-brand-slate-700" />
                       {item.kind !== 'Identity' && item.kind !== 'TeamMember' && (
                         <div className="mt-2 flex justify-end">
                           <Button

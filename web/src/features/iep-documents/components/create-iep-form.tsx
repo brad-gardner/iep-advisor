@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Input, Textarea, Select } from '@/components/ui/input';
+import { Input, Select } from '@/components/ui/input';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { createIep } from '../api/iep-documents-api';
@@ -80,31 +81,25 @@ export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormPro
         </Select>
       </div>
 
-      <div>
-        <Textarea
-          label="Attendees"
-          placeholder="e.g. Teachers, therapists, parents present..."
-          value={attendees}
-          onChange={(e) => setAttendees(e.target.value)}
-          rows={2}
-          maxLength={1000}
-          data-testid="iep-attendees"
-        />
-        <p className="text-[11px] text-brand-slate-300 mt-1">{attendees.length}/1000 characters</p>
-      </div>
+      <RichTextEditor
+        label="Attendees"
+        placeholder="e.g. Teachers, therapists, parents present..."
+        value={attendees}
+        onChange={setAttendees}
+        minRows={2}
+        maxLength={1000}
+        data-testid="iep-attendees"
+      />
 
-      <div>
-        <Textarea
-          label="Notes"
-          placeholder="Any notes about this meeting..."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-          maxLength={2000}
-          data-testid="iep-notes"
-        />
-        <p className="text-[11px] text-brand-slate-300 mt-1">{notes.length}/2000 characters</p>
-      </div>
+      <RichTextEditor
+        label="Notes"
+        placeholder="Any notes about this meeting..."
+        value={notes}
+        onChange={setNotes}
+        minRows={3}
+        maxLength={2000}
+        data-testid="iep-notes"
+      />
 
       <div className="flex gap-2">
         <Button type="submit" disabled={isSubmitting || !iepDate || !meetingType} data-testid="iep-create-submit">
