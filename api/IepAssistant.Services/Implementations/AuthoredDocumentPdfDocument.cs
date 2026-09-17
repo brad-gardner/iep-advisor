@@ -3,8 +3,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Models;
-using Markdig.Syntax;
-using Markdig.Syntax.Inlines;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -399,7 +397,7 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
             case FieldType.RichText:
                 // Render the stored markdown structurally (bold/italic/strike, headings, lists, quotes,
                 // links) rather than flattening it to one line of "**"/"- " syntax (G-d.3 / defense in
-                // depth: unknown/HTML nodes still degrade to plain text — see ComposeMarkdownBlocks).
+                // depth: unknown/HTML nodes still degrade to plain text — see MarkdownPdfPlanBuilder).
                 RichTextBlock(container, field.Label, AsString(node));
                 break;
 
@@ -584,14 +582,14 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
 
     // ---------------------------------------------------------------- Markdown (RichText) rendering
     //
-    // Walks the Markdig AST (parsed via the shared MarkdownText.Parse pipeline) instead of flattening
-    // the stored markdown to one line: paragraphs each get their own Text item, emphasis becomes real
-    // Bold()/Italic()/Strikethrough() spans, headings render SemiBold and slightly larger, lists render
-    // as marker + content rows (nesting indents naturally through the row/column structure), blockquotes
-    // get a left border, and links render underlined with "(url)" appended when the link text differs
-    // from the url. Any block/inline type this doesn't recognize (including raw HTML that slipped past
-    // RichTextSanitizer) falls back to MarkdownText's plain-text flattening — defense in depth, never a
-    // dropped field (G-d.3).
+    // Renders from a MarkdownPdfPlan (MarkdownPdfPlan.cs) rather than walking the Markdig AST directly:
+    // MarkdownPdfPlanBuilder.Build does the "what does this markdown mean" work (paragraphs/headings/
+    // lists/quotes, bold/italic/strike flags, link-scheme validation, nesting-depth capping) as a pure,
+    // unit-testable step; this class only turns that plan into QuestPDF elements. Any block/inline type
+    // the plan builder doesn't specifically recognize (including a GFM table, or raw HTML that slipped
+    // past RichTextSanitizer) still degrades to plain text there — defense in depth, never a dropped
+    // field (G-d.3) — and list/quote nesting beyond MarkdownPdfPlanBuilder.MaxNestingDepth renders flat
+    // instead of compounding indentation/padding without bound.
 
     private static void RichTextBlock(IContainer container, string label, string? markdown)
     {
@@ -604,192 +602,101 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
 
     private static void ComposeMarkdown(IContainer container, string? markdown)
     {
-        if (string.IsNullOrWhiteSpace(markdown))
+        var plan = MarkdownPdfPlanBuilder.Build(markdown);
+        if (plan.Blocks.Count == 0)
         {
             container.Text(string.Empty);
             return;
         }
 
-        var document = MarkdownText.Parse(markdown);
         container.Column(col =>
         {
             col.Spacing(4);
-            ComposeMarkdownBlocks(col, document);
+            RenderPlanBlocks(col, plan.Blocks);
         });
     }
 
-    private static void ComposeMarkdownBlocks(ColumnDescriptor col, ContainerBlock container)
+    private static void RenderPlanBlocks(ColumnDescriptor col, IReadOnlyList<MarkdownPdfBlock> blocks)
     {
-        foreach (var block in container)
+        foreach (var block in blocks)
         {
             switch (block)
             {
-                case ParagraphBlock paragraph when paragraph.Inline != null:
-                    col.Item().Text(text => ComposeMarkdownInline(text, paragraph.Inline, false, false, false));
+                case MarkdownPdfParagraph paragraph:
+                    col.Item().Text(text => RenderRuns(text, paragraph.Runs));
                     break;
 
-                case HeadingBlock heading when heading.Inline != null:
+                case MarkdownPdfHeading heading:
                 {
                     var size = heading.Level switch { 1 => 15f, 2 => 14f, _ => 12f };
                     col.Item().Text(text =>
                     {
                         text.DefaultTextStyle(s => s.FontSize(size).SemiBold());
-                        ComposeMarkdownInline(text, heading.Inline, false, false, false);
+                        RenderRuns(text, heading.Runs);
                     });
                     break;
                 }
 
-                case QuoteBlock quote:
+                case MarkdownPdfQuote quote:
+                    // At most MaxNestingDepth of these actually get nested (see MarkdownPdfPlanBuilder),
+                    // so this fixed-per-level padding can never compound into an impossible constraint.
                     col.Item().PaddingLeft(4).BorderLeft(2).BorderColor(Colors.Grey.Lighten1).PaddingLeft(8)
                         .Column(inner =>
                         {
                             inner.Spacing(2);
-                            ComposeMarkdownBlocks(inner, quote);
+                            RenderPlanBlocks(inner, quote.Blocks);
                         });
                     break;
 
-                case ListBlock list:
-                    ComposeMarkdownList(col, list);
-                    break;
-
-                // Unknown/HTML node (e.g. a stray HtmlBlock or code block) — never dropped silently,
-                // falls back to flattened plain text (defense in depth, G-d.3).
-                case LeafBlock leaf:
-                {
-                    var fallback = leaf.Inline != null
-                        ? MarkdownText.InlineToPlainText(leaf.Inline)
-                        : MarkdownText.ToPlainText(leaf.Lines.ToString());
-                    if (!string.IsNullOrWhiteSpace(fallback))
-                        col.Item().Text(fallback);
-                    break;
-                }
-            }
-        }
-    }
-
-    private static void ComposeMarkdownList(ColumnDescriptor col, ListBlock list)
-    {
-        var counter = int.TryParse(list.OrderedStart, out var start) ? start : 1;
-
-        foreach (var child in list)
-        {
-            if (child is not ListItemBlock item)
-                continue;
-
-            var marker = list.IsOrdered ? $"{counter}." : "•";
-            counter++;
-
-            col.Item().Row(row =>
-            {
-                row.ConstantItem(16).Text(marker);
-                row.RelativeItem().Column(itemCol =>
-                {
-                    itemCol.Spacing(2);
-                    foreach (var itemChild in item)
+                case MarkdownPdfListItem item:
+                    // Flat: one Column item per list item at every depth, indent-only via PaddingLeft —
+                    // no Row/Column nested per nesting level (see MarkdownPdfPlanBuilder's remarks on the
+                    // exponential-time defect this replaces).
+                    col.Item().PaddingLeft(item.Depth * 14).Text(text =>
                     {
-                        if (itemChild is ListBlock nested)
-                            ComposeMarkdownList(itemCol, nested);
-                        else if (itemChild is LeafBlock { Inline: { } inline })
-                            itemCol.Item().Text(text => ComposeMarkdownInline(text, inline, false, false, false));
-                    }
-                });
-            });
-        }
-    }
-
-    /// <summary>Walks an inline run, emitting styled QuestPDF spans. Emphasis nesting accumulates the
-    /// bold/italic/strikethrough flags rather than resetting them, so e.g. bold text inside a list item
-    /// inside a blockquote still renders bold.</summary>
-    private static void ComposeMarkdownInline(TextDescriptor text, Inline? inline, bool bold, bool italic, bool strike)
-    {
-        for (var current = inline; current != null; current = current.NextSibling)
-        {
-            switch (current)
-            {
-                case LiteralInline literal:
-                    EmitMarkdownSpan(text, literal.Content.ToString(), bold, italic, strike);
-                    break;
-
-                case LineBreakInline:
-                    EmitMarkdownSpan(text, " ", bold, italic, strike);
-                    break;
-
-                case CodeInline code:
-                    EmitMarkdownSpan(text, code.Content, bold, italic, strike);
-                    break;
-
-                case AutolinkInline autolink:
-                    EmitMarkdownLink(text, autolink.Url ?? string.Empty, autolink.Url ?? string.Empty, bold, italic, strike);
-                    break;
-
-                case LinkInline { IsImage: true } image:
-                {
-                    var alt = MarkdownText.InlineToPlainText(image.FirstChild);
-                    if (!string.IsNullOrWhiteSpace(alt))
-                        EmitMarkdownSpan(text, alt, bold, italic, strike);
-                    break;
-                }
-
-                case LinkInline link:
-                {
-                    var label = MarkdownText.InlineToPlainText(link.FirstChild);
-                    var url = link.Url ?? string.Empty;
-                    EmitMarkdownLink(text, string.IsNullOrWhiteSpace(label) ? url : label, url, bold, italic, strike);
-                    break;
-                }
-
-                case EmphasisInline { DelimiterChar: '~' } strikethrough:
-                    ComposeMarkdownInline(text, strikethrough.FirstChild, bold, italic, strike: true);
-                    break;
-
-                case EmphasisInline { DelimiterCount: >= 2 } strongEmphasis:
-                    ComposeMarkdownInline(text, strongEmphasis.FirstChild, true, italic || strongEmphasis.DelimiterCount == 3, strike);
-                    break;
-
-                case EmphasisInline emphasis:
-                    ComposeMarkdownInline(text, emphasis.FirstChild, bold, true, strike);
-                    break;
-
-                case HtmlEntityInline entity:
-                    EmitMarkdownSpan(text, entity.Transcoded.ToString(), bold, italic, strike);
-                    break;
-
-                case HtmlInline:
-                    // Raw markup that slipped past RichTextSanitizer — dropped (defense in depth).
-                    break;
-
-                case ContainerInline container:
-                    if (container.FirstChild != null)
-                        ComposeMarkdownInline(text, container.FirstChild, bold, italic, strike);
+                        text.Span(item.Marker + " ");
+                        RenderRuns(text, item.Runs);
+                    });
                     break;
             }
         }
     }
 
-    private static void EmitMarkdownSpan(TextDescriptor text, string content, bool bold, bool italic, bool strike)
+    private static void RenderRuns(TextDescriptor text, IReadOnlyList<MarkdownPdfRun> runs)
     {
-        if (string.IsNullOrEmpty(content))
-            return;
-        var span = text.Span(content);
-        if (bold) span.Bold();
-        if (italic) span.Italic();
-        if (strike) span.Strikethrough();
+        foreach (var run in runs)
+        {
+            if (run.Href != null)
+                EmitMarkdownLink(text, run);
+            else
+                EmitMarkdownSpan(text, run);
+        }
     }
 
-    private static void EmitMarkdownLink(TextDescriptor text, string display, string url, bool bold, bool italic, bool strike)
+    private static void EmitMarkdownSpan(TextDescriptor text, MarkdownPdfRun run)
     {
-        if (string.IsNullOrEmpty(display))
+        if (string.IsNullOrEmpty(run.Text))
+            return;
+        var span = text.Span(run.Text);
+        if (run.Bold) span.Bold();
+        if (run.Italic) span.Italic();
+        if (run.Strike) span.Strikethrough();
+    }
+
+    private static void EmitMarkdownLink(TextDescriptor text, MarkdownPdfRun run)
+    {
+        if (string.IsNullOrEmpty(run.Text))
             return;
 
-        var span = string.IsNullOrWhiteSpace(url) ? text.Span(display) : text.Hyperlink(display, url);
+        // Defense in depth: MarkdownPdfPlanBuilder already checked RichTextSanitizer.IsSafeUrl before
+        // setting Href, but this is the sink that actually makes a url actionable (QuestPDF's
+        // Hyperlink() annotation), so re-validate here too — a disallowed scheme renders as a plain,
+        // non-linked span rather than ever reaching Hyperlink() (reviewer pass1 P1: link scheme bypass).
+        var span = RichTextSanitizer.IsSafeUrl(run.Href!) ? text.Hyperlink(run.Text, run.Href!) : text.Span(run.Text);
         span.Underline();
-        if (bold) span.Bold();
-        if (italic) span.Italic();
-        if (strike) span.Strikethrough();
-
-        // Only spell out the url when it adds information — a bare autolink already displays it once.
-        if (!string.IsNullOrEmpty(url) && !string.Equals(display.Trim(), url.Trim(), StringComparison.Ordinal))
-            EmitMarkdownSpan(text, $" ({url})", bold, italic, false);
+        if (run.Bold) span.Bold();
+        if (run.Italic) span.Italic();
+        if (run.Strike) span.Strikethrough();
     }
 
     private static void HeaderCell(TableCellDescriptor header, string text)

@@ -130,6 +130,15 @@ public static class MarkdownText
                         output.Add(prefix + raw.Trim());
                     break;
                 }
+
+                case ContainerBlock unknownContainer:
+                    // A GFM Table (or any other advanced-extension ContainerBlock: footnote, definition
+                    // list, custom container) isn't a LeafBlock, so it matched none of the cases above —
+                    // recurse into its children instead of silently dropping the block (reviewer pass1
+                    // P1: GFM tables dropped). A Table's TableRow/TableCell children are themselves
+                    // ContainerBlocks, so this recurses down to their paragraph content generically.
+                    AppendBlocks(unknownContainer, output, indent);
+                    break;
             }
         }
     }

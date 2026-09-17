@@ -203,10 +203,13 @@ public sealed class AuthoredDocumentPdfDocumentTests
     {
         // This file asserts the composed Outline rather than PDF bytes (see the class doc) — there is no
         // PDF-text-extraction dependency here to also assert "**"/"- " never appear in the rendered
-        // output. This proves the markdown AST walk (ComposeMarkdownBlocks/ComposeMarkdownInline) runs
-        // end to end for a realistic mix — bold, a list, a link — without throwing, which is the failure
-        // mode a regression here would actually produce (an unhandled Markdig node, a null Inline, etc.);
-        // MarkdownTextTests separately proves the text itself comes out free of markdown syntax.
+        // output, or that bold/link formatting was actually applied. That is what
+        // MarkdownPdfPlanBuilderTests covers directly (it asserts the pure plan AuthoredDocumentPdfDocument
+        // renders from — run flags, resolved hrefs, list/quote depth — without needing QuestPDF at all).
+        // This test proves only that composing that plan into QuestPDF elements runs end to end for a
+        // realistic mix — bold, a list, a link — without throwing, which is the failure mode a regression
+        // in the QuestPDF-rendering half specifically would produce (a null Inline, an unhandled block
+        // shape reaching RenderPlanBlocks, etc.).
         var richKey = Guid.NewGuid();
         var tree = new TemplateVersionDetailModel
         {
@@ -234,6 +237,95 @@ public sealed class AuthoredDocumentPdfDocumentTests
 
         Assert.NotEmpty(bytes);
         Assert.Equal(new[] { "Header", "Section: Present Levels" }, doc.Outline);
+    }
+
+    [Fact]
+    public void GenericLayout_RichTextField_UnsafeSchemeLink_RendersWithoutThrowing_AndNeverEmitsHyperlink()
+    {
+        // Defense-in-depth end-to-end smoke test (reviewer pass1 P1: link scheme bypass) — the actual
+        // "no Href reaches Hyperlink()" assertion is made directly against MarkdownPdfPlanBuilder's output
+        // in MarkdownPdfPlanBuilderTests (no PDF-text-extraction dependency needed to prove that). This
+        // test only proves the whole pipeline, including the render-time re-check in
+        // AuthoredDocumentPdfDocument.EmitMarkdownLink, tolerates an unsafe-scheme link without throwing.
+        var markdown = "Contact us: [click here](javascript:alert(document.cookie)) or <javascript:alert(1)>.";
+        var bytes = BuildSingleRichTextFieldPdf(markdown, out var doc);
+
+        Assert.NotEmpty(bytes);
+        Assert.Equal(new[] { "Header", "Section: Present Levels" }, doc.Outline);
+    }
+
+    [Fact]
+    public void GenericLayout_RichTextField_PipeTable_RendersWithoutThrowing()
+    {
+        // Reviewer pass1 P1: a GFM Table is a ContainerBlock, not a LeafBlock, and previously matched no
+        // case in the compose switch, so its content silently vanished. MarkdownTextTests /
+        // MarkdownPdfPlanBuilderTests separately assert the cell text isn't dropped from the flattened/
+        // plan representations; this proves the same input also renders to a PDF without throwing.
+        var markdown = "Before.\n\n| Name | Score |\n| --- | --- |\n| Alex | 92 |\n\nAfter.";
+        var bytes = BuildSingleRichTextFieldPdf(markdown, out var doc);
+
+        Assert.NotEmpty(bytes);
+        Assert.Equal(new[] { "Header", "Section: Present Levels" }, doc.Outline);
+    }
+
+    [Fact]
+    public void GenericLayout_RichTextField_SixtyDeepBlockquote_RendersWithoutThrowing()
+    {
+        // Reviewer pass1 P1: 45+ levels of nested blockquote used to throw QuestPDF.Drawing.Exceptions.
+        // DocumentLayoutException ("conflicting size constraints") because each level's fixed 12pt of
+        // left padding compounded with no cap. MarkdownPdfPlanBuilder now caps the number of wrapped
+        // Columns at MaxNestingDepth (8), so cumulative padding is bounded regardless of source depth.
+        var markdown = new string('>', 60) + " deep quote text";
+        var bytes = BuildSingleRichTextFieldPdf(markdown, out _);
+
+        Assert.NotEmpty(bytes);
+    }
+
+    [Fact]
+    public void GenericLayout_RichTextField_ThirtyDeepNestedList_RendersWithoutThrowing_AndIsFast()
+    {
+        // Reviewer pass1 P1: nested-list rendering was exponential in depth (15 deep = 275ms, 20 deep =
+        // 3.8s, 23 deep = 25s) because the composer built one QuestPDF Row-in-Column per nesting level.
+        // MarkdownPdfPlanBuilder/AuthoredDocumentPdfDocument now render every list item as a single flat,
+        // PaddingLeft-indented Column item regardless of depth, so cost is linear in item count. Measured
+        // locally at ~190ms in isolation for this 30-item case (most of which is JIT/QuestPDF warm-up on
+        // the first PDF generated in the process, not the list itself) vs. an extrapolated multiple
+        // minutes on the old exponential path; the 5s ceiling below leaves generous margin for slower CI
+        // hardware while still catching a regression back to exponential behavior.
+        var markdown = string.Join("\n", Enumerable.Range(0, 30).Select(i => new string(' ', i * 2) + "- item " + i));
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var bytes = BuildSingleRichTextFieldPdf(markdown, out _);
+        stopwatch.Stop();
+
+        Assert.NotEmpty(bytes);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5),
+            $"Expected 30-deep nested list to render in well under 5s, took {stopwatch.Elapsed}.");
+    }
+
+    private static byte[] BuildSingleRichTextFieldPdf(string markdown, out AuthoredDocumentPdfDocument doc)
+    {
+        var richKey = Guid.NewGuid();
+        var tree = new TemplateVersionDetailModel
+        {
+            VersionNumber = 1,
+            Sections = new List<TemplateSectionModel>
+            {
+                new()
+                {
+                    Id = 1, Title = "Present Levels", DisplayOrder = 0,
+                    Fields = new List<TemplateFieldModel>
+                    {
+                        new() { Id = 1, FieldKey = richKey, FieldType = FieldType.RichText, Label = "Summary", Required = true, DisplayOrder = 0 }
+                    }
+                }
+            }
+        };
+        var markdownJson = JsonSerializer.Serialize(markdown);
+        var values = $$"""{ "{{richKey}}": {{markdownJson}} }""";
+
+        doc = new AuthoredDocumentPdfDocument("IEP", 1, new DateTime(2026, 1, 1), tree, values);
+        return doc.GeneratePdf();
     }
 
     [Fact]

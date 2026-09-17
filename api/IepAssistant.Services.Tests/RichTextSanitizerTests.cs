@@ -112,4 +112,45 @@ public sealed class RichTextSanitizerTests
     {
         Assert.Equal(string.Empty, RichTextSanitizer.Sanitize(input));
     }
+
+    // ------------------------------------------------------------ Markdown link/autolink scheme gate
+    // (reviewer pass1 P1: the persisted RichText format is now GFM markdown, not HTML, so
+    // "[text](url)" and "<url>" carry no angle brackets around the url and never hit the <a href> path
+    // above -- an unsafe scheme there would otherwise reach AuthoredDocumentPdfDocument's Hyperlink()
+    // sink unvalidated.)
+
+    [Fact]
+    public void Sanitize_MarkdownLink_UnsafeJavascriptScheme_RewritesToPlainText()
+    {
+        var result = RichTextSanitizer.Sanitize("See [x](javascript:alert(1)) for detail.");
+
+        Assert.Equal("See x for detail.", result);
+        Assert.DoesNotContain("javascript:", result);
+    }
+
+    [Fact]
+    public void Sanitize_MarkdownLink_UnsafeDataScheme_RewritesToPlainText()
+    {
+        var result = RichTextSanitizer.Sanitize("See [x](data:text/html;base64,SGk=) for detail.");
+
+        Assert.Equal("See x for detail.", result);
+        Assert.DoesNotContain("data:", result);
+    }
+
+    [Fact]
+    public void Sanitize_Autolink_UnsafeJavascriptScheme_RewritesToPlainText()
+    {
+        var result = RichTextSanitizer.Sanitize("Contact <javascript:alert(1)> now.");
+
+        Assert.Equal("Contact javascript:alert(1) now.", result);
+    }
+
+    [Theory]
+    [InlineData("[x](https://ok)")]
+    [InlineData("[x](mailto:a@b)")]
+    [InlineData("[x](/relative)")]
+    public void Sanitize_MarkdownLink_SafeScheme_SurvivesUnchanged(string input)
+    {
+        Assert.Equal(input, RichTextSanitizer.Sanitize(input));
+    }
 }
