@@ -116,6 +116,11 @@ public static class RichTextSanitizer
         });
         s = NeutralizeUnsafeMarkdownLinks(s);
         s = NeutralizeUnsafeReferenceDefinitions(s);
+        // Authoritative pass: whatever the scanners above missed, Markdig's own parse settles. Every
+        // link/autolink/definition Markdig resolves to an unsafe scheme is rewritten at its precise source
+        // span, so the persisted text can never re-parse into an unsafe link (review passes 3–4 kept
+        // finding CommonMark corners — escapes, multi-line titles — a hand-written scanner had to chase).
+        s = MarkdownLinkAst.NeutralizeUnsafeLinks(s, IsSafeUrl);
 
         return Tag.Replace(s, static m =>
         {
