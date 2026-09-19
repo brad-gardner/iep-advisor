@@ -101,9 +101,10 @@ public class AdvocateController : ControllerBase
 
     /// <summary>
     /// Sends a message and streams the answer as server-sent events (<c>event: delta | tool | done | error</c>).
-    /// Failures decidable before the model is called come back as ordinary JSON status codes (400 validation,
-    /// 403 forbidden, 404 not found, 429 usage cap); once the stream has started, a failure is an
-    /// <c>error</c> frame.
+    /// Any failure decidable before the response has started — including a model failure with nothing yet
+    /// streamed — comes back as an ordinary JSON status code (400 validation, 403 forbidden, 404 not found,
+    /// 429 usage cap, 503 unavailable) so status-based monitoring sees it; once the stream has started, a
+    /// failure is an <c>error</c> frame instead, since the 200 status is already committed.
     /// </summary>
     [HttpPost("api/advocate/threads/{id:int}/messages")]
     [EnableRateLimiting("advocate-message")]
@@ -116,7 +117,7 @@ public class AdvocateController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, ApiResponse<object>.Error(AdvocatePrompts.UnavailableMessage));
 
         var first = enumerator.Current;
-        if (first.Kind == AdvocateStreamEventKind.Error && first.Code != AdvocateErrorCodes.Unavailable)
+        if (first.Kind == AdvocateStreamEventKind.Error)
         {
             var status = first.Code switch
             {
@@ -124,6 +125,7 @@ public class AdvocateController : ControllerBase
                 AdvocateErrorCodes.Forbidden => StatusCodes.Status403Forbidden,
                 AdvocateErrorCodes.NotFound => StatusCodes.Status404NotFound,
                 AdvocateErrorCodes.UsageCap => StatusCodes.Status429TooManyRequests,
+                AdvocateErrorCodes.Unavailable => StatusCodes.Status503ServiceUnavailable,
                 _ => StatusCodes.Status400BadRequest
             };
             return StatusCode(status, ApiResponse<object>.Error(first.Message ?? "Request failed"));
@@ -136,11 +138,22 @@ public class AdvocateController : ControllerBase
         HttpContext.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
         await Response.StartAsync(ct);
 
-        var body = Response.Body;
-        await WriteFrameAsync(body, first, ct);
-        while (await SseWriter.AwaitWithPingsAsync(body, enumerator.MoveNextAsync().AsTask(), PingInterval, ct))
+        try
         {
-            await WriteFrameAsync(body, enumerator.Current, ct);
+            var body = Response.Body;
+            await WriteFrameAsync(body, first, ct);
+            while (await SseWriter.AwaitWithPingsAsync(body, enumerator.MoveNextAsync().AsTask(), PingInterval, ct))
+            {
+                await WriteFrameAsync(body, enumerator.Current, ct);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // The client aborted mid-stream (Stop button, navigation, unmount). The 200 + headers are
+            // already on the wire, so there is no status code left to change; SseWriter has already
+            // observed the enumerator's pending MoveNextAsync, so `await using` above can dispose it
+            // safely. Nothing further to write.
+            return new EmptyResult();
         }
 
         return new EmptyResult();
@@ -163,11 +176,16 @@ public class AdvocateController : ControllerBase
         _ => Task.CompletedTask
     };
 
-    /// <summary>"not found" (unknown child/thread or no access) ⇒ 404; anything else ⇒ 400.</summary>
+    /// <summary>"not found" (unknown child/thread or no access) ⇒ 404; a Viewer who lacks Collaborator
+    /// access ⇒ 403 (same distinction <see cref="SendMessage"/> makes); anything else ⇒ 400.</summary>
     private IActionResult MapFailure(string message)
-        => message.Contains("not found", StringComparison.OrdinalIgnoreCase)
-            ? NotFound(ApiResponse<object>.Error(message))
-            : BadRequest(ApiResponse<object>.Error(message));
+    {
+        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
+            return NotFound(ApiResponse<object>.Error(message));
+        if (message == AdvocateService.CollaboratorRequired)
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Error(message));
+        return BadRequest(ApiResponse<object>.Error(message));
+    }
 
     private static AdvocateThreadDto MapThread(AdvocateThreadModel t) => new()
     {

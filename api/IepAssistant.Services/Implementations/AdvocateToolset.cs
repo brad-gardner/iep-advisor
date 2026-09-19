@@ -48,8 +48,13 @@ public sealed class AdvocateToolset : IToolExecutor
 
     private sealed record ToolEntry(ClaudeToolDefinition Definition, ToolHandler Handler);
 
-    /// <summary>A handler's result: the payload plus the arrays to drop items from (longest first) if it is over the per-tool cap.</summary>
-    private sealed class ToolPayload
+    /// <summary>A handler's result: the payload plus the arrays that may be trimmed if it is over the
+    /// per-tool cap, in priority order — <paramref name="trimmable"/>[0] is least valuable (emptied
+    /// first), the last is most valuable (emptied only if everything before it was not enough).
+    /// Internal (not private) so <c>FitToCap</c> can be exercised directly from
+    /// IepAssistant.Services.Tests (<c>InternalsVisibleTo</c>) with synthetic oversized payloads that
+    /// would be impractical to reproduce through the real handlers' own field-level caps.</summary>
+    internal sealed class ToolPayload
     {
         public ToolPayload(JsonObject payload, params JsonArray[] trimmable)
         {
@@ -415,6 +420,7 @@ public sealed class AdvocateToolset : IToolExecutor
             ("documentId", "integer", "The document's id from list_documents.", true)));
 
     private const string NoAnalysisHint = "The parent can run an analysis from the document page.";
+    private const string SizeTruncatedHint = "This result was too large to return in full; ask a narrower question or use get_document_section for the raw text.";
 
     private async Task<ToolPayload> GetDocumentAnalysisAsync(JsonElement input, CancellationToken ct)
     {
@@ -458,6 +464,8 @@ public sealed class AdvocateToolset : IToolExecutor
         var sectionAnalyses = ParseArray(analysis.SectionAnalyses);
         var redFlags = ParseArray(analysis.OverallRedFlags);
         var run = await LatestRunSectionsAsync(AnalysisSourceType.IepDocument, iep.Id, ct);
+        var advocacyGapAnalysis = ParseOrText(analysis.AdvocacyGapAnalysis);
+        var goalAlignments = NestedArray(advocacyGapAnalysis, "goalAlignments");
 
         var payload = new JsonObject
         {
@@ -468,10 +476,12 @@ public sealed class AdvocateToolset : IToolExecutor
             ["overallRedFlags"] = redFlags,
             ["goalAnalyses"] = goalAnalyses,
             ["sectionAnalyses"] = sectionAnalyses,
-            ["advocacyGapAnalysis"] = ParseOrText(analysis.AdvocacyGapAnalysis),
+            ["advocacyGapAnalysis"] = advocacyGapAnalysis,
             ["analysisRun"] = run.Payload
         };
-        return new ToolPayload(payload, goalAnalyses, sectionAnalyses, redFlags, run.Sections);
+        // Least valuable first: cross-document run context, then the parent-priority alignments, then red
+        // flags, then section summaries, then per-goal analyses (the most load-bearing for citations).
+        return new ToolPayload(payload, run.Sections, goalAlignments, redFlags, sectionAnalyses, goalAnalyses);
     }
 
     private async Task<ToolPayload> GetEtrAnalysisAsync(int etrId, CancellationToken ct)
@@ -490,6 +500,8 @@ public sealed class AdvocateToolset : IToolExecutor
         var sourceRef = Register("etr_analysis", analysis.Id, $"Analysis of {Labels[documentRef]}", documentRef);
         var redFlags = ParseArray(analysis.OverallRedFlags);
         var run = await LatestRunSectionsAsync(AnalysisSourceType.EtrDocument, etr.Id, ct);
+        var advocacyGapAnalysis = ParseOrText(analysis.AdvocacyGapAnalysis);
+        var goalAlignments = NestedArray(advocacyGapAnalysis, "goalAlignments");
 
         var payload = new JsonObject
         {
@@ -500,10 +512,11 @@ public sealed class AdvocateToolset : IToolExecutor
             ["assessmentCompleteness"] = ParseOrText(analysis.AssessmentCompleteness),
             ["eligibilityReview"] = ParseOrText(analysis.EligibilityReview),
             ["overallRedFlags"] = redFlags,
-            ["advocacyGapAnalysis"] = ParseOrText(analysis.AdvocacyGapAnalysis),
+            ["advocacyGapAnalysis"] = advocacyGapAnalysis,
             ["analysisRun"] = run.Payload
         };
-        return new ToolPayload(payload, redFlags, run.Sections);
+        // Least valuable first: see GetIepAnalysisAsync.
+        return new ToolPayload(payload, run.Sections, goalAlignments, redFlags);
     }
 
     private async Task<ToolPayload> GetProgressReportAnalysisAsync(int reportId, CancellationToken ct)
@@ -528,6 +541,8 @@ public sealed class AdvocateToolset : IToolExecutor
         var findings = ParseArray(analysis.GoalProgressFindings);
         var redFlags = ParseArray(analysis.RedFlags);
         var run = await LatestRunSectionsAsync(AnalysisSourceType.ProgressReport, report.Id, ct);
+        var advocacyGapAnalysis = ParseOrText(analysis.AdvocacyGapAnalysis);
+        var goalAlignments = NestedArray(advocacyGapAnalysis, "goalAlignments");
 
         var payload = new JsonObject
         {
@@ -540,10 +555,11 @@ public sealed class AdvocateToolset : IToolExecutor
             ["summary"] = Str(analysis.Summary, 1_500),
             ["goalProgressFindings"] = findings,
             ["redFlags"] = redFlags,
-            ["advocacyGapAnalysis"] = ParseOrText(analysis.AdvocacyGapAnalysis),
+            ["advocacyGapAnalysis"] = advocacyGapAnalysis,
             ["analysisRun"] = run.Payload
         };
-        return new ToolPayload(payload, findings, redFlags, run.Sections);
+        // Least valuable first: see GetIepAnalysisAsync.
+        return new ToolPayload(payload, run.Sections, goalAlignments, redFlags, findings);
     }
 
     private static ToolPayload NoAnalysis(string documentRef, string? status) => new(new JsonObject
@@ -1291,6 +1307,14 @@ public sealed class AdvocateToolset : IToolExecutor
     }
 
     /// <summary>
+    /// A named array property nested one level inside an already-parsed node (e.g. an
+    /// <c>advocacyGapAnalysis.goalAlignments</c> array) — the SAME instance embedded in the payload tree, so
+    /// registering it as trimmable shrinks it in place. Missing or not an object/array ⇒ empty (a no-op to trim).
+    /// </summary>
+    private static JsonArray NestedArray(JsonNode? node, string propertyName) =>
+        node is JsonObject obj && obj[propertyName] is JsonArray array ? array : new JsonArray();
+
+    /// <summary>
     /// A stored JSON column → a sanitised copy with every string value entity-escaped and truncated to
     /// <see cref="MaxAnalysisStringChars"/>. A column that is not JSON is returned as one escaped text value; null stays null.
     /// </summary>
@@ -1331,12 +1355,30 @@ public sealed class AdvocateToolset : IToolExecutor
         }
     }
 
+    /// <summary>Top-level keys the size-reduction passes below never remove or count as droppable — the
+    /// minimum needed to keep the result meaningful (and, worst case, to build the fallback object).</summary>
+    private static readonly HashSet<string> ProtectedKeys = new(StringComparer.Ordinal)
+    {
+        "sourceRef", "documentRef", "status", "truncated", "reason", "dropped", "hint"
+    };
+
     /// <summary>
-    /// Serialises the payload under <see cref="PerToolCharCap"/>: drops trailing items from the trimmable
-    /// arrays (longest first, flagging <c>truncated: "size"</c>), then shortens the longest top-level string
-    /// values, and only if that is not enough hard-cuts the JSON.
+    /// Serialises the payload under <see cref="PerToolCharCap"/> in four escalating passes, each applied
+    /// only if the previous one was not enough:
+    /// 1. Empty the registered trimmable arrays one at a time, in the caller's registration order (least
+    ///    valuable first) — fully emptying one before touching the next, not "whichever is longest" (which
+    ///    could empty the most load-bearing array first just because it happened to be the longest).
+    /// 2. Drop whole top-level keys that are still objects/arrays too big to shrink any other way (an
+    ///    untrimmable nested object such as <c>advocacyGapAnalysis</c> or <c>analysisRun</c>), largest
+    ///    first, recording each in <c>dropped</c> so the model knows content is missing, not merely absent.
+    /// 3. Halve the longest remaining top-level string.
+    /// 4. If still over cap (pathological), fall back to a minimal object that is always valid JSON —
+    ///    never a raw <c>json[..cap]</c> substring, which can slice mid-string/mid-escape and hand the
+    ///    model unparsable text with the truncation marker itself cut away.
+    /// <c>truncated</c>/<c>reason</c> are set as soon as any pass is needed and survive every later pass,
+    /// including the final fallback.
     /// </summary>
-    private static string FitToCap(ToolPayload result)
+    internal static string FitToCap(ToolPayload result)
     {
         var json = result.Payload.ToJsonString();
         if (json.Length <= PerToolCharCap) return json;
@@ -1345,16 +1387,42 @@ public sealed class AdvocateToolset : IToolExecutor
         result.Payload["reason"] = "size";
         json = result.Payload.ToJsonString();
 
+        // Pass 1: registered arrays, least valuable first, each emptied before the next is touched.
+        foreach (var array in result.Trimmable)
+        {
+            if (json.Length <= PerToolCharCap) break;
+            while (json.Length > PerToolCharCap && array.Count > 0)
+            {
+                array.RemoveAt(array.Count - 1);
+                json = result.Payload.ToJsonString();
+            }
+        }
+        if (json.Length <= PerToolCharCap) return json;
+
+        // Pass 2: whole untrimmable top-level objects/arrays, largest serialised size first.
+        JsonArray? dropped = null;
         while (json.Length > PerToolCharCap)
         {
-            var longest = result.Trimmable.Where(a => a.Count > 0).OrderByDescending(a => a.Count).FirstOrDefault();
-            if (longest == null) break;
-            longest.RemoveAt(longest.Count - 1);
+            var key = result.Payload
+                .Where(kv => !ProtectedKeys.Contains(kv.Key) && kv.Value is JsonObject or JsonArray)
+                .OrderByDescending(kv => kv.Value!.ToJsonString().Length)
+                .Select(kv => kv.Key)
+                .FirstOrDefault();
+            if (key == null) break;
+            result.Payload.Remove(key);
+            (dropped ??= new JsonArray()).Add(key);
+            json = result.Payload.ToJsonString();
+        }
+        if (dropped != null)
+        {
+            result.Payload["dropped"] = dropped;
+            result.Payload["truncated"] = true;
+            result.Payload["reason"] = "size";
             json = result.Payload.ToJsonString();
         }
         if (json.Length <= PerToolCharCap) return json;
 
-        // Long scalar text (a section, a rendered draft) — halve the longest string until it fits.
+        // Pass 3: long scalar text (a section, a rendered draft) — halve the longest top-level string.
         while (json.Length > PerToolCharCap)
         {
             var longestKey = result.Payload
@@ -1369,7 +1437,17 @@ public sealed class AdvocateToolset : IToolExecutor
         }
         if (json.Length <= PerToolCharCap) return json;
 
-        return json[..PerToolCharCap];
+        // Pass 4: nothing left to shrink — a minimal, always-valid fallback rather than a raw byte cut.
+        var fallback = new JsonObject
+        {
+            ["status"] = "truncated",
+            ["truncated"] = true,
+            ["reason"] = "size",
+            ["hint"] = SizeTruncatedHint
+        };
+        if (result.Payload["sourceRef"] is JsonValue sourceRef) fallback["sourceRef"] = sourceRef.DeepClone();
+        if (result.Payload["documentRef"] is JsonValue documentRef) fallback["documentRef"] = documentRef.DeepClone();
+        return fallback.ToJsonString();
     }
 }
 

@@ -40,20 +40,37 @@ public static class SseWriter
     /// Awaits <paramref name="next"/>, writing a ping every <paramref name="pingInterval"/> while it is still
     /// pending. Returns the awaited result.
     /// </summary>
+    /// <remarks>
+    /// <paramref name="next"/> is typically a caller's pending <c>MoveNextAsync()</c> on an async iterator.
+    /// If <paramref name="ct"/> is cancelled while it is still pending, this method stops pinging but keeps
+    /// awaiting <paramref name="next"/> (swallowing whatever it completes with — cancellation is the error
+    /// to report, not that) before throwing, so <see langword="await using"/> disposal back in the caller
+    /// never races a still-in-flight <c>MoveNextAsync</c> (which would throw <see cref="NotSupportedException"/>
+    /// from the compiler-generated state machine).
+    /// </remarks>
     public static async Task<T> AwaitWithPingsAsync<T>(Stream output, Task<T> next, TimeSpan pingInterval, CancellationToken ct)
     {
-        while (true)
+        try
         {
-            using var delayCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            var delay = Task.Delay(pingInterval, delayCts.Token);
-            var completed = await Task.WhenAny(next, delay);
-            if (completed == next)
+            while (true)
             {
-                delayCts.Cancel();
-                return await next;
+                using var delayCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                var delay = Task.Delay(pingInterval, delayCts.Token);
+                var completed = await Task.WhenAny(next, delay);
+                if (completed == next)
+                {
+                    delayCts.Cancel();
+                    return await next;
+                }
+                ct.ThrowIfCancellationRequested();
+                await WritePingAsync(output, ct);
             }
-            ct.ThrowIfCancellationRequested();
-            await WritePingAsync(output, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            try { await next; }
+            catch { /* swallowed: we are already unwinding via cancellation, not whatever `next` faulted with */ }
+            throw;
         }
     }
 }

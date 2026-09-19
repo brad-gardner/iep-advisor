@@ -91,8 +91,9 @@ public sealed class JournalServiceTests : IDisposable
         var result = await CreateService(ctx).GetForChildAsync(f.ChildId, f.OwnerId);
 
         Assert.True(result.Success, result.Message);
-        Assert.Equal(new[] { "newest", "middle", "oldest" }, result.Data!.Select(e => e.ContentMarkdown).ToArray());
-        var newest = result.Data[0];
+        var data = result.Data!;
+        Assert.Equal(new[] { "newest", "middle", "oldest" }, data.Select(e => e.ContentMarkdown).ToArray());
+        var newest = data[0];
         Assert.Equal(f.ChildId, newest.ChildProfileId);
         Assert.Equal(Yesterday, newest.OccurredOn);
         Assert.Equal(JournalTag.Incident, newest.Tag);

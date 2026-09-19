@@ -276,8 +276,9 @@ public sealed class ParentPrepQuestionServiceTests : IDisposable
         var result = await CreateService(ctx).ReorderAsync(f.ChildId, f.CoParentId, new[] { c.Id, a.Id });
 
         Assert.True(result.Success, result.Message);
-        Assert.Equal(new[] { c.Id, a.Id, b.Id, d.Id }, result.Data!.Select(q => q.Id));
-        Assert.Equal(new[] { 0, 1, 2, 3 }, result.Data.Select(q => q.DisplayOrder));
+        var data = result.Data!;
+        Assert.Equal(new[] { c.Id, a.Id, b.Id, d.Id }, data.Select(q => q.Id));
+        Assert.Equal(new[] { 0, 1, 2, 3 }, data.Select(q => q.DisplayOrder));
 
         var list = await ListAsync(f.ChildId, f.OwnerId);
         Assert.Equal(new[] { "C", "A", "B", "D" }, list.Select(q => q.Text));

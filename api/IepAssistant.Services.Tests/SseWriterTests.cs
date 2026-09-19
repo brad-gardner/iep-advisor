@@ -68,8 +68,37 @@ public class SseWriterTests
     [Fact]
     public async Task AwaitWithPingsAsync_HonoursCancellation()
     {
-        using var cts = new CancellationTokenSource(50);
-        var never = new TaskCompletionSource<int>().Task;
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => SseWriter.AwaitWithPingsAsync(new MemoryStream(), never, TimeSpan.FromSeconds(30), cts.Token));
+        // A real `next` is a MoveNextAsync on an enumerable that also observes `ct`, so it completes
+        // (here: cancels) once `ct` fires — never a task that hangs forever, which is what a caller's
+        // `await using` disposal (racing a live MoveNextAsync) would otherwise force this helper into.
+        var next = new TaskCompletionSource<int>();
+        using var cts = new CancellationTokenSource();
+        cts.Token.Register(() => next.TrySetCanceled(cts.Token));
+        cts.CancelAfter(50);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => SseWriter.AwaitWithPingsAsync(new MemoryStream(), next.Task, TimeSpan.FromSeconds(30), cts.Token));
+    }
+
+    [Fact]
+    public async Task AwaitWithPingsAsync_OnCancellation_AwaitsThePendingNextTask_BeforeThrowing()
+    {
+        // Reproduces todos/171: cancelling `ct` while `next` (the caller's pending MoveNextAsync) is
+        // still outstanding must not throw until `next` is observed — otherwise the caller's
+        // `await using` disposes an iterator with a MoveNextAsync in flight, which throws
+        // NotSupportedException from the compiler-generated state machine.
+        var next = new TaskCompletionSource<int>();
+        using var cts = new CancellationTokenSource();
+        var pending = SseWriter.AwaitWithPingsAsync(new MemoryStream(), next.Task, TimeSpan.FromMilliseconds(10), cts.Token);
+
+        cts.Cancel();
+        await Task.Delay(50);
+        Assert.False(pending.IsCompleted, "must keep awaiting the pending next task before unwinding on cancellation");
+
+        // `next` finally settles with its own (unrelated) fault — proving the helper actually observed
+        // it (swallowing this) rather than abandoning it, and still reports cancellation, not this.
+        next.TrySetException(new InvalidOperationException("the iterator's own failure — never the reported error"));
+        var ex = await Record.ExceptionAsync(() => pending);
+
+        Assert.IsType<OperationCanceledException>(ex);
     }
 }

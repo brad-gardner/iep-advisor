@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using IepAssistant.Domain.Data;
@@ -338,6 +339,101 @@ public sealed class AdvocateToolsetTests : IDisposable
         Assert.True(doc.RootElement.GetProperty("truncated").GetBoolean());
         Assert.Equal("size", doc.RootElement.GetProperty("reason").GetString());
         Assert.InRange(doc.RootElement.GetProperty("entries").GetArrayLength(), 1, 7);
+    }
+
+    // ------------------------------------------------------------------ FitToCap (todos/174)
+    //
+    // Exercises AdvocateToolset.FitToCap/ToolPayload directly (internal, via InternalsVisibleTo) with
+    // synthetic oversized payloads: the real handlers' own per-field caps (Sanitize's 400-char string
+    // cap, Str's 1_000/1_500-char caps) make it impractical to reproduce a genuinely over-cap, partly
+    // untrimmable payload through them end to end.
+
+    [Fact]
+    public void FitToCap_UntrimmableNestedContentOverCap_StillProducesValidTruncatedJson()
+    {
+        // No registered array at all: a single huge nested object (like advocacyGapAnalysis or
+        // analysisRun before todos/174) that array-trimming and top-level-string-halving cannot reach,
+        // since the oversized string is one level down, not a top-level value.
+        var huge = new string('x', AdvocateToolset.PerToolCharCap + 2_000);
+        var payload = new JsonObject
+        {
+            ["sourceRef"] = "iep_analysis:1",
+            ["documentRef"] = "iep:1",
+            ["status"] = "completed",
+            ["nested"] = new JsonObject { ["hugeText"] = huge }
+        };
+
+        var json = AdvocateToolset.FitToCap(new AdvocateToolset.ToolPayload(payload));
+
+        // Must parse — never AdvocateToolset's old json[..cap] raw cut, which can slice mid-string and
+        // hand the model unparsable text with the truncation marker itself cut away.
+        using var doc = JsonDocument.Parse(json);
+        Assert.True(doc.RootElement.GetProperty("truncated").GetBoolean());
+        Assert.Equal("size", doc.RootElement.GetProperty("reason").GetString());
+        // The whole untrimmable "nested" key was dropped rather than byte-cut.
+        Assert.False(doc.RootElement.TryGetProperty("nested", out _));
+        var dropped = doc.RootElement.GetProperty("dropped").EnumerateArray().Select(e => e.GetString()).ToList();
+        Assert.Contains("nested", dropped);
+        // sourceRef/documentRef survive into the (possibly minimal) fallback.
+        Assert.Equal("iep_analysis:1", doc.RootElement.GetProperty("sourceRef").GetString());
+    }
+
+    [Fact]
+    public void FitToCap_TrimsRegisteredArrays_InRegistrationOrder_LeastValuableFirst()
+    {
+        // The FIRST-registered array is deliberately the one with by far the most bulk, and the
+        // LAST-registered is small — proving trimming drains the array in registration order (least
+        // valuable first) rather than "whichever array is currently longest", which is what the
+        // pre-todos/174 code did (and which, for a real get_document_analysis payload, could empty the
+        // load-bearing goalAnalyses before ever touching the much-less-valuable run sections).
+        var leastValuable = new JsonArray();
+        for (var i = 0; i < 200; i++) leastValuable.Add(new string('a', 100));
+        var mostValuable = new JsonArray { "keep-1", "keep-2", "keep-3" };
+
+        var payload = new JsonObject
+        {
+            ["sourceRef"] = "iep_analysis:1",
+            ["leastValuable"] = leastValuable,
+            ["mostValuable"] = mostValuable
+        };
+
+        var json = AdvocateToolset.FitToCap(new AdvocateToolset.ToolPayload(payload, leastValuable, mostValuable));
+
+        using var doc = JsonDocument.Parse(json);
+        Assert.True(doc.RootElement.GetProperty("truncated").GetBoolean());
+        // The least-valuable array absorbed the trimming (it started at 200)...
+        Assert.True(doc.RootElement.GetProperty("leastValuable").GetArrayLength() < 200);
+        // ...while the most-valuable array was never touched, because fitting under the cap never
+        // required reaching it.
+        Assert.Equal(new[] { "keep-1", "keep-2", "keep-3" }, doc.RootElement.GetProperty("mostValuable").EnumerateArray().Select(e => e.GetString()));
+        Assert.True(json.Length <= AdvocateToolset.PerToolCharCap, $"result was {json.Length} chars");
+    }
+
+    [Fact]
+    public void FitToCap_NothingLeftToShrink_FallsBackToMinimalValidObject()
+    {
+        // No array to trim, no object/array to drop, and every string is under the 200-char threshold
+        // pass 3 halves — nothing but the last-resort fallback can bring this under cap.
+        var payload = new JsonObject
+        {
+            ["sourceRef"] = "iep_analysis:1",
+            ["documentRef"] = "iep:1",
+            ["status"] = "completed"
+        };
+        for (var i = 0; i < 100; i++)
+            payload[$"field{i}"] = new string('a', 150);
+
+        var json = AdvocateToolset.FitToCap(new AdvocateToolset.ToolPayload(payload));
+
+        // Must still be valid JSON — never AdvocateToolset's old json[..cap] raw cut.
+        using var doc = JsonDocument.Parse(json);
+        Assert.Equal("truncated", doc.RootElement.GetProperty("status").GetString());
+        Assert.True(doc.RootElement.GetProperty("truncated").GetBoolean());
+        Assert.Equal("size", doc.RootElement.GetProperty("reason").GetString());
+        Assert.True(doc.RootElement.TryGetProperty("hint", out _));
+        Assert.Equal("iep_analysis:1", doc.RootElement.GetProperty("sourceRef").GetString());
+        Assert.Equal("iep:1", doc.RootElement.GetProperty("documentRef").GetString());
+        Assert.False(doc.RootElement.TryGetProperty("field0", out _));
     }
 
     [Fact]

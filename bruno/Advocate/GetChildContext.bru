@@ -1,0 +1,48 @@
+meta {
+  name: Get advocate context for child
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/children/{{childId}}/advocate/context
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # GET /api/children/{childId}/advocate/context
+
+  Viewer+: the state the advocate will apply for this child, so the UI can show a "set your state"
+  hint before the parent ever sends a message. Resolved the same way `SendMessage` resolves it
+  (District/School.StateCode via the child's link, else the parent's own `User.State`).
+
+  ## Responses
+
+  - `200` — `data: AdvocateChildContextDto`
+  - `401` — missing/invalid bearer token
+  - `404` — child not found or the caller has no access to it
+
+  ```json
+  {
+    "success": true,
+    "message": null,
+    "data": {
+      "stateCode": "OH"
+    },
+    "errors": []
+  }
+  ```
+
+  `stateCode` is `null` when no state can be resolved anywhere (no school link and no `User.State`)
+  — the UI renders this as the "set your state" hint, and the advocate falls back to federal (IDEA)
+  rules only.
+}

@@ -1,3 +1,4 @@
+using System.Data;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -35,7 +36,10 @@ public class AdvocateService : IAdvocateService
 
     private const string ChildNotFound = "Child profile not found.";
     private const string ThreadNotFound = "Conversation not found.";
-    private const string CollaboratorRequired = "You can view this child but cannot ask the advocate about them.";
+
+    /// <summary>Viewer-but-not-Collaborator message, shared with the controller so it can map this specific
+    /// failure to 403 (every other <see cref="ServiceResult"/> failure from this class maps to 404/400).</summary>
+    public const string CollaboratorRequired = "You can view this child but cannot ask the advocate about them.";
 
     private static readonly Regex AboutGrammar = new(@"^(iep|etr|goal|analysis|progress_report|journal):(\d{1,9})$", RegexOptions.Compiled);
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -83,7 +87,12 @@ public class AdvocateService : IAdvocateService
     public async Task<ServiceResult<AdvocateThreadModel>> CreateThreadAsync(int userId, int childId, string? title, CancellationToken ct = default)
     {
         if (!await _access.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult<AdvocateThreadModel>.FailureResult(ChildNotFound);
+        {
+            // Same role-gap distinction as SendMessage: a Viewer can see the child but not ask the
+            // advocate about them (403); no access at all stays a 404 "not found", never a reveal.
+            return ServiceResult<AdvocateThreadModel>.FailureResult(
+                await _access.HasMinimumRoleAsync(childId, userId, AccessRole.Viewer, ct) ? CollaboratorRequired : ChildNotFound);
+        }
 
         var (cleanTitle, error) = NormalizeTitle(title, allowEmpty: true);
         if (error != null) return ServiceResult<AdvocateThreadModel>.FailureResult(error);
@@ -212,7 +221,7 @@ public class AdvocateService : IAdvocateService
         }
     }
 
-    private sealed record PreparedTurn(AdvocateThread Thread, ClaudeToolRequest Request, AdvocateToolset Toolset);
+    private sealed record PreparedTurn(AdvocateThread Thread, ClaudeToolRequest Request, AdvocateToolset Toolset, int UsageRecordId);
 
     private async Task<(PreparedTurn? Turn, AdvocateStreamEvent? Error)> PrepareTurnAsync(int userId, int threadId, string text, string? about, CancellationToken ct)
     {
@@ -243,10 +252,6 @@ public class AdvocateService : IAdvocateService
         if (user == null)
             return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.NotFound, ThreadNotFound));
 
-        var usage = await CountUsageAsync(userId, user.SubscriptionStatus, user.SubscriptionExpiresAt, ct);
-        if (usage.Used >= usage.Limit)
-            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.UsageCap, AdvocatePrompts.UsageCapMessage));
-
         var child = await _context.ChildProfiles.AsNoTracking()
             .Where(c => c.Id == thread.ChildProfileId)
             .Select(c => new { c.FirstName, c.GradeLevel })
@@ -256,20 +261,70 @@ public class AdvocateService : IAdvocateService
 
         var stateCode = await ChildStateResolver.ResolveAsync(_context, thread.ChildProfileId, ct);
 
-        // History is everything BEFORE this message: read it before the user row is added.
-        var history = await BuildHistoryAsync(threadId, ct);
-
+        // The usage cap check-then-reserve and the user-message persist are one unit of work, committed
+        // BEFORE the model is called: a concurrent send or a client abort must not get an uncounted turn
+        // (todos/173). Serializable matches SubscriptionService.TryReserveUsageAsync's count-then-insert.
         var now = DateTime.UtcNow;
-        _context.AdvocateMessages.Add(new AdvocateMessage
+        int usageRecordId;
+        List<ClaudeTurn> history;
+        await using (var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct))
         {
-            AdvocateThreadId = threadId,
-            Role = AdvocateMessageRole.User,
-            ContentMarkdown = question,
-            CreatedAt = now
-        });
-        thread.LastMessageAt = now;
-        thread.UpdatedAt = now;
-        await _context.SaveChangesAsync(ct);
+            try
+            {
+                var usage = await CountUsageAsync(userId, user.SubscriptionStatus, user.SubscriptionExpiresAt, ct);
+                if (usage.Used >= usage.Limit)
+                {
+                    await transaction.RollbackAsync(ct);
+                    return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.UsageCap, AdvocatePrompts.UsageCapMessage));
+                }
+
+                // Retry: the thread's latest message is this exact unanswered question ⇒ reuse the row
+                // instead of duplicating it (todos/172), and keep it out of history — it IS the current
+                // turn, not a past one. A different follow-up after a failure is not a retry: the earlier
+                // unanswered question stays as its own row and is replayed as history.
+                var latest = await _context.AdvocateMessages
+                    .Where(m => m.AdvocateThreadId == threadId)
+                    .OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id)
+                    .FirstOrDefaultAsync(ct);
+                var isRetry = latest != null && latest.Role == AdvocateMessageRole.User && latest.ContentMarkdown == question;
+
+                // History is everything BEFORE this turn's question.
+                history = await BuildHistoryAsync(threadId, isRetry ? latest!.Id : null, ct);
+
+                if (isRetry)
+                    latest!.CreatedAt = now;
+                else
+                    _context.AdvocateMessages.Add(new AdvocateMessage
+                    {
+                        AdvocateThreadId = threadId,
+                        Role = AdvocateMessageRole.User,
+                        ContentMarkdown = question,
+                        CreatedAt = now
+                    });
+
+                var usageRecord = new UsageRecord
+                {
+                    UserId = userId,
+                    ChildProfileId = thread.ChildProfileId,
+                    DistrictId = null,
+                    OperationType = OperationType,
+                    CreatedAt = now
+                };
+                _context.UsageRecords.Add(usageRecord);
+
+                thread.LastMessageAt = now;
+                thread.UpdatedAt = now;
+
+                await _context.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+                usageRecordId = usageRecord.Id;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+        }
 
         var context = new StringBuilder();
         context.AppendLine("<context>");
@@ -290,11 +345,20 @@ public class AdvocateService : IAdvocateService
             Tools = toolset.Definitions,
             MaxTokens = MaxTokens
         };
-        return (new PreparedTurn(thread, request, toolset), null);
+        return (new PreparedTurn(thread, request, toolset, usageRecordId), null);
     }
 
     private async Task ProduceAsync(PreparedTurn turn, ChannelWriter<AdvocateStreamEvent> writer, CancellationToken callerCt, CancellationToken turnCt)
     {
+        // Usage was reserved up front (todos/173), before the model was called. Whether the reservation
+        // is kept or released depends on how the turn ends:
+        //  - a completed turn (even truncated) keeps it — that is the normal, billable case.
+        //  - a Claude API failure or a blank/empty reply is never billable, however much text (if any)
+        //    already reached the client: nothing usable was ever delivered, so it is always released.
+        //  - a client abort or a server-side timeout keeps the reservation once any delta has actually
+        //    been forwarded to the client (they were shown a partial answer); with no delta forwarded
+        //    yet, it is released — nothing was ever shown.
+        var hadDelta = false;
         try
         {
             ClaudeStreamEvent? completed = null;
@@ -304,7 +368,10 @@ public class AdvocateService : IAdvocateService
                 {
                     case ClaudeStreamEventKind.TextDelta:
                         if (!string.IsNullOrEmpty(evt.Text))
+                        {
+                            hadDelta = true;
                             await writer.WriteAsync(AdvocateStreamEvent.Delta(evt.Text), turnCt);
+                        }
                         break;
                     case ClaudeStreamEventKind.ToolStarted:
                         await writer.WriteAsync(AdvocateStreamEvent.Tool(evt.ToolName ?? string.Empty, AdvocatePrompts.ToolLabel(evt.ToolName ?? string.Empty, evt.ToolInput), "started"), turnCt);
@@ -321,6 +388,7 @@ public class AdvocateService : IAdvocateService
             if (completed == null || string.IsNullOrWhiteSpace(completed.FullText))
             {
                 _logger.LogWarning("Advocate turn on thread {ThreadId}: Claude returned no content.", turn.Thread.Id);
+                await ReleaseUsageReservationAsync(turn.UsageRecordId);
                 await writer.WriteAsync(AdvocateStreamEvent.Error(AdvocateErrorCodes.Unavailable, AdvocatePrompts.UnavailableMessage), turnCt);
                 return;
             }
@@ -331,20 +399,24 @@ public class AdvocateService : IAdvocateService
         catch (ClaudeApiException ex)
         {
             _logger.LogError(ex, "Advocate turn on thread {ThreadId} failed with {Kind}", turn.Thread.Id, ex.Kind);
+            await ReleaseUsageReservationAsync(turn.UsageRecordId);
             await TryWriteErrorAsync(writer, AdvocatePrompts.UnavailableMessage);
         }
         catch (OperationCanceledException) when (!callerCt.IsCancellationRequested)
         {
             _logger.LogWarning("Advocate turn on thread {ThreadId} timed out after {Timeout}s", turn.Thread.Id, TurnTimeout.TotalSeconds);
+            if (!hadDelta) await ReleaseUsageReservationAsync(turn.UsageRecordId);
             await TryWriteErrorAsync(writer, ClaudeFailureMessages.Timeout);
         }
         catch (OperationCanceledException)
         {
-            // Caller went away: nothing to report to.
+            // Caller went away: nothing to report to, but still settle the reservation.
+            if (!hadDelta) await ReleaseUsageReservationAsync(turn.UsageRecordId);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Advocate turn on thread {ThreadId} failed unexpectedly", turn.Thread.Id);
+            await ReleaseUsageReservationAsync(turn.UsageRecordId);
             await TryWriteErrorAsync(writer, AdvocatePrompts.UnavailableMessage);
         }
         finally
@@ -357,6 +429,27 @@ public class AdvocateService : IAdvocateService
     {
         try { await writer.WriteAsync(AdvocateStreamEvent.Error(AdvocateErrorCodes.Unavailable, message)); }
         catch (ChannelClosedException) { }
+    }
+
+    /// <summary>
+    /// Refunds a usage reservation taken up front by <see cref="PrepareTurnAsync"/>. Never abortable — a
+    /// caller-cancelled or timed-out turn must still release its reservation, so this always runs with
+    /// <see cref="CancellationToken.None"/>. Failures are logged, not thrown: a lost refund is a leaked
+    /// (billable-looking) usage row, not a correctness break for the turn that is already unwinding.
+    /// </summary>
+    private async Task ReleaseUsageReservationAsync(int usageRecordId)
+    {
+        try
+        {
+            var record = await _context.UsageRecords.FirstOrDefaultAsync(u => u.Id == usageRecordId, CancellationToken.None);
+            if (record == null) return;
+            _context.UsageRecords.Remove(record);
+            await _context.SaveChangesAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to release advocate usage reservation {UsageRecordId}", usageRecordId);
+        }
     }
 
     private async Task<AdvocateStreamEvent> PersistAnswerAsync(PreparedTurn turn, ClaudeStreamEvent completed, CancellationToken ct)
@@ -381,15 +474,9 @@ public class AdvocateService : IAdvocateService
             Truncated = truncated,
             CreatedAt = now
         };
+        // Usage was already reserved up front in PrepareTurnAsync (todos/173) — a completed turn simply
+        // keeps that reservation, it does not record a second unit here.
         _context.AdvocateMessages.Add(message);
-        _context.UsageRecords.Add(new UsageRecord
-        {
-            UserId = turn.Thread.ParentUserId,
-            ChildProfileId = turn.Thread.ChildProfileId,
-            DistrictId = null,
-            OperationType = OperationType,
-            CreatedAt = now
-        });
         turn.Thread.LastMessageAt = now;
         turn.Thread.UpdatedAt = now;
         await _context.SaveChangesAsync(ct);
@@ -401,11 +488,16 @@ public class AdvocateService : IAdvocateService
     /// The last <see cref="HistoryMessageCount"/> messages oldest-first, trimmed to <see cref="HistoryCharBudget"/>
     /// by dropping the oldest first, then trimmed again so the conversation starts with a user turn. User text
     /// is re-wrapped as data (it is parent-typed); assistant text is our own stored markdown.
+    /// <paramref name="excludeMessageId"/> leaves out the row being reused for a same-text retry (todos/172):
+    /// that row IS the current turn's question, appended separately, so it must not also appear as history.
     /// </summary>
-    private async Task<List<ClaudeTurn>> BuildHistoryAsync(int threadId, CancellationToken ct)
+    private async Task<List<ClaudeTurn>> BuildHistoryAsync(int threadId, int? excludeMessageId, CancellationToken ct)
     {
-        var recent = await _context.AdvocateMessages.AsNoTracking()
-            .Where(m => m.AdvocateThreadId == threadId)
+        var query = _context.AdvocateMessages.AsNoTracking().Where(m => m.AdvocateThreadId == threadId);
+        if (excludeMessageId.HasValue)
+            query = query.Where(m => m.Id != excludeMessageId.Value);
+
+        var recent = await query
             .OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id)
             .Take(HistoryMessageCount)
             .Select(m => new { m.Role, m.ContentMarkdown })

@@ -39,20 +39,25 @@ docs {
   ## Body (`SendAdvocateMessageRequest`)
 
   - `text` (required) — 1–2000 characters.
-  - `about` (optional, max 40) — launcher context in the form `<kind>:<id>` where kind is
-    `iep | etr | goal | analysis | progress_report | journal` (e.g. `iep:12`, `goal:340`).
-    Unrecognised values are ignored.
+  - `about` (optional, max 40) — launcher context, matched against the grammar
+    `^(iep|etr|goal|analysis|progress_report|journal):\d{1,9}$` (e.g. `iep:12`, `goal:340`). A
+    value that does not match — wrong kind, non-numeric/oversized id, extra characters — is
+    **rejected with 400**, not silently ignored (`about is not a recognised record reference.`).
+    Omit the field entirely for no launcher context.
 
   ## Before the stream starts (plain JSON `ApiResponse`)
 
   Failures that can be decided before the model is called come back as ordinary status codes:
 
-  - `400` — validation (empty / over-limit text)
+  - `400` — validation (empty / over-limit text, or `about` outside the grammar above)
   - `401` — missing/invalid bearer token
   - `403` — forbidden
   - `404` — thread not found or not owned by the caller
   - `429` — usage cap reached (`message` explains the cap), or the `advocate-message` rate limit
-  - `500` — the advocate is unavailable before any frame could be produced
+  - `503` — Claude itself failed before any frame could be produced (e.g. a blank key, or an
+    immediate 5xx/429 from Anthropic) — visible to status-based monitoring, unlike the `error` frame
+    below, which only covers a failure *after* the stream has already started
+  - `500` — defensive fallback if the stream produced no event at all (should not happen in practice)
 
   ## Stream (`200`, `text/event-stream`)
 
@@ -81,5 +86,9 @@ docs {
   - `delta` — `{ text }`: the next chunk of the answer; concatenate deltas in order.
   - `tool` — `{ name, label, status }`: a record lookup the advocate is running; `status` is `started | finished | failed`.
   - `done` — `{ messageId, contentMarkdown, citations[], suggestions[], truncated, disclaimer }`: the persisted assistant message. `contentMarkdown` is the authoritative full text (use it instead of the concatenated deltas). `citations` / `suggestions` have the same shape as in *Get advocate thread with messages*. `truncated` is true when the answer hit its length budget. Terminal frame.
-  - `error` — `{ code, message }`: a failure after the stream started; `code` is `unavailable` and `message` is safe to show. Terminal frame. (`validation | not_found | forbidden | usage_cap` are never streamed — they are returned as the status codes above before the stream begins.)
+  - `error` — `{ code, message }`: a failure *after the stream had already started* (some delta/tool
+    events already sent) — `code` is `unavailable` and `message` is safe to show. Terminal frame. A
+    failure before the first byte, including `unavailable`, is one of the status codes above instead
+    (`validation | not_found | forbidden | usage_cap | unavailable` are never streamed when they are
+    the very first event — only a later, mid-turn failure is).
 }

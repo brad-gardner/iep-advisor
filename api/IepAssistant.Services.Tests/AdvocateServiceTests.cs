@@ -97,6 +97,23 @@ public sealed class AdvocateServiceTests : IDisposable
         throw ex;
     }
 
+    /// <summary>Fails before any delta ever reaches the client — the "nothing was ever shown" case.</summary>
+    private static async IAsyncEnumerable<ClaudeStreamEvent> ThrowImmediately(Exception ex, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await Task.Yield();
+        if (ex is not null) throw ex;
+        yield break; // unreachable at runtime; keeps this a valid async-iterator signature
+    }
+
+    /// <summary>Streams one delta, signals <paramref name="ready"/>, then hangs until <paramref name="ct"/>
+    /// is cancelled — simulates a client abort (or timeout) after the model has already produced output.</summary>
+    private static async IAsyncEnumerable<ClaudeStreamEvent> DeltaThenHang(TaskCompletionSource ready, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        yield return new ClaudeStreamEvent(ClaudeStreamEventKind.TextDelta, Text: "Here is ");
+        ready.TrySetResult();
+        await Task.Delay(Timeout.Infinite, ct);
+    }
+
     // ------------------------------------------------------------------ seeding
 
     private sealed record Family(int OwnerId, int CoParentId, int ViewerId, int StrangerId, int ChildId, int OtherChildId);
@@ -229,10 +246,17 @@ public sealed class AdvocateServiceTests : IDisposable
 
         var list = await service.ListThreadsAsync(f.ViewerId, f.ChildId);
         var create = await service.CreateThreadAsync(f.ViewerId, f.ChildId, null);
+        var stranger = await service.CreateThreadAsync(f.StrangerId, f.ChildId, null);
 
         Assert.True(list.Success);
         Assert.Empty(list.Data!);
         Assert.False(create.Success);
+        // A Viewer gets the same Forbidden-style message (and, at the controller, 403) as SendMessage —
+        // never the "not found" wording a stranger with no access at all gets (todos/198).
+        Assert.Equal(AdvocateService.CollaboratorRequired, create.Message);
+        Assert.DoesNotContain("not found", create.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(stranger.Success);
+        Assert.Contains("not found", stranger.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     // ------------------------------------------------------------------ threads: CRUD
@@ -412,6 +436,30 @@ public sealed class AdvocateServiceTests : IDisposable
 
         Assert.Equal(AdvocateStreamEventKind.Done, underCap.Last().Kind);
         Assert.Equal(AdvocateErrorCodes.UsageCap, Assert.Single(overCap).Code);
+    }
+
+    [Fact]
+    public async Task Send_ReservesUsage_InTheSameUnitOfWorkAsTheUserMessage_BeforeInvokingClaude()
+    {
+        // todos/173: the usage cap must be a check-then-reserve committed BEFORE the model is called, not
+        // a debit recorded after a successful completion — otherwise concurrent sends at the cap, or a
+        // client abort before "done", get uncounted turns. Proven here by checking (from a second,
+        // independent DbContext on the same database) that the reservation is already committed by the
+        // time the model is invoked — the earliest point a concurrent second request's own count-check
+        // could observe it.
+        var f = SeedFamily("reserve-before-call");
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+        var usageCountAtInvocation = -1;
+        _claude.Script = (_, _, ct) =>
+        {
+            using var probe = CreateContext();
+            usageCountAtInvocation = probe.UsageRecords.Count(u => u.UserId == f.OwnerId && u.OperationType == AdvocateService.OperationType);
+            return Answer("Hi there");
+        };
+
+        await SendAsync(f.OwnerId, threadId, "Hi");
+
+        Assert.Equal(1, usageCountAtInvocation);
     }
 
     [Fact]
@@ -718,6 +766,54 @@ public sealed class AdvocateServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Send_FailureBeforeAnyDelta_ReleasesTheUsageReservation()
+    {
+        // todos/173: nothing was ever shown to the parent, so the reservation taken up front by
+        // PrepareTurnAsync must be refunded — the free/subscription cap should not shrink for a turn
+        // that failed before producing any output at all.
+        var f = SeedFamily("fail-before-delta");
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+        _claude.Script = (_, _, ct) => ThrowImmediately(new ClaudeApiException(ClaudeFailureKind.RateLimited), ct);
+
+        var events = await SendAsync(f.OwnerId, threadId, "Hi");
+
+        Assert.Equal(AdvocateErrorCodes.Unavailable, Assert.Single(events).Code);
+        var snapshot = Snapshot(threadId);
+        var only = Assert.Single(snapshot.Messages);
+        Assert.Equal(AdvocateMessageRole.User, only.Role);
+        Assert.Equal(0, snapshot.UsageCount);
+    }
+
+    [Fact]
+    public async Task Send_CallerCancelsAfterADelta_PropagatesCancellation_NoAssistantRow_KeepsUsageReservation()
+    {
+        // todos/171 + todos/173: a client abort mid-stream (Stop button, unmount) must propagate
+        // cancellation cleanly — no NotSupportedException from disposing an in-flight MoveNextAsync — and,
+        // because a delta already reached the client, the up-front usage reservation is kept, not refunded.
+        var f = SeedFamily("abort-mid-stream");
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+        var ready = new TaskCompletionSource();
+        _claude.Script = (_, _, ct) => DeltaThenHang(ready, ct);
+
+        using var ctx = CreateContext();
+        using var cts = new CancellationTokenSource();
+        var enumerator = CreateService(ctx).SendMessageAsync(f.OwnerId, threadId, "Hi", null, cts.Token).GetAsyncEnumerator(cts.Token);
+
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal(AdvocateStreamEventKind.Delta, enumerator.Current.Kind);
+
+        cts.Cancel();
+        await ready.Task; // the fake has reached its cancellation-aware wait
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await enumerator.MoveNextAsync());
+        await enumerator.DisposeAsync();
+
+        var snapshot = Snapshot(threadId);
+        Assert.Single(snapshot.Messages, m => m.Role == AdvocateMessageRole.User);
+        Assert.DoesNotContain(snapshot.Messages, m => m.Role == AdvocateMessageRole.Assistant);
+        Assert.Equal(1, snapshot.UsageCount);
+    }
+
+    [Fact]
     public async Task Send_EmptyFullText_IsTreatedAsFailure()
     {
         var f = SeedFamily("empty-answer");
@@ -745,9 +841,9 @@ public sealed class AdvocateServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Send_FailedTurnQuestion_IsReplayedAsHistoryOnRetry()
+    public async Task Send_DifferentFollowUpAfterFailure_KeepsEarlierQuestionAsHistory()
     {
-        var f = SeedFamily("retry");
+        var f = SeedFamily("retry-diff");
         var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
         _claude.Script = (_, _, ct) => DeltaThenThrow(new ClaudeApiException(ClaudeFailureKind.Transient), ct);
         await SendAsync(f.OwnerId, threadId, "First try");
@@ -759,6 +855,38 @@ public sealed class AdvocateServiceTests : IDisposable
         Assert.Equal(new[] { "user", "user" }, messages.Select(m => m.Role));
         Assert.Contains("First try", messages[0].Text);
         Assert.Contains("Second try", messages[1].Text);
+
+        // A different follow-up is not a retry: the earlier unanswered question keeps its own row (one
+        // row each), never collapsed or duplicated (todos/172).
+        var snapshot = Snapshot(threadId);
+        Assert.Equal(
+            new[] { AdvocateMessageRole.User, AdvocateMessageRole.User, AdvocateMessageRole.Assistant },
+            snapshot.Messages.Select(m => m.Role));
+        Assert.Equal("First try", snapshot.Messages[0].ContentMarkdown);
+        Assert.Equal("Second try", snapshot.Messages[1].ContentMarkdown);
+    }
+
+    [Fact]
+    public async Task Send_SameTextRetriedAfterFailure_ReusesTheRowInsteadOfDuplicating()
+    {
+        var f = SeedFamily("retry-same");
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+        _claude.Script = (_, _, ct) => DeltaThenThrow(new ClaudeApiException(ClaudeFailureKind.Transient), ct);
+        await SendAsync(f.OwnerId, threadId, "Retry me");
+        _claude.Script = (_, _, _) => Answer("Answer at last");
+
+        await SendAsync(f.OwnerId, threadId, "Retry me");
+
+        // Exactly one user row on disk (reused, not duplicated) and exactly one user turn sent to the
+        // model on the retry — the reused row is the CURRENT turn, not also replayed as history (todos/172).
+        var snapshot = Snapshot(threadId);
+        Assert.Equal(new[] { AdvocateMessageRole.User, AdvocateMessageRole.Assistant }, snapshot.Messages.Select(m => m.Role));
+        Assert.Equal("Retry me", snapshot.Messages[0].ContentMarkdown);
+
+        var retryRequestMessages = _claude.Requests[1].Messages;
+        var userTurn = Assert.Single(retryRequestMessages);
+        Assert.Equal("user", userTurn.Role);
+        Assert.Contains("Retry me", userTurn.Text);
     }
 
     // ------------------------------------------------------------------ prompt construction
