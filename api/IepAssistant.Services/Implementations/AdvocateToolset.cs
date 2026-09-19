@@ -1399,25 +1399,31 @@ public sealed class AdvocateToolset : IToolExecutor
         }
         if (json.Length <= PerToolCharCap) return json;
 
-        // Pass 2: whole untrimmable top-level objects/arrays, largest serialised size first.
+        // Pass 2: whole untrimmable top-level objects/arrays, largest serialised size first. The
+        // "dropped" marker itself is attached to the payload as soon as it exists — before each
+        // re-serialisation, not after the loop — so its own overhead is included in the cap check;
+        // otherwise a payload that lands within the marker's width of the cap could look done, only to
+        // go back over once the marker is appended, with nothing left in the loop to correct it.
         JsonArray? dropped = null;
         while (json.Length > PerToolCharCap)
         {
             var key = result.Payload
                 .Where(kv => !ProtectedKeys.Contains(kv.Key) && kv.Value is JsonObject or JsonArray)
+                // An array already registered as trimmable and fully emptied by pass 1 isn't a
+                // meaningful drop candidate — reporting it in "dropped" would tell the model content
+                // is missing when pass 1 already accounted for it as trimmed.
+                .Where(kv => kv.Value is not JsonArray array || array.Count > 0 || !result.Trimmable.Contains(array))
                 .OrderByDescending(kv => kv.Value!.ToJsonString().Length)
                 .Select(kv => kv.Key)
                 .FirstOrDefault();
             if (key == null) break;
             result.Payload.Remove(key);
-            (dropped ??= new JsonArray()).Add(key);
-            json = result.Payload.ToJsonString();
-        }
-        if (dropped != null)
-        {
-            result.Payload["dropped"] = dropped;
-            result.Payload["truncated"] = true;
-            result.Payload["reason"] = "size";
+            if (dropped == null)
+            {
+                dropped = new JsonArray();
+                result.Payload["dropped"] = dropped;
+            }
+            dropped.Add(key);
             json = result.Payload.ToJsonString();
         }
         if (json.Length <= PerToolCharCap) return json;

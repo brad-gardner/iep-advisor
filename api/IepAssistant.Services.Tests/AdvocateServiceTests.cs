@@ -114,6 +114,55 @@ public sealed class AdvocateServiceTests : IDisposable
         await Task.Delay(Timeout.Infinite, ct);
     }
 
+    /// <summary>Completes immediately with a blank/whitespace answer and no deltas at all — the genuine
+    /// "Claude returned nothing" case, distinct from <see cref="Answer"/>, which would forward two
+    /// non-empty whitespace TextDelta chunks (via its half-split) before completing.</summary>
+    private static async IAsyncEnumerable<ClaudeStreamEvent> CompletedWithNoDeltas(string fullText, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await Task.Yield();
+        yield return new ClaudeStreamEvent(ClaudeStreamEventKind.Completed, FullText: fullText);
+    }
+
+    /// <summary>Deletes the thread directly (simulating a concurrent delete racing the turn) — makes
+    /// PersistAnswerAsync's later attempt to update/insert against it fail.</summary>
+    private async Task DeleteThreadDirectlyAsync(int threadId, CancellationToken ct)
+    {
+        using var deleteCtx = CreateContext();
+        var thread = await deleteCtx.AdvocateThreads.FindAsync(new object?[] { threadId }, ct);
+        Assert.NotNull(thread);
+        deleteCtx.AdvocateThreads.Remove(thread!);
+        await deleteCtx.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Streams one delta, then deletes the thread before completing — reproduces
+    /// PersistAnswerAsync failing on a thread that vanished out from under it, with a delta already
+    /// forwarded to the client (todos/219).</summary>
+    private async IAsyncEnumerable<ClaudeStreamEvent> DeltaThenThreadDeletedThenAnswer(int threadId, string fullText, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await Task.Yield();
+        yield return new ClaudeStreamEvent(ClaudeStreamEventKind.TextDelta, Text: "Here is ");
+        await DeleteThreadDirectlyAsync(threadId, ct);
+        yield return new ClaudeStreamEvent(ClaudeStreamEventKind.Completed, FullText: fullText);
+    }
+
+    /// <summary>Deletes the thread, then completes — no delta or tool frame is ever forwarded, so
+    /// PersistAnswerAsync's failure on the vanished thread happens with nothing shown yet (todos/218).</summary>
+    private async IAsyncEnumerable<ClaudeStreamEvent> ThreadDeletedThenAnswer_NoPriorOutput(int threadId, string fullText, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await Task.Yield();
+        await DeleteThreadDirectlyAsync(threadId, ct);
+        yield return new ClaudeStreamEvent(ClaudeStreamEventKind.Completed, FullText: fullText);
+    }
+
+    /// <summary>Starts one tool call, signals <paramref name="ready"/>, then hangs until <paramref name="ct"/>
+    /// is cancelled — simulates a client abort after only a tool round-trip, with no text ever forwarded.</summary>
+    private static async IAsyncEnumerable<ClaudeStreamEvent> ToolStartedThenHang(TaskCompletionSource ready, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        yield return new ClaudeStreamEvent(ClaudeStreamEventKind.ToolStarted, ToolName: "search_knowledge_base", ToolUseId: "tu_1", ToolInput: JsonDocument.Parse("{}").RootElement.Clone());
+        ready.TrySetResult();
+        await Task.Delay(Timeout.Infinite, ct);
+    }
+
     // ------------------------------------------------------------------ seeding
 
     private sealed record Family(int OwnerId, int CoParentId, int ViewerId, int StrangerId, int ChildId, int OtherChildId);
@@ -748,8 +797,11 @@ public sealed class AdvocateServiceTests : IDisposable
     // ------------------------------------------------------------------ send: failures
 
     [Fact]
-    public async Task Send_ClaudeApiException_EmitsUnavailable_KeepsUserRow_NoAssistantRow_NoUsage()
+    public async Task Send_ClaudeApiExceptionAfterADelta_EmitsUnavailable_KeepsUserRow_NoAssistantRow_KeepsUsageReservation()
     {
+        // todos/219: the release rule is uniform across every failure arm — a delta already reached the
+        // client here, so even a ClaudeApiException (previously always refunded, regardless of output
+        // already shown) must keep the reservation rather than release it.
         var f = SeedFamily("api-error");
         var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
         _claude.Script = (_, _, ct) => DeltaThenThrow(new ClaudeApiException(ClaudeFailureKind.RateLimited), ct);
@@ -762,7 +814,7 @@ public sealed class AdvocateServiceTests : IDisposable
         var snapshot = Snapshot(threadId);
         var only = Assert.Single(snapshot.Messages);
         Assert.Equal(AdvocateMessageRole.User, only.Role);
-        Assert.Equal(0, snapshot.UsageCount);
+        Assert.Equal(1, snapshot.UsageCount);
     }
 
     [Fact]
@@ -816,15 +868,93 @@ public sealed class AdvocateServiceTests : IDisposable
     [Fact]
     public async Task Send_EmptyFullText_IsTreatedAsFailure()
     {
+        // No delta is ever forwarded here (unlike Answer("   "), which would split the whitespace into
+        // two non-empty TextDelta chunks) — this is the genuine "Claude returned nothing" case, so the
+        // reservation is released (todos/219: hadOutput stays false when nothing at all was forwarded).
         var f = SeedFamily("empty-answer");
         var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
-        _claude.Script = (_, _, _) => Answer("   ");
+        _claude.Script = (_, _, _) => CompletedWithNoDeltas("   ");
 
         var events = await SendAsync(f.OwnerId, threadId, "Hi");
 
         Assert.Equal(AdvocateErrorCodes.Unavailable, events.Last().Code);
         Assert.Single(Snapshot(threadId).Messages);
         Assert.Equal(0, Snapshot(threadId).UsageCount);
+    }
+
+    [Fact]
+    public async Task Send_ThreadDeletedConcurrently_BetweenFirstDeltaAndCompletion_PersistFails_KeepsUsageReservation()
+    {
+        // todos/219: PersistAnswerAsync's own failure (here, a concurrent delete of the thread between
+        // the first delta and completion — cascade-deletes the thread's messages and makes the thread
+        // row PersistAnswerAsync tries to update disappear out from under it) falls into ProduceAsync's
+        // generic Exception arm. A delta already reached the client, so the reservation must be kept even
+        // though nothing could ultimately be persisted.
+        var f = SeedFamily("thread-deleted-midstream");
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+        _claude.Script = (_, _, ct) => DeltaThenThreadDeletedThenAnswer(threadId, "Here is your answer.", ct);
+
+        var events = await SendAsync(f.OwnerId, threadId, "Hi");
+
+        Assert.Equal(new[] { AdvocateStreamEventKind.Delta, AdvocateStreamEventKind.Error }, events.Select(e => e.Kind));
+        Assert.Equal(AdvocateErrorCodes.Unavailable, events[^1].Code);
+
+        // The thread row (and its cascade-deleted messages) is gone, so Snapshot's own Single() lookup
+        // no longer applies here — query the usage record directly by user + operation type instead.
+        using var ctx = CreateContext();
+        var usageCount = ctx.UsageRecords.Count(u => u.UserId == f.OwnerId && u.OperationType == AdvocateService.OperationType);
+        Assert.Equal(1, usageCount);
+    }
+
+    [Fact]
+    public async Task Send_PersistAnswerFails_WithNoPriorOutput_StillReleasesTheUsageReservation()
+    {
+        // todos/218: PersistAnswerAsync's failed SaveChangesAsync leaves a failed Added AdvocateMessage
+        // entity tracked in the request DbContext. ReleaseUsageReservationAsync must not go through that
+        // same change tracker — an ordinary tracked SaveChangesAsync there would retry the poisoned entity
+        // alongside the refund, fail again, and leak the reservation. It deletes by id via ExecuteDeleteAsync
+        // instead, bypassing the tracker entirely. No delta or tool frame is ever forwarded here, so
+        // hadOutput (todos/219) stays false and the release path actually runs.
+        var f = SeedFamily("persist-fails-no-output");
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+        _claude.Script = (_, _, ct) => ThreadDeletedThenAnswer_NoPriorOutput(threadId, "Answer that can never be saved.", ct);
+
+        var events = await SendAsync(f.OwnerId, threadId, "Hi");
+
+        Assert.Equal(AdvocateErrorCodes.Unavailable, Assert.Single(events).Code);
+
+        using var ctx = CreateContext();
+        var usageCount = ctx.UsageRecords.Count(u => u.UserId == f.OwnerId && u.OperationType == AdvocateService.OperationType);
+        Assert.Equal(0, usageCount);
+    }
+
+    [Fact]
+    public async Task Send_CallerCancelsAfterOnlyAToolFrame_NoTextEver_KeepsUsageReservation()
+    {
+        // todos/219: a tool round-trip is itself a paid Claude API call, so hadOutput must be set on
+        // ToolStarted too — aborting right after only a tool frame (no text ever forwarded) must still
+        // keep the reservation, not refund it.
+        var f = SeedFamily("abort-after-tool-frame");
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+        var ready = new TaskCompletionSource();
+        _claude.Script = (_, _, ct) => ToolStartedThenHang(ready, ct);
+
+        using var ctx = CreateContext();
+        using var cts = new CancellationTokenSource();
+        var enumerator = CreateService(ctx).SendMessageAsync(f.OwnerId, threadId, "Hi", null, cts.Token).GetAsyncEnumerator(cts.Token);
+
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal(AdvocateStreamEventKind.Tool, enumerator.Current.Kind);
+
+        cts.Cancel();
+        await ready.Task; // the fake has reached its cancellation-aware wait
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await enumerator.MoveNextAsync());
+        await enumerator.DisposeAsync();
+
+        var snapshot = Snapshot(threadId);
+        Assert.Single(snapshot.Messages, m => m.Role == AdvocateMessageRole.User);
+        Assert.DoesNotContain(snapshot.Messages, m => m.Role == AdvocateMessageRole.Assistant);
+        Assert.Equal(1, snapshot.UsageCount);
     }
 
     [Fact]

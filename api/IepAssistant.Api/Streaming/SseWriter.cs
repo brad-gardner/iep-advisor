@@ -42,9 +42,11 @@ public static class SseWriter
     /// </summary>
     /// <remarks>
     /// <paramref name="next"/> is typically a caller's pending <c>MoveNextAsync()</c> on an async iterator.
-    /// If <paramref name="ct"/> is cancelled while it is still pending, this method stops pinging but keeps
-    /// awaiting <paramref name="next"/> (swallowing whatever it completes with — cancellation is the error
-    /// to report, not that) before throwing, so <see langword="await using"/> disposal back in the caller
+    /// If anything in the ping loop faults while <paramref name="next"/> is still pending — <paramref name="ct"/>
+    /// being cancelled, or a ping write itself failing (e.g. <see cref="IOException"/> on a half-closed
+    /// socket, which can happen before <paramref name="ct"/> ever fires) — this method still observes
+    /// <paramref name="next"/> (swallowing whatever it completes with; the original fault is the error to
+    /// report, not that) before rethrowing, so <see langword="await using"/> disposal back in the caller
     /// never races a still-in-flight <c>MoveNextAsync</c> (which would throw <see cref="NotSupportedException"/>
     /// from the compiler-generated state machine).
     /// </remarks>
@@ -66,10 +68,13 @@ public static class SseWriter
                 await WritePingAsync(output, ct);
             }
         }
-        catch (OperationCanceledException)
+        catch
         {
-            try { await next; }
-            catch { /* swallowed: we are already unwinding via cancellation, not whatever `next` faulted with */ }
+            if (!next.IsCompleted)
+            {
+                try { await next; }
+                catch { /* swallowed: we are already unwinding via the original fault, not whatever `next` completed with */ }
+            }
             throw;
         }
     }

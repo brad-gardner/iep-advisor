@@ -101,4 +101,33 @@ public class SseWriterTests
 
         Assert.IsType<OperationCanceledException>(ex);
     }
+
+    private sealed class ThrowingWriteStream : MemoryStream
+    {
+        public override void Write(byte[] buffer, int offset, int count) => throw new IOException("simulated half-closed socket");
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => throw new IOException("simulated half-closed socket");
+    }
+
+    [Fact]
+    public async Task AwaitWithPingsAsync_OnPingWriteFault_AwaitsThePendingNextTask_BeforePropagating()
+    {
+        // Reproduces todos/222: a ping write can fault (e.g. IOException on a half-closed socket) before
+        // `ct` ever fires. Before the fix, only OperationCanceledException triggered observing the pending
+        // `next` task, so a ping-write fault re-created the todos/171 disposal race: the caller's
+        // `await using` would dispose an iterator whose MoveNextAsync is still in flight.
+        var stream = new ThrowingWriteStream();
+        var next = new TaskCompletionSource<int>();
+
+        var pending = SseWriter.AwaitWithPingsAsync(stream, next.Task, TimeSpan.FromMilliseconds(10), CancellationToken.None);
+
+        await Task.Delay(50);
+        Assert.False(pending.IsCompleted, "must keep awaiting the pending next task before propagating the ping fault");
+
+        // `next` finally settles normally — proving the helper actually observed it (swallowing this
+        // result) rather than abandoning it, and still reports the original IOException, not this.
+        next.TrySetResult(7);
+        var ex = await Record.ExceptionAsync(() => pending);
+
+        Assert.IsType<IOException>(ex);
+    }
 }

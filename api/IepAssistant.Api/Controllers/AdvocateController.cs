@@ -152,8 +152,7 @@ public class AdvocateController : ControllerBase
             // The client aborted mid-stream (Stop button, navigation, unmount). The 200 + headers are
             // already on the wire, so there is no status code left to change; SseWriter has already
             // observed the enumerator's pending MoveNextAsync, so `await using` above can dispose it
-            // safely. Nothing further to write.
-            return new EmptyResult();
+            // safely. Nothing further to write — fall through to the same EmptyResult below.
         }
 
         return new EmptyResult();

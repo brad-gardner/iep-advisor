@@ -437,6 +437,83 @@ public sealed class AdvocateToolsetTests : IDisposable
     }
 
     [Fact]
+    public void FitToCap_DroppingLandsWithinMarkerWidthOfCap_KeepsDroppingRatherThanFallingBack()
+    {
+        // "keyB" is padded so that, once the even-larger "keyA" is removed (pass 2's largest-first
+        // order), the remainder lands just under the cap -- close enough that attaching the "dropped"
+        // marker (`,"dropped":["keyA"]`) pushes it back over by a small margin no other pass can absorb
+        // (pass 3 only halves strings > 200 chars, and there are none here). Before todos/216, the
+        // marker was attached only after the pass-2 loop exited, so this overshoot was invisible to the
+        // loop's own cap check and fell through to the pass-4 minimal fallback even though also dropping
+        // the smaller "keyB" would fit comfortably under cap.
+        var baseline = new JsonObject
+        {
+            ["sourceRef"] = "iep_analysis:1",
+            ["documentRef"] = "iep:1",
+            ["status"] = "completed",
+            ["marker"] = "still-here"
+        };
+        var baselineLength = baseline.ToJsonString().Length;
+
+        const int marginUnderCap = 15; // less than the ~19-char "dropped" marker overhead
+        var target = AdvocateToolset.PerToolCharCap - marginUnderCap;
+        // Appending one more top-level key {"keyX":{"filler":"<N chars>"}} to a non-empty object adds
+        // exactly 21 + N chars: `,"keyX":{"filler":"` (20) + N + `"}` (1, the closing quote+brace pair
+        // is folded into the 21) — verified by the sanity check just below.
+        var keyBFillerLength = target - baselineLength - 21;
+        Assert.True(keyBFillerLength > 0, "test setup: baseline already too close to the cap");
+
+        var payload = (JsonObject)baseline.DeepClone();
+        payload["keyB"] = new JsonObject { ["filler"] = new string('b', keyBFillerLength) };
+        payload["keyA"] = new JsonObject { ["filler"] = new string('a', keyBFillerLength + 1_000) }; // strictly bigger than keyB -> pass 2 removes it first
+
+        // Sanity check: removing only "keyA" (no marker yet) must land within ~40 chars of the cap, on
+        // either side, for this test to actually exercise the bug.
+        var withoutKeyA = (JsonObject)payload.DeepClone();
+        withoutKeyA.Remove("keyA");
+        Assert.InRange(AdvocateToolset.PerToolCharCap - withoutKeyA.ToJsonString().Length, 0, 40);
+
+        var json = AdvocateToolset.FitToCap(new AdvocateToolset.ToolPayload(payload));
+
+        using var doc = JsonDocument.Parse(json);
+        Assert.True(json.Length <= AdvocateToolset.PerToolCharCap, $"result was {json.Length} chars");
+        Assert.True(doc.RootElement.GetProperty("truncated").GetBoolean());
+        Assert.Equal("size", doc.RootElement.GetProperty("reason").GetString());
+        var dropped = doc.RootElement.GetProperty("dropped").EnumerateArray().Select(e => e.GetString()).ToList();
+        Assert.Contains("keyA", dropped);
+        // Did not fall through to the pass-4 minimal fallback: a field the fallback would have stripped
+        // (only sourceRef/documentRef/status/truncated/reason/hint survive a fallback) is still present.
+        Assert.Equal("still-here", doc.RootElement.GetProperty("marker").GetString());
+    }
+
+    [Fact]
+    public void FitToCap_EmptiedTrimmableArray_NeverListedAsDropped()
+    {
+        // "emptied" is registered as trimmable and starts empty (as it would after pass 1 fully drained
+        // it); an untrimmable "huge" object forces pass 2 to run. Before todos/216, pass 2 could pick the
+        // already-empty registered array as a "drop" candidate and report it in "dropped" even though
+        // pass 1 already accounted for it as trimmed, misleading the model about what happened.
+        var emptied = new JsonArray();
+        var huge = new string('x', AdvocateToolset.PerToolCharCap + 2_000);
+        var payload = new JsonObject
+        {
+            ["sourceRef"] = "iep_analysis:1",
+            ["emptied"] = emptied,
+            ["huge"] = new JsonObject { ["text"] = huge }
+        };
+
+        var json = AdvocateToolset.FitToCap(new AdvocateToolset.ToolPayload(payload, emptied));
+
+        using var doc = JsonDocument.Parse(json);
+        Assert.True(json.Length <= AdvocateToolset.PerToolCharCap, $"result was {json.Length} chars");
+        if (doc.RootElement.TryGetProperty("dropped", out var droppedProp))
+        {
+            var dropped = droppedProp.EnumerateArray().Select(e => e.GetString()).ToList();
+            Assert.DoesNotContain("emptied", dropped);
+        }
+    }
+
+    [Fact]
     public async Task UnexpectedFailureInsideATool_BecomesGenericToolExecutionException()
     {
         var (userId, childId) = SeedChild("boom");

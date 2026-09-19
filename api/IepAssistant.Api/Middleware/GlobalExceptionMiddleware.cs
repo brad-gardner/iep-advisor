@@ -33,15 +33,21 @@ public class GlobalExceptionMiddleware
             // failing — most commonly the client aborting the request, which surfaces here as
             // OperationCanceledException. Setting ContentType/StatusCode on a started response throws
             // InvalidOperationException, and an aborted request is routine, not an operational error.
+            // The demotion to Information keys off the request actually being aborted
+            // (context.RequestAborted.IsCancellationRequested), not merely the exception's type: an
+            // OperationCanceledException can also come from an HttpClient timeout or another unrelated
+            // cancellation on a request the client never left, and that is a genuine fault — logging it at
+            // Information (or, after the response started, at Debug — dropped by default in production)
+            // would hide it.
+            var level = context.RequestAborted.IsCancellationRequested ? LogLevel.Information : LogLevel.Error;
+
             if (context.Response.HasStarted)
             {
-                var level = ex is OperationCanceledException ? LogLevel.Information : LogLevel.Debug;
                 _logger.Log(level, ex, "An exception occurred after the response had already started; no response can be written");
                 return;
             }
 
-            var errorLevel = ex is OperationCanceledException ? LogLevel.Information : LogLevel.Error;
-            _logger.Log(errorLevel, ex, "An unhandled exception occurred");
+            _logger.Log(level, ex, "An unhandled exception occurred");
             await HandleExceptionAsync(context, ex);
         }
     }

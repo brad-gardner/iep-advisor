@@ -40,5 +40,7 @@ docs {
   - `201` — `Location: /api/advocate/threads/{id}`; `data: AdvocateThreadDto`
   - `400` — validation failure (e.g. title over 120 characters)
   - `401` — missing/invalid bearer token
-  - `404` — child not found or the caller has no access to it
+  - `403` — "You can view this child but cannot ask the advocate about them." (caller has Viewer access to
+    the child but not Collaborator+)
+  - `404` — child not found, or the caller has no access to it at all
 }

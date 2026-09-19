@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Channels;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
@@ -263,68 +264,33 @@ public class AdvocateService : IAdvocateService
 
         // The usage cap check-then-reserve and the user-message persist are one unit of work, committed
         // BEFORE the model is called: a concurrent send or a client abort must not get an uncounted turn
-        // (todos/173). Serializable matches SubscriptionService.TryReserveUsageAsync's count-then-insert.
+        // (todos/173). Serializable matches SubscriptionService.TryReserveUsageAsync's count-then-insert,
+        // including its exposure to a same-shape deadlock (single-column UserId index → RangeS-S/RangeI-N
+        // lock conflict) under concurrent sends from the same user; that is retried once here (todos/220).
         var now = DateTime.UtcNow;
-        int usageRecordId;
-        List<ClaudeTurn> history;
-        await using (var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct))
+        (int UsageRecordId, List<ClaudeTurn> History)? reservation = null;
+        const int maxReservationAttempts = 2;
+        for (var attempt = 1; attempt <= maxReservationAttempts; attempt++)
         {
             try
             {
-                var usage = await CountUsageAsync(userId, user.SubscriptionStatus, user.SubscriptionExpiresAt, ct);
-                if (usage.Used >= usage.Limit)
-                {
-                    await transaction.RollbackAsync(ct);
-                    return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.UsageCap, AdvocatePrompts.UsageCapMessage));
-                }
-
-                // Retry: the thread's latest message is this exact unanswered question ⇒ reuse the row
-                // instead of duplicating it (todos/172), and keep it out of history — it IS the current
-                // turn, not a past one. A different follow-up after a failure is not a retry: the earlier
-                // unanswered question stays as its own row and is replayed as history.
-                var latest = await _context.AdvocateMessages
-                    .Where(m => m.AdvocateThreadId == threadId)
-                    .OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id)
-                    .FirstOrDefaultAsync(ct);
-                var isRetry = latest != null && latest.Role == AdvocateMessageRole.User && latest.ContentMarkdown == question;
-
-                // History is everything BEFORE this turn's question.
-                history = await BuildHistoryAsync(threadId, isRetry ? latest!.Id : null, ct);
-
-                if (isRetry)
-                    latest!.CreatedAt = now;
-                else
-                    _context.AdvocateMessages.Add(new AdvocateMessage
-                    {
-                        AdvocateThreadId = threadId,
-                        Role = AdvocateMessageRole.User,
-                        ContentMarkdown = question,
-                        CreatedAt = now
-                    });
-
-                var usageRecord = new UsageRecord
-                {
-                    UserId = userId,
-                    ChildProfileId = thread.ChildProfileId,
-                    DistrictId = null,
-                    OperationType = OperationType,
-                    CreatedAt = now
-                };
-                _context.UsageRecords.Add(usageRecord);
-
-                thread.LastMessageAt = now;
-                thread.UpdatedAt = now;
-
-                await _context.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
-                usageRecordId = usageRecord.Id;
+                reservation = await TryReserveUsageAndPersistQuestionAsync(thread, threadId, userId, question, user.SubscriptionStatus, user.SubscriptionExpiresAt, now, ct);
+                break;
             }
-            catch
+            catch (SqlException ex) when (ex.Number == 1205 && attempt < maxReservationAttempts)
             {
-                await transaction.RollbackAsync(ct);
-                throw;
+                _logger.LogWarning(ex, "Advocate usage reservation deadlocked for thread {ThreadId}; retrying", threadId);
+            }
+            catch (SqlException ex) when (ex.Number == 1205)
+            {
+                _logger.LogError(ex, "Advocate usage reservation deadlocked again for thread {ThreadId}; giving up", threadId);
+                return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.Unavailable, AdvocatePrompts.UnavailableMessage));
             }
         }
+        if (reservation == null)
+            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.UsageCap, AdvocatePrompts.UsageCapMessage));
+
+        var (usageRecordId, history) = reservation.Value;
 
         var context = new StringBuilder();
         context.AppendLine("<context>");
@@ -348,17 +314,72 @@ public class AdvocateService : IAdvocateService
         return (new PreparedTurn(thread, request, toolset, usageRecordId), null);
     }
 
+    /// <summary>
+    /// Runs the Serializable count-then-insert as a single attempt: null means the usage cap was hit (not
+    /// an error — the caller maps that to its own event), while a Serializable conflict propagates as the
+    /// provider's exception so the caller can retry the whole attempt with a fresh transaction (todos/220).
+    /// </summary>
+    private async Task<(int UsageRecordId, List<ClaudeTurn> History)?> TryReserveUsageAndPersistQuestionAsync(
+        AdvocateThread thread, int threadId, int userId, string question, string subscriptionStatus, DateTime? subscriptionExpiresAt, DateTime now, CancellationToken ct)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+
+        var usage = await CountUsageAsync(userId, subscriptionStatus, subscriptionExpiresAt, ct);
+        if (usage.Used >= usage.Limit)
+            return null; // `await using` rolls the transaction back on disposal — no explicit Rollback needed.
+
+        // Retry: the thread's latest message is this exact unanswered question ⇒ reuse the row
+        // instead of duplicating it (todos/172), and keep it out of history — it IS the current
+        // turn, not a past one. A different follow-up after a failure is not a retry: the earlier
+        // unanswered question stays as its own row and is replayed as history.
+        var latest = await _context.AdvocateMessages
+            .Where(m => m.AdvocateThreadId == threadId)
+            .OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id)
+            .FirstOrDefaultAsync(ct);
+        var isRetry = latest != null && latest.Role == AdvocateMessageRole.User && latest.ContentMarkdown == question;
+
+        // History is everything BEFORE this turn's question.
+        var history = await BuildHistoryAsync(threadId, isRetry ? latest!.Id : null, ct);
+
+        if (isRetry)
+            latest!.CreatedAt = now;
+        else
+            _context.AdvocateMessages.Add(new AdvocateMessage
+            {
+                AdvocateThreadId = threadId,
+                Role = AdvocateMessageRole.User,
+                ContentMarkdown = question,
+                CreatedAt = now
+            });
+
+        var usageRecord = new UsageRecord
+        {
+            UserId = userId,
+            ChildProfileId = thread.ChildProfileId,
+            DistrictId = null,
+            OperationType = OperationType,
+            CreatedAt = now
+        };
+        _context.UsageRecords.Add(usageRecord);
+
+        thread.LastMessageAt = now;
+        thread.UpdatedAt = now;
+
+        await _context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return (usageRecord.Id, history);
+    }
+
     private async Task ProduceAsync(PreparedTurn turn, ChannelWriter<AdvocateStreamEvent> writer, CancellationToken callerCt, CancellationToken turnCt)
     {
-        // Usage was reserved up front (todos/173), before the model was called. Whether the reservation
-        // is kept or released depends on how the turn ends:
-        //  - a completed turn (even truncated) keeps it — that is the normal, billable case.
-        //  - a Claude API failure or a blank/empty reply is never billable, however much text (if any)
-        //    already reached the client: nothing usable was ever delivered, so it is always released.
-        //  - a client abort or a server-side timeout keeps the reservation once any delta has actually
-        //    been forwarded to the client (they were shown a partial answer); with no delta forwarded
-        //    yet, it is released — nothing was ever shown.
-        var hadDelta = false;
+        // Usage was reserved up front (todos/173), before the model was called. Whether the reservation is
+        // kept or released is decided by ONE rule, applied uniformly in every failure arm below (todos/219):
+        // release only when nothing was ever forwarded to the client. `hadOutput` is set on the first
+        // TextDelta OR ToolStarted written to the channel — a tool round-trip is a real, billed Claude API
+        // call even before any text follows, so aborting right after a tool frame must not refund it. A
+        // completed turn (even truncated) always keeps the reservation regardless of `hadOutput` — that is
+        // the normal, billable case.
+        var hadOutput = false;
         try
         {
             ClaudeStreamEvent? completed = null;
@@ -369,11 +390,12 @@ public class AdvocateService : IAdvocateService
                     case ClaudeStreamEventKind.TextDelta:
                         if (!string.IsNullOrEmpty(evt.Text))
                         {
-                            hadDelta = true;
+                            hadOutput = true;
                             await writer.WriteAsync(AdvocateStreamEvent.Delta(evt.Text), turnCt);
                         }
                         break;
                     case ClaudeStreamEventKind.ToolStarted:
+                        hadOutput = true;
                         await writer.WriteAsync(AdvocateStreamEvent.Tool(evt.ToolName ?? string.Empty, AdvocatePrompts.ToolLabel(evt.ToolName ?? string.Empty, evt.ToolInput), "started"), turnCt);
                         break;
                     case ClaudeStreamEventKind.ToolFinished:
@@ -388,7 +410,7 @@ public class AdvocateService : IAdvocateService
             if (completed == null || string.IsNullOrWhiteSpace(completed.FullText))
             {
                 _logger.LogWarning("Advocate turn on thread {ThreadId}: Claude returned no content.", turn.Thread.Id);
-                await ReleaseUsageReservationAsync(turn.UsageRecordId);
+                if (!hadOutput) await ReleaseUsageReservationAsync(turn.UsageRecordId);
                 await writer.WriteAsync(AdvocateStreamEvent.Error(AdvocateErrorCodes.Unavailable, AdvocatePrompts.UnavailableMessage), turnCt);
                 return;
             }
@@ -399,24 +421,27 @@ public class AdvocateService : IAdvocateService
         catch (ClaudeApiException ex)
         {
             _logger.LogError(ex, "Advocate turn on thread {ThreadId} failed with {Kind}", turn.Thread.Id, ex.Kind);
-            await ReleaseUsageReservationAsync(turn.UsageRecordId);
+            if (!hadOutput) await ReleaseUsageReservationAsync(turn.UsageRecordId);
             await TryWriteErrorAsync(writer, AdvocatePrompts.UnavailableMessage);
         }
         catch (OperationCanceledException) when (!callerCt.IsCancellationRequested)
         {
             _logger.LogWarning("Advocate turn on thread {ThreadId} timed out after {Timeout}s", turn.Thread.Id, TurnTimeout.TotalSeconds);
-            if (!hadDelta) await ReleaseUsageReservationAsync(turn.UsageRecordId);
+            if (!hadOutput) await ReleaseUsageReservationAsync(turn.UsageRecordId);
             await TryWriteErrorAsync(writer, ClaudeFailureMessages.Timeout);
         }
         catch (OperationCanceledException)
         {
             // Caller went away: nothing to report to, but still settle the reservation.
-            if (!hadDelta) await ReleaseUsageReservationAsync(turn.UsageRecordId);
+            if (!hadOutput) await ReleaseUsageReservationAsync(turn.UsageRecordId);
         }
         catch (Exception ex)
         {
+            // Includes a failed PersistAnswerAsync (e.g. the thread was deleted concurrently between the
+            // first delta and completion): the answer was already shown, so the reservation is kept, not
+            // released, even though nothing could be persisted.
             _logger.LogError(ex, "Advocate turn on thread {ThreadId} failed unexpectedly", turn.Thread.Id);
-            await ReleaseUsageReservationAsync(turn.UsageRecordId);
+            if (!hadOutput) await ReleaseUsageReservationAsync(turn.UsageRecordId);
             await TryWriteErrorAsync(writer, AdvocatePrompts.UnavailableMessage);
         }
         finally
@@ -434,17 +459,19 @@ public class AdvocateService : IAdvocateService
     /// <summary>
     /// Refunds a usage reservation taken up front by <see cref="PrepareTurnAsync"/>. Never abortable — a
     /// caller-cancelled or timed-out turn must still release its reservation, so this always runs with
-    /// <see cref="CancellationToken.None"/>. Failures are logged, not thrown: a lost refund is a leaked
-    /// (billable-looking) usage row, not a correctness break for the turn that is already unwinding.
+    /// <see cref="CancellationToken.None"/>. Deletes by id via <c>ExecuteDeleteAsync</c>, bypassing the
+    /// request <see cref="ApplicationDbContext"/>'s change tracker (todos/218): when this runs after a
+    /// failed <see cref="PersistAnswerAsync"/>, the tracker still holds that failed Added assistant-message
+    /// entity, and an ordinary tracked <c>SaveChangesAsync</c> here would retry saving it alongside the
+    /// refund, fail again, and leave the reservation stuck. Idempotent: a no-op if already gone. Failures
+    /// are logged, not thrown: a lost refund is a leaked (billable-looking) usage row, not a correctness
+    /// break for the turn that is already unwinding.
     /// </summary>
     private async Task ReleaseUsageReservationAsync(int usageRecordId)
     {
         try
         {
-            var record = await _context.UsageRecords.FirstOrDefaultAsync(u => u.Id == usageRecordId, CancellationToken.None);
-            if (record == null) return;
-            _context.UsageRecords.Remove(record);
-            await _context.SaveChangesAsync(CancellationToken.None);
+            await _context.UsageRecords.Where(u => u.Id == usageRecordId).ExecuteDeleteAsync(CancellationToken.None);
         }
         catch (Exception ex)
         {
