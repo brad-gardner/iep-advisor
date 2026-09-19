@@ -20,6 +20,7 @@ import { ChildEtrsTab } from '@/features/children/components/child-etrs-tab';
 import { ChildGoalsTab } from '@/features/children/components/child-goals-tab';
 import { ChildAnalysisTab } from '@/features/analysis/components/child-analysis-tab';
 import { ChildMeetingPrepTab } from '@/features/meeting-prep/components/child-meeting-prep-tab';
+import { JournalPage } from '@/features/journal/components/journal-page';
 import { IepViewerPage } from '@/features/iep-documents/components/iep-viewer-page';
 import { IepRouteRedirect } from '@/features/iep-documents/components/iep-route-redirect';
 import { ProgressReportViewerPage } from '@/features/progress-reports/components/progress-report-viewer-page';
@@ -249,6 +250,8 @@ export function AppRouter() {
         <Route path="goals" element={<ChildGoalsTab />} />
         <Route path="analysis" element={<ChildAnalysisTab />} />
         <Route path="meeting-prep" element={<ChildMeetingPrepTab />} />
+        {/* Parent-private dated journal — a child sub-page with its own tab. */}
+        <Route path="journal" element={<JournalPage />} />
       </Route>
       <Route
         path="/children/:childId/ieps/:id"

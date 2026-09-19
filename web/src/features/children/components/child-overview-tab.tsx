@@ -8,6 +8,7 @@ import { ShareChildDialog } from "@/features/sharing/components/share-child-dial
 import { AccessList } from "@/features/sharing/components/access-list";
 import { SchoolIepsCard } from "@/features/iep-versions/components/school-ieps-card";
 import { AboutMyChildCard } from "@/features/contributions/components/about-my-child-card";
+import { JournalCard } from "@/features/journal/components/journal-card";
 import { SharedDraftsCard } from "@/features/shared-drafts/components/shared-drafts-card";
 import { ChildProgressCard } from "@/features/goals/components/child-progress-card";
 import { UpcomingMeetingCard } from "./upcoming-meeting-card";
@@ -21,6 +22,7 @@ export function ChildOverviewTab() {
   const [showInviteStudent, setShowInviteStudent] = useState(false);
   const [accessListKey, setAccessListKey] = useState(0);
   const isOwner = child.role === "owner";
+  const canEdit = isOwner || child.role === "collaborator";
 
   const handleInviteStudent = async (email: string) => {
     try {
@@ -71,7 +73,9 @@ export function ChildOverviewTab() {
 
       <SchoolIepsCard childId={childId} />
 
-      <AboutMyChildCard childId={childId} childName={child.firstName} canEdit={child.role === "owner" || child.role === "collaborator"} />
+      <AboutMyChildCard childId={childId} childName={child.firstName} canEdit={canEdit} />
+
+      <JournalCard childId={childId} childName={child.firstName} canEdit={canEdit} />
 
       {isOwner && (
         <Card data-testid="sharing-section">
