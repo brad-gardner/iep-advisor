@@ -185,6 +185,12 @@ export function ChildDetailPage() {
         <TabLink to={`${base}/etrs`} testId="tab-etrs">
           ETRs
         </TabLink>
+        <TabLink to={`${base}/journal`} testId="tab-journal">
+          Journal
+        </TabLink>
+        <TabLink to={`${base}/advocate`} testId="tab-advocate">
+          Advocate
+        </TabLink>
       </TabsNav>
 
       <Outlet

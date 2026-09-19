@@ -29,7 +29,25 @@ public class GlobalExceptionMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An unhandled exception occurred");
+            // A streaming response (SSE) may already have written its 200 status and headers before
+            // failing — most commonly the client aborting the request, which surfaces here as
+            // OperationCanceledException. Setting ContentType/StatusCode on a started response throws
+            // InvalidOperationException, and an aborted request is routine, not an operational error.
+            // The demotion to Information keys off the request actually being aborted
+            // (context.RequestAborted.IsCancellationRequested), not merely the exception's type: an
+            // OperationCanceledException can also come from an HttpClient timeout or another unrelated
+            // cancellation on a request the client never left, and that is a genuine fault — logging it at
+            // Information (or, after the response started, at Debug — dropped by default in production)
+            // would hide it.
+            var level = context.RequestAborted.IsCancellationRequested ? LogLevel.Information : LogLevel.Error;
+
+            if (context.Response.HasStarted)
+            {
+                _logger.Log(level, ex, "An exception occurred after the response had already started; no response can be written");
+                return;
+            }
+
+            _logger.Log(level, ex, "An unhandled exception occurred");
             await HandleExceptionAsync(context, ex);
         }
     }

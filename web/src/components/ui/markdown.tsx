@@ -8,6 +8,17 @@ import { cn } from '@/lib/cn';
 // relying on rehype-raw — raw HTML in the source markdown is never rendered,
 // only the tag names react-markdown/rehype-sanitize already understand as
 // markdown-produced elements.
+// GFM tables get their own horizontal scroll region so a wide table (the
+// advocate likes comparing IEP versions in one) never widens the page on a
+// phone; the styles live under `.prose-iep` in src/index.css.
+// `node` is react-markdown's hast element — not a DOM attribute, so it stays off the `<table>`.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const table: Components['table'] = ({ children, node, ...props }) => (
+  <div className="prose-iep-table-wrap">
+    <table {...props}>{children}</table>
+  </div>
+);
+
 const components: Components = {
   a: ({ href, children, ...props }) => {
     const isHashLink = href?.startsWith('#');
@@ -17,6 +28,7 @@ const components: Components = {
       </a>
     );
   },
+  table,
 };
 
 // Same renderer, but with links downgraded to plain, non-interactive spans —
@@ -25,6 +37,7 @@ const components: Components = {
 // interactive element inside another one.
 const componentsNoLinks: Components = {
   a: ({ children }) => <span>{children}</span>,
+  table,
 };
 
 interface MarkdownProps {

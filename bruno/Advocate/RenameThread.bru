@@ -1,0 +1,43 @@
+meta {
+  name: Rename advocate thread
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/advocate/threads/{{threadId}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "title": "Reading goal — fall 2026"
+  }
+}
+
+docs {
+  # PATCH /api/advocate/threads/{id}
+
+  Renames a thread. Body is `RenameAdvocateThreadRequest`.
+
+  ## Body
+
+  - `title` (required) — 1–120 characters.
+
+  ## Responses
+
+  - `200` — `{ "success": true, "data": {} }`
+  - `400` — missing/empty or over-limit title
+  - `401` — missing/invalid bearer token
+  - `404` — thread not found or not owned by the caller
+}

@@ -1,0 +1,31 @@
+meta {
+  name: Delete prep question
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/prep-questions/{{prepQuestionId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # DELETE /api/prep-questions/{id}
+
+  Deletes one question.
+
+  ## Responses
+
+  - `200` — `{ "success": true, "data": {} }`
+  - `401` — missing/invalid bearer token
+  - `404` — question not found or not owned by the caller (any service failure maps to 404)
+}

@@ -332,6 +332,21 @@ builder.Services.AddRateLimiter(options =>
                     SegmentsPerWindow = 3
                 }));
 
+    // Virtual Advocate messages: each one is a multi-round Claude tool loop and the per-year usage cap is
+    // enforced in the service, but a burst of sends could still run many concurrent streams for one user.
+    // 30 / 15 min per user, on top of the yearly cap.
+    options.AddPolicy("advocate-message", context =>
+        disableRateLimiting
+            ? RateLimitPartition.GetNoLimiter<string>("")
+            : RateLimitPartition.GetSlidingWindowLimiter(
+                partitionKey: context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = 30,
+                    Window = TimeSpan.FromMinutes(15),
+                    SegmentsPerWindow = 3
+                }));
+
     // Unauthenticated district self-serve signup — very tight per-IP cap (3 / hour, fixed window) since
     // each success provisions a brand-new District + DistrictAdmin. Depends on UseForwardedHeaders to see
     // the real client IP behind the App Service front end.

@@ -1,0 +1,95 @@
+meta {
+  name: Send advocate message (SSE stream)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/advocate/threads/{{threadId}}/messages
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Accept: text/event-stream
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "text": "Is my son on track for his reading goal this year?",
+    "about": "goal:340"
+  }
+}
+
+docs {
+  # POST /api/advocate/threads/{id}/messages
+
+  Sends a parent message and streams the advocate's answer back as **server-sent events**
+  (`Content-Type: text/event-stream; charset=utf-8`). Rate limited by the `advocate-message`
+  policy (30 requests / 15 minutes per user).
+
+  Bruno does not render SSE incrementally: the response pane fills in once the stream closes, and
+  a long answer can take tens of seconds. The raw body shows the frames below.
+
+  ## Body (`SendAdvocateMessageRequest`)
+
+  - `text` (required) — 1–2000 characters.
+  - `about` (optional, max 40) — launcher context, matched against the grammar
+    `^(iep|etr|goal|analysis|progress_report|journal):\d{1,9}$` (e.g. `iep:12`, `goal:340`). A
+    value that does not match — wrong kind, non-numeric/oversized id, extra characters — is
+    **rejected with 400**, not silently ignored (`about is not a recognised record reference.`).
+    Omit the field entirely for no launcher context.
+
+  ## Before the stream starts (plain JSON `ApiResponse`)
+
+  Failures that can be decided before the model is called come back as ordinary status codes:
+
+  - `400` — validation (empty / over-limit text, or `about` outside the grammar above)
+  - `401` — missing/invalid bearer token
+  - `403` — forbidden
+  - `404` — thread not found or not owned by the caller
+  - `429` — usage cap reached (`message` explains the cap), or the `advocate-message` rate limit
+  - `503` — nothing could be produced before the first frame: Claude itself failed (e.g. a blank
+    key, or an immediate 5xx/429 from Anthropic), or the usage reservation lost a database deadlock
+    on both attempts (concurrent sends from the same user; retried once) — visible to status-based monitoring, unlike the `error` frame
+    below, which only covers a failure *after* the stream has already started
+  - `500` — defensive fallback if the stream produced no event at all (should not happen in practice)
+
+  ## Stream (`200`, `text/event-stream`)
+
+  Each frame is `event: <name>\ndata: <json>\n\n`. JSON is camelCase with nulls omitted. Comment
+  lines `: ping` are written every 15 seconds while the model is busy and should be ignored.
+
+  ```
+  event: tool
+  data: {"name":"get_goal_progress","label":"Reading goal progress","status":"started"}
+
+  event: tool
+  data: {"name":"get_goal_progress","label":"Reading goal progress","status":"finished"}
+
+  event: delta
+  data: {"text":"Based on the latest progress report, "}
+
+  event: delta
+  data: {"text":"your son has moved from 45 to 68 words per minute ..."}
+
+  event: done
+  data: {"messageId":41,"contentMarkdown":"Based on the latest progress report, your son has ...","citations":[{"kind":"goal","id":340,"label":"Reading fluency","parent":{"kind":"iep","id":12}}],"suggestions":[{"kind":"prep_question","text":"How is fluency being measured each week?"}],"truncated":false,"disclaimer":"The Virtual Advocate gives general information ... It is not legal advice. ..."}
+  ```
+
+  Frames:
+
+  - `delta` — `{ text }`: the next chunk of the answer; concatenate deltas in order.
+  - `tool` — `{ name, label, status }`: a record lookup the advocate is running; `status` is `started | finished | failed`.
+  - `done` — `{ messageId, contentMarkdown, citations[], suggestions[], truncated, disclaimer }`: the persisted assistant message. `contentMarkdown` is the authoritative full text (use it instead of the concatenated deltas). `citations` / `suggestions` have the same shape as in *Get advocate thread with messages*. `truncated` is true when the answer hit its length budget. Terminal frame.
+  - `error` — `{ code, message }`: a failure *after the stream had already started* (some delta/tool
+    events already sent) — `code` is `unavailable` and `message` is safe to show. Terminal frame. A
+    failure before the first byte, including `unavailable`, is one of the status codes above instead
+    (`validation | not_found | forbidden | usage_cap | unavailable` are never streamed when they are
+    the very first event — only a later, mid-turn failure is).
+}

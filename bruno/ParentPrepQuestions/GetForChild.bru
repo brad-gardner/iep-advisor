@@ -1,0 +1,55 @@
+meta {
+  name: List prep questions for child
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/children/{{childId}}/prep-questions
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # GET /api/children/{childId}/prep-questions
+
+  The caller's own meeting-prep questions for the child, in display order.
+
+  ## Responses
+
+  - `200` — `data: ParentPrepQuestionDto[]`
+  - `401` — missing/invalid bearer token
+  - `404` — child not found or the caller has no access to it
+
+  ```json
+  {
+    "success": true,
+    "message": null,
+    "data": [
+      {
+        "id": 21,
+        "childProfileId": 1,
+        "text": "How is reading fluency being measured each week?",
+        "isChecked": false,
+        "displayOrder": 0,
+        "source": "advocate",
+        "createdAt": "2026-09-10T14:06:00Z",
+        "updatedAt": "2026-09-10T14:06:00Z",
+        "alreadyExisted": null
+      }
+    ],
+    "errors": []
+  }
+  ```
+
+  - `source`: `parent | advocate`
+  - `alreadyExisted` is only populated on the add response.
+}

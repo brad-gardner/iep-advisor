@@ -2,9 +2,14 @@ import { CircleCheck, AlertTriangle, Lightbulb } from 'lucide-react';
 import type { GoalAnalysis } from '@/types/api';
 import { SmartCriteriaGrid } from './smart-criteria-grid';
 import { Badge } from '@/components/ui/badge';
+import { AskAdvocateButton } from '@/features/advocate/components/ask-advocate-button';
+import { goalAnchorId } from '@/features/advocate/lib/citation-links';
 
 interface AnalysisGoalCardProps {
   goalAnalysis: GoalAnalysis;
+  /** When set (with `canAsk`), each card carries an "Ask the advocate" launcher about that goal. */
+  childId?: number;
+  canAsk?: boolean;
 }
 
 const RATING_BADGES: Record<string, { label: string; variant: 'success' | 'warning' | 'error' }> = {
@@ -13,11 +18,16 @@ const RATING_BADGES: Record<string, { label: string; variant: 'success' | 'warni
   red: { label: 'Significant Concerns', variant: 'error' },
 };
 
-export function AnalysisGoalCard({ goalAnalysis }: AnalysisGoalCardProps) {
+export function AnalysisGoalCard({ goalAnalysis, childId, canAsk = false }: AnalysisGoalCardProps) {
   const badge = RATING_BADGES[goalAnalysis.overallRating] || RATING_BADGES.yellow;
+  const goalName = goalAnalysis.domain ? `${goalAnalysis.domain} goal` : 'goal';
 
   return (
-    <div className="bg-white rounded-card border-[0.5px] border-brand-slate-200 p-5 space-y-4">
+    <div
+      id={goalAnchorId(goalAnalysis.goalId)}
+      className="bg-white rounded-card border-[0.5px] border-brand-slate-200 p-5 space-y-4 scroll-mt-20"
+      data-testid={`analysis-goal-${goalAnalysis.goalId}`}
+    >
       {/* Eyebrow + badge */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
@@ -30,9 +40,20 @@ export function AnalysisGoalCard({ goalAnalysis }: AnalysisGoalCardProps) {
             {goalAnalysis.goalText}
           </h3>
         </div>
-        <Badge variant={badge.variant} className="shrink-0">
-          {badge.label}
-        </Badge>
+        <div className="flex shrink-0 items-center gap-2">
+          <Badge variant={badge.variant} className="shrink-0">
+            {badge.label}
+          </Badge>
+          {childId != null && canAsk && (
+            <AskAdvocateButton
+              childId={childId}
+              about={{ kind: 'goal', id: goalAnalysis.goalId }}
+              label={`the ${goalName}`}
+              appearance="icon"
+              ariaLabel={`Ask the advocate about this ${goalName}`}
+            />
+          )}
+        </div>
       </div>
 
       {/* Goal text in italic panel */}

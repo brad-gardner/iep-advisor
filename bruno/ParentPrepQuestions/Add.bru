@@ -1,0 +1,48 @@
+meta {
+  name: Add prep question
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/children/{{childId}}/prep-questions
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "text": "How is reading fluency being measured each week?",
+    "source": "parent"
+  }
+}
+
+docs {
+  # POST /api/children/{childId}/prep-questions
+
+  Adds a question to the end of the child's list. Body is `AddParentPrepQuestionRequest`.
+  Duplicate text (after markup stripping and whitespace normalisation) is de-duplicated: the existing
+  row is returned instead of creating a second one.
+
+  ## Body
+
+  - `text` (required) — markup is stripped; the plain text must be 1–500 characters.
+  - `source` (optional) — `parent` (default) | `advocate`.
+
+  ## Responses
+
+  - `201` — new question; `Location: /api/prep-questions/{id}`; `data: ParentPrepQuestionDto` with `alreadyExisted: false`
+  - `200` — the text was already on the list; `data` is the existing question with `alreadyExisted: true`
+  - `400` — empty/over-limit text or an unknown `source`
+  - `401` — missing/invalid bearer token
+  - `404` — child not found or the caller has no access to it
+}

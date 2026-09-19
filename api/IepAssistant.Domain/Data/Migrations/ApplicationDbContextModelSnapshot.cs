@@ -84,6 +84,93 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.AdvocateMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AdvocateThreadId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CitationsJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ContentMarkdown")
+                        .IsRequired()
+                        .HasMaxLength(32000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("InputTokens")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("OutputTokens")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("SuggestionsJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ToolTraceJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("Truncated")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdvocateThreadId", "CreatedAt");
+
+                    b.ToTable("AdvocateMessages");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.AdvocateThread", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ChildProfileId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("LastMessageAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ParentUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChildProfileId");
+
+                    b.HasIndex("ParentUserId", "ChildProfileId", "LastMessageAt")
+                        .IsDescending(false, false, true);
+
+                    b.ToTable("AdvocateThreads");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.AnalysisRun", b =>
                 {
                     b.Property<int>("Id")
@@ -2615,6 +2702,65 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.ToTable("ImportRows");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.JournalEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ChildProfileId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContentMarkdown")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("LinkedEtrDocumentId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("LinkedIepDocumentId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("LinkedMeetingId")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("OccurredOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Tag")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkedEtrDocumentId");
+
+                    b.HasIndex("LinkedIepDocumentId");
+
+                    b.HasIndex("LinkedMeetingId");
+
+                    b.HasIndex("ChildProfileId", "OccurredOn")
+                        .IsDescending(false, true);
+
+                    b.ToTable("JournalEntries");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.KnowledgeBaseEntry", b =>
                 {
                     b.Property<int>("Id")
@@ -3513,6 +3659,52 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasIndex("SharedDraftRevisionId", "ParentUserId");
 
                     b.ToTable("ParentDraftNotes");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.ParentPrepQuestion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ChildProfileId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsChecked")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChildProfileId", "DisplayOrder");
+
+                    b.ToTable("ParentPrepQuestions");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.PasswordResetToken", b =>
@@ -4807,6 +4999,36 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.ToTable("UserRecoveryCodes");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.AdvocateMessage", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.AdvocateThread", "Thread")
+                        .WithMany("Messages")
+                        .HasForeignKey("AdvocateThreadId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Thread");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.AdvocateThread", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.ChildProfile", "ChildProfile")
+                        .WithMany()
+                        .HasForeignKey("ChildProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.User", "ParentUser")
+                        .WithMany()
+                        .HasForeignKey("ParentUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ChildProfile");
+
+                    b.Navigation("ParentUser");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.AnalysisRun", b =>
                 {
                     b.HasOne("IepAssistant.Domain.Entities.ChildProfile", "ChildProfile")
@@ -5403,6 +5625,38 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Navigation("Batch");
                 });
 
+            modelBuilder.Entity("IepAssistant.Domain.Entities.JournalEntry", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.ChildProfile", "ChildProfile")
+                        .WithMany()
+                        .HasForeignKey("ChildProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.EtrDocument", "LinkedEtrDocument")
+                        .WithMany()
+                        .HasForeignKey("LinkedEtrDocumentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("IepAssistant.Domain.Entities.IepDocument", "LinkedIepDocument")
+                        .WithMany()
+                        .HasForeignKey("LinkedIepDocumentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("IepAssistant.Domain.Entities.Meeting", "LinkedMeeting")
+                        .WithMany()
+                        .HasForeignKey("LinkedMeetingId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("ChildProfile");
+
+                    b.Navigation("LinkedEtrDocument");
+
+                    b.Navigation("LinkedIepDocument");
+
+                    b.Navigation("LinkedMeeting");
+                });
+
             modelBuilder.Entity("IepAssistant.Domain.Entities.MagicLinkToken", b =>
                 {
                     b.HasOne("IepAssistant.Domain.Entities.User", "User")
@@ -5596,6 +5850,17 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Navigation("ParentUser");
 
                     b.Navigation("SharedDraftRevision");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.ParentPrepQuestion", b =>
+                {
+                    b.HasOne("IepAssistant.Domain.Entities.ChildProfile", "ChildProfile")
+                        .WithMany()
+                        .HasForeignKey("ChildProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChildProfile");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.PasswordResetToken", b =>
@@ -5958,6 +6223,11 @@ namespace IepAssistant.Domain.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("IepAssistant.Domain.Entities.AdvocateThread", b =>
+                {
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.AnalysisRun", b =>

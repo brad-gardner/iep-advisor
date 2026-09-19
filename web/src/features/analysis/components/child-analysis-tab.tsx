@@ -87,7 +87,7 @@ export function ChildAnalysisTab() {
 
         <div>
           {selectedRunId !== null ? (
-            <RunDetail childId={childId} runId={selectedRunId} />
+            <RunDetail childId={childId} runId={selectedRunId} canAsk={!isViewer} />
           ) : (
             <Notice variant="info" title="No analysis selected">
               Select a past analysis or run a new one to see results here.

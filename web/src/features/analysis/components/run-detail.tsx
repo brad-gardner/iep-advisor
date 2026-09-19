@@ -3,6 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { RedFlagCard } from "@/features/iep-documents/components/red-flag-card";
 import { AdvocacyGapAnalysisSection } from "@/features/iep-documents/components/advocacy-gap-analysis";
+import { AskAdvocateButton } from "@/features/advocate/components/ask-advocate-button";
+import { formatDate } from "@/lib/format-date";
 import { useAnalysisRun } from "../hooks/use-analysis-run";
 import { RunStatusBadge } from "./run-status-badge";
 import { RunSourceSections } from "./run-source-sections";
@@ -12,9 +14,11 @@ import type { AnalysisRunSection } from "../types";
 interface RunDetailProps {
   childId: number;
   runId: number;
+  /** Shows the "Ask the advocate" launcher for this run (parents who can ask). */
+  canAsk?: boolean;
 }
 
-export function RunDetail({ childId, runId }: RunDetailProps) {
+export function RunDetail({ childId, runId, canAsk = false }: RunDetailProps) {
   const { run, isLoading, pollTimedOut } = useAnalysisRun(childId, runId);
 
   const sectionsBySource = useMemo(() => {
@@ -51,9 +55,18 @@ export function RunDetail({ childId, runId }: RunDetailProps) {
 
   return (
     <div className="space-y-6" data-testid="analysis-run-detail">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <h2 className="font-serif">Analysis</h2>
         <RunStatusBadge status={run.status} />
+        {canAsk && isComplete && (
+          <AskAdvocateButton
+            childId={childId}
+            about={{ kind: "analysis", id: run.id }}
+            label={`analysis from ${formatDate(run.createdAt)}`}
+            className="ml-auto"
+            data-testid="analysis-ask-advocate"
+          />
+        )}
       </div>
 
       {isError && (

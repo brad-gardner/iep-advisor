@@ -121,6 +121,12 @@ public class AccountPurgeService : IAccountPurgeService
 
             _context.ParentAdvocacyGoals.RemoveRange(_context.ParentAdvocacyGoals.Where(g => childIds.Contains(g.ChildProfileId)));
             _context.ParentContributions.RemoveRange(_context.ParentContributions.Where(c => childIds.Contains(c.ChildProfileId)));
+            _context.JournalEntries.RemoveRange(_context.JournalEntries.Where(j => childIds.Contains(j.ChildProfileId)));
+            _context.ParentPrepQuestions.RemoveRange(_context.ParentPrepQuestions.Where(q => childIds.Contains(q.ChildProfileId)));
+            // Advocate threads on owned children (any parent's): messages first so the delete never leans on
+            // the DB cascade, then the threads.
+            _context.AdvocateMessages.RemoveRange(_context.AdvocateMessages.Where(m => childIds.Contains(m.Thread.ChildProfileId)));
+            _context.AdvocateThreads.RemoveRange(_context.AdvocateThreads.Where(t => childIds.Contains(t.ChildProfileId)));
             _context.MeetingPrepChecklists.RemoveRange(_context.MeetingPrepChecklists.Where(c => childIds.Contains(c.ChildProfileId)));
             _context.ChildAccesses.RemoveRange(_context.ChildAccesses.Where(a => childIds.Contains(a.ChildProfileId)));
             _context.ChildLinks.RemoveRange(_context.ChildLinks.Where(l => l.ChildProfileId != null && childIds.Contains(l.ChildProfileId.Value)));
@@ -140,6 +146,11 @@ public class AccountPurgeService : IAccountPurgeService
         // Usage records billed to this user directly (the owner side of TryReserveUsageAsync) — a
         // superset of the child-scoped ones above, covering any not tied to a still-existing child.
         _context.UsageRecords.RemoveRange(_context.UsageRecords.Where(u => u.UserId == user.Id));
+
+        // Advocate threads this parent started on a child they do NOT own (co-parent) — AdvocateThread.ParentUser
+        // is Restrict, so these must go before the User row.
+        _context.AdvocateMessages.RemoveRange(_context.AdvocateMessages.Where(m => m.Thread.ParentUserId == user.Id));
+        _context.AdvocateThreads.RemoveRange(_context.AdvocateThreads.Where(t => t.ParentUserId == user.Id));
 
         // Access this parent holds on a child they do NOT own (co-parent / invited viewer).
         _context.ChildAccesses.RemoveRange(_context.ChildAccesses.Where(a => a.UserId == user.Id));

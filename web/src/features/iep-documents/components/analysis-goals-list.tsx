@@ -3,9 +3,11 @@ import { AnalysisGoalCard } from './analysis-goal-card';
 
 interface AnalysisGoalsListProps {
   goalAnalyses: GoalAnalysis[];
+  childId?: number;
+  canAsk?: boolean;
 }
 
-export function AnalysisGoalsList({ goalAnalyses }: AnalysisGoalsListProps) {
+export function AnalysisGoalsList({ goalAnalyses, childId, canAsk }: AnalysisGoalsListProps) {
   if (goalAnalyses.length === 0) {
     return (
       <div className="text-center py-8">
@@ -39,7 +41,7 @@ export function AnalysisGoalsList({ goalAnalyses }: AnalysisGoalsListProps) {
 
       <div className="space-y-4">
         {goalAnalyses.map((ga) => (
-          <AnalysisGoalCard key={ga.goalId} goalAnalysis={ga} />
+          <AnalysisGoalCard key={ga.goalId} goalAnalysis={ga} childId={childId} canAsk={canAsk} />
         ))}
       </div>
     </div>

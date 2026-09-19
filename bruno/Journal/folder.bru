@@ -1,0 +1,13 @@
+meta {
+  name: Journal
+  seq: 1
+}
+
+docs {
+  `JournalController` — the parent-private journal about a child. Requires the caller to have access
+  to the child (owner or collaborator). No educator endpoint by design.
+
+  Tags: `Incident | Communication | Medical | Progress | Other` (case-insensitive on input).
+  `occurredOn` is `yyyy-MM-dd` and must not be after today (UTC). `contentMarkdown` is sanitized and
+  limited to 4000 characters. Linked ids must resolve to records of the same child.
+}

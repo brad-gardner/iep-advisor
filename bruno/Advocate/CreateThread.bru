@@ -1,0 +1,46 @@
+meta {
+  name: Create advocate thread
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/children/{{childId}}/advocate/threads
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "title": "Reading goal progress"
+  }
+}
+
+docs {
+  # POST /api/children/{childId}/advocate/threads
+
+  Starts a new thread. Body is `CreateAdvocateThreadRequest`; the body (and `title`) is optional —
+  an empty body or `{}` creates a thread with a default title.
+
+  ## Body
+
+  - `title` (optional) — max 120 characters.
+
+  ## Responses
+
+  - `201` — `Location: /api/advocate/threads/{id}`; `data: AdvocateThreadDto`
+  - `400` — validation failure (e.g. title over 120 characters)
+  - `401` — missing/invalid bearer token
+  - `403` — "You can view this child but cannot ask the advocate about them." (caller has Viewer access to
+    the child but not Collaborator+)
+  - `404` — child not found, or the caller has no access to it at all
+}

@@ -34,10 +34,20 @@ interface MenuProps {
  * arrow / Home / End navigation, Esc-to-close with return-focus, and
  * click-outside dismissal.
  *
- * The popover is **portaled to `<body>` and `position: fixed`** so it is never
- * clipped by an ancestor's `overflow` (e.g. a Table's horizontal-scroll region)
- * and can rise above the app's stacking contexts. It closes on scroll to avoid
+ * The popover is **portaled and `position: fixed`** so it is never clipped by
+ * an ancestor's `overflow` (e.g. a Table's horizontal-scroll region) and can
+ * rise above the app's stacking contexts. It closes on scroll to avoid
  * drifting away from its trigger.
+ *
+ * The portal target is resolved when the menu opens: the nearest open
+ * `<dialog>` ancestor, or `document.body`. A native modal dialog
+ * (`showModal()`) makes the rest of the document `inert`, so a menu portaled
+ * to `document.body` from inside a Modal/Drawer would be unreachable —
+ * painted underneath the dialog's top layer with `focus()`/clicks landing
+ * nowhere. Portaling into the dialog keeps it in the reachable subtree; a
+ * non-transformed dialog is not a CSS containing block for `position: fixed`,
+ * so the fixed coordinates computed from the trigger's `getBoundingClientRect`
+ * still work unchanged.
  */
 export function Menu({
   label,
@@ -49,6 +59,7 @@ export function Menu({
 }: MenuProps) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  const [portalTarget, setPortalTarget] = useState<Element | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -65,6 +76,7 @@ export function Menu({
 
   const openMenu = () => {
     positionFromTrigger();
+    setPortalTarget(containerRef.current?.closest('dialog[open]') ?? document.body);
     setOpen(true);
   };
 
@@ -224,7 +236,7 @@ export function Menu({
               </button>
             ))}
           </div>,
-          document.body,
+          portalTarget ?? document.body,
         )}
     </div>
   );

@@ -7,6 +7,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { PageLayout } from "@/components/ui/page-layout";
 import { PdfViewer } from "@/components/ui/pdf-viewer";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { AskAdvocateButton } from "@/features/advocate/components/ask-advocate-button";
 import { getById, getDownloadUrl } from "../api/progress-reports-api";
 import { ProgressReportAnalysisTab } from "./progress-report-analysis-tab";
 import type { ProgressReport } from "../types";
@@ -44,6 +45,7 @@ export function ProgressReportViewerPage() {
     prId: string;
   }>();
   const reportId = Number(prId);
+  const childIdNumber = childId && /^\d+$/.test(childId) ? Number(childId) : null;
   const [report, setReport] = useState<ProgressReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"document" | "analysis">("document");
@@ -100,6 +102,16 @@ export function ProgressReportViewerPage() {
         { label: "Back to IEP", to: `/children/${childId}/ieps/${id}` },
         { label: "Progress Report" },
       ]}
+      actions={
+        childIdNumber != null ? (
+          <AskAdvocateButton
+            childId={childIdNumber}
+            about={{ kind: "progress_report", id: report.id }}
+            label={`progress report for ${formatPeriod(report.reportingPeriodStart, report.reportingPeriodEnd)}`}
+            data-testid="progress-report-ask-advocate"
+          />
+        ) : undefined
+      }
     >
       <div className="space-y-3">
         <div className="flex items-center gap-3 flex-wrap">
