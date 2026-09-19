@@ -301,6 +301,15 @@ describe('AdvocatePage', () => {
     await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(2));
     expect(lastStream().body).toEqual({ text: 'And what if they refuse?' });
     expect(api.createAdvocateThread).toHaveBeenCalledTimes(1);
+
+    // One-shot: switching to another thread and back mounts an empty status node (thread 3 keeps its
+    // stored answer on refetch, so the list renders but nothing is re-announced).
+    api.listAdvocateThreads.mockResolvedValue({ success: true, data: [thread(3, 'What is prior written notice?'), thread(1, 'PWN question'), thread(2, 'ETR timing')] });
+    fireEvent.click(await screen.findByTestId('advocate-thread-2-open'));
+    await screen.findByTestId('advocate-empty');
+    fireEvent.click(await screen.findByTestId('advocate-thread-3-open'));
+    await screen.findByTestId('advocate-assistant-message');
+    expect(screen.getByTestId('advocate-announcement')).toBeEmptyDOMElement();
   });
 
   it('keeps focus in the composer while the first thread is being created', async () => {

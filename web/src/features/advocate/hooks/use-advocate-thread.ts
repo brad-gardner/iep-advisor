@@ -167,6 +167,8 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
     }
     // The announcement is a one-shot event, not per-thread state: reopening a
     // thread must mount an empty status node, or some AT re-read the old answer.
+    // (Keep this after the ref-guarded block above: `react-hooks/set-state-in-effect`
+    // only tolerates the effect because the earlier setters are ref-derived.)
     setAnswered((a) => (a && a.threadId !== threadId ? null : a));
   }, [threadId, abortRun]);
 

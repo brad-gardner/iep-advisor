@@ -462,17 +462,6 @@ public class AdvocateService : IAdvocateService
     }
 
     /// <summary>
-    /// Refunds a usage reservation taken up front by <see cref="PrepareTurnAsync"/>. Never abortable — a
-    /// caller-cancelled or timed-out turn must still release its reservation, so this always runs with
-    /// <see cref="CancellationToken.None"/>. Deletes by id via <c>ExecuteDeleteAsync</c>, bypassing the
-    /// request <see cref="ApplicationDbContext"/>'s change tracker (todos/218): when this runs after a
-    /// failed <see cref="PersistAnswerAsync"/>, the tracker still holds that failed Added assistant-message
-    /// entity, and an ordinary tracked <c>SaveChangesAsync</c> here would retry saving it alongside the
-    /// refund, fail again, and leave the reservation stuck. Idempotent: a no-op if already gone. Failures
-    /// are logged, not thrown: a lost refund is a leaked (billable-looking) usage row, not a correctness
-    /// break for the turn that is already unwinding.
-    /// </summary>
-    /// <summary>
     /// SQL Server deadlock victim (error 1205), raw or wrapped by EF's SaveChanges (DbUpdateException).
     /// Settable only so tests on SQLite — which cannot raise 1205 and cannot construct SqlException — can
     /// exercise the retry path; production never reassigns it.
@@ -490,6 +479,17 @@ public class AdvocateService : IAdvocateService
             entry.State = EntityState.Detached;
     }
 
+    /// <summary>
+    /// Refunds a usage reservation taken up front by <see cref="PrepareTurnAsync"/>. Never abortable — a
+    /// caller-cancelled or timed-out turn must still release its reservation, so this always runs with
+    /// <see cref="CancellationToken.None"/>. Deletes by id via <c>ExecuteDeleteAsync</c>, bypassing the
+    /// request <see cref="ApplicationDbContext"/>'s change tracker (todos/218): when this runs after a
+    /// failed <see cref="PersistAnswerAsync"/>, the tracker still holds that failed Added assistant-message
+    /// entity, and an ordinary tracked <c>SaveChangesAsync</c> here would retry saving it alongside the
+    /// refund, fail again, and leave the reservation stuck. Idempotent: a no-op if already gone. Failures
+    /// are logged, not thrown: a lost refund is a leaked (billable-looking) usage row, not a correctness
+    /// break for the turn that is already unwinding.
+    /// </summary>
     private async Task ReleaseUsageReservationAsync(int usageRecordId)
     {
         try

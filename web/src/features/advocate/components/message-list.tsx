@@ -110,8 +110,8 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
       </div>
 
       {/* Outside the conversation region on purpose: a status node under an aria-busy ancestor is
-          dropped by some AT (Gecko/NVDA) rather than replayed, and the region is busy at the exact
-          commit the announcement lands. Plain text, not markdown, so punctuation is not read aloud. */}
+          dropped by some AT (Gecko/NVDA) rather than replayed, so the region carries no aria-busy and
+          the node lives beside it. Plain text, not markdown, so punctuation is not read aloud. */}
       <p role="status" className="sr-only" data-testid="advocate-announcement">
         {announcementText}
       </p>

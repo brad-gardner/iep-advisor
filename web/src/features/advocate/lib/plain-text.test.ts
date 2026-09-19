@@ -15,6 +15,14 @@ describe('markdownToPlainText', () => {
     expect(markdownToPlainText('Answer.\n\n<sources>kb:12; kb:40</sources>\n<suggest kind="open_kb" id="12"/>')).toBe('Answer. kb:12; kb:40');
   });
 
+  it('keeps a space at hard line breaks', () => {
+    expect(markdownToPlainText('line one  \nline two')).toBe('line one line two');
+  });
+
+  it('separates a fenced code block from the paragraph after it', () => {
+    expect(markdownToPlainText('x\n\n```\ncode\n```\n\ny')).toBe('x code y');
+  });
+
   it('is safe on empty and plain input', () => {
     expect(markdownToPlainText('')).toBe('');
     expect(markdownToPlainText('just words')).toBe('just words');
