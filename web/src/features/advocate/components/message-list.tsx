@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Markdown } from '@/components/ui/markdown';
-import type { PendingMessage, StreamingAnswer } from '../hooks/use-advocate-thread';
+import type { AdvocateAnnouncement, PendingMessage, StreamingAnswer } from '../hooks/use-advocate-thread';
 import type { AdvocateMessageDto } from '../types/advocate';
 import { AssistantMessage, type SuggestionHandlers } from './assistant-message';
 import { ToolActivity } from './tool-activity';
@@ -11,6 +11,9 @@ interface MessageListProps {
   messages: AdvocateMessageDto[];
   pending: PendingMessage | null;
   streaming: StreamingAnswer | null;
+  /** The latest answer completed this session — announced once via the
+   *  sr-only status node below. */
+  announcement: AdvocateAnnouncement | null;
   handlers: SuggestionHandlers;
 }
 
@@ -22,11 +25,13 @@ const PIN_THRESHOLD_PX = 48;
  * the streaming answer. Auto-scrolls to the newest content unless the reader
  * has scrolled up to re-read something.
  *
- * The streaming bubble is an `aria-live="polite"` region marked `aria-busy`
- * while deltas arrive, so a screen reader hears the finished answer once
- * rather than every token.
+ * The streaming bubble is hidden from assistive tech (`aria-hidden`) so a
+ * screen reader never re-reads it token by token; a separate sr-only
+ * `role="status"` node announces the finished answer exactly once, after
+ * `done` lands. `aria-busy` lives on the scroll region instead, so it still
+ * tells assistive tech the conversation is updating while streaming.
  */
-export function MessageList({ childId, messages, pending, streaming, handlers }: MessageListProps) {
+export function MessageList({ childId, messages, pending, streaming, announcement, handlers }: MessageListProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
 
@@ -51,10 +56,14 @@ export function MessageList({ childId, messages, pending, streaming, handlers }:
     <div
       ref={scrollerRef}
       onScroll={onScroll}
+      tabIndex={0}
+      role="region"
+      aria-label="Conversation"
+      aria-busy={streaming !== null}
       className="max-h-[60vh] min-h-[16rem] overflow-y-auto rounded-card bg-brand-slate-50 p-3 md:max-h-[calc(100vh-22rem)]"
       data-testid="advocate-messages"
     >
-      <ul className="space-y-3" aria-label="Conversation">
+      <ul className="space-y-3">
         {messages.map((m) =>
           m.role === 'User' ? (
             <UserMessage key={m.id} text={m.contentMarkdown} />
@@ -73,7 +82,7 @@ export function MessageList({ childId, messages, pending, streaming, handlers }:
         {pending && <UserMessage text={pending.text} pending data-testid="advocate-user-message-pending" />}
       </ul>
 
-      <div aria-live="polite" aria-busy={streaming !== null} className="mt-3 space-y-2" data-testid="advocate-streaming">
+      <div aria-hidden="true" className="mt-3 space-y-2" data-testid="advocate-streaming">
         {streaming && (
           <>
             <ToolActivity tools={streaming.tools} />
@@ -93,6 +102,10 @@ export function MessageList({ childId, messages, pending, streaming, handlers }:
           </>
         )}
       </div>
+
+      <p role="status" className="sr-only" data-testid="advocate-announcement">
+        {announcement?.text ?? ''}
+      </p>
     </div>
   );
 }

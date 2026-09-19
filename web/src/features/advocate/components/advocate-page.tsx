@@ -276,6 +276,7 @@ export function AdvocatePage() {
               messages={thread.messages}
               pending={thread.pending}
               streaming={thread.streaming}
+              announcement={thread.announcement}
               handlers={suggestionHandlers}
             />
           )}
@@ -319,7 +320,8 @@ export function AdvocatePage() {
                 onSend={(text) => void handleSend(text)}
                 onStop={thread.stop}
                 streaming={thread.isStreaming}
-                disabled={capped || creating}
+                creating={creating}
+                disabled={capped}
                 disabledReason={capped ? 'You’ve used this year’s advocate messages.' : undefined}
                 childFirstName={child.firstName}
               />

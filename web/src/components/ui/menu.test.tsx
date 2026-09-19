@@ -84,4 +84,25 @@ describe('Menu', () => {
     expect(onDelete).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
+
+  it('portals the popover into the nearest open dialog instead of document.body, so it is reachable under a modal', () => {
+    // jsdom has no showModal(); Modal/Drawer fall back to setAttribute('open', '')
+    // for the same effect, so a plain <dialog open> stands in for either here.
+    render(
+      <dialog open data-testid="host-dialog">
+        <Menu
+          label="Actions for Lincoln Elementary"
+          data-testid="school-actions"
+          items={[{ label: 'Rename', onSelect: vi.fn(), 'data-testid': 'menu-rename' }]}
+        />
+      </dialog>,
+    );
+    fireEvent.click(screen.getByTestId('school-actions'));
+    const menu = screen.getByRole('menu');
+    const dialog = screen.getByTestId('host-dialog');
+    expect(dialog).toContainElement(menu);
+    // Portaled as a direct child of the dialog, not of document.body (which
+    // would also technically "contain" it, since the dialog itself lives there).
+    expect(menu.parentElement).toBe(dialog);
+  });
 });

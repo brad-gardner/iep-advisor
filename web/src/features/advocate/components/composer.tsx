@@ -12,6 +12,13 @@ interface ComposerProps {
   onStop: () => void;
   /** An answer is streaming: typing is paused and Send becomes Stop. */
   streaming: boolean;
+  /**
+   * A send is in flight before any stream can start (the first message on a
+   * thread has to create it first). Like `streaming` this pauses typing and
+   * disables Send, but — unlike `disabled` — uses `readOnly` so the textarea
+   * never loses focus, and there is nothing yet to Stop.
+   */
+  creating?: boolean;
   /** No sends at all (usage cap reached, thread unavailable). */
   disabled?: boolean;
   disabledReason?: string;
@@ -21,8 +28,9 @@ interface ComposerProps {
 /**
  * The message box. Enter sends, Shift+Enter adds a line; a 2000-character
  * counter mirrors the server limit and blocks over-length sends rather than
- * trimming. While an answer streams the textarea is read-only (the draft is
- * kept) and the action button aborts the stream.
+ * trimming. While an answer streams (or the first thread is being created)
+ * the textarea is read-only — never `disabled`, which would blur it — and
+ * the draft is kept; the action button aborts the stream when one exists.
  */
 export function Composer({
   value,
@@ -30,6 +38,7 @@ export function Composer({
   onSend,
   onStop,
   streaming,
+  creating = false,
   disabled = false,
   disabledReason,
   childFirstName,
@@ -40,7 +49,7 @@ export function Composer({
 
   const length = value.length;
   const overLimit = length > ADVOCATE_MESSAGE_MAX_LENGTH;
-  const canSend = !disabled && !streaming && value.trim().length > 0 && !overLimit;
+  const canSend = !disabled && !streaming && !creating && value.trim().length > 0 && !overLimit;
 
   const submit = () => {
     if (!canSend) return;
@@ -74,7 +83,7 @@ export function Composer({
         onCompositionStart={() => setComposing(true)}
         onCompositionEnd={() => setComposing(false)}
         rows={3}
-        readOnly={streaming}
+        readOnly={streaming || creating}
         disabled={disabled}
         aria-describedby={counterId}
         aria-invalid={overLimit || undefined}

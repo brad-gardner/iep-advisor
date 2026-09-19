@@ -17,6 +17,8 @@ interface ParentQuestionRowProps {
   isLast: boolean;
   /** A reorder is in flight — the arrows wait for it so two swaps cannot cross. */
   isReordering: boolean;
+  /** This question's own check-toggle PUT is in flight — the checkbox waits for it. */
+  isChecking: boolean;
   onCheck: (id: number, isChecked: boolean) => void;
   onMove: (id: number, direction: MoveDirection) => void;
   onEdit: (id: number, text: string) => Promise<SaveParentQuestionResult>;
@@ -52,6 +54,7 @@ export function ParentQuestionRow({
   isFirst,
   isLast,
   isReordering,
+  isChecking,
   onCheck,
   onMove,
   onEdit,
@@ -109,7 +112,7 @@ export function ParentQuestionRow({
           type="checkbox"
           id={checkboxId}
           checked={question.isChecked}
-          disabled={readOnly || editing}
+          disabled={readOnly || editing || isChecking}
           onChange={(e) => onCheck(question.id, e.target.checked)}
           className="mt-0.5 h-4 w-4 shrink-0 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-400"
         />

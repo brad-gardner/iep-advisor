@@ -242,7 +242,7 @@ export function IepViewerPage() {
               childId={document.childProfileId}
               about={{ kind: "iep", id: document.id }}
               label={document.iepDate ? `IEP from ${formatDate(document.iepDate)}` : undefined}
-              canAsk={childRole !== "viewer"}
+              canAsk={childRole !== null && childRole !== "viewer"}
               data-testid="iep-ask-advocate"
             />
             {otherIeps.length > 0 && (

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AxiosError, AxiosHeaders } from 'axios';
 import type { ChildProfile } from '@/types/api';
 import type { ParentPrepQuestionDto } from '../api/prep-questions-api';
@@ -63,7 +63,17 @@ function LocationProbe() {
   return <output data-testid="location">{location.pathname + location.search}</output>;
 }
 
-function renderTab(url: string, role: ChildProfile['role'] = 'owner') {
+/** Stands in for a second advocate hand-off landing while the tab stays mounted. */
+function Relauncher({ to }: { to: string }) {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate(to)} data-testid="relaunch">
+      relaunch
+    </button>
+  );
+}
+
+function renderTab(url: string, role: ChildProfile['role'] = 'owner', relaunchTo?: string) {
   const ctx = { child: child(role), childId: 4, reloadChild: () => Promise.resolve() };
   return render(
     <MemoryRouter initialEntries={[url]}>
@@ -75,6 +85,7 @@ function renderTab(url: string, role: ChildProfile['role'] = 'owner') {
               <>
                 <ChildMeetingPrepTab />
                 <LocationProbe />
+                {relaunchTo && <Relauncher to={relaunchTo} />}
               </>
             }
           />
@@ -134,6 +145,23 @@ describe('ChildMeetingPrepTab — parent questions', () => {
     await waitFor(() => expect(screen.getByTestId('location')).not.toHaveTextContent('addQuestion'));
   });
 
+  it('accepts a second hand-off of the same question once the first has been consumed and cleared from the URL', async () => {
+    const target = `/children/4/meeting-prep?${new URLSearchParams({ addQuestion: QUESTION }).toString()}`;
+    renderTab(`/children/4/meeting-prep?addQuestion=${encodeURIComponent(QUESTION)}`, 'owner', target);
+    await waitFor(() => expect(prepQuestionsApi.createPrepQuestion).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByTestId('location')).not.toHaveTextContent('addQuestion'));
+
+    // A second, later hand-off carrying the exact same text lands while the
+    // tab is still mounted. The question is already on the list, so this is
+    // correctly reported as a duplicate — the point being that it is
+    // reported at all, rather than the stale consumedRef silently eating it
+    // (which would also leave `?addQuestion=` stuck in the URL).
+    fireEvent.click(screen.getByTestId('relaunch'));
+    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: QUESTION_EXISTS_TOAST, variant: 'info' }));
+    await waitFor(() => expect(screen.getByTestId('location')).not.toHaveTextContent('addQuestion'));
+    expect(prepQuestionsApi.createPrepQuestion).toHaveBeenCalledTimes(1);
+  });
+
   it('lists what the API returns and lets a question be checked off', async () => {
     prepQuestionsApi.listPrepQuestions.mockResolvedValue({ success: true, data: [question(1, QUESTION)] });
     renderTab('/children/4/meeting-prep');
@@ -144,6 +172,45 @@ describe('ChildMeetingPrepTab — parent questions', () => {
     expect(within(list).getByRole('checkbox', { name: QUESTION })).toBeChecked();
     expect(screen.getByTestId('parent-questions')).toHaveTextContent('1 of 1 asked');
     await waitFor(() => expect(prepQuestionsApi.updatePrepQuestion).toHaveBeenCalledWith(1, { isChecked: true }));
+  });
+
+  it('disables the checkbox while its PUT is in flight, so a double-click cannot race two overlapping writes', async () => {
+    prepQuestionsApi.listPrepQuestions.mockResolvedValue({ success: true, data: [question(1, QUESTION)] });
+    let resolveUpdate: (value: { success: true; data: ParentPrepQuestionDto }) => void = () => {};
+    prepQuestionsApi.updatePrepQuestion.mockImplementation(
+      () =>
+        new Promise<{ success: true; data: ParentPrepQuestionDto }>((resolve) => {
+          resolveUpdate = resolve;
+        }),
+    );
+    renderTab('/children/4/meeting-prep');
+    const list = await screen.findByTestId('parent-questions-list');
+    const checkbox = within(list).getByRole('checkbox', { name: QUESTION });
+
+    fireEvent.click(checkbox);
+    expect(checkbox).toBeChecked();
+    expect(checkbox).toBeDisabled();
+
+    // A second click while the first PUT is still in flight must not fire another one.
+    fireEvent.click(checkbox);
+    expect(prepQuestionsApi.updatePrepQuestion).toHaveBeenCalledTimes(1);
+
+    act(() => resolveUpdate({ success: true, data: question(1, QUESTION, { isChecked: true }) }));
+    await waitFor(() => expect(checkbox).not.toBeDisabled());
+    expect(checkbox).toBeChecked();
+  });
+
+  it('applies the server’s isChecked from the response rather than assuming the optimistic value stuck', async () => {
+    prepQuestionsApi.listPrepQuestions.mockResolvedValue({ success: true, data: [question(1, QUESTION)] });
+    // The server disagrees with the optimistic value (e.g. a concurrent change elsewhere).
+    prepQuestionsApi.updatePrepQuestion.mockResolvedValue({ success: true, data: question(1, QUESTION, { isChecked: false }) });
+    renderTab('/children/4/meeting-prep');
+    const list = await screen.findByTestId('parent-questions-list');
+    const checkbox = within(list).getByRole('checkbox', { name: QUESTION });
+
+    fireEvent.click(checkbox);
+    expect(checkbox).toBeChecked();
+    await waitFor(() => expect(checkbox).not.toBeChecked());
   });
 
   it('reverts a tick the server refused', async () => {
@@ -234,6 +301,31 @@ describe('ChildMeetingPrepTab — parent questions', () => {
     await waitFor(() => expect(toast.show).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })));
     const rows = within(list).getAllByTestId('parent-question');
     expect(rows[0]).toHaveTextContent('First');
+  });
+
+  it('keeps a check toggled during an in-flight reorder even after that reorder is reverted', async () => {
+    prepQuestionsApi.listPrepQuestions.mockResolvedValue({ success: true, data: [question(1, 'First'), question(2, 'Second')] });
+    let resolveReorder: (value: { success: boolean }) => void = () => {};
+    prepQuestionsApi.reorderPrepQuestions.mockImplementation(
+      () => new Promise<{ success: boolean }>((resolve) => { resolveReorder = resolve; }),
+    );
+    prepQuestionsApi.updatePrepQuestion.mockResolvedValue({ success: true, data: question(1, 'First', { isChecked: true }) });
+    renderTab('/children/4/meeting-prep');
+    const list = await screen.findByTestId('parent-questions-list');
+
+    fireEvent.click(within(list).getByRole('button', { name: 'Move down: First' }));
+    // While that reorder PUT is still in flight, check off "First" (checks are not blocked during a reorder).
+    fireEvent.click(within(list).getByRole('checkbox', { name: 'First' }));
+    await waitFor(() => expect(prepQuestionsApi.updatePrepQuestion).toHaveBeenCalledWith(1, { isChecked: true }));
+
+    act(() => resolveReorder({ success: false }));
+    await waitFor(() => expect(toast.show).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })));
+
+    // The reorder is reverted (First is back on top)...
+    const rows = within(list).getAllByTestId('parent-question');
+    expect(rows[0]).toHaveTextContent('First');
+    // ...but the check applied while it was in flight is not undone with it.
+    expect(within(list).getByRole('checkbox', { name: 'First' })).toBeChecked();
   });
 
   it('only cleans the URL for a viewer — nothing is posted for them and no controls show', async () => {

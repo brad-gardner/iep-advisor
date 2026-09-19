@@ -29,6 +29,16 @@ export interface StreamingAnswer {
   tools: ToolActivity[];
 }
 
+/**
+ * The most recently completed answer for a thread, tracked from `done` so an
+ * sr-only status node can announce it once — separately from the (non-live)
+ * streaming bubble, which a screen reader would otherwise re-read per token.
+ */
+export interface AdvocateAnnouncement {
+  id: number;
+  text: string;
+}
+
 export type SendFailureCode = AdvocateRequestErrorCode | 'network';
 
 export interface SendFailure {
@@ -119,6 +129,7 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
   const [streaming, setStreaming] = useState<Keyed<StreamingAnswer> | null>(null);
   const [failure, setFailure] = useState<Keyed<SendFailure> | null>(null);
   const [stoppedIn, setStoppedIn] = useState<number | null>(null);
+  const [answered, setAnswered] = useState<Keyed<AdvocateAnnouncement> | null>(null);
 
   const runRef = useRef<Run | null>(null);
   const onAnsweredRef = useRef(onAnswered);
@@ -140,8 +151,20 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
   // Switching threads abandons a stream for another thread (its bubbles are
   // hidden by `forThread`); a stream for *this* thread — started right after
   // the page created it — carries on. Unmount aborts whatever is running.
+  // This is the only place a run is dropped without its own settle/error
+  // cleanup, so the abandoned run's pending/streaming/failure state is
+  // cleared here too — otherwise reopening that thread later would show a
+  // frozen streaming bubble, an inert Stop button and a composer that can
+  // never send again.
   useEffect(() => {
-    if (runRef.current && runRef.current.threadId !== threadId) abortRun();
+    if (runRef.current && runRef.current.threadId !== threadId) {
+      const abandoned = abortRun();
+      if (abandoned) {
+        setPending((p) => (p?.threadId === abandoned.threadId ? null : p));
+        setStreaming((s) => (s?.threadId === abandoned.threadId ? null : s));
+        setFailure((f) => (f?.threadId === abandoned.threadId ? null : f));
+      }
+    }
   }, [threadId, abortRun]);
 
   useEffect(
@@ -246,6 +269,7 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
           run.settling = true;
           // Show the final text at once; the refetch below only swaps in server ids.
           patch((s) => ({ ...s, text: done.contentMarkdown }));
+          setAnswered({ threadId: id, value: { id: done.messageId, text: done.contentMarkdown } });
           onAnsweredRef.current?.(id);
           void settleFromServer(run, message, done);
         },
@@ -303,10 +327,17 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
   const stop = useCallback(() => {
     if (runRef.current?.settling) return;
     const run = abortRun();
-    if (!run) return;
-    setStreaming(null);
-    setStoppedIn(run.threadId);
-  }, [abortRun]);
+    if (run) {
+      setStreaming(null);
+      setStoppedIn(run.threadId);
+      return;
+    }
+    // No run is current (e.g. state left behind by an earlier bug, or Stop
+    // fired after settling already cleared it) — still clear anything shown
+    // for the open thread rather than leaving Stop a silent no-op.
+    setStreaming((s) => (s?.threadId === threadId ? null : s));
+    setPending((p) => (p?.threadId === threadId ? null : p));
+  }, [abortRun, threadId]);
 
   const current = loaded && loaded.threadId === threadId ? loaded : null;
   const loadError = forThread(loadFailure, threadId);
@@ -320,6 +351,7 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
     reload,
     pending: pending && pending.threadId === threadId ? pending : null,
     streaming: streamingNow,
+    announcement: forThread(answered, threadId),
     failure: forThread(failure, threadId),
     stopped: threadId != null && stoppedIn === threadId,
     isStreaming: streamingNow !== null,

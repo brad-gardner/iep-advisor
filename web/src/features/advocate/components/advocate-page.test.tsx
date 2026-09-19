@@ -245,7 +245,12 @@ describe('AdvocatePage', () => {
     act(() => stream.handlers.onDelta('Prior written '));
     act(() => stream.handlers.onDelta('notice is'));
     expect(screen.getByTestId('advocate-streaming-text')).toHaveTextContent('Prior written notice is');
-    expect(screen.getByTestId('advocate-streaming')).toHaveAttribute('aria-busy', 'true');
+    // The streaming bubble is hidden from assistive tech (not a live region) so
+    // tokens are never re-read; aria-busy lives on the scroll region instead.
+    expect(screen.getByTestId('advocate-streaming')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByTestId('advocate-messages')).toHaveAttribute('aria-busy', 'true');
+    // No answer has finished yet — the sr-only status node has nothing to announce.
+    expect(screen.getByTestId('advocate-announcement')).toBeEmptyDOMElement();
 
     api.getAdvocateThread.mockImplementation((id: number) =>
       Promise.resolve(
@@ -267,6 +272,10 @@ describe('AdvocatePage', () => {
     const assistant = await screen.findByTestId('advocate-assistant-message');
     expect(screen.queryByTestId('advocate-user-message-pending')).not.toBeInTheDocument();
     expect(screen.queryByTestId('advocate-streaming-text')).not.toBeInTheDocument();
+    // The finished answer is announced once through the sr-only status node —
+    // the only place a screen reader hears it, since the streaming bubble was hidden.
+    expect(screen.getByTestId('advocate-announcement')).toHaveTextContent(answer.contentMarkdown);
+    expect(screen.getByTestId('advocate-messages')).toHaveAttribute('aria-busy', 'false');
     expect(within(assistant).getByText('letter')).toBeInTheDocument();
     const sources = within(assistant).getAllByTestId('advocate-source-link');
     expect(sources.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
@@ -291,6 +300,34 @@ describe('AdvocatePage', () => {
     await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(2));
     expect(lastStream().body).toEqual({ text: 'And what if they refuse?' });
     expect(api.createAdvocateThread).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps focus in the composer while the first thread is being created', async () => {
+    let resolveCreate: (value: { success: true; data: AdvocateThreadDto }) => void = () => {};
+    api.createAdvocateThread.mockImplementation(
+      () =>
+        new Promise<{ success: true; data: AdvocateThreadDto }>((resolve) => {
+          resolveCreate = resolve;
+        }),
+    );
+    renderPage();
+    await screen.findByTestId('advocate-empty');
+
+    const el = composer();
+    el.focus();
+    fireEvent.change(el, { target: { value: 'What is prior written notice?' } });
+    fireEvent.keyDown(el, { key: 'Enter' });
+
+    await waitFor(() => expect(api.createAdvocateThread).toHaveBeenCalled());
+    // readOnly, not disabled — disabling the textarea would blur it.
+    expect(composer()).toHaveAttribute('readonly');
+    expect(composer()).not.toBeDisabled();
+    expect(composer()).toHaveFocus();
+    expect(screen.getByTestId('advocate-send')).toBeDisabled();
+    expect(screen.queryByTestId('advocate-stop')).not.toBeInTheDocument();
+
+    act(() => resolveCreate({ success: true, data: thread(3, 'What is prior written notice?') }));
+    await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(1));
   });
 
   it('keeps the user message and offers Retry when an error frame arrives after deltas', async () => {
@@ -403,6 +440,28 @@ describe('AdvocatePage', () => {
     expect(composer()).not.toHaveAttribute('readonly');
     expect(screen.getByTestId('advocate-send')).toBeInTheDocument();
     expect(screen.queryByTestId('advocate-send-error')).not.toBeInTheDocument();
+  });
+
+  it('clears streaming/pending state abandoned by a thread switch, so reopening the thread does not show a frozen stream', async () => {
+    renderPage('owner', '/children/4/advocate?thread=2');
+    await screen.findByTestId('advocate-empty');
+    typeAndSend('Tell me about ESY');
+    await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(1));
+    const stream = lastStream();
+    act(() => stream.handlers.onDelta('Extended school year'));
+    expect(screen.getByTestId('advocate-streaming-text')).toHaveTextContent('Extended school year');
+
+    const rail = screen.getByTestId('advocate-thread-list');
+    fireEvent.click(within(rail).getByTestId('advocate-thread-1-open'));
+    await screen.findByTestId('advocate-assistant-message');
+
+    fireEvent.click(within(rail).getByTestId('advocate-thread-2-open'));
+    await screen.findByTestId('advocate-empty');
+    expect(screen.queryByTestId('advocate-streaming-text')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('advocate-user-message-pending')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('advocate-stop')).not.toBeInTheDocument();
+    fireEvent.change(composer(), { target: { value: 'A fresh question' } });
+    expect(screen.getByTestId('advocate-send')).toBeEnabled();
   });
 
   it('sends on Enter but not on Shift+Enter, and blocks over-length text', async () => {
@@ -564,6 +623,14 @@ describe('AdvocatePage', () => {
     auth.user = parent(null);
     localStorage.clear();
     api.getAdvocateChildContext.mockResolvedValue({ success: true, data: { stateCode: 'OH' } });
+    renderPage();
+    await screen.findByTestId('advocate-empty');
+    expect(screen.queryByTestId('advocate-state-hint')).not.toBeInTheDocument();
+  });
+
+  it('does not show the state hint when the context call fails — a failure is not the server positively saying "no state"', async () => {
+    auth.user = parent(null);
+    api.getAdvocateChildContext.mockRejectedValue(new Error('network'));
     renderPage();
     await screen.findByTestId('advocate-empty');
     expect(screen.queryByTestId('advocate-state-hint')).not.toBeInTheDocument();

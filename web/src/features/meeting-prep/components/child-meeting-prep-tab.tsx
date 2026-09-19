@@ -42,7 +42,14 @@ export function ChildMeetingPrepTab() {
   // reload or back-navigation does not add it twice. A viewer's URL is only
   // cleaned up (nothing is added for them).
   useEffect(() => {
-    if (incoming === null || questionsLoading || consumedRef.current === incoming) return;
+    if (incoming === null) {
+      // The param is gone (cleaned up below, or navigated away and back) —
+      // forget what was consumed so an identical handoff later is not
+      // silently ignored as a repeat.
+      consumedRef.current = null;
+      return;
+    }
+    if (questionsLoading || consumedRef.current === incoming) return;
     consumedRef.current = incoming;
     if (canEditQuestions) {
       void addQuestion(incoming, "advocate").then((result) => {
@@ -82,6 +89,7 @@ export function ChildMeetingPrepTab() {
         isLoading={questionsLoading}
         loadError={parentQuestions.loadError}
         isReordering={parentQuestions.isReordering}
+        checkingIds={parentQuestions.checkingIds}
         onAdd={addTyped}
         onCheck={parentQuestions.setChecked}
         onEdit={parentQuestions.updateText}

@@ -21,6 +21,8 @@ interface ParentQuestionsProps {
   loadError?: string | null;
   /** True while an up/down move is being saved; the arrows wait for it. */
   isReordering?: boolean;
+  /** Ids with a check-toggle PUT in flight — their checkbox waits for it. */
+  checkingIds?: ReadonlySet<number>;
   onAdd: (text: string) => Promise<AddParentQuestionResult>;
   onCheck: (id: number, isChecked: boolean) => void;
   onEdit: (id: number, text: string) => Promise<SaveParentQuestionResult>;
@@ -49,6 +51,7 @@ export function ParentQuestions({
   isLoading = false,
   loadError = null,
   isReordering = false,
+  checkingIds,
   onAdd,
   onCheck,
   onEdit,
@@ -135,6 +138,7 @@ export function ParentQuestions({
               isFirst={index === 0}
               isLast={index === questions.length - 1}
               isReordering={isReordering}
+              isChecking={checkingIds?.has(q.id) ?? false}
               onCheck={onCheck}
               onMove={onMove}
               onEdit={onEdit}

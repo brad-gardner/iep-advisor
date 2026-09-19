@@ -137,8 +137,8 @@ export const ADVOCATE_MESSAGE_MAX_LENGTH = 2000;
 /** Same cap the API enforces on a thread title. */
 export const ADVOCATE_TITLE_MAX_LENGTH = 120;
 
-/** The server grammar for `about`; anything else is dropped client-side rather than sent. */
-export const ABOUT_PATTERN = /^(iep|etr|goal|analysis|progress_report|journal):\d+$/;
+/** The server grammar for `about` (mirrors the API's `\d{1,9}` id bound); anything else is dropped client-side rather than sent. */
+export const ABOUT_PATTERN = /^(iep|etr|goal|analysis|progress_report|journal):\d{1,9}$/;
 
 /** Share of the yearly allowance at which the usage banner appears. */
 export const USAGE_WARNING_RATIO = 0.8;

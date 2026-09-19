@@ -51,6 +51,9 @@ export function useParentQuestions(childId: number) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
   const [writeForbidden, setWriteForbidden] = useState(false);
+  /** Ids with a check-toggle PUT in flight — the checkbox is disabled meanwhile so a
+   *  double-click cannot fire two overlapping writes that race on which one lands last. */
+  const [checkingIds, setCheckingIds] = useState<ReadonlySet<number>>(new Set());
 
   // Another child on the same mounted tab: start over for that list.
   const [loadedFor, setLoadedFor] = useState(childId);
@@ -60,6 +63,7 @@ export function useParentQuestions(childId: number) {
     setIsLoading(true);
     setLoadError(null);
     setWriteForbidden(false);
+    setCheckingIds(new Set());
   }
 
   useEffect(() => {
@@ -120,16 +124,31 @@ export function useParentQuestions(childId: number) {
 
   const setChecked = useCallback(
     async (id: number, isChecked: boolean) => {
+      // Guards the race a double-click (or two independent clicks before the
+      // UI disables) would otherwise create: PUT(true) then PUT(false) in
+      // flight together, with the response's `isChecked` discarded and a
+      // negation-based revert landing on whichever side loses.
+      if (checkingIds.has(id)) return;
+      const previous = questions.find((q) => q.id === id)?.isChecked;
+      setCheckingIds((prev) => new Set(prev).add(id));
       setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, isChecked } : q)));
       try {
         const res = await updatePrepQuestion(id, { isChecked });
-        if (!res.success) throw new Error(res.message ?? 'update failed');
+        if (!res.success || !res.data) throw new Error(res.message ?? 'update failed');
+        const applied = res.data.isChecked;
+        setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, isChecked: applied } : q)));
       } catch (err) {
-        setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, isChecked: !isChecked } : q)));
+        setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, isChecked: previous ?? !isChecked } : q)));
         reportWriteFailure(err, 'Could not update that question.');
+      } finally {
+        setCheckingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
       }
     },
-    [reportWriteFailure],
+    [questions, checkingIds, reportWriteFailure],
   );
 
   const updateText = useCallback(
@@ -174,6 +193,8 @@ export function useParentQuestions(childId: number) {
       const index = questions.findIndex((q) => q.id === id);
       const target = direction === 'up' ? index - 1 : index + 1;
       if (index < 0 || target < 0 || target >= questions.length) return;
+      const movedId = questions[index].id;
+      const swappedId = questions[target].id;
       const next = [...questions];
       [next[index], next[target]] = [next[target], next[index]];
       setIsReordering(true);
@@ -185,7 +206,18 @@ export function useParentQuestions(childId: number) {
         );
         if (!res.success) throw new Error(res.message ?? 'reorder failed');
       } catch (err) {
-        setQuestions(questions);
+        // Swap the two moved ids back wherever they currently sit, rather
+        // than reinstating the whole pre-move snapshot — a checkbox toggled
+        // on either question while the PUT was in flight (checks are not
+        // blocked during a reorder) must not be undone by this revert.
+        setQuestions((prev) => {
+          const i = prev.findIndex((q) => q.id === movedId);
+          const j = prev.findIndex((q) => q.id === swappedId);
+          if (i < 0 || j < 0) return prev;
+          const reverted = [...prev];
+          [reverted[i], reverted[j]] = [reverted[j], reverted[i]];
+          return reverted;
+        });
         reportWriteFailure(err, 'Could not reorder your questions.');
       } finally {
         setIsReordering(false);
@@ -194,5 +226,17 @@ export function useParentQuestions(childId: number) {
     [childId, questions, isReordering, reportWriteFailure],
   );
 
-  return { questions, isLoading, loadError, isReordering, writeForbidden, add, setChecked, updateText, remove, move };
+  return {
+    questions,
+    isLoading,
+    loadError,
+    isReordering,
+    writeForbidden,
+    checkingIds,
+    add,
+    setChecked,
+    updateText,
+    remove,
+    move,
+  };
 }

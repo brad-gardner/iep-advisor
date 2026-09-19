@@ -16,10 +16,15 @@ export function useAdvocateChildContext(childId: number) {
     let active = true;
     getAdvocateChildContext(childId)
       .then((res) => {
-        if (active) setResolved({ childId, stateCode: res.success && res.data ? res.data.stateCode : null });
+        // Only a genuine server answer counts as "resolved" — a failed
+        // response is not the same as the server positively saying "no
+        // state", so it must not flip to `null` and trigger the hint for a
+        // parent whose child's state simply failed to load this time.
+        if (active && res.success && res.data) setResolved({ childId, stateCode: res.data.stateCode });
       })
       .catch(() => {
-        if (active) setResolved({ childId, stateCode: null });
+        // Network/exception: leave `resolved` as-is (stays `undefined` for
+        // this child) rather than reporting a positive "no state".
       });
     return () => {
       active = false;
