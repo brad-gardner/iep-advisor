@@ -1,7 +1,7 @@
 ---
 title: "feat: Virtual Advocate — parent AI chat with tool-grounded answers, plus a dated Journal"
 type: feat
-status: active
+status: completed
 date: 2026-09-19
 origin: docs/brainstorms/2026-09-19-virtual-advocate-brainstorm.md
 design: docs/designs/2026-09-19-virtual-advocate-design.md
@@ -322,6 +322,24 @@ Routes added to `web/src/app/routes.tsx` under the `/children/:childId` layout: 
 - Tests: `search_knowledge_base` returns OH entries for OH and hides them for PA; null state ⇒ federal only + context line; migration seed count and required fields (title, content, legal reference, category) asserted.
 - **Checkpoint:** Ohio parent asks about ETR timelines and gets OAC 3301-51-06 cited; a PA parent gets federal content plus the "set your state" nudge.
 
+## Implementation Notes (2026-09-19)
+
+Implemented on `feat/virtual-advocate-and-journal` (base `main`) in the four planned slices plus one addition that surfaced during Phase 3: meeting prep had no parent-authored question store, so "Add to meeting prep" now lands in a new `ParentPrepQuestion` table (`GET/POST /api/children/{id}/prep-questions`, `PUT /api/prep-questions/{id}`, reorder, delete) and the advocate's `get_meeting_prep` reads them back. Also added `GET /api/children/{id}/advocate/context` so the "set your state" hint follows the server-resolved state.
+
+**Checks (current HEAD):** `dotnet test` 1211 passed (baseline 1003); vitest 678 passed (baseline 566); `tsc -b`, `test:types`, `vite build` (advocate page is its own lazy chunk), `guard:ux` green; eslint at the 36-error baseline; `dotnet ef migrations has-pending-model-changes` clean. Migrations added: `AddJournalEntries`, `AddAdvocateThreads`, `SeedOhioKnowledgeBase` (data-only, reversible), `AddParentPrepQuestions`.
+
+**Live smoke (local API on 7200 against the QA database, demo parent `jamie.parent@…`):** journal entry created and rendered; a real advocate question streamed 306 deltas across four tool rounds (`search_knowledge_base` ×2, `list_journal`, `get_child_summary`), cited two Ohio KB entries, the journal entry and a meeting, and produced two `prep_question` suggestions; "Add to meeting prep" persisted the question (`source: advocate`). Screenshots (ignored dir): `docs/screenshots/journal-page.png`, `journal-entry-drawer.png`, `child-overview-journal-card.png`, `advocate-thread.png`, `advocate-thread-phone.png`, `meeting-prep-parent-questions.png`.
+
+**Deviations / follow-ups (P3):** meeting deadlines tool returns meetings only (no parent-visible obligation API); `compare_iep_versions` cites the two IEPs rather than a composite ref; `get_document_section` labels are generic unless the input carries `documentType`; the model sometimes writes `(kb:65)` inline in addition to the `<sources>` block; Ohio paragraph-level citations were verified only where the LII mirror confirmed them — the rest cite at rule level and should be spot-checked against codes.ohio.gov; `viewport-fit=cover` was not added to the global meta so the phone dock's safe-area padding is inert on iOS notches.
+
+## Post-Deploy Monitoring & Validation
+
+- **Logs (Kibana / Serilog):** `SourceContext:"IepAssistant.Services.Implementations.AdvocateService"` — watch `Kind` on "Advocate turn failed" errors (Configuration ⇒ key/model problem, RateLimited/Transient ⇒ retry storms, Timeout ⇒ 120 s turn cap hit); `SourceContext:"…ClaudeClient"` for "Claude call failed" with the new streaming path; `Message:"advocate_message"` usage writes.
+- **Metrics:** count of `UsageRecords` with `OperationType='advocate_message'` per day; `AdvocateMessages` where `Truncated=1` (target < 5 %); average `InputTokens`/`OutputTokens` per assistant message (cost); 429s on the `advocate-message` rate-limit policy; SSE requests to `POST /api/advocate/threads/*/messages` lasting > 60 s.
+- **Healthy:** first `delta` within ~3 s; ≥ 80 % of child-specific answers carry ≥ 1 non-`kb` citation; no `error` frames with code `unavailable` outside genuine Anthropic incidents; Ohio parents see `kb` citations with `OAC 3301-51` references.
+- **Failure / mitigation:** a spike of `Configuration` failures ⇒ check `Anthropic:ApiKey`/`Model` app settings; sustained `Truncated` > 20 % ⇒ raise `MaxToolRounds`/budgets or tighten prompts; runaway cost ⇒ lower `Anthropic:Effort` or the fair-use caps (`AdvocateService.ActiveSubscriptionMessageCap`/`FreeMessageCap`); rollback = revert the deploy; the four migrations are additive and each has a clean `Down` (`SeedOhioKnowledgeBase` deletes exactly the seeded titles).
+- **Window / owner:** first 7 days after release, Brad; re-check citation coverage after the first 100 messages.
+
 ## Alternative Approaches Considered
 
 - **Single-call "case brief" per turn (brainstorm A)** — rejected: character budgets cap what the advocate can see for multi-year records, citations become brief-line references rather than exact sources, and it has no path to later actions.
@@ -354,26 +372,26 @@ Journal has no educator-facing endpoint (private by design). The advocate is par
 ## Acceptance Criteria
 
 ### Functional
-- [ ] Journal: dated rich-text entries with tag and optional document/meeting links; visible to everyone with access to the child; Collaborator+ to write; never returned by any educator endpoint.
-- [ ] Advocate threads are per child, private to the asking parent, persist across sessions, and can be renamed/deleted.
-- [ ] Sending a message streams the answer token-by-token with visible tool activity; the final message is stored with citations and suggestions.
-- [ ] The advocate can answer general IEP/ETR/process/rights questions citing knowledge-base entries, and child-specific questions citing the exact document, goal, journal entry, or draft it read.
-- [ ] Every citation shown resolves to something a tool returned in that turn and deep-links to it.
-- [ ] Suggestions render as cards that navigate into existing flows prefilled; no chat action writes to the record.
-- [ ] Ohio parents get Ohio-specific entries with OAC/ORC references; other states get federal content and a nudge to set their state.
-- [ ] Fair-use cap (300 paid / 20 trial per subscription year) with an 80 % banner and a 100 % block that uses the existing subscription CTA.
-- [ ] Failures show a friendly retry and never a partial answer.
+- [x] Journal: dated rich-text entries with tag and optional document/meeting links; visible to everyone with access to the child; Collaborator+ to write; never returned by any educator endpoint.
+- [x] Advocate threads are per child, private to the asking parent, persist across sessions, and can be renamed/deleted.
+- [x] Sending a message streams the answer token-by-token with visible tool activity; the final message is stored with citations and suggestions.
+- [x] The advocate can answer general IEP/ETR/process/rights questions citing knowledge-base entries, and child-specific questions citing the exact document, goal, journal entry, or draft it read.
+- [x] Every citation shown resolves to something a tool returned in that turn and deep-links to it.
+- [x] Suggestions render as cards that navigate into existing flows prefilled; no chat action writes to the record.
+- [x] Ohio parents get Ohio-specific entries with OAC/ORC references; other states get federal content and a nudge to set their state.
+- [x] Fair-use cap (300 paid / 20 trial per subscription year) with an 80 % banner and a 100 % block that uses the existing subscription CTA.
+- [x] Failures show a friendly retry and never a partial answer.
 
 ### Non-Functional
-- [ ] No tool can read another child's or any staff-only data; ids from the model are re-validated against the thread's child.
-- [ ] All untrusted text (user question, journal, contributions, document text, tool results) reaches the prompt only entity-escaped inside data tags; `about` context is rendered by the server from a fixed grammar.
-- [ ] Bounded cost: ≤ 6 tool rounds, ≤ 30 000 chars of tool results and ≤ 20 000 chars of history per turn; prompt caching on for system + tools; tokens recorded per message.
-- [ ] Phone-first layout at 400 px; composer and cards keyboard-accessible; streaming region uses `aria-live="polite"`.
-- [ ] Markdown rendered only through the sanitised `Markdown` component; journal stored markdown sanitised and capped at 4 000 chars.
+- [x] No tool can read another child's or any staff-only data; ids from the model are re-validated against the thread's child.
+- [x] All untrusted text (user question, journal, contributions, document text, tool results) reaches the prompt only entity-escaped inside data tags; `about` context is rendered by the server from a fixed grammar.
+- [x] Bounded cost: ≤ 6 tool rounds, ≤ 30 000 chars of tool results and ≤ 20 000 chars of history per turn; prompt caching on for system + tools; tokens recorded per message.
+- [x] Phone-first layout at 400 px; composer and cards keyboard-accessible; streaming region uses `aria-live="polite"`.
+- [x] Markdown rendered only through the sanitised `Markdown` component; journal stored markdown sanitised and capped at 4 000 chars.
 
 ### Quality Gates
-- [ ] `dotnet test` green with new suites listed per phase; `tsc -b`, vitest, lint at baseline, `vite build` (advocate chunk lazy-loaded like the editor).
-- [ ] `/sht-review` P1/P2 findings fixed; Bruno collection updated; wiki updated via `/sht-docs`.
+- [x] `dotnet test` green with new suites listed per phase; `tsc -b`, vitest, lint at baseline, `vite build` (advocate chunk lazy-loaded like the editor).
+- [ ] `/sht-review` P1/P2 findings fixed; wiki updated via `/sht-docs`. (Bruno collection added: `bruno/`.)
 
 ## Success Metrics
 - Share of parents with ≥ 1 document who send ≥ 1 advocate message in their first week.
