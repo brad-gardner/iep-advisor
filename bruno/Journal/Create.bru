@@ -1,0 +1,51 @@
+meta {
+  name: Create journal entry
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/children/{{childId}}/journal
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "occurredOn": "2026-09-01",
+    "tag": "Incident",
+    "contentMarkdown": "Sent home early after a meltdown in math. Teacher called at 1:15pm.",
+    "linkedIepDocumentId": null,
+    "linkedEtrDocumentId": null,
+    "linkedMeetingId": null
+  }
+}
+
+docs {
+  # POST /api/children/{childId}/journal
+
+  Creates a journal entry for the child. Body is `SaveJournalEntryRequest`.
+
+  ## Body
+
+  - `occurredOn` (required) — `yyyy-MM-dd`; must not be after today (UTC).
+  - `tag` (required) — `Incident | Communication | Medical | Progress | Other` (case-insensitive).
+  - `contentMarkdown` (required) — markdown; sanitized, then limited to 4000 characters.
+  - `linkedIepDocumentId`, `linkedEtrDocumentId`, `linkedMeetingId` (optional) — must belong to the same child.
+
+  ## Responses
+
+  - `201` — `Location: /api/journal/{id}`; `data: JournalEntryDto` (same shape as the list endpoint)
+  - `400` — invalid tag, malformed/future `occurredOn`, empty or over-limit content, or a link that does not resolve to this child
+  - `401` — missing/invalid bearer token
+  - `404` — child not found or the caller has no access to it
+}

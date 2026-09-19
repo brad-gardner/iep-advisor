@@ -1,0 +1,26 @@
+docs {
+  # IepAssistant.Api
+
+  Bruno collection for the IEP Advisor API (`api/IepAssistant.Api`).
+
+  ## Setup
+
+  1. Open this `bruno/` folder as a collection in Bruno.
+  2. Select the `local` environment and fill in the `token` secret with a JWT for a parent user
+     (log in through the web app or `POST /api/auth/login` and copy the bearer token). Secret values
+     are stored encrypted on your machine and never written to git.
+  3. The local API listens on `https://localhost:7200` with the ASP.NET dev certificate — if requests
+     fail with a certificate error, disable SSL certificate verification in Bruno's preferences or
+     trust the dev cert (`dotnet dev-certs https --trust`).
+  4. Set `childId` (and the other id variables) to records that belong to the signed-in parent.
+
+  ## Response envelope
+
+  Every JSON endpoint returns `{ "success": bool, "message": string|null, "data": T|null, "errors": string[] }`.
+  Failures use `success: false` with `message`; validation errors from model binding use `errors`.
+
+  ## Coverage
+
+  This collection currently covers the Virtual Advocate + Journal feature set only (Journal, Advocate,
+  ParentPrepQuestions controllers). Other controllers are not yet reconciled.
+}

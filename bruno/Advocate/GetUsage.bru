@@ -1,0 +1,45 @@
+meta {
+  name: Get advocate usage
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/advocate/usage
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # GET /api/advocate/usage
+
+  The caller's advocate message usage against their cap (20 messages without an active subscription,
+  300 with one).
+
+  ## Responses
+
+  - `200` — `data: AdvocateUsageDto`
+  - `401` — missing/invalid bearer token
+  - `404` — the token's user no longer exists
+
+  ```json
+  {
+    "success": true,
+    "message": null,
+    "data": {
+      "used": 4,
+      "limit": 20,
+      "subscriptionActive": false
+    },
+    "errors": []
+  }
+  ```
+}

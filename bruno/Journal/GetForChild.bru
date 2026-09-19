@@ -1,0 +1,65 @@
+meta {
+  name: List journal entries for child
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/children/{{childId}}/journal?take=50
+  body: none
+  auth: bearer
+}
+
+params:query {
+  take: 50
+  ~tag: Incident
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # GET /api/children/{childId}/journal
+
+  Journal entries for a child, newest first by the day they happened (`occurredOn`).
+
+  ## Query
+
+  - `tag` (optional) — `Incident | Communication | Medical | Progress | Other`, case-insensitive. Invalid value → 400.
+  - `take` (optional) — number of entries to return. Default 50, max 200.
+
+  ## Responses
+
+  - `200` — `data: JournalEntryDto[]`
+  - `400` — invalid `tag`, or `take` outside 1–200
+  - `401` — missing/invalid bearer token
+  - `404` — child not found or the caller has no access to it
+
+  ```json
+  {
+    "success": true,
+    "message": null,
+    "data": [
+      {
+        "id": 12,
+        "childProfileId": 1,
+        "occurredOn": "2026-09-01",
+        "tag": "Incident",
+        "contentMarkdown": "Sent home early after a meltdown in math.",
+        "linkedIepDocumentId": null,
+        "linkedEtrDocumentId": null,
+        "linkedMeetingId": null,
+        "createdAt": "2026-09-01T18:22:10Z",
+        "updatedAt": "2026-09-01T18:22:10Z",
+        "createdById": 7
+      }
+    ],
+    "errors": []
+  }
+  ```
+}

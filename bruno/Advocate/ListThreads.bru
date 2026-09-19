@@ -1,0 +1,49 @@
+meta {
+  name: List advocate threads for child
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/children/{{childId}}/advocate/threads
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # GET /api/children/{childId}/advocate/threads
+
+  The caller's own advocate threads about this child (other parents' threads are never returned).
+
+  ## Responses
+
+  - `200` — `data: AdvocateThreadDto[]`
+  - `401` — missing/invalid bearer token
+  - `404` — child not found or the caller has no access to it
+
+  ```json
+  {
+    "success": true,
+    "message": null,
+    "data": [
+      {
+        "id": 3,
+        "childProfileId": 1,
+        "title": "Reading goal progress",
+        "createdAt": "2026-09-10T14:00:00Z",
+        "updatedAt": "2026-09-10T14:05:31Z",
+        "lastMessageAt": "2026-09-10T14:05:31Z"
+      }
+    ],
+    "errors": []
+  }
+  ```
+}

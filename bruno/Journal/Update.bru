@@ -1,0 +1,45 @@
+meta {
+  name: Update journal entry
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/api/journal/{{journalId}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "occurredOn": "2026-09-01",
+    "tag": "Communication",
+    "contentMarkdown": "Teacher called at 1:15pm; agreed to a sensory break plan.",
+    "linkedIepDocumentId": null,
+    "linkedEtrDocumentId": null,
+    "linkedMeetingId": null
+  }
+}
+
+docs {
+  # PUT /api/journal/{id}
+
+  Replaces a journal entry. Body is `SaveJournalEntryRequest` — the full entry, not a partial patch
+  (see *Create journal entry* for field rules).
+
+  ## Responses
+
+  - `200` — `data: JournalEntryDto`
+  - `400` — validation failure (invalid tag, bad/future date, content limit, unresolvable link)
+  - `401` — missing/invalid bearer token
+  - `404` — entry not found or the caller has no access to it
+}

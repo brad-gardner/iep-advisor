@@ -1,0 +1,44 @@
+meta {
+  name: Reorder prep questions
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/children/{{childId}}/prep-questions/order
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "ids": [23, 21, 22]
+  }
+}
+
+docs {
+  # PUT /api/children/{childId}/prep-questions/order
+
+  Sets the display order of the child's questions. Body is `ReorderParentPrepQuestionsRequest`.
+
+  ## Body
+
+  - `ids` — question ids in the wanted order; each must belong to this child. Questions not listed
+    keep their relative order and follow the listed ones.
+
+  ## Responses
+
+  - `200` — `data: ParentPrepQuestionDto[]`, the whole list in its new order
+  - `400` — `ids` empty, repeated, or containing an id that is not one of this child's questions
+  - `401` — missing/invalid bearer token
+  - `404` — child not found or the caller has no access to it
+}

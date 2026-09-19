@@ -1,0 +1,31 @@
+meta {
+  name: Delete advocate thread
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/advocate/threads/{{threadId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # DELETE /api/advocate/threads/{id}
+
+  Deletes a thread and its messages.
+
+  ## Responses
+
+  - `200` — `{ "success": true, "data": {} }`
+  - `401` — missing/invalid bearer token
+  - `404` — thread not found or not owned by the caller
+}

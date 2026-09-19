@@ -1,0 +1,46 @@
+meta {
+  name: Update prep question
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/api/prep-questions/{{prepQuestionId}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "text": "How is reading fluency measured, and how often?",
+    "isChecked": true
+  }
+}
+
+docs {
+  # PUT /api/prep-questions/{id}
+
+  Partial update of one question. Body is `UpdateParentPrepQuestionRequest`; omit a field (or send
+  `null`) to leave it unchanged.
+
+  ## Body
+
+  - `text` (optional) — markup stripped, 1–500 characters.
+  - `isChecked` (optional) — whether the parent has marked the question as asked/answered.
+
+  ## Responses
+
+  - `200` — `data: ParentPrepQuestionDto` (`alreadyExisted` is `null` here)
+  - `400` — neither `text` nor `isChecked` supplied, or empty/over-limit text
+  - `401` — missing/invalid bearer token
+  - `404` — question not found or not owned by the caller
+}

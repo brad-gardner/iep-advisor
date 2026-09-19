@@ -1,0 +1,79 @@
+meta {
+  name: Get advocate thread with messages
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/advocate/threads/{{threadId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # GET /api/advocate/threads/{id}
+
+  One thread with its messages, oldest first. Only the parent who started the thread can read it.
+
+  ## Responses
+
+  - `200` — `data: AdvocateThreadDetailDto`
+  - `401` — missing/invalid bearer token
+  - `404` — thread not found or not owned by the caller
+
+  ```json
+  {
+    "success": true,
+    "message": null,
+    "data": {
+      "id": 3,
+      "childProfileId": 1,
+      "title": "Reading goal progress",
+      "createdAt": "2026-09-10T14:00:00Z",
+      "updatedAt": "2026-09-10T14:05:31Z",
+      "lastMessageAt": "2026-09-10T14:05:31Z",
+      "messages": [
+        {
+          "id": 40,
+          "role": "User",
+          "contentMarkdown": "Is my son on track for his reading goal?",
+          "citations": [],
+          "suggestions": [],
+          "truncated": false,
+          "createdAt": "2026-09-10T14:05:00Z"
+        },
+        {
+          "id": 41,
+          "role": "Assistant",
+          "contentMarkdown": "Based on the latest progress report ...",
+          "citations": [
+            { "kind": "goal", "id": 340, "label": "Reading fluency", "parent": { "kind": "iep", "id": 12 } },
+            { "kind": "kb", "id": 5, "label": "Measuring goal progress", "parent": null }
+          ],
+          "suggestions": [
+            { "kind": "prep_question", "text": "How is fluency being measured each week?", "id": null, "date": null },
+            { "kind": "open_goal", "text": null, "id": 340, "date": null }
+          ],
+          "truncated": false,
+          "createdAt": "2026-09-10T14:05:31Z"
+        }
+      ],
+      "disclaimer": "The Virtual Advocate gives general information ... It is not legal advice. ..."
+    },
+    "errors": []
+  }
+  ```
+
+  - `role`: `User | Assistant`
+  - `citations[].kind`: `kb | child | iep | etr | progress_report | authored_version | shared_draft | iep_analysis | etr_analysis | progress_report_analysis | analysis_run | iep_section | etr_section | goal | goal_record | comparison | journal | contribution | advocacy_goal | meeting_prep | prep_question | meeting`
+  - `citations[].parent`: the record to open the citation inside (goal / iep_section / iep_analysis → iep; etr_section / etr_analysis → etr; progress_report → iep; progress_report_analysis → progress_report), otherwise `null`
+  - `suggestions[].kind`: `prep_question | journal_entry | open_kb | open_goal`; `date` (`yyyy-MM-dd`) is set for `journal_entry` only
+}

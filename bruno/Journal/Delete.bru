@@ -1,0 +1,31 @@
+meta {
+  name: Delete journal entry
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/journal/{{journalId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # DELETE /api/journal/{id}
+
+  Deletes a journal entry.
+
+  ## Responses
+
+  - `200` — `{ "success": true, "data": {} }`
+  - `401` — missing/invalid bearer token
+  - `404` — entry not found or the caller has no access to it (any service failure maps to 404)
+}
