@@ -32,9 +32,16 @@ public class AdvocateMessageModel
 /// <summary>
 /// A record the assistant read this turn and named in its <c>&lt;sources&gt;</c> block. <see cref="Kind"/> is
 /// the sourceRef kind (<c>kb</c>, <c>child</c>, and from Phase 3 <c>goal</c>, <c>iep</c>, <c>journal</c>…);
-/// <see cref="Label"/> is the human title the toolset recorded for it, when it has one.
+/// <see cref="Label"/> is the human title the toolset recorded for it, when it has one. <see cref="Parent"/>
+/// is the record a kind that has no page of its own lives inside — a <c>goal</c>, <c>iep_section</c> or
+/// <c>iep_analysis</c> points at its <c>iep</c>, an <c>etr_section</c> at its <c>etr</c>, a
+/// <c>progress_report</c> at its <c>iep</c> — so the UI can deep-link it. Null for kinds that are their own
+/// page (<c>kb</c>, <c>iep</c>, <c>journal</c>…) and for rows persisted before parents were recorded.
 /// </summary>
-public sealed record AdvocateCitation(string Kind, int Id, string? Label);
+public sealed record AdvocateCitation(string Kind, int Id, string? Label, AdvocateCitationParent? Parent = null);
+
+/// <summary>The record a citation should be opened inside; a sourceRef split into its two halves.</summary>
+public sealed record AdvocateCitationParent(string Kind, int Id);
 
 /// <summary>
 /// A handoff the assistant proposed via <c>&lt;suggest&gt;</c>. <see cref="Kind"/> is one of

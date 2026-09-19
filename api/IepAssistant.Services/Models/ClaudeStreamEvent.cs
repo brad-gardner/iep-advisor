@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace IepAssistant.Services.Models;
 
 public enum ClaudeStreamEventKind
@@ -29,7 +31,8 @@ public sealed record ClaudeStreamEvent(
     ClaudeToolTrace? Trace = null,  // Completed
     int? InputTokens = null,        // Completed: sum of input_tokens across every model turn
     int? OutputTokens = null,       // Completed: sum of output_tokens across every model turn
-    bool Truncated = false);        // Completed: MaxToolRounds reached with tools pending, or max_tokens hit
+    bool Truncated = false,         // Completed: MaxToolRounds reached with tools pending, or max_tokens hit
+    JsonElement? ToolInput = null); // ToolStarted / ToolFinished: the model's parsed input, as handed to the executor (model-supplied — never render it verbatim)
 
 /// <summary>
 /// What happened during the tool loop, for persistence and diagnostics. <see cref="Rounds"/> is the

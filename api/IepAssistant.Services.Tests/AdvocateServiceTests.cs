@@ -73,17 +73,18 @@ public sealed class AdvocateServiceTests : IDisposable
     /// <summary>Runs one real tool through the executor, then answers with <paramref name="fullText"/>.</summary>
     private static async IAsyncEnumerable<ClaudeStreamEvent> ToolThenAnswer(IToolExecutor tools, string toolName, string inputJson, string fullText, [EnumeratorCancellation] CancellationToken ct = default)
     {
-        yield return new ClaudeStreamEvent(ClaudeStreamEventKind.ToolStarted, ToolName: toolName, ToolUseId: "tu_1");
+        var input = JsonDocument.Parse(inputJson).RootElement.Clone();
+        yield return new ClaudeStreamEvent(ClaudeStreamEventKind.ToolStarted, ToolName: toolName, ToolUseId: "tu_1", ToolInput: input);
         var isError = false;
         try
         {
-            await tools.ExecuteAsync(toolName, JsonDocument.Parse(inputJson).RootElement, ct);
+            await tools.ExecuteAsync(toolName, input, ct);
         }
         catch (ToolExecutionException)
         {
             isError = true;
         }
-        yield return new ClaudeStreamEvent(ClaudeStreamEventKind.ToolFinished, ToolName: toolName, ToolUseId: "tu_1", ToolIsError: isError);
+        yield return new ClaudeStreamEvent(ClaudeStreamEventKind.ToolFinished, ToolName: toolName, ToolUseId: "tu_1", ToolIsError: isError, ToolInput: input);
         yield return new ClaudeStreamEvent(ClaudeStreamEventKind.TextDelta, Text: fullText);
         yield return new ClaudeStreamEvent(ClaudeStreamEventKind.Completed, FullText: fullText,
             Trace: new ClaudeToolTrace(new[] { new ClaudeToolCallTrace(toolName, "tu_1", inputJson.Length, 500, 12, isError) }, 2), InputTokens: 300, OutputTokens: 40);
@@ -536,6 +537,106 @@ public sealed class AdvocateServiceTests : IDisposable
         var stored = Snapshot(threadId).Messages.Single(m => m.Role == AdvocateMessageRole.Assistant);
         Assert.Contains($"\"id\":{goalId}", stored.CitationsJson);
         Assert.DoesNotContain("999", stored.CitationsJson);
+    }
+
+    [Fact]
+    public async Task Send_GoalCitation_CarriesItsIepAsParent_OnDoneInTheRowAndOnGetThread()
+    {
+        var f = SeedFamily("goal-parent");
+        int iepId, goalId;
+        using (var ctx = CreateContext())
+        {
+            var iep = new IepDocument { ChildProfileId = f.ChildId, IepDate = new DateTime(2026, 3, 1), Status = "parsed" };
+            ctx.IepDocuments.Add(iep);
+            ctx.SaveChanges();
+            var section = new IepSection { IepDocumentId = iep.Id, SectionType = "annual_goals", RawText = "Goals" };
+            ctx.IepSections.Add(section);
+            ctx.SaveChanges();
+            var goal = new Goal { IepSectionId = section.Id, GoalText = "Read 80 words per minute", Domain = "Reading" };
+            ctx.Goals.Add(goal);
+            ctx.SaveChanges();
+            iepId = iep.Id;
+            goalId = goal.Id;
+        }
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+        var answer = $"Measurable.\n\n<sources>goal:{goalId}; iep:{iepId}</sources>";
+        _claude.Script = (_, tools, ct) => ToolThenAnswer(tools, "get_goals_and_progress", "{}", answer, ct);
+
+        var events = await SendAsync(f.OwnerId, threadId, "Is the reading goal measurable?");
+
+        var done = events.Single(e => e.Kind == AdvocateStreamEventKind.Done);
+        Assert.Collection(done.Citations!,
+            c => Assert.Equal(new AdvocateCitation("goal", goalId, "Reading goal", new AdvocateCitationParent("iep", iepId)), c),
+            c => Assert.Equal(new AdvocateCitation("iep", iepId, "IEP 2026-03-01", null), c));
+
+        var stored = Snapshot(threadId).Messages.Single(m => m.Role == AdvocateMessageRole.Assistant);
+        Assert.Contains($"\"parent\":{{\"kind\":\"iep\",\"id\":{iepId}}}", stored.CitationsJson);
+
+        using var readCtx = CreateContext();
+        var detail = (await CreateService(readCtx).GetThreadAsync(f.OwnerId, threadId)).Data!;
+        Assert.Equal(done.Citations, detail.Messages[1].Citations);
+    }
+
+    [Fact]
+    public async Task GetThread_CitationsPersistedBeforeParentsExisted_StillParse_WithNullParent()
+    {
+        var f = SeedFamily("legacy-citations");
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+        using (var ctx = CreateContext())
+        {
+            ctx.AdvocateMessages.Add(new AdvocateMessage
+            {
+                AdvocateThreadId = threadId, Role = AdvocateMessageRole.Assistant, ContentMarkdown = "Old answer.",
+                CitationsJson = """[{"kind":"kb","id":12,"label":"Prior written notice"},{"kind":"goal","id":340,"label":null}]"""
+            });
+            ctx.SaveChanges();
+        }
+
+        using var readCtx = CreateContext();
+        var detail = (await CreateService(readCtx).GetThreadAsync(f.OwnerId, threadId)).Data!;
+
+        Assert.Equal(
+            new[] { new AdvocateCitation("kb", 12, "Prior written notice"), new AdvocateCitation("goal", 340, null) },
+            detail.Messages.Single().Citations);
+        Assert.All(detail.Messages.Single().Citations, c => Assert.Null(c.Parent));
+    }
+
+    [Fact]
+    public async Task Send_DocumentReaderTools_AreLabelledByDocumentType()
+    {
+        var f = SeedFamily("tool-label");
+        int etrId;
+        using (var ctx = CreateContext())
+        {
+            var etr = new EtrDocument { ChildProfileId = f.ChildId, EvaluationDate = new DateTime(2025, 9, 1), Status = "parsed" };
+            ctx.EtrDocuments.Add(etr);
+            ctx.SaveChanges();
+            etrId = etr.Id;
+        }
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+        _claude.Script = (_, tools, ct) => ToolThenAnswer(tools, "get_document_section", $$"""{"documentType":"etr","documentId":{{etrId}}}""", "The ETR lists two sections.", ct);
+
+        var events = await SendAsync(f.OwnerId, threadId, "What does the ETR say?");
+
+        Assert.Equal("Reading the ETR", events[0].ToolLabel);
+        Assert.Equal("Reading the ETR", events[1].ToolLabel);
+        Assert.Equal("finished", events[1].ToolStatus);
+    }
+
+    [Theory]
+    [InlineData("get_document_section", """{"documentType":"iep","documentId":1}""", "Reading the IEP")]
+    [InlineData("get_document_analysis", """{"documentType":"iep","documentId":1}""", "Reading the IEP analysis")]
+    [InlineData("get_document_analysis", """{"documentType":"progress_report","documentId":1}""", "Reading the progress report analysis")]
+    [InlineData("get_document_section", """{"documentType":"<b>evil</b>","documentId":1}""", "Reading the document")]
+    [InlineData("get_document_analysis", """{"documentId":1}""", "Reading the analysis")]
+    [InlineData("get_document_section", "null", "Reading the document")]
+    [InlineData("search_knowledge_base", """{"documentType":"iep"}""", "Checking the rules")]
+    public void ToolLabel_NamesTheDocumentTypeOnlyForRecognisedValues_NeverEchoesInput(string tool, string inputJson, string expected)
+    {
+        var input = JsonDocument.Parse(inputJson).RootElement.Clone();
+
+        Assert.Equal(expected, AdvocatePrompts.ToolLabel(tool, input));
+        Assert.Equal(AdvocatePrompts.ToolLabel(tool), AdvocatePrompts.ToolLabel(tool, null));
     }
 
     [Fact]

@@ -296,12 +296,12 @@ public class ClaudeClient : IClaudeClient
             var results = new List<ContentBase>(toolUses.Count);
             foreach (var use in toolUses)
             {
-                yield return new ClaudeStreamEvent(ClaudeStreamEventKind.ToolStarted, ToolName: use.Name, ToolUseId: use.Id);
-
                 // Parsed, never string-matched: the SDK has already turned the streamed partial_json
                 // into a JsonNode, and the executor validates the JsonElement against its schema.
                 var input = JsonSerializer.SerializeToElement(use.Input ?? new JsonObject());
                 var inputChars = input.GetRawText().Length;
+
+                yield return new ClaudeStreamEvent(ClaudeStreamEventKind.ToolStarted, ToolName: use.Name, ToolUseId: use.Id, ToolInput: input);
 
                 var stopwatch = Stopwatch.StartNew();
                 string resultText;
@@ -333,7 +333,7 @@ public class ClaudeClient : IClaudeClient
                     Content = [new TextContent { Text = resultText }],
                 });
 
-                yield return new ClaudeStreamEvent(ClaudeStreamEventKind.ToolFinished, ToolName: use.Name, ToolUseId: use.Id, ToolIsError: isError);
+                yield return new ClaudeStreamEvent(ClaudeStreamEventKind.ToolFinished, ToolName: use.Name, ToolUseId: use.Id, ToolIsError: isError, ToolInput: input);
             }
 
             messages.Add(new Message { Role = RoleType.User, Content = results });

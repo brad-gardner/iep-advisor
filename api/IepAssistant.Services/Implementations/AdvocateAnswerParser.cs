@@ -28,7 +28,8 @@ public static class AdvocateAnswerParser
 
     /// <param name="returnedRefs">The toolset's <c>ReturnedRefs</c> — the only refs allowed to survive.</param>
     /// <param name="labels">Optional titles per ref, copied onto citations.</param>
-    public static AdvocateParsedAnswer Parse(string? text, IReadOnlySet<string> returnedRefs, IReadOnlyDictionary<string, string>? labels = null)
+    /// <param name="parents">Optional parent record per ref (the toolset's <c>Parents</c>), copied onto citations so the UI can deep-link them.</param>
+    public static AdvocateParsedAnswer Parse(string? text, IReadOnlySet<string> returnedRefs, IReadOnlyDictionary<string, string>? labels = null, IReadOnlyDictionary<string, AdvocateCitationParent>? parents = null)
     {
         if (string.IsNullOrEmpty(text))
             return new AdvocateParsedAnswer(string.Empty, new List<AdvocateCitation>(), new List<AdvocateSuggestion>());
@@ -39,12 +40,12 @@ public static class AdvocateAnswerParser
 
         var stripped = SourcesBlock.Replace(text, m =>
         {
-            CollectRefs(m.Groups[1].Value, returnedRefs, labels, citations, seenRefs);
+            CollectRefs(m.Groups[1].Value, returnedRefs, labels, parents, citations, seenRefs);
             return string.Empty;
         });
         stripped = UnclosedSources.Replace(stripped, m =>
         {
-            CollectRefs(m.Groups[1].Value, returnedRefs, labels, citations, seenRefs);
+            CollectRefs(m.Groups[1].Value, returnedRefs, labels, parents, citations, seenRefs);
             return string.Empty;
         });
 
@@ -59,7 +60,7 @@ public static class AdvocateAnswerParser
         return new AdvocateParsedAnswer(stripped.TrimEnd(), citations, suggestions);
     }
 
-    private static void CollectRefs(string body, IReadOnlySet<string> returnedRefs, IReadOnlyDictionary<string, string>? labels, List<AdvocateCitation> citations, HashSet<string> seen)
+    private static void CollectRefs(string body, IReadOnlySet<string> returnedRefs, IReadOnlyDictionary<string, string>? labels, IReadOnlyDictionary<string, AdvocateCitationParent>? parents, List<AdvocateCitation> citations, HashSet<string> seen)
     {
         foreach (var token in RefSeparator.Split(body))
         {
@@ -72,7 +73,9 @@ public static class AdvocateAnswerParser
 
             string? label = null;
             labels?.TryGetValue(candidate, out label);
-            citations.Add(new AdvocateCitation(match.Groups[1].Value, id, label));
+            AdvocateCitationParent? parent = null;
+            parents?.TryGetValue(candidate, out parent);
+            citations.Add(new AdvocateCitation(match.Groups[1].Value, id, label, parent));
         }
     }
 

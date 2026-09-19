@@ -38,7 +38,6 @@ public class AdvocateService : IAdvocateService
     private const string CollaboratorRequired = "You can view this child but cannot ask the advocate about them.";
 
     private static readonly Regex AboutGrammar = new(@"^(iep|etr|goal|analysis|progress_report|journal):(\d{1,9})$", RegexOptions.Compiled);
-    private static readonly Regex StateCodeShape = new(@"^[A-Za-z]{2}$", RegexOptions.Compiled);
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     private readonly ApplicationDbContext _context;
@@ -241,12 +240,12 @@ public class AdvocateService : IAdvocateService
 
         var child = await _context.ChildProfiles.AsNoTracking()
             .Where(c => c.Id == thread.ChildProfileId)
-            .Select(c => new { c.FirstName, c.GradeLevel, OwnerState = c.User.State })
+            .Select(c => new { c.FirstName, c.GradeLevel })
             .FirstOrDefaultAsync(ct);
         if (child == null)
             return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.NotFound, ThreadNotFound));
 
-        var stateCode = await ResolveStateCodeAsync(thread.ChildProfileId, child.OwnerState, ct);
+        var stateCode = await ChildStateResolver.ResolveAsync(_context, thread.ChildProfileId, ct);
 
         // History is everything BEFORE this message: read it before the user row is added.
         var history = await BuildHistoryAsync(threadId, ct);
@@ -299,10 +298,10 @@ public class AdvocateService : IAdvocateService
                             await writer.WriteAsync(AdvocateStreamEvent.Delta(evt.Text), turnCt);
                         break;
                     case ClaudeStreamEventKind.ToolStarted:
-                        await writer.WriteAsync(AdvocateStreamEvent.Tool(evt.ToolName ?? string.Empty, AdvocatePrompts.ToolLabel(evt.ToolName ?? string.Empty), "started"), turnCt);
+                        await writer.WriteAsync(AdvocateStreamEvent.Tool(evt.ToolName ?? string.Empty, AdvocatePrompts.ToolLabel(evt.ToolName ?? string.Empty, evt.ToolInput), "started"), turnCt);
                         break;
                     case ClaudeStreamEventKind.ToolFinished:
-                        await writer.WriteAsync(AdvocateStreamEvent.Tool(evt.ToolName ?? string.Empty, AdvocatePrompts.ToolLabel(evt.ToolName ?? string.Empty), evt.ToolIsError ? "failed" : "finished"), turnCt);
+                        await writer.WriteAsync(AdvocateStreamEvent.Tool(evt.ToolName ?? string.Empty, AdvocatePrompts.ToolLabel(evt.ToolName ?? string.Empty, evt.ToolInput), evt.ToolIsError ? "failed" : "finished"), turnCt);
                         break;
                     case ClaudeStreamEventKind.Completed:
                         completed = evt;
@@ -353,7 +352,7 @@ public class AdvocateService : IAdvocateService
 
     private async Task<AdvocateStreamEvent> PersistAnswerAsync(PreparedTurn turn, ClaudeStreamEvent completed, CancellationToken ct)
     {
-        var parsed = AdvocateAnswerParser.Parse(completed.FullText, turn.Toolset.ReturnedRefs, turn.Toolset.Labels);
+        var parsed = AdvocateAnswerParser.Parse(completed.FullText, turn.Toolset.ReturnedRefs, turn.Toolset.Labels, turn.Toolset.Parents);
         var markdown = parsed.Markdown.Length > AdvocateMessageConfiguration.AssistantContentMaxLength
             ? parsed.Markdown[..AdvocateMessageConfiguration.AssistantContentMaxLength]
             : parsed.Markdown;
@@ -441,25 +440,6 @@ public class AdvocateService : IAdvocateService
             _ => null
         };
         return noun == null ? null : $"The parent opened this conversation from their {noun} #{id}.";
-    }
-
-    /// <summary>Linked school record's district, then school, then the owning parent's profile state; null when none is a 2-letter code.</summary>
-    private async Task<string?> ResolveStateCodeAsync(int childId, string? ownerState, CancellationToken ct)
-    {
-        var linked = await _context.ChildLinks.AsNoTracking()
-            .Where(l => l.ChildProfileId == childId && l.IsActive && l.AcceptedAt != null)
-            .OrderByDescending(l => l.AcceptedAt)
-            .Select(l => new { DistrictState = l.SchoolStudent.District.StateCode, SchoolState = l.SchoolStudent.School.StateCode })
-            .FirstOrDefaultAsync(ct);
-
-        return NormalizeState(linked?.DistrictState) ?? NormalizeState(linked?.SchoolState) ?? NormalizeState(ownerState);
-    }
-
-    private static string? NormalizeState(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return null;
-        var trimmed = value.Trim();
-        return StateCodeShape.IsMatch(trimmed) ? trimmed.ToUpperInvariant() : null;
     }
 
     // ------------------------------------------------------------------ helpers

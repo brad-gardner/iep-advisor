@@ -33,10 +33,27 @@ public class AdvocateMessageDto
 
 public class AdvocateCitationDto
 {
-    /// <summary>kb | child (Phase 3 adds goal, iep, etr, journal, …)</summary>
+    /// <summary>
+    /// kb | child | iep | etr | progress_report | authored_version | shared_draft | iep_analysis | etr_analysis |
+    /// progress_report_analysis | analysis_run | iep_section | etr_section | goal | goal_record | comparison |
+    /// journal | contribution | advocacy_goal | meeting_prep | meeting
+    /// </summary>
     public string Kind { get; set; } = string.Empty;
     public int Id { get; set; }
     public string? Label { get; set; }
+    /// <summary>
+    /// The record to open this citation inside, for kinds that have no page of their own: goal, iep_section and
+    /// iep_analysis → their iep; etr_section and etr_analysis → their etr; progress_report → its iep;
+    /// progress_report_analysis → its progress_report. Null otherwise (analysis_run opens the analysis tab,
+    /// goal_record the goals tab).
+    /// </summary>
+    public AdvocateCitationParentDto? Parent { get; set; }
+}
+
+public class AdvocateCitationParentDto
+{
+    public string Kind { get; set; } = string.Empty;
+    public int Id { get; set; }
 }
 
 public class AdvocateSuggestionDto

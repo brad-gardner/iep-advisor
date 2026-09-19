@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace IepAssistant.Services.Implementations;
 
 /// <summary>
@@ -103,7 +105,39 @@ public static class AdvocatePrompts
         ["get_shared_draft"] = "Reading the shared draft"
     };
 
-    /// <summary>Parent-facing activity label for a tool, shown while it runs ("Checking the rules…").</summary>
-    public static string ToolLabel(string toolName) =>
-        ToolLabels.TryGetValue(toolName, out var label) ? label : "Looking something up";
+    /// <summary>
+    /// Parent-facing activity label for a tool, shown while it runs ("Checking the rules…"). For the two
+    /// document readers the label names the document type when <paramref name="input"/> carries a recognised
+    /// <c>documentType</c>; the input is model-supplied, so only fixed strings ever come out of here.
+    /// </summary>
+    public static string ToolLabel(string toolName, JsonElement? input = null)
+    {
+        var documentType = DocumentTypeOf(input);
+        if (documentType != null)
+        {
+            switch (toolName)
+            {
+                case "get_document_section":
+                    return $"Reading the {documentType}";
+                case "get_document_analysis":
+                    return $"Reading the {documentType} analysis";
+            }
+        }
+        return ToolLabels.TryGetValue(toolName, out var label) ? label : "Looking something up";
+    }
+
+    private static string? DocumentTypeOf(JsonElement? input)
+    {
+        if (input is not { ValueKind: JsonValueKind.Object } element
+            || !element.TryGetProperty("documentType", out var value)
+            || value.ValueKind != JsonValueKind.String)
+            return null;
+        return value.GetString() switch
+        {
+            "iep" => "IEP",
+            "etr" => "ETR",
+            "progress_report" => "progress report",
+            _ => null
+        };
+    }
 }

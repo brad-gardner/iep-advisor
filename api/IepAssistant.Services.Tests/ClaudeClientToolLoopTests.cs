@@ -273,6 +273,10 @@ public class ClaudeClientToolLoopTests
         Assert.Equal("toolu_1", events[1].ToolUseId);
         Assert.Equal("search_kb", events[1].ToolName);
         Assert.False(events[2].ToolIsError);
+        // Both tool events carry the same parsed input the executor received, so a consumer can label the activity.
+        Assert.Equal("prior written notice", events[1].ToolInput!.Value.GetProperty("query").GetString());
+        Assert.Equal("prior written notice", events[2].ToolInput!.Value.GetProperty("query").GetString());
+        Assert.Null(events[0].ToolInput);
 
         // Second request: original 3 turns + assistant tool_use turn + ONE user tool_result message.
         Assert.Equal(2, streams.MessagesPerCall.Count);

@@ -33,6 +33,18 @@ public class AdvocateAnswerParserTests
     }
 
     [Fact]
+    public void Parse_CopiesTheParentThrough_AndLeavesItNullWhenTheToolsetRecordedNone()
+    {
+        var parents = new Dictionary<string, AdvocateCitationParent>(StringComparer.Ordinal) { ["goal:340"] = new("iep", 7) };
+
+        var parsed = AdvocateAnswerParser.Parse("A\n<sources>goal:340; kb:12</sources>", Returned, Labels, parents);
+
+        Assert.Collection(parsed.Citations,
+            c => Assert.Equal(new AdvocateCitation("goal", 340, null, new AdvocateCitationParent("iep", 7)), c),
+            c => Assert.Equal(new AdvocateCitation("kb", 12, "Prior written notice", null), c));
+    }
+
+    [Fact]
     public void Parse_DropsRefsTheToolsetNeverReturned_AndDuplicates_AndGarbage()
     {
         var parsed = AdvocateAnswerParser.Parse("A\n<sources>kb:12; kb:999; iep:7; kb:12; nonsense; kb:abc; child:3</sources>", Returned);

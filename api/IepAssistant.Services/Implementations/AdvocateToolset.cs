@@ -121,6 +121,13 @@ public sealed class AdvocateToolset : IToolExecutor
     /// <summary>Human labels for returned refs (KB titles, "IEP 2026-03-12", goal domains…), for citation chips.</summary>
     public Dictionary<string, string> Labels { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// For returned refs that have no page of their own, the record to open them inside (goal, iep_section,
+    /// iep_analysis → the iep; etr_section, etr_analysis → the etr; progress_report → its iep;
+    /// progress_report_analysis → the progress report). Kinds that are their own page have no entry.
+    /// </summary>
+    public Dictionary<string, AdvocateCitationParent> Parents { get; } = new(StringComparer.Ordinal);
+
     public async Task<string> ExecuteAsync(string toolName, JsonElement input, CancellationToken cancellationToken)
     {
         if (!_tools.TryGetValue(toolName, out var tool))
@@ -175,9 +182,11 @@ public sealed class AdvocateToolset : IToolExecutor
 
         var results = await _knowledgeBase.SearchAsync(query, category, _stateCode, ct);
         // Defence in depth: the service leaves state unfiltered when no state is given; the advocate only
-        // ever sees federal entries plus the child's own state.
+        // ever sees federal entries plus the child's own state. The state's own entries come first (stable
+        // within each group) so the more specific rule is never the one the cap drops.
         var entries = results
             .Where(e => e.State == null || (_stateCode != null && string.Equals(e.State, _stateCode, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(e => e.State == null ? 1 : 0)
             .Take(MaxKnowledgeBaseEntries)
             .ToList();
 
@@ -347,7 +356,7 @@ public sealed class AdvocateToolset : IToolExecutor
         {
             reportArray.Add(new JsonObject
             {
-                ["sourceRef"] = Register("progress_report", r.Id, ProgressReportLabel(r.ReportingPeriodEnd, r.UploadDate)),
+                ["sourceRef"] = Register("progress_report", r.Id, ProgressReportLabel(r.ReportingPeriodEnd, r.UploadDate), IepRef(r.IepDocumentId)),
                 ["iepId"] = r.IepDocumentId,
                 ["periodStart"] = Date(r.ReportingPeriodStart),
                 ["periodEnd"] = Date(r.ReportingPeriodEnd),
@@ -433,7 +442,7 @@ public sealed class AdvocateToolset : IToolExecutor
         if (analysis == null || !IsCompleted(analysis.Status))
             return NoAnalysis(documentRef, analysis?.Status);
 
-        var sourceRef = Register("iep_analysis", analysis.Id, $"Analysis of {Labels[documentRef]}");
+        var sourceRef = Register("iep_analysis", analysis.Id, $"Analysis of {Labels[documentRef]}", documentRef);
 
         // goalId values inside the stored JSON are only trusted when they are goals of THIS IEP.
         var goalIds = (await _context.Goals.AsNoTracking()
@@ -444,7 +453,7 @@ public sealed class AdvocateToolset : IToolExecutor
         foreach (var node in goalAnalyses.OfType<JsonObject>())
         {
             if (node["goalId"] is JsonValue idValue && idValue.TryGetValue<int>(out var goalId) && goalIds.TryGetValue(goalId, out var goal))
-                node["sourceRef"] = Register("goal", goal.Id, GoalLabel(goal.Domain, goal.GoalText));
+                node["sourceRef"] = Register("goal", goal.Id, GoalLabel(goal.Domain, goal.GoalText), documentRef);
         }
         var sectionAnalyses = ParseArray(analysis.SectionAnalyses);
         var redFlags = ParseArray(analysis.OverallRedFlags);
@@ -478,7 +487,7 @@ public sealed class AdvocateToolset : IToolExecutor
         if (analysis == null || !IsCompleted(analysis.Status))
             return NoAnalysis(documentRef, analysis?.Status);
 
-        var sourceRef = Register("etr_analysis", analysis.Id, $"Analysis of {Labels[documentRef]}");
+        var sourceRef = Register("etr_analysis", analysis.Id, $"Analysis of {Labels[documentRef]}", documentRef);
         var redFlags = ParseArray(analysis.OverallRedFlags);
         var run = await LatestRunSectionsAsync(AnalysisSourceType.EtrDocument, etr.Id, ct);
 
@@ -505,7 +514,7 @@ public sealed class AdvocateToolset : IToolExecutor
             .FirstOrDefaultAsync(ct);
         if (report == null)
             throw new ToolExecutionException(NotFoundMessage);
-        var documentRef = Register("progress_report", report.Id, ProgressReportLabel(report.ReportingPeriodEnd, report.UploadDate));
+        var documentRef = Register("progress_report", report.Id, ProgressReportLabel(report.ReportingPeriodEnd, report.UploadDate), IepRef(report.IepDocumentId));
 
         var analysis = await _context.ProgressReportAnalyses.AsNoTracking()
             .Where(a => a.ProgressReportId == report.Id)
@@ -515,7 +524,7 @@ public sealed class AdvocateToolset : IToolExecutor
         if (analysis == null || !IsCompleted(analysis.Status))
             return NoAnalysis(documentRef, analysis?.Status);
 
-        var sourceRef = Register("progress_report_analysis", analysis.Id, $"Analysis of {Labels[documentRef]}");
+        var sourceRef = Register("progress_report_analysis", analysis.Id, $"Analysis of {Labels[documentRef]}", documentRef);
         var findings = ParseArray(analysis.GoalProgressFindings);
         var redFlags = ParseArray(analysis.RedFlags);
         var run = await LatestRunSectionsAsync(AnalysisSourceType.ProgressReport, report.Id, ct);
@@ -635,7 +644,7 @@ public sealed class AdvocateToolset : IToolExecutor
             {
                 list.Add(new JsonObject
                 {
-                    ["sourceRef"] = Register(refKind, s.Id, SectionLabel(s.SectionType, Labels[documentRef])),
+                    ["sourceRef"] = Register(refKind, s.Id, SectionLabel(s.SectionType, Labels[documentRef]), documentRef),
                     ["sectionType"] = Str(s.SectionType, MaxLabelChars),
                     ["displayOrder"] = s.DisplayOrder,
                     ["chars"] = (s.RawText ?? s.ParsedContent ?? string.Empty).Length
@@ -660,7 +669,7 @@ public sealed class AdvocateToolset : IToolExecutor
         var text = section.RawText ?? section.ParsedContent;
         var payload = new JsonObject
         {
-            ["sourceRef"] = Register(refKind, section.Id, SectionLabel(section.SectionType, Labels[documentRef])),
+            ["sourceRef"] = Register(refKind, section.Id, SectionLabel(section.SectionType, Labels[documentRef]), documentRef),
             ["documentRef"] = documentRef,
             ["sectionType"] = Str(section.SectionType, MaxLabelChars),
             ["source"] = section.RawText != null ? "raw_text" : "parsed_content",
@@ -718,7 +727,7 @@ public sealed class AdvocateToolset : IToolExecutor
             {
                 goalArray.Add(new JsonObject
                 {
-                    ["sourceRef"] = Register("goal", g.Id, GoalLabel(g.Domain, g.GoalText)),
+                    ["sourceRef"] = Register("goal", g.Id, GoalLabel(g.Domain, g.GoalText), documentRef),
                     ["domain"] = Str(g.Domain, MaxLabelChars),
                     ["goalText"] = Str(g.GoalText, 800),
                     ["baseline"] = Str(g.Baseline, 400),
@@ -1197,13 +1206,21 @@ public sealed class AdvocateToolset : IToolExecutor
 
     // ------------------------------------------------------------------ helpers
 
-    private string Register(string kind, int id, string label)
+    /// <param name="parentRef">The sourceRef (<c>kind:id</c>) of the record this one should be opened inside, when it has no page of its own.</param>
+    private string Register(string kind, int id, string label, string? parentRef = null)
     {
         var sourceRef = $"{kind}:{id}";
         ReturnedRefs.Add(sourceRef);
         Labels[sourceRef] = label;
+        if (parentRef != null)
+        {
+            var separator = parentRef.IndexOf(':');
+            Parents[sourceRef] = new AdvocateCitationParent(parentRef[..separator], int.Parse(parentRef[(separator + 1)..], CultureInfo.InvariantCulture));
+        }
         return sourceRef;
     }
+
+    private static string IepRef(int iepId) => $"iep:{iepId}";
 
     private string StateValue() => _stateCode == null ? "unknown" : PromptText.Data(_stateCode);
 

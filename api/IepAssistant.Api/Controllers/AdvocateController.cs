@@ -181,7 +181,13 @@ public class AdvocateController : ControllerBase
         CreatedAt = m.CreatedAt
     };
 
-    private static AdvocateCitationDto MapCitation(AdvocateCitation c) => new() { Kind = c.Kind, Id = c.Id, Label = c.Label };
+    private static AdvocateCitationDto MapCitation(AdvocateCitation c) => new()
+    {
+        Kind = c.Kind,
+        Id = c.Id,
+        Label = c.Label,
+        Parent = c.Parent == null ? null : new AdvocateCitationParentDto { Kind = c.Parent.Kind, Id = c.Parent.Id }
+    };
 
     private static AdvocateSuggestionDto MapSuggestion(AdvocateSuggestion s) => new() { Kind = s.Kind, Text = s.Text, Id = s.Id, Date = s.Date };
 }

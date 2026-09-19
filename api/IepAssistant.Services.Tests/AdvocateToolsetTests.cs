@@ -89,13 +89,65 @@ public sealed class AdvocateToolsetTests : IDisposable
         using var doc = JsonDocument.Parse(json);
         var entries = doc.RootElement.GetProperty("entries").EnumerateArray().ToList();
         Assert.Equal(2, entries.Count);
-        Assert.Equal(new[] { "federal", "OH" }, entries.Select(e => e.GetProperty("state").GetString()));
+        // The child's own state first, then federal — so the cap never drops the more specific rule.
+        Assert.Equal(new[] { "OH", "federal" }, entries.Select(e => e.GetProperty("state").GetString()));
         Assert.Equal("OH", doc.RootElement.GetProperty("state").GetString());
         Assert.All(entries, e => Assert.StartsWith("kb:", e.GetProperty("sourceRef").GetString()));
-        Assert.Equal("34 CFR 300.503", entries[0].GetProperty("legalReference").GetString());
+        Assert.Equal("34 CFR 300.503", entries[1].GetProperty("legalReference").GetString());
 
         Assert.Equal(entries.Select(e => e.GetProperty("sourceRef").GetString()!).ToHashSet(), toolset.ReturnedRefs);
-        Assert.Equal("Prior written notice (federal)", toolset.Labels[entries[0].GetProperty("sourceRef").GetString()!]);
+        Assert.Equal("Prior written notice (federal)", toolset.Labels[entries[1].GetProperty("sourceRef").GetString()!]);
+        Assert.Empty(toolset.Parents); // kb entries are their own page
+    }
+
+    [Fact]
+    public async Task SearchKnowledgeBase_StateEntriesComeFirst_SoTheCapNeverDropsThem()
+    {
+        var (userId, childId) = SeedChild("kb-state-first");
+        var entries = Enumerable.Range(1, AdvocateToolset.MaxKnowledgeBaseEntries).Select(i => Entry($"Federal notice {i}", null, order: i)).ToList();
+        entries.Add(Entry("Ohio notice", "OH", order: 50));
+        SeedKnowledgeBase(entries.ToArray());
+
+        using var ctx = CreateContext();
+        var json = await CreateToolset(ctx, childId, userId, "OH").ExecuteAsync("search_knowledge_base", Input("""{"query":"notice"}"""), CancellationToken.None);
+
+        using var doc = JsonDocument.Parse(json);
+        var returned = doc.RootElement.GetProperty("entries").EnumerateArray().Select(e => e.GetProperty("title").GetString()).ToList();
+        Assert.Equal(AdvocateToolset.MaxKnowledgeBaseEntries, returned.Count);
+        Assert.Equal("Ohio notice", returned[0]);
+        Assert.Equal(new[] { "Federal notice 1", "Federal notice 2" }, returned.Skip(1).Take(2));
+    }
+
+    [Fact]
+    public async Task SearchKnowledgeBase_OhioSeed_IsReturnedForOhio_HiddenForOtherStatesAndUnknown()
+    {
+        var (userId, childId) = SeedChild("kb-ohio-seed");
+        using (var ctx = CreateContext())
+        {
+            ctx.KnowledgeBaseEntries.AddRange(IepAssistant.Domain.Data.Migrations.SeedOhioKnowledgeBase.Entries.Select((e, i) => new KnowledgeBaseEntry
+            {
+                Title = e.Title, Content = e.Content, Category = e.Category, LegalReference = e.LegalReference, Tags = e.Tags,
+                State = IepAssistant.Domain.Data.Migrations.SeedOhioKnowledgeBase.StateCode, DisplayOrder = IepAssistant.Domain.Data.Migrations.SeedOhioKnowledgeBase.FirstDisplayOrder + i
+            }));
+            ctx.KnowledgeBaseEntries.Add(Entry("The Evaluation Process", null, content: "The school has 60 days (in most states) from your written consent to complete the evaluation.", category: "process", order: 2));
+            ctx.SaveChanges();
+        }
+
+        using var toolCtx = CreateContext();
+        using var ohio = await RunAsync(CreateToolset(toolCtx, childId, userId, "OH"), "search_knowledge_base", """{"query":"evaluation timeline"}""");
+        var ohioEntries = ohio.RootElement.GetProperty("entries").EnumerateArray().ToList();
+        var etrTimeline = Assert.Single(ohioEntries, e => e.GetProperty("state").GetString() == "OH" && e.GetProperty("legalReference").GetString()!.StartsWith("OAC 3301-51-06"));
+        Assert.Contains("60 days", etrTimeline.GetProperty("summary").GetString());
+        Assert.Equal("The 60-day ETR timeline", etrTimeline.GetProperty("title").GetString());
+
+        using var pennsylvania = await RunAsync(CreateToolset(toolCtx, childId, userId, "PA"), "search_knowledge_base", """{"query":"evaluation"}""");
+        var paEntries = pennsylvania.RootElement.GetProperty("entries").EnumerateArray().ToList();
+        Assert.NotEmpty(paEntries);
+        Assert.All(paEntries, e => Assert.Equal("federal", e.GetProperty("state").GetString()));
+
+        using var unknown = await RunAsync(CreateToolset(toolCtx, childId, userId, null), "search_knowledge_base", """{"query":"evaluation"}""");
+        Assert.All(unknown.RootElement.GetProperty("entries").EnumerateArray(), e => Assert.Equal("federal", e.GetProperty("state").GetString()));
+        Assert.DoesNotContain(unknown.RootElement.GetProperty("entries").EnumerateArray(), e => e.GetProperty("legalReference").GetString()!.StartsWith("OAC"));
     }
 
     [Fact]
@@ -1161,6 +1213,20 @@ public sealed class AdvocateToolsetTests : IDisposable
             "progress_report_analysis", "iep_section", "etr_section", "goal", "goal_record", "comparison", "journal", "contribution",
             "advocacy_goal", "meeting_prep", "meeting"
         }, seenKinds);
+
+        // Parents: every kind that has no page of its own points at the record to open it inside; nothing else has one.
+        var parentByKind = toolset.Parents.GroupBy(p => p.Key[..p.Key.IndexOf(':')]).ToDictionary(g => g.Key, g => g.Select(p => p.Value).Distinct().ToList());
+        Assert.Equal(new[] { new AdvocateCitationParent("iep", iepId) }, parentByKind["goal"]);
+        Assert.Equal(new[] { new AdvocateCitationParent("iep", iepId) }, parentByKind["iep_section"]);
+        Assert.Equal(new[] { new AdvocateCitationParent("etr", etrId) }, parentByKind["etr_section"]);
+        Assert.Equal(new[] { new AdvocateCitationParent("iep", iepId) }, parentByKind["iep_analysis"]);
+        Assert.Equal(new[] { new AdvocateCitationParent("etr", etrId) }, parentByKind["etr_analysis"]);
+        Assert.Equal(new[] { new AdvocateCitationParent("iep", iepId) }, parentByKind["progress_report"]);
+        Assert.Equal(new[] { new AdvocateCitationParent("progress_report", reportId) }, parentByKind["progress_report_analysis"]);
+        Assert.Equal(
+            new HashSet<string> { "goal", "iep_section", "etr_section", "iep_analysis", "etr_analysis", "progress_report", "progress_report_analysis" },
+            parentByKind.Keys.ToHashSet());
+        Assert.All(toolset.Parents.Keys, r => Assert.Contains(r, toolset.ReturnedRefs));
 
         // Spot checks on the tools not covered elsewhere.
         using var meetings = await RunAsync(toolset, "list_meetings_and_deadlines");
