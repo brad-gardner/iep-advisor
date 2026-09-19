@@ -54,8 +54,9 @@ docs {
   - `403` — forbidden
   - `404` — thread not found or not owned by the caller
   - `429` — usage cap reached (`message` explains the cap), or the `advocate-message` rate limit
-  - `503` — Claude itself failed before any frame could be produced (e.g. a blank key, or an
-    immediate 5xx/429 from Anthropic) — visible to status-based monitoring, unlike the `error` frame
+  - `503` — nothing could be produced before the first frame: Claude itself failed (e.g. a blank
+    key, or an immediate 5xx/429 from Anthropic), or the usage reservation lost a database deadlock
+    on both attempts (concurrent sends from the same user; retried once) — visible to status-based monitoring, unlike the `error` frame
     below, which only covers a failure *after* the stream has already started
   - `500` — defensive fallback if the stream produced no event at all (should not happen in practice)
 

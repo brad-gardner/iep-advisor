@@ -277,13 +277,18 @@ public class AdvocateService : IAdvocateService
                 reservation = await TryReserveUsageAndPersistQuestionAsync(thread, threadId, userId, question, user.SubscriptionStatus, user.SubscriptionExpiresAt, now, ct);
                 break;
             }
-            catch (SqlException ex) when (ex.Number == 1205 && attempt < maxReservationAttempts)
+            catch (Exception ex) when (IsDeadlock(ex) && attempt < maxReservationAttempts)
             {
+                // The victim is chosen at the INSERT, which EF surfaces as DbUpdateException wrapping the
+                // SqlException — hence the classifier rather than a bare SqlException filter. The failed
+                // attempt's Added rows are still tracked; detach them so the retry cannot insert them twice.
                 _logger.LogWarning(ex, "Advocate usage reservation deadlocked for thread {ThreadId}; retrying", threadId);
+                DetachAddedEntries();
             }
-            catch (SqlException ex) when (ex.Number == 1205)
+            catch (Exception ex) when (IsDeadlock(ex))
             {
                 _logger.LogError(ex, "Advocate usage reservation deadlocked again for thread {ThreadId}; giving up", threadId);
+                DetachAddedEntries();
                 return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.Unavailable, AdvocatePrompts.UnavailableMessage));
             }
         }
@@ -467,6 +472,24 @@ public class AdvocateService : IAdvocateService
     /// are logged, not thrown: a lost refund is a leaked (billable-looking) usage row, not a correctness
     /// break for the turn that is already unwinding.
     /// </summary>
+    /// <summary>
+    /// SQL Server deadlock victim (error 1205), raw or wrapped by EF's SaveChanges (DbUpdateException).
+    /// Settable only so tests on SQLite — which cannot raise 1205 and cannot construct SqlException — can
+    /// exercise the retry path; production never reassigns it.
+    /// </summary>
+    internal static Func<Exception, bool> IsDeadlock { get; set; } = ex =>
+        (ex as SqlException ?? ex.InnerException as SqlException)?.Number == 1205;
+
+    /// <summary>
+    /// Detaches every Added entry so a retried reservation attempt starts clean. Modified entries (the
+    /// tracked thread) are left alone — the retry re-sets their timestamps and PersistAnswerAsync saves them.
+    /// </summary>
+    private void DetachAddedEntries()
+    {
+        foreach (var entry in _context.ChangeTracker.Entries().Where(e => e.State == EntityState.Added).ToList())
+            entry.State = EntityState.Detached;
+    }
+
     private async Task ReleaseUsageReservationAsync(int usageRecordId)
     {
         try

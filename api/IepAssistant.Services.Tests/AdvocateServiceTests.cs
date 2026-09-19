@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -242,6 +243,93 @@ public sealed class AdvocateServiceTests : IDisposable
         var messages = ctx.AdvocateMessages.AsNoTracking().Where(m => m.AdvocateThreadId == threadId).OrderBy(m => m.CreatedAt).ThenBy(m => m.Id).ToList();
         var usage = ctx.UsageRecords.Count(u => u.UserId == thread.ParentUserId && u.OperationType == AdvocateService.OperationType);
         return (messages, usage, thread);
+    }
+
+    // ------------------------------------------------------------------ reservation retry (todos/220)
+
+    /// <summary>Fails the first SavingChangesAsync the way a SQL Server deadlock victim surfaces through EF: DbUpdateException wrapping the provider error.</summary>
+    private sealed class FirstSaveDeadlocks : SaveChangesInterceptor
+    {
+        public int Failures { get; private set; }
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (Failures == 0)
+            {
+                Failures++;
+                throw new DbUpdateException("An error occurred while saving the entity changes.", new InvalidOperationException("deadlock-victim-1205"));
+            }
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task Send_ReservationDeadlocksOnce_RetriesWithoutDuplicatingTheQuestionOrTheUsageRecord()
+    {
+        var f = SeedFamily("deadlock", ownerSubscription: "active");
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+        var interceptor = new FirstSaveDeadlocks();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(_connection).AddInterceptors(interceptor).Options;
+        var original = AdvocateService.IsDeadlock;
+        AdvocateService.IsDeadlock = ex => ex.InnerException?.Message == "deadlock-victim-1205";
+        try
+        {
+            using var ctx = new ApplicationDbContext(options);
+            var events = new List<AdvocateStreamEvent>();
+            await foreach (var evt in CreateService(ctx).SendMessageAsync(f.OwnerId, threadId, "Does the retry keep one row?", null))
+                events.Add(evt);
+
+            Assert.Equal(1, interceptor.Failures);
+            Assert.Equal(AdvocateStreamEventKind.Done, events.Last().Kind);
+        }
+        finally
+        {
+            AdvocateService.IsDeadlock = original;
+        }
+
+        var (messages, usage, _) = Snapshot(threadId);
+        Assert.Equal(1, usage);
+        Assert.Single(messages, m => m.Role == AdvocateMessageRole.User);
+        Assert.Single(messages, m => m.Role == AdvocateMessageRole.Assistant);
+    }
+
+    [Fact]
+    public async Task Send_ReservationDeadlocksTwice_IsUnavailable_AndPersistsNothing()
+    {
+        var f = SeedFamily("deadlock2", ownerSubscription: "active");
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+        var original = AdvocateService.IsDeadlock;
+        AdvocateService.IsDeadlock = ex => ex.InnerException?.Message == "deadlock-victim-1205";
+        try
+        {
+            var always = new AlwaysDeadlocks();
+            var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(_connection).AddInterceptors(always).Options;
+            using var ctx = new ApplicationDbContext(options);
+            var events = new List<AdvocateStreamEvent>();
+            await foreach (var evt in CreateService(ctx).SendMessageAsync(f.OwnerId, threadId, "Still deadlocked?", null))
+                events.Add(evt);
+
+            var error = Assert.Single(events);
+            Assert.Equal(AdvocateErrorCodes.Unavailable, error.Code);
+            Assert.Equal(2, always.Failures);
+        }
+        finally
+        {
+            AdvocateService.IsDeadlock = original;
+        }
+
+        var (messages, usage, _) = Snapshot(threadId);
+        Assert.Equal(0, usage);
+        Assert.Empty(messages);
+    }
+
+    private sealed class AlwaysDeadlocks : SaveChangesInterceptor
+    {
+        public int Failures { get; private set; }
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            Failures++;
+            throw new DbUpdateException("An error occurred while saving the entity changes.", new InvalidOperationException("deadlock-victim-1205"));
+        }
     }
 
     // ------------------------------------------------------------------ threads: access

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Markdown } from '@/components/ui/markdown';
 import { markdownToPlainText } from '../lib/plain-text';
 import type { AdvocateAnnouncement, PendingMessage, StreamingAnswer } from '../hooks/use-advocate-thread';
@@ -26,14 +26,16 @@ const PIN_THRESHOLD_PX = 48;
  * the streaming answer. Auto-scrolls to the newest content unless the reader
  * has scrolled up to re-read something.
  *
- * The streaming bubble is hidden from assistive tech (`aria-hidden`) so a
- * screen reader never re-reads it token by token; a separate sr-only
- * `role="status"` node announces the finished answer exactly once, after
- * `done` lands. `aria-busy` lives on the scroll region instead, so it still
- * tells assistive tech the conversation is updating while streaming.
+ * Accessibility contract: the streaming text bubble is `aria-hidden` (never
+ * re-read token by token) and rendered without links; tool-activity rows keep
+ * their own status role so progress is still announced; the finished answer is
+ * announced exactly once from an sr-only `role="status"` node rendered as a
+ * sibling *outside* the conversation region, which carries no `aria-busy` —
+ * a busy ancestor makes some AT drop the announcement instead of replaying it.
  */
 export function MessageList({ childId, messages, pending, streaming, announcement, handlers }: MessageListProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const announcementText = useMemo(() => (announcement ? markdownToPlainText(announcement.text) : ''), [announcement]);
   const pinnedRef = useRef(true);
 
   const onScroll = () => {
@@ -111,7 +113,7 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
           dropped by some AT (Gecko/NVDA) rather than replayed, and the region is busy at the exact
           commit the announcement lands. Plain text, not markdown, so punctuation is not read aloud. */}
       <p role="status" className="sr-only" data-testid="advocate-announcement">
-        {announcement ? markdownToPlainText(announcement.text) : ''}
+        {announcementText}
       </p>
     </>
   );

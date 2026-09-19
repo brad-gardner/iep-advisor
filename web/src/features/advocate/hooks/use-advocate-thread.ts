@@ -165,6 +165,9 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
         setFailure((f) => (f?.threadId === abandoned.threadId ? null : f));
       }
     }
+    // The announcement is a one-shot event, not per-thread state: reopening a
+    // thread must mount an empty status node, or some AT re-read the old answer.
+    setAnswered((a) => (a && a.threadId !== threadId ? null : a));
   }, [threadId, abortRun]);
 
   useEffect(

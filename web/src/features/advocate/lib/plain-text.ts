@@ -1,23 +1,35 @@
+import remarkGfm from 'remark-gfm';
+import remarkParse from 'remark-parse';
+import { unified } from 'unified';
+
+interface MdNode {
+  type: string;
+  value?: string;
+  children?: MdNode[];
+}
+
+const BLOCK_TYPES = new Set(['paragraph', 'heading', 'listItem', 'tableCell', 'blockquote', 'code', 'tableRow', 'list', 'table']);
+
 /**
- * Reduce the advocate's markdown answer to the words a screen reader should say:
- * strips the `<sources>`-style residue, headings, emphasis, list markers, links (keeps the
- * label), code fences and table pipes, and collapses whitespace. Good enough for an
- * announcement; the visual bubble still renders the real markdown.
+ * The words a screen reader should say for an advocate answer: the same remark-gfm parse the
+ * visual bubble uses, reduced to its text (emphasis, headings, list markers, link URLs, table
+ * pipes and raw HTML dropped; link labels, inline code and cell text kept). Using the real
+ * parser keeps the announcement in step with what is rendered — intraword `_`/`*` and
+ * arithmetic survive, and a stray raw tag loses its markup but keeps its inner text, exactly as
+ * rehype-sanitize renders it (the server strips the real `<sources>` block before storage anyway).
  */
 export function markdownToPlainText(markdown: string): string {
-  return markdown
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/`([^`]*)`/g, '$1')
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
-    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/gm, '')
-    .replace(/^\s*>\s?/gm, '')
-    .replace(/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/gm, '')
-    .replace(/\|/g, ' ')
-    .replace(/(\*\*|__)(.*?)\1/g, '$2')
-    .replace(/(\*|_)(.*?)\1/g, '$2')
-    .replace(/~~(.*?)~~/g, '$1')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const tree = unified().use(remarkParse).use(remarkGfm).parse(markdown) as MdNode;
+  const parts: string[] = [];
+  const walk = (node: MdNode) => {
+    if (node.type === 'html') return;
+    if (node.type === 'text' || node.type === 'inlineCode' || node.type === 'code') {
+      if (node.value) parts.push(node.value);
+      return;
+    }
+    node.children?.forEach(walk);
+    if (BLOCK_TYPES.has(node.type)) parts.push(' ');
+  };
+  walk(tree);
+  return parts.join('').replace(/\s+/g, ' ').trim();
 }
