@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { warmRichTextEditor } from '@/components/ui/rich-text-editor';
@@ -21,6 +21,9 @@ import { ChildGoalsTab } from '@/features/children/components/child-goals-tab';
 import { ChildAnalysisTab } from '@/features/analysis/components/child-analysis-tab';
 import { ChildMeetingPrepTab } from '@/features/meeting-prep/components/child-meeting-prep-tab';
 import { JournalPage } from '@/features/journal/components/journal-page';
+// The advocate page (chat + streaming) is code-split so the main chunk does not
+// carry it for the many pages that never open it.
+const AdvocatePage = lazy(() => import('@/features/advocate/components/advocate-page'));
 import { IepViewerPage } from '@/features/iep-documents/components/iep-viewer-page';
 import { IepRouteRedirect } from '@/features/iep-documents/components/iep-route-redirect';
 import { ProgressReportViewerPage } from '@/features/progress-reports/components/progress-report-viewer-page';
@@ -252,6 +255,21 @@ export function AppRouter() {
         <Route path="meeting-prep" element={<ChildMeetingPrepTab />} />
         {/* Parent-private dated journal — a child sub-page with its own tab. */}
         <Route path="journal" element={<JournalPage />} />
+        {/* Parent-private Virtual Advocate chat — same layout, lazy chunk. */}
+        <Route
+          path="advocate"
+          element={
+            <Suspense
+              fallback={
+                <div className="flex justify-center py-12">
+                  <Spinner label="Loading the advocate…" />
+                </div>
+              }
+            >
+              <AdvocatePage />
+            </Suspense>
+          }
+        />
       </Route>
       <Route
         path="/children/:childId/ieps/:id"
@@ -356,6 +374,17 @@ export function AppRouter() {
       />
       <Route
         path="/knowledge-base"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <KnowledgeBasePage />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* One entry brought into view (advocate "Sources" chips link here). */}
+      <Route
+        path="/knowledge-base/:entryId"
         element={
           <ProtectedRoute>
             <MainLayout>

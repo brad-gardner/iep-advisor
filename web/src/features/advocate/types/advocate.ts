@@ -1,0 +1,99 @@
+/** Mirrors api/IepAssistant.Api/DTOs/Advocate/AdvocateDtos.cs. */
+
+export interface AdvocateThreadDto {
+  id: number;
+  childProfileId: number;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  lastMessageAt: string;
+}
+
+export type AdvocateRole = 'User' | 'Assistant';
+
+/** `kind` is `kb` | `child` today; Phase 3 adds goal, iep, etr, journal, … */
+export interface AdvocateCitation {
+  kind: string;
+  id: number;
+  label?: string | null;
+}
+
+export type AdvocateSuggestionKind = 'prep_question' | 'journal_entry' | 'open_kb' | 'open_goal';
+
+export interface AdvocateSuggestion {
+  /** One of `AdvocateSuggestionKind`; unknown kinds are ignored by the UI. */
+  kind: AdvocateSuggestionKind | string;
+  text?: string | null;
+  id?: number | null;
+  /** yyyy-MM-dd, `journal_entry` only. */
+  date?: string | null;
+}
+
+export interface AdvocateMessageDto {
+  id: number;
+  role: AdvocateRole;
+  contentMarkdown: string;
+  citations: AdvocateCitation[];
+  suggestions: AdvocateSuggestion[];
+  truncated: boolean;
+  createdAt: string;
+}
+
+export interface AdvocateThreadDetailDto extends AdvocateThreadDto {
+  /** Oldest first. */
+  messages: AdvocateMessageDto[];
+  disclaimer: string;
+}
+
+export interface AdvocateUsageDto {
+  used: number;
+  limit: number;
+  subscriptionActive: boolean;
+}
+
+export interface SendAdvocateMessageRequest {
+  text: string;
+  /** Launcher context, e.g. `iep:12` — see `ABOUT_PATTERN`. */
+  about?: string;
+}
+
+// ---- SSE frame payloads (event: delta | tool | done | error) ----
+
+export interface AdvocateDeltaFrame {
+  text: string;
+}
+
+export type AdvocateToolStatus = 'started' | 'finished' | 'failed';
+
+export interface AdvocateToolFrame {
+  name: string;
+  label: string;
+  status: AdvocateToolStatus;
+}
+
+export interface AdvocateDoneFrame {
+  messageId: number;
+  contentMarkdown: string;
+  citations: AdvocateCitation[];
+  suggestions: AdvocateSuggestion[];
+  truncated: boolean;
+  disclaimer: string;
+}
+
+export interface AdvocateErrorFrame {
+  /** `unavailable` mid-stream; the pre-stream codes come back as HTTP statuses instead. */
+  code: string;
+  message: string;
+}
+
+/** Same cap the API enforces on `SendAdvocateMessageRequest.Text`. */
+export const ADVOCATE_MESSAGE_MAX_LENGTH = 2000;
+
+/** Same cap the API enforces on a thread title. */
+export const ADVOCATE_TITLE_MAX_LENGTH = 120;
+
+/** The server grammar for `about`; anything else is dropped client-side rather than sent. */
+export const ABOUT_PATTERN = /^(iep|etr|goal|analysis|progress_report|journal):\d+$/;
+
+/** Share of the yearly allowance at which the usage banner appears. */
+export const USAGE_WARNING_RATIO = 0.8;

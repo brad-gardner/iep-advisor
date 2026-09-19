@@ -21,12 +21,16 @@ import {
 
 export type JournalSaveMode = 'created' | 'updated';
 
+/** Starting values for a *new* entry (e.g. a note the advocate suggested); ignored when editing. */
+export type JournalEntryDraft = Partial<Pick<SaveJournalEntryRequest, 'occurredOn' | 'tag' | 'contentMarkdown'>>;
+
 interface JournalEntryDrawerProps {
   open: boolean;
   onClose: () => void;
   childId: number;
   /** The entry being edited; omit (or `null`) to add a new one. */
   entry?: JournalEntryDto | null;
+  initial?: JournalEntryDraft;
   onSaved: (entry: JournalEntryDto, mode: JournalSaveMode) => void;
   onDeleted?: (id: number) => void;
   'data-testid'?: string;
@@ -43,6 +47,7 @@ export function JournalEntryDrawer({
   onClose,
   childId,
   entry,
+  initial,
   onSaved,
   onDeleted,
   'data-testid': testId = 'journal-entry-drawer',
@@ -61,6 +66,7 @@ export function JournalEntryDrawer({
       <JournalEntryForm
         childId={childId}
         entry={entry ?? null}
+        initial={initial}
         testId={testId}
         onBusyChange={setBusy}
         onCancel={onClose}
@@ -74,6 +80,7 @@ export function JournalEntryDrawer({
 interface JournalEntryFormProps {
   childId: number;
   entry: JournalEntryDto | null;
+  initial?: JournalEntryDraft;
   testId: string;
   onBusyChange: (busy: boolean) => void;
   onCancel: () => void;
@@ -85,11 +92,20 @@ interface JournalEntryFormProps {
 const toSelectValue = (id: number | null | undefined) => (id == null ? '' : String(id));
 const fromSelectValue = (value: string): number | null => (value === '' ? null : Number(value));
 
-function JournalEntryForm({ childId, entry, testId, onBusyChange, onCancel, onSaved, onDeleted }: JournalEntryFormProps) {
+function JournalEntryForm({
+  childId,
+  entry,
+  initial,
+  testId,
+  onBusyChange,
+  onCancel,
+  onSaved,
+  onDeleted,
+}: JournalEntryFormProps) {
   const today = todayInputValue();
-  const [occurredOn, setOccurredOn] = useState(entry?.occurredOn ?? today);
-  const [tag, setTag] = useState<JournalTag>(entry?.tag ?? 'Other');
-  const [content, setContent] = useState(entry?.contentMarkdown ?? '');
+  const [occurredOn, setOccurredOn] = useState(entry?.occurredOn ?? initial?.occurredOn ?? today);
+  const [tag, setTag] = useState<JournalTag>(entry?.tag ?? initial?.tag ?? 'Other');
+  const [content, setContent] = useState(entry?.contentMarkdown ?? initial?.contentMarkdown ?? '');
   const [linkedIepDocumentId, setLinkedIepDocumentId] = useState<number | null>(entry?.linkedIepDocumentId ?? null);
   const [linkedEtrDocumentId, setLinkedEtrDocumentId] = useState<number | null>(entry?.linkedEtrDocumentId ?? null);
   const [linkedMeetingId, setLinkedMeetingId] = useState<number | null>(entry?.linkedMeetingId ?? null);

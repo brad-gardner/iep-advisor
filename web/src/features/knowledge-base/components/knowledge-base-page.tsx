@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { Search as SearchIcon } from 'lucide-react';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Spinner } from '@/components/ui/spinner';
@@ -8,17 +10,23 @@ import { KnowledgeBaseSearch } from './knowledge-base-search';
 import { CategoryTabs } from './category-tabs';
 import { KnowledgeBaseEntryCard } from './knowledge-base-entry-card';
 
+/** DOM id of one entry's card (set by `KnowledgeBaseEntryCard`) — `/knowledge-base/:entryId` scrolls to it. */
+const entryElementId = (id: number) => `kb-entry-${id}`;
+
 export function KnowledgeBasePage() {
   usePageTitle('Knowledge Base');
-  const {
-    entries,
-    categories,
-    isLoading,
-    query,
-    setQuery,
-    category,
-    setCategory,
-  } = useKnowledgeBase();
+  // `/knowledge-base/:entryId` (e.g. from an advocate citation) opens the
+  // same list and brings that entry into view; an id the list doesn't hold
+  // (inactive, another state) simply shows the list.
+  const { entryId: entryIdParam } = useParams<{ entryId?: string }>();
+  const targetEntryId = entryIdParam && /^\d+$/.test(entryIdParam) ? Number(entryIdParam) : null;
+  const { entries, categories, isLoading, query, setQuery, category, setCategory } = useKnowledgeBase();
+
+  useEffect(() => {
+    if (targetEntryId == null || isLoading) return;
+    const el = document.getElementById(entryElementId(targetEntryId));
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'start' });
+  }, [targetEntryId, isLoading, entries]);
 
   return (
     <PageLayout
@@ -30,13 +38,7 @@ export function KnowledgeBasePage() {
       <KnowledgeBaseSearch value={query} onChange={setQuery} />
 
       {/* Category tabs */}
-      {categories.length > 0 && (
-        <CategoryTabs
-          categories={categories}
-          active={category}
-          onChange={setCategory}
-        />
-      )}
+      {categories.length > 0 && <CategoryTabs categories={categories} active={category} onChange={setCategory} />}
 
       {/* Entry list */}
       {isLoading ? (
@@ -48,7 +50,7 @@ export function KnowledgeBasePage() {
       ) : (
         <div className="space-y-4" data-testid="kb-results">
           {entries.map((entry) => (
-            <KnowledgeBaseEntryCard key={entry.id} entry={entry} />
+            <KnowledgeBaseEntryCard key={entry.id} entry={entry} highlighted={entry.id === targetEntryId} />
           ))}
         </div>
       )}
