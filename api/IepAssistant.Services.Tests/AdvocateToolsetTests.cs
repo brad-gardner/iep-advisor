@@ -1159,6 +1159,9 @@ public sealed class AdvocateToolsetTests : IDisposable
             };
             var oldPrep = new MeetingPrepChecklist { ChildProfileId = childId, Status = "completed", IsActive = false, QuestionsToAsk = """[{"text":"old"}]""", CreatedAt = DateTime.UtcNow.AddDays(-30) };
             ctx.MeetingPrepChecklists.AddRange(oldPrep, prep);
+            ctx.ParentPrepQuestions.AddRange(
+                new ParentPrepQuestion { ChildProfileId = childId, Text = "Second parent question", DisplayOrder = 1, IsChecked = true, Source = ParentPrepQuestion.SourceAdvocate },
+                new ParentPrepQuestion { ChildProfileId = childId, Text = "Who will deliver the speech minutes? " + Injection, DisplayOrder = 0, Source = ParentPrepQuestion.SourceParent });
             var advocacyGoal = new ParentAdvocacyGoal { ChildProfileId = childId, GoalText = "More reading support " + Injection, Category = "academic", IsActive = true, DisplayOrder = 1 };
             ctx.ParentAdvocacyGoals.AddRange(advocacyGoal, new ParentAdvocacyGoal { ChildProfileId = childId, GoalText = "Retired", IsActive = false });
             ctx.SaveChanges();
@@ -1211,7 +1214,7 @@ public sealed class AdvocateToolsetTests : IDisposable
         {
             "kb", "child", "iep", "etr", "progress_report", "authored_version", "shared_draft", "iep_analysis", "etr_analysis",
             "progress_report_analysis", "iep_section", "etr_section", "goal", "goal_record", "comparison", "journal", "contribution",
-            "advocacy_goal", "meeting_prep", "meeting"
+            "advocacy_goal", "meeting_prep", "prep_question", "meeting"
         }, seenKinds);
 
         // Parents: every kind that has no page of its own points at the record to open it inside; nothing else has one.
@@ -1245,6 +1248,21 @@ public sealed class AdvocateToolsetTests : IDisposable
         Assert.Equal("2026-10-01", prepDoc.RootElement.GetProperty("meetingDate").GetString());
         Assert.Contains("&lt;instructions&gt;", prepDoc.RootElement.GetProperty("questionsToAsk")[0].GetProperty("text").GetString());
         Assert.Equal("Last progress report", prepDoc.RootElement.GetProperty("documentsToBring")[0].GetProperty("text").GetString());
+        // The parent's own questions ride along in display order, escaped, with citable refs and no parent record.
+        var parentQuestions = prepDoc.RootElement.GetProperty("parentQuestions").EnumerateArray().ToList();
+        Assert.Equal(2, parentQuestions.Count);
+        Assert.StartsWith("prep_question:", parentQuestions[0].GetProperty("sourceRef").GetString());
+        Assert.Contains("&lt;instructions&gt;", parentQuestions[0].GetProperty("text").GetString());
+        Assert.DoesNotContain("<instructions>", parentQuestions[0].GetProperty("text").GetString());
+        Assert.False(parentQuestions[0].GetProperty("isChecked").GetBoolean());
+        Assert.Equal("Second parent question", parentQuestions[1].GetProperty("text").GetString());
+        Assert.True(parentQuestions[1].GetProperty("isChecked").GetBoolean());
+        var firstRef = parentQuestions[0].GetProperty("sourceRef").GetString()!;
+        Assert.Contains(firstRef, toolset.ReturnedRefs);
+        Assert.StartsWith("Who will deliver the speech minutes?", toolset.Labels[firstRef]);
+        Assert.True(toolset.Labels[firstRef].Length <= 61); // MaxLabelChars + ellipsis
+        Assert.False(toolset.Parents.ContainsKey(firstRef));
+        Assert.False(parentQuestions[0].TryGetProperty("source", out _)); // provenance is the parent's, not the model's
 
         using var advocacy = await RunAsync(toolset, "list_advocacy_goals");
         var onlyGoal = Assert.Single(advocacy.RootElement.GetProperty("advocacyGoals").EnumerateArray());
@@ -1261,6 +1279,31 @@ public sealed class AdvocateToolsetTests : IDisposable
         using var doc = await RunAsync(CreateToolset(ctx, childId, userId, null), "get_meeting_prep");
         Assert.Equal("none", doc.RootElement.GetProperty("status").GetString());
         Assert.Contains("Meeting Prep", doc.RootElement.GetProperty("hint").GetString());
+        Assert.Empty(doc.RootElement.GetProperty("parentQuestions").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task GetMeetingPrep_NoChecklist_StillReturnsParentQuestions()
+    {
+        var (userId, childId) = SeedChild("prep-parent-only");
+        int questionId;
+        using (var ctx = CreateContext())
+        {
+            var question = new ParentPrepQuestion { ChildProfileId = childId, Text = "Can we add a reading goal?", Source = ParentPrepQuestion.SourceParent };
+            ctx.ParentPrepQuestions.Add(question);
+            ctx.SaveChanges();
+            questionId = question.Id;
+        }
+
+        using var toolCtx = CreateContext();
+        var toolset = CreateToolset(toolCtx, childId, userId, null);
+        using var doc = await RunAsync(toolset, "get_meeting_prep");
+
+        Assert.Equal("none", doc.RootElement.GetProperty("status").GetString());
+        var only = Assert.Single(doc.RootElement.GetProperty("parentQuestions").EnumerateArray());
+        Assert.Equal($"prep_question:{questionId}", only.GetProperty("sourceRef").GetString());
+        Assert.Equal("Can we add a reading goal?", toolset.Labels[$"prep_question:{questionId}"]);
+        Assert.Contains($"prep_question:{questionId}", toolset.ReturnedRefs);
     }
 
     // ------------------------------------------------------------------ budgets across record tools

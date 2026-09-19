@@ -25,6 +25,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ParentAdvocacyGoal> ParentAdvocacyGoals => Set<ParentAdvocacyGoal>();
     public DbSet<ParentContribution> ParentContributions => Set<ParentContribution>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
+    public DbSet<ParentPrepQuestion> ParentPrepQuestions => Set<ParentPrepQuestion>();
     public DbSet<AdvocateThread> AdvocateThreads => Set<AdvocateThread>();
     public DbSet<AdvocateMessage> AdvocateMessages => Set<AdvocateMessage>();
     public DbSet<UserRecoveryCode> UserRecoveryCodes => Set<UserRecoveryCode>();

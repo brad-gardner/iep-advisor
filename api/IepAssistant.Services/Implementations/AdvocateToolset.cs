@@ -1024,8 +1024,9 @@ public sealed class AdvocateToolset : IToolExecutor
     private static readonly ClaudeToolDefinition GetMeetingPrepDefinition = new(
         "get_meeting_prep",
         "Read the parent's latest meeting-prep checklist: questions to ask, documents to bring, red flags to " +
-        "raise, rights to reference, goal gaps and notes. Use it when the parent is preparing for a meeting or " +
-        "asks what to bring up.",
+        "raise, rights to reference, goal gaps and notes — plus parentQuestions, the questions the parent has " +
+        "already written down to ask themselves. Use it when the parent is preparing for a meeting or asks " +
+        "what to bring up, and check parentQuestions before suggesting a prep_question.",
         ToolSchema.Object());
 
     private async Task<ToolPayload> GetMeetingPrepAsync(JsonElement input, CancellationToken ct)
@@ -1039,13 +1040,34 @@ public sealed class AdvocateToolset : IToolExecutor
                 p.QuestionsToAsk, p.DocumentsToBring, p.RedFlagsToRaise, p.RightsToReference, p.GoalGaps, p.GeneralTips, p.PreparationNotes
             })
             .FirstOrDefaultAsync(ct);
+
+        // The parent's own questions live beside the AI checklist and are returned even when there is no
+        // checklist — they are what the parent already plans to ask, so the model can avoid re-suggesting them.
+        var parentRows = await _context.ParentPrepQuestions.AsNoTracking()
+            .Where(q => q.ChildProfileId == _childId)
+            .OrderBy(q => q.DisplayOrder).ThenBy(q => q.Id)
+            .Take(MaxListItems)
+            .Select(q => new { q.Id, q.Text, q.IsChecked })
+            .ToListAsync(ct);
+        var parentQuestions = new JsonArray();
+        foreach (var q in parentRows)
+        {
+            parentQuestions.Add(new JsonObject
+            {
+                ["sourceRef"] = Register("prep_question", q.Id, PromptText.Truncate(PromptText.OneLine(q.Text), MaxLabelChars)),
+                ["text"] = Str(q.Text, ParentPrepQuestionService.MaxTextLength),
+                ["isChecked"] = q.IsChecked
+            });
+        }
+
         if (prep == null)
         {
             return new ToolPayload(new JsonObject
             {
                 ["status"] = "none",
-                ["hint"] = "The parent can generate a meeting-prep checklist from the Meeting Prep tab."
-            });
+                ["hint"] = "The parent can generate a meeting-prep checklist from the Meeting Prep tab.",
+                ["parentQuestions"] = parentQuestions
+            }, parentQuestions);
         }
 
         var questions = ParseArray(prep.QuestionsToAsk);
@@ -1069,9 +1091,10 @@ public sealed class AdvocateToolset : IToolExecutor
             ["rightsToReference"] = rights,
             ["goalGaps"] = gaps,
             ["generalTips"] = tips,
-            ["preparationNotes"] = notes
+            ["preparationNotes"] = notes,
+            ["parentQuestions"] = parentQuestions
         };
-        return new ToolPayload(payload, questions, documents, redFlags, rights, gaps, tips, notes);
+        return new ToolPayload(payload, questions, documents, redFlags, rights, gaps, tips, notes, parentQuestions);
     }
 
     // ------------------------------------------------------------------ list_meetings_and_deadlines

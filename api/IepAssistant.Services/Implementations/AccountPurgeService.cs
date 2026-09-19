@@ -122,6 +122,7 @@ public class AccountPurgeService : IAccountPurgeService
             _context.ParentAdvocacyGoals.RemoveRange(_context.ParentAdvocacyGoals.Where(g => childIds.Contains(g.ChildProfileId)));
             _context.ParentContributions.RemoveRange(_context.ParentContributions.Where(c => childIds.Contains(c.ChildProfileId)));
             _context.JournalEntries.RemoveRange(_context.JournalEntries.Where(j => childIds.Contains(j.ChildProfileId)));
+            _context.ParentPrepQuestions.RemoveRange(_context.ParentPrepQuestions.Where(q => childIds.Contains(q.ChildProfileId)));
             // Advocate threads on owned children (any parent's): messages first so the delete never leans on
             // the DB cascade, then the threads.
             _context.AdvocateMessages.RemoveRange(_context.AdvocateMessages.Where(m => childIds.Contains(m.Thread.ChildProfileId)));

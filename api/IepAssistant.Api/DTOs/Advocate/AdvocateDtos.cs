@@ -36,7 +36,7 @@ public class AdvocateCitationDto
     /// <summary>
     /// kb | child | iep | etr | progress_report | authored_version | shared_draft | iep_analysis | etr_analysis |
     /// progress_report_analysis | analysis_run | iep_section | etr_section | goal | goal_record | comparison |
-    /// journal | contribution | advocacy_goal | meeting_prep | meeting
+    /// journal | contribution | advocacy_goal | meeting_prep | prep_question | meeting
     /// </summary>
     public string Kind { get; set; } = string.Empty;
     public int Id { get; set; }

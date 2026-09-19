@@ -59,6 +59,7 @@ public static class DependencyInjection
         services.AddScoped<IDocumentAssistService, DocumentAssistService>();
         services.AddScoped<IParentContributionService, ParentContributionService>();
         services.AddScoped<IJournalService, JournalService>();
+        services.AddScoped<IParentPrepQuestionService, ParentPrepQuestionService>();
         services.AddScoped<IAdvocateService, AdvocateService>();
         services.AddScoped<IStudentEvidenceService, StudentEvidenceService>();
         services.AddScoped<IDocumentPrefillService, DocumentPrefillService>();

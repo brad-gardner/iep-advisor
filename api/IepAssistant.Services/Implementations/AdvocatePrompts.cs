@@ -53,7 +53,8 @@ public static class AdvocatePrompts
         "- Use list_journal for anything the parent says happened, and before suggesting what to raise from " +
         "recent weeks. Use list_contributions and list_advocacy_goals to ground advice in what the parent " +
         "has already said they want. Use get_meeting_prep and list_meetings_and_deadlines when the parent " +
-        "is preparing for, or asking about, a meeting.\n" +
+        "is preparing for, or asking about, a meeting. The parent's own questions are in get_meeting_prep " +
+        "(parentQuestions, sourceRef prep_question:id); do not suggest a prep_question they already have.\n" +
         "- Read the record before judging it: never say a goal is vague, a service is missing or a deadline " +
         "was missed unless a tool result shows it. Cite the item you read.\n" +
         "- If a tool result says it was truncated, or you hit the tool budget, tell the parent exactly what " +
