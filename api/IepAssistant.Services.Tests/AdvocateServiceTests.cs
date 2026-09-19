@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Domain.Repositories;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
@@ -35,8 +36,11 @@ public sealed class AdvocateServiceTests : IDisposable
 
     private ApplicationDbContext CreateContext() => new(_options);
 
-    private AdvocateService CreateService(ApplicationDbContext ctx) =>
-        new(ctx, new AccessService(ctx), new KnowledgeBaseService(ctx), _claude, NullLogger<AdvocateService>.Instance);
+    private AdvocateService CreateService(ApplicationDbContext ctx)
+    {
+        var access = new AccessService(ctx);
+        return new AdvocateService(ctx, access, new KnowledgeBaseService(ctx), new IepComparisonService(ctx, new ChildProfileRepository(ctx), access), _claude, NullLogger<AdvocateService>.Instance);
+    }
 
     // ------------------------------------------------------------------ scripted model
 
@@ -492,6 +496,46 @@ public sealed class AdvocateServiceTests : IDisposable
         Assert.Equal(2, detail.Messages.Count);
         Assert.Equal(kbId, Assert.Single(detail.Messages[1].Citations).Id);
         Assert.Equal(new[] { "open_kb", "prep_question" }, detail.Messages[1].Suggestions.Select(s => s.Kind));
+    }
+
+    [Fact]
+    public async Task Send_GoalCitations_FromGoalsTool_Survive_AndFabricatedGoalIsDropped()
+    {
+        var f = SeedFamily("goal-cite");
+        int goalId;
+        using (var ctx = CreateContext())
+        {
+            var iep = new IepDocument { ChildProfileId = f.ChildId, IepDate = new DateTime(2026, 3, 1), Status = "parsed" };
+            ctx.IepDocuments.Add(iep);
+            ctx.SaveChanges();
+            var section = new IepSection { IepDocumentId = iep.Id, SectionType = "annual_goals", RawText = "Goals" };
+            ctx.IepSections.Add(section);
+            ctx.SaveChanges();
+            var goal = new Goal { IepSectionId = section.Id, GoalText = "Read 80 words per minute", Domain = "Reading", Baseline = "40 wpm" };
+            ctx.Goals.Add(goal);
+            ctx.SaveChanges();
+            goalId = goal.Id;
+        }
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+        var answer = "The reading goal is measurable: it names a number and a method.\n\n" +
+                     $"<sources>goal:{goalId}; goal:999</sources>\n" +
+                     $"<suggest kind=\"open_goal\" id=\"{goalId}\"/>\n<suggest kind=\"open_goal\" id=\"999\"/>";
+        _claude.Script = (_, tools, ct) => ToolThenAnswer(tools, "get_goals_and_progress", "{}", answer, ct);
+
+        var events = await SendAsync(f.OwnerId, threadId, "Is the reading goal measurable?");
+
+        Assert.Equal("Checking goals and progress", events[0].ToolLabel);
+        Assert.Equal("finished", events[1].ToolStatus);
+        var done = events.Single(e => e.Kind == AdvocateStreamEventKind.Done);
+        var citation = Assert.Single(done.Citations!);
+        Assert.Equal(("goal", goalId, "Reading goal"), (citation.Kind, citation.Id, citation.Label));
+        var suggestion = Assert.Single(done.Suggestions!);
+        Assert.Equal(("open_goal", goalId), (suggestion.Kind, suggestion.Id));
+        Assert.Equal("The reading goal is measurable: it names a number and a method.", done.ContentMarkdown);
+
+        var stored = Snapshot(threadId).Messages.Single(m => m.Role == AdvocateMessageRole.Assistant);
+        Assert.Contains($"\"id\":{goalId}", stored.CitationsJson);
+        Assert.DoesNotContain("999", stored.CitationsJson);
     }
 
     [Fact]

@@ -44,14 +44,16 @@ public class AdvocateService : IAdvocateService
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _access;
     private readonly IKnowledgeBaseService _knowledgeBase;
+    private readonly IIepComparisonService _comparison;
     private readonly IClaudeClient _claude;
     private readonly ILogger<AdvocateService> _logger;
 
-    public AdvocateService(ApplicationDbContext context, IAccessService access, IKnowledgeBaseService knowledgeBase, IClaudeClient claude, ILogger<AdvocateService> logger)
+    public AdvocateService(ApplicationDbContext context, IAccessService access, IKnowledgeBaseService knowledgeBase, IIepComparisonService comparison, IClaudeClient claude, ILogger<AdvocateService> logger)
     {
         _context = context;
         _access = access;
         _knowledgeBase = knowledgeBase;
+        _comparison = comparison;
         _claude = claude;
         _logger = logger;
     }
@@ -272,7 +274,7 @@ public class AdvocateService : IAdvocateService
         context.Append($"<question>{PromptText.Data(question)}</question>");
         history.Add(new ClaudeTurn("user", context.ToString()));
 
-        var toolset = new AdvocateToolset(_context, _knowledgeBase, thread.ChildProfileId, userId, stateCode, _logger);
+        var toolset = new AdvocateToolset(_context, _access, _knowledgeBase, _comparison, thread.ChildProfileId, userId, stateCode, _logger);
         var request = new ClaudeToolRequest
         {
             SystemPrompt = AdvocatePrompts.System,
