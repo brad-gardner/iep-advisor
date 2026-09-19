@@ -73,6 +73,13 @@ public static class AdvocateSuggestionKinds
     };
 }
 
+/// <summary>What the advocate knows about a child before any question is asked — today just the resolved state.</summary>
+public class AdvocateChildContextModel
+{
+    /// <summary>Two-letter state code resolved by <c>ChildStateResolver</c> (district → school → parent profile), or null.</summary>
+    public string? StateCode { get; set; }
+}
+
 public class AdvocateUsageModel
 {
     public int Used { get; set; }

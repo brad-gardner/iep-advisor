@@ -81,6 +81,15 @@ public class AdvocateController : ControllerBase
         return Ok(ApiResponse<object>.SuccessResponse(new { }));
     }
 
+    /// <summary>Viewer+: the state the advocate will apply for this child (null ⇒ federal rules only).</summary>
+    [HttpGet("api/children/{childId:int}/advocate/context")]
+    public async Task<IActionResult> GetChildContext(int childId, CancellationToken ct)
+    {
+        var result = await _service.GetChildContextAsync(User.GetUserId(), childId, ct);
+        if (!result.Success) return MapFailure(result.Message ?? "Not found");
+        return Ok(ApiResponse<AdvocateChildContextDto>.SuccessResponse(new AdvocateChildContextDto { StateCode = result.Data!.StateCode }));
+    }
+
     [HttpGet("api/advocate/usage")]
     public async Task<IActionResult> GetUsage(CancellationToken ct)
     {

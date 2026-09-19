@@ -23,6 +23,7 @@ const api = vi.hoisted(() => ({
   renameAdvocateThread: vi.fn(),
   deleteAdvocateThread: vi.fn(),
   getAdvocateUsage: vi.fn(),
+  getAdvocateChildContext: vi.fn(),
   streamAdvocateMessage: vi.fn(),
 }));
 vi.mock('../api/advocate-api', async () => {
@@ -198,6 +199,7 @@ describe('AdvocatePage', () => {
       Promise.resolve(id === 1 ? detail(1, [userMsg(11, 'What is PWN?'), answer]) : detail(id, [])),
     );
     api.getAdvocateUsage.mockResolvedValue({ success: true, data: { used: 10, limit: 300, subscriptionActive: true } });
+    api.getAdvocateChildContext.mockResolvedValue({ success: true, data: { stateCode: 'OH' } });
     api.createAdvocateThread.mockImplementation((_childId: number, title?: string) =>
       Promise.resolve({ success: true, data: thread(3, title ?? 'New conversation') }),
     );
@@ -543,8 +545,9 @@ describe('AdvocatePage', () => {
     expect(lastStream().body).toEqual({ text: 'Hello' });
   });
 
-  it('nudges a parent with no profile state and remembers the dismissal', async () => {
+  it('nudges a parent when no state resolves for the child and remembers the dismissal', async () => {
     auth.user = parent(null);
+    api.getAdvocateChildContext.mockResolvedValue({ success: true, data: { stateCode: null } });
     const first = renderPage();
     const hint = await screen.findByTestId('advocate-state-hint');
     expect(within(hint).getByRole('link', { name: STATE_HINT_COPY })).toHaveAttribute('href', '/profile');
@@ -557,8 +560,10 @@ describe('AdvocatePage', () => {
     expect(screen.queryByTestId('advocate-state-hint')).not.toBeInTheDocument();
     second.unmount();
 
-    auth.user = parent('OH');
+    // The server resolved a state (e.g. from a linked district) even though the profile is blank: no hint.
+    auth.user = parent(null);
     localStorage.clear();
+    api.getAdvocateChildContext.mockResolvedValue({ success: true, data: { stateCode: 'OH' } });
     renderPage();
     await screen.findByTestId('advocate-empty');
     expect(screen.queryByTestId('advocate-state-hint')).not.toBeInTheDocument();

@@ -71,6 +71,15 @@ public class AdvocateService : IAdvocateService
         return ServiceResult<List<AdvocateThreadModel>>.SuccessResult(threads.Select(MapThread).ToList());
     }
 
+    public async Task<ServiceResult<AdvocateChildContextModel>> GetChildContextAsync(int userId, int childId, CancellationToken ct = default)
+    {
+        if (!await _access.HasMinimumRoleAsync(childId, userId, AccessRole.Viewer, ct))
+            return ServiceResult<AdvocateChildContextModel>.FailureResult(ChildNotFound);
+
+        var stateCode = await ChildStateResolver.ResolveAsync(_context, childId, ct);
+        return ServiceResult<AdvocateChildContextModel>.SuccessResult(new AdvocateChildContextModel { StateCode = stateCode });
+    }
+
     public async Task<ServiceResult<AdvocateThreadModel>> CreateThreadAsync(int userId, int childId, string? title, CancellationToken ct = default)
     {
         if (!await _access.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, ct))

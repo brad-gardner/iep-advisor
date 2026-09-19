@@ -15,6 +15,7 @@ import { todayInputValue } from '@/features/journal/lib/today';
 import { useAdvocateThread, type SendFailure } from '../hooks/use-advocate-thread';
 import { useAdvocateThreads } from '../hooks/use-advocate-threads';
 import { useAdvocateUsage } from '../hooks/use-advocate-usage';
+import { useAdvocateChildContext } from '../hooks/use-advocate-child-context';
 import { useHasJournalEntries } from '../hooks/use-has-journal-entries';
 import { parseAbout, readAboutLabel } from '../lib/about';
 import { PREP_QUESTION_COPIED_TOAST, STOPPED_COPY, VIEWER_NOTICE_COPY } from '../lib/copy';
@@ -78,6 +79,7 @@ export function AdvocatePage() {
 
   const threadsApi = useAdvocateThreads(childId);
   const usageApi = useAdvocateUsage();
+  const resolvedState = useAdvocateChildContext(childId);
   const hasJournalEntries = useHasJournalEntries(childId);
 
   // One navigation per event: react-router's functional `setSearchParams`
@@ -310,7 +312,7 @@ export function AdvocatePage() {
               {about && (
                 <AboutContextPill about={about} label={aboutLabel} onClear={() => updateParams({ dropAbout: true })} />
               )}
-              {user && !user.state && <StateHint userId={user.id} />}
+              {user && resolvedState === null && <StateHint userId={user.id} />}
               <Composer
                 value={draft}
                 onChange={setDraft}

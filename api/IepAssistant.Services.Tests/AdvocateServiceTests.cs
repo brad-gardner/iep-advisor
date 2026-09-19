@@ -436,6 +436,29 @@ public sealed class AdvocateServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetChildContext_ResolvesStateForViewers_AndHidesUnknownChildren()
+    {
+        var f = SeedFamily("context");
+        using var ctx = CreateContext();
+        var service = CreateService(ctx);
+
+        var owner = await service.GetChildContextAsync(f.OwnerId, f.ChildId);
+        var viewer = await service.GetChildContextAsync(f.ViewerId, f.ChildId);
+        var stranger = await service.GetChildContextAsync(f.StrangerId, f.ChildId);
+
+        Assert.True(owner.Success);
+        Assert.Equal("OH", owner.Data!.StateCode);   // owner User.State = "oh", normalised
+        Assert.True(viewer.Success);
+        Assert.Equal("OH", viewer.Data!.StateCode);
+        Assert.False(stranger.Success);
+
+        // No state anywhere ⇒ null, which the UI renders as the "set your state" hint.
+        ctx.Users.Single(u => u.Id == f.OwnerId).State = null;
+        await ctx.SaveChangesAsync();
+        Assert.Null((await service.GetChildContextAsync(f.OwnerId, f.ChildId)).Data!.StateCode);
+    }
+
+    [Fact]
     public void SubscriptionYearStart_MatchesSubscriptionServiceRule()
     {
         var expiry = new DateTime(2027, 3, 1, 0, 0, 0, DateTimeKind.Utc);

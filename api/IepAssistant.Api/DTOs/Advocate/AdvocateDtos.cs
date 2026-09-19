@@ -66,6 +66,11 @@ public class AdvocateSuggestionDto
     public string? Date { get; set; }
 }
 
+public class AdvocateChildContextDto
+{
+    public string? StateCode { get; set; }
+}
+
 public class AdvocateUsageDto
 {
     public int Used { get; set; }

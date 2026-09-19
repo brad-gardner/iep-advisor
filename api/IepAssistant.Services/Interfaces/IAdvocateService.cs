@@ -15,6 +15,8 @@ public interface IAdvocateService
     Task<ServiceResult> RenameThreadAsync(int userId, int threadId, string title, CancellationToken ct = default);
     Task<ServiceResult> DeleteThreadAsync(int userId, int threadId, CancellationToken ct = default);
     Task<ServiceResult<AdvocateUsageModel>> GetUsageAsync(int userId, CancellationToken ct = default);
+    /// <summary>Viewer+: the child's resolved state so the UI can tell the parent whether state rules apply.</summary>
+    Task<ServiceResult<AdvocateChildContextModel>> GetChildContextAsync(int userId, int childId, CancellationToken ct = default);
 
     /// <summary>
     /// Validates, persists the user message, streams the answer, persists the assistant message. Failures

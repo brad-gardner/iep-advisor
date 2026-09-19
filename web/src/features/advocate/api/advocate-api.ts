@@ -2,6 +2,7 @@ import { apiClient } from '@/lib/api-client';
 import { getToken, removeToken } from '@/lib/auth';
 import type { ApiResponse } from '@/types/api';
 import type {
+  AdvocateChildContextDto,
   AdvocateDoneFrame,
   AdvocateErrorFrame,
   AdvocateThreadDetailDto,
@@ -40,6 +41,11 @@ export async function renameAdvocateThread(threadId: number, title: string): Pro
 
 export async function deleteAdvocateThread(threadId: number): Promise<ApiResponse<unknown>> {
   const res = await apiClient.delete<ApiResponse<unknown>>(`/api/advocate/threads/${threadId}`);
+  return res.data;
+}
+
+export async function getAdvocateChildContext(childId: number): Promise<ApiResponse<AdvocateChildContextDto>> {
+  const res = await apiClient.get<ApiResponse<AdvocateChildContextDto>>(`/api/children/${childId}/advocate/context`);
   return res.data;
 }
 

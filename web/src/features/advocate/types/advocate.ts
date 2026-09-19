@@ -85,6 +85,11 @@ export interface AdvocateThreadDetailDto extends AdvocateThreadDto {
   disclaimer: string;
 }
 
+/** The state the server will apply for this child (district → school → parent profile); null ⇒ federal only. */
+export interface AdvocateChildContextDto {
+  stateCode: string | null;
+}
+
 export interface AdvocateUsageDto {
   used: number;
   limit: number;
