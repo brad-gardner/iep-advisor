@@ -121,6 +121,7 @@ public class AccountPurgeService : IAccountPurgeService
 
             _context.ParentAdvocacyGoals.RemoveRange(_context.ParentAdvocacyGoals.Where(g => childIds.Contains(g.ChildProfileId)));
             _context.ParentContributions.RemoveRange(_context.ParentContributions.Where(c => childIds.Contains(c.ChildProfileId)));
+            _context.JournalEntries.RemoveRange(_context.JournalEntries.Where(j => childIds.Contains(j.ChildProfileId)));
             _context.MeetingPrepChecklists.RemoveRange(_context.MeetingPrepChecklists.Where(c => childIds.Contains(c.ChildProfileId)));
             _context.ChildAccesses.RemoveRange(_context.ChildAccesses.Where(a => childIds.Contains(a.ChildProfileId)));
             _context.ChildLinks.RemoveRange(_context.ChildLinks.Where(l => l.ChildProfileId != null && childIds.Contains(l.ChildProfileId.Value)));

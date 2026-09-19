@@ -103,6 +103,8 @@ public sealed class AccountPurgeServiceTests : IDisposable
             ctx.EtrDocuments.Add(new EtrDocument { ChildProfileId = childId, BlobUri = "etr/blob2.pdf" });
             ctx.ProgressReports.Add(new ProgressReport { ChildProfileId = childId, IepDocumentId = iepDoc.Id, BlobUri = "pr/blob3.pdf" });
             ctx.ParentAdvocacyGoals.Add(new ParentAdvocacyGoal { ChildProfileId = childId, GoalText = "advocate" });
+            // Linked to the IEP doc on purpose: the JournalEntry -> IepDocument FK is NoAction, so the purge must delete it first.
+            ctx.JournalEntries.Add(new JournalEntry { ChildProfileId = childId, OccurredOn = new DateOnly(2026, 9, 1), Tag = JournalTag.Incident, ContentMarkdown = "sent home early", LinkedIepDocumentId = iepDoc.Id });
             ctx.ChildAccesses.Add(new ChildAccess { ChildProfileId = childId, UserId = parentId, Role = AccessRole.Owner, IsActive = true, AcceptedAt = DateTime.UtcNow });
             ctx.UsageRecords.Add(new UsageRecord { UserId = parentId, ChildProfileId = childId, OperationType = "analysis" });
             ctx.SaveChanges();
@@ -150,6 +152,7 @@ public sealed class AccountPurgeServiceTests : IDisposable
         Assert.Empty(verify.EtrDocuments.ToList());
         Assert.Empty(verify.ProgressReports.ToList());
         Assert.Empty(verify.ParentAdvocacyGoals.ToList());
+        Assert.Empty(verify.JournalEntries.ToList());
         Assert.Empty(verify.ChildAccesses.ToList());
         Assert.Empty(verify.UsageRecords.ToList());
 

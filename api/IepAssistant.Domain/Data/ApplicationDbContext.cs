@@ -24,6 +24,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<AnalysisRunSection> AnalysisRunSections => Set<AnalysisRunSection>();
     public DbSet<ParentAdvocacyGoal> ParentAdvocacyGoals => Set<ParentAdvocacyGoal>();
     public DbSet<ParentContribution> ParentContributions => Set<ParentContribution>();
+    public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<UserRecoveryCode> UserRecoveryCodes => Set<UserRecoveryCode>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<MeetingPrepChecklist> MeetingPrepChecklists => Set<MeetingPrepChecklist>();
