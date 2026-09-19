@@ -41,6 +41,9 @@ export function citationHref(citation: AdvocateCitation, childId: number): strin
     case 'etr_analysis':
     case 'progress_report_analysis':
     case 'analysis_run':
+      // Every analysis kind lands on the analysis tab. A progress_report_analysis
+      // parent is the progress_report itself, which is not enough to build the
+      // report viewer route (that needs the IEP id) — so it goes here too.
       return `/children/${childId}/analysis`;
     case 'iep_section':
       // The IEP page shows the PDF and per-type analysis, not per-section
@@ -55,6 +58,8 @@ export function citationHref(citation: AdvocateCitation, childId: number): strin
     case 'journal':
       return `/children/${childId}/journal?entry=${id}`;
     case 'meeting_prep':
+    case 'prep_question':
+      // A parent's own question has no page of its own; the meeting-prep tab lists them.
       return `/children/${childId}/meeting-prep`;
     case 'comparison':
     default:

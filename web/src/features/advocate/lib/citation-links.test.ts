@@ -37,8 +37,23 @@ describe('citationHref', () => {
     ['advocacy_goal', null, '/children/4/overview'],
     ['meeting_prep', null, '/children/4/meeting-prep'],
     ['meeting', null, '/children/4/overview'],
+    ['prep_question', null, '/children/4/meeting-prep'],
   ])('maps %s (parent %j) to %s', (kind, parent, expected) => {
     expect(citationHref(cite(kind, 12, parent), childId)).toBe(expected);
+  });
+
+  it('sends a progress-report analysis to the analysis tab, not a report route it cannot build', () => {
+    // The parent is the progress_report, not the IEP the viewer route needs.
+    const href = citationHref(cite('progress_report_analysis', 12, { kind: 'progress_report', id: 3 }), childId);
+    expect(href).toBe('/children/4/analysis');
+    expect(href).not.toContain('progress-reports');
+    expect(citationHref(cite('progress_report_analysis', 12, null), childId)).toBe('/children/4/analysis');
+  });
+
+  it('sends a prep question to the meeting-prep tab with or without a parent', () => {
+    expect(citationHref(cite('prep_question', 12, null), childId)).toBe('/children/4/meeting-prep');
+    expect(citationHref(cite('prep_question', 12, { kind: 'child', id: 4 }), childId)).toBe('/children/4/meeting-prep');
+    expect(citationHref(cite('prep_question', 0, null), childId)).toBeNull();
   });
 
   it('covers every kind the server can return', () => {

@@ -1,42 +1,106 @@
 import { useId, useState, type FormEvent } from 'react';
-import { MessageSquarePlus, Plus, X } from 'lucide-react';
+import { MessageSquarePlus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/cn';
-import { PARENT_QUESTION_MAX_LENGTH, type AddParentQuestionResult, type ParentQuestion } from '../hooks/use-parent-questions';
+import { Notice } from '@/components/ui/notice';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  PARENT_QUESTION_MAX_LENGTH,
+  type AddParentQuestionResult,
+  type MoveDirection,
+  type ParentQuestion,
+  type SaveParentQuestionResult,
+} from '../hooks/use-parent-questions';
+import { ParentQuestionRow } from './parent-question-row';
 
 interface ParentQuestionsProps {
   questions: ParentQuestion[];
-  onAdd: (text: string) => AddParentQuestionResult;
-  onCheck: (id: string, isChecked: boolean) => void;
-  onRemove: (id: string) => void;
+  isLoading?: boolean;
+  loadError?: string | null;
+  /** True while an up/down move is being saved; the arrows wait for it. */
+  isReordering?: boolean;
+  onAdd: (text: string) => Promise<AddParentQuestionResult>;
+  onCheck: (id: number, isChecked: boolean) => void;
+  onEdit: (id: number, text: string) => Promise<SaveParentQuestionResult>;
+  onMove: (id: number, direction: MoveDirection) => void;
+  /** Resolves true once removed; false keeps the confirmation open with an error. */
+  onRemove: (id: number) => Promise<boolean>;
   /** Viewers see the list but cannot change it. */
   readOnly?: boolean;
 }
 
+const ADD_ERRORS: Record<Exclude<AddParentQuestionResult, 'added'>, string> = {
+  duplicate: 'That question is already on your list.',
+  invalid: `Write a question of up to ${PARENT_QUESTION_MAX_LENGTH} characters.`,
+  failed: 'Could not save your question. Please try again.',
+};
+
+const REMOVE_ERROR = 'Could not remove this question.';
+
 /**
  * "Your questions": the parent's own list for the meeting, next to the
  * generated checklist. Questions arrive from the add form here or from an
- * advocate suggestion (`?addQuestion=`). Kept on this device — the note says so.
+ * advocate suggestion (`?addQuestion=`), and are kept by the API.
  */
-export function ParentQuestions({ questions, onAdd, onCheck, onRemove, readOnly = false }: ParentQuestionsProps) {
+export function ParentQuestions({
+  questions,
+  isLoading = false,
+  loadError = null,
+  isReordering = false,
+  onAdd,
+  onCheck,
+  onEdit,
+  onMove,
+  onRemove,
+  readOnly = false,
+}: ParentQuestionsProps) {
   const inputId = useId();
   const [draft, setDraft] = useState('');
+  const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<ParentQuestion | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const checkedCount = questions.filter((q) => q.isChecked).length;
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const result = onAdd(draft);
-    if (result === 'added') {
-      setDraft('');
-      setError(null);
-    } else if (result === 'duplicate') {
-      setError('That question is already on your list.');
-    } else {
-      setError(`Write a question of up to ${PARENT_QUESTION_MAX_LENGTH} characters.`);
+    if (adding) return;
+    setAdding(true);
+    try {
+      const result = await onAdd(draft);
+      if (result === 'added') {
+        setDraft('');
+        setError(null);
+      } else {
+        setError(ADD_ERRORS[result]);
+      }
+    } finally {
+      setAdding(false);
     }
+  };
+
+  // A failed remove keeps the dialog open with the reason so the parent can
+  // retry or cancel; only success closes it.
+  const remove = async () => {
+    if (!confirmRemove || removing) return;
+    setRemoving(true);
+    setRemoveError(null);
+    try {
+      const ok = await onRemove(confirmRemove.id);
+      if (ok) setConfirmRemove(null);
+      else setRemoveError(REMOVE_ERROR);
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  const closeRemove = () => {
+    if (removing) return;
+    setConfirmRemove(null);
+    setRemoveError(null);
   };
 
   return (
@@ -52,44 +116,33 @@ export function ParentQuestions({ questions, onAdd, onCheck, onRemove, readOnly 
           </span>
         )}
       </div>
-      <p className="mt-1 text-[12px] text-brand-slate-400">
-        Questions you add yourself or accept from the advocate. Saved on this device.
-      </p>
+      <p className="mt-1 text-[12px] text-brand-slate-400">Questions you add yourself or accept from the advocate.</p>
 
-      {questions.length > 0 ? (
+      {isLoading ? (
+        <div className="mt-3 space-y-2" role="status" aria-label="Loading your questions" data-testid="parent-questions-loading">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ) : loadError ? (
+        <Notice variant="error" title={loadError} className="mt-3" data-testid="parent-questions-error" />
+      ) : questions.length > 0 ? (
         <ul className="mt-3 space-y-2" aria-label="Your questions" data-testid="parent-questions-list">
-          {questions.map((q) => (
-            <li
+          {questions.map((q, index) => (
+            <ParentQuestionRow
               key={q.id}
-              className="flex items-start gap-3 rounded-card border-[0.5px] border-brand-slate-200 p-3"
-              data-testid="parent-question"
-            >
-              <input
-                type="checkbox"
-                id={`${inputId}-${q.id}`}
-                checked={q.isChecked}
-                disabled={readOnly}
-                onChange={(e) => onCheck(q.id, e.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-400"
-              />
-              <label
-                htmlFor={`${inputId}-${q.id}`}
-                className={cn('min-w-0 flex-1 text-sm leading-relaxed', q.isChecked ? 'text-brand-slate-400 line-through' : 'text-brand-slate-700')}
-              >
-                {q.text}
-              </label>
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={() => onRemove(q.id)}
-                  aria-label={`Remove question: ${q.text}`}
-                  className="shrink-0 rounded p-1 text-brand-slate-400 transition-colors hover:bg-brand-slate-100 hover:text-brand-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-teal-400"
-                  data-testid="parent-question-remove"
-                >
-                  <X className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-                </button>
-              )}
-            </li>
+              question={q}
+              readOnly={readOnly}
+              isFirst={index === 0}
+              isLast={index === questions.length - 1}
+              isReordering={isReordering}
+              onCheck={onCheck}
+              onMove={onMove}
+              onEdit={onEdit}
+              onRemoveRequest={(question) => {
+                setRemoveError(null);
+                setConfirmRemove(question);
+              }}
+            />
           ))}
         </ul>
       ) : (
@@ -99,7 +152,11 @@ export function ParentQuestions({ questions, onAdd, onCheck, onRemove, readOnly 
       )}
 
       {!readOnly && (
-        <form onSubmit={submit} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end" data-testid="parent-questions-form">
+        <form
+          onSubmit={(e) => void submit(e)}
+          className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end"
+          data-testid="parent-questions-form"
+        >
           <div className="min-w-0 flex-1">
             <Input
               id={inputId}
@@ -107,6 +164,7 @@ export function ParentQuestions({ questions, onAdd, onCheck, onRemove, readOnly 
               value={draft}
               maxLength={PARENT_QUESTION_MAX_LENGTH}
               placeholder="What would you like to ask the team?"
+              disabled={adding}
               onChange={(e) => {
                 setDraft(e.target.value);
                 if (error) setError(null);
@@ -115,7 +173,7 @@ export function ParentQuestions({ questions, onAdd, onCheck, onRemove, readOnly 
               aria-describedby={error ? `${inputId}-error` : undefined}
             />
           </div>
-          <Button type="submit" variant="secondary" disabled={!draft.trim()} data-testid="parent-questions-add">
+          <Button type="submit" variant="secondary" loading={adding} disabled={!draft.trim()} data-testid="parent-questions-add">
             <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
             Add
           </Button>
@@ -126,6 +184,18 @@ export function ParentQuestions({ questions, onAdd, onCheck, onRemove, readOnly 
           {error}
         </p>
       )}
+
+      <ConfirmDialog
+        open={confirmRemove !== null}
+        title="Remove question"
+        message={confirmRemove ? `Remove "${confirmRemove.text}" from your list?` : ''}
+        confirmLabel="Remove question"
+        loading={removing}
+        error={removeError}
+        onConfirm={() => void remove()}
+        onCancel={closeRemove}
+        data-testid="parent-question-remove-dialog"
+      />
     </Card>
   );
 }

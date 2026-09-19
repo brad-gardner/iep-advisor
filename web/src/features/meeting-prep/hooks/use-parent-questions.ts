@@ -1,109 +1,198 @@
-import { useCallback, useState } from 'react';
+import axios from 'axios';
+import { useCallback, useEffect, useState } from 'react';
+import { useToast } from '@/components/ui/toast';
+import {
+  createPrepQuestion,
+  deletePrepQuestion,
+  listPrepQuestions,
+  reorderPrepQuestions,
+  updatePrepQuestion,
+  type ParentPrepQuestionDto,
+  type PrepQuestionSource,
+} from '../api/prep-questions-api';
 
 /** A question the parent wrote (or accepted from the advocate) for the next meeting. */
-export interface ParentQuestion {
-  id: string;
-  text: string;
-  isChecked: boolean;
-  addedAt: string;
-}
+export type ParentQuestion = ParentPrepQuestionDto;
 
-/** Same cap the advocate applies to a suggestion payload. */
+/** Same cap the API enforces and the advocate applies to a suggestion payload. */
 export const PARENT_QUESTION_MAX_LENGTH = 500;
 
-export type AddParentQuestionResult = 'added' | 'duplicate' | 'invalid';
+export type AddParentQuestionResult = 'added' | 'duplicate' | 'invalid' | 'failed';
+export type SaveParentQuestionResult = 'saved' | 'duplicate' | 'invalid' | 'failed';
+export type MoveDirection = 'up' | 'down';
 
-const STORAGE_PREFIX = 'iep-advisor:meeting-prep:my-questions';
-
-function storageKey(userId: number | null | undefined, childId: number): string {
-  return `${STORAGE_PREFIX}:${userId ?? 'anon'}:${childId}`;
-}
+export const QUESTIONS_FORBIDDEN_MESSAGE = "You don't have permission to change these questions.";
+export const QUESTIONS_LOAD_ERROR = 'Could not load your questions.';
 
 function normalise(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
-function isParentQuestion(value: unknown): value is ParentQuestion {
-  if (!value || typeof value !== 'object') return false;
-  const q = value as Record<string, unknown>;
-  return typeof q.id === 'string' && typeof q.text === 'string' && typeof q.isChecked === 'boolean' && typeof q.addedAt === 'string';
+/** The API treats questions as the same when they match case-insensitively; mirror that before asking it. */
+function sameText(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
 }
 
-function readStored(key: string): ParentQuestion[] {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(isParentQuestion) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeStored(key: string, questions: ParentQuestion[]): void {
-  try {
-    if (questions.length === 0) localStorage.removeItem(key);
-    else localStorage.setItem(key, JSON.stringify(questions));
-  } catch {
-    // Storage unavailable (private mode, quota): the in-memory list still works for this visit.
-  }
-}
-
-function newId(): string {
-  const c = typeof crypto !== 'undefined' ? crypto : undefined;
-  return c && typeof c.randomUUID === 'function' ? c.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+function isForbidden(err: unknown): boolean {
+  return axios.isAxiosError(err) && err.response?.status === 403;
 }
 
 /**
- * The parent's own questions for one child's meetings. The generated
- * checklist has no write path for parent-authored items, so these live in
- * this browser's storage (keyed by user and child) until the API grows one.
+ * The parent's own questions for one child's meetings, kept by the API so
+ * they follow the parent across devices and reach the advocate's tools.
+ * Writes are optimistic where the UI benefits (check, reorder) and reverted
+ * on failure; a 403 on any write flips `writeForbidden` so the caller can
+ * hide the controls for a viewer whose role changed mid-session.
  */
-export function useParentQuestions(userId: number | null | undefined, childId: number) {
-  const key = storageKey(userId, childId);
-  const [questions, setQuestions] = useState<ParentQuestion[]>(() => readStored(key));
-  const [loadedKey, setLoadedKey] = useState(key);
+export function useParentQuestions(childId: number) {
+  const { show } = useToast();
+  const [questions, setQuestions] = useState<ParentQuestion[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
+  const [writeForbidden, setWriteForbidden] = useState(false);
 
-  // Another child (or account) on the same mounted tab: re-read that list.
-  if (loadedKey !== key) {
-    setLoadedKey(key);
-    setQuestions(readStored(key));
+  // Another child on the same mounted tab: start over for that list.
+  const [loadedFor, setLoadedFor] = useState(childId);
+  if (loadedFor !== childId) {
+    setLoadedFor(childId);
+    setQuestions([]);
+    setIsLoading(true);
+    setLoadError(null);
+    setWriteForbidden(false);
   }
 
-  const update = useCallback(
-    (fn: (prev: ParentQuestion[]) => ParentQuestion[]) => {
-      setQuestions((prev) => {
-        const next = fn(prev);
-        writeStored(key, next);
-        return next;
+  useEffect(() => {
+    let active = true;
+    listPrepQuestions(childId)
+      .then((res) => {
+        if (!active) return;
+        if (res.success && res.data) setQuestions(res.data);
+        else setLoadError(res.message ?? QUESTIONS_LOAD_ERROR);
+      })
+      .catch(() => {
+        if (active) setLoadError(QUESTIONS_LOAD_ERROR);
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
       });
+    return () => {
+      active = false;
+    };
+  }, [childId]);
+
+  /** A write was refused: remember it (so controls hide) or tell the parent what went wrong. */
+  const reportWriteFailure = useCallback(
+    (err: unknown, fallback: string | null) => {
+      if (isForbidden(err)) {
+        setWriteForbidden(true);
+        show({ message: QUESTIONS_FORBIDDEN_MESSAGE, variant: 'error' });
+      } else if (fallback) {
+        show({ message: fallback, variant: 'error' });
+      }
     },
-    [key],
+    [show],
   );
 
-  /** Adds one question; a repeat of an existing question is reported rather than duplicated. */
+  /**
+   * Adds one question. A repeat of one already on the list — here or, case-
+   * insensitively, on the server — is reported as `duplicate` rather than
+   * added twice. Callers message `failed` themselves (inline or toast).
+   */
   const add = useCallback(
-    (text: string): AddParentQuestionResult => {
+    async (text: string, source: PrepQuestionSource = 'parent'): Promise<AddParentQuestionResult> => {
       const clean = normalise(text);
       if (!clean || clean.length > PARENT_QUESTION_MAX_LENGTH) return 'invalid';
-      // Read the stored list directly so two adds in the same tick (or a
-      // deep link arriving before state settles) still de-duplicate.
-      const current = readStored(key);
-      if (current.some((q) => q.text.toLowerCase() === clean.toLowerCase())) return 'duplicate';
-      const next = [...current, { id: newId(), text: clean, isChecked: false, addedAt: new Date().toISOString() }];
-      writeStored(key, next);
-      setQuestions(next);
-      return 'added';
+      if (questions.some((q) => sameText(q.text, clean))) return 'duplicate';
+      try {
+        const res = await createPrepQuestion(childId, { text: clean, source });
+        const created = res.success ? res.data : undefined;
+        if (!created) return 'failed';
+        setQuestions((prev) => (prev.some((q) => q.id === created.id) ? prev : [...prev, created]));
+        return created.alreadyExisted ? 'duplicate' : 'added';
+      } catch (err) {
+        reportWriteFailure(err, null);
+        return 'failed';
+      }
     },
-    [key],
+    [childId, questions, reportWriteFailure],
   );
 
   const setChecked = useCallback(
-    (id: string, isChecked: boolean) => update((prev) => prev.map((q) => (q.id === id ? { ...q, isChecked } : q))),
-    [update],
+    async (id: number, isChecked: boolean) => {
+      setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, isChecked } : q)));
+      try {
+        const res = await updatePrepQuestion(id, { isChecked });
+        if (!res.success) throw new Error(res.message ?? 'update failed');
+      } catch (err) {
+        setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, isChecked: !isChecked } : q)));
+        reportWriteFailure(err, 'Could not update that question.');
+      }
+    },
+    [reportWriteFailure],
   );
 
-  const remove = useCallback((id: string) => update((prev) => prev.filter((q) => q.id !== id)), [update]);
+  const updateText = useCallback(
+    async (id: number, text: string): Promise<SaveParentQuestionResult> => {
+      const clean = normalise(text);
+      if (!clean || clean.length > PARENT_QUESTION_MAX_LENGTH) return 'invalid';
+      if (questions.some((q) => q.id !== id && sameText(q.text, clean))) return 'duplicate';
+      try {
+        const res = await updatePrepQuestion(id, { text: clean });
+        const saved = res.success ? res.data : undefined;
+        if (!saved) return 'failed';
+        setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, ...saved } : q)));
+        return 'saved';
+      } catch (err) {
+        reportWriteFailure(err, null);
+        return 'failed';
+      }
+    },
+    [questions, reportWriteFailure],
+  );
 
-  return { questions, add, setChecked, remove };
+  /** Resolves true once the server has dropped the question; false leaves it in place for a retry. */
+  const remove = useCallback(
+    async (id: number): Promise<boolean> => {
+      try {
+        const res = await deletePrepQuestion(id);
+        if (!res.success) return false;
+        setQuestions((prev) => prev.filter((q) => q.id !== id));
+        return true;
+      } catch (err) {
+        reportWriteFailure(err, null);
+        return false;
+      }
+    },
+    [reportWriteFailure],
+  );
+
+  /** Swaps a question with its neighbour and persists the whole order; one reorder in flight at a time. */
+  const move = useCallback(
+    async (id: number, direction: MoveDirection) => {
+      if (isReordering) return;
+      const index = questions.findIndex((q) => q.id === id);
+      const target = direction === 'up' ? index - 1 : index + 1;
+      if (index < 0 || target < 0 || target >= questions.length) return;
+      const next = [...questions];
+      [next[index], next[target]] = [next[target], next[index]];
+      setIsReordering(true);
+      setQuestions(next);
+      try {
+        const res = await reorderPrepQuestions(
+          childId,
+          next.map((q) => q.id),
+        );
+        if (!res.success) throw new Error(res.message ?? 'reorder failed');
+      } catch (err) {
+        setQuestions(questions);
+        reportWriteFailure(err, 'Could not reorder your questions.');
+      } finally {
+        setIsReordering(false);
+      }
+    },
+    [childId, questions, isReordering, reportWriteFailure],
+  );
+
+  return { questions, isLoading, loadError, isReordering, writeForbidden, add, setChecked, updateText, remove, move };
 }

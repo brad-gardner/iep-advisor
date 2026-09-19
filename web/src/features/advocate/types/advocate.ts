@@ -20,7 +20,8 @@ export interface AdvocateCitationParent {
 /**
  * One source the answer drew on. `kind` is one of `CITATION_KINDS` (unknown
  * kinds render as plain chips); `parent` is set for goal, iep_section,
- * etr_section, progress_report and the *_analysis kinds.
+ * etr_section, progress_report and the *_analysis kinds (a
+ * progress_report_analysis names its progress_report, not the IEP).
  */
 export interface AdvocateCitation {
   kind: string;
@@ -52,6 +53,7 @@ export const CITATION_KINDS = [
   'advocacy_goal',
   'meeting_prep',
   'meeting',
+  'prep_question',
 ] as const;
 
 export type CitationKind = (typeof CITATION_KINDS)[number];

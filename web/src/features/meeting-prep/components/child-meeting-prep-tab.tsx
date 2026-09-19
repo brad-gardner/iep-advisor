@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext, useSearchParams } from "react-router-dom";
 import { useToast } from "@/components/ui/toast";
-import { useAuth } from "@/features/auth/hooks/use-auth";
 import type { ChildOutletContext } from "@/features/children/components/child-detail-page";
 import { useMeetingPrep } from "../hooks/use-meeting-prep";
 import { useParentQuestions } from "../hooks/use-parent-questions";
@@ -14,6 +13,8 @@ import { StudentSharedEntries } from "./student-shared-entries";
 export const ADD_QUESTION_PARAM = "addQuestion";
 
 export const QUESTION_ADDED_TOAST = "Added to your questions";
+export const QUESTION_EXISTS_TOAST = "Already in your questions";
+export const QUESTION_FAILED_TOAST = "Could not add that question";
 
 /**
  * Child-level (standalone) Meeting Prep tab, gated behind the
@@ -23,29 +24,32 @@ export const QUESTION_ADDED_TOAST = "Added to your questions";
  */
 export function ChildMeetingPrepTab() {
   const { child, childId } = useOutletContext<ChildOutletContext>();
-  const { user } = useAuth();
   const { show } = useToast();
   const canEdit = child.role === "owner" || child.role === "collaborator";
   const { checklist, isLoading, isGenerating, generateFromGoals } =
     useMeetingPrep(childId);
   const [meetingDate, setMeetingDate] = useState("");
-  const parentQuestions = useParentQuestions(user?.id, childId);
-  const { add: addQuestion } = parentQuestions;
+  const parentQuestions = useParentQuestions(childId);
+  const { add: addQuestion, isLoading: questionsLoading, writeForbidden } = parentQuestions;
+  const canEditQuestions = canEdit && !writeForbidden;
 
   const [searchParams, setSearchParams] = useSearchParams();
   const incoming = searchParams.get(ADD_QUESTION_PARAM);
   const consumedRef = useRef<string | null>(null);
 
-  // Consume the handoff once: add it, say so, and take it out of the URL so a
+  // Consume the handoff once the list is known (so a repeat is recognised
+  // without a round trip): add it, say so, and take it out of the URL so a
   // reload or back-navigation does not add it twice. A viewer's URL is only
   // cleaned up (nothing is added for them).
   useEffect(() => {
-    if (incoming === null || consumedRef.current === incoming) return;
+    if (incoming === null || questionsLoading || consumedRef.current === incoming) return;
     consumedRef.current = incoming;
-    if (canEdit) {
-      const result = addQuestion(incoming);
-      if (result === "added") show({ message: QUESTION_ADDED_TOAST, variant: "success" });
-      else if (result === "duplicate") show({ message: "That question is already on your list", variant: "info" });
+    if (canEditQuestions) {
+      void addQuestion(incoming, "advocate").then((result) => {
+        if (result === "added") show({ message: QUESTION_ADDED_TOAST, variant: "success" });
+        else if (result === "duplicate") show({ message: QUESTION_EXISTS_TOAST, variant: "info" });
+        else if (result === "failed") show({ message: QUESTION_FAILED_TOAST, variant: "error" });
+      });
     }
     setSearchParams(
       (prev) => {
@@ -55,7 +59,13 @@ export function ChildMeetingPrepTab() {
       },
       { replace: true },
     );
-  }, [incoming, canEdit, addQuestion, setSearchParams, show]);
+  }, [incoming, questionsLoading, canEditQuestions, addQuestion, setSearchParams, show]);
+
+  const addTyped = async (text: string) => {
+    const result = await addQuestion(text, "parent");
+    if (result === "added") show({ message: QUESTION_ADDED_TOAST, variant: "success" });
+    return result;
+  };
 
   return (
     <div className="space-y-6">
@@ -69,10 +79,15 @@ export function ChildMeetingPrepTab() {
       />
       <ParentQuestions
         questions={parentQuestions.questions}
-        onAdd={parentQuestions.add}
+        isLoading={questionsLoading}
+        loadError={parentQuestions.loadError}
+        isReordering={parentQuestions.isReordering}
+        onAdd={addTyped}
         onCheck={parentQuestions.setChecked}
+        onEdit={parentQuestions.updateText}
+        onMove={parentQuestions.move}
         onRemove={parentQuestions.remove}
-        readOnly={!canEdit}
+        readOnly={!canEditQuestions}
       />
       <MeetingPrepTab
         checklist={checklist}
