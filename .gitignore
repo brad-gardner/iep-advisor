@@ -61,3 +61,7 @@ e2e/node_modules/
 
 # sht:review todo files
 todos/
+
+# Local workflow evidence (screenshots, validation reports) — never committed
+docs/screenshots/
+docs/validations/
