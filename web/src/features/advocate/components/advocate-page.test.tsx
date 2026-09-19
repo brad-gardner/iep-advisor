@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
-import type { ChildProfile } from '@/types/api';
+import { MemoryRouter, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import type { ChildProfile, User } from '@/types/api';
 import type { StreamAdvocateMessageHandlers } from '../api/advocate-api';
 import type { AdvocateMessageDto, AdvocateThreadDto, SendAdvocateMessageRequest } from '../types/advocate';
-import { EXAMPLE_QUESTIONS, PREP_QUESTION_COPIED_TOAST, TRUNCATED_NOTICE_COPY } from '../lib/copy';
+import { EXAMPLE_QUESTIONS, JOURNAL_EXAMPLE_QUESTION, PREP_QUESTION_COPIED_TOAST, TRUNCATED_NOTICE_COPY } from '../lib/copy';
+import { STATE_HINT_COPY } from './state-hint';
 
 interface FakeStream {
   threadId: number;
@@ -34,8 +35,15 @@ vi.mock('@/components/ui/toast', () => ({ useToast: () => toast }));
 vi.mock('@/features/journal/hooks/use-journal-link-options', () => ({
   useJournalLinkOptions: () => ({ options: { ieps: [], etrs: [], meetings: [] }, loading: false }),
 }));
-const journalApi = vi.hoisted(() => ({ createJournalEntry: vi.fn(), updateJournalEntry: vi.fn(), deleteJournalEntry: vi.fn() }));
+const journalApi = vi.hoisted(() => ({
+  listJournalEntries: vi.fn(),
+  createJournalEntry: vi.fn(),
+  updateJournalEntry: vi.fn(),
+  deleteJournalEntry: vi.fn(),
+}));
 vi.mock('@/features/journal/api/journal-api', () => journalApi);
+const auth = vi.hoisted(() => ({ user: null as User | null }));
+vi.mock('@/features/auth/hooks/use-auth', () => ({ useAuth: () => ({ user: auth.user }) }));
 vi.mock('@/features/subscription/components/subscribe-button', () => ({
   SubscribeButton: () => (
     <button type="button" data-testid="subscribe-button">
@@ -103,12 +111,34 @@ const detail = (id: number, messages: AdvocateMessageDto[]) => ({
   data: { ...thread(id, `Thread ${id}`), messages, disclaimer: 'Not legal advice.' },
 });
 
+const parent = (state: string | null): User => ({
+  id: 9,
+  email: 'p@example.com',
+  firstName: 'Pat',
+  lastName: 'Lee',
+  state,
+  role: 'Parent',
+  fullName: 'Pat Lee',
+  onboardingCompleted: true,
+  subscriptionStatus: 'active',
+});
+
 function LocationProbe() {
   const location = useLocation();
   return <output data-testid="location">{location.pathname + location.search}</output>;
 }
 
-function renderPage(role: ChildProfile['role'] = 'owner', url = '/children/4/advocate') {
+/** Stands in for a launcher elsewhere in the app: navigates to the advocate page with router state. */
+function Launcher({ to, label }: { to: string; label?: string }) {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate(to, label ? { state: { aboutLabel: label } } : undefined)} data-testid="fake-launcher">
+      launch
+    </button>
+  );
+}
+
+function renderPage(role: ChildProfile['role'] = 'owner', url = '/children/4/advocate', launcher?: { to: string; label?: string }) {
   const ctx = { child: child(role), childId: 4, reloadChild: () => Promise.resolve() };
   return render(
     <MemoryRouter initialEntries={[url]}>
@@ -119,6 +149,16 @@ function renderPage(role: ChildProfile['role'] = 'owner', url = '/children/4/adv
             element={
               <>
                 <AdvocatePage />
+                <LocationProbe />
+                {launcher && <Launcher {...launcher} />}
+              </>
+            }
+          />
+          <Route
+            path="meeting-prep"
+            element={
+              <>
+                <output data-testid="meeting-prep-page">meeting prep</output>
                 <LocationProbe />
               </>
             }
@@ -142,6 +182,9 @@ const lastStream = () => api.streams[api.streams.length - 1];
 describe('AdvocatePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    auth.user = parent('OH');
+    journalApi.listJournalEntries.mockResolvedValue({ success: true, data: [] });
     api.streams.length = 0;
     api.streamAdvocateMessage.mockImplementation(
       (threadId: number, body: SendAdvocateMessageRequest, handlers: StreamAdvocateMessageHandlers) =>
@@ -223,8 +266,12 @@ describe('AdvocatePage', () => {
     expect(screen.queryByTestId('advocate-user-message-pending')).not.toBeInTheDocument();
     expect(screen.queryByTestId('advocate-streaming-text')).not.toBeInTheDocument();
     expect(within(assistant).getByText('letter')).toBeInTheDocument();
-    expect(within(assistant).getByTestId('advocate-source-link')).toHaveAttribute('href', '/knowledge-base/3');
-    expect(within(assistant).getByTestId('advocate-source-chip')).toHaveTextContent('Child profile');
+    const sources = within(assistant).getAllByTestId('advocate-source-link');
+    expect(sources.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['Prior written notice', '/knowledge-base/3'],
+      ['Child profile', '/children/4/overview'],
+    ]);
+    expect(within(assistant).queryByTestId('advocate-source-chip')).not.toBeInTheDocument();
     expect(within(assistant).getByTestId('advocate-assistant-message-truncated')).toHaveTextContent(TRUNCATED_NOTICE_COPY);
     expect(within(assistant).getByTestId('advocate-suggestion-prep_question')).toBeInTheDocument();
     expect(within(assistant).getByTestId('advocate-suggestion-journal_entry')).toBeInTheDocument();
@@ -397,8 +444,132 @@ describe('AdvocatePage', () => {
     expect(within(form).getByLabelText('What happened')).toHaveValue('School said no to the evaluation on 9/10.');
     expect(within(form).getByLabelText('Date')).toHaveValue('2026-09-10');
 
-    fireEvent.click(within(assistant).getByRole('button', { name: 'Copy question' }));
+    fireEvent.click(within(assistant).getByRole('button', { name: 'Copy' }));
     expect(writeText).toHaveBeenCalledWith('When will I get prior written notice about this change?');
     await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: PREP_QUESTION_COPIED_TOAST, variant: 'success' }));
+  });
+
+  it('hands a prep question to meeting prep through ?addQuestion=', async () => {
+    renderPage('owner', '/children/4/advocate?thread=1');
+    const assistant = await screen.findByTestId('advocate-assistant-message');
+    fireEvent.click(within(assistant).getByRole('button', { name: 'Add to meeting prep' }));
+    expect(await screen.findByTestId('meeting-prep-page')).toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/children/4/meeting-prep?addQuestion=When+will+I+get+prior+written+notice+about+this+change%3F',
+    );
+  });
+
+  it('deep-links every kind of source chip and reuses a cited goal for open_goal', async () => {
+    api.getAdvocateThread.mockImplementation((id: number) =>
+      Promise.resolve(
+        detail(id, [
+          userMsg(11, 'Is the reading goal measurable?'),
+          {
+            ...answer,
+            citations: [
+              { kind: 'goal', id: 340, label: 'Reading goal', parent: { kind: 'iep', id: 12 } },
+              { kind: 'journal', id: 77, label: 'Journal entry 2026-09-12' },
+              { kind: 'comparison', id: 1, label: 'IEP comparison' },
+              { kind: 'mystery', id: 5, label: 'Something new' },
+            ],
+            suggestions: [{ kind: 'open_goal', id: 340, text: 'Look at the reading goal' }],
+          },
+        ]),
+      ),
+    );
+    renderPage('owner', '/children/4/advocate?thread=1');
+    const assistant = await screen.findByTestId('advocate-assistant-message');
+    expect(within(assistant).getByRole('link', { name: 'Reading goal' })).toHaveAttribute('href', '/children/4/ieps/12#goal-340');
+    expect(within(assistant).getByRole('link', { name: 'Journal entry 2026-09-12' })).toHaveAttribute(
+      'href',
+      '/children/4/journal?entry=77',
+    );
+    const chips = within(assistant).getAllByTestId('advocate-source-chip');
+    expect(chips.map((c) => c.textContent)).toEqual(['IEP comparison', 'Something new']);
+    expect(within(assistant).getByRole('link', { name: 'Open the goal' })).toHaveAttribute('href', '/children/4/ieps/12#goal-340');
+  });
+
+  it('shows the context pill for ?about=, sends it once with a fresh thread, and a new launcher starts another thread', async () => {
+    renderPage('owner', '/children/4/advocate?about=iep:12', { to: '/children/4/advocate?about=etr:5', label: 'ETR from Sep 1, 2026' });
+    await screen.findByTestId('advocate-empty');
+    expect(screen.getByTestId('advocate-about-pill')).toHaveTextContent('About: this IEP');
+    expect(screen.getByTestId('advocate-about-pill')).not.toHaveTextContent('iep:12');
+
+    typeAndSend('Is this IEP complete?');
+    await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(1));
+    expect(lastStream().body).toEqual({ text: 'Is this IEP complete?', about: 'iep:12' });
+    expect(api.createAdvocateThread).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/children/4/advocate?thread=3'));
+    expect(screen.queryByTestId('advocate-about-pill')).not.toBeInTheDocument();
+    act(() => {
+      lastStream().handlers.onDone({
+        messageId: 30,
+        contentMarkdown: 'Mostly.',
+        citations: [],
+        suggestions: [],
+        truncated: false,
+        disclaimer: 'Not legal advice.',
+      });
+      lastStream().resolve();
+    });
+    await waitFor(() => expect(composer()).not.toHaveAttribute('readonly'));
+
+    // A launcher on another page lands here while the page is still mounted.
+    api.createAdvocateThread.mockImplementation((_childId: number, title?: string) =>
+      Promise.resolve({ success: true, data: thread(7, title ?? 'New conversation') }),
+    );
+    fireEvent.click(screen.getByTestId('fake-launcher'));
+    expect(await screen.findByTestId('advocate-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('advocate-about-pill')).toHaveTextContent('About: ETR from Sep 1, 2026');
+
+    typeAndSend('What did the ETR find?');
+    await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(2));
+    expect(api.createAdvocateThread).toHaveBeenCalledTimes(2);
+    expect(lastStream().threadId).toBe(7);
+    expect(lastStream().body).toEqual({ text: 'What did the ETR find?', about: 'etr:5' });
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/children/4/advocate?thread=7'));
+  });
+
+  it('drops the launcher context when the parent opens an existing conversation instead', async () => {
+    renderPage('owner', '/children/4/advocate?about=iep:12');
+    await screen.findByTestId('advocate-about-pill');
+    fireEvent.click(await screen.findByTestId('advocate-thread-2-open'));
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/children/4/advocate?thread=2'));
+    expect(screen.getByTestId('location')).not.toHaveTextContent('about=');
+    expect(screen.queryByTestId('advocate-about-pill')).not.toBeInTheDocument();
+    await screen.findByTestId('advocate-empty');
+    typeAndSend('Hello');
+    await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(1));
+    expect(lastStream().body).toEqual({ text: 'Hello' });
+  });
+
+  it('nudges a parent with no profile state and remembers the dismissal', async () => {
+    auth.user = parent(null);
+    const first = renderPage();
+    const hint = await screen.findByTestId('advocate-state-hint');
+    expect(within(hint).getByRole('link', { name: STATE_HINT_COPY })).toHaveAttribute('href', '/profile');
+    fireEvent.click(within(hint).getByRole('button', { name: 'Dismiss this hint' }));
+    expect(screen.queryByTestId('advocate-state-hint')).not.toBeInTheDocument();
+    first.unmount();
+
+    const second = renderPage();
+    await screen.findByTestId('advocate-empty');
+    expect(screen.queryByTestId('advocate-state-hint')).not.toBeInTheDocument();
+    second.unmount();
+
+    auth.user = parent('OH');
+    localStorage.clear();
+    renderPage();
+    await screen.findByTestId('advocate-empty');
+    expect(screen.queryByTestId('advocate-state-hint')).not.toBeInTheDocument();
+  });
+
+  it('offers the journal example only when the child has journal entries', async () => {
+    journalApi.listJournalEntries.mockResolvedValue({ success: true, data: [{ id: 1 }] });
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getAllByTestId('advocate-example').map((b) => b.textContent)).toEqual([...EXAMPLE_QUESTIONS, JOURNAL_EXAMPLE_QUESTION]),
+    );
+    expect(journalApi.listJournalEntries).toHaveBeenCalledWith(4, { take: 1 });
   });
 });

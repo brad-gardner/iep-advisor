@@ -45,10 +45,10 @@ const entry = (id: number, overrides: Partial<JournalEntryDto> = {}): JournalEnt
 });
 
 /** Mounts the page the way the app does: as an Outlet child of the child layout. */
-function renderPage(role: ChildProfile['role'] = 'owner') {
+function renderPage(role: ChildProfile['role'] = 'owner', url = '/children/4/journal') {
   const ctx = { child: child(role), childId: 4, reloadChild: () => Promise.resolve() };
   return render(
-    <MemoryRouter initialEntries={['/children/4/journal']}>
+    <MemoryRouter initialEntries={[url]}>
       <Routes>
         <Route path="/children/:childId" element={<Outlet context={ctx} />}>
           <Route path="journal" element={<JournalPage />} />
@@ -117,11 +117,33 @@ describe('JournalPage', () => {
     expect(await screen.findByRole('heading', { name: 'Edit update' })).toBeInTheDocument();
   });
 
+  it('marks and scrolls to the entry named in ?entry= (an advocate citation)', async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    renderPage('owner', '/children/4/journal?entry=1');
+    await screen.findByTestId('journal-list');
+    const target = screen.getByTestId('journal-entry-1');
+    expect(target).toHaveAttribute('id', 'journal-entry-1');
+    expect(target).toHaveAttribute('data-highlighted', 'true');
+    expect(screen.getByTestId('journal-entry-2')).not.toHaveAttribute('data-highlighted');
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+    expect(scrollIntoView.mock.instances[0]).toBe(target);
+  });
+
+  it('gives each entry an "Ask the advocate" launcher about that entry', async () => {
+    renderPage();
+    await screen.findByTestId('journal-list');
+    const launcher = screen.getByTestId('journal-entry-2-ask');
+    expect(launcher).toHaveAttribute('href', '/children/4/advocate?about=journal%3A2');
+    expect(launcher).toHaveAccessibleName('Ask the advocate about the update from Sep 12, 2026');
+  });
+
   it('hides every write control from a viewer', async () => {
     renderPage('viewer');
     await screen.findByTestId('journal-list');
     expect(screen.queryByTestId('journal-add')).not.toBeInTheDocument();
     expect(screen.queryByTestId('journal-entry-1-edit')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('journal-entry-1-ask')).not.toBeInTheDocument();
     expect(screen.queryByTestId('journal-entry-drawer')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Show')).toBeInTheDocument(); // reading and filtering still work
   });

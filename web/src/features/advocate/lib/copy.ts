@@ -17,3 +17,6 @@ export const EXAMPLE_QUESTIONS = [
   'What should an ETR include?',
   'How do I ask for an evaluation?',
 ];
+
+/** Offered as a fourth example only when the child's journal has entries. */
+export const JOURNAL_EXAMPLE_QUESTION = 'What should I raise from my journal this month?';

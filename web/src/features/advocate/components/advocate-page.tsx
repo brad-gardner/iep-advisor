@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
-import { useOutletContext, useSearchParams } from 'react-router-dom';
+import { useCallback, useState } from 'react';
+import { useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { MessagesSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
@@ -7,20 +7,26 @@ import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/components/ui/toast';
 import { usePageTitle } from '@/hooks/use-page-title';
+import { useAuth } from '@/features/auth/hooks/use-auth';
 import type { ChildOutletContext } from '@/features/children/components/child-detail-page';
+import { ADD_QUESTION_PARAM } from '@/features/meeting-prep/components/child-meeting-prep-tab';
 import { JournalEntryDrawer, type JournalEntryDraft } from '@/features/journal/components/journal-entry-drawer';
 import { todayInputValue } from '@/features/journal/lib/today';
 import { useAdvocateThread, type SendFailure } from '../hooks/use-advocate-thread';
 import { useAdvocateThreads } from '../hooks/use-advocate-threads';
 import { useAdvocateUsage } from '../hooks/use-advocate-usage';
+import { useHasJournalEntries } from '../hooks/use-has-journal-entries';
+import { parseAbout, readAboutLabel } from '../lib/about';
 import { PREP_QUESTION_COPIED_TOAST, STOPPED_COPY, VIEWER_NOTICE_COPY } from '../lib/copy';
 import { isUsageCapped } from '../lib/usage';
-import { ABOUT_PATTERN, ADVOCATE_TITLE_MAX_LENGTH } from '../types/advocate';
+import { ADVOCATE_TITLE_MAX_LENGTH } from '../types/advocate';
+import { AboutContextPill } from './about-context-pill';
 import type { SuggestionHandlers } from './assistant-message';
 import { Composer } from './composer';
 import { AdvocateEmptyState } from './empty-state';
 import { MessageList } from './message-list';
 import { PrivacyBanner } from './privacy-banner';
+import { StateHint } from './state-hint';
 import { ThreadList } from './thread-list';
 import { UsageNotice } from './usage-notice';
 
@@ -40,27 +46,29 @@ function parseThreadParam(value: string | null): number | null {
   return n > 0 ? n : null;
 }
 
-/** Only a value in the server grammar is ever sent; anything else is dropped silently. */
-function parseAboutParam(value: string | null): string | null {
-  return value && ABOUT_PATTERN.test(value) ? value : null;
-}
-
 /**
  * `/children/:childId/advocate` — the parent's private conversations with the
- * Virtual Advocate about this child. The open thread lives in `?thread=`; a
- * launcher's `?about=` context is sent once with the first message and then
- * removed from the URL (its raw value is never displayed).
+ * Virtual Advocate about this child. The open thread lives in `?thread=`. A
+ * launcher arrives with `?about=` and no thread: the page shows a context
+ * pill, the first question starts a fresh thread, `about` is sent with that
+ * message only and then removed from the URL (its raw value is never
+ * displayed). The param is read at send time, so a second launcher landing on
+ * the already-mounted page starts another conversation.
  */
 export function AdvocatePage() {
   const { child, childId } = useOutletContext<ChildOutletContext>();
   const canAsk = child.role === 'owner' || child.role === 'collaborator';
   usePageTitle('Advocate');
   const { show } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = parseThreadParam(searchParams.get(THREAD_PARAM));
-  // Read once on arrival; consumed by the first send.
-  const aboutRef = useRef<string | null>(parseAboutParam(searchParams.get(ABOUT_PARAM)));
+  // Only a value in the server grammar counts; anything else is dropped silently.
+  const about = selectedId == null ? parseAbout(searchParams.get(ABOUT_PARAM)) : null;
+  const aboutLabel = readAboutLabel(location.state);
 
   const [draft, setDraft] = useState('');
   const [railOpen, setRailOpen] = useState(false);
@@ -70,6 +78,7 @@ export function AdvocatePage() {
 
   const threadsApi = useAdvocateThreads(childId);
   const usageApi = useAdvocateUsage();
+  const hasJournalEntries = useHasJournalEntries(childId);
 
   // One navigation per event: react-router's functional `setSearchParams`
   // reads the params captured at render, so two back-to-back updates would
@@ -92,9 +101,10 @@ export function AdvocatePage() {
     [setSearchParams],
   );
 
+  // Opening a thread (or a blank page) leaves any launcher context behind.
   const select = useCallback(
     (id: number | null) => {
-      updateParams({ thread: id });
+      updateParams({ thread: id, dropAbout: true });
       setRailOpen(false);
     },
     [updateParams],
@@ -140,11 +150,10 @@ export function AdvocatePage() {
       }
     }
     // The launcher context rides along with the first message only.
-    const about = aboutRef.current ?? undefined;
-    aboutRef.current = null;
-    if (created || about) updateParams({ thread: created ? target : undefined, dropAbout: Boolean(about) });
+    const aboutValue = created && about ? `${about.kind}:${about.id}` : undefined;
+    if (created) updateParams({ thread: target, dropAbout: true });
     setRailOpen(false);
-    if (thread.send(text, { threadId: target, about })) setDraft('');
+    if (thread.send(text, { threadId: target, about: aboutValue })) setDraft('');
   };
 
   const handleNew = () => {
@@ -159,6 +168,10 @@ export function AdvocatePage() {
   };
 
   const suggestionHandlers: SuggestionHandlers = {
+    onAddPrepQuestion: (text) => {
+      const params = new URLSearchParams({ [ADD_QUESTION_PARAM]: text });
+      navigate(`/children/${childId}/meeting-prep?${params.toString()}`);
+    },
     onCopyPrepQuestion: (text) => {
       const clipboard = typeof navigator !== 'undefined' ? navigator.clipboard : undefined;
       if (!clipboard?.writeText) {
@@ -247,7 +260,12 @@ export function AdvocatePage() {
           )}
 
           {conversationEmpty && !thread.loadError && (
-            <AdvocateEmptyState childFirstName={child.firstName} canAsk={canAsk && !capped} onPickExample={setDraft} />
+            <AdvocateEmptyState
+              childFirstName={child.firstName}
+              canAsk={canAsk && !capped}
+              onPickExample={setDraft}
+              hasJournalEntries={hasJournalEntries === true}
+            />
           )}
 
           {!conversationEmpty && !showLoading && (
@@ -285,16 +303,25 @@ export function AdvocatePage() {
           )}
 
           {canAsk && (
-            <Composer
-              value={draft}
-              onChange={setDraft}
-              onSend={(text) => void handleSend(text)}
-              onStop={thread.stop}
-              streaming={thread.isStreaming}
-              disabled={capped || creating}
-              disabledReason={capped ? 'You’ve used this year’s advocate messages.' : undefined}
-              childFirstName={child.firstName}
-            />
+            <div
+              className="sticky bottom-0 -mx-4 space-y-2 border-t border-brand-slate-100 bg-white px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6 md:static md:mx-0 md:border-0 md:px-0 md:pb-0"
+              data-testid="advocate-composer-dock"
+            >
+              {about && (
+                <AboutContextPill about={about} label={aboutLabel} onClear={() => updateParams({ dropAbout: true })} />
+              )}
+              {user && !user.state && <StateHint userId={user.id} />}
+              <Composer
+                value={draft}
+                onChange={setDraft}
+                onSend={(text) => void handleSend(text)}
+                onStop={thread.stop}
+                streaming={thread.isStreaming}
+                disabled={capped || creating}
+                disabledReason={capped ? 'You’ve used this year’s advocate messages.' : undefined}
+                childFirstName={child.firstName}
+              />
+            </div>
           )}
 
           {thread.disclaimer && thread.messages.length > 0 && (

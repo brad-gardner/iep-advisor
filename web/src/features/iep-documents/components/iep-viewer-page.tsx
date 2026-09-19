@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   ChevronDown,
@@ -32,6 +32,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PdfViewer } from "@/components/ui/pdf-viewer";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { ProgressReportsTab } from "@/features/progress-reports/components/progress-reports-tab";
+import { AskAdvocateButton } from "@/features/advocate/components/ask-advocate-button";
+import { formatDate } from "@/lib/format-date";
 
 const MEETING_TYPE_LABELS: Record<string, string> = {
   initial: "Initial IEP",
@@ -40,17 +42,22 @@ const MEETING_TYPE_LABELS: Record<string, string> = {
   reevaluation: "Reevaluation",
 };
 
+/** `#goal-340` (an advocate citation) opens the analysis tab on the goal list and scrolls to that goal. */
+const GOAL_HASH = /^#goal-\d+$/;
+
 export function IepViewerPage() {
   usePageTitle("IEP");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { hash } = useLocation();
+  const goalDeepLink = GOAL_HASH.test(hash);
   const documentId = Number(id);
   const [document, setDocument] = useState<IepDocument | null>(null);
   const [sections, setSections] = useState<IepSection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
     "document" | "analysis" | "progress-reports"
-  >("document");
+  >(goalDeepLink ? "analysis" : "document");
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [otherIeps, setOtherIeps] = useState<IepDocument[]>([]);
@@ -113,6 +120,13 @@ export function IepViewerPage() {
   }, [documentId, loadSections]);
 
   usePolling(pollDocumentStatus, 5000, document?.status === "processing");
+
+  // Bring the deep-linked goal card into view once the analysis has rendered it.
+  useEffect(() => {
+    if (!goalDeepLink || activeTab !== "analysis" || analysis?.status !== "completed") return;
+    const el = window.document.getElementById(hash.slice(1));
+    if (el && typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "start" });
+  }, [goalDeepLink, hash, activeTab, analysis?.status]);
 
   // Load other IEPs for comparison when document is available
   useEffect(() => {
@@ -224,6 +238,13 @@ export function IepViewerPage() {
         title={documentTitle}
         actions={
           <>
+            <AskAdvocateButton
+              childId={document.childProfileId}
+              about={{ kind: "iep", id: document.id }}
+              label={document.iepDate ? `IEP from ${formatDate(document.iepDate)}` : undefined}
+              canAsk={childRole !== "viewer"}
+              data-testid="iep-ask-advocate"
+            />
             {otherIeps.length > 0 && (
               <div className="relative" ref={compareRef}>
                 <Button
@@ -434,6 +455,9 @@ export function IepViewerPage() {
               advocacyGoals={advocacyGoals}
               onTrigger={triggerAnalysis}
               onReload={reloadAnalysis}
+              initialView={goalDeepLink ? "goals" : undefined}
+              childId={document.childProfileId}
+              canAsk={childRole !== null && childRole !== "viewer"}
             />
           )}
 

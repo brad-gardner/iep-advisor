@@ -1,6 +1,6 @@
 import { MessageCircleQuestion } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
-import { EXAMPLE_QUESTIONS } from '../lib/copy';
+import { EXAMPLE_QUESTIONS, JOURNAL_EXAMPLE_QUESTION } from '../lib/copy';
 
 interface AdvocateEmptyStateProps {
   childFirstName: string;
@@ -8,10 +8,13 @@ interface AdvocateEmptyStateProps {
   onPickExample: (question: string) => void;
   /** Hide the examples for a viewer who cannot send. */
   canAsk: boolean;
+  /** Adds the journal example when there is a journal to draw on. */
+  hasJournalEntries?: boolean;
 }
 
-/** A blank conversation: what the advocate is for, plus three questions to start from. */
-export function AdvocateEmptyState({ childFirstName, onPickExample, canAsk }: AdvocateEmptyStateProps) {
+/** A blank conversation: what the advocate is for, plus three (or four) questions to start from. */
+export function AdvocateEmptyState({ childFirstName, onPickExample, canAsk, hasJournalEntries = false }: AdvocateEmptyStateProps) {
+  const examples = hasJournalEntries ? [...EXAMPLE_QUESTIONS, JOURNAL_EXAMPLE_QUESTION] : EXAMPLE_QUESTIONS;
   return (
     <EmptyState
       icon={MessageCircleQuestion}
@@ -21,7 +24,7 @@ export function AdvocateEmptyState({ childFirstName, onPickExample, canAsk }: Ad
       action={
         canAsk ? (
           <ul className="flex flex-wrap justify-center gap-2" aria-label="Example questions">
-            {EXAMPLE_QUESTIONS.map((q) => (
+            {examples.map((q) => (
               <li key={q}>
                 <button
                   type="button"

@@ -116,7 +116,7 @@ export function JournalCard({ childId, childName, canEdit }: JournalCardProps) {
       {items.length > 0 && (
         <ul className="divide-y divide-brand-slate-100" data-testid="journal-recent">
           {items.map((entry) => (
-            <JournalEntryItem key={entry.id} entry={entry} onEdit={canEdit ? setEditing : undefined} />
+            <JournalEntryItem key={entry.id} entry={entry} onEdit={canEdit ? setEditing : undefined} canAsk={canEdit} />
           ))}
         </ul>
       )}

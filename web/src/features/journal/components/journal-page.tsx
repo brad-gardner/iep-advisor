@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { NotebookPen, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -15,10 +15,14 @@ import { listJournalEntries } from '../api/journal-api';
 import { JOURNAL_EMPTY_COPY } from '../lib/copy';
 import { JOURNAL_TAGS, JOURNAL_TAG_LABELS, type JournalEntryDto, type JournalTag } from '../types/journal';
 import { JournalEntryDrawer, type JournalSaveMode } from './journal-entry-drawer';
+import { journalEntryElementId } from '../lib/entry-anchor';
 import { JournalEntryItem } from './journal-entry-item';
 
 /** Server-side maximum for one page of entries. */
 const PAGE_SIZE = 200;
+
+/** `?entry=<id>` — an advocate citation brings one entry into view. */
+const ENTRY_PARAM = 'entry';
 
 const TAG_FILTER_ALL = '';
 
@@ -36,6 +40,10 @@ export function JournalPage() {
   const canEdit = child.role === 'owner' || child.role === 'collaborator';
   usePageTitle('Journal');
   const { show } = useToast();
+
+  const [searchParams] = useSearchParams();
+  const entryParam = searchParams.get(ENTRY_PARAM);
+  const targetEntryId = entryParam && /^\d+$/.test(entryParam) ? Number(entryParam) : null;
 
   const [tagFilter, setTagFilter] = useState<JournalTag | typeof TAG_FILTER_ALL>(TAG_FILTER_ALL);
   const [items, setItems] = useState<JournalEntryDto[] | null>(null);
@@ -62,6 +70,14 @@ export function JournalPage() {
       active = false;
     };
   }, [childId, tagFilter, reloadToken]);
+
+  // Once the list holds the deep-linked entry, bring it into view (the row
+  // itself is marked `highlighted`). An id not in the list simply shows the list.
+  useEffect(() => {
+    if (targetEntryId == null || !items) return;
+    const el = document.getElementById(journalEntryElementId(targetEntryId));
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
+  }, [targetEntryId, items]);
 
   const refresh = () => setReloadToken((t) => t + 1);
 
@@ -159,7 +175,13 @@ export function JournalPage() {
         <Card>
           <ul className="divide-y divide-brand-slate-100" data-testid="journal-list">
             {items.map((entry) => (
-              <JournalEntryItem key={entry.id} entry={entry} onEdit={canEdit ? setEditing : undefined} />
+              <JournalEntryItem
+                key={entry.id}
+                entry={entry}
+                onEdit={canEdit ? setEditing : undefined}
+                canAsk={canEdit}
+                highlighted={entry.id === targetEntryId}
+              />
             ))}
           </ul>
           {items.length >= PAGE_SIZE && (

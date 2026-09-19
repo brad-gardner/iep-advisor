@@ -120,6 +120,27 @@
     @apply text-brand-teal-700;
   }
 
+  /* GFM tables (rendered by `Markdown` only — the editor has no table
+     extension). The wrapper scrolls sideways so a wide table never pushes the
+     page wider than the phone. */
+  .prose-iep .prose-iep-table-wrap {
+    @apply my-2 max-w-full overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .prose-iep table {
+    @apply w-max min-w-full border-collapse text-[13px];
+  }
+
+  .prose-iep th,
+  .prose-iep td {
+    @apply border border-brand-slate-200 px-2 py-1 text-left align-top;
+  }
+
+  .prose-iep th {
+    @apply bg-brand-slate-50 font-semibold text-brand-slate-700;
+  }
+
   /* The editor never shows a focus ring on the contenteditable itself — the
      wrapper's `focus-within` ring (rich-text-editor.tsx) carries that. */
   .ProseMirror:focus {

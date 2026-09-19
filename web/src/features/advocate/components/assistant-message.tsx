@@ -1,13 +1,16 @@
 import { Link } from 'react-router-dom';
-import { BookOpen, ClipboardCopy, NotebookPen, Target } from 'lucide-react';
+import { BookOpen, ClipboardCopy, ListPlus, NotebookPen, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Markdown } from '@/components/ui/markdown';
+import { citationHref, citationLabel, openGoalHref } from '../lib/citation-links';
 import { TRUNCATED_NOTICE_COPY } from '../lib/copy';
 import type { AdvocateCitation, AdvocateSuggestion } from '../types/advocate';
 
 export interface SuggestionHandlers {
-  /** `prep_question` — interim handoff: copies the question for meeting prep. */
+  /** `prep_question` — hands the question to meeting prep (`?addQuestion=`). */
+  onAddPrepQuestion: (text: string) => void;
+  /** `prep_question` secondary action: copies the question. */
   onCopyPrepQuestion: (text: string) => void;
   /** `journal_entry` — opens the journal drawer prefilled. */
   onJournalEntry: (text: string, date: string | null) => void;
@@ -21,18 +24,6 @@ interface AssistantMessageProps {
   truncated?: boolean;
   handlers: SuggestionHandlers;
   'data-testid'?: string;
-}
-
-/** Where a citation chip leads; `kb` entries have a page, other kinds (Phase 3) do not yet. */
-function citationHref(citation: AdvocateCitation): string | null {
-  return citation.kind === 'kb' ? `/knowledge-base/${citation.id}` : null;
-}
-
-function citationLabel(citation: AdvocateCitation): string {
-  if (citation.label) return citation.label;
-  if (citation.kind === 'kb') return `Knowledge base #${citation.id}`;
-  if (citation.kind === 'child') return 'Child profile';
-  return `${citation.kind} #${citation.id}`;
 }
 
 const chipClass =
@@ -68,15 +59,21 @@ export function AssistantMessage({
           <div className="flex flex-wrap items-center gap-1.5" data-testid={`${testId}-sources`}>
             <span className="text-xs font-medium text-brand-slate-500">Sources:</span>
             {citations.map((c, i) => {
-              const href = citationHref(c);
+              const href = citationHref(c, childId);
               const label = citationLabel(c);
               return href ? (
-                <Link key={`${c.kind}-${c.id}-${i}`} to={href} className={chipClass} data-testid="advocate-source-link">
+                <Link
+                  key={`${c.kind}-${c.id}-${i}`}
+                  to={href}
+                  className={chipClass}
+                  data-testid="advocate-source-link"
+                  data-kind={c.kind}
+                >
                   <BookOpen className="h-3 w-3" aria-hidden="true" />
                   {label}
                 </Link>
               ) : (
-                <Badge key={`${c.kind}-${c.id}-${i}`} variant="neutral" data-testid="advocate-source-chip">
+                <Badge key={`${c.kind}-${c.id}-${i}`} variant="neutral" data-testid="advocate-source-chip" data-kind={c.kind}>
                   {label}
                 </Badge>
               );
@@ -88,7 +85,7 @@ export function AssistantMessage({
           <ul className="grid gap-2 sm:grid-cols-2" aria-label="Suggested next steps" data-testid={`${testId}-suggestions`}>
             {visibleSuggestions.map((s, i) => (
               <li key={`${s.kind}-${i}`}>
-                <SuggestionCard suggestion={s} childId={childId} handlers={handlers} />
+                <SuggestionCard suggestion={s} childId={childId} citations={citations} handlers={handlers} />
               </li>
             ))}
           </ul>
@@ -115,6 +112,8 @@ function isRenderable(s: AdvocateSuggestion): boolean {
 interface SuggestionCardProps {
   suggestion: AdvocateSuggestion;
   childId: number;
+  /** The same answer's sources — an `open_goal` with an id can reuse the goal's deep link. */
+  citations: AdvocateCitation[];
   handlers: SuggestionHandlers;
 }
 
@@ -122,7 +121,7 @@ const cardClass = 'flex h-full flex-col gap-2 rounded-card border border-brand-s
 const titleClass = 'flex items-center gap-1.5 text-xs font-medium text-brand-slate-600';
 const textClass = 'text-sm text-brand-slate-800';
 
-function SuggestionCard({ suggestion, childId, handlers }: SuggestionCardProps) {
+function SuggestionCard({ suggestion, childId, citations, handlers }: SuggestionCardProps) {
   const text = suggestion.text?.trim() ?? '';
 
   switch (suggestion.kind) {
@@ -134,15 +133,15 @@ function SuggestionCard({ suggestion, childId, handlers }: SuggestionCardProps) 
             Question for the meeting
           </p>
           <p className={textClass}>{text}</p>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="mt-auto self-start"
-            onClick={() => handlers.onCopyPrepQuestion(text)}
-          >
-            Copy question
-          </Button>
+          <div className="mt-auto flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={() => handlers.onAddPrepQuestion(text)}>
+              <ListPlus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+              Add to meeting prep
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => handlers.onCopyPrepQuestion(text)}>
+              Copy
+            </Button>
+          </div>
         </div>
       );
     case 'journal_entry':
@@ -180,7 +179,9 @@ function SuggestionCard({ suggestion, childId, handlers }: SuggestionCardProps) 
           </Link>
         </div>
       );
-    case 'open_goal':
+    case 'open_goal': {
+      const href = openGoalHref(suggestion.id, citations, childId);
+      const direct = href.includes('#goal-');
       return (
         <div className={cardClass} data-testid="advocate-suggestion-open_goal">
           <p className={titleClass}>
@@ -188,14 +189,12 @@ function SuggestionCard({ suggestion, childId, handlers }: SuggestionCardProps) 
             Look at the goals
           </p>
           {text && <p className={textClass}>{text}</p>}
-          <Link
-            to={`/children/${childId}/goals`}
-            className="mt-auto self-start text-sm font-medium text-brand-teal-500 underline hover:text-brand-teal-600"
-          >
-            See goals
+          <Link to={href} className="mt-auto self-start text-sm font-medium text-brand-teal-500 underline hover:text-brand-teal-600">
+            {direct ? 'Open the goal' : 'See goals'}
           </Link>
         </div>
       );
+    }
     default:
       return null;
   }

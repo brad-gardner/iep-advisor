@@ -11,12 +11,50 @@ export interface AdvocateThreadDto {
 
 export type AdvocateRole = 'User' | 'Assistant';
 
-/** `kind` is `kb` | `child` today; Phase 3 adds goal, iep, etr, journal, … */
+/** The record a citation belongs to (a goal's IEP, a section's document, an analysis's document). */
+export interface AdvocateCitationParent {
+  kind: string;
+  id: number;
+}
+
+/**
+ * One source the answer drew on. `kind` is one of `CITATION_KINDS` (unknown
+ * kinds render as plain chips); `parent` is set for goal, iep_section,
+ * etr_section, progress_report and the *_analysis kinds.
+ */
 export interface AdvocateCitation {
   kind: string;
   id: number;
   label?: string | null;
+  parent?: AdvocateCitationParent | null;
 }
+
+/** Every `kind` the server can return in `citations` — see AdvocateToolset.Register. */
+export const CITATION_KINDS = [
+  'kb',
+  'child',
+  'iep',
+  'etr',
+  'progress_report',
+  'authored_version',
+  'shared_draft',
+  'iep_analysis',
+  'etr_analysis',
+  'progress_report_analysis',
+  'analysis_run',
+  'iep_section',
+  'etr_section',
+  'goal',
+  'goal_record',
+  'comparison',
+  'journal',
+  'contribution',
+  'advocacy_goal',
+  'meeting_prep',
+  'meeting',
+] as const;
+
+export type CitationKind = (typeof CITATION_KINDS)[number];
 
 export type AdvocateSuggestionKind = 'prep_question' | 'journal_entry' | 'open_kb' | 'open_goal';
 

@@ -19,6 +19,11 @@ interface AnalysisTabProps {
   advocacyGoals: AdvocacyGoal[];
   onTrigger: () => void;
   onReload: () => void;
+  /** Which view opens first — a `#goal-…` deep link starts on the goal list. */
+  initialView?: 'overview' | 'goals';
+  /** For the per-goal "Ask the advocate" launcher. */
+  childId?: number;
+  canAsk?: boolean;
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -43,8 +48,11 @@ export function AnalysisTab({
   advocacyGoals,
   onTrigger,
   onReload,
+  initialView = 'overview',
+  childId,
+  canAsk,
 }: AnalysisTabProps) {
-  const [activeView, setActiveView] = useState<string>('overview');
+  const [activeView, setActiveView] = useState<string>(initialView);
 
   // Staleness detection: goals changed after analysis was created
   const isStale = useMemo(() => {
@@ -141,7 +149,7 @@ export function AnalysisTab({
     }
 
     if (activeView === 'goals') {
-      return <AnalysisGoalsList goalAnalyses={analysis.goalAnalyses} />;
+      return <AnalysisGoalsList goalAnalyses={analysis.goalAnalyses} childId={childId} canAsk={canAsk} />;
     }
 
     const sectionAnalysis = analysis.sectionAnalyses.find(

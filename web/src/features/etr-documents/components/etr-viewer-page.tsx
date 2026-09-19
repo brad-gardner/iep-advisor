@@ -24,6 +24,8 @@ import { EtrErrorBanner } from './etr-error-banner';
 import { EtrSectionsList } from './etr-sections-list';
 import { EtrAnalysisTab } from './etr-analysis-tab';
 import { usePageTitle } from '@/hooks/use-page-title';
+import { formatDate } from '@/lib/format-date';
+import { AskAdvocateButton } from '@/features/advocate/components/ask-advocate-button';
 
 type TabKey = 'overview' | 'sections' | 'analysis';
 
@@ -113,7 +115,18 @@ export function EtrViewerPage() {
         Back to child
       </Link>
 
-      <PageHeader title={headerTitle} subtitle="Evaluation Team Report" />
+      <PageHeader
+        title={headerTitle}
+        subtitle="Evaluation Team Report"
+        actions={
+          <AskAdvocateButton
+            childId={etr.childProfileId}
+            about={{ kind: 'etr', id: etr.id }}
+            label={etr.evaluationDate ? `ETR from ${formatDate(etr.evaluationDate)}` : undefined}
+            data-testid="etr-ask-advocate"
+          />
+        }
+      />
 
       <div className="flex items-center gap-3 flex-wrap">
         {etr.evaluationType && (
