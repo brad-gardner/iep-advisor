@@ -112,8 +112,14 @@ export function ParentQuestionRow({
           type="checkbox"
           id={checkboxId}
           checked={question.isChecked}
-          disabled={readOnly || editing || isChecking}
-          onChange={(e) => onCheck(question.id, e.target.checked)}
+          disabled={readOnly || editing}
+          aria-disabled={isChecking || undefined}
+          // The hook already refuses overlapping writes per id; `disabled` would blur a keyboard user
+          // after every Space press, so the in-flight state is advisory only.
+          onChange={(e) => {
+            if (isChecking) return;
+            onCheck(question.id, e.target.checked);
+          }}
           className="mt-0.5 h-4 w-4 shrink-0 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-400"
         />
         {editing ? (

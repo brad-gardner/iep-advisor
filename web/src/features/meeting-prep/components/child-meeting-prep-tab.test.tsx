@@ -189,14 +189,16 @@ describe('ChildMeetingPrepTab — parent questions', () => {
 
     fireEvent.click(checkbox);
     expect(checkbox).toBeChecked();
-    expect(checkbox).toBeDisabled();
+    // Advisory only — never `disabled`, which would blur a keyboard user mid-toggle.
+    expect(checkbox).not.toBeDisabled();
+    expect(checkbox).toHaveAttribute('aria-disabled', 'true');
 
     // A second click while the first PUT is still in flight must not fire another one.
     fireEvent.click(checkbox);
     expect(prepQuestionsApi.updatePrepQuestion).toHaveBeenCalledTimes(1);
 
     act(() => resolveUpdate({ success: true, data: question(1, QUESTION, { isChecked: true }) }));
-    await waitFor(() => expect(checkbox).not.toBeDisabled());
+    await waitFor(() => expect(checkbox).not.toHaveAttribute('aria-disabled'));
     expect(checkbox).toBeChecked();
   });
 

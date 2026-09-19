@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Markdown } from '@/components/ui/markdown';
+import { markdownToPlainText } from '../lib/plain-text';
 import type { AdvocateAnnouncement, PendingMessage, StreamingAnswer } from '../hooks/use-advocate-thread';
 import type { AdvocateMessageDto } from '../types/advocate';
 import { AssistantMessage, type SuggestionHandlers } from './assistant-message';
@@ -53,43 +54,46 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
   }, [messages, pending, streaming]);
 
   return (
-    <div
-      ref={scrollerRef}
-      onScroll={onScroll}
-      tabIndex={0}
-      role="region"
-      aria-label="Conversation"
-      aria-busy={streaming !== null}
-      className="max-h-[60vh] min-h-[16rem] overflow-y-auto rounded-card bg-brand-slate-50 p-3 md:max-h-[calc(100vh-22rem)]"
-      data-testid="advocate-messages"
-    >
-      <ul className="space-y-3">
-        {messages.map((m) =>
-          m.role === 'User' ? (
-            <UserMessage key={m.id} text={m.contentMarkdown} />
-          ) : (
-            <AssistantMessage
-              key={m.id}
-              childId={childId}
-              contentMarkdown={m.contentMarkdown}
-              citations={m.citations}
-              suggestions={m.suggestions}
-              truncated={m.truncated}
-              handlers={handlers}
-            />
-          ),
-        )}
-        {pending && <UserMessage text={pending.text} pending data-testid="advocate-user-message-pending" />}
-      </ul>
+    <>
+      <div
+        ref={scrollerRef}
+        onScroll={onScroll}
+        tabIndex={0}
+        role="region"
+        aria-label="Conversation"
+        className="max-h-[60vh] min-h-[16rem] overflow-y-auto rounded-card bg-brand-slate-50 p-3 md:max-h-[calc(100vh-22rem)]"
+        data-testid="advocate-messages"
+      >
+        <ul className="space-y-3">
+          {messages.map((m) =>
+            m.role === 'User' ? (
+              <UserMessage key={m.id} text={m.contentMarkdown} />
+            ) : (
+              <AssistantMessage
+                key={m.id}
+                childId={childId}
+                contentMarkdown={m.contentMarkdown}
+                citations={m.citations}
+                suggestions={m.suggestions}
+                truncated={m.truncated}
+                handlers={handlers}
+              />
+            ),
+          )}
+          {pending && <UserMessage text={pending.text} pending data-testid="advocate-user-message-pending" />}
+        </ul>
 
-      <div aria-hidden="true" className="mt-3 space-y-2" data-testid="advocate-streaming">
         {streaming && (
-          <>
+          <div className="mt-3 space-y-2" data-testid="advocate-streaming">
+            {/* Tool rows keep their own status semantics so progress is still announced. */}
             <ToolActivity tools={streaming.tools} />
             {streaming.text ? (
-              <div className="flex justify-start">
+              // The token stream is visual only: hidden from AT so it is not re-read per delta, and
+              // rendered without links so nothing focusable sits inside the hidden subtree. The
+              // finished answer is announced once from the status node below.
+              <div className="flex justify-start" aria-hidden="true">
                 <div className="max-w-[92%] rounded-card rounded-bl-sm border-[0.5px] border-brand-slate-200 bg-white px-4 py-3">
-                  <Markdown content={streaming.text} className="text-sm" data-testid="advocate-streaming-text" />
+                  <Markdown content={streaming.text} className="text-sm" disableLinks data-testid="advocate-streaming-text" />
                 </div>
               </div>
             ) : (
@@ -99,13 +103,16 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
                 </p>
               )
             )}
-          </>
+          </div>
         )}
       </div>
 
+      {/* Outside the conversation region on purpose: a status node under an aria-busy ancestor is
+          dropped by some AT (Gecko/NVDA) rather than replayed, and the region is busy at the exact
+          commit the announcement lands. Plain text, not markdown, so punctuation is not read aloud. */}
       <p role="status" className="sr-only" data-testid="advocate-announcement">
-        {announcement?.text ?? ''}
+        {announcement ? markdownToPlainText(announcement.text) : ''}
       </p>
-    </div>
+    </>
   );
 }

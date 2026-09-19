@@ -246,9 +246,9 @@ describe('AdvocatePage', () => {
     act(() => stream.handlers.onDelta('notice is'));
     expect(screen.getByTestId('advocate-streaming-text')).toHaveTextContent('Prior written notice is');
     // The streaming bubble is hidden from assistive tech (not a live region) so
-    // tokens are never re-read; aria-busy lives on the scroll region instead.
-    expect(screen.getByTestId('advocate-streaming')).toHaveAttribute('aria-hidden', 'true');
-    expect(screen.getByTestId('advocate-messages')).toHaveAttribute('aria-busy', 'true');
+    // tokens are never re-read; the text bubble is hidden from AT while tool rows stay announced.
+    expect(screen.getByTestId('advocate-streaming-text').closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(screen.getByTestId('advocate-messages')).not.toHaveAttribute('aria-busy');
     // No answer has finished yet — the sr-only status node has nothing to announce.
     expect(screen.getByTestId('advocate-announcement')).toBeEmptyDOMElement();
 
@@ -274,8 +274,9 @@ describe('AdvocatePage', () => {
     expect(screen.queryByTestId('advocate-streaming-text')).not.toBeInTheDocument();
     // The finished answer is announced once through the sr-only status node —
     // the only place a screen reader hears it, since the streaming bubble was hidden.
-    expect(screen.getByTestId('advocate-announcement')).toHaveTextContent(answer.contentMarkdown);
-    expect(screen.getByTestId('advocate-messages')).toHaveAttribute('aria-busy', 'false');
+    // Announced as plain words (no markdown punctuation), from a node outside the conversation region.
+    expect(screen.getByTestId('advocate-announcement')).toHaveTextContent('Prior written notice is the letter the school must send.');
+    expect(screen.getByTestId('advocate-announcement').closest('[data-testid="advocate-messages"]')).toBeNull();
     expect(within(assistant).getByText('letter')).toBeInTheDocument();
     const sources = within(assistant).getAllByTestId('advocate-source-link');
     expect(sources.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([

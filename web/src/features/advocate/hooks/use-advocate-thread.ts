@@ -332,11 +332,10 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
       setStoppedIn(run.threadId);
       return;
     }
-    // No run is current (e.g. state left behind by an earlier bug, or Stop
-    // fired after settling already cleared it) — still clear anything shown
-    // for the open thread rather than leaving Stop a silent no-op.
+    // Defensive: no run is current (no known path leaves `streaming` set
+    // without one). Clear only the streaming bubble; `pending` is the parent's
+    // question and every other terminal path keeps it for Retry.
     setStreaming((s) => (s?.threadId === threadId ? null : s));
-    setPending((p) => (p?.threadId === threadId ? null : p));
   }, [abortRun, threadId]);
 
   const current = loaded && loaded.threadId === threadId ? loaded : null;
