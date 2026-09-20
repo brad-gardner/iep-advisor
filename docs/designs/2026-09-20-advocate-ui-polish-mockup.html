@@ -1,0 +1,213 @@
+<!doctype html>
+<!-- mockup-v1 -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Advocate page — UI polish mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Lora:wght@500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: { brand: {
+      teal: { 50:'#EDF8F5',100:'#C8EEE6',200:'#A3E4D7',300:'#6DD4C0',400:'#3BC4A9',500:'#1A9478',600:'#0F6652',700:'#0A4D3E',800:'#06342A' },
+      amber:{ 50:'#FEF7EC',100:'#FCE8C0',200:'#F9D98A',300:'#F0C050',400:'#D4820F',500:'#A8620A',600:'#7C4808' },
+      slate:{ 50:'#F5F7F7',100:'#E8ECEC',200:'#D1D8D8',300:'#A8B5B5',400:'#7F9292',500:'#5A6F6F',600:'#3E5252',700:'#2C3C3C',800:'#1E2A2A' },
+      danger:{ 50:'#FEF2F2',200:'#F7C4C4',700:'#B91C1C' },
+    }},
+    fontFamily: { serif:['Lora','Georgia','serif'], sans:['DM Sans','system-ui','sans-serif'] },
+    borderRadius: { input:'4px', badge:'6px', button:'8px', card:'12px', modal:'16px' },
+  }}
+};
+</script>
+<style>
+  body { font-family: 'DM Sans', system-ui, sans-serif; }
+  .font-serif { font-family: 'Lora', Georgia, serif; }
+  .mock-label { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+</style>
+</head>
+<body class="bg-brand-slate-50 text-brand-slate-800" data-mockup-version="v1">
+
+<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+
+  <!-- ══════════════════ A. EMPTY CONVERSATION (the screenshot's state) ══════════════════ -->
+  <section>
+    <p class="mock-label mb-2 text-brand-teal-600">A · Empty conversation — desktop</p>
+
+    <div class="space-y-6">
+      <!-- page header + tabs, for margin context -->
+      <div>
+        <nav class="flex items-center gap-2 text-xs text-brand-slate-500"><span>Children</span><span>›</span><span class="text-brand-slate-600">Jacob Gardner</span></nav>
+        <div class="mt-1 flex items-start justify-between gap-4">
+          <h1 class="font-serif text-3xl text-brand-slate-800">Jacob Gardner</h1>
+          <div class="flex items-center gap-3">
+            <button class="rounded-button border-[1.5px] border-brand-teal-300 px-3 py-1.5 text-sm font-medium text-brand-teal-600">Edit</button>
+            <button class="text-sm font-medium text-brand-danger-700">Remove</button>
+          </div>
+        </div>
+        <div class="mt-4 flex gap-6 border-b border-brand-slate-200 text-sm">
+          <span class="pb-2 text-brand-slate-500">Overview</span><span class="pb-2 text-brand-slate-500">Goals</span>
+          <span class="pb-2 text-brand-slate-500">Analysis</span><span class="pb-2 text-brand-slate-500">Meeting Prep</span>
+          <span class="pb-2 text-brand-slate-500">IEPs</span><span class="pb-2 text-brand-slate-500">ETRs</span>
+          <span class="pb-2 text-brand-slate-500">Journal</span>
+          <span class="-mb-px border-b-2 border-brand-teal-500 pb-2 font-medium text-brand-slate-800">Advocate</span>
+        </div>
+      </div>
+
+      <!-- one heading (the empty state no longer repeats it) + quiet privacy line -->
+      <div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+        <div>
+          <h2 class="font-serif text-xl text-brand-slate-800">Ask the advocate about Jacob</h2>
+          <p class="mt-0.5 text-sm text-brand-slate-500">Plain answers about the plan, your rights, and what to do next.</p>
+        </div>
+        <p class="flex items-center gap-1.5 text-xs text-brand-slate-500">
+          <svg class="h-3.5 w-3.5 text-brand-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Private — only you can see this. The advocate reads Jacob's documents and journal; it can't change anything or contact the school.
+        </p>
+      </div>
+
+      <!-- two panels, equal top edge -->
+      <div class="grid gap-4 md:grid-cols-[16rem_minmax(0,1fr)] items-start">
+
+        <!-- rail panel -->
+        <aside class="rounded-card border border-brand-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(30,42,42,0.04)]">
+          <div class="mb-2 flex items-center justify-between px-1">
+            <p class="mock-label text-brand-slate-500">Conversations</p>
+            <button class="flex items-center gap-1 rounded-button px-2 py-1 text-xs font-medium text-brand-teal-600 hover:bg-brand-teal-50">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New
+            </button>
+          </div>
+          <ul class="space-y-0.5">
+            <li class="flex items-center gap-1">
+              <button class="flex min-w-0 flex-1 items-start gap-2 rounded-button bg-brand-teal-50 px-2 py-2 text-left">
+                <svg class="mt-0.5 h-4 w-4 shrink-0 text-brand-teal-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-medium text-brand-slate-800">What is prior written notice?</span>
+                  <span class="block text-[11px] text-brand-slate-500">just now</span>
+                </span>
+              </button>
+              <button class="rounded-button p-1 text-brand-slate-400 hover:bg-brand-slate-100" aria-label="Actions">⋮</button>
+            </li>
+          </ul>
+        </aside>
+
+        <!-- conversation panel: fills height, composer docked inside -->
+        <section class="flex min-h-[34rem] flex-col overflow-hidden rounded-card border border-brand-slate-200 bg-white shadow-[0_1px_2px_rgba(30,42,42,0.04)]">
+          <div class="flex flex-1 items-center justify-center px-6 py-10">
+            <div class="max-w-md text-center">
+              <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-brand-teal-50 text-brand-teal-500">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.6.2-1 .8-1 1.4v.2"/><circle cx="11.7" cy="16" r=".6" fill="currentColor"/></svg>
+              </div>
+              <p class="text-sm text-brand-slate-600">Plain answers that point back to the rules and to what's actually in the documents. <span class="text-brand-slate-500">Not legal advice.</span></p>
+              <p class="mt-5 mb-2 text-xs font-medium text-brand-slate-500">Not sure where to start?</p>
+              <ul class="flex flex-wrap justify-center gap-2">
+                <li><button class="rounded-button border-[1.5px] border-brand-teal-200 bg-white px-3 py-1.5 text-sm font-medium text-brand-teal-600 hover:bg-brand-teal-50">What is prior written notice?</button></li>
+                <li><button class="rounded-button border-[1.5px] border-brand-teal-200 bg-white px-3 py-1.5 text-sm font-medium text-brand-teal-600 hover:bg-brand-teal-50">What should an ETR include?</button></li>
+                <li><button class="rounded-button border-[1.5px] border-brand-teal-200 bg-white px-3 py-1.5 text-sm font-medium text-brand-teal-600 hover:bg-brand-teal-50">How do I ask for an evaluation?</button></li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- composer: inside the panel, one input group -->
+          <div class="border-t border-brand-slate-200 bg-brand-slate-50/60 p-3">
+            <div class="rounded-card border border-brand-slate-200 bg-white focus-within:border-brand-teal-400 focus-within:ring-[3px] focus-within:ring-brand-teal-50">
+              <textarea rows="2" class="w-full resize-none rounded-t-card bg-transparent px-3 pt-2.5 pb-1 text-sm text-brand-slate-800 placeholder:text-brand-slate-400 focus:outline-none" placeholder="Ask about Jacob's plan, a document, or what to do next…"></textarea>
+              <div class="flex items-center justify-between gap-3 px-3 pb-2">
+                <p class="text-xs text-brand-slate-500">0 / 2,000 · <span class="text-brand-slate-400">Enter sends</span></p>
+                <button class="flex items-center gap-1.5 rounded-button bg-brand-teal-500 px-3 py-1.5 text-sm font-medium text-white opacity-40">
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4z"/></svg>Send
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════ B. POPULATED CONVERSATION ══════════════════ -->
+  <section>
+    <p class="mock-label mb-2 text-brand-teal-600">B · With an answer — same panel, messages scroll inside</p>
+
+    <div class="grid gap-4 md:grid-cols-[16rem_minmax(0,1fr)] items-start">
+      <aside class="rounded-card border border-brand-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(30,42,42,0.04)]">
+        <div class="mb-2 flex items-center justify-between px-1">
+          <p class="mock-label text-brand-slate-500">Conversations</p>
+          <button class="flex items-center gap-1 rounded-button px-2 py-1 text-xs font-medium text-brand-teal-600 hover:bg-brand-teal-50">＋ New</button>
+        </div>
+        <ul class="space-y-0.5">
+          <li><button class="flex w-full items-start gap-2 rounded-button bg-brand-teal-50 px-2 py-2 text-left"><span class="min-w-0 flex-1"><span class="block truncate text-sm font-medium text-brand-slate-800">What is prior written notice?</span><span class="block text-[11px] text-brand-slate-500">just now</span></span></button></li>
+          <li><button class="flex w-full items-start gap-2 rounded-button px-2 py-2 text-left hover:bg-brand-slate-100"><span class="min-w-0 flex-1"><span class="block truncate text-sm font-medium text-brand-slate-600">Is the reading goal ambitious enough?</span><span class="block text-[11px] text-brand-slate-500">2 days ago</span></span></button></li>
+        </ul>
+      </aside>
+
+      <section class="flex min-h-[34rem] flex-col overflow-hidden rounded-card border border-brand-slate-200 bg-white shadow-[0_1px_2px_rgba(30,42,42,0.04)]">
+        <div class="flex-1 space-y-4 overflow-y-auto bg-brand-slate-50/40 p-4">
+          <div class="flex justify-end">
+            <p class="max-w-[80%] rounded-card rounded-br-sm bg-brand-teal-500 px-3.5 py-2.5 text-sm text-white">What is prior written notice, and has anything happened lately I should raise?</p>
+          </div>
+          <div class="max-w-[92%] space-y-3 rounded-card rounded-bl-sm border border-brand-slate-200 bg-white px-4 py-3">
+            <p class="font-serif text-base text-brand-slate-800">What prior written notice is</p>
+            <p class="text-sm leading-relaxed text-brand-slate-700">Prior written notice (PWN) is the letter your district must send <strong class="font-semibold">before</strong> it changes — or refuses to change — Jacob's identification, evaluation, placement or services. In Ohio it's form PR-01.</p>
+            <ul class="ml-4 list-disc space-y-1 text-sm leading-relaxed text-brand-slate-700"><li>What the district proposes or refuses, and <em>why</em> — specific to Jacob, not boilerplate</li><li>What data the decision was based on, and what else the team considered</li></ul>
+            <div class="flex flex-wrap items-center gap-1.5 border-t border-brand-slate-100 pt-2.5">
+              <span class="mock-label mr-1 text-brand-slate-500">Sources</span>
+              <a class="rounded-badge bg-brand-teal-50 px-2 py-0.5 text-xs font-medium text-brand-teal-600" href="#">Prior written notice (PWN) in Ohio</a>
+              <a class="rounded-badge bg-brand-teal-50 px-2 py-0.5 text-xs font-medium text-brand-teal-600" href="#">Journal · Sep 12</a>
+            </div>
+            <div class="grid gap-2 sm:grid-cols-2">
+              <div class="rounded-card border border-brand-amber-100 bg-brand-amber-50 p-2.5">
+                <p class="text-xs leading-relaxed text-brand-slate-700">Jacob's support wasn't available on 9/12 — what's the written coverage plan when the aide is out?</p>
+                <div class="mt-2 flex items-center gap-2"><button class="rounded-button bg-white px-2 py-1 text-xs font-medium text-brand-teal-600 ring-1 ring-brand-teal-200">Add to meeting prep</button><button class="text-xs text-brand-slate-500">Copy</button></div>
+              </div>
+              <div class="rounded-card border border-brand-amber-100 bg-brand-amber-50 p-2.5">
+                <p class="text-xs leading-relaxed text-brand-slate-700">How many times has Jacob been sent home early this year?</p>
+                <div class="mt-2 flex items-center gap-2"><button class="rounded-button bg-white px-2 py-1 text-xs font-medium text-brand-teal-600 ring-1 ring-brand-teal-200">Add to meeting prep</button><button class="text-xs text-brand-slate-500">Copy</button></div>
+              </div>
+            </div>
+          </div>
+          <p class="flex items-center gap-2 pl-1 text-xs text-brand-slate-500"><span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-brand-teal-400"></span>Checking the rules…</p>
+        </div>
+
+        <div class="border-t border-brand-slate-200 bg-brand-slate-50/60 p-3">
+          <div class="rounded-card border border-brand-slate-200 bg-white">
+            <textarea rows="2" class="w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-sm text-brand-slate-800 placeholder:text-brand-slate-400 focus:outline-none" placeholder="Ask a follow-up…"></textarea>
+            <div class="flex items-center justify-between gap-3 px-3 pb-2">
+              <p class="text-xs text-brand-slate-500">0 / 2,000 · <span class="text-brand-slate-400">Enter sends</span></p>
+              <button class="flex items-center gap-1.5 rounded-button border border-brand-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-brand-slate-600">■ Stop</button>
+            </div>
+          </div>
+          <p class="mt-2 px-1 text-[11px] leading-relaxed text-brand-slate-500">Information to help you advocate — not legal advice.</p>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ══════════════════ C. PHONE ══════════════════ -->
+  <section>
+    <p class="mock-label mb-2 text-brand-teal-600">C · Phone (400 px) — unchanged behaviour: sticky dock, drawer rail</p>
+    <div class="w-[400px] overflow-hidden rounded-card border border-brand-slate-200 bg-brand-slate-50">
+      <div class="space-y-3 p-4">
+        <h2 class="font-serif text-lg text-brand-slate-800">Ask the advocate about Jacob</h2>
+        <button class="flex items-center gap-1.5 rounded-button border-[1.5px] border-brand-teal-300 px-2.5 py-1.5 text-xs font-medium text-brand-teal-600">Conversations (2)</button>
+        <p class="flex items-start gap-1.5 text-[11px] leading-relaxed text-brand-slate-500"><svg class="mt-0.5 h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Private — only you can see this.</p>
+        <div class="rounded-card border border-brand-slate-200 bg-white p-3">
+          <p class="text-sm leading-relaxed text-brand-slate-700">PWN is the letter the district must send before it changes or refuses to change Jacob's services…</p>
+        </div>
+      </div>
+      <div class="sticky bottom-0 border-t border-brand-slate-200 bg-white p-3">
+        <div class="rounded-card border border-brand-slate-200">
+          <textarea rows="2" class="w-full resize-none bg-transparent px-3 pt-2 pb-1 text-sm placeholder:text-brand-slate-400 focus:outline-none" placeholder="Ask about Jacob's plan…"></textarea>
+          <div class="flex items-center justify-between px-3 pb-2"><span class="text-[11px] text-brand-slate-500">0 / 2,000</span><button class="rounded-button bg-brand-teal-500 px-3 py-1.5 text-xs font-medium text-white opacity-40">Send</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="pt-2 text-xs text-brand-slate-500">Mockup v1 · planning artifact for <code>docs/designs/2026-09-20-advocate-ui-polish-design.md</code> — not implementation code.</p>
+</div>
+</body>
+</html>
