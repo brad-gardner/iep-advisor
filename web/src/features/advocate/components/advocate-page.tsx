@@ -198,7 +198,7 @@ export function AdvocatePage() {
   const conversationEmpty = !thread.loading && thread.messages.length === 0 && !hasLocalActivity;
   const threadCount = threadsApi.threads?.length ?? 0;
 
-  const rail = (
+  const renderRail = (variant: 'panel' | 'plain') => (
     <ThreadList
       threads={threadsApi.threads}
       error={threadsApi.error}
@@ -209,6 +209,7 @@ export function AdvocatePage() {
       onDelete={handleDelete}
       canAsk={canAsk}
       busy={busy}
+      variant={variant}
     />
   );
 
@@ -239,75 +240,101 @@ export function AdvocatePage() {
         </Notice>
       )}
 
-      <div className="gap-4 md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
+      <div className="items-start gap-4 md:grid md:grid-cols-[16rem_minmax(0,1fr)]">
         <aside className="hidden md:block" aria-label="Conversations">
-          {rail}
+          {renderRail('panel')}
         </aside>
 
-        <section className="space-y-3" aria-label="Conversation" data-testid="advocate-conversation">
-          {showLoading && (
-            <div className="flex justify-center py-12">
-              <Spinner label="Loading conversation…" />
-            </div>
-          )}
+        <section
+          className="flex min-h-[34rem] flex-col rounded-card border border-brand-slate-200 bg-white shadow-sm md:h-[calc(100vh-19rem)] md:overflow-hidden"
+          aria-label="Conversation"
+          data-testid="advocate-conversation"
+        >
+          {/*
+           * The scrollable slot: exactly one of {loading spinner, empty state,
+           * MessageList} renders here. MessageList supplies its own
+           * `flex-1 overflow-y-auto` (see message-list.tsx) and is the ONLY
+           * scroller in the panel; the other two states are short enough that
+           * they never need to scroll, so this wrapper itself stays a plain
+           * (non-scrolling) flex column and just lets the flex-1 child fill
+           * whatever height the panel has above the composer.
+           */}
+          <div className="flex min-h-0 flex-1 flex-col">
+            {showLoading && (
+              <div className="flex flex-1 items-center justify-center">
+                <Spinner label="Loading conversation…" />
+              </div>
+            )}
 
-          {thread.loadError && (
-            <div role="alert">
-              <Notice variant="error" title={thread.loadError}>
-                <Button variant="secondary" size="sm" className="mt-2" onClick={thread.reload}>
-                  Try again
-                </Button>
-              </Notice>
-            </div>
-          )}
-
-          {conversationEmpty && !thread.loadError && (
-            <AdvocateEmptyState
-              childFirstName={child.firstName}
-              canAsk={canAsk && !capped}
-              onPickExample={setDraft}
-              hasJournalEntries={hasJournalEntries === true}
-            />
-          )}
-
-          {!conversationEmpty && !showLoading && (
-            <MessageList
-              childId={childId}
-              messages={thread.messages}
-              pending={thread.pending}
-              streaming={thread.streaming}
-              announcement={thread.announcement}
-              handlers={suggestionHandlers}
-            />
-          )}
-
-          {thread.stopped && (
-            <p className="text-xs text-brand-slate-500" role="status" data-testid="advocate-stopped">
-              {STOPPED_COPY}
-            </p>
-          )}
-
-          {thread.failure && (
-            <div role="alert" data-testid="advocate-send-error">
-              <Notice variant="error" title={thread.failure.message}>
-                {thread.failure.retryable && (
-                  <Button variant="secondary" size="sm" className="mt-2" onClick={thread.retry} data-testid="advocate-retry">
-                    Retry
+            {thread.loadError && (
+              <div role="alert" className="p-4">
+                <Notice variant="error" title={thread.loadError}>
+                  <Button variant="secondary" size="sm" className="mt-2" onClick={thread.reload}>
+                    Try again
                   </Button>
-                )}
-              </Notice>
-            </div>
-          )}
+                </Notice>
+              </div>
+            )}
 
-          {createError && (
-            <div role="alert">
-              <Notice variant="error" title={createError} />
+            {conversationEmpty && !thread.loadError && (
+              <div className="flex flex-1 items-center justify-center px-6 py-8">
+                <AdvocateEmptyState
+                  canAsk={canAsk && !capped}
+                  onPickExample={setDraft}
+                  hasJournalEntries={hasJournalEntries === true}
+                />
+              </div>
+            )}
+
+            {!conversationEmpty && !showLoading && (
+              <MessageList
+                childId={childId}
+                messages={thread.messages}
+                pending={thread.pending}
+                streaming={thread.streaming}
+                announcement={thread.announcement}
+                handlers={suggestionHandlers}
+              />
+            )}
+          </div>
+
+          {(thread.stopped || thread.failure || createError || (thread.disclaimer && thread.messages.length > 0)) && (
+            <div className="space-y-2 border-t border-brand-slate-100 px-3 py-2">
+              {thread.stopped && (
+                <p className="text-xs text-brand-slate-500" role="status" data-testid="advocate-stopped">
+                  {STOPPED_COPY}
+                </p>
+              )}
+
+              {thread.failure && (
+                <div role="alert" data-testid="advocate-send-error">
+                  <Notice variant="error" title={thread.failure.message}>
+                    {thread.failure.retryable && (
+                      <Button variant="secondary" size="sm" className="mt-2" onClick={thread.retry} data-testid="advocate-retry">
+                        Retry
+                      </Button>
+                    )}
+                  </Notice>
+                </div>
+              )}
+
+              {createError && (
+                <div role="alert">
+                  <Notice variant="error" title={createError} />
+                </div>
+              )}
+
+              {thread.disclaimer && thread.messages.length > 0 && (
+                <p className="text-[11px] leading-relaxed text-brand-slate-500" data-testid="advocate-disclaimer">
+                  {thread.disclaimer}
+                </p>
+              )}
             </div>
           )}
 
           {canAsk && (
             <div
-              className="sticky bottom-0 -mx-4 space-y-2 border-t border-brand-slate-100 bg-white px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6 md:static md:mx-0 md:border-0 md:px-0 md:pb-0"
+              className="sticky bottom-0 space-y-2 border-t border-brand-slate-200 bg-brand-slate-50/60 p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:static"
               data-testid="advocate-composer-dock"
             >
               {about && (
@@ -327,17 +354,11 @@ export function AdvocatePage() {
               />
             </div>
           )}
-
-          {thread.disclaimer && thread.messages.length > 0 && (
-            <p className="text-[11px] leading-relaxed text-brand-slate-400" data-testid="advocate-disclaimer">
-              {thread.disclaimer}
-            </p>
-          )}
         </section>
       </div>
 
       <Drawer open={railOpen} onClose={() => setRailOpen(false)} title="Conversations" data-testid="advocate-rail-drawer">
-        {rail}
+        {renderRail('plain')}
       </Drawer>
 
       {canAsk && (

@@ -219,6 +219,37 @@ describe('AdvocatePage', () => {
     expect(screen.queryByTestId('advocate-usage-warning')).not.toBeInTheDocument();
   });
 
+  it('does not repeat the section heading inside the empty state', async () => {
+    renderPage();
+    await screen.findByTestId('advocate-empty');
+    // The section heading above the panel is the only place this says it.
+    expect(screen.getByRole('heading', { level: 2, name: 'Ask the advocate about Jordan' })).toBeInTheDocument();
+    expect(screen.queryByText("Ask about Jordan's plan, your rights, or what to do next")).not.toBeInTheDocument();
+  });
+
+  it('nests the composer inside one conversation panel with a single scroller once a thread has messages', async () => {
+    renderPage('owner', '/children/4/advocate?thread=1');
+    await screen.findByTestId('advocate-assistant-message');
+
+    // The composer dock is a descendant of the panel, not a separate floating band.
+    const panel = screen.getByTestId('advocate-conversation');
+    expect(within(panel).getByTestId('advocate-composer-dock')).toBeInTheDocument();
+
+    // Exactly one scroller in the conversation area — MessageList's own region
+    // owns the scroll; the panel does not add a second wrapping scroller.
+    const scrollers = panel.querySelectorAll('[class*="overflow-y-auto"]');
+    expect(scrollers).toHaveLength(1);
+    expect(scrollers[0]).toBe(screen.getByTestId('advocate-messages'));
+  });
+
+  it('lets thread titles wrap onto two lines instead of truncating', async () => {
+    renderPage();
+    const rail = await screen.findByTestId('advocate-thread-list');
+    const title = within(rail).getByText('PWN question');
+    expect(title).toHaveClass('line-clamp-2');
+    expect(title.className).not.toMatch(/\btruncate\b/);
+  });
+
   it('sends from a blank page: creates a thread, shows the user bubble at once, streams tools and deltas, then renders the stored answer with sources and suggestions', async () => {
     renderPage('owner', '/children/4/advocate?about=iep:12');
     await screen.findByTestId('advocate-empty');

@@ -32,6 +32,13 @@ const PIN_THRESHOLD_PX = 48;
  * announced exactly once from an sr-only `role="status"` node rendered as a
  * sibling *outside* the conversation region, which carries no `aria-busy` —
  * a busy ancestor makes some AT drop the announcement instead of replaying it.
+ *
+ * Scroll ownership: this component's own `role="region"` div stays the single
+ * scroller (ref, `onScroll`, pin-to-bottom logic unchanged) — it no longer
+ * caps itself with `max-h`/`min-h`; instead it takes `flex-1 overflow-y-auto`
+ * so it fills whatever height the conversation panel (`advocate-page.tsx`)
+ * gives it. The panel does not add a second scrolling wrapper around this
+ * component, so there is exactly one scroller in the conversation area.
  */
 export function MessageList({ childId, messages, pending, streaming, announcement, handlers }: MessageListProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -63,7 +70,7 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
         tabIndex={0}
         role="region"
         aria-label="Conversation"
-        className="max-h-[60vh] min-h-[16rem] overflow-y-auto rounded-card bg-brand-slate-50 p-3 md:max-h-[calc(100vh-22rem)]"
+        className="min-h-0 flex-1 overflow-y-auto p-3"
         data-testid="advocate-messages"
       >
         <ul className="space-y-3">
