@@ -77,7 +77,7 @@ export function MfaVerifyPage() {
           <h2 className="text-xl font-serif font-semibold text-center mb-2 text-brand-slate-800">
             Two-Factor Authentication
           </h2>
-          <p className="text-sm text-brand-slate-400 text-center mb-6">
+          <p className="text-sm text-brand-slate-500 text-center mb-6">
             {useRecovery
               ? 'Enter one of your recovery codes'
               : 'Enter the 6-digit code from your authenticator app'}
@@ -138,7 +138,7 @@ export function MfaVerifyPage() {
             <button
               type="button"
               onClick={() => navigate('/login')}
-              className="text-xs text-brand-slate-400 hover:text-brand-slate-600"
+              className="text-xs text-brand-slate-500 hover:text-brand-slate-600"
             >
               Back to login
             </button>

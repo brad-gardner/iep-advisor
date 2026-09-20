@@ -55,7 +55,7 @@ export function RegisterPage() {
       {path === 'parent' && <ParentRegisterForm initialInviteCode={codeFromUrl} />}
       {path === 'district' && <DistrictRegisterForm />}
 
-      <p className="mt-6 text-center text-sm text-brand-slate-400">
+      <p className="mt-6 text-center text-sm text-brand-slate-500">
         Already have an account?{' '}
         <Link to="/login" className="text-brand-teal-500 hover:text-brand-teal-600">
           Sign in

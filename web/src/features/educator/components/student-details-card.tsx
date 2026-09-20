@@ -68,7 +68,7 @@ export function StudentDetailsCard({ student, onEdit }: StudentDetailsCardProps)
         <Row label="Disability" testId="student-info-disability">
           {disability}
           {student.legacyDisabilityText && (
-            <span className="block text-xs text-brand-slate-400">
+            <span className="block text-xs text-brand-slate-500">
               Previously: {student.legacyDisabilityText}
             </span>
           )}
@@ -79,7 +79,7 @@ export function StudentDetailsCard({ student, onEdit }: StudentDetailsCardProps)
         </Row>
       </dl>
 
-      <h3 className="mb-2 mt-4 text-xs font-medium uppercase tracking-wide text-brand-slate-400">
+      <h3 className="mb-2 mt-4 text-xs font-medium uppercase tracking-wide text-brand-slate-500">
         Timeline
       </h3>
       <dl className="space-y-2 text-sm" data-testid="student-info-timeline">

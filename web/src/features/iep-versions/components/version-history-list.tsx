@@ -36,7 +36,7 @@ export function VersionHistoryList({ versions, linkBase, isLoading }: VersionHis
             <span className="flex flex-col">
               <span className="text-sm font-medium text-brand-slate-800">
                 {v.title || `IEP v${v.versionNumber}`}{' '}
-                <span className="text-brand-slate-400">v{v.versionNumber}</span>
+                <span className="text-brand-slate-500">v{v.versionNumber}</span>
               </span>
               <span className="text-xs text-brand-slate-500">
                 Finalized {formatDate(v.finalizedAt)}

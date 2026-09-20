@@ -65,7 +65,7 @@ export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormPro
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && <Notice variant="error" title={error} />}
 
-      <p className="text-[12px] text-brand-slate-400">
+      <p className="text-[12px] text-brand-slate-500">
         An ETR (Evaluation Team Report) documents the team&rsquo;s assessment findings
         and eligibility determination for special education.
       </p>

@@ -32,7 +32,7 @@ export function ParticipantList({ participants, attendance }: ParticipantListPro
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-brand-slate-800">{p.displayName}</p>
-                <p className="text-xs text-brand-slate-400">
+                <p className="text-xs text-brand-slate-500">
                   {TEAM_ROLE_LABELS[p.teamRole]}
                   {p.isRequired ? '' : ' · optional'}
                   {p.isFamily ? ' · family' : ''}

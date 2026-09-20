@@ -11,7 +11,7 @@ interface ResourceCommitmentListProps {
 export function ResourceCommitmentList({ items }: ResourceCommitmentListProps) {
   if (items.length === 0) {
     return (
-      <p className="text-sm text-brand-slate-400" data-testid="brief-resource-commitments-empty">
+      <p className="text-sm text-brand-slate-500" data-testid="brief-resource-commitments-empty">
         No resource commitments detected in this draft.
       </p>
     );

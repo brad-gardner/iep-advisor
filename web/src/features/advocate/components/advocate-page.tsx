@@ -218,7 +218,7 @@ export function AdvocatePage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h2 className="font-serif">Ask the advocate about {child.firstName}</h2>
-          <p className="mt-1 text-sm text-brand-slate-400">Plain answers about the plan, your rights, and what to do next.</p>
+          <p className="mt-1 text-sm text-brand-slate-500">Plain answers about the plan, your rights, and what to do next.</p>
         </div>
         <Button
           variant="secondary"
@@ -246,7 +246,12 @@ export function AdvocatePage() {
         </aside>
 
         <section
-          className="flex min-h-[34rem] flex-col rounded-card border border-brand-slate-200 bg-white shadow-sm md:h-[calc(100vh-19rem)] md:overflow-hidden"
+          // Height measured in-browser, not guessed: the stack above the panel (page padding,
+          // breadcrumb, title, badge, tabs, heading, privacy line) is a constant 319px, and the
+          // container adds 32px below — so 22rem lands the panel exactly on the viewport floor at
+          // 900px tall with no page scroll (19rem overflowed by 15px). The 26rem floor keeps the
+          // panel usable on a short laptop; 34rem forced 175px of page scroll at 720px tall.
+          className="flex min-h-[26rem] flex-col rounded-card border border-brand-slate-200 bg-white shadow-sm md:h-[calc(100vh-22rem)] md:overflow-hidden"
           aria-label="Conversation"
           data-testid="advocate-conversation"
         >

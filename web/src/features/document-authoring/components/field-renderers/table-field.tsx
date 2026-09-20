@@ -197,7 +197,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
           )}
         </div>
         {rows.length === 0 ? (
-          <p className="mb-2 text-sm text-brand-slate-400">No rows yet.</p>
+          <p className="mb-2 text-sm text-brand-slate-500">No rows yet.</p>
         ) : (
           <ol className="space-y-3">
             {rows.map((row, rowIndex) => {
@@ -306,7 +306,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                     />
                   ) : (
                     !disabled && (
-                      <p className="mt-2 text-xs text-brand-slate-400">AI help is available once this row has saved.</p>
+                      <p className="mt-2 text-xs text-brand-slate-500">AI help is available once this row has saved.</p>
                     )
                   )}
                 </li>
@@ -390,7 +390,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
               <tr>
                 <td
                   colSpan={columns.length + 1}
-                  className="px-3 py-4 text-center text-sm text-brand-slate-400"
+                  className="px-3 py-4 text-center text-sm text-brand-slate-500"
                 >
                   No rows yet.
                 </td>

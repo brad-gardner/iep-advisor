@@ -232,7 +232,7 @@ describe('RichTextEditor markdown length limit (MarkdownLimit)', () => {
   it('does not show over-limit styling under the cap', async () => {
     render(<RichTextEditor label="Note" value="short" onChange={() => {}} maxLength={10} />);
 
-    expect(await screen.findByText('5 / 10')).toHaveClass('text-brand-slate-400');
+    expect(await screen.findByText('5 / 10')).toHaveClass('text-brand-slate-500');
     expect(await screen.findByLabelText('Note')).not.toHaveAttribute('aria-invalid');
   });
 });

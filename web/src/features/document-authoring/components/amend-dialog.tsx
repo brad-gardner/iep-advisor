@@ -111,7 +111,7 @@ export function AmendDialog({ open, versionId, onClose, onAmended }: AmendDialog
           required
           data-testid="amend-dialog-reason"
         />
-        <p className="text-xs text-brand-slate-400">At least {MIN_REASON_LENGTH} characters.</p>
+        <p className="text-xs text-brand-slate-500">At least {MIN_REASON_LENGTH} characters.</p>
 
         <Input
           label="Effective date (optional)"

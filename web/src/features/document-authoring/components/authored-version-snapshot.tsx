@@ -30,7 +30,7 @@ export function AuthoredVersionSnapshot({ templateVersion, values }: AuthoredVer
   const sections = [...templateVersion.sections].sort((a, b) => a.displayOrder - b.displayOrder);
 
   if (sections.length === 0) {
-    return <p className="text-sm text-brand-slate-400">This template has no sections.</p>;
+    return <p className="text-sm text-brand-slate-500">This template has no sections.</p>;
   }
 
   return (
@@ -57,7 +57,7 @@ function SectionBlock({
       </h2>
       <Card className="space-y-4">
         {fields.length === 0 ? (
-          <p className="text-sm text-brand-slate-400">No fields.</p>
+          <p className="text-sm text-brand-slate-500">No fields.</p>
         ) : (
           fields.map((field) => (
             <FieldValueDisplay key={field.id} field={field} value={values[field.fieldKey]} />
@@ -87,7 +87,7 @@ export function FieldValueDisplay({ field, value }: { field: TemplateFieldDto; v
 }
 
 function renderScalar(field: TemplateFieldDto, value: unknown): React.ReactNode {
-  const empty = <span className="text-brand-slate-400">—</span>;
+  const empty = <span className="text-brand-slate-500">—</span>;
 
   switch (field.fieldType) {
     case 'Checkbox':
@@ -126,7 +126,7 @@ function TableValue({ field, value }: { field: TemplateFieldDto; value: unknown 
         {field.label || 'Untitled field'}
       </p>
       {rows.length === 0 ? (
-        <p className="text-sm text-brand-slate-400">No rows.</p>
+        <p className="text-sm text-brand-slate-500">No rows.</p>
       ) : (
         <div className="overflow-x-auto rounded-card border border-brand-slate-200">
           <table className="w-full border-collapse text-sm">
@@ -169,7 +169,7 @@ export function CellValue({ column, value }: { column: TableColumn; value: unkno
 }
 
 function renderCell(column: TableColumn, value: unknown): React.ReactNode {
-  const empty = <span className="text-brand-slate-400">—</span>;
+  const empty = <span className="text-brand-slate-500">—</span>;
   switch (column.type) {
     case 'Checkbox':
       return value === true ? 'Yes' : 'No';

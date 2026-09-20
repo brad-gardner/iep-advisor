@@ -73,7 +73,7 @@ export function LoginPage() {
             <button
               type="button"
               onClick={() => toggleMagicLink(false)}
-              className="text-xs text-brand-slate-400 hover:text-brand-slate-600"
+              className="text-xs text-brand-slate-500 hover:text-brand-slate-600"
               data-testid="magic-link-back"
             >
               Back to password sign-in
@@ -134,7 +134,7 @@ export function LoginPage() {
         </div>
       )}
 
-      <p className="mt-6 text-center text-sm text-brand-slate-400">
+      <p className="mt-6 text-center text-sm text-brand-slate-500">
         Don't have an account?{' '}
         <Link to="/register" className="text-brand-teal-500 hover:text-brand-teal-600" data-testid="register-link">
           Sign up

@@ -109,7 +109,7 @@ export function Composer({
         <div className="flex items-center justify-between gap-3 px-3 pb-2">
           <p
             id={counterId}
-            className={cn('text-xs', overLimit ? 'text-brand-danger-700' : 'text-brand-slate-400')}
+            className={cn('text-xs', overLimit ? 'text-brand-danger-700' : 'text-brand-slate-500')}
             data-testid="advocate-composer-count"
           >
             {length.toLocaleString()} / {ADVOCATE_MESSAGE_MAX_LENGTH.toLocaleString()}

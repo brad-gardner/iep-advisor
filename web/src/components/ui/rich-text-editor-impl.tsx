@@ -444,7 +444,7 @@ function RichTextEditorImpl({
           id={counterId}
           className={cn(
             'mt-1 text-right text-xs',
-            overLimit ? 'text-brand-danger-600' : 'text-brand-slate-400'
+            overLimit ? 'text-brand-danger-600' : 'text-brand-slate-500'
           )}
         >
           {markdownForCount.length} / {maxLength}

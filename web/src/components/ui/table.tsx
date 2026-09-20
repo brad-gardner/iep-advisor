@@ -271,7 +271,7 @@ export function Table<T>({
             <tr>
               <td colSpan={totalCols} className="px-4 py-10">
                 {empty ?? (
-                  <p className="text-center text-sm text-brand-slate-400">
+                  <p className="text-center text-sm text-brand-slate-500">
                     Nothing to show yet.
                   </p>
                 )}

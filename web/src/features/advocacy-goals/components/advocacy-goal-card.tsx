@@ -23,7 +23,7 @@ export function AdvocacyGoalCard({
   onDelete,
 }: AdvocacyGoalCardProps) {
   return (
-    <div className="bg-white rounded-card p-4 border-[0.5px] border-brand-slate-200 flex gap-3" data-testid="goal-card">
+    <div className="bg-white rounded-card p-4 border border-brand-slate-200 flex gap-3" data-testid="goal-card">
       {(onMoveUp || onMoveDown) && (
         <div className="flex flex-col gap-1 shrink-0">
           <button

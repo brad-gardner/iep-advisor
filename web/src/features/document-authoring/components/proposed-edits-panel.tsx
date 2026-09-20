@@ -56,10 +56,10 @@ export function ProposedEditsPanel({ instanceId, templateVersion }: ProposedEdit
           </div>
         )}
 
-        {!error && isLoading && <p className="text-sm text-brand-slate-400">Loading…</p>}
+        {!error && isLoading && <p className="text-sm text-brand-slate-500">Loading…</p>}
 
         {!error && !isLoading && edits.length === 0 && (
-          <p className="text-sm text-brand-slate-400" data-testid="proposed-edits-empty">
+          <p className="text-sm text-brand-slate-500" data-testid="proposed-edits-empty">
             No decisions from meetings yet.
           </p>
         )}
@@ -96,7 +96,7 @@ export function ProposedEditsPanel({ instanceId, templateVersion }: ProposedEdit
                     </Button>
                   )}
                   {edit.appliedAt ? (
-                    <span className="text-xs text-brand-slate-400" data-testid={`proposed-edit-applied-${edit.decisionId}`}>
+                    <span className="text-xs text-brand-slate-500" data-testid={`proposed-edit-applied-${edit.decisionId}`}>
                       Applied {formatDate(edit.appliedAt)}
                     </span>
                   ) : (

@@ -14,7 +14,7 @@ const SEVERITY_ORDER: Record<string, number> = {
 export function EtrRedFlagsList({ redFlags }: EtrRedFlagsListProps) {
   if (redFlags.length === 0) {
     return (
-      <div className="text-sm text-brand-slate-400 py-8 text-center">
+      <div className="text-sm text-brand-slate-500 py-8 text-center">
         No red flags identified.
       </div>
     );

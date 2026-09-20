@@ -13,7 +13,7 @@ export function ChecklistItemRow({ item, index, onCheck }: ChecklistItemRowProps
   const hasDetails = item.context || item.legalBasis;
 
   return (
-    <div className="border-[0.5px] border-brand-slate-200 rounded-card">
+    <div className="border border-brand-slate-200 rounded-card">
       <div className="flex items-start gap-3 p-3">
         <button
           onClick={() => onCheck(index, !item.isChecked)}
@@ -36,7 +36,7 @@ export function ChecklistItemRow({ item, index, onCheck }: ChecklistItemRowProps
           <p
             className={`text-sm leading-relaxed ${
               item.isChecked
-                ? 'line-through text-brand-slate-400'
+                ? 'line-through text-brand-slate-500'
                 : 'text-brand-slate-700'
             }`}
           >

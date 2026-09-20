@@ -87,7 +87,7 @@ export function RemoveGoalDialog({ open, goalLabel, loading = false, error, onCo
           required
           data-testid="remove-goal-dialog-reason"
         />
-        <p className="text-xs text-brand-slate-400">At least {MIN_REASON_LENGTH} characters.</p>
+        <p className="text-xs text-brand-slate-500">At least {MIN_REASON_LENGTH} characters.</p>
       </form>
     </Modal>
   );

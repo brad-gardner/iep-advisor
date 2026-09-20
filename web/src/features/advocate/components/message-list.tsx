@@ -101,13 +101,13 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
               // rendered without links so nothing focusable sits inside the hidden subtree. The
               // finished answer is announced once from the status node below.
               <div className="flex justify-start" aria-hidden="true">
-                <div className="max-w-[92%] rounded-card rounded-bl-sm border-[0.5px] border-brand-slate-200 bg-white px-4 py-3">
+                <div className="max-w-[92%] rounded-card rounded-bl-sm border border-brand-slate-200 bg-white px-4 py-3">
                   <Markdown content={streaming.text} className="text-sm" disableLinks data-testid="advocate-streaming-text" />
                 </div>
               </div>
             ) : (
               streaming.tools.length === 0 && (
-                <p className="text-xs text-brand-slate-400" data-testid="advocate-thinking">
+                <p className="text-xs text-brand-slate-500" data-testid="advocate-thinking">
                   The advocate is thinking…
                 </p>
               )

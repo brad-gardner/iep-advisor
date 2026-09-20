@@ -93,7 +93,7 @@ export function ProgressReportUpload({
         {isUploading ? (
           <div className="flex flex-col items-center gap-2">
             <Spinner size="sm" label="Uploading…" />
-            <p className="text-brand-slate-400 text-sm">Uploading...</p>
+            <p className="text-brand-slate-500 text-sm">Uploading...</p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1">
@@ -103,7 +103,7 @@ export function ProgressReportUpload({
               aria-hidden="true"
             />
             <p className="text-brand-slate-600 text-sm">Attach PDF</p>
-            <p className="text-brand-slate-400 text-[11px]">
+            <p className="text-brand-slate-500 text-[11px]">
               Drop a PDF here or click to browse
             </p>
           </div>

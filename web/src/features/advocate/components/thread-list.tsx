@@ -89,7 +89,7 @@ export function ThreadList({
       )}
 
       {threads && threads.length === 0 && (
-        <p className="px-1 text-xs text-brand-slate-400" data-testid="advocate-thread-list-empty">
+        <p className="px-1 text-xs text-brand-slate-500" data-testid="advocate-thread-list-empty">
           No conversations yet.
         </p>
       )}
@@ -113,7 +113,7 @@ export function ThreadList({
                   <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-brand-slate-400" aria-hidden="true" />
                   <span className="min-w-0 flex-1">
                     <span className="line-clamp-2 text-sm font-medium">{t.title}</span>
-                    <span className="block text-[11px] text-brand-slate-400">{relativeTime(t.lastMessageAt)}</span>
+                    <span className="block text-[11px] text-brand-slate-500">{relativeTime(t.lastMessageAt)}</span>
                   </span>
                 </button>
                 {canAsk && (

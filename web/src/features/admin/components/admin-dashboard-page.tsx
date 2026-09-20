@@ -195,7 +195,7 @@ function StatCard({ icon: Icon, label, value, delta }: StatCardProps) {
         )}
       </div>
       <p className="mt-4 text-3xl font-semibold text-brand-slate-800">{value.toLocaleString()}</p>
-      <p className="text-sm text-brand-slate-400 mt-1">{label}</p>
+      <p className="text-sm text-brand-slate-500 mt-1">{label}</p>
     </Card>
   );
 }
@@ -277,7 +277,7 @@ function BreakdownCard({ title, data }: BreakdownCardProps) {
     <Card>
       <h3 className="text-sm font-medium text-brand-slate-700 mb-4">{title}</h3>
       {entries.length === 0 ? (
-        <p className="text-xs text-brand-slate-400">No data yet.</p>
+        <p className="text-xs text-brand-slate-500">No data yet.</p>
       ) : (
         <div className="space-y-3">
           {entries.map(([label, value], i) => (
@@ -317,10 +317,10 @@ function RecentUsersTable({ users }: RecentUsersTableProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-brand-slate-100">
-              <th className="text-left pb-2 text-xs font-medium text-brand-slate-400">Name</th>
-              <th className="text-left pb-2 text-xs font-medium text-brand-slate-400">Email</th>
-              <th className="text-left pb-2 text-xs font-medium text-brand-slate-400">Joined</th>
-              <th className="text-left pb-2 text-xs font-medium text-brand-slate-400">Status</th>
+              <th className="text-left pb-2 text-xs font-medium text-brand-slate-500">Name</th>
+              <th className="text-left pb-2 text-xs font-medium text-brand-slate-500">Email</th>
+              <th className="text-left pb-2 text-xs font-medium text-brand-slate-500">Joined</th>
+              <th className="text-left pb-2 text-xs font-medium text-brand-slate-500">Status</th>
             </tr>
           </thead>
           <tbody>

@@ -30,7 +30,7 @@ export function MyResponsesSection({ responses }: MyResponsesSectionProps) {
                     <span className="text-sm text-brand-slate-500">{response.targetLabel}</span>
                   )}
                 </div>
-                <span className="text-xs text-brand-slate-400">{formatDate(response.createdAt)}</span>
+                <span className="text-xs text-brand-slate-500">{formatDate(response.createdAt)}</span>
               </div>
               <Markdown content={response.text} data-testid={`my-response-${response.id}-text`} />
               {response.staffReply && (
@@ -46,7 +46,7 @@ export function MyResponsesSection({ responses }: MyResponsesSectionProps) {
                 </div>
               )}
               {response.status === 'Resolved' && !response.staffReply && (
-                <p className="text-xs text-brand-slate-400">Marked resolved in the updated draft.</p>
+                <p className="text-xs text-brand-slate-500">Marked resolved in the updated draft.</p>
               )}
             </Card>
           </li>

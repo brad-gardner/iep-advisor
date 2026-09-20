@@ -49,7 +49,7 @@ export function EtrSectionCard({ section, defaultOpen = false }: EtrSectionCardP
         data-testid="etr-section-toggle"
       >
         <div className="min-w-0">
-          <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
+          <p className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold">
             {section.sectionType}
           </p>
           <p className="font-serif text-[17px] font-semibold text-brand-slate-800 truncate">
@@ -77,7 +77,7 @@ export function EtrSectionCard({ section, defaultOpen = false }: EtrSectionCardP
               {section.rawText}
             </pre>
           ) : (
-            <p className="mt-3 text-sm text-brand-slate-400 italic">
+            <p className="mt-3 text-sm text-brand-slate-500 italic">
               No content captured for this section.
             </p>
           )}
@@ -102,14 +102,14 @@ function ParsedContentView({ value }: { value: ParsedShape }) {
 
   if (Array.isArray(value)) {
     if (value.length === 0) {
-      return <p className="text-sm text-brand-slate-400 italic">None</p>;
+      return <p className="text-sm text-brand-slate-500 italic">None</p>;
     }
     return (
       <ul className="space-y-2">
         {value.map((item, idx) => (
           <li
             key={idx}
-            className="text-sm text-brand-slate-600 bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200"
+            className="text-sm text-brand-slate-600 bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200"
           >
             <ParsedContentView value={item} />
           </li>
@@ -121,13 +121,13 @@ function ParsedContentView({ value }: { value: ParsedShape }) {
   // object
   const entries = Object.entries(value);
   if (entries.length === 0) {
-    return <p className="text-sm text-brand-slate-400 italic">No details</p>;
+    return <p className="text-sm text-brand-slate-500 italic">No details</p>;
   }
   return (
     <dl className="space-y-3">
       {entries.map(([k, v]) => (
         <div key={k}>
-          <dt className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
+          <dt className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold">
             {humanizeKey(k)}
           </dt>
           <dd className="mt-1">

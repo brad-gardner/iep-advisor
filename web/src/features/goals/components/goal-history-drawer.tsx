@@ -78,7 +78,7 @@ export function GoalHistoryDrawer({ open, onClose, studentId, lineageId, goalTex
       )}
 
       {!error && records !== null && records.length === 0 && (
-        <p className="text-sm text-brand-slate-400">No history recorded yet.</p>
+        <p className="text-sm text-brand-slate-500">No history recorded yet.</p>
       )}
 
       {!error && records !== null && records.length > 0 && (

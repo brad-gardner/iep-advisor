@@ -45,7 +45,7 @@ export function GoalProgressCard({ finding }: GoalProgressCardProps) {
       </div>
 
       <div>
-        <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold mb-1">
+        <p className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold mb-1">
           What the report says
         </p>
         <p className="text-sm text-brand-slate-600 whitespace-pre-wrap">

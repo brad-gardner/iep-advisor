@@ -100,13 +100,13 @@ export function ShareWithFamilyModal({ open, onClose, instanceId, onShared }: Sh
             <div>
               <p className="mb-2 text-[13px] font-medium text-brand-slate-600">Will be shared with</p>
               {preview.recipients.length === 0 ? (
-                <p className="text-sm text-brand-slate-400">No linked family or student accounts yet.</p>
+                <p className="text-sm text-brand-slate-500">No linked family or student accounts yet.</p>
               ) : (
                 <ul className="space-y-1.5" data-testid="share-recipient-list">
                   {preview.recipients.map((r) => (
                     <li key={r.userId} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                       <span className="text-brand-slate-800">
-                        {r.displayName} <span className="text-brand-slate-400">({r.relationship})</span>
+                        {r.displayName} <span className="text-brand-slate-500">({r.relationship})</span>
                       </span>
                       <span className="text-brand-slate-500">{r.email}</span>
                     </li>

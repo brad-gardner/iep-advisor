@@ -41,7 +41,7 @@ export function StatTile({
     >
       <p className="text-xs font-medium uppercase tracking-wide text-brand-slate-500">{label}</p>
       <p className="mt-1 font-serif text-2xl text-brand-slate-800">{value}</p>
-      {denominator && <p className="mt-1 text-xs text-brand-slate-400">{denominator}</p>}
+      {denominator && <p className="mt-1 text-xs text-brand-slate-500">{denominator}</p>}
     </div>
   );
 

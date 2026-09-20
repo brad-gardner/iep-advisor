@@ -36,13 +36,13 @@ export function SectionNavigator({ sections, activeId, onJump }: SectionNavigato
               )}
               data-testid={`section-nav-${s.id}`}
             >
-              <span className="mr-1.5 text-brand-slate-400">{i + 1}</span>
+              <span className="mr-1.5 text-brand-slate-500">{i + 1}</span>
               {s.title || 'Untitled section'}
             </a>
           </li>
         ))}
       </ol>
-      <p className="mt-2 hidden text-xs text-brand-slate-400 lg:block">
+      <p className="mt-2 hidden text-xs text-brand-slate-500 lg:block">
         Press <kbd className="rounded border px-1">[</kbd> / <kbd className="rounded border px-1">]</kbd> to move between sections
       </p>
     </nav>

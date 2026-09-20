@@ -55,7 +55,7 @@ export function ChatPanel({ chat, onClose }: ChatPanelProps) {
         data-testid="chat-thread"
       >
         {messages.length === 0 && (
-          <p className="text-[13px] leading-relaxed text-brand-slate-400" data-testid="chat-empty">
+          <p className="text-[13px] leading-relaxed text-brand-slate-500" data-testid="chat-empty">
             Ask about this IEP — e.g. &ldquo;Is this goal measurable?&rdquo;
           </p>
         )}
@@ -63,7 +63,7 @@ export function ChatPanel({ chat, onClose }: ChatPanelProps) {
           <ChatMessageBubble key={index} message={message} index={index} />
         ))}
         {isSending && (
-          <p className="text-[13px] text-brand-slate-400" data-testid="chat-thinking">
+          <p className="text-[13px] text-brand-slate-500" data-testid="chat-thinking">
             Thinking…
           </p>
         )}

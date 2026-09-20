@@ -48,7 +48,7 @@ export function SchoolIepsCard({ childId }: SchoolIepsCardProps) {
   return (
     <Card data-testid="school-ieps-section">
       <h2 className="font-serif mb-1">School documents</h2>
-      <p className="text-sm text-brand-slate-400 mb-4">Finalized documents shared by your child's school.</p>
+      <p className="text-sm text-brand-slate-500 mb-4">Finalized documents shared by your child's school.</p>
       <ul className="divide-y divide-brand-slate-100" data-testid="school-documents-list">
         {rows.map((row) => (
           <li key={row.id} className="py-3">

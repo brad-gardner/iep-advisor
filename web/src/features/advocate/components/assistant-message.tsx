@@ -46,7 +46,7 @@ export function AssistantMessage({
   const visibleSuggestions = suggestions.filter(isRenderable);
   return (
     <li className="flex justify-start" data-testid={testId}>
-      <div className="max-w-[92%] space-y-3 rounded-card rounded-bl-sm border-[0.5px] border-brand-slate-200 bg-white px-4 py-3">
+      <div className="max-w-[92%] space-y-3 rounded-card rounded-bl-sm border border-brand-slate-200 bg-white px-4 py-3">
         <Markdown content={contentMarkdown} className="text-sm" data-testid={`${testId}-content`} />
 
         {truncated && (

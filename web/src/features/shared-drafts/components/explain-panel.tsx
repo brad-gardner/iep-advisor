@@ -60,7 +60,7 @@ export function ExplainPanel({ target, 'data-testid': testId }: ExplainPanelProp
             <>
               <p className="whitespace-pre-wrap text-brand-slate-700">{explanation}</p>
               {explanations.disclaimer && (
-                <p className="mt-2 text-xs text-brand-slate-400">{explanations.disclaimer}</p>
+                <p className="mt-2 text-xs text-brand-slate-500">{explanations.disclaimer}</p>
               )}
             </>
           ) : explanations.isLoading ? (

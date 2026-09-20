@@ -38,7 +38,7 @@ export function AuditLogRow({ entry }: AuditLogRowProps) {
       </p>
       <time
         dateTime={entry.createdAt}
-        className="shrink-0 text-xs text-brand-slate-400 sm:text-right"
+        className="shrink-0 text-xs text-brand-slate-500 sm:text-right"
       >
         {new Date(entry.createdAt).toLocaleString()}
       </time>

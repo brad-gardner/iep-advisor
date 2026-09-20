@@ -30,7 +30,7 @@ export function AboutContextPill({ about, label, onClear }: AboutContextPillProp
           </button>
         )}
       </span>
-      <span className="text-xs text-brand-slate-400">Your first question starts a new conversation about it.</span>
+      <span className="text-xs text-brand-slate-500">Your first question starts a new conversation about it.</span>
     </div>
   );
 }

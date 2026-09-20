@@ -114,12 +114,12 @@ export function ParentQuestions({
           <h3 className="font-serif text-[17px] font-semibold text-brand-slate-800">Your questions</h3>
         </div>
         {questions.length > 0 && (
-          <span className="text-[12px] font-medium text-brand-slate-400">
+          <span className="text-[12px] font-medium text-brand-slate-500">
             {checkedCount} of {questions.length} asked
           </span>
         )}
       </div>
-      <p className="mt-1 text-[12px] text-brand-slate-400">Questions you add yourself or accept from the advocate.</p>
+      <p className="mt-1 text-[12px] text-brand-slate-500">Questions you add yourself or accept from the advocate.</p>
 
       {isLoading ? (
         <div className="mt-3 space-y-2" role="status" aria-label="Loading your questions" data-testid="parent-questions-loading">

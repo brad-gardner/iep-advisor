@@ -29,9 +29,9 @@ export function RunHistoryList({
       <h2 className="font-serif mb-4">Past Analyses</h2>
 
       {isLoading && runs.length === 0 ? (
-        <p className="text-sm text-brand-slate-400">Loading…</p>
+        <p className="text-sm text-brand-slate-500">Loading…</p>
       ) : runs.length === 0 ? (
-        <p className="text-sm text-brand-slate-400">No analyses yet.</p>
+        <p className="text-sm text-brand-slate-500">No analyses yet.</p>
       ) : (
         <ul className="space-y-2">
           {runs.map((run) => {
@@ -54,7 +54,7 @@ export function RunHistoryList({
                     </span>
                     <RunStatusBadge status={run.status} />
                   </div>
-                  <p className="text-xs text-brand-slate-400 mt-1">
+                  <p className="text-xs text-brand-slate-500 mt-1">
                     {sourceSummary(run)}
                   </p>
                 </button>

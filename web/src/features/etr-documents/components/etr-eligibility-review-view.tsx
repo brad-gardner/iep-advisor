@@ -51,16 +51,16 @@ export function EtrEligibilityReviewView({ data }: EtrEligibilityReviewViewProps
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-            <dt className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
+          <div className="bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200">
+            <dt className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold">
               Stated Category
             </dt>
             <dd className="text-sm font-medium text-brand-slate-800 mt-1">
               {data.stated_category || '—'}
             </dd>
           </div>
-          <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-            <dt className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
+          <div className="bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200">
+            <dt className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold">
               Stated Conclusion
             </dt>
             <dd className="text-sm font-medium text-brand-slate-800 mt-1">

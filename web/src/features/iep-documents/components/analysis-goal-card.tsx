@@ -25,7 +25,7 @@ export function AnalysisGoalCard({ goalAnalysis, childId, canAsk = false }: Anal
   return (
     <div
       id={goalAnchorId(goalAnalysis.goalId)}
-      className="bg-white rounded-card border-[0.5px] border-brand-slate-200 p-5 space-y-4 scroll-mt-20"
+      className="bg-white rounded-card border border-brand-slate-200 p-5 space-y-4 scroll-mt-20"
       data-testid={`analysis-goal-${goalAnalysis.goalId}`}
     >
       {/* Eyebrow + badge */}
@@ -57,7 +57,7 @@ export function AnalysisGoalCard({ goalAnalysis, childId, canAsk = false }: Anal
       </div>
 
       {/* Goal text in italic panel */}
-      <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+      <div className="bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200">
         <p className="text-sm italic text-brand-slate-600 leading-relaxed">
           {goalAnalysis.plainLanguageSummary}
         </p>

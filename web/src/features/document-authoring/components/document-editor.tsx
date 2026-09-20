@@ -217,7 +217,7 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
                         {section.title || 'Untitled section'}
                       </h2>
                       {fields.length === 0 ? (
-                        <p className="text-sm text-brand-slate-400">No fields.</p>
+                        <p className="text-sm text-brand-slate-500">No fields.</p>
                       ) : (
                         <div className="space-y-4">
                           {fields.map((field) => (

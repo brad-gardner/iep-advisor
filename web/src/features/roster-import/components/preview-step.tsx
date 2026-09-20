@@ -218,7 +218,7 @@ export function PreviewStep({
         rows={pageRows}
         rowKey={(r) => r.rowNumber}
         empty={
-          <p className="text-center text-sm text-brand-slate-400" data-testid="import-preview-no-rows">
+          <p className="text-center text-sm text-brand-slate-500" data-testid="import-preview-no-rows">
             {errorsOnly ? 'No rows have errors.' : 'The workbook has no data rows.'}
           </p>
         }

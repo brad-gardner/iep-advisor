@@ -29,7 +29,7 @@ export function TabLink({ to, end, testId, children }: TabLinkProps) {
         `px-4 py-2 text-[13px] font-medium transition-colors whitespace-nowrap ${
           isActive
             ? "text-brand-slate-800 border-b-2 border-brand-teal-500"
-            : "text-brand-slate-400 hover:text-brand-slate-800"
+            : "text-brand-slate-500 hover:text-brand-slate-800"
         }`
       }
     >

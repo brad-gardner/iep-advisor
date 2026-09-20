@@ -58,7 +58,7 @@ export function NextSteps({ onFinish }: NextStepsProps) {
               <p className="text-sm font-medium text-brand-slate-800">
                 {title}
               </p>
-              <p className="text-xs text-brand-slate-400 mt-0.5 leading-relaxed">
+              <p className="text-xs text-brand-slate-500 mt-0.5 leading-relaxed">
                 {description}
               </p>
             </div>

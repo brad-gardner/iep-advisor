@@ -97,7 +97,7 @@ export function DecisionsPanel({ meetingId, documentInstanceId, canManage }: Dec
       )}
 
       {!error && !isLoading && decisions.length === 0 && (
-        <p className="text-sm text-brand-slate-400" data-testid="decisions-empty">
+        <p className="text-sm text-brand-slate-500" data-testid="decisions-empty">
           No decisions recorded yet.
         </p>
       )}
@@ -114,7 +114,7 @@ export function DecisionsPanel({ meetingId, documentInstanceId, canManage }: Dec
                 <div>
                   {d.targetLabel && <p className="text-xs font-medium text-brand-slate-500">{d.targetLabel}</p>}
                   <Markdown content={d.text} className="text-sm text-brand-slate-800" />
-                  <p className="mt-1 text-xs text-brand-slate-400">
+                  <p className="mt-1 text-xs text-brand-slate-500">
                     {d.recordedByName ?? 'Staff'} · {formatDate(d.createdAt)}
                     {d.appliedAt ? ' · Applied to draft' : ''}
                   </p>

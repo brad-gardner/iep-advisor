@@ -196,9 +196,9 @@ export function NotificationBell() {
             data-testid="notification-bell-menu"
           >
             {items === null ? (
-              <p className="px-4 py-3 text-sm text-brand-slate-400">Loading…</p>
+              <p className="px-4 py-3 text-sm text-brand-slate-500">Loading…</p>
             ) : items.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-brand-slate-400">No notifications yet.</p>
+              <p className="px-4 py-3 text-sm text-brand-slate-500">No notifications yet.</p>
             ) : (
               items.map((n, index) => (
                 <Link

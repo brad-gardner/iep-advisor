@@ -191,7 +191,7 @@ export function FieldEditor({
             </option>
           ))}
         </Select>
-        <p className="mt-1 text-xs text-brand-slate-400">
+        <p className="mt-1 text-xs text-brand-slate-500">
           Lets AI help, prefill and PDF layout recognise this field in any template.
         </p>
       </div>
@@ -247,7 +247,7 @@ export function FieldEditor({
           />
         )}
         {(config.kind === 'RichText' || config.kind === 'Checkbox') && (
-          <p className="text-xs text-brand-slate-400">This field type has no extra configuration.</p>
+          <p className="text-xs text-brand-slate-500">This field type has no extra configuration.</p>
         )}
       </div>
 

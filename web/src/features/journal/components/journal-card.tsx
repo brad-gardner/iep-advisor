@@ -87,7 +87,7 @@ export function JournalCard({ childId, childName, canEdit }: JournalCardProps) {
           </Button>
         )}
       </div>
-      <p className="mb-4 text-sm text-brand-slate-400">
+      <p className="mb-4 text-sm text-brand-slate-500">
         A dated record of what happens — private to your family, never shared with the school team.
       </p>
 

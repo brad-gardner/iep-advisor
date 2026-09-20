@@ -50,7 +50,7 @@ export function Iep101Page() {
         </div>
         <div>
           <h1 className="font-serif text-2xl text-brand-slate-800">IEP 101</h1>
-          <p className="text-sm text-brand-slate-400">
+          <p className="text-sm text-brand-slate-500">
             Everything you need to know, in plain language
           </p>
         </div>

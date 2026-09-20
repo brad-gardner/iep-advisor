@@ -19,7 +19,7 @@ export function ChildProgressCard({ childId }: ChildProgressCardProps) {
   return (
     <Card data-testid="child-progress-card">
       <h2 className="mb-1 font-serif">Progress</h2>
-      <p className="mb-4 text-sm text-brand-slate-400">
+      <p className="mb-4 text-sm text-brand-slate-500">
         Goal progress your child's school has logged.
       </p>
       <div className="space-y-4" data-testid="child-progress-card-list">

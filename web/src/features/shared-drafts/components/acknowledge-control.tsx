@@ -57,7 +57,7 @@ export function AcknowledgeControl({ revisionId, acknowledgedAt, onAcknowledged 
       <Button size="sm" variant="secondary" onClick={handleClick} loading={isSaving} data-testid="mark-reviewed-button">
         Mark as reviewed
       </Button>
-      <p className="text-xs text-brand-slate-400">This is not consent or a signature.</p>
+      <p className="text-xs text-brand-slate-500">This is not consent or a signature.</p>
     </div>
   );
 }

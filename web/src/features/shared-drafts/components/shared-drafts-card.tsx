@@ -45,7 +45,7 @@ export function SharedDraftsCard({ childId }: SharedDraftsCardProps) {
   return (
     <Card data-testid="shared-drafts-card">
       <h2 className="font-serif mb-1">Shared drafts</h2>
-      <p className="mb-4 text-sm text-brand-slate-400">
+      <p className="mb-4 text-sm text-brand-slate-500">
         Drafts your child's school has shared for your review.
       </p>
       <ul className="divide-y divide-brand-slate-100" data-testid="shared-drafts-card-list">

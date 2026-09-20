@@ -91,7 +91,7 @@ export function IepTimeline({ childId }: { childId: number }) {
 
   if (!timeline || timeline.ieps.length === 0) {
     return (
-      <p className="text-[13px] text-brand-slate-400 py-4">
+      <p className="text-[13px] text-brand-slate-500 py-4">
         No IEPs found. Upload at least two IEPs to see a timeline and compare versions.
       </p>
     );

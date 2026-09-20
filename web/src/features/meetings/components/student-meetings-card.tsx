@@ -127,7 +127,7 @@ export function StudentMeetingsCard({ studentId, studentName }: StudentMeetingsC
       {!error && meetings !== null && (
         <div className="space-y-6">
           <div>
-            <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-brand-slate-400">Upcoming</h3>
+            <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-brand-slate-500">Upcoming</h3>
             <Table
               label="Upcoming meetings"
               columns={columns}
@@ -148,7 +148,7 @@ export function StudentMeetingsCard({ studentId, studentName }: StudentMeetingsC
 
           {history.length > 0 && (
             <div>
-              <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-brand-slate-400">History</h3>
+              <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-brand-slate-500">History</h3>
               <Table
                 label="Meeting history"
                 columns={columns}

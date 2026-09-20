@@ -155,7 +155,7 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
               <p className="mt-1 text-sm font-medium text-brand-slate-800">
                 {formatMeetingWhen(meeting.startsAtUtc, meeting.durationMinutes)}
               </p>
-              <p className="text-xs text-brand-slate-400">
+              <p className="text-xs text-brand-slate-500">
                 Scheduled in {timeZoneLabel(meeting.timeZoneId)}
               </p>
               {meeting.location && <p className="mt-1 text-sm text-brand-slate-600">{meeting.location}</p>}

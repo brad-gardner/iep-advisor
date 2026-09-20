@@ -28,7 +28,7 @@ export function RedFlagCard({ redFlag }: RedFlagCardProps) {
           </h4>
           <p className="text-sm text-brand-slate-600 mt-1">{redFlag.description}</p>
           {redFlag.legalBasis && (
-            <p className="text-[11px] text-brand-slate-400 mt-2 italic">
+            <p className="text-[11px] text-brand-slate-500 mt-2 italic">
               Legal basis: {redFlag.legalBasis}
             </p>
           )}

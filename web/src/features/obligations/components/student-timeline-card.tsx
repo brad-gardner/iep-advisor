@@ -89,7 +89,7 @@ export function StudentTimelineCard({ studentId, onEditDates }: StudentTimelineC
                 <dt className="text-brand-slate-500">{OBLIGATION_KIND_LABELS[o.kind]}</dt>
                 <dd className="text-brand-slate-800">
                   {formatDate(o.dueDate)}
-                  <span className="ml-1 text-xs text-brand-slate-400">{o.sourceLabel}</span>
+                  <span className="ml-1 text-xs text-brand-slate-500">{o.sourceLabel}</span>
                 </dd>
               </div>
               <ObligationStatusChip status={o.status} />

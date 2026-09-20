@@ -183,7 +183,7 @@ export function AdminEmailPage() {
         rowActionLabel={(e) => e.toEmail}
         loading={isLoading}
         defaultSort={{ key: 'when', direction: 'desc' }}
-        empty={<p className="text-center text-sm text-brand-slate-400">No emails match this filter.</p>}
+        empty={<p className="text-center text-sm text-brand-slate-500">No emails match this filter.</p>}
       />
 
       <ConfirmDialog

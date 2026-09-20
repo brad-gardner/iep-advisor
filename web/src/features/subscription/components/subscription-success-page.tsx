@@ -17,7 +17,7 @@ export function SubscriptionSuccessPage() {
           <h2 className="font-serif text-xl font-semibold text-brand-slate-800 mb-2">
             You're subscribed!
           </h2>
-          <p className="text-sm text-brand-slate-400 mb-6">
+          <p className="text-sm text-brand-slate-500 mb-6">
             Thank you for subscribing to IEP Advisor Pro. You now have full access to all features.
           </p>
           <Link to="/dashboard">

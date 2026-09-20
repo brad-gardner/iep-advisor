@@ -90,7 +90,7 @@ export function ChildrenListPage() {
                     <SharedBadge role={child.role} />
                   </div>
                 )}
-                <div className="mt-2 flex flex-wrap gap-3 text-xs text-brand-slate-400">
+                <div className="mt-2 flex flex-wrap gap-3 text-xs text-brand-slate-500">
                   {child.gradeLevel && <span>Grade: {child.gradeLevel}</span>}
                   {child.disabilityCategory && (
                     <span>{child.disabilityCategory}</span>

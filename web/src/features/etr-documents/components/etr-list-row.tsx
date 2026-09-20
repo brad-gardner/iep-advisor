@@ -52,7 +52,7 @@ export function EtrListRow({ etr }: EtrListRowProps) {
           <Badge variant={STATUS_VARIANTS[etr.status] || 'neutral'}>{etr.status}</Badge>
         </div>
         {etr.fileName && (
-          <p className="mt-0.5 text-[11px] text-brand-slate-400 truncate">{etr.fileName}</p>
+          <p className="mt-0.5 text-[11px] text-brand-slate-500 truncate">{etr.fileName}</p>
         )}
       </div>
       <ChevronRight

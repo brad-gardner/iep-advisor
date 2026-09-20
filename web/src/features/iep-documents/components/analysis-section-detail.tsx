@@ -85,12 +85,12 @@ export function AnalysisSectionDetail({ sectionAnalysis }: AnalysisSectionDetail
           </h3>
           <div className="space-y-2">
             {sectionAnalysis.legalReferences.map((ref, i) => (
-              <div key={i} className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+              <div key={i} className="bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200">
                 <div className="flex items-center gap-1.5 mb-1">
                   <Scale className="w-3.5 h-3.5 text-brand-teal-500" strokeWidth={1.8} aria-hidden="true" />
                   <p className="text-sm font-medium text-brand-teal-600">{ref.provision}</p>
                 </div>
-                <p className="text-[11px] text-brand-slate-400 mt-1">{ref.summary}</p>
+                <p className="text-[11px] text-brand-slate-500 mt-1">{ref.summary}</p>
               </div>
             ))}
           </div>

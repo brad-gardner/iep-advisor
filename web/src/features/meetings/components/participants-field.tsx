@@ -47,7 +47,7 @@ function ParticipantRowItem({
         />
         <label htmlFor={checkboxId} className="min-w-0 truncate text-sm text-brand-slate-800">
           {row.displayName}
-          <span className="ml-1.5 text-xs text-brand-slate-400">
+          <span className="ml-1.5 text-xs text-brand-slate-500">
             {row.kind === 'team' ? TEAM_ROLE_LABELS[row.teamRole] : KIND_LABEL[row.kind]}
           </span>
         </label>
@@ -134,7 +134,7 @@ export function ParticipantsField({
           />
         ))}
         {pool.length === 0 && external.length === 0 && (
-          <p className="py-3 text-sm text-brand-slate-400">No participants yet.</p>
+          <p className="py-3 text-sm text-brand-slate-500">No participants yet.</p>
         )}
       </div>
 

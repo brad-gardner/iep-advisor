@@ -34,12 +34,12 @@ export function SmartCriteriaGrid({ smartAnalysis }: SmartCriteriaGridProps) {
         {CRITERIA_LABELS.map(({ key, label }) => {
           const criterion = smartAnalysis[key];
           return (
-            <div key={key} className="bg-white rounded-card p-3 border-[0.5px] border-brand-slate-200">
+            <div key={key} className="bg-white rounded-card p-3 border border-brand-slate-200">
               <div className="flex items-center gap-2 mb-1">
                 <span
                   className={`inline-block w-2.5 h-2.5 rounded-full ${RATING_COLORS[criterion.rating] || 'bg-brand-slate-400'}`}
                 />
-                <span className={`text-[13px] font-medium ${RATING_TEXT_COLORS[criterion.rating] || 'text-brand-slate-400'}`}>
+                <span className={`text-[13px] font-medium ${RATING_TEXT_COLORS[criterion.rating] || 'text-brand-slate-500'}`}>
                   {label}
                 </span>
               </div>

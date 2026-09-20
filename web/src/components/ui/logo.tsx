@@ -27,7 +27,7 @@ export function Logo({ variant = 'light', size = 'md', showTagline = true, ...re
           <span className="text-brand-teal-500 font-semibold">Advisor</span>
         </div>
         {showTagline && (
-          <p className={`${s.tagline} font-semibold uppercase tracking-[0.12em] ${variant === 'dark' ? 'text-brand-slate-400' : 'text-brand-slate-400'} mt-0.5`}>
+          <p className={`${s.tagline} font-semibold uppercase tracking-[0.12em] ${variant === 'dark' ? 'text-brand-slate-400' : 'text-brand-slate-500'} mt-0.5`}>
             Navigate with confidence
           </p>
         )}

@@ -98,7 +98,7 @@ export function SetupChecklistCard() {
               <span
                 className={
                   item.done
-                    ? 'text-brand-slate-400 line-through'
+                    ? 'text-brand-slate-500 line-through'
                     : 'text-brand-slate-800'
                 }
               >

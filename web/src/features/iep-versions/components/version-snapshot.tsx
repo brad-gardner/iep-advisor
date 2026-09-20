@@ -36,7 +36,7 @@ function SectionsBlock({ sections }: { sections: IepVersionDto['sections'] }) {
           {s.richText ? (
             <Markdown content={s.richText} className="text-sm text-brand-slate-600" />
           ) : (
-            <p className="text-sm text-brand-slate-400">—</p>
+            <p className="text-sm text-brand-slate-500">—</p>
           )}
         </Card>
       ))}
@@ -53,12 +53,12 @@ function GoalsBlock({ goals }: { goals: IepVersionDto['goals'] }) {
         {goals.map((g) => (
           <Card key={g.id}>
             {g.domain && (
-              <p className="text-xs uppercase tracking-wide text-brand-slate-400 mb-1">
+              <p className="text-xs uppercase tracking-wide text-brand-slate-500 mb-1">
                 {g.domain}
               </p>
             )}
             <p className="text-sm text-brand-slate-800 whitespace-pre-wrap">
-              {g.goalText || <span className="text-brand-slate-400">—</span>}
+              {g.goalText || <span className="text-brand-slate-500">—</span>}
             </p>
             <dl className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
               <Field label="Baseline" value={g.baseline} />
@@ -122,7 +122,7 @@ function AccommodationsBlock({
           {accommodations.map((a) => (
             <li key={a.id} className="flex gap-2">
               {a.category && (
-                <span className="text-brand-slate-400 shrink-0">{a.category}:</span>
+                <span className="text-brand-slate-500 shrink-0">{a.category}:</span>
               )}
               <span className="text-brand-slate-700">{a.text || '—'}</span>
             </li>
@@ -146,7 +146,7 @@ function TransitionBlock({ items }: { items: IepVersionDto['transitionItems'] })
               </p>
             )}
             <p className="text-sm text-brand-slate-600 whitespace-pre-wrap">
-              {t.servicesText || <span className="text-brand-slate-400">—</span>}
+              {t.servicesText || <span className="text-brand-slate-500">—</span>}
             </p>
           </Card>
         ))}
@@ -159,7 +159,7 @@ function Field({ label, value }: { label: string; value: string | null }) {
   if (!value) return null;
   return (
     <div>
-      <dt className="text-brand-slate-400">{label}</dt>
+      <dt className="text-brand-slate-500">{label}</dt>
       <dd className="text-brand-slate-700">{value}</dd>
     </div>
   );

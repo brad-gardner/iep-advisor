@@ -45,7 +45,7 @@ export function StudentSharedEntries({ childId }: StudentSharedEntriesProps) {
         />
         <div>
           <h2 className="font-serif text-lg">From your student</h2>
-          <p className="text-sm text-brand-slate-400">
+          <p className="text-sm text-brand-slate-500">
             What your student chose to share to help you prepare.
           </p>
         </div>
@@ -54,7 +54,7 @@ export function StudentSharedEntries({ childId }: StudentSharedEntriesProps) {
         {entries.map((entry) => (
           <li
             key={entry.id}
-            className="rounded-card border-[0.5px] border-brand-slate-200 p-3"
+            className="rounded-card border border-brand-slate-200 p-3"
             data-testid={`student-shared-entry-${entry.id}`}
           >
             <span className="block text-[11px] font-medium uppercase tracking-wide text-brand-teal-600">

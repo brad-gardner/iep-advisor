@@ -34,7 +34,7 @@ function UsageBar({ usage }: { usage: ChildUsage }) {
     <div className="space-y-1" data-testid="usage-bar">
       <div className="flex items-center justify-between text-sm">
         <span className="text-brand-slate-600 font-medium">{usage.childName}</span>
-        <span className="text-brand-slate-400 text-xs">
+        <span className="text-brand-slate-500 text-xs">
           {usage.analysisCount} of {usage.analysisLimit} analyses used
         </span>
       </div>
@@ -85,7 +85,7 @@ function StatusContent({ data }: { data: SubscriptionStatusType }) {
       </div>
 
       {isActive && data.expiresAt && (
-        <p className="text-sm text-brand-slate-400">
+        <p className="text-sm text-brand-slate-500">
           Renews{' '}
           {new Date(data.expiresAt).toLocaleDateString('en-US', {
             month: 'long',
@@ -97,7 +97,7 @@ function StatusContent({ data }: { data: SubscriptionStatusType }) {
 
       {usageEntries.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs font-semibold text-brand-slate-400 uppercase tracking-wide">
+          <p className="text-xs font-semibold text-brand-slate-500 uppercase tracking-wide">
             Usage
           </p>
           {usageEntries.map((u) => (

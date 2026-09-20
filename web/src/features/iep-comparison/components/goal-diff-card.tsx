@@ -16,7 +16,7 @@ function AddedGoalCard({ goal }: { goal: GoalDiff }) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           {goal.domain && (
-            <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold mb-1">
+            <p className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold mb-1">
               {goal.domain}
             </p>
           )}
@@ -34,7 +34,7 @@ function RemovedGoalCard({ goal }: { goal: GoalDiff }) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           {goal.domain && (
-            <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold mb-1">
+            <p className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold mb-1">
               {goal.domain}
             </p>
           )}
@@ -52,7 +52,7 @@ function ModifiedGoalCard({ goal }: { goal: ModifiedGoalDiff }) {
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
           {goal.domain && (
-            <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold mb-1">
+            <p className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold mb-1">
               {goal.domain}
             </p>
           )}
@@ -63,7 +63,7 @@ function ModifiedGoalCard({ goal }: { goal: ModifiedGoalDiff }) {
 
       {goal.changes.length > 0 && (
         <div className="space-y-2 pt-3 border-t border-brand-slate-100">
-          <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
+          <p className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold">
             Changes
           </p>
           {goal.changes.map((change, i) => (
@@ -71,7 +71,7 @@ function ModifiedGoalCard({ goal }: { goal: ModifiedGoalDiff }) {
               <span className="text-brand-slate-500 font-medium shrink-0">
                 {FIELD_LABELS[change.field] || change.field}:
               </span>
-              <span className="text-brand-slate-400 line-through">
+              <span className="text-brand-slate-500 line-through">
                 {change.older || '(none)'}
               </span>
               <span className="text-brand-slate-400" aria-hidden="true">

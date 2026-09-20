@@ -179,7 +179,7 @@ export function FinalizeDocumentSection({
           <button
             type="button"
             onClick={() => setFinalized(null)}
-            className="text-brand-slate-400 hover:underline"
+            className="text-brand-slate-500 hover:underline"
             data-testid="dismiss-finalized"
           >
             Dismiss

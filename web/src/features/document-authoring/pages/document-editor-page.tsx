@@ -72,7 +72,7 @@ export function DocumentEditorPage() {
           className={`px-4 py-2 text-[13px] font-medium transition-colors ${
             tab === 'edit'
               ? 'border-b-2 border-brand-teal-500 text-brand-slate-800'
-              : 'text-brand-slate-400 hover:text-brand-slate-800'
+              : 'text-brand-slate-500 hover:text-brand-slate-800'
           }`}
         >
           Edit
@@ -86,7 +86,7 @@ export function DocumentEditorPage() {
           className={`px-4 py-2 text-[13px] font-medium transition-colors ${
             tab === 'converge'
               ? 'border-b-2 border-brand-teal-500 text-brand-slate-800'
-              : 'text-brand-slate-400 hover:text-brand-slate-800'
+              : 'text-brand-slate-500 hover:text-brand-slate-800'
           }`}
         >
           Converge

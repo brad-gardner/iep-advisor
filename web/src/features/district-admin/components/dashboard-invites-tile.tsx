@@ -28,7 +28,7 @@ export function DashboardInvitesTile({ invites }: DashboardInvitesTileProps) {
 
       {invites.length === 0 ? (
         <p
-          className="text-sm text-brand-slate-400"
+          className="text-sm text-brand-slate-500"
           data-testid="dashboard-invites-tile-empty"
         >
           No invites need attention.
@@ -45,7 +45,7 @@ export function DashboardInvitesTile({ invites }: DashboardInvitesTileProps) {
                   </span>
                   {isExpired && <Badge variant="error">Expired</Badge>}
                 </div>
-                <p className="text-xs text-brand-slate-400">
+                <p className="text-xs text-brand-slate-500">
                   {orgRoleLabel(invite.orgRoleName)}
                   {invite.schoolName ? ` · ${invite.schoolName}` : ' · District-wide'}
                   {' · '}

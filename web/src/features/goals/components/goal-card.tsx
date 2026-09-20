@@ -46,7 +46,7 @@ export function GoalCard({
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          {goal.domain && <p className="text-xs font-medium uppercase tracking-wide text-brand-slate-400">{goal.domain}</p>}
+          {goal.domain && <p className="text-xs font-medium uppercase tracking-wide text-brand-slate-500">{goal.domain}</p>}
           <h3 className="font-serif text-base text-brand-slate-800">{goal.goalText}</h3>
         </div>
         <div className="flex shrink-0 items-center gap-2">

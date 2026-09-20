@@ -109,7 +109,7 @@ function MfaSection() {
         </>
       ) : (
         <div>
-          <p className="text-sm text-brand-slate-400 mb-2">
+          <p className="text-sm text-brand-slate-500 mb-2">
             Add an extra layer of security with two-factor authentication.
           </p>
           <Link to="/mfa-setup">
@@ -166,7 +166,7 @@ export function ProfilePage() {
             type="text"
             value={user?.email ?? ''}
             disabled
-            className="bg-brand-slate-50 text-brand-slate-400 cursor-not-allowed"
+            className="bg-brand-slate-50 text-brand-slate-500 cursor-not-allowed"
             data-testid="profile-email"
           />
 

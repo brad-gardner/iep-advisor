@@ -151,7 +151,7 @@ export function TemplateBuilderPage() {
       )}
 
       {!readOnly && !canPublish && (
-        <p className="text-sm text-brand-slate-400">
+        <p className="text-sm text-brand-slate-500">
           Add at least one section, and at least one field to every section, to publish.
         </p>
       )}
@@ -162,7 +162,7 @@ export function TemplateBuilderPage() {
           <h2 className="text-sm font-medium text-brand-slate-800">Structure</h2>
           {sections.length === 0 ? (
             <Card>
-              <p className="text-sm text-brand-slate-400">
+              <p className="text-sm text-brand-slate-500">
                 No sections yet. Add a section to start building this template.
               </p>
             </Card>

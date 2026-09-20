@@ -70,7 +70,7 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
         />
         <div>
           <h2 className="font-serif text-lg">AI Interview</h2>
-          <p className="text-sm text-brand-slate-400">
+          <p className="text-sm text-brand-slate-500">
             Tell the assistant what you want help saying. It will draft something
             you can save or change.
           </p>
@@ -104,7 +104,7 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
 
       {phase === 'suggested' && suggestion && (
         <div
-          className="space-y-3 rounded-card border-[0.5px] border-brand-teal-100 bg-brand-teal-50 p-4"
+          className="space-y-3 rounded-card border border-brand-teal-100 bg-brand-teal-50 p-4"
           data-testid="ai-interview-suggestion"
         >
           <p className="whitespace-pre-wrap text-sm text-brand-slate-800">
@@ -135,7 +135,7 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
               Dismiss
             </Button>
           </div>
-          <p className="text-xs text-brand-slate-400">
+          <p className="text-xs text-brand-slate-500">
             Saved entries are private until you choose to share them.
           </p>
         </div>

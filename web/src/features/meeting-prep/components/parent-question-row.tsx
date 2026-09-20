@@ -106,7 +106,7 @@ export function ParentQuestionRow({
   };
 
   return (
-    <li className="rounded-card border-[0.5px] border-brand-slate-200 p-3" data-testid="parent-question">
+    <li className="rounded-card border border-brand-slate-200 p-3" data-testid="parent-question">
       <div className="flex items-start gap-3">
         <input
           type="checkbox"
@@ -159,7 +159,7 @@ export function ParentQuestionRow({
             htmlFor={checkboxId}
             className={cn(
               'min-w-0 flex-1 text-sm leading-relaxed',
-              question.isChecked ? 'text-brand-slate-400 line-through' : 'text-brand-slate-700',
+              question.isChecked ? 'text-brand-slate-500 line-through' : 'text-brand-slate-700',
             )}
           >
             {question.text}

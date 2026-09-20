@@ -178,7 +178,7 @@ export function FamilySummaryPanel({ meetingId }: FamilySummaryPanelProps) {
             className="rounded-card border border-brand-slate-200 bg-brand-slate-50 p-3"
             data-testid="family-summary-sent-body"
           />
-          <p className="text-xs text-brand-slate-400">
+          <p className="text-xs text-brand-slate-500">
             Sent {summary.sentAt ? formatDate(summary.sentAt) : ''}
             {summary.sentByName ? ` by ${summary.sentByName}` : ''}
           </p>
