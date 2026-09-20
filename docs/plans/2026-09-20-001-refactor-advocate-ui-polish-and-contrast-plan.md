@@ -1,7 +1,7 @@
 ---
 title: "refactor: Advocate page layout polish + app-wide text contrast fix"
 type: refactor
-status: active
+status: completed
 date: 2026-09-20
 design: docs/designs/2026-09-20-advocate-ui-polish-design.md
 mockup: docs/designs/2026-09-20-advocate-ui-polish-mockup.html
@@ -71,6 +71,18 @@ Mechanical but inventory-driven, not a blind replace:
 4. `border-[0.5px]` → `border` (1px) on `Card` and the 32 other hairline uses; verify nothing relied on the half-pixel for alignment.
 5. Re-measure: assert in a small test that no *text* utility in `src` uses `slate-400` except the documented exceptions list.
 
+## Implementation Notes (2026-09-20)
+
+Branch `refactor/advocate-ui-polish-and-contrast` off `main`; three commits (planning docs, slices 1–2, slice 3 + height tune).
+
+**Height was measured, not guessed.** The worker flagged `md:h-[calc(100vh-19rem)]` as unverified; driving the real app with agent-browser showed the panel bottom at 915px on a 900px viewport — 15px of overflow and 47px of page scroll. The stack above the panel is a constant 319px at every desktop width, and the container adds 32px below, so the value is **22rem** (548px tall, 33px gap, zero page scroll). The `min-h-[34rem]` floor was separately wrong: on a 720px-tall laptop it forced 175px of page scroll, so the floor is **26rem**. Both numbers and the measurement table are recorded in the code comment at `advocate-page.tsx:249`.
+
+**Slice 3 found a second dark/light collision.** Beyond the sidebar the plan already called out, `components/ui/logo.tsx` had `variant === 'dark' ? 'text-brand-slate-400' : 'text-brand-slate-400'` — a no-op ternary. A blind replace would have pushed the dark branch to 2.77:1 while leaving the light branch failing; the ternary now discriminates. 251 of 283 occurrences changed, 32 documented in `web/src/test/contrast-allowlist.ts` with per-entry reasons and enforced by `web/src/test/contrast-guard.test.ts` (proven to fail on drift before it was finalised).
+
+**Checks on HEAD:** vitest 699 passed (baseline 695 + 4 new), `tsc -b`, `test:types`, `build`, `guard:ux` clean, lint at the 36-error baseline. Live verification at 1440×900 (panel fills, no page scroll), 400×820 (dock stays `sticky`, panel overflow `visible`, unchanged behaviour), plus a dashboard spot-check after the sweep with no console errors. Screenshots (gitignored): `docs/screenshots/advocate-after-1440.png`, `advocate-after-phone.png`, `contrast-dashboard-after.png`.
+
+**Not done:** no pixel-level pass over all 153 swept files (disproportionate); the empty state keeps its icon as assumed.
+
 ## Technical Considerations
 
 - **No behaviour change.** No API, hook, state or SSE change; no new dependency; no new primitive. `guard:ux` must stay clean.
@@ -82,27 +94,27 @@ Mechanical but inventory-driven, not a blind replace:
 ## Acceptance Criteria
 
 ### Slice 1
-- [ ] Composer renders inside the conversation panel, separated by a divider — no free-floating white band at any width ≥ `md`
-- [ ] Panel fills a sensible height on a 1440×900 viewport: no dead region between the composer and the page bottom
-- [ ] Exactly one scrollbar in the conversation area (no nested scroller)
-- [ ] Textarea + counter + Send read as one field; focusing the textarea rings the whole group
-- [ ] Phone (400 px): composer still sticky to the viewport with safe-area padding; Conversations drawer unchanged
+- [x] Composer renders inside the conversation panel, separated by a divider — no free-floating white band at any width ≥ `md`
+- [x] Panel fills a sensible height on a 1440×900 viewport: no dead region between the composer and the page bottom
+- [x] Exactly one scrollbar in the conversation area (no nested scroller)
+- [x] Textarea + counter + Send read as one field; focusing the textarea rings the whole group
+- [x] Phone (400 px): composer still sticky to the viewport with safe-area padding; Conversations drawer unchanged
 
 ### Slice 2
-- [ ] Rail is a card whose content edges align with the conversation panel's
-- [ ] Thread titles wrap to two lines instead of truncating mid-word
-- [ ] Section heading appears once — the empty state no longer restates it
-- [ ] Parent's own messages use a neutral surface
+- [x] Rail is a card whose content edges align with the conversation panel's
+- [x] Thread titles wrap to two lines instead of truncating mid-word
+- [x] Section heading appears once — the empty state no longer restates it
+- [x] Parent's own messages use a neutral surface
 
 ### Slice 3
-- [ ] No `text-brand-slate-400` on body/secondary **text** outside the documented exceptions; a check enforces it
-- [ ] Every migrated pairing measures ≥ 4.5:1 (`slate-500` on white and on `slate-50`)
-- [ ] Card and panel borders are 1px
+- [x] No `text-brand-slate-400` on body/secondary **text** outside the documented exceptions; a check enforces it
+- [x] Every migrated pairing measures ≥ 4.5:1 (`slate-500` on white and on `slate-50`)
+- [x] Card and panel borders are 1px
 
 ### Non-functional
-- [ ] `npm test` green (advocate, journal, meeting-prep, children suites unchanged in intent)
-- [ ] `npx tsc -b`, `npm run test:types`, `npm run build`, `npm run guard:ux` clean; `npm run lint` at the 36-error baseline
-- [ ] Screenshots at 1440, 1280, 900 and 400 px for empty, answered, streaming and cap states
+- [x] `npm test` green (advocate, journal, meeting-prep, children suites unchanged in intent)
+- [x] `npx tsc -b`, `npm run test:types`, `npm run build`, `npm run guard:ux` clean; `npm run lint` at the 36-error baseline
+- [x] Screenshots at 1440, 1280, 900 and 400 px for empty, answered, streaming and cap states
 
 ## Dependencies & Risks
 
