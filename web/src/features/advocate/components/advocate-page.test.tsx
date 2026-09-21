@@ -247,17 +247,22 @@ describe('AdvocatePage', () => {
     expect(overflowing[0]).toBe(scrollers[0]);
   });
 
-  it('publishes the measured dock height so the message tail can clear the sticky phone dock', async () => {
-    // jsdom has no ResizeObserver, so the component skips the measurement and the sentinel falls
-    // back to the 10rem baked into its class. Stub one to prove the wiring: the panel must carry
-    // `--advocate-dock-h`, and the sentinel must read it rather than a hard-coded reserve.
-    const observed: Element[] = [];
+  it('publishes the summed height of everything the sticky dock paints over', async () => {
+    // jsdom has no ResizeObserver and no layout, so the measurement is driven by hand: the stub
+    // keeps its callback so the test can re-fire it after giving the two observed boxes real
+    // heights, which is the only way to assert the arithmetic rather than just `0px`.
+    // The effect re-creates the observer when the dock or the notice row mounts, so only the live
+    // instance's targets are interesting — an accumulating list would also hold the torn-down one's.
+    let observed: Element[] = [];
+    let fire = () => {};
     vi.stubGlobal(
       'ResizeObserver',
       class {
         callback: () => void;
         constructor(callback: () => void) {
           this.callback = callback;
+          observed = [];
+          fire = callback;
         }
         observe(target: Element) {
           observed.push(target);
@@ -272,19 +277,144 @@ describe('AdvocatePage', () => {
       await screen.findByTestId('advocate-assistant-message');
 
       const panel = screen.getByTestId('advocate-conversation');
-      // Set at all (offsetHeight is 0 in jsdom, so the value itself is not the assertion).
-      expect(panel.style.getPropertyValue('--advocate-dock-h')).toMatch(/^\d+px$/);
-      // Both boxes the sticky dock paints over are measured, not just the composer.
-      expect(observed).toContain(screen.getByTestId('advocate-composer-dock'));
-      expect(observed.length).toBeGreaterThan(1);
+      const dock = screen.getByTestId('advocate-composer-dock');
+      // Both boxes the sticky dock paints over are measured, not just the composer: the notice row
+      // (stopped / Retry / disclaimer) sits between the scroller and the dock and is covered too.
+      expect(observed).toContain(dock);
+      expect(observed).toHaveLength(2);
+      const notices = observed.find((el) => el !== dock) as HTMLElement;
+      expect(notices).toContainElement(screen.getByTestId('advocate-disclaimer'));
 
-      const scroller = screen.getByTestId('advocate-messages');
-      const sentinel = scroller.lastElementChild;
-      expect(sentinel?.className).toContain('scroll-mb-[var(--advocate-dock-h,10rem)]');
-      expect(sentinel?.className).toContain('md:scroll-mb-0');
+      // Real dock heights measured in-browser at 400x820: 152px with the composer and the
+      // disclaimer row's 89px above it.
+      Object.defineProperty(dock, 'offsetHeight', { value: 152, configurable: true });
+      Object.defineProperty(notices, 'offsetHeight', { value: 89, configurable: true });
+      act(() => fire());
+      expect(panel.style.getPropertyValue('--advocate-dock-h')).toBe('241px');
+
+      // A later resize (the About pill mounting, the composer growing) re-publishes through the
+      // same observer rather than being measured once at mount.
+      Object.defineProperty(dock, 'offsetHeight', { value: 261, configurable: true });
+      act(() => fire());
+      expect(panel.style.getPropertyValue('--advocate-dock-h')).toBe('350px');
+
+      const sentinel = screen.getByTestId('advocate-scroll-tail');
+      expect(sentinel.className).toContain('scroll-mb-[var(--advocate-dock-h,10rem)]');
+      expect(sentinel.className).toContain('md:scroll-mb-0');
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('follows new content to the bottom, and stops following once the reader scrolls the conversation up', async () => {
+    const targets: Element[] = [];
+    const spy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (this: Element) {
+      targets.push(this);
+    });
+
+    try {
+      renderPage('owner', '/children/4/advocate?thread=1');
+      await screen.findByTestId('advocate-assistant-message');
+      const tail = screen.getByTestId('advocate-scroll-tail');
+      const scroller = screen.getByTestId('advocate-messages');
+
+      targets.length = 0;
+      typeAndSend('And what if they refuse?');
+      await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(1));
+      // The reader asked for this one, so it pins regardless of where they were.
+      expect(targets).toContain(tail);
+
+      // Reader scrolls back up to re-read something: 1500px from the bottom, well past the 48px
+      // threshold. jsdom reports 0 for every scroll metric, so they are supplied here.
+      Object.defineProperty(scroller, 'scrollHeight', { value: 2000, configurable: true });
+      Object.defineProperty(scroller, 'clientHeight', { value: 500, configurable: true });
+      scroller.scrollTop = 0;
+      fireEvent.scroll(scroller);
+
+      targets.length = 0;
+      act(() => lastStream().handlers.onDelta('They have to tell you '));
+      act(() => lastStream().handlers.onDelta('in writing.'));
+      expect(screen.getByTestId('advocate-streaming-text')).toHaveTextContent('They have to tell you in writing.');
+      expect(targets).not.toContain(tail);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not drag the page back down on every streamed token when the reader has scrolled the page away', async () => {
+    // `scrollIntoView` satisfies the sentinel's reserve against every scrollable ancestor, the
+    // document included — and below `md` the page is the scroller. The conversation region does not
+    // move when the page does, so its own scroll handler never fires: without a page-level pin the
+    // reader is dragged back down once per token (measured in-browser: 386 -> 0 -> 386).
+    const targets: Element[] = [];
+    const spy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (this: Element) {
+      targets.push(this);
+    });
+    const innerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+    const scrollY = Object.getOwnPropertyDescriptor(window, 'scrollY');
+
+    const setPage = (y: number) => {
+      Object.defineProperty(window, 'scrollY', { value: y, configurable: true });
+      fireEvent.scroll(window);
+    };
+
+    try {
+      Object.defineProperty(window, 'innerHeight', { value: 820, configurable: true });
+      Object.defineProperty(document.documentElement, 'scrollHeight', { value: 1250, configurable: true });
+
+      renderPage('owner', '/children/4/advocate?thread=1');
+      await screen.findByTestId('advocate-assistant-message');
+      const tail = screen.getByTestId('advocate-scroll-tail');
+
+      typeAndSend('And what if they refuse?');
+      await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(1));
+
+      // Reader scrolls the page to the top while the answer streams.
+      setPage(0);
+      targets.length = 0;
+      act(() => lastStream().handlers.onDelta('They have to tell you '));
+      expect(targets).not.toContain(tail);
+
+      // Back near the page bottom (a `block: 'nearest'` scroll settles ~44px short of the maximum,
+      // which is why the page threshold is looser than the scroller's) — following resumes.
+      setPage(386);
+      targets.length = 0;
+      act(() => lastStream().handlers.onDelta('in writing.'));
+      expect(targets).toContain(tail);
+    } finally {
+      spy.mockRestore();
+      if (innerHeight) Object.defineProperty(window, 'innerHeight', innerHeight);
+      if (scrollY) Object.defineProperty(window, 'scrollY', scrollY);
+      delete (document.documentElement as unknown as Record<string, unknown>).scrollHeight;
+    }
+  });
+
+  it('tints the whole composer while input is paused and reddens its border over the limit', async () => {
+    // Regression guard for a fix that silently removed both affordances: `cn` is a plain join, so a
+    // conditional class layered over a base one is decided by CSS source order (`bg-white` is
+    // emitted after `bg-brand-slate-50`, `border-brand-slate-200` after `border-brand-danger-200`)
+    // and never painted. Each pair has to emit exactly one utility.
+    renderPage('owner', '/children/4/advocate?thread=2');
+    await screen.findByTestId('advocate-empty');
+    const field = () => composer().parentElement as HTMLElement;
+
+    expect(field()).toHaveClass('bg-white');
+    expect(field()).not.toHaveClass('bg-brand-slate-50');
+
+    fireEvent.change(composer(), { target: { value: 'x'.repeat(2001) } });
+    expect(field()).toHaveClass('border-brand-danger-200');
+    expect(field()).not.toHaveClass('border-brand-slate-200');
+
+    fireEvent.change(composer(), { target: { value: 'What is PWN?' } });
+    fireEvent.keyDown(composer(), { key: 'Enter' });
+    await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(1));
+
+    // Streaming: the textarea is read-only (never disabled — that would blur it), and the tint is on
+    // the wrapper so the counter row greys out with it rather than staying white underneath.
+    expect(composer()).toHaveAttribute('readonly');
+    expect(field()).toHaveClass('bg-brand-slate-50');
+    expect(field()).not.toHaveClass('bg-white');
+    expect(field()).toHaveClass('border-brand-slate-200');
   });
 
   it('lets thread titles wrap onto two lines instead of truncating', async () => {

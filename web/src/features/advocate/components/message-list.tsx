@@ -22,6 +22,15 @@ interface MessageListProps {
 const PIN_THRESHOLD_PX = 48;
 
 /**
+ * The same test for the page below `md`, where it is the page — not the panel — that scrolls, but
+ * with more slack: a `block: 'nearest'` scroll stops the moment the sentinel's reserve is satisfied,
+ * which leaves the page short of its own maximum (44px measured at 400x820 — the container's bottom
+ * padding and the panel border sit below the dock). A threshold as tight as the scroller's would
+ * read that perfectly-pinned state as "the reader scrolled away" and stop following the stream.
+ */
+const PAGE_PIN_THRESHOLD_PX = 96;
+
+/**
  * The conversation, oldest first, followed by the in-flight user message and
  * the streaming answer. Auto-scrolls to the newest content unless the reader
  * has scrolled up to re-read something.
@@ -57,12 +66,22 @@ const PIN_THRESHOLD_PX = 48;
  * dock grows with the About pill, the state hint and the notice row; the
  * `10rem` in the class is only the fallback for environments without
  * ResizeObserver.
+ *
+ * Crossing those ancestors is why the page needs a pin test of its own. The
+ * `onScroll` below watches this region only, and below `md` a reader can scroll
+ * the *page* away without this region moving at all — so its scroll handler
+ * never fires, `pinnedRef` stays true, and every streamed token would drag the
+ * page back down (measured: page 386 -> reader scrolls to 0 -> next delta
+ * snaps it to 386 again). `pagePinnedRef` closes that: the page follows the
+ * stream only while the reader has left it near the bottom, and a new message
+ * re-pins both because the reader asked for it.
  */
 export function MessageList({ childId, messages, pending, streaming, announcement, handlers }: MessageListProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const tailRef = useRef<HTMLDivElement>(null);
   const announcementText = useMemo(() => (announcement ? markdownToPlainText(announcement.text) : ''), [announcement]);
   const pinnedRef = useRef(true);
+  const pagePinnedRef = useRef(true);
 
   const onScroll = () => {
     const el = scrollerRef.current;
@@ -70,14 +89,29 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
     pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= PIN_THRESHOLD_PX;
   };
 
+  useEffect(() => {
+    const onPageScroll = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      // A page that cannot scroll (every width from `md` up, where the panel is height-bound) is
+      // always "at the bottom" — the guard must not disable following there.
+      pagePinnedRef.current = max <= 0 || max - window.scrollY <= PAGE_PIN_THRESHOLD_PX;
+    };
+
+    window.addEventListener('scroll', onPageScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onPageScroll);
+  }, []);
+
   // A new message always pins (the reader asked for it); streaming text only
-  // follows while already pinned.
+  // follows while already pinned. Both surfaces re-pin together: a send made
+  // from the docked composer can leave the page mid-thread, and the answer to
+  // it still belongs on screen.
   useLayoutEffect(() => {
     pinnedRef.current = true;
+    pagePinnedRef.current = true;
   }, [messages.length, pending]);
 
   useEffect(() => {
-    if (pinnedRef.current) tailRef.current?.scrollIntoView({ block: 'nearest' });
+    if (pinnedRef.current && pagePinnedRef.current) tailRef.current?.scrollIntoView({ block: 'nearest' });
   }, [messages, pending, streaming]);
 
   return (
@@ -88,7 +122,14 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
         tabIndex={0}
         role="region"
         aria-label="Conversation"
-        className="min-h-0 max-h-[60vh] flex-1 overflow-y-auto p-3 md:max-h-none"
+        // `relative` is load-bearing, not decoration: the sr-only speaker labels inside the bubbles
+        // ("You said: ", "Advocate: ") are `position: absolute`, and an absolutely-positioned box is
+        // only clipped by an ancestor's `overflow` when that ancestor is also its containing block.
+        // Without a positioned scroller they were laid out against the initial containing block
+        // instead — measured at 400x820 with four messages, they landed ~857px below the content and
+        // dragged `documentElement.scrollHeight` from 1250 to 2107, giving the phone that much dead
+        // scroll below the page and breaking the page-bottom test the pin guard above depends on.
+        className="relative min-h-0 max-h-[60vh] flex-1 overflow-y-auto p-3 md:max-h-none"
         data-testid="advocate-messages"
       >
         <ul className="space-y-3">
@@ -143,6 +184,7 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
           ref={tailRef}
           aria-hidden="true"
           className="scroll-mb-[var(--advocate-dock-h,10rem)] md:scroll-mb-0"
+          data-testid="advocate-scroll-tail"
         />
       </div>
 
