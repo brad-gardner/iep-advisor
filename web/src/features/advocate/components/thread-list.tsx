@@ -61,9 +61,9 @@ export function ThreadList({
       data-testid="advocate-thread-list"
     >
       <div className="flex items-center justify-between gap-2 px-1">
-        {/* Inside the phone Drawer (`variant="plain"`) the Drawer's own <h2> already announces
-            "Conversations", and so does the <ul> below — a third caption here would have a
-            screen reader hear it three times, so it renders only for the desktop rail. */}
+        {/* Inside the phone Drawer (`variant="plain"`) the Drawer renders its own <h2>Conversations</h2>,
+            so this visible caption would repeat the name straight after it; the desktop rail has no such
+            heading and needs it. The <ul> keeps its own aria-label either way so the list is named. */}
         {variant === 'panel' && (
           <p className="text-[11px] font-medium uppercase tracking-wide text-brand-slate-500">Conversations</p>
         )}
@@ -101,7 +101,7 @@ export function ThreadList({
       )}
 
       {threads && threads.length > 0 && (
-        <ul className="space-y-1">
+        <ul className="space-y-1" aria-label="Conversations">
           {threads.map((t) => {
             const selected = t.id === selectedId;
             return (

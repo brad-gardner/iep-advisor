@@ -51,7 +51,6 @@ const PIN_THRESHOLD_PX = 48;
  * scrollable content itself, so pin-to-bottom lands the newest message just
  * above that reserved (blank) space instead of the dock painting over it.
  */
-const PHONE_DOCK_RESERVE_CLASS = 'h-40 shrink-0 md:hidden';
 export function MessageList({ childId, messages, pending, streaming, announcement, handlers }: MessageListProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const announcementText = useMemo(() => (announcement ? markdownToPlainText(announcement.text) : ''), [announcement]);
@@ -128,7 +127,13 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
         )}
 
         {/* See the scroll-ownership note above: reserves room for the sticky composer dock below `md`. */}
-        <div aria-hidden="true" className={PHONE_DOCK_RESERVE_CLASS} />
+        {/*
+          Phones only: the dock is sticky over this scroller, so reserve its height at the end of the
+          content and pin-to-bottom lands the newest message above it instead of behind it. 160px was
+          measured against the dock with just the Composer; with the About pill and the state hint both
+          showing it is taller, and the last line can sit under it until the reader scrolls.
+        */}
+        <div aria-hidden="true" className="h-40 md:hidden" />
       </div>
 
       {/* Outside the conversation region on purpose: a status node under an aria-busy ancestor is

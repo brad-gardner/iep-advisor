@@ -80,11 +80,15 @@ export function Composer({
         Ask the advocate about {childFirstName}
       </label>
       <div
+        // `cn` is a plain join, so two conflicting utilities would be decided by CSS source order,
+        // not by the order written here (`bg-white` is emitted after `bg-brand-slate-50`, so a
+        // `tinted && 'bg-brand-slate-50'` alongside a base `bg-white` never paints). Each pair is
+        // therefore a ternary that emits exactly one utility.
         className={cn(
-          'rounded-card border border-brand-slate-200 bg-white transition-colors',
-          'focus-within:border-brand-teal-400 focus-within:ring-[3px] focus-within:ring-brand-teal-50',
-          tinted && 'bg-brand-slate-50',
-          overLimit && 'border-brand-danger-200',
+          'rounded-card border transition-colors',
+          'focus-within:border-brand-teal-600 focus-within:ring-[3px] focus-within:ring-brand-teal-100',
+          tinted ? 'bg-brand-slate-50' : 'bg-white',
+          overLimit ? 'border-brand-danger-200' : 'border-brand-slate-200',
         )}
       >
         <textarea
