@@ -6,7 +6,7 @@ import type { BriefChecklistItemDto } from '../types';
 export function BriefChecklist({ items }: { items: BriefChecklistItemDto[] }) {
   if (items.length === 0) {
     return (
-      <p className="text-sm text-brand-slate-400" data-testid="brief-checklist-empty">
+      <p className="text-sm text-brand-slate-500" data-testid="brief-checklist-empty">
         Nothing to check for this meeting type.
       </p>
     );
@@ -43,7 +43,7 @@ function ChecklistIcon({ satisfied }: { satisfied: boolean | null }) {
     );
   }
   return (
-    <span className="mt-0.5 text-brand-slate-400" aria-label="Unknown" data-testid="checklist-icon-unknown">
+    <span className="mt-0.5 text-brand-slate-500" aria-label="Unknown" data-testid="checklist-icon-unknown">
       <Minus className="h-4 w-4" aria-hidden="true" />
     </span>
   );

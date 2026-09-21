@@ -54,7 +54,7 @@ function AttentionSection<T extends DashboardStudent>({
                 <span className="text-brand-slate-800">{studentName(student)}</span>
                 <span className="flex items-center gap-2">
                   {renderStatus?.(student)}
-                  <span className="text-xs text-brand-slate-400">
+                  <span className="text-xs text-brand-slate-500">
                     {student.schoolName}
                   </span>
                 </span>
@@ -90,7 +90,7 @@ export function DashboardAttentionTile({
 
       {!hasStudents ? (
         <p
-          className="text-sm text-brand-slate-400"
+          className="text-sm text-brand-slate-500"
           data-testid="dashboard-attention-tile-empty"
         >
           Once students are added, any student missing a case manager or a

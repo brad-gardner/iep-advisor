@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { MessagesSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -197,8 +197,42 @@ export function AdvocatePage() {
   const showLoading = thread.loading && !hasLocalActivity;
   const conversationEmpty = !thread.loading && thread.messages.length === 0 && !hasLocalActivity;
   const threadCount = threadsApi.threads?.length ?? 0;
+  const showDisclaimer = Boolean(thread.disclaimer) && thread.messages.length > 0;
+  const showNotices = Boolean(thread.stopped || thread.failure || createError || showDisclaimer);
 
-  const rail = (
+  /**
+   * Below `md` the composer dock is `position: sticky` against the *viewport*, so it floats over
+   * whatever the page renders behind it — including the tail of the conversation. MessageList
+   * clears its newest message by scrolling a sentinel into view with a bottom scroll-margin
+   * (see message-list.tsx); this publishes what that margin has to be.
+   *
+   * It is measured, not assumed: the dock is 137px with just the Composer and up to ~261px with
+   * the About pill and the state hint showing, and the notice row above it (stopped / retry /
+   * disclaimer) is covered by the same sticky dock, so both are summed. The ResizeObserver fires
+   * only when one of those boxes actually changes size, never per streamed token. Environments
+   * without ResizeObserver (jsdom) keep the `10rem` fallback baked into the sentinel's class.
+   */
+  const panelRef = useRef<HTMLElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const noticesRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!panel || typeof ResizeObserver === 'undefined') return;
+
+    const measure = () => {
+      const height = (noticesRef.current?.offsetHeight ?? 0) + (dockRef.current?.offsetHeight ?? 0);
+      panel.style.setProperty('--advocate-dock-h', `${height}px`);
+    };
+
+    const observer = new ResizeObserver(measure);
+    if (noticesRef.current) observer.observe(noticesRef.current);
+    if (dockRef.current) observer.observe(dockRef.current);
+    measure();
+    return () => observer.disconnect();
+  }, [canAsk, showNotices]);
+
+  const renderRail = (variant: 'panel' | 'plain') => (
     <ThreadList
       threads={threadsApi.threads}
       error={threadsApi.error}
@@ -209,6 +243,7 @@ export function AdvocatePage() {
       onDelete={handleDelete}
       canAsk={canAsk}
       busy={busy}
+      variant={variant}
     />
   );
 
@@ -217,7 +252,7 @@ export function AdvocatePage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h2 className="font-serif">Ask the advocate about {child.firstName}</h2>
-          <p className="mt-1 text-sm text-brand-slate-400">Plain answers about the plan, your rights, and what to do next.</p>
+          <p className="mt-1 text-sm text-brand-slate-500">Plain answers about the plan, your rights, and what to do next.</p>
         </div>
         <Button
           variant="secondary"
@@ -239,75 +274,119 @@ export function AdvocatePage() {
         </Notice>
       )}
 
-      <div className="gap-4 md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
+      <div className="items-start gap-4 md:grid md:grid-cols-[16rem_minmax(0,1fr)]">
         <aside className="hidden md:block" aria-label="Conversations">
-          {rail}
+          {renderRail('panel')}
         </aside>
 
-        <section className="space-y-3" aria-label="Conversation" data-testid="advocate-conversation">
-          {showLoading && (
-            <div className="flex justify-center py-12">
-              <Spinner label="Loading conversation…" />
-            </div>
-          )}
+        <section
+          ref={panelRef}
+          // Height measured in-browser, not guessed: the stack above the panel (page padding,
+          // breadcrumb, title, badge, tabs, heading, privacy line) is a constant 319px, and the
+          // container adds 32px below — so 22rem lands the panel exactly on the viewport floor at
+          // 900px tall with no page scroll (19rem overflowed by 15px). The 26rem floor keeps the
+          // panel usable on a short laptop; 34rem forced 175px of page scroll at 720px tall.
+          // Both measurements were taken at `md` and up, where the panel is height-bound and is
+          // the scrolling element. Below `md` the panel is intentionally content-sized (the page
+          // scrolls instead, with the composer dock pinned via `position: sticky`), so the floor
+          // is scoped to `md:` — an unconditional min-height here made the panel taller than short
+          // phone viewports and let the sticky dock paint over the panel's own content.
+          className="flex flex-col rounded-card border border-brand-slate-200 bg-white shadow-sm md:h-[calc(100vh-22rem)] md:min-h-[26rem] md:overflow-hidden"
+          aria-label="Conversation"
+          data-testid="advocate-conversation"
+        >
+          {/*
+           * The scrollable slot: exactly one of {loading spinner, empty state,
+           * MessageList} renders here. MessageList supplies its own
+           * `flex-1 overflow-y-auto` (see message-list.tsx) and is the ONLY
+           * scroller in the panel; the other two states are short enough that
+           * they never need to scroll, so this wrapper itself stays a plain
+           * (non-scrolling) flex column and just lets the flex-1 child fill
+           * whatever height the panel has above the composer.
+           */}
+          <div className="flex min-h-0 flex-1 flex-col">
+            {showLoading && (
+              <div className="flex flex-1 items-center justify-center">
+                <Spinner label="Loading conversation…" />
+              </div>
+            )}
 
-          {thread.loadError && (
-            <div role="alert">
-              <Notice variant="error" title={thread.loadError}>
-                <Button variant="secondary" size="sm" className="mt-2" onClick={thread.reload}>
-                  Try again
-                </Button>
-              </Notice>
-            </div>
-          )}
-
-          {conversationEmpty && !thread.loadError && (
-            <AdvocateEmptyState
-              childFirstName={child.firstName}
-              canAsk={canAsk && !capped}
-              onPickExample={setDraft}
-              hasJournalEntries={hasJournalEntries === true}
-            />
-          )}
-
-          {!conversationEmpty && !showLoading && (
-            <MessageList
-              childId={childId}
-              messages={thread.messages}
-              pending={thread.pending}
-              streaming={thread.streaming}
-              announcement={thread.announcement}
-              handlers={suggestionHandlers}
-            />
-          )}
-
-          {thread.stopped && (
-            <p className="text-xs text-brand-slate-500" role="status" data-testid="advocate-stopped">
-              {STOPPED_COPY}
-            </p>
-          )}
-
-          {thread.failure && (
-            <div role="alert" data-testid="advocate-send-error">
-              <Notice variant="error" title={thread.failure.message}>
-                {thread.failure.retryable && (
-                  <Button variant="secondary" size="sm" className="mt-2" onClick={thread.retry} data-testid="advocate-retry">
-                    Retry
+            {thread.loadError && (
+              <div role="alert" className="p-4">
+                <Notice variant="error" title={thread.loadError}>
+                  <Button variant="secondary" size="sm" className="mt-2" onClick={thread.reload}>
+                    Try again
                   </Button>
-                )}
-              </Notice>
-            </div>
-          )}
+                </Notice>
+              </div>
+            )}
 
-          {createError && (
-            <div role="alert">
-              <Notice variant="error" title={createError} />
+            {/*
+              Empty state is top-aligned on phones and centred from `md`. At 400px the page header
+              stack can reach ~482px (a long child name wraps), leaving ~186px of panel above the
+              sticky dock — centring inside the scroller there pushes the example chips under the
+              dock. Starting at the top keeps the prompt and first chips visible.
+            */}
+            {conversationEmpty && !thread.loadError && (
+              <div className="flex flex-1 items-start justify-center px-6 py-8 md:items-center">
+                <AdvocateEmptyState
+                  canAsk={canAsk && !capped}
+                  onPickExample={setDraft}
+                  hasJournalEntries={hasJournalEntries === true}
+                />
+              </div>
+            )}
+
+            {!conversationEmpty && !showLoading && (
+              <MessageList
+                childId={childId}
+                messages={thread.messages}
+                pending={thread.pending}
+                streaming={thread.streaming}
+                announcement={thread.announcement}
+                handlers={suggestionHandlers}
+              />
+            )}
+          </div>
+
+          {showNotices && (
+            <div ref={noticesRef} className="space-y-2 border-t border-brand-slate-100 px-3 py-2">
+              {thread.stopped && (
+                <p className="text-xs text-brand-slate-500" role="status" data-testid="advocate-stopped">
+                  {STOPPED_COPY}
+                </p>
+              )}
+
+              {thread.failure && (
+                <div role="alert" data-testid="advocate-send-error">
+                  <Notice variant="error" title={thread.failure.message}>
+                    {thread.failure.retryable && (
+                      <Button variant="secondary" size="sm" className="mt-2" onClick={thread.retry} data-testid="advocate-retry">
+                        Retry
+                      </Button>
+                    )}
+                  </Notice>
+                </div>
+              )}
+
+              {createError && (
+                <div role="alert">
+                  <Notice variant="error" title={createError} />
+                </div>
+              )}
+
+              {showDisclaimer && (
+                <p className="text-[11px] leading-relaxed text-brand-slate-500" data-testid="advocate-disclaimer">
+                  {thread.disclaimer}
+                </p>
+              )}
             </div>
           )}
 
           {canAsk && (
             <div
-              className="sticky bottom-0 -mx-4 space-y-2 border-t border-brand-slate-100 bg-white px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6 md:static md:mx-0 md:border-0 md:px-0 md:pb-0"
+              ref={dockRef}
+              className="sticky bottom-0 space-y-2 border-t border-brand-slate-200 bg-brand-slate-50 p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:static md:bg-brand-slate-50/60 md:pb-3"
               data-testid="advocate-composer-dock"
             >
               {about && (
@@ -327,17 +406,11 @@ export function AdvocatePage() {
               />
             </div>
           )}
-
-          {thread.disclaimer && thread.messages.length > 0 && (
-            <p className="text-[11px] leading-relaxed text-brand-slate-400" data-testid="advocate-disclaimer">
-              {thread.disclaimer}
-            </p>
-          )}
         </section>
       </div>
 
       <Drawer open={railOpen} onClose={() => setRailOpen(false)} title="Conversations" data-testid="advocate-rail-drawer">
-        {rail}
+        {renderRail('plain')}
       </Drawer>
 
       {canAsk && (

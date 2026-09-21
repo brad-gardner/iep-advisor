@@ -17,7 +17,7 @@ export function SubscriptionCancelPage() {
           <h2 className="font-serif text-xl font-semibold text-brand-slate-800 mb-2">
             Checkout Canceled
           </h2>
-          <p className="text-sm text-brand-slate-400 mb-6">
+          <p className="text-sm text-brand-slate-500 mb-6">
             No worries — you can subscribe anytime.
           </p>
           <Link to="/subscription">

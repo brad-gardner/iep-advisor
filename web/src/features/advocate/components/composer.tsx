@@ -50,6 +50,10 @@ export function Composer({
   const length = value.length;
   const overLimit = length > ADVOCATE_MESSAGE_MAX_LENGTH;
   const canSend = !disabled && !streaming && !creating && value.trim().length > 0 && !overLimit;
+  // Streaming/creating (readOnly) and the usage cap (disabled) all mean "not accepting input right
+  // now" — tinted as one field, not just the textarea, so the counter row doesn't stay white while
+  // the textarea greys out above it.
+  const tinted = streaming || creating || disabled;
 
   const submit = () => {
     if (!canSend) return;
@@ -75,52 +79,64 @@ export function Composer({
       <label htmlFor={id} className="sr-only">
         Ask the advocate about {childFirstName}
       </label>
-      <textarea
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={onKeyDown}
-        onCompositionStart={() => setComposing(true)}
-        onCompositionEnd={() => setComposing(false)}
-        rows={3}
-        readOnly={streaming || creating}
-        disabled={disabled}
-        aria-describedby={counterId}
-        aria-invalid={overLimit || undefined}
-        placeholder={
-          disabled
-            ? (disabledReason ?? 'Sending is paused.')
-            : `Ask about ${childFirstName}'s plan, a document, or what to do next…`
-        }
+      <div
+        // `cn` is a plain join, so two conflicting utilities would be decided by CSS source order,
+        // not by the order written here (`bg-white` is emitted after `bg-brand-slate-50`, so a
+        // `tinted && 'bg-brand-slate-50'` alongside a base `bg-white` never paints). Each pair is
+        // therefore a ternary that emits exactly one utility.
         className={cn(
-          'w-full resize-y rounded-input border border-brand-slate-200 bg-white px-3 py-2 text-sm text-brand-slate-800 placeholder:text-brand-slate-300',
-          'focus:border-brand-teal-400 focus:outline-none focus:ring-[3px] focus:ring-brand-teal-50 transition-colors',
-          'disabled:cursor-not-allowed disabled:bg-brand-slate-50 read-only:bg-brand-slate-50',
-          overLimit && 'border-brand-danger-200',
+          'rounded-card border transition-colors',
+          'focus-within:border-brand-teal-600 focus-within:ring-[3px] focus-within:ring-brand-teal-100',
+          tinted ? 'bg-brand-slate-50' : 'bg-white',
+          overLimit ? 'border-brand-danger-200' : 'border-brand-slate-200',
         )}
-        data-testid="advocate-composer-input"
-      />
-      <div className="flex items-center justify-between gap-3">
-        <p
-          id={counterId}
-          className={cn('text-xs', overLimit ? 'text-brand-danger-700' : 'text-brand-slate-400')}
-          data-testid="advocate-composer-count"
-        >
-          {length.toLocaleString()} / {ADVOCATE_MESSAGE_MAX_LENGTH.toLocaleString()}
-          {overLimit && ' — too long'}
-          <span className="sr-only">. Enter sends, Shift+Enter starts a new line.</span>
-        </p>
-        {streaming ? (
-          <Button type="button" variant="secondary" size="sm" onClick={onStop} data-testid="advocate-stop">
-            <Square className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-            Stop
-          </Button>
-        ) : (
-          <Button type="submit" size="sm" disabled={!canSend} data-testid="advocate-send">
-            <Send className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-            Send
-          </Button>
-        )}
+      >
+        <textarea
+          id={id}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          onCompositionStart={() => setComposing(true)}
+          onCompositionEnd={() => setComposing(false)}
+          rows={3}
+          readOnly={streaming || creating}
+          disabled={disabled}
+          aria-describedby={counterId}
+          aria-invalid={overLimit || undefined}
+          placeholder={
+            disabled
+              ? (disabledReason ?? 'Sending is paused.')
+              : `Ask about ${childFirstName}'s plan, a document, or what to do next…`
+          }
+          className={cn(
+            'w-full max-h-[40vh] resize-y rounded-t-card bg-transparent px-3 py-2 text-sm text-brand-slate-800 placeholder:text-brand-slate-500',
+            'focus:outline-none',
+            'disabled:cursor-not-allowed',
+          )}
+          data-testid="advocate-composer-input"
+        />
+        <div className="flex items-center justify-between gap-3 px-3 pb-2">
+          <p
+            id={counterId}
+            className={cn('text-xs', overLimit ? 'text-brand-danger-700' : 'text-brand-slate-500')}
+            data-testid="advocate-composer-count"
+          >
+            {length.toLocaleString()} / {ADVOCATE_MESSAGE_MAX_LENGTH.toLocaleString()}
+            {overLimit && ' — too long'}
+            <span className="sr-only">. Enter sends, Shift+Enter starts a new line.</span>
+          </p>
+          {streaming ? (
+            <Button type="button" variant="secondary" size="sm" onClick={onStop} data-testid="advocate-stop">
+              <Square className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+              Stop
+            </Button>
+          ) : (
+            <Button type="submit" size="sm" disabled={!canSend} data-testid="advocate-send">
+              <Send className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+              Send
+            </Button>
+          )}
+        </div>
       </div>
     </form>
   );

@@ -106,7 +106,7 @@ export function AddTeamMemberForm({
 
   if (eligible.length === 0) {
     return (
-      <p className="text-sm text-brand-slate-400" data-testid="team-add-empty">
+      <p className="text-sm text-brand-slate-500" data-testid="team-add-empty">
         Everyone eligible at this school is already on the team.
       </p>
     );

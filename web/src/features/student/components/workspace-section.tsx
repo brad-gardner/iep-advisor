@@ -34,11 +34,11 @@ export function WorkspaceSection({
         <h2 id={`${testId}-heading`} className="font-serif text-lg">
           {meta.sectionTitle}
         </h2>
-        <p className="text-sm text-brand-slate-400">{meta.hint}</p>
+        <p className="text-sm text-brand-slate-500">{meta.hint}</p>
       </div>
 
       {entries.length === 0 && !adding && (
-        <p className="text-sm italic text-brand-slate-400" data-testid={`${testId}-empty`}>
+        <p className="text-sm italic text-brand-slate-500" data-testid={`${testId}-empty`}>
           Nothing here yet.
         </p>
       )}

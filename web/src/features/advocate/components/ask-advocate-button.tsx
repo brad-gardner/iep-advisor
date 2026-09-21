@@ -23,7 +23,7 @@ interface AskAdvocateButtonProps {
 const HELPER_TEXT = 'Opens a private conversation with the Virtual Advocate about this item.';
 
 const buttonClass =
-  'inline-flex items-center justify-center rounded-button border-[1.5px] border-brand-teal-300 bg-transparent font-medium leading-[1.3] text-brand-teal-500 transition-colors hover:bg-brand-teal-50 focus:outline-none focus:ring-1 focus:ring-brand-teal-400 focus:ring-offset-2';
+  'inline-flex items-center justify-center rounded-button border-[1.5px] border-brand-teal-300 bg-transparent font-medium leading-[1.3] text-brand-teal-500 transition-colors hover:bg-brand-teal-50 focus:outline-none focus:ring-1 focus:ring-brand-teal-500 focus:ring-offset-2';
 
 /**
  * "Ask the advocate" launcher: a secondary-styled link to a fresh advocate

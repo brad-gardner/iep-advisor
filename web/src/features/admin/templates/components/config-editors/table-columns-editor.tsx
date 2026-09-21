@@ -119,7 +119,7 @@ export function TableColumnsEditor({ config, onChange, disabled, idPrefix }: Tab
                   checked={col.required}
                   onChange={(e) => updateColumn(i, { required: e.target.checked })}
                   disabled={disabled}
-                  className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-400"
+                  className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-500"
                   data-testid={`${colId}-required`}
                 />
                 Required

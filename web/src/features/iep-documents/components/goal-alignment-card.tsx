@@ -17,7 +17,7 @@ export function GoalAlignmentCard({ alignment }: GoalAlignmentCardProps) {
   const status = STATUS_VARIANTS[alignment.alignmentStatus] || STATUS_VARIANTS.not_addressed;
 
   return (
-    <div className="border-[0.5px] border-brand-slate-200 rounded-card p-4 space-y-3 bg-white">
+    <div className="border border-brand-slate-200 rounded-card p-4 space-y-3 bg-white">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">

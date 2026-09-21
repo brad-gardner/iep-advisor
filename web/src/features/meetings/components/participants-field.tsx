@@ -42,12 +42,12 @@ function ParticipantRowItem({
           type="checkbox"
           checked={row.checked}
           onChange={onToggle}
-          className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+          className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
           data-testid={`participant-checkbox-${row.key}`}
         />
         <label htmlFor={checkboxId} className="min-w-0 truncate text-sm text-brand-slate-800">
           {row.displayName}
-          <span className="ml-1.5 text-xs text-brand-slate-400">
+          <span className="ml-1.5 text-xs text-brand-slate-500">
             {row.kind === 'team' ? TEAM_ROLE_LABELS[row.teamRole] : KIND_LABEL[row.kind]}
           </span>
         </label>
@@ -59,7 +59,7 @@ function ParticipantRowItem({
             checked={row.isRequired}
             disabled={!row.checked}
             onChange={(e) => onRequiredChange(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+            className="h-3.5 w-3.5 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
             data-testid={`participant-required-${row.key}`}
           />
           Required
@@ -134,7 +134,7 @@ export function ParticipantsField({
           />
         ))}
         {pool.length === 0 && external.length === 0 && (
-          <p className="py-3 text-sm text-brand-slate-400">No participants yet.</p>
+          <p className="py-3 text-sm text-brand-slate-500">No participants yet.</p>
         )}
       </div>
 

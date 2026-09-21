@@ -191,7 +191,7 @@ export function FieldEditor({
             </option>
           ))}
         </Select>
-        <p className="mt-1 text-xs text-brand-slate-400">
+        <p className="mt-1 text-xs text-brand-slate-500">
           Lets AI help, prefill and PDF layout recognise this field in any template.
         </p>
       </div>
@@ -202,7 +202,7 @@ export function FieldEditor({
           checked={required}
           onChange={(e) => handleRequired(e.target.checked)}
           disabled={readOnly}
-          className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-400"
+          className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-500"
           data-testid={`field-${field.id}-required`}
         />
         Required
@@ -247,7 +247,7 @@ export function FieldEditor({
           />
         )}
         {(config.kind === 'RichText' || config.kind === 'Checkbox') && (
-          <p className="text-xs text-brand-slate-400">This field type has no extra configuration.</p>
+          <p className="text-xs text-brand-slate-500">This field type has no extra configuration.</p>
         )}
       </div>
 

@@ -203,7 +203,7 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
       )}
 
       {!loadError && !isLoading && artifacts.length === 0 && (
-        <p className="text-sm text-brand-slate-400" data-testid="signed-artifacts-empty">
+        <p className="text-sm text-brand-slate-500" data-testid="signed-artifacts-empty">
           No signed copies attached yet.
         </p>
       )}

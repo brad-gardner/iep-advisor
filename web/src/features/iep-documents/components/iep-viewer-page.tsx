@@ -228,7 +228,7 @@ export function IepViewerPage() {
     <div className="space-y-4 max-w-5xl">
       <Link
         to={`/children/${document.childProfileId}`}
-        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
+        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />
         Back to child
@@ -261,7 +261,7 @@ export function IepViewerPage() {
                 </Button>
                 {compareOpen && (
                   <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-card border border-brand-slate-200 shadow-lg z-20 py-1">
-                    <p className="px-3 py-1.5 text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
+                    <p className="px-3 py-1.5 text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold">
                       Compare with...
                     </p>
                     {otherIeps.map((other) => (
@@ -281,7 +281,7 @@ export function IepViewerPage() {
                             : `IEP #${other.id}`}
                         </span>
                         {other.meetingType && (
-                          <span className="text-brand-slate-400 ml-2 text-[12px]">
+                          <span className="text-brand-slate-500 ml-2 text-[12px]">
                             {MEETING_TYPE_LABELS[other.meetingType] ||
                               other.meetingType}
                           </span>
@@ -363,7 +363,7 @@ export function IepViewerPage() {
             Notes
           </Button>
           {notesExpanded && (
-            <div className="mt-1 bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+            <div className="mt-1 bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200">
               <Markdown content={document.notes ?? ''} className="text-sm text-brand-slate-600" />
             </div>
           )}
@@ -399,7 +399,7 @@ export function IepViewerPage() {
               className={`px-4 py-2 text-[13px] font-medium transition-colors ${
                 activeTab === "document"
                   ? "text-brand-slate-800 border-b-2 border-brand-teal-500"
-                  : "text-brand-slate-400 hover:text-brand-slate-800"
+                  : "text-brand-slate-500 hover:text-brand-slate-800"
               }`}
             >
               Document
@@ -410,7 +410,7 @@ export function IepViewerPage() {
               className={`px-4 py-2 text-[13px] font-medium transition-colors ${
                 activeTab === "analysis"
                   ? "text-brand-slate-800 border-b-2 border-brand-teal-500"
-                  : "text-brand-slate-400 hover:text-brand-slate-800"
+                  : "text-brand-slate-500 hover:text-brand-slate-800"
               }`}
             >
               Analysis
@@ -424,7 +424,7 @@ export function IepViewerPage() {
               className={`px-4 py-2 text-[13px] font-medium transition-colors ${
                 activeTab === "progress-reports"
                   ? "text-brand-slate-800 border-b-2 border-brand-teal-500"
-                  : "text-brand-slate-400 hover:text-brand-slate-800"
+                  : "text-brand-slate-500 hover:text-brand-slate-800"
               }`}
             >
               Progress Reports

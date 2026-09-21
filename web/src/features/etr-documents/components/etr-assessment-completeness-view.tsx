@@ -32,7 +32,7 @@ export function EtrAssessmentCompletenessView({ data }: EtrAssessmentCompletenes
             Assessment Completeness
           </h2>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-brand-slate-400 uppercase tracking-wide">
+            <span className="text-[11px] text-brand-slate-500 uppercase tracking-wide">
               Overall
             </span>
             <Badge variant={overall.variant}>{overall.label}</Badge>
@@ -45,7 +45,7 @@ export function EtrAssessmentCompletenessView({ data }: EtrAssessmentCompletenes
           Evaluated Domains ({data.evaluated_domains.length})
         </h3>
         {data.evaluated_domains.length === 0 ? (
-          <p className="text-sm text-brand-slate-400">No evaluated domains reported.</p>
+          <p className="text-sm text-brand-slate-500">No evaluated domains reported.</p>
         ) : (
           <div className="space-y-2">
             {data.evaluated_domains.map((d, i) => {
@@ -56,7 +56,7 @@ export function EtrAssessmentCompletenessView({ data }: EtrAssessmentCompletenes
               return (
                 <div
                   key={i}
-                  className="rounded-card border-[0.5px] border-brand-slate-200 bg-white p-3"
+                  className="rounded-card border border-brand-slate-200 bg-white p-3"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-2">
@@ -95,7 +95,7 @@ export function EtrAssessmentCompletenessView({ data }: EtrAssessmentCompletenes
           Missing or Under-Evaluated Domains ({data.missing_domains.length})
         </h3>
         {data.missing_domains.length === 0 ? (
-          <p className="text-sm text-brand-slate-400">
+          <p className="text-sm text-brand-slate-500">
             No missing domains identified.
           </p>
         ) : (

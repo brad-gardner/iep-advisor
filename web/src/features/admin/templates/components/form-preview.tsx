@@ -10,7 +10,7 @@ import { parseConfig, readColumnOptions, type TableColumn } from '../template-co
  */
 export function FormPreview({ sections }: { sections: TemplateSectionDto[] }) {
   if (sections.length === 0) {
-    return <p className="text-sm text-brand-slate-400">Add a section to see the form preview.</p>;
+    return <p className="text-sm text-brand-slate-500">Add a section to see the form preview.</p>;
   }
 
   return (
@@ -21,7 +21,7 @@ export function FormPreview({ sections }: { sections: TemplateSectionDto[] }) {
             {section.title || 'Untitled section'}
           </h3>
           {section.fields.length === 0 ? (
-            <p className="text-sm text-brand-slate-400">No fields.</p>
+            <p className="text-sm text-brand-slate-500">No fields.</p>
           ) : (
             <div className="space-y-4">
               {section.fields.map((field) => (

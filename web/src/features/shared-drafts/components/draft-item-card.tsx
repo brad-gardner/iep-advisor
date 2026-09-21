@@ -63,7 +63,7 @@ export function DraftItemCard({
       )}
 
       {myResponseCount > 0 && (
-        <p className="text-xs text-brand-slate-400">
+        <p className="text-xs text-brand-slate-500">
           You already responded to this — see "My responses" below.
         </p>
       )}

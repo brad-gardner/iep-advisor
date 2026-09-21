@@ -93,7 +93,7 @@ export function ChildOverviewTab() {
               Invite Someone
             </Button>
           </div>
-          <p className="text-sm text-brand-slate-400 mb-4">
+          <p className="text-sm text-brand-slate-500 mb-4">
             Share {child.firstName}'s IEP information with a co-parent,
             advocate, or attorney. They'll get their own login and can view or
             collaborate depending on the role you assign.
@@ -123,7 +123,7 @@ export function ChildOverviewTab() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="font-serif">Student account</h2>
-              <p className="mt-1 max-w-prose text-sm text-brand-slate-400">
+              <p className="mt-1 max-w-prose text-sm text-brand-slate-500">
                 Invite {child.firstName} to activate their own account and take
                 part in their IEP process.
               </p>
@@ -162,8 +162,8 @@ export function ChildOverviewTab() {
 
 function ProfileField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-      <p className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
+    <div className="bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200">
+      <p className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold">
         {label}
       </p>
       <p className="text-sm font-medium text-brand-slate-800 mt-1">{value}</p>

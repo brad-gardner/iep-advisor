@@ -41,7 +41,7 @@ export function StatTile({
     >
       <p className="text-xs font-medium uppercase tracking-wide text-brand-slate-500">{label}</p>
       <p className="mt-1 font-serif text-2xl text-brand-slate-800">{value}</p>
-      {denominator && <p className="mt-1 text-xs text-brand-slate-400">{denominator}</p>}
+      {denominator && <p className="mt-1 text-xs text-brand-slate-500">{denominator}</p>}
     </div>
   );
 
@@ -50,7 +50,7 @@ export function StatTile({
   return (
     <Link
       to={href}
-      className="block rounded-card transition-colors hover:border-brand-teal-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+      className="block rounded-card transition-colors hover:border-brand-teal-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
     >
       {body}
     </Link>

@@ -42,7 +42,7 @@ export const FrozenSectionList = memo(function FrozenSectionList({
 }: FrozenSectionListProps) {
   const sections = [...templateVersion.sections].sort((a, b) => a.displayOrder - b.displayOrder);
   if (sections.length === 0) {
-    return <p className="text-sm text-brand-slate-400">This document has no sections.</p>;
+    return <p className="text-sm text-brand-slate-500">This document has no sections.</p>;
   }
 
   const changedFieldKeys = new Set((changeSummary?.changedFields ?? []).map((f) => f.fieldKey));
@@ -128,7 +128,7 @@ function RowBlockGroup({
       <h3 className="text-sm font-medium text-brand-slate-600">{field.label || 'Untitled field'}</h3>
 
       {removedRows.length > 0 && (
-        <ul className="space-y-1 text-sm text-brand-slate-400" data-testid={`removed-rows-${field.fieldKey}`}>
+        <ul className="space-y-1 text-sm text-brand-slate-500" data-testid={`removed-rows-${field.fieldKey}`}>
           {removedRows.map((r) => (
             <li key={r.rowId}>Removed since last revision: {r.label}</li>
           ))}
@@ -136,7 +136,7 @@ function RowBlockGroup({
       )}
 
       {rows.length === 0 ? (
-        <p className="text-sm text-brand-slate-400">Nothing here yet.</p>
+        <p className="text-sm text-brand-slate-500">Nothing here yet.</p>
       ) : (
         <div className="space-y-3">
           {rows.map((row, i) => {

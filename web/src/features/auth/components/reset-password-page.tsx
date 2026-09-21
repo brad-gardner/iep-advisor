@@ -24,7 +24,7 @@ export function ResetPasswordPage() {
           Invalid Reset Link
         </h2>
         <Notice variant="error" title="This reset link is invalid or has expired" />
-        <p className="mt-6 text-center text-sm text-brand-slate-400">
+        <p className="mt-6 text-center text-sm text-brand-slate-500">
           <Link to="/forgot-password" className="text-brand-teal-500 hover:text-brand-teal-600">
             Request a new reset link
           </Link>
@@ -106,7 +106,7 @@ export function ResetPasswordPage() {
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-brand-slate-400">
+      <p className="mt-6 text-center text-sm text-brand-slate-500">
         <Link to="/login" className="text-brand-teal-500 hover:text-brand-teal-600">
           Back to login
         </Link>

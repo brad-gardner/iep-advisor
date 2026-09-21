@@ -126,7 +126,7 @@ export function SectionEditor({
 
       <div className="space-y-3">
         {section.fields.length === 0 ? (
-          <p className="text-sm text-brand-slate-400">No fields yet.</p>
+          <p className="text-sm text-brand-slate-500">No fields yet.</p>
         ) : (
           section.fields.map((f, i) => (
             <FieldEditor

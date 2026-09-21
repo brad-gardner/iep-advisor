@@ -25,7 +25,7 @@ function FlagGroup({
         <Icon className={`w-4.5 h-4.5 ${colorClass}`} strokeWidth={1.8} />
         <h4 className={`text-sm font-semibold ${colorClass}`}>{title}</h4>
       </div>
-      <p className="text-[12px] text-brand-slate-400 mb-3">{description}</p>
+      <p className="text-[12px] text-brand-slate-500 mb-3">{description}</p>
       <ul className="space-y-1.5">
         {items.map((item, i) => (
           <li key={i} className="text-sm text-brand-slate-700 flex items-start gap-2">

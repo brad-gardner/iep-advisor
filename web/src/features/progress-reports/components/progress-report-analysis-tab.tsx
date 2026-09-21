@@ -115,7 +115,7 @@ export function ProgressReportAnalysisTab({
             {analysis.redFlags.map((rf, i) => (
               <div
                 key={i}
-                className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200"
+                className="bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200"
               >
                 <div className="flex items-center gap-2 mb-1">
                   <Badge

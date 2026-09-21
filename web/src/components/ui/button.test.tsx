@@ -7,8 +7,9 @@ describe('Button', () => {
     render(<Button>Save</Button>);
     const btn = screen.getByRole('button', { name: 'Save' });
     expect(btn).toHaveClass('px-4', 'py-2', 'text-[13px]');
-    // primary variant classes preserved
-    expect(btn).toHaveClass('bg-brand-teal-500');
+    // primary variant classes preserved (teal-600: AA fix 2026-09-20, see
+    // variantStyles comment in button.tsx)
+    expect(btn).toHaveClass('bg-brand-teal-600');
   });
 
   it('is not disabled and has no aria-busy when not loading', () => {

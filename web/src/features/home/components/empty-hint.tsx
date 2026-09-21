@@ -10,7 +10,7 @@ interface EmptyHintProps {
  */
 export function EmptyHint({ 'data-testid': testId, children }: EmptyHintProps) {
   return (
-    <p className="text-sm text-brand-slate-400" data-testid={testId}>
+    <p className="text-sm text-brand-slate-500" data-testid={testId}>
       {children}
     </p>
   );

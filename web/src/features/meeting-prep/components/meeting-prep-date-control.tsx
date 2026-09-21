@@ -51,7 +51,7 @@ export function MeetingPrepDateControl({
       </Button>
       {savedMeetingDate && (
         <p
-          className="text-[12px] text-brand-slate-400"
+          className="text-[12px] text-brand-slate-500"
           data-testid="meeting-prep-saved-date"
         >
           Current checklist meeting date: {formatMeetingDate(savedMeetingDate)}

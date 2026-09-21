@@ -54,7 +54,7 @@ export function InviteStudentForm({
     >
       {error && <Notice variant="error" title={error} />}
       {embedded && description && (
-        <p className="text-sm text-brand-slate-400">{description}</p>
+        <p className="text-sm text-brand-slate-500">{description}</p>
       )}
 
       <Input
@@ -83,7 +83,7 @@ export function InviteStudentForm({
   return (
     <Card className="max-w-lg">
       <h2 className="font-serif text-lg mb-2">Invite student</h2>
-      <p className="text-sm text-brand-slate-400 mb-4">
+      <p className="text-sm text-brand-slate-500 mb-4">
         {description ??
           "Invite the student to activate their own account and participate in their IEP process."}
       </p>

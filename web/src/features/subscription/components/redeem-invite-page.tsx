@@ -49,7 +49,7 @@ export function RedeemInvitePage() {
           <div className="w-10 h-10 rounded-full bg-brand-teal-50 flex items-center justify-center">
             <Ticket className="w-5 h-5 text-brand-teal-500" strokeWidth={1.8} aria-hidden="true" />
           </div>
-          <p className="text-sm text-brand-slate-400">
+          <p className="text-sm text-brand-slate-500">
             Enter the 8-character invite code you received to activate your subscription.
           </p>
         </div>

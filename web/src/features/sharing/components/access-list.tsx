@@ -64,7 +64,7 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
 
   if (entries.length === 0) {
     return (
-      <p className="text-sm text-brand-slate-400 py-2">
+      <p className="text-sm text-brand-slate-500 py-2">
         No one else has access to this profile.
       </p>
     );
@@ -80,7 +80,7 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
         return (
           <div
             key={entry.id}
-            className="flex items-center justify-between bg-white rounded-card p-3 border-[0.5px] border-brand-slate-200"
+            className="flex items-center justify-between bg-white rounded-card p-3 border border-brand-slate-200"
           >
             <div className="flex items-center gap-3 min-w-0">
               <div className="min-w-0">
@@ -88,7 +88,7 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
                   {displayName}
                 </p>
                 {displayEmail && displayName !== displayEmail && (
-                  <p className="text-xs text-brand-slate-400 truncate">{displayEmail}</p>
+                  <p className="text-xs text-brand-slate-500 truncate">{displayEmail}</p>
                 )}
               </div>
             </div>

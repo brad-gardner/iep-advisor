@@ -56,7 +56,7 @@ export function KnowledgeBasePage() {
       )}
 
       {/* Legal disclaimer */}
-      <p className="text-xs text-brand-slate-400 border-t border-brand-slate-100 pt-4">
+      <p className="text-xs text-brand-slate-500 border-t border-brand-slate-100 pt-4">
         This information is provided for educational purposes. It is not legal advice.
       </p>
     </PageLayout>

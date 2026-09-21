@@ -78,7 +78,7 @@ export function ProgressReportViewerPage() {
   if (!report) {
     return (
       <div className="text-center py-12">
-        <p className="text-brand-slate-400">Progress report not found.</p>
+        <p className="text-brand-slate-500">Progress report not found.</p>
         <Link
           to={`/children/${childId}/ieps/${id}`}
           className="text-brand-teal-500 hover:underline mt-2 inline-block"
@@ -128,7 +128,7 @@ export function ProgressReportViewerPage() {
         {report.notes && (
           <Markdown
             content={report.notes}
-            className="text-sm text-brand-slate-600 bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200"
+            className="text-sm text-brand-slate-600 bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200"
           />
         )}
       </div>
@@ -155,7 +155,7 @@ export function ProgressReportViewerPage() {
               className={`px-4 py-2 text-[13px] font-medium transition-colors ${
                 activeTab === "document"
                   ? "text-brand-slate-800 border-b-2 border-brand-teal-500"
-                  : "text-brand-slate-400 hover:text-brand-slate-800"
+                  : "text-brand-slate-500 hover:text-brand-slate-800"
               }`}
             >
               Document
@@ -166,7 +166,7 @@ export function ProgressReportViewerPage() {
               className={`px-4 py-2 text-[13px] font-medium transition-colors ${
                 activeTab === "analysis"
                   ? "text-brand-slate-800 border-b-2 border-brand-teal-500"
-                  : "text-brand-slate-400 hover:text-brand-slate-800"
+                  : "text-brand-slate-500 hover:text-brand-slate-800"
               }`}
             >
               Analysis

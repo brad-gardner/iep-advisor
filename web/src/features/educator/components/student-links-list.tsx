@@ -17,7 +17,7 @@ function formatDate(value?: string | null): string | null {
 export function StudentLinksList({ links, revokingId, onRevoke }: StudentLinksListProps) {
   if (links.length === 0) {
     return (
-      <p className="text-brand-slate-400 text-sm" data-testid="student-links-empty">
+      <p className="text-brand-slate-500 text-sm" data-testid="student-links-empty">
         No parent links yet.
       </p>
     );
@@ -42,7 +42,7 @@ export function StudentLinksList({ links, revokingId, onRevoke }: StudentLinksLi
                     <span className="text-sm text-brand-slate-700">{link.inviteEmail}</span>
                   )}
                 </div>
-                <p className="text-xs text-brand-slate-400">
+                <p className="text-xs text-brand-slate-500">
                   {link.isAccepted && linkedDate
                     ? `Linked ${linkedDate}`
                     : createdDate

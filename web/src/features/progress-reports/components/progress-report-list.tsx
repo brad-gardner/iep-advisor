@@ -93,7 +93,7 @@ export function ProgressReportList({
 
   if (reports.length === 0) {
     return (
-      <p className="text-brand-slate-400 text-sm">
+      <p className="text-brand-slate-500 text-sm">
         No progress reports yet for this IEP.
       </p>
     );
@@ -121,7 +121,7 @@ export function ProgressReportList({
                   {r.status}
                 </Badge>
               </div>
-              <div className="flex gap-3 text-[11px] text-brand-slate-400 mt-1">
+              <div className="flex gap-3 text-[11px] text-brand-slate-500 mt-1">
                 <span>
                   {formatPeriod(r.reportingPeriodStart, r.reportingPeriodEnd)}
                 </span>
@@ -148,7 +148,7 @@ export function ProgressReportList({
               {r.fileSizeBytes > 0 && (
                 <button
                   onClick={() => handleDownload(r.id)}
-                  className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
+                  className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors"
                 >
                   <Download
                     className="w-3.5 h-3.5"

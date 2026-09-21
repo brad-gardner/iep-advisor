@@ -67,7 +67,7 @@ export function FamilyContactCard({ studentId }: FamilyContactCardProps) {
               </div>
             )}
             {attempts.length === 0 ? (
-              <p className="text-sm text-brand-slate-400" data-testid="contact-attempts-empty">
+              <p className="text-sm text-brand-slate-500" data-testid="contact-attempts-empty">
                 No contact attempts logged yet.
               </p>
             ) : (
@@ -107,7 +107,7 @@ export function FamilyContactCard({ studentId }: FamilyContactCardProps) {
               </div>
             )}
             {offlineInput.length === 0 ? (
-              <p className="text-sm text-brand-slate-400" data-testid="offline-input-empty">
+              <p className="text-sm text-brand-slate-500" data-testid="offline-input-empty">
                 No offline input recorded yet.
               </p>
             ) : (

@@ -100,13 +100,13 @@ export function IepUpload({ iepId, onUploaded }: IepUploadProps) {
         {isUploading ? (
           <div className="flex flex-col items-center gap-2">
             <Spinner size="sm" label="Uploading…" />
-            <p className="text-brand-slate-400 text-sm">Uploading...</p>
+            <p className="text-brand-slate-500 text-sm">Uploading...</p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1">
             <Upload className="w-5 h-5 text-brand-slate-400" strokeWidth={1.8} aria-hidden="true" />
             <p className="text-brand-slate-600 text-sm">Attach PDF</p>
-            <p className="text-brand-slate-400 text-[11px]">Drop a PDF here or click to browse</p>
+            <p className="text-brand-slate-500 text-[11px]">Drop a PDF here or click to browse</p>
           </div>
         )}
       </label>

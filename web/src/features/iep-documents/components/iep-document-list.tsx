@@ -144,7 +144,7 @@ export function IepDocumentList({
                   </Badge>
                 )}
               </div>
-              <div className="flex gap-3 text-[11px] text-brand-slate-400 mt-1">
+              <div className="flex gap-3 text-[11px] text-brand-slate-500 mt-1">
                 {doc.iepDate && (
                   <span>Meeting: {formatMeetingDate(doc.iepDate)}</span>
                 )}

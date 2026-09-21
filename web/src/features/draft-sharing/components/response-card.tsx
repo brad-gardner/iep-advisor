@@ -25,7 +25,7 @@ export function ResponseCard({ response, onJump, onResolve }: ResponseCardProps)
           </Badge>
           <span className="text-sm font-medium text-brand-slate-800">{response.parentName}</span>
         </div>
-        <span className="text-xs text-brand-slate-400">{formatDate(response.createdAt)}</span>
+        <span className="text-xs text-brand-slate-500">{formatDate(response.createdAt)}</span>
       </div>
 
       {response.targetLabel && onJump ? (

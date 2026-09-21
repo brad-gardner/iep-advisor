@@ -1,8 +1,11 @@
 import type { InputHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { forwardRef } from 'react';
 
+// AA fix (2026-09-20): placeholder:text-brand-slate-300 measured 2.11:1 on
+// white (1.96:1 on the slate-50 read-only/disabled surface); placeholder
+// text is text under WCAG 1.4.3. Raised to slate-500 (5.33:1).
 const baseStyles =
-  'w-full px-3 py-2 bg-white rounded-input text-brand-slate-800 text-sm border border-brand-slate-200 focus:outline-none focus:border-brand-teal-400 focus:ring-[3px] focus:ring-brand-teal-50 transition-colors placeholder:text-brand-slate-300';
+  'w-full px-3 py-2 bg-white rounded-input text-brand-slate-800 text-sm border border-brand-slate-200 focus:outline-none focus:border-brand-teal-500 focus:ring-[3px] focus:ring-brand-teal-50 transition-colors placeholder:text-brand-slate-500';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;

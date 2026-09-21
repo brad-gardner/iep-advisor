@@ -187,7 +187,7 @@ export function Menu({
         className={cn(
           triggerClassName ??
             'flex h-9 w-9 items-center justify-center rounded-button text-brand-slate-400 transition-colors hover:bg-brand-slate-50 hover:text-brand-slate-600',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400'
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500'
         )}
       >
         {trigger ?? <MoreVertical className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />}

@@ -113,7 +113,7 @@ export function MfaSetupPage() {
           </div>
 
           <div className="mb-4">
-            <p className="text-xs text-brand-slate-400 mb-1">Can't scan? Enter this key manually:</p>
+            <p className="text-xs text-brand-slate-500 mb-1">Can't scan? Enter this key manually:</p>
             <code className="block text-sm bg-brand-slate-50 border border-brand-slate-100 rounded-card px-3 py-2 font-mono text-brand-slate-700 break-all select-all">
               {manualEntryKey}
             </code>

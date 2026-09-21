@@ -24,7 +24,7 @@ export function ChecklistSection({ title, icon: Icon, items, section: _section, 
             {title}
           </h3>
         </div>
-        <span className="text-[12px] text-brand-slate-400 font-medium">
+        <span className="text-[12px] text-brand-slate-500 font-medium">
           {checkedCount} of {items.length} completed
         </span>
       </div>

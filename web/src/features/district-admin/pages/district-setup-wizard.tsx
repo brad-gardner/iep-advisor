@@ -63,14 +63,14 @@ export function DistrictSetupWizard() {
           labels={STEP_LABELS}
           testId="district-setup-progress"
         />
-        <p className="text-xs text-brand-slate-400" aria-live="polite">
+        <p className="text-xs text-brand-slate-500" aria-live="polite">
           Step {step + 1} of {TOTAL_STEPS}
         </p>
       </div>
 
       <div className="flex-1 flex items-start justify-center px-4 pb-12">
         <div
-          className="bg-white rounded-card border-[0.5px] border-brand-slate-200 p-8 w-full max-w-xl"
+          className="bg-white rounded-card border border-brand-slate-200 p-8 w-full max-w-xl"
           data-testid="district-setup-step"
         >
           {step === 0 && (

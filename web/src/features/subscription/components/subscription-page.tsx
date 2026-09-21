@@ -11,7 +11,7 @@ export function SubscriptionPage() {
         <SubscriptionStatusCard />
       </div>
 
-      <p className="text-sm text-brand-slate-400">
+      <p className="text-sm text-brand-slate-500">
         Have an invite code?{' '}
         <Link to="/redeem-invite" className="text-brand-teal-500 hover:text-brand-teal-600 underline">
           Redeem it here

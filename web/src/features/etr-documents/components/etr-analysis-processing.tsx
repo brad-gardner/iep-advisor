@@ -15,7 +15,7 @@ export function EtrAnalysisProcessing({ onReload }: EtrAnalysisProcessingProps) 
       <h3 className="font-serif text-[22px] font-semibold text-brand-slate-800 mb-2">
         Analyzing your ETR
       </h3>
-      <p className="text-brand-slate-400 text-sm text-center max-w-md mb-6">
+      <p className="text-brand-slate-500 text-sm text-center max-w-md mb-6">
         This typically takes 30-90 seconds. We're reviewing assessment completeness,
         eligibility determination, red flags, and drafting meeting questions.
       </p>

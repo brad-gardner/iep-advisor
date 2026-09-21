@@ -8,11 +8,8 @@ import { PRIVACY_BANNER_COPY } from '../lib/copy';
  */
 export function PrivacyBanner() {
   return (
-    <p
-      className="flex items-start gap-2 rounded-card border border-brand-slate-200 bg-brand-slate-50 px-3 py-2 text-xs text-brand-slate-600"
-      data-testid="advocate-privacy-banner"
-    >
-      <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-slate-400" strokeWidth={1.8} aria-hidden="true" />
+    <p className="flex items-center gap-1.5 text-xs text-brand-slate-500" data-testid="advocate-privacy-banner">
+      <Lock className="h-3.5 w-3.5 shrink-0 text-brand-slate-500" strokeWidth={1.8} aria-hidden="true" />
       <span>{PRIVACY_BANNER_COPY}</span>
     </p>
   );

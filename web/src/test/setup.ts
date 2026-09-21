@@ -12,6 +12,14 @@ if (!('scrollTo' in window) || typeof window.scrollTo !== 'function') {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
 }
 
+// Same gap on the element side: jsdom leaves `Element.prototype.scrollIntoView`
+// undefined, so a pin-to-bottom that scrolls a sentinel into view (MessageList)
+// would throw rather than no-op. Stub it as a no-op — jsdom has no layout, so
+// there is no scroll position for a test to assert against either way.
+if (typeof Element.prototype.scrollIntoView !== 'function') {
+  Element.prototype.scrollIntoView = vi.fn();
+}
+
 // jsdom implements Element.getClientRects/getBoundingClientRect but not
 // Range's — ProseMirror's `coordsAtPos` (used by the real RichTextEditor's
 // `.focus()` command, which scrolls the new selection into view) measures a

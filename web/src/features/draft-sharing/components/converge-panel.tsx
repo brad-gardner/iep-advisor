@@ -114,7 +114,7 @@ export function ConvergePanel({ instanceId, status, templateVersion, onBeforeJum
       <div>
         <h2 className="mb-3 font-serif text-lg text-brand-slate-800">Open responses</h2>
         {converge.openResponses.length === 0 ? (
-          <p className="text-sm text-brand-slate-400">Nothing waiting on a reply.</p>
+          <p className="text-sm text-brand-slate-500">Nothing waiting on a reply.</p>
         ) : (
           <div className="space-y-3" data-testid="converge-open-responses">
             {converge.openResponses.map((r) => (

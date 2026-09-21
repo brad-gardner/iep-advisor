@@ -15,7 +15,7 @@ export function EtrAnalysisEmptyState({ onStart, isTriggering }: EtrAnalysisEmpt
       <h3 className="font-serif text-[22px] font-semibold text-brand-slate-800 mb-2">
         Analyze this ETR
       </h3>
-      <p className="text-brand-slate-400 text-sm text-center max-w-md mb-6">
+      <p className="text-brand-slate-500 text-sm text-center max-w-md mb-6">
         We'll review assessment completeness, eligibility determination, red flags,
         and generate suggested questions for your ETR meeting.
       </p>

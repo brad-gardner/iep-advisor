@@ -27,7 +27,7 @@ function Crumb({ crumb, isLast }: { crumb: Breadcrumb; isLast: boolean }) {
   if (isLast || !crumb.to) {
     return (
       <span
-        className={cn(className, isLast ? 'text-brand-slate-600 font-medium' : 'text-brand-slate-400')}
+        className={cn(className, isLast ? 'text-brand-slate-600 font-medium' : 'text-brand-slate-500')}
         aria-current={isLast ? 'page' : undefined}
       >
         {crumb.label}
@@ -35,7 +35,7 @@ function Crumb({ crumb, isLast }: { crumb: Breadcrumb; isLast: boolean }) {
     );
   }
   return (
-    <Link to={crumb.to} className={cn(className, 'text-brand-slate-400 hover:text-brand-slate-600 transition-colors')}>
+    <Link to={crumb.to} className={cn(className, 'text-brand-slate-500 hover:text-brand-slate-600 transition-colors')}>
       {crumb.label}
     </Link>
   );

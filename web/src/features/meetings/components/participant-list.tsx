@@ -32,7 +32,7 @@ export function ParticipantList({ participants, attendance }: ParticipantListPro
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-brand-slate-800">{p.displayName}</p>
-                <p className="text-xs text-brand-slate-400">
+                <p className="text-xs text-brand-slate-500">
                   {TEAM_ROLE_LABELS[p.teamRole]}
                   {p.isRequired ? '' : ' · optional'}
                   {p.isFamily ? ' · family' : ''}
@@ -51,7 +51,7 @@ export function ParticipantList({ participants, attendance }: ParticipantListPro
                     type="checkbox"
                     checked={entry?.attended ?? false}
                     onChange={(e) => attendance.onChange(p.id, e.target.checked, entry?.excusalNote)}
-                    className="h-3.5 w-3.5 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+                    className="h-3.5 w-3.5 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
                     data-testid={`attendance-checkbox-${p.id}`}
                   />
                   Attended

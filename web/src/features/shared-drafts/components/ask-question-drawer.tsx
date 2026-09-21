@@ -101,7 +101,7 @@ export function AskQuestionDrawer({
             announced (same idiom as the editor's AssistPopover). */}
         <div aria-live="polite">
         {thread.length === 0 ? (
-          <p className="text-sm text-brand-slate-400">No questions yet.</p>
+          <p className="text-sm text-brand-slate-500">No questions yet.</p>
         ) : (
           <ul className="space-y-3" data-testid={`${testId}-thread`}>
             {thread.map((note) => (
@@ -117,7 +117,7 @@ export function AskQuestionDrawer({
                     onClick={() => handleDelete(note.id)}
                     aria-label="Delete this question"
                     data-testid={`delete-note-${note.id}`}
-                    className="shrink-0 text-brand-slate-400 transition-colors hover:text-brand-danger-700"
+                    className="shrink-0 text-brand-slate-500 transition-colors hover:text-brand-danger-700"
                   >
                     <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>

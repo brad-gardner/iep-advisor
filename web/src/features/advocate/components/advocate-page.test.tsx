@@ -219,6 +219,284 @@ describe('AdvocatePage', () => {
     expect(screen.queryByTestId('advocate-usage-warning')).not.toBeInTheDocument();
   });
 
+  it('does not repeat the section heading inside the empty state', async () => {
+    renderPage();
+    await screen.findByTestId('advocate-empty');
+    // The section heading above the panel is the only place this says it.
+    expect(screen.getByRole('heading', { level: 2, name: 'Ask the advocate about Jordan' })).toBeInTheDocument();
+    expect(screen.queryByText("Ask about Jordan's plan, your rights, or what to do next")).not.toBeInTheDocument();
+  });
+
+  it('nests the composer inside one conversation panel with a single scroller once a thread has messages', async () => {
+    renderPage('owner', '/children/4/advocate?thread=1');
+    await screen.findByTestId('advocate-assistant-message');
+
+    // The composer dock is a descendant of the panel, not a separate floating band.
+    const panel = screen.getByTestId('advocate-conversation');
+    expect(within(panel).getByTestId('advocate-composer-dock')).toBeInTheDocument();
+
+    // Exactly one scroller in the conversation area — MessageList's own region
+    // owns the scroll; the panel does not add a second wrapping scroller.
+    const scrollers = within(panel).getAllByRole('region', { name: 'Conversation' });
+    expect(scrollers).toHaveLength(1);
+    expect(scrollers[0]).toBe(screen.getByTestId('advocate-messages'));
+    // ...and structurally: a re-added `overflow-y-auto` wrapper around MessageList would not be a
+    // named region, so the role query above cannot catch it on its own.
+    const overflowing = panel.querySelectorAll('[class*="overflow-y-auto"]');
+    expect(overflowing).toHaveLength(1);
+    expect(overflowing[0]).toBe(scrollers[0]);
+
+    // Guards the class, which is as far as jsdom can go — it has no layout, so the clipping itself
+    // cannot be measured here. The sr-only speaker labels inside the bubbles are `position:
+    // absolute`, and an absolutely-positioned box is only clipped by an ancestor's `overflow` when
+    // that ancestor is also its containing block. Dropping `relative` lets them lay out against the
+    // initial containing block instead: measured at 400x820 with four messages they landed ~857px
+    // below the content and pushed `documentElement.scrollHeight` from 1250 to 2107, which is both
+    // dead phone scroll and a broken page-bottom test for the pin guard.
+    expect(scrollers[0]).toHaveClass('relative');
+  });
+
+  it('publishes the summed height of everything the sticky dock paints over', async () => {
+    // jsdom has no ResizeObserver and no layout, so the measurement is driven by hand: the stub
+    // keeps its callback so the test can re-fire it after giving the two observed boxes real
+    // heights, which is the only way to assert the arithmetic rather than just `0px`.
+    // The effect re-creates the observer when the dock or the notice row mounts, so only the live
+    // instance's targets are interesting — an accumulating list would also hold the torn-down one's.
+    let observed: Element[] = [];
+    let fire = () => {};
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        callback: () => void;
+        constructor(callback: () => void) {
+          this.callback = callback;
+          observed = [];
+          fire = callback;
+        }
+        observe(target: Element) {
+          observed.push(target);
+          this.callback();
+        }
+        disconnect() {}
+      },
+    );
+
+    try {
+      renderPage('owner', '/children/4/advocate?thread=1');
+      await screen.findByTestId('advocate-assistant-message');
+
+      const panel = screen.getByTestId('advocate-conversation');
+      const dock = screen.getByTestId('advocate-composer-dock');
+      // Both boxes the sticky dock paints over are measured, not just the composer: the notice row
+      // (stopped / Retry / disclaimer) sits between the scroller and the dock and is covered too.
+      expect(observed).toContain(dock);
+      expect(observed).toHaveLength(2);
+      const notices = observed.find((el) => el !== dock) as HTMLElement;
+      expect(notices).toContainElement(screen.getByTestId('advocate-disclaimer'));
+
+      // Real dock heights measured in-browser at 400x820: 152px with the composer and the
+      // disclaimer row's 89px above it.
+      Object.defineProperty(dock, 'offsetHeight', { value: 152, configurable: true });
+      Object.defineProperty(notices, 'offsetHeight', { value: 89, configurable: true });
+      act(() => fire());
+      expect(panel.style.getPropertyValue('--advocate-dock-h')).toBe('241px');
+
+      // A later resize (the About pill mounting, the composer growing) re-publishes through the
+      // same observer rather than being measured once at mount.
+      Object.defineProperty(dock, 'offsetHeight', { value: 261, configurable: true });
+      act(() => fire());
+      expect(panel.style.getPropertyValue('--advocate-dock-h')).toBe('350px');
+
+      const sentinel = screen.getByTestId('advocate-scroll-tail');
+      expect(sentinel.className).toContain('scroll-mb-[var(--advocate-dock-h,10rem)]');
+      expect(sentinel.className).toContain('md:scroll-mb-0');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('follows new content to the bottom, and stops following once the reader scrolls the conversation up', async () => {
+    const targets: Element[] = [];
+    const spy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (this: Element) {
+      targets.push(this);
+    });
+
+    try {
+      renderPage('owner', '/children/4/advocate?thread=1');
+      await screen.findByTestId('advocate-assistant-message');
+      const tail = screen.getByTestId('advocate-scroll-tail');
+      const scroller = screen.getByTestId('advocate-messages');
+
+      targets.length = 0;
+      typeAndSend('And what if they refuse?');
+      await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(1));
+      // The reader asked for this one, so it pins regardless of where they were.
+      expect(targets).toContain(tail);
+
+      // Reader scrolls back up to re-read something: 1500px from the bottom, well past the 48px
+      // threshold. jsdom reports 0 for every scroll metric, so they are supplied here.
+      Object.defineProperty(scroller, 'scrollHeight', { value: 2000, configurable: true });
+      Object.defineProperty(scroller, 'clientHeight', { value: 500, configurable: true });
+      scroller.scrollTop = 0;
+      fireEvent.scroll(scroller);
+
+      targets.length = 0;
+      act(() => lastStream().handlers.onDelta('They have to tell you '));
+      act(() => lastStream().handlers.onDelta('in writing.'));
+      expect(screen.getByTestId('advocate-streaming-text')).toHaveTextContent('They have to tell you in writing.');
+      expect(targets).not.toContain(tail);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not drag the page back down on every streamed token when the reader has scrolled the page away', async () => {
+    // `scrollIntoView` satisfies the sentinel's reserve against every scrollable ancestor, the
+    // document included — and below `md` the page is the scroller. The conversation region does not
+    // move when the page does, so its own scroll handler never fires: without a page-level pin the
+    // reader is dragged back down once per token (measured in-browser: 386 -> 0 -> 386).
+    const targets: Element[] = [];
+    const spy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (this: Element) {
+      targets.push(this);
+    });
+    const innerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+    const scrollY = Object.getOwnPropertyDescriptor(window, 'scrollY');
+
+    const setPage = (y: number, event: 'scroll' | 'resize' = 'scroll') => {
+      Object.defineProperty(window, 'scrollY', { value: y, configurable: true });
+      fireEvent(window, new Event(event));
+    };
+
+    try {
+      Object.defineProperty(window, 'innerHeight', { value: 820, configurable: true });
+      Object.defineProperty(document.documentElement, 'scrollHeight', { value: 1250, configurable: true });
+
+      renderPage('owner', '/children/4/advocate?thread=1');
+      await screen.findByTestId('advocate-assistant-message');
+      const tail = screen.getByTestId('advocate-scroll-tail');
+
+      typeAndSend('And what if they refuse?');
+      await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(1));
+
+      // Reader scrolls the page to the top while the answer streams.
+      setPage(0);
+      targets.length = 0;
+      act(() => lastStream().handlers.onDelta('They have to tell you '));
+      expect(targets).not.toContain(tail);
+
+      // The answer landing must not re-pin the page either: settling changes `messages.length`,
+      // and folding the page into the "a new message always pins" rule would move the whole page
+      // at the one moment the reader is least expecting it.
+      api.getAdvocateThread.mockImplementation((id: number) =>
+        Promise.resolve(id === 1 ? detail(1, [userMsg(11, 'What is PWN?'), answer, { ...answer, id: 33 }]) : detail(id, [])),
+      );
+      targets.length = 0;
+      await act(async () => {
+        lastStream().handlers.onDone({
+          messageId: 33,
+          contentMarkdown: answer.contentMarkdown,
+          citations: [],
+          suggestions: [],
+          truncated: false,
+          disclaimer: 'Not legal advice.',
+        });
+        lastStream().resolve();
+        await Promise.resolve();
+      });
+      expect(targets).not.toContain(tail);
+
+      // ...but it is offered rather than silently withheld: the sr-only status node announces the
+      // answer to AT, and this is the sighted equivalent.
+      const jump = await screen.findByTestId('advocate-jump-latest');
+      targets.length = 0;
+      fireEvent.click(jump);
+      expect(targets).toContain(tail);
+      expect(screen.queryByTestId('advocate-jump-latest')).not.toBeInTheDocument();
+      // Taking the offer must not drop focus to <body>: the button unmounts itself on click.
+      expect(screen.getByTestId('advocate-messages')).toHaveFocus();
+
+      // Sending re-pins the page on its own, from wherever the reader happens to be — not because
+      // they scrolled back first. (386 would be within PAGE_PIN_THRESHOLD_PX of the 430 maximum and
+      // so would pin through the ordinary scroll path, proving nothing about the send rule.)
+      setPage(0);
+      targets.length = 0;
+      typeAndSend('And in writing?');
+      await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(2));
+      expect(targets).toContain(tail);
+
+      // Scroll away again, let the second answer land off-screen, and this time arrive at the
+      // bottom without taking the offer: it has to clear itself. `resize` as well as `scroll`,
+      // because a rotation or the keyboard can put the reader at the bottom without either.
+      setPage(0);
+      api.getAdvocateThread.mockImplementation((id: number) =>
+        Promise.resolve(
+          id === 1 ? detail(1, [userMsg(11, 'What is PWN?'), answer, { ...answer, id: 33 }, { ...answer, id: 44 }]) : detail(id, []),
+        ),
+      );
+      await act(async () => {
+        lastStream().handlers.onDone({
+          messageId: 44,
+          contentMarkdown: answer.contentMarkdown,
+          citations: [],
+          suggestions: [],
+          truncated: false,
+          disclaimer: 'Not legal advice.',
+        });
+        lastStream().resolve();
+        await Promise.resolve();
+      });
+      await screen.findByTestId('advocate-jump-latest');
+      setPage(386, 'resize');
+      expect(screen.queryByTestId('advocate-jump-latest')).not.toBeInTheDocument();
+    } finally {
+      spy.mockRestore();
+      if (innerHeight) Object.defineProperty(window, 'innerHeight', innerHeight);
+      if (scrollY) Object.defineProperty(window, 'scrollY', scrollY);
+      delete (document.documentElement as unknown as Record<string, unknown>).scrollHeight;
+    }
+  });
+
+  it('tints the whole composer while input is paused and reddens its border over the limit', async () => {
+    // Regression guard for a fix that silently removed both affordances: `cn` is a plain join, so a
+    // conditional class layered over a base one is decided by CSS source order (`bg-white` is
+    // emitted after `bg-brand-slate-50`, `border-brand-slate-200` after `border-brand-danger-200`)
+    // and never painted. Each pair has to emit exactly one utility.
+    renderPage('owner', '/children/4/advocate?thread=2');
+    await screen.findByTestId('advocate-empty');
+    const field = () => composer().parentElement as HTMLElement;
+
+    expect(field()).toHaveClass('bg-white');
+    expect(field()).not.toHaveClass('bg-brand-slate-50');
+
+    fireEvent.change(composer(), { target: { value: 'x'.repeat(2001) } });
+    expect(field()).toHaveClass('border-brand-danger-200');
+    expect(field()).not.toHaveClass('border-brand-slate-200');
+
+    fireEvent.change(composer(), { target: { value: 'What is PWN?' } });
+    fireEvent.keyDown(composer(), { key: 'Enter' });
+    await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(1));
+
+    // Streaming: the textarea is read-only (never disabled — that would blur it), and the tint is on
+    // the wrapper so the counter row greys out with it rather than staying white underneath.
+    expect(composer()).toHaveAttribute('readonly');
+    expect(field()).toHaveClass('bg-brand-slate-50');
+    expect(field()).not.toHaveClass('bg-white');
+    expect(field()).toHaveClass('border-brand-slate-200');
+  });
+
+  it('lets thread titles wrap onto two lines instead of truncating', async () => {
+    const longTitle =
+      'A conversation title long enough that the old single-line truncate-with-ellipsis behavior would have cut it short';
+    api.listAdvocateThreads.mockResolvedValue({ success: true, data: [thread(1, longTitle)] });
+    renderPage();
+    const rail = await screen.findByTestId('advocate-thread-list');
+    // Rendered in full (not sliced with an ellipsis) — CSS handles any two-line wrapping, not JS truncation.
+    const title = within(rail).getByText(longTitle);
+    expect(title.className).not.toMatch(/\btruncate\b/);
+    // Two lines, not unbounded: an 8-line title in a 16rem rail would push the rest of the list off.
+    expect(title).toHaveClass('line-clamp-2');
+  });
+
   it('sends from a blank page: creates a thread, shows the user bubble at once, streams tools and deltas, then renders the stored answer with sources and suggestions', async () => {
     renderPage('owner', '/children/4/advocate?about=iep:12');
     await screen.findByTestId('advocate-empty');
@@ -360,8 +638,29 @@ describe('AdvocatePage', () => {
     expect(screen.queryByTestId('advocate-streaming-text')).not.toBeInTheDocument();
     expect(composer()).not.toHaveAttribute('readonly');
 
-    fireEvent.click(screen.getByTestId('advocate-retry'));
-    await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(2));
+    // Retry counts as a send for pin-to-bottom. It only does so because `retry` hands `start` a
+    // fresh object: passing the pending message already in state makes React bail out of
+    // `setPending`, its identity never changes, and the effects keyed on it never re-arm — so a
+    // reader who scrolled away while the error showed would not be followed for the retried answer.
+    const targets: Element[] = [];
+    const spy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (this: Element) {
+      targets.push(this);
+    });
+    try {
+      const scroller = screen.getByTestId('advocate-messages');
+      Object.defineProperty(scroller, 'scrollHeight', { value: 2000, configurable: true });
+      Object.defineProperty(scroller, 'clientHeight', { value: 500, configurable: true });
+      scroller.scrollTop = 0;
+      fireEvent.scroll(scroller);
+
+      targets.length = 0;
+      fireEvent.click(screen.getByTestId('advocate-retry'));
+      await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(2));
+      expect(targets).toContain(screen.getByTestId('advocate-scroll-tail'));
+    } finally {
+      spy.mockRestore();
+    }
+
     expect(lastStream().body).toEqual({ text: 'Is the reading goal measurable?' });
     expect(screen.queryByTestId('advocate-send-error')).not.toBeInTheDocument();
     expect(screen.getByTestId('advocate-user-message-pending')).toBeInTheDocument();
@@ -383,6 +682,10 @@ describe('AdvocatePage', () => {
     expect(screen.getByTestId('subscribe-button')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Have an invite code?' })).toHaveAttribute('href', '/redeem-invite');
     expect(composer()).toBeDisabled();
+    // The cap is the third leg of the composer's `tinted` OR (streaming || creating || disabled);
+    // the other two are covered by the tint test above.
+    expect(composer().parentElement).toHaveClass('bg-brand-slate-50');
+    expect(composer().parentElement).not.toHaveClass('bg-white');
     expect(screen.getByTestId('advocate-send')).toBeDisabled();
     expect(screen.queryByTestId('advocate-user-message-pending')).not.toBeInTheDocument();
     expect(screen.getByTestId('advocate-send-error')).toHaveTextContent('You have used all of this year’s advocate messages.');
@@ -494,7 +797,7 @@ describe('AdvocatePage', () => {
     expect(lastStream().body.text).toBe('Line one');
   });
 
-  it('hides the composer and thread actions from a viewer', async () => {
+  it('hides the composer and thread actions from a viewer, but still shows a read-only thread and its disclaimer', async () => {
     renderPage('viewer');
     await screen.findByTestId('advocate-thread-list');
     expect(screen.getByTestId('advocate-viewer-notice')).toBeInTheDocument();
@@ -502,6 +805,13 @@ describe('AdvocatePage', () => {
     expect(screen.queryByTestId('advocate-new-thread')).not.toBeInTheDocument();
     expect(screen.queryByTestId('advocate-example')).not.toBeInTheDocument();
     expect(screen.queryByTestId('advocate-thread-1-menu')).not.toBeInTheDocument();
+
+    // Regression guard: a read-only collaborator can still open an existing thread and must still
+    // see its disclaimer — the message-region regrouping around `showDisclaimer` must not drop it
+    // just because the composer (and its dock) never render for a viewer.
+    fireEvent.click(screen.getByTestId('advocate-thread-1-open'));
+    await screen.findByTestId('advocate-assistant-message');
+    expect(screen.getByTestId('advocate-disclaimer')).toHaveTextContent('Not legal advice.');
   });
 
   it('hands suggestions to existing flows: journal drawer prefilled, prep question copied with a toast', async () => {

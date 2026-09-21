@@ -42,7 +42,7 @@ export function ComparisonView({
       <div className="space-y-4">
         <Link
           to={`/children/${childId}`}
-          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" strokeWidth={1.8} />
           Back to child
@@ -102,7 +102,7 @@ export function ComparisonView({
           <h3 className="font-serif text-[17px] font-semibold text-brand-slate-800 mb-2">
             Goal Changes
           </h3>
-          <p className="text-[13px] text-brand-slate-400">No goal changes detected between these IEPs.</p>
+          <p className="text-[13px] text-brand-slate-500">No goal changes detected between these IEPs.</p>
         </Card>
       )}
 

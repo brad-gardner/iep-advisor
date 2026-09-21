@@ -11,7 +11,7 @@ export function AnalysisGoalsList({ goalAnalyses, childId, canAsk }: AnalysisGoa
   if (goalAnalyses.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-brand-slate-400">No goal analyses available.</p>
+        <p className="text-brand-slate-500">No goal analyses available.</p>
       </div>
     );
   }

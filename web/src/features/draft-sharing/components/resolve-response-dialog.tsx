@@ -100,7 +100,7 @@ export function ResolveResponseDialog({ open, onClose, response, onResolved }: R
           />
           Resolved in the draft (no reply needed)
         </label>
-        {!canSubmit && <p className="text-xs text-brand-slate-400">Add a reply, or check "resolved in the draft".</p>}
+        {!canSubmit && <p className="text-xs text-brand-slate-500">Add a reply, or check "resolved in the draft".</p>}
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>

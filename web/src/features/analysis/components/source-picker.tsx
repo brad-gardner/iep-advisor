@@ -89,14 +89,14 @@ export function SourcePicker({ childId, isRunning, onRun }: SourcePickerProps) {
   return (
     <Card data-testid="analysis-source-picker">
       <h2 className="font-serif mb-1">New Analysis</h2>
-      <p className="text-sm text-brand-slate-400 mb-4">
+      <p className="text-sm text-brand-slate-500 mb-4">
         Select one or more documents to analyze together.
       </p>
 
       {isLoading ? (
-        <p className="text-sm text-brand-slate-400">Loading documents…</p>
+        <p className="text-sm text-brand-slate-500">Loading documents…</p>
       ) : !hasAnySource ? (
-        <p className="text-sm text-brand-slate-400">
+        <p className="text-sm text-brand-slate-500">
           No documents available yet. Add an IEP, ETR, or progress report first.
         </p>
       ) : (

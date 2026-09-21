@@ -167,7 +167,7 @@ export function NotificationBell() {
         aria-expanded={open}
         data-testid="notification-bell"
         onClick={() => (open ? setOpen(false) : openMenu())}
-        className="relative flex h-9 w-9 items-center justify-center rounded-button text-brand-slate-400 transition-colors hover:bg-brand-slate-700 hover:text-brand-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+        className="relative flex h-9 w-9 items-center justify-center rounded-button text-brand-slate-400 transition-colors hover:bg-brand-slate-700 hover:text-brand-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
       >
         <Bell size={18} strokeWidth={1.8} aria-hidden="true" />
         {!!unreadCount && (
@@ -196,9 +196,9 @@ export function NotificationBell() {
             data-testid="notification-bell-menu"
           >
             {items === null ? (
-              <p className="px-4 py-3 text-sm text-brand-slate-400">Loading…</p>
+              <p className="px-4 py-3 text-sm text-brand-slate-500">Loading…</p>
             ) : items.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-brand-slate-400">No notifications yet.</p>
+              <p className="px-4 py-3 text-sm text-brand-slate-500">No notifications yet.</p>
             ) : (
               items.map((n, index) => (
                 <Link

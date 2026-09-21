@@ -39,7 +39,7 @@ export function ForgotPasswordPage() {
           </p>
         </Notice>
 
-        <p className="mt-6 text-center text-sm text-brand-slate-400">
+        <p className="mt-6 text-center text-sm text-brand-slate-500">
           <Link to="/login" className="text-brand-teal-500 hover:text-brand-teal-600">
             Back to login
           </Link>
@@ -54,7 +54,7 @@ export function ForgotPasswordPage() {
         Reset Your Password
       </h2>
 
-      <p className="text-sm text-brand-slate-400 text-center mb-6">
+      <p className="text-sm text-brand-slate-500 text-center mb-6">
         Enter your email address and we'll send you a link to reset your password.
       </p>
 
@@ -76,7 +76,7 @@ export function ForgotPasswordPage() {
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-brand-slate-400">
+      <p className="mt-6 text-center text-sm text-brand-slate-500">
         <Link to="/login" className="text-brand-teal-500 hover:text-brand-teal-600">
           Back to login
         </Link>

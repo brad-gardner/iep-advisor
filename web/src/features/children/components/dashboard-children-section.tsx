@@ -101,7 +101,7 @@ export function DashboardChildrenSection() {
                 {child.role !== "owner" && <SharedBadge role={child.role} />}
               </div>
               {(child.gradeLevel || child.schoolDistrict) && (
-                <div className="mt-2 flex flex-wrap gap-3 text-xs text-brand-slate-400">
+                <div className="mt-2 flex flex-wrap gap-3 text-xs text-brand-slate-500">
                   {child.gradeLevel && <span>Grade: {child.gradeLevel}</span>}
                   {child.schoolDistrict && <span>{child.schoolDistrict}</span>}
                 </div>

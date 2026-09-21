@@ -50,7 +50,7 @@ export function StudentPickerModal({ open, onClose, onSelect }: StudentPickerMod
             <Spinner label="Searching…" />
           </div>
         ) : results.length === 0 ? (
-          <p className="py-4 text-center text-sm text-brand-slate-400">No students found.</p>
+          <p className="py-4 text-center text-sm text-brand-slate-500">No students found.</p>
         ) : (
           <ul className="max-h-72 divide-y divide-brand-slate-100 overflow-y-auto rounded-input border border-brand-slate-200">
             {results.map((student) => (
@@ -58,13 +58,13 @@ export function StudentPickerModal({ open, onClose, onSelect }: StudentPickerMod
                 <button
                   type="button"
                   onClick={() => onSelect(student)}
-                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-brand-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-teal-400"
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-brand-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-teal-500"
                   data-testid={`student-picker-option-${student.id}`}
                 >
                   <span>
                     {student.firstName} {student.lastName}
                   </span>
-                  <span className="text-xs text-brand-slate-400">{student.externalStudentId}</span>
+                  <span className="text-xs text-brand-slate-500">{student.externalStudentId}</span>
                 </button>
               </li>
             ))}

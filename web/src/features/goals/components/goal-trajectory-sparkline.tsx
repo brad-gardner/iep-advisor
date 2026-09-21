@@ -9,7 +9,7 @@ import type { GoalTrajectoryDto } from '../types';
 export function GoalTrajectorySparkline({ trajectory, goalText }: { trajectory: GoalTrajectoryDto; goalText: string }) {
   if (trajectory.insufficientData) {
     return (
-      <p className="text-xs text-brand-slate-400" data-testid="goal-trajectory-insufficient">
+      <p className="text-xs text-brand-slate-500" data-testid="goal-trajectory-insufficient">
         Insufficient data — log at least two observations to see a trend.
       </p>
     );

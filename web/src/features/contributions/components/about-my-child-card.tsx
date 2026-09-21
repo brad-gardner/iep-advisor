@@ -143,7 +143,7 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
           </Button>
         )}
       </div>
-      <p className="mb-4 text-sm text-brand-slate-400">
+      <p className="mb-4 text-sm text-brand-slate-500">
         Strengths, concerns, what works. Notes are private unless you choose to share one with the school team —
         shared notes help the team (and its AI suggestions) see your child the way you do.
       </p>
@@ -182,7 +182,7 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
               type="checkbox"
               checked={shared}
               onChange={(e) => setShared(e.target.checked)}
-              className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-400"
+              className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-500"
               data-testid="contribution-share"
             />
             Visible to the school team
@@ -205,7 +205,7 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
       )}
 
       {!loading && !error && items.length === 0 && !adding && (
-        <p className="text-sm text-brand-slate-400" data-testid="contributions-empty">
+        <p className="text-sm text-brand-slate-500" data-testid="contributions-empty">
           No notes yet.
         </p>
       )}

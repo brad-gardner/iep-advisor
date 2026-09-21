@@ -41,7 +41,7 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
       )}
 
       <fieldset className="space-y-4">
-        <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-brand-slate-400">
+        <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-brand-slate-500">
           Identity
         </legend>
         <Input
@@ -89,7 +89,7 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
       </fieldset>
 
       <fieldset className="space-y-4">
-        <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-brand-slate-400">
+        <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-brand-slate-500">
           Placement
         </legend>
         <GradeLevelSelect
@@ -116,7 +116,7 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
       </fieldset>
 
       <fieldset className="space-y-4">
-        <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-brand-slate-400">
+        <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-brand-slate-500">
           Timeline
         </legend>
         <Input

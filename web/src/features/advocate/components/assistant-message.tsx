@@ -27,7 +27,7 @@ interface AssistantMessageProps {
 }
 
 const chipClass =
-  'inline-flex items-center gap-1 rounded-badge border border-brand-teal-100 bg-brand-teal-50 px-2 py-0.5 text-xs font-medium text-brand-teal-600 hover:bg-brand-teal-100 focus:outline-none focus:ring-1 focus:ring-brand-teal-400 focus:ring-offset-1';
+  'inline-flex items-center gap-1 rounded-badge border border-brand-teal-100 bg-brand-teal-50 px-2 py-0.5 text-xs font-medium text-brand-teal-600 hover:bg-brand-teal-100 focus:outline-none focus:ring-1 focus:ring-brand-teal-500 focus:ring-offset-1';
 
 /**
  * One answer: sanitised markdown, then the sources it drew on (trust rule:
@@ -46,7 +46,8 @@ export function AssistantMessage({
   const visibleSuggestions = suggestions.filter(isRenderable);
   return (
     <li className="flex justify-start" data-testid={testId}>
-      <div className="max-w-[92%] space-y-3 rounded-card rounded-bl-sm border-[0.5px] border-brand-slate-200 bg-white px-4 py-3">
+      <div className="max-w-[92%] space-y-3 rounded-card rounded-bl-sm border border-brand-slate-200 bg-white px-4 py-3">
+        <span className="sr-only">Advocate: </span>
         <Markdown content={contentMarkdown} className="text-sm" data-testid={`${testId}-content`} />
 
         {truncated && (

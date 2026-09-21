@@ -171,7 +171,7 @@ export function AdvocacyGoalsList({
   if (goals.length === 0) {
     if (readOnly) {
       return (
-        <p className="text-sm text-brand-slate-400 py-4 text-center">
+        <p className="text-sm text-brand-slate-500 py-4 text-center">
           No advocacy goals have been set yet.
         </p>
       );
@@ -188,7 +188,7 @@ export function AdvocacyGoalsList({
     <div className="space-y-3">
       <div className="flex justify-between items-center">
         <p
-          className="text-[11px] text-brand-slate-400"
+          className="text-[11px] text-brand-slate-500"
           data-testid="goal-count"
         >
           {goals.length}/10 goals

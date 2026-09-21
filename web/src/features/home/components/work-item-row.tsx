@@ -26,7 +26,7 @@ export function WorkItemRow({ title, subtitle, subtitleIcon: Icon, meta, href, '
       <Link
         to={href}
         data-testid={testId}
-        className="-mx-3 flex items-center justify-between gap-3 rounded-card px-3 py-2.5 transition-colors hover:bg-brand-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+        className="-mx-3 flex items-center justify-between gap-3 rounded-card px-3 py-2.5 transition-colors hover:bg-brand-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
       >
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium text-brand-slate-800">{title}</span>

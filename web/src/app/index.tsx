@@ -5,9 +5,9 @@ import { AppRouter } from './routes';
 function FallbackError() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-brand-slate-50 px-4">
-      <div className="bg-white rounded-card border-[0.5px] border-brand-slate-200 p-8 max-w-md text-center">
+      <div className="bg-white rounded-card border border-brand-slate-200 p-8 max-w-md text-center">
         <h1 className="font-serif text-2xl text-brand-slate-800 mb-2">Something went wrong</h1>
-        <p className="text-sm text-brand-slate-400 mb-4">
+        <p className="text-sm text-brand-slate-500 mb-4">
           An unexpected error occurred. Our team has been notified.
         </p>
         <button

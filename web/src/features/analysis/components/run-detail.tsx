@@ -36,7 +36,7 @@ export function RunDetail({ childId, runId, canAsk = false }: RunDetailProps) {
   if (isLoading && !run) {
     return (
       <Card>
-        <p className="text-sm text-brand-slate-400">Loading analysis…</p>
+        <p className="text-sm text-brand-slate-500">Loading analysis…</p>
       </Card>
     );
   }
@@ -44,7 +44,7 @@ export function RunDetail({ childId, runId, canAsk = false }: RunDetailProps) {
   if (!run) {
     return (
       <Card>
-        <p className="text-sm text-brand-slate-400">Select an analysis to view.</p>
+        <p className="text-sm text-brand-slate-500">Select an analysis to view.</p>
       </Card>
     );
   }

@@ -109,7 +109,7 @@ export function EtrViewerPage() {
     <div className="space-y-4">
       <Link
         to={`/children/${etr.childProfileId}`}
-        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
+        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />
         Back to child
@@ -172,7 +172,7 @@ export function EtrViewerPage() {
             Notes
           </Button>
           {notesExpanded && (
-            <div className="mt-1 bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
+            <div className="mt-1 bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200">
               <Markdown content={etr.notes ?? ''} className="text-sm text-brand-slate-600" />
             </div>
           )}
@@ -200,7 +200,7 @@ export function EtrViewerPage() {
                   ? 'text-brand-slate-800 border-b-2 border-brand-teal-500'
                   : tab.disabled
                     ? 'text-brand-slate-300 cursor-not-allowed'
-                    : 'text-brand-slate-400 hover:text-brand-slate-800'
+                    : 'text-brand-slate-500 hover:text-brand-slate-800'
               }`}
             >
               {tab.label}
@@ -350,8 +350,8 @@ function OverviewTab({ etrId, etr, onUploaded }: OverviewTabProps) {
 
 function OverviewItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-brand-slate-50 rounded-card p-3 border-[0.5px] border-brand-slate-200">
-      <dt className="text-[11px] text-brand-slate-400 uppercase tracking-wide font-semibold">
+    <div className="bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200">
+      <dt className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold">
         {label}
       </dt>
       <dd className="text-sm font-medium text-brand-slate-800 mt-1">{value}</dd>

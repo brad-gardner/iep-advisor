@@ -47,14 +47,14 @@ export function OnboardingFlow() {
           labels={STEP_LABELS}
           testId="onboarding-progress"
         />
-        <p className="text-xs text-brand-slate-400" aria-live="polite">
+        <p className="text-xs text-brand-slate-500" aria-live="polite">
           Step {step + 1} of {TOTAL_STEPS}
         </p>
       </div>
 
       {/* Content */}
       <div className="flex-1 flex items-start justify-center px-4 pb-12">
-        <div className="bg-white rounded-card border-[0.5px] border-brand-slate-200 p-8 w-full max-w-xl" data-testid="onboarding-step">
+        <div className="bg-white rounded-card border border-brand-slate-200 p-8 w-full max-w-xl" data-testid="onboarding-step">
           {error && <div className="mb-4"><Notice variant="error" title={error} /></div>}
           {step === 0 && <WelcomeStep onNext={next} />}
           {step === 1 && <StateStep onNext={next} onSkip={next} />}

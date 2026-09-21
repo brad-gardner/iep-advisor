@@ -62,7 +62,7 @@ export function StudentDocumentsSummary({ studentId }: StudentDocumentsSummaryPr
                 >
                   {d.documentTypeDisplayName}
                 </Link>
-                <span className="flex items-center gap-2 text-xs text-brand-slate-400">
+                <span className="flex items-center gap-2 text-xs text-brand-slate-500">
                   {d.lastEditedAt ? `edited ${relativeTime(d.lastEditedAt)}` : 'not started'}
                   <Badge variant={statusVariant[d.status]}>{d.status}</Badge>
                 </span>
@@ -84,7 +84,7 @@ export function StudentDocumentsSummary({ studentId }: StudentDocumentsSummaryPr
                 >
                   {v.documentTypeDisplayName} v{v.versionNumber}
                 </Link>
-                <span className="text-xs text-brand-slate-400">finalized {relativeTime(v.finalizedAt)}</span>
+                <span className="text-xs text-brand-slate-500">finalized {relativeTime(v.finalizedAt)}</span>
               </li>
             ))}
           </ul>

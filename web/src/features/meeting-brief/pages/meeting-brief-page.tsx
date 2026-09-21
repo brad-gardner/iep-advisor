@@ -123,7 +123,7 @@ export function MeetingBriefPage() {
         <Card>
           <h2 className="mb-3 font-serif text-lg text-brand-slate-800">Open family responses</h2>
           {brief.openFamilyResponses.length === 0 ? (
-            <p className="text-sm text-brand-slate-400" data-testid="brief-family-responses-empty">
+            <p className="text-sm text-brand-slate-500" data-testid="brief-family-responses-empty">
               Nothing waiting on a reply.
             </p>
           ) : (
@@ -143,7 +143,7 @@ export function MeetingBriefPage() {
                 Contact attempts (last 90 days)
               </h3>
               {brief.contactAttempts.length === 0 ? (
-                <p className="text-sm text-brand-slate-400" data-testid="brief-contact-attempts-empty">
+                <p className="text-sm text-brand-slate-500" data-testid="brief-contact-attempts-empty">
                   None recorded.
                 </p>
               ) : (
@@ -162,7 +162,7 @@ export function MeetingBriefPage() {
                 Offline input (last 90 days)
               </h3>
               {brief.offlineInput.length === 0 ? (
-                <p className="text-sm text-brand-slate-400" data-testid="brief-offline-input-empty">
+                <p className="text-sm text-brand-slate-500" data-testid="brief-offline-input-empty">
                   None recorded.
                 </p>
               ) : (
@@ -181,7 +181,7 @@ export function MeetingBriefPage() {
           </div>
         </Card>
 
-        <p className="text-xs italic text-brand-slate-400" data-testid="brief-disclaimer">
+        <p className="text-xs italic text-brand-slate-500" data-testid="brief-disclaimer">
           {brief.disclaimer}
         </p>
 

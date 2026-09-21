@@ -326,7 +326,12 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
 
   const retry = useCallback(() => {
     if (!pending || runRef.current) return;
-    start(pending);
+    // A fresh object, not the one already in state: `start` does `setPending(message)`, and passing
+    // the identical reference makes React bail out of the update, so `pending`'s identity never
+    // changes. Consumers that key effects on it — MessageList re-pins the conversation and the page
+    // on a send — would then treat a retry as "nothing sent" and leave a reader who scrolled away
+    // unfollowed for the whole retried answer.
+    start({ ...pending });
   }, [pending, start]);
 
   const stop = useCallback(() => {

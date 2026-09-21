@@ -108,7 +108,7 @@ export function JournalPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h2 className="font-serif">{child.firstName}'s journal</h2>
-          <p className="mt-1 text-sm text-brand-slate-400">Private to your family — never shared with the school team.</p>
+          <p className="mt-1 text-sm text-brand-slate-500">Private to your family — never shared with the school team.</p>
         </div>
         <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
           <div className="min-w-[10rem] flex-1 sm:flex-none">
@@ -185,7 +185,7 @@ export function JournalPage() {
             ))}
           </ul>
           {items.length >= PAGE_SIZE && (
-            <p className="mt-3 text-xs text-brand-slate-400">Showing the {PAGE_SIZE} most recent updates.</p>
+            <p className="mt-3 text-xs text-brand-slate-500">Showing the {PAGE_SIZE} most recent updates.</p>
           )}
         </Card>
       )}

@@ -58,7 +58,7 @@ export function PdfViewer({ fileName, parsedNote, loadUrl }: PdfViewerProps) {
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
+                className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors"
               >
                 <ExternalLink
                   className="w-3.5 h-3.5"
@@ -72,7 +72,7 @@ export function PdfViewer({ fileName, parsedNote, loadUrl }: PdfViewerProps) {
               <a
                 href={url}
                 download={fileName || undefined}
-                className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-400 hover:text-brand-teal-500 transition-colors"
+                className="inline-flex items-center gap-1 text-[13px] font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors"
               >
                 <Download
                   className="w-3.5 h-3.5"
@@ -98,7 +98,7 @@ export function PdfViewer({ fileName, parsedNote, loadUrl }: PdfViewerProps) {
         )}
 
         {!isLoading && !error && !url && (
-          <p className="text-sm text-brand-slate-400 py-8 text-center">
+          <p className="text-sm text-brand-slate-500 py-8 text-center">
             No document attached.
           </p>
         )}

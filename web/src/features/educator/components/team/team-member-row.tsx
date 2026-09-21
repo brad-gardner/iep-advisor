@@ -36,7 +36,7 @@ export function TeamMemberCell({ member }: { member: StudentTeamMember }) {
         {member.isLead && <LeadBadge />}
       </div>
       <p className="text-xs text-brand-slate-500">{member.email}</p>
-      <p className="text-xs text-brand-slate-400">{orgRoleLabel(member.orgRoleName)}</p>
+      <p className="text-xs text-brand-slate-500">{orgRoleLabel(member.orgRoleName)}</p>
     </div>
   );
 }

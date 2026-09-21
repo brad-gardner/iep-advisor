@@ -33,11 +33,11 @@ export function StudentEntryPicker({
       ref={listRef}
       role="listbox"
       aria-label="Shared student entries"
-      className="absolute z-10 mt-1 max-h-80 w-80 overflow-y-auto rounded-card border-[0.5px] border-brand-slate-200 bg-white p-1 shadow-lg"
+      className="absolute z-10 mt-1 max-h-80 w-80 overflow-y-auto rounded-card border border-brand-slate-200 bg-white p-1 shadow-lg"
       data-testid={`${testIdPrefix}-picker`}
     >
       {isLoading && (
-        <p className="px-3 py-2 text-sm text-brand-slate-400" data-testid={`${testIdPrefix}-loading`}>
+        <p className="px-3 py-2 text-sm text-brand-slate-500" data-testid={`${testIdPrefix}-loading`}>
           Loading shared entries…
         </p>
       )}
@@ -49,7 +49,7 @@ export function StudentEntryPicker({
       )}
 
       {!isLoading && !error && entries.length === 0 && (
-        <p className="px-3 py-2 text-sm italic text-brand-slate-400" data-testid={`${testIdPrefix}-empty`}>
+        <p className="px-3 py-2 text-sm italic text-brand-slate-500" data-testid={`${testIdPrefix}-empty`}>
           No shared entries yet.
         </p>
       )}

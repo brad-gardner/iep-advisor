@@ -164,7 +164,7 @@ export function EtrAnalysisTab({ etrId, childProfileId }: EtrAnalysisTabProps) {
               className={`px-3 py-2 text-[13px] font-medium transition-colors ${
                 isActive
                   ? 'text-brand-slate-800 border-b-2 border-brand-teal-500'
-                  : 'text-brand-slate-400 hover:text-brand-slate-800'
+                  : 'text-brand-slate-500 hover:text-brand-slate-800'
               }`}
             >
               {VIEW_LABELS[view]}
@@ -183,6 +183,6 @@ export function EtrAnalysisTab({ etrId, childProfileId }: EtrAnalysisTabProps) {
 
 function EmptySection({ message }: { message: string }) {
   return (
-    <div className="text-sm text-brand-slate-400 py-8 text-center">{message}</div>
+    <div className="text-sm text-brand-slate-500 py-8 text-center">{message}</div>
   );
 }

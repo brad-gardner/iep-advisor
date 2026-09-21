@@ -139,7 +139,7 @@ export function NotificationsPage() {
                   <div className="min-w-0">
                     <p className="font-medium text-brand-slate-800">{n.title}</p>
                     <p className="mt-1 text-sm text-brand-slate-600">{n.body}</p>
-                    <p className="mt-1 text-xs text-brand-slate-400">{formatDate(n.createdAt)}</p>
+                    <p className="mt-1 text-xs text-brand-slate-500">{formatDate(n.createdAt)}</p>
                     {n.emailError && (
                       <p className="mt-1 text-xs text-brand-danger-600">Email failed: {n.emailError}</p>
                     )}
@@ -154,7 +154,7 @@ export function NotificationsPage() {
                   <Link
                     to={n.linkPath}
                     onClick={() => handleMarkRead(n)}
-                    className="block rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+                    className="block rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
                   >
                     {body}
                   </Link>
@@ -162,7 +162,7 @@ export function NotificationsPage() {
                   <button
                     type="button"
                     onClick={() => handleMarkRead(n)}
-                    className="block w-full rounded-card text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+                    className="block w-full rounded-card text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
                   >
                     {body}
                   </button>

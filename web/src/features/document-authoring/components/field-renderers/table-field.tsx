@@ -197,7 +197,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
           )}
         </div>
         {rows.length === 0 ? (
-          <p className="mb-2 text-sm text-brand-slate-400">No rows yet.</p>
+          <p className="mb-2 text-sm text-brand-slate-500">No rows yet.</p>
         ) : (
           <ol className="space-y-3">
             {rows.map((row, rowIndex) => {
@@ -306,7 +306,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                     />
                   ) : (
                     !disabled && (
-                      <p className="mt-2 text-xs text-brand-slate-400">AI help is available once this row has saved.</p>
+                      <p className="mt-2 text-xs text-brand-slate-500">AI help is available once this row has saved.</p>
                     )
                   )}
                 </li>
@@ -390,7 +390,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
               <tr>
                 <td
                   colSpan={columns.length + 1}
-                  className="px-3 py-4 text-center text-sm text-brand-slate-400"
+                  className="px-3 py-4 text-center text-sm text-brand-slate-500"
                 >
                   No rows yet.
                 </td>
@@ -446,7 +446,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
 }
 
 const cellInputClass =
-  'w-full px-2 py-1 bg-white rounded-input text-brand-slate-800 text-sm border border-brand-slate-200 focus:outline-none focus:border-brand-teal-400 focus:ring-[3px] focus:ring-brand-teal-50 transition-colors';
+  'w-full px-2 py-1 bg-white rounded-input text-brand-slate-800 text-sm border border-brand-slate-200 focus:outline-none focus:border-brand-teal-500 focus:ring-[3px] focus:ring-brand-teal-50 transition-colors';
 
 /** Human label for one row of a semantic block ("Goal 2", "Service 1"). */
 function blockLabel(semantic: FieldSemantic | undefined): string {
@@ -538,7 +538,7 @@ function TableCell({
           aria-label={ariaLabel}
           onChange={(e) => onChange(e.target.checked)}
           onBlur={onBlur}
-          className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-400"
+          className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-500"
           data-testid={testId}
         />
       );

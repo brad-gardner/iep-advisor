@@ -8,7 +8,7 @@ export function AutosaveIndicator({ status }: { status: AutosaveStatus }) {
 
   if (status === 'saving') {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-brand-slate-400" role="status">
+      <span className="inline-flex items-center gap-1 text-xs text-brand-slate-500" role="status">
         <Spinner size="sm" tone="current" className="h-3 w-3" aria-hidden="true" />
         Saving…
       </span>

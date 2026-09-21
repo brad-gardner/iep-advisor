@@ -24,6 +24,14 @@ interface ThreadListProps {
   canAsk: boolean;
   /** Sends are in flight — starting a new conversation would abandon the answer. */
   busy: boolean;
+  /**
+   * `panel` (default) draws its own card border/padding — used for the
+   * desktop `<aside>` rail, which sits next to the conversation panel and
+   * needs a matching frame. `plain` drops that chrome for the phone
+   * `<Drawer>`, which already supplies its own border and padding, so the
+   * two would otherwise double up.
+   */
+  variant?: 'panel' | 'plain';
 }
 
 /**
@@ -32,25 +40,47 @@ interface ThreadListProps {
  * the shared Modal / ConfirmDialog. The same component renders inside a
  * Drawer on phones and as a side rail from `md` up.
  */
-export function ThreadList({ threads, error, selectedId, onSelect, onNew, onRename, onDelete, canAsk, busy }: ThreadListProps) {
+export function ThreadList({
+  threads,
+  error,
+  selectedId,
+  onSelect,
+  onNew,
+  onRename,
+  onDelete,
+  canAsk,
+  busy,
+  variant = 'panel',
+}: ThreadListProps) {
   const [renaming, setRenaming] = useState<AdvocateThreadDto | null>(null);
   const [deleting, setDeleting] = useState<AdvocateThreadDto | null>(null);
 
   return (
-    <div className="space-y-3" data-testid="advocate-thread-list">
-      {canAsk && (
-        <Button
-          variant="secondary"
-          size="sm"
-          className="w-full"
-          onClick={onNew}
-          disabled={busy}
-          data-testid="advocate-new-thread"
-        >
-          <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-          New conversation
-        </Button>
-      )}
+    <div
+      className={cn('space-y-3', variant === 'panel' && 'rounded-card border border-brand-slate-200 bg-white p-3')}
+      data-testid="advocate-thread-list"
+    >
+      <div className="flex items-center justify-between gap-2 px-1">
+        {/* Inside the phone Drawer (`variant="plain"`) the Drawer renders its own <h2>Conversations</h2>,
+            so this visible caption would repeat the name straight after it; the desktop rail has no such
+            heading and needs it. The <ul> keeps its own aria-label either way so the list is named. */}
+        {variant === 'panel' && (
+          <p className="text-[11px] font-medium uppercase tracking-wide text-brand-slate-500">Conversations</p>
+        )}
+        {canAsk && (
+          <button
+            type="button"
+            onClick={onNew}
+            disabled={busy}
+            aria-label="New conversation"
+            className="flex items-center gap-1 rounded-button px-2 py-1 text-xs font-medium text-brand-teal-600 transition-colors hover:bg-brand-teal-50 focus:outline-none focus:ring-1 focus:ring-brand-teal-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+            data-testid="advocate-new-thread"
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            New
+          </button>
+        )}
+      </div>
 
       {error && (
         <div role="alert">
@@ -65,7 +95,7 @@ export function ThreadList({ threads, error, selectedId, onSelect, onNew, onRena
       )}
 
       {threads && threads.length === 0 && (
-        <p className="px-1 text-xs text-brand-slate-400" data-testid="advocate-thread-list-empty">
+        <p className="px-1 text-xs text-brand-slate-500" data-testid="advocate-thread-list-empty">
           No conversations yet.
         </p>
       )}
@@ -81,15 +111,15 @@ export function ThreadList({ threads, error, selectedId, onSelect, onNew, onRena
                   onClick={() => onSelect(t.id)}
                   aria-current={selected ? 'true' : undefined}
                   className={cn(
-                    'flex min-w-0 flex-1 items-start gap-2 rounded-button px-2 py-1.5 text-left transition-colors focus:outline-none focus:ring-1 focus:ring-brand-teal-400 focus:ring-offset-1',
+                    'flex min-w-0 flex-1 items-start gap-2 rounded-button px-2 py-1.5 text-left transition-colors focus:outline-none focus:ring-1 focus:ring-brand-teal-500 focus:ring-offset-1',
                     selected ? 'bg-brand-teal-50 text-brand-slate-800' : 'text-brand-slate-600 hover:bg-brand-slate-100',
                   )}
                   data-testid={`advocate-thread-${t.id}-open`}
                 >
                   <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-brand-slate-400" aria-hidden="true" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{t.title}</span>
-                    <span className="block text-[11px] text-brand-slate-400">{relativeTime(t.lastMessageAt)}</span>
+                    <span className="line-clamp-2 text-sm font-medium">{t.title}</span>
+                    <span className="block text-[11px] text-brand-slate-500">{relativeTime(t.lastMessageAt)}</span>
                   </span>
                 </button>
                 {canAsk && (

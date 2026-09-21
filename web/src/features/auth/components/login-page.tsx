@@ -67,13 +67,13 @@ export function LoginPage() {
       {error && <div className="mb-4" data-testid="login-error"><Notice variant="error" title={error} /></div>}
 
       {showMagicLink ? (
-        <div data-testid="login-magic-link-panel" ref={panelRef} tabIndex={-1} className="rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400">
+        <div data-testid="login-magic-link-panel" ref={panelRef} tabIndex={-1} className="rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500">
           <MagicLinkRequestForm />
           <div className="mt-4 text-center">
             <button
               type="button"
               onClick={() => toggleMagicLink(false)}
-              className="text-xs text-brand-slate-400 hover:text-brand-slate-600"
+              className="text-xs text-brand-slate-500 hover:text-brand-slate-600"
               data-testid="magic-link-back"
             >
               Back to password sign-in
@@ -81,7 +81,7 @@ export function LoginPage() {
           </div>
         </div>
       ) : (
-        <div ref={passwordPanelRef} tabIndex={-1} className="rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400" data-testid="login-password-panel">
+        <div ref={passwordPanelRef} tabIndex={-1} className="rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500" data-testid="login-password-panel">
           <form onSubmit={handleSubmit} className="space-y-4" data-testid="login-form">
             <Input
               label="Email"
@@ -134,7 +134,7 @@ export function LoginPage() {
         </div>
       )}
 
-      <p className="mt-6 text-center text-sm text-brand-slate-400">
+      <p className="mt-6 text-center text-sm text-brand-slate-500">
         Don't have an account?{' '}
         <Link to="/register" className="text-brand-teal-500 hover:text-brand-teal-600" data-testid="register-link">
           Sign up

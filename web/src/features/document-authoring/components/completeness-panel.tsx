@@ -66,7 +66,7 @@ export function CompletenessPanel({ summary }: CompletenessPanelProps) {
           </ul>
         )}
         {advisory.length > 0 && (
-          <p className="mt-3 text-xs text-brand-slate-400">Suggestions never block finalizing.</p>
+          <p className="mt-3 text-xs text-brand-slate-500">Suggestions never block finalizing.</p>
         )}
       </Card>
     </aside>
