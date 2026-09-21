@@ -47,7 +47,7 @@ export function TemplateStep({ kind, onContinue, headingRef }: TemplateStepProps
           <h2
             ref={headingRef}
             tabIndex={-1}
-            className="font-serif text-lg text-brand-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+            className="font-serif text-lg text-brand-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
           >
             Download the template
           </h2>

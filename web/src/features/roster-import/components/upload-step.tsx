@@ -83,7 +83,7 @@ export function UploadStep({ kind, onPreviewed, onBack, onBusyChange, headingRef
           <h2
             ref={headingRef}
             tabIndex={-1}
-            className="font-serif text-lg text-brand-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+            className="font-serif text-lg text-brand-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
           >
             Upload your workbook
           </h2>
@@ -113,7 +113,7 @@ export function UploadStep({ kind, onPreviewed, onBack, onBusyChange, headingRef
             aria-describedby={error ? errorId : undefined}
             aria-invalid={error ? true : undefined}
             data-testid="import-file-input"
-            className="block w-full rounded-input border border-brand-slate-200 bg-white px-3 py-2 text-sm text-brand-slate-800 file:mr-3 file:rounded-button file:border-0 file:bg-brand-teal-50 file:px-3 file:py-1 file:text-xs file:font-medium file:text-brand-teal-600 focus:border-brand-teal-400 focus:outline-none focus:ring-[3px] focus:ring-brand-teal-50"
+            className="block w-full rounded-input border border-brand-slate-200 bg-white px-3 py-2 text-sm text-brand-slate-800 file:mr-3 file:rounded-button file:border-0 file:bg-brand-teal-50 file:px-3 file:py-1 file:text-xs file:font-medium file:text-brand-teal-600 focus:border-brand-teal-500 focus:outline-none focus:ring-[3px] focus:ring-brand-teal-50"
           />
           {file && (
             <p className="mt-1 text-xs text-brand-slate-500" data-testid="import-file-summary">

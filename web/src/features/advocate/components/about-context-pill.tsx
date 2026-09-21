@@ -23,7 +23,7 @@ export function AboutContextPill({ about, label, onClear }: AboutContextPillProp
             type="button"
             onClick={onClear}
             aria-label="Clear the conversation context"
-            className="ml-0.5 rounded-full p-0.5 text-brand-teal-500 hover:bg-brand-teal-100 focus:outline-none focus:ring-1 focus:ring-brand-teal-400"
+            className="ml-0.5 rounded-full p-0.5 text-brand-teal-500 hover:bg-brand-teal-100 focus:outline-none focus:ring-1 focus:ring-brand-teal-500"
             data-testid="advocate-about-clear"
           >
             <X className="h-3 w-3" aria-hidden="true" />

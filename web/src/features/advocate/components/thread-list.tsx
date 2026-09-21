@@ -73,7 +73,7 @@ export function ThreadList({
             onClick={onNew}
             disabled={busy}
             aria-label="New conversation"
-            className="flex items-center gap-1 rounded-button px-2 py-1 text-xs font-medium text-brand-teal-600 transition-colors hover:bg-brand-teal-50 focus:outline-none focus:ring-1 focus:ring-brand-teal-400 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center gap-1 rounded-button px-2 py-1 text-xs font-medium text-brand-teal-600 transition-colors hover:bg-brand-teal-50 focus:outline-none focus:ring-1 focus:ring-brand-teal-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
             data-testid="advocate-new-thread"
           >
             <Plus className="h-3.5 w-3.5" aria-hidden="true" />
@@ -111,7 +111,7 @@ export function ThreadList({
                   onClick={() => onSelect(t.id)}
                   aria-current={selected ? 'true' : undefined}
                   className={cn(
-                    'flex min-w-0 flex-1 items-start gap-2 rounded-button px-2 py-1.5 text-left transition-colors focus:outline-none focus:ring-1 focus:ring-brand-teal-400 focus:ring-offset-1',
+                    'flex min-w-0 flex-1 items-start gap-2 rounded-button px-2 py-1.5 text-left transition-colors focus:outline-none focus:ring-1 focus:ring-brand-teal-500 focus:ring-offset-1',
                     selected ? 'bg-brand-teal-50 text-brand-slate-800' : 'text-brand-slate-600 hover:bg-brand-slate-100',
                   )}
                   data-testid={`advocate-thread-${t.id}-open`}

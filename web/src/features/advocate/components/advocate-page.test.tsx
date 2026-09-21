@@ -240,6 +240,51 @@ describe('AdvocatePage', () => {
     const scrollers = within(panel).getAllByRole('region', { name: 'Conversation' });
     expect(scrollers).toHaveLength(1);
     expect(scrollers[0]).toBe(screen.getByTestId('advocate-messages'));
+    // ...and structurally: a re-added `overflow-y-auto` wrapper around MessageList would not be a
+    // named region, so the role query above cannot catch it on its own.
+    const overflowing = panel.querySelectorAll('[class*="overflow-y-auto"]');
+    expect(overflowing).toHaveLength(1);
+    expect(overflowing[0]).toBe(scrollers[0]);
+  });
+
+  it('publishes the measured dock height so the message tail can clear the sticky phone dock', async () => {
+    // jsdom has no ResizeObserver, so the component skips the measurement and the sentinel falls
+    // back to the 10rem baked into its class. Stub one to prove the wiring: the panel must carry
+    // `--advocate-dock-h`, and the sentinel must read it rather than a hard-coded reserve.
+    const observed: Element[] = [];
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        callback: () => void;
+        constructor(callback: () => void) {
+          this.callback = callback;
+        }
+        observe(target: Element) {
+          observed.push(target);
+          this.callback();
+        }
+        disconnect() {}
+      },
+    );
+
+    try {
+      renderPage('owner', '/children/4/advocate?thread=1');
+      await screen.findByTestId('advocate-assistant-message');
+
+      const panel = screen.getByTestId('advocate-conversation');
+      // Set at all (offsetHeight is 0 in jsdom, so the value itself is not the assertion).
+      expect(panel.style.getPropertyValue('--advocate-dock-h')).toMatch(/^\d+px$/);
+      // Both boxes the sticky dock paints over are measured, not just the composer.
+      expect(observed).toContain(screen.getByTestId('advocate-composer-dock'));
+      expect(observed.length).toBeGreaterThan(1);
+
+      const scroller = screen.getByTestId('advocate-messages');
+      const sentinel = scroller.lastElementChild;
+      expect(sentinel?.className).toContain('scroll-mb-[var(--advocate-dock-h,10rem)]');
+      expect(sentinel?.className).toContain('md:scroll-mb-0');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('lets thread titles wrap onto two lines instead of truncating', async () => {
@@ -251,6 +296,8 @@ describe('AdvocatePage', () => {
     // Rendered in full (not sliced with an ellipsis) — CSS handles any two-line wrapping, not JS truncation.
     const title = within(rail).getByText(longTitle);
     expect(title.className).not.toMatch(/\btruncate\b/);
+    // Two lines, not unbounded: an 8-line title in a 16rem rail would push the rest of the list off.
+    expect(title).toHaveClass('line-clamp-2');
   });
 
   it('sends from a blank page: creates a thread, shows the user bubble at once, streams tools and deltas, then renders the stored answer with sources and suggestions', async () => {

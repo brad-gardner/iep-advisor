@@ -79,7 +79,7 @@ export function Drawer({
               disabled={preventClose}
               aria-label="Close dialog"
               data-testid={testId ? `${testId}-close` : undefined}
-              className="-mr-1.5 -mt-0.5 rounded-button p-1 text-brand-slate-400 transition-colors hover:bg-brand-slate-50 hover:text-brand-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+              className="-mr-1.5 -mt-0.5 rounded-button p-1 text-brand-slate-400 transition-colors hover:bg-brand-slate-50 hover:text-brand-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
             >
               <X className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
             </button>

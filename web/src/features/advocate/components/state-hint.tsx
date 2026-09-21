@@ -54,7 +54,7 @@ export function StateHint({ userId }: StateHintProps) {
         type="button"
         onClick={dismiss}
         aria-label="Dismiss this hint"
-        className="shrink-0 rounded p-0.5 text-brand-slate-400 hover:bg-brand-amber-100 hover:text-brand-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-teal-400"
+        className="shrink-0 rounded p-0.5 text-brand-slate-400 hover:bg-brand-amber-100 hover:text-brand-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-teal-500"
         data-testid="advocate-state-hint-dismiss"
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" />

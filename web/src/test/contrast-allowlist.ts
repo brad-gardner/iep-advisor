@@ -80,7 +80,7 @@ export const CONTRAST_ALLOWLIST: ContrastAllowlistEntry[] = [
   // changed to slate-500 and are not in this list.
   {
     file: 'src/features/notifications/components/notification-bell.tsx',
-    text: 'className="relative flex h-9 w-9 items-center justify-center rounded-button text-brand-slate-400 transition-colors hover:bg-brand-slate-700 hover:text-brand-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"',
+    text: 'className="relative flex h-9 w-9 items-center justify-center rounded-button text-brand-slate-400 transition-colors hover:bg-brand-slate-700 hover:text-brand-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"',
     count: 1,
     reason: 'Bell trigger sits in the dark top bar (hover:bg-brand-slate-700), same surface as the sidebar — slate-400 is correct here.',
   },
@@ -88,13 +88,13 @@ export const CONTRAST_ALLOWLIST: ContrastAllowlistEntry[] = [
   // Icon-only close/menu triggers on white — glyph, not text.
   {
     file: 'src/components/ui/drawer.tsx',
-    text: 'className="-mr-1.5 -mt-0.5 rounded-button p-1 text-brand-slate-400 transition-colors hover:bg-brand-slate-50 hover:text-brand-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"',
+    text: 'className="-mr-1.5 -mt-0.5 rounded-button p-1 text-brand-slate-400 transition-colors hover:bg-brand-slate-50 hover:text-brand-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"',
     count: 1,
     reason: ICON_ONLY_TRIGGER,
   },
   {
     file: 'src/components/ui/modal.tsx',
-    text: 'className="-mr-1.5 -mt-0.5 rounded-button p-1 text-brand-slate-400 transition-colors hover:bg-brand-slate-50 hover:text-brand-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"',
+    text: 'className="-mr-1.5 -mt-0.5 rounded-button p-1 text-brand-slate-400 transition-colors hover:bg-brand-slate-50 hover:text-brand-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"',
     count: 1,
     reason: ICON_ONLY_TRIGGER,
   },
@@ -190,7 +190,7 @@ export const CONTRAST_ALLOWLIST: ContrastAllowlistEntry[] = [
   // Icon-only buttons elsewhere in the app, same pattern as drawer/modal/menu.
   {
     file: 'src/features/advocate/components/state-hint.tsx',
-    text: 'className="shrink-0 rounded p-0.5 text-brand-slate-400 hover:bg-brand-amber-100 hover:text-brand-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-teal-400"',
+    text: 'className="shrink-0 rounded p-0.5 text-brand-slate-400 hover:bg-brand-amber-100 hover:text-brand-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-teal-500"',
     count: 1,
     reason: ICON_ONLY_TRIGGER,
   },
@@ -208,7 +208,7 @@ export const CONTRAST_ALLOWLIST: ContrastAllowlistEntry[] = [
   },
   {
     file: 'src/features/meeting-prep/components/parent-question-row.tsx',
-    text: "'shrink-0 rounded p-1 text-brand-slate-400 transition-colors hover:bg-brand-slate-100 hover:text-brand-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-teal-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',",
+    text: "'shrink-0 rounded p-1 text-brand-slate-400 transition-colors hover:bg-brand-slate-100 hover:text-brand-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-teal-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',",
     count: 1,
     reason: ICON_ONLY_TRIGGER,
   },

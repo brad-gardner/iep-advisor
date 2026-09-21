@@ -67,7 +67,7 @@ export function LoginPage() {
       {error && <div className="mb-4" data-testid="login-error"><Notice variant="error" title={error} /></div>}
 
       {showMagicLink ? (
-        <div data-testid="login-magic-link-panel" ref={panelRef} tabIndex={-1} className="rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400">
+        <div data-testid="login-magic-link-panel" ref={panelRef} tabIndex={-1} className="rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500">
           <MagicLinkRequestForm />
           <div className="mt-4 text-center">
             <button
@@ -81,7 +81,7 @@ export function LoginPage() {
           </div>
         </div>
       ) : (
-        <div ref={passwordPanelRef} tabIndex={-1} className="rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400" data-testid="login-password-panel">
+        <div ref={passwordPanelRef} tabIndex={-1} className="rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500" data-testid="login-password-panel">
           <form onSubmit={handleSubmit} className="space-y-4" data-testid="login-form">
             <Input
               label="Email"

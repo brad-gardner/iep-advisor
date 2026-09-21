@@ -140,7 +140,7 @@ export function PreviewStep({
             <h2
               ref={headingRef}
               tabIndex={-1}
-              className="font-serif text-lg text-brand-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+              className="font-serif text-lg text-brand-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
             >
               Preview
             </h2>
@@ -199,7 +199,7 @@ export function PreviewStep({
             type="checkbox"
             checked={errorsOnly}
             onChange={(e) => toggleErrorsOnly(e.target.checked)}
-            className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+            className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
             data-testid="import-preview-errors-only"
           />
           Errors only

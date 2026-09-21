@@ -47,7 +47,7 @@ const sizeStyles: Record<ButtonSize, string> = {
 };
 
 const baseStyles =
-  'inline-flex items-center justify-center rounded-button font-medium leading-[1.3] transition-colors focus:outline-none focus:ring-1 focus:ring-brand-teal-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+  'inline-flex items-center justify-center rounded-button font-medium leading-[1.3] transition-colors focus:outline-none focus:ring-1 focus:ring-brand-teal-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
 
 export function Button({
   variant = 'primary',

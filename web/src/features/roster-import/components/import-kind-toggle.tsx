@@ -41,7 +41,7 @@ export function ImportKindToggle({ value, onChange, disabled = false }: ImportKi
             <span
               className={cn(
                 'inline-flex cursor-pointer items-center justify-center rounded-button border px-3 py-1.5 text-xs font-medium leading-[1.3] transition-colors',
-                'peer-focus-visible:ring-1 peer-focus-visible:ring-brand-teal-400 peer-focus-visible:ring-offset-2',
+                'peer-focus-visible:ring-1 peer-focus-visible:ring-brand-teal-500 peer-focus-visible:ring-offset-2',
                 'peer-disabled:cursor-not-allowed peer-disabled:opacity-50',
                 selected
                   ? 'border-transparent bg-brand-teal-500 text-white'

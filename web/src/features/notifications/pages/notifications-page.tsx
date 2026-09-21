@@ -154,7 +154,7 @@ export function NotificationsPage() {
                   <Link
                     to={n.linkPath}
                     onClick={() => handleMarkRead(n)}
-                    className="block rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+                    className="block rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
                   >
                     {body}
                   </Link>
@@ -162,7 +162,7 @@ export function NotificationsPage() {
                   <button
                     type="button"
                     onClick={() => handleMarkRead(n)}
-                    className="block w-full rounded-card text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+                    className="block w-full rounded-card text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
                   >
                     {body}
                   </button>

@@ -71,7 +71,7 @@ export interface TableSelection<T> {
 export const CLIENT_SORT_ROW_CEILING = 500;
 
 const checkboxStyles =
-  "h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400";
+  "h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500";
 
 function compare(a: string | number, b: string | number): number {
   if (typeof a === "number" && typeof b === "number") return a - b;
@@ -159,7 +159,7 @@ export function Table<T>({
       aria-label={label}
       tabIndex={0}
       data-testid={testId}
-      className="overflow-x-auto rounded-card border border-brand-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+      className="overflow-x-auto rounded-card border border-brand-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
     >
       <table className="w-full border-collapse text-sm" aria-label={label}>
         <thead>
@@ -210,7 +210,7 @@ export function Table<T>({
                         testId ? `${testId}-sort-${col.key}` : undefined
                       }
                       className={cn(
-                        "inline-flex items-center gap-1 rounded-button font-medium transition-colors hover:text-brand-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400",
+                        "inline-flex items-center gap-1 rounded-button font-medium transition-colors hover:text-brand-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500",
                         col.align === "right" && "flex-row-reverse",
                       )}
                     >

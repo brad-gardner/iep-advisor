@@ -50,7 +50,7 @@ export function StatTile({
   return (
     <Link
       to={href}
-      className="block rounded-card transition-colors hover:border-brand-teal-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+      className="block rounded-card transition-colors hover:border-brand-teal-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
     >
       {body}
     </Link>

@@ -182,7 +182,7 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
               type="checkbox"
               checked={shared}
               onChange={(e) => setShared(e.target.checked)}
-              className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-400"
+              className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-500"
               data-testid="contribution-share"
             />
             Visible to the school team

@@ -45,14 +45,22 @@ const PIN_THRESHOLD_PX = 48;
  * component, so there is exactly one scroller in the conversation area.
  *
  * Below `md` the composer dock is `position: sticky` (see `advocate-page.tsx`)
- * and floats over whatever the page happens to render at the viewport's
- * bottom edge — that includes the tail of this scroller's own box. The
- * bottom spacer below reserves roughly the dock's height inside the
- * scrollable content itself, so pin-to-bottom lands the newest message just
- * above that reserved (blank) space instead of the dock painting over it.
+ * and pins to the *viewport's* bottom edge, while this scroller's own bottom
+ * edge sits wherever the content ends — the two do not coincide, so no
+ * constant amount of reserved space inside the scroller can keep the newest
+ * message clear of the dock. Instead the tail sentinel below is scrolled into
+ * view with a bottom scroll-margin: `scrollIntoView` satisfies that margin
+ * against every scrollable ancestor (this scroller *and* the document), which
+ * is the frame the dock actually lives in, and `block: 'nearest'` makes it a
+ * no-op when the end is already visible. The margin is the dock's *measured*
+ * height, published as `--advocate-dock-h` by `advocate-page.tsx`, because the
+ * dock grows with the About pill, the state hint and the notice row; the
+ * `10rem` in the class is only the fallback for environments without
+ * ResizeObserver.
  */
 export function MessageList({ childId, messages, pending, streaming, announcement, handlers }: MessageListProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const tailRef = useRef<HTMLDivElement>(null);
   const announcementText = useMemo(() => (announcement ? markdownToPlainText(announcement.text) : ''), [announcement]);
   const pinnedRef = useRef(true);
 
@@ -69,8 +77,7 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
   }, [messages.length, pending]);
 
   useEffect(() => {
-    const el = scrollerRef.current;
-    if (el && pinnedRef.current) el.scrollTop = el.scrollHeight;
+    if (pinnedRef.current) tailRef.current?.scrollIntoView({ block: 'nearest' });
   }, [messages, pending, streaming]);
 
   return (
@@ -126,14 +133,17 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
           </div>
         )}
 
-        {/* See the scroll-ownership note above: reserves room for the sticky composer dock below `md`. */}
         {/*
-          Phones only: the dock is sticky over this scroller, so reserve its height at the end of the
-          content and pin-to-bottom lands the newest message above it instead of behind it. 160px was
-          measured against the dock with just the Composer; with the About pill and the state hint both
-          showing it is taller, and the last line can sit under it until the reader scrolls.
+          Scroll target for pin-to-bottom. Zero height, so it never inflates `scrollHeight` (a spacer
+          would make a short thread open pre-scrolled); the bottom scroll-margin is what keeps the
+          newest message clear of the sticky dock on phones, and it is dropped at `md` where the dock
+          sits in normal flow inside the panel.
         */}
-        <div aria-hidden="true" className="h-40 md:hidden" />
+        <div
+          ref={tailRef}
+          aria-hidden="true"
+          className="scroll-mb-[var(--advocate-dock-h,10rem)] md:scroll-mb-0"
+        />
       </div>
 
       {/* Outside the conversation region on purpose: a status node under an aria-busy ancestor is

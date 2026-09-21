@@ -38,7 +38,7 @@ export function AdvocateEmptyState({ onPickExample, canAsk, hasJournalEntries = 
                 <button
                   type="button"
                   onClick={() => onPickExample(q)}
-                  className="rounded-button border-[1.5px] border-brand-teal-200 bg-white px-3 py-1.5 text-sm font-medium text-brand-teal-600 transition-colors hover:bg-brand-teal-50 focus:outline-none focus:ring-1 focus:ring-brand-teal-400 focus:ring-offset-2"
+                  className="rounded-button border-[1.5px] border-brand-teal-200 bg-white px-3 py-1.5 text-sm font-medium text-brand-teal-600 transition-colors hover:bg-brand-teal-50 focus:outline-none focus:ring-1 focus:ring-brand-teal-500 focus:ring-offset-2"
                   data-testid="advocate-example"
                 >
                   {q}

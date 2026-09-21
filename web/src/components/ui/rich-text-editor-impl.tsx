@@ -110,7 +110,7 @@ function LinkControl({ editor, disabled }: { editor: Editor; disabled?: boolean 
           placeholder="https://…"
           aria-label="Link URL"
           autoFocus
-          className="h-7 w-40 rounded border border-brand-slate-200 px-2 text-xs text-brand-slate-800 focus:border-brand-teal-400 focus:outline-none focus:ring-[3px] focus:ring-brand-teal-50"
+          className="h-7 w-40 rounded border border-brand-slate-200 px-2 text-xs text-brand-slate-800 focus:border-brand-teal-500 focus:outline-none focus:ring-[3px] focus:ring-brand-teal-50"
         />
       </div>
     );

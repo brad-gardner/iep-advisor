@@ -202,7 +202,7 @@ export function FieldEditor({
           checked={required}
           onChange={(e) => handleRequired(e.target.checked)}
           disabled={readOnly}
-          className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-400"
+          className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-500"
           data-testid={`field-${field.id}-required`}
         />
         Required

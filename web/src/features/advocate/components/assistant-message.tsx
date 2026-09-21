@@ -27,7 +27,7 @@ interface AssistantMessageProps {
 }
 
 const chipClass =
-  'inline-flex items-center gap-1 rounded-badge border border-brand-teal-100 bg-brand-teal-50 px-2 py-0.5 text-xs font-medium text-brand-teal-600 hover:bg-brand-teal-100 focus:outline-none focus:ring-1 focus:ring-brand-teal-400 focus:ring-offset-1';
+  'inline-flex items-center gap-1 rounded-badge border border-brand-teal-100 bg-brand-teal-50 px-2 py-0.5 text-xs font-medium text-brand-teal-600 hover:bg-brand-teal-100 focus:outline-none focus:ring-1 focus:ring-brand-teal-500 focus:ring-offset-1';
 
 /**
  * One answer: sanitised markdown, then the sources it drew on (trust rule:

@@ -51,7 +51,7 @@ export function ParticipantList({ participants, attendance }: ParticipantListPro
                     type="checkbox"
                     checked={entry?.attended ?? false}
                     onChange={(e) => attendance.onChange(p.id, e.target.checked, entry?.excusalNote)}
-                    className="h-3.5 w-3.5 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+                    className="h-3.5 w-3.5 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
                     data-testid={`attendance-checkbox-${p.id}`}
                   />
                   Attended

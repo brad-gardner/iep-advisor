@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { MessagesSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -198,6 +198,39 @@ export function AdvocatePage() {
   const conversationEmpty = !thread.loading && thread.messages.length === 0 && !hasLocalActivity;
   const threadCount = threadsApi.threads?.length ?? 0;
   const showDisclaimer = Boolean(thread.disclaimer) && thread.messages.length > 0;
+  const showNotices = Boolean(thread.stopped || thread.failure || createError || showDisclaimer);
+
+  /**
+   * Below `md` the composer dock is `position: sticky` against the *viewport*, so it floats over
+   * whatever the page renders behind it — including the tail of the conversation. MessageList
+   * clears its newest message by scrolling a sentinel into view with a bottom scroll-margin
+   * (see message-list.tsx); this publishes what that margin has to be.
+   *
+   * It is measured, not assumed: the dock is 137px with just the Composer and up to ~261px with
+   * the About pill and the state hint showing, and the notice row above it (stopped / retry /
+   * disclaimer) is covered by the same sticky dock, so both are summed. The ResizeObserver fires
+   * only when one of those boxes actually changes size, never per streamed token. Environments
+   * without ResizeObserver (jsdom) keep the `10rem` fallback baked into the sentinel's class.
+   */
+  const panelRef = useRef<HTMLElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const noticesRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!panel || typeof ResizeObserver === 'undefined') return;
+
+    const measure = () => {
+      const height = (noticesRef.current?.offsetHeight ?? 0) + (dockRef.current?.offsetHeight ?? 0);
+      panel.style.setProperty('--advocate-dock-h', `${height}px`);
+    };
+
+    const observer = new ResizeObserver(measure);
+    if (noticesRef.current) observer.observe(noticesRef.current);
+    if (dockRef.current) observer.observe(dockRef.current);
+    measure();
+    return () => observer.disconnect();
+  }, [canAsk, showNotices]);
 
   const renderRail = (variant: 'panel' | 'plain') => (
     <ThreadList
@@ -247,6 +280,7 @@ export function AdvocatePage() {
         </aside>
 
         <section
+          ref={panelRef}
           // Height measured in-browser, not guessed: the stack above the panel (page padding,
           // breadcrumb, title, badge, tabs, heading, privacy line) is a constant 319px, and the
           // container adds 32px below — so 22rem lands the panel exactly on the viewport floor at
@@ -315,8 +349,8 @@ export function AdvocatePage() {
             )}
           </div>
 
-          {(thread.stopped || thread.failure || createError || showDisclaimer) && (
-            <div className="space-y-2 border-t border-brand-slate-100 px-3 py-2">
+          {showNotices && (
+            <div ref={noticesRef} className="space-y-2 border-t border-brand-slate-100 px-3 py-2">
               {thread.stopped && (
                 <p className="text-xs text-brand-slate-500" role="status" data-testid="advocate-stopped">
                   {STOPPED_COPY}
@@ -351,6 +385,7 @@ export function AdvocatePage() {
 
           {canAsk && (
             <div
+              ref={dockRef}
               className="sticky bottom-0 space-y-2 border-t border-brand-slate-200 bg-brand-slate-50 p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:static md:bg-brand-slate-50/60 md:pb-3"
               data-testid="advocate-composer-dock"
             >

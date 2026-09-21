@@ -41,7 +41,7 @@ export function CalendarAgendaList({ items, onSelectMeeting }: CalendarAgendaLis
               <button
                 type="button"
                 onClick={() => onSelectMeeting(meeting)}
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-brand-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-teal-400"
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-brand-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-teal-500"
                 data-testid={`calendar-item-meeting-${meeting.id}`}
               >
                 <div className="min-w-0">
@@ -64,7 +64,7 @@ export function CalendarAgendaList({ items, onSelectMeeting }: CalendarAgendaLis
             <li key={`obligation-${obligation.schoolStudentId}-${obligation.kind}`}>
               <Link
                 to={`/educator/students/${obligation.schoolStudentId}`}
-                className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-brand-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-teal-400"
+                className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-brand-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-teal-500"
                 data-testid={`calendar-item-obligation-${obligation.schoolStudentId}-${obligation.kind}`}
               >
                 <div className="min-w-0">

@@ -27,7 +27,7 @@ export function CheckboxField({ field, value, disabled, onSave }: FieldRendererP
         checked={checked}
         disabled={disabled}
         onChange={(e) => handleToggle(e.target.checked)}
-        className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-400"
+        className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-500"
         data-testid={`field-${field.fieldKey}`}
       />
       <label htmlFor={id} className="text-[13px] font-medium text-brand-slate-600">

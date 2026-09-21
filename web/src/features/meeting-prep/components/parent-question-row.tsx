@@ -37,7 +37,7 @@ function IconButton({ className, ...props }: ButtonHTMLAttributes<HTMLButtonElem
       type="button"
       {...props}
       className={cn(
-        'shrink-0 rounded p-1 text-brand-slate-400 transition-colors hover:bg-brand-slate-100 hover:text-brand-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-teal-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',
+        'shrink-0 rounded p-1 text-brand-slate-400 transition-colors hover:bg-brand-slate-100 hover:text-brand-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-teal-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent',
         className,
       )}
     />
@@ -120,7 +120,7 @@ export function ParentQuestionRow({
             if (isChecking) return;
             onCheck(question.id, e.target.checked);
           }}
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-400"
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-500"
         />
         {editing ? (
           <form onSubmit={(e) => void saveEdit(e)} className="min-w-0 flex-1" data-testid="parent-question-edit-form">

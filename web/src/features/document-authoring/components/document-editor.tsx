@@ -210,7 +210,7 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
                       key={section.id}
                       id={sectionDomId(section.id)}
                       tabIndex={-1}
-                      className="scroll-mt-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-400"
+                      className="scroll-mt-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
                       data-testid={`section-${section.id}`}
                     >
                       <h2 className="mb-4 font-serif text-lg text-brand-slate-800">
