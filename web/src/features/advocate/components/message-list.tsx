@@ -102,9 +102,10 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
     };
 
     // `resize` as well as `scroll`: the page can stop being at its bottom (or start being at it)
-    // with no scroll event at all — a rotation, the virtual keyboard, or the notice row mounting
-    // and changing the document's height. Without it a stale `false` would silently stop the
-    // stream from following until the reader happened to scroll again.
+    // with no scroll event at all — a rotation, or the virtual keyboard changing `innerHeight`.
+    // Without it a stale `false` would silently stop the stream from following until the reader
+    // happened to scroll again. (Content growth alone does not fire `resize`, and does not need to:
+    // the scroll below reads live layout when it runs.)
     window.addEventListener('scroll', measurePage, { passive: true });
     window.addEventListener('resize', measurePage, { passive: true });
     window.visualViewport?.addEventListener('resize', measurePage);
@@ -125,9 +126,14 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
    * The page is re-pinned when the reader *sends*, and deliberately not when an answer lands.
    * Settling an answer also changes `messages.length`, so folding the page into the rule above
    * would move the whole page — a thousand pixels, page header included — at the one moment a
-   * reader who scrolled away to re-read something is least expecting it. On `md` and up the page
-   * cannot scroll at all, so `pagePinnedRef` is always true there and completion still re-pins
-   * exactly as it did before; this only changes the phone case the sticky dock introduced.
+   * reader who scrolled away to re-read something is least expecting it.
+   *
+   * From `md` up this changes nothing. The panel is height-bound there, so on a viewport at least
+   * 768px tall the page does not scroll at all. Shorter than that the `md:min-h-[26rem]` floor wins
+   * and the page does scroll — measured at 1440px wide: 47px at 720px tall, 96px at 671px — but
+   * that is still inside `PAGE_PIN_THRESHOLD_PX`, so `pagePinnedRef` is true wherever the reader
+   * is and completion re-pins exactly as it did before. Only below roughly 670px tall does a
+   * desktop window behave like the phone case the sticky dock introduced.
    */
   useLayoutEffect(() => {
     if (pending) pagePinnedRef.current = true;

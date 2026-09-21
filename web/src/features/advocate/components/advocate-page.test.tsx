@@ -611,8 +611,29 @@ describe('AdvocatePage', () => {
     expect(screen.queryByTestId('advocate-streaming-text')).not.toBeInTheDocument();
     expect(composer()).not.toHaveAttribute('readonly');
 
-    fireEvent.click(screen.getByTestId('advocate-retry'));
-    await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(2));
+    // Retry counts as a send for pin-to-bottom. It only does so because `retry` hands `start` a
+    // fresh object: passing the pending message already in state makes React bail out of
+    // `setPending`, its identity never changes, and the effects keyed on it never re-arm — so a
+    // reader who scrolled away while the error showed would not be followed for the retried answer.
+    const targets: Element[] = [];
+    const spy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (this: Element) {
+      targets.push(this);
+    });
+    try {
+      const scroller = screen.getByTestId('advocate-messages');
+      Object.defineProperty(scroller, 'scrollHeight', { value: 2000, configurable: true });
+      Object.defineProperty(scroller, 'clientHeight', { value: 500, configurable: true });
+      scroller.scrollTop = 0;
+      fireEvent.scroll(scroller);
+
+      targets.length = 0;
+      fireEvent.click(screen.getByTestId('advocate-retry'));
+      await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(2));
+      expect(targets).toContain(screen.getByTestId('advocate-scroll-tail'));
+    } finally {
+      spy.mockRestore();
+    }
+
     expect(lastStream().body).toEqual({ text: 'Is the reading goal measurable?' });
     expect(screen.queryByTestId('advocate-send-error')).not.toBeInTheDocument();
     expect(screen.getByTestId('advocate-user-message-pending')).toBeInTheDocument();
