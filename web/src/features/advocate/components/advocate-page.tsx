@@ -197,6 +197,7 @@ export function AdvocatePage() {
   const showLoading = thread.loading && !hasLocalActivity;
   const conversationEmpty = !thread.loading && thread.messages.length === 0 && !hasLocalActivity;
   const threadCount = threadsApi.threads?.length ?? 0;
+  const showDisclaimer = Boolean(thread.disclaimer) && thread.messages.length > 0;
 
   const renderRail = (variant: 'panel' | 'plain') => (
     <ThreadList
@@ -251,7 +252,12 @@ export function AdvocatePage() {
           // container adds 32px below — so 22rem lands the panel exactly on the viewport floor at
           // 900px tall with no page scroll (19rem overflowed by 15px). The 26rem floor keeps the
           // panel usable on a short laptop; 34rem forced 175px of page scroll at 720px tall.
-          className="flex min-h-[26rem] flex-col rounded-card border border-brand-slate-200 bg-white shadow-sm md:h-[calc(100vh-22rem)] md:overflow-hidden"
+          // Both measurements were taken at `md` and up, where the panel is height-bound and is
+          // the scrolling element. Below `md` the panel is intentionally content-sized (the page
+          // scrolls instead, with the composer dock pinned via `position: sticky`), so the floor
+          // is scoped to `md:` — an unconditional min-height here made the panel taller than short
+          // phone viewports and let the sticky dock paint over the panel's own content.
+          className="flex flex-col rounded-card border border-brand-slate-200 bg-white shadow-sm md:h-[calc(100vh-22rem)] md:min-h-[26rem] md:overflow-hidden"
           aria-label="Conversation"
           data-testid="advocate-conversation"
         >
@@ -281,8 +287,14 @@ export function AdvocatePage() {
               </div>
             )}
 
+            {/*
+              Empty state is top-aligned on phones and centred from `md`. At 400px the page header
+              stack can reach ~482px (a long child name wraps), leaving ~186px of panel above the
+              sticky dock — centring inside the scroller there pushes the example chips under the
+              dock. Starting at the top keeps the prompt and first chips visible.
+            */}
             {conversationEmpty && !thread.loadError && (
-              <div className="flex flex-1 items-center justify-center px-6 py-8">
+              <div className="flex flex-1 items-start justify-center px-6 py-8 md:items-center">
                 <AdvocateEmptyState
                   canAsk={canAsk && !capped}
                   onPickExample={setDraft}
@@ -303,7 +315,7 @@ export function AdvocatePage() {
             )}
           </div>
 
-          {(thread.stopped || thread.failure || createError || (thread.disclaimer && thread.messages.length > 0)) && (
+          {(thread.stopped || thread.failure || createError || showDisclaimer) && (
             <div className="space-y-2 border-t border-brand-slate-100 px-3 py-2">
               {thread.stopped && (
                 <p className="text-xs text-brand-slate-500" role="status" data-testid="advocate-stopped">
@@ -329,7 +341,7 @@ export function AdvocatePage() {
                 </div>
               )}
 
-              {thread.disclaimer && thread.messages.length > 0 && (
+              {showDisclaimer && (
                 <p className="text-[11px] leading-relaxed text-brand-slate-500" data-testid="advocate-disclaimer">
                   {thread.disclaimer}
                 </p>
@@ -339,7 +351,7 @@ export function AdvocatePage() {
 
           {canAsk && (
             <div
-              className="sticky bottom-0 space-y-2 border-t border-brand-slate-200 bg-brand-slate-50/60 p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:static"
+              className="sticky bottom-0 space-y-2 border-t border-brand-slate-200 bg-brand-slate-50 p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:static md:bg-brand-slate-50/60 md:pb-3"
               data-testid="advocate-composer-dock"
             >
               {about && (

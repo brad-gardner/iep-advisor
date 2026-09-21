@@ -41,7 +41,7 @@ export function ChatComposer({ disabled, onSend }: ChatComposerProps) {
           }
         }}
         placeholder="Ask about this IEP…"
-        className="w-full resize-none rounded-input border border-brand-slate-200 px-3 py-2 text-sm text-brand-slate-800 transition-colors placeholder:text-brand-slate-300 focus:border-brand-teal-400 focus:outline-none focus:ring-[3px] focus:ring-brand-teal-50"
+        className="w-full resize-none rounded-input border border-brand-slate-200 px-3 py-2 text-sm text-brand-slate-800 transition-colors placeholder:text-brand-slate-500 focus:border-brand-teal-400 focus:outline-none focus:ring-[3px] focus:ring-brand-teal-50"
         data-testid="chat-input"
       />
       <Button

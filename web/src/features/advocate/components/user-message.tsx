@@ -10,6 +10,7 @@ export function UserMessage({ text, pending = false, 'data-testid': testId = 'ad
   return (
     <li className="flex justify-end" data-testid={testId} data-pending={pending ? 'true' : undefined}>
       <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-card rounded-br-sm bg-brand-slate-100 px-3.5 py-2.5 text-sm text-brand-slate-800">
+        <span className="sr-only">You said: </span>
         {text}
       </p>
     </li>

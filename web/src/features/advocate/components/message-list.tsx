@@ -34,12 +34,24 @@ const PIN_THRESHOLD_PX = 48;
  * a busy ancestor makes some AT drop the announcement instead of replaying it.
  *
  * Scroll ownership: this component's own `role="region"` div stays the single
- * scroller (ref, `onScroll`, pin-to-bottom logic unchanged) — it no longer
- * caps itself with `max-h`/`min-h`; instead it takes `flex-1 overflow-y-auto`
- * so it fills whatever height the conversation panel (`advocate-page.tsx`)
- * gives it. The panel does not add a second scrolling wrapper around this
+ * scroller (ref, `onScroll`, pin-to-bottom logic unchanged). From `md` up the
+ * conversation panel (`advocate-page.tsx`) gives it a bounded height via
+ * `flex-1`, so it just fills that. Below `md` the panel has no fixed height
+ * (it is content-sized so the page — not the panel — scrolls), which would
+ * leave `flex-1` with nothing to size against: the scroller's `scrollHeight`
+ * would equal its `clientHeight` and pin-to-bottom would become a no-op. The
+ * `max-h-[60vh]` (removed again at `md`) keeps it a real, bounded scroller at
+ * every width. The panel does not add a second scrolling wrapper around this
  * component, so there is exactly one scroller in the conversation area.
+ *
+ * Below `md` the composer dock is `position: sticky` (see `advocate-page.tsx`)
+ * and floats over whatever the page happens to render at the viewport's
+ * bottom edge — that includes the tail of this scroller's own box. The
+ * bottom spacer below reserves roughly the dock's height inside the
+ * scrollable content itself, so pin-to-bottom lands the newest message just
+ * above that reserved (blank) space instead of the dock painting over it.
  */
+const PHONE_DOCK_RESERVE_CLASS = 'h-40 shrink-0 md:hidden';
 export function MessageList({ childId, messages, pending, streaming, announcement, handlers }: MessageListProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const announcementText = useMemo(() => (announcement ? markdownToPlainText(announcement.text) : ''), [announcement]);
@@ -70,7 +82,7 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
         tabIndex={0}
         role="region"
         aria-label="Conversation"
-        className="min-h-0 flex-1 overflow-y-auto p-3"
+        className="min-h-0 max-h-[60vh] flex-1 overflow-y-auto p-3 md:max-h-none"
         data-testid="advocate-messages"
       >
         <ul className="space-y-3">
@@ -114,6 +126,9 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
             )}
           </div>
         )}
+
+        {/* See the scroll-ownership note above: reserves room for the sticky composer dock below `md`. */}
+        <div aria-hidden="true" className={PHONE_DOCK_RESERVE_CLASS} />
       </div>
 
       {/* Outside the conversation region on purpose: a status node under an aria-busy ancestor is

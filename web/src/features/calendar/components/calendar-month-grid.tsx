@@ -115,7 +115,7 @@ export function CalendarMonthGrid({ days, items, selectedIso, onSelectDay }: Cal
                     onKeyDown={(e) => handleKeyDown(e, index)}
                     className={cn(
                       'flex h-16 w-full flex-col items-center justify-start gap-1 p-1.5 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-teal-400',
-                      day.inCurrentMonth ? 'text-brand-slate-700' : 'text-brand-slate-300',
+                      day.inCurrentMonth ? 'text-brand-slate-700' : 'text-brand-slate-500',
                       isSelected && 'bg-brand-teal-50',
                       !isSelected && 'hover:bg-brand-slate-50'
                     )}

@@ -191,7 +191,7 @@ export function ProfilePage() {
               State / Jurisdiction
             </label>
             <StateSelector value={state} onChange={setState} />
-            <p className="text-[11px] text-brand-slate-300 mt-1">
+            <p className="text-[11px] text-brand-slate-500 mt-1">
               Used to provide state-specific IEP guidance and regulations
             </p>
           </div>

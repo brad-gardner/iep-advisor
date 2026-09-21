@@ -47,6 +47,7 @@ export function AssistantMessage({
   return (
     <li className="flex justify-start" data-testid={testId}>
       <div className="max-w-[92%] space-y-3 rounded-card rounded-bl-sm border border-brand-slate-200 bg-white px-4 py-3">
+        <span className="sr-only">Advocate: </span>
         <Markdown content={contentMarkdown} className="text-sm" data-testid={`${testId}-content`} />
 
         {truncated && (

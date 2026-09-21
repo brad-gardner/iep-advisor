@@ -61,7 +61,7 @@ export function AccountDeletionSection() {
         <Button variant="secondary" onClick={handleExport} loading={isExporting} data-testid="export-data">
           Export My Data
         </Button>
-        <p className="text-xs text-brand-slate-300 mt-1">
+        <p className="text-xs text-brand-slate-500 mt-1">
           Download all your data as a JSON file
         </p>
       </div>

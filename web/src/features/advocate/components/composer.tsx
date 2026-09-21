@@ -50,6 +50,10 @@ export function Composer({
   const length = value.length;
   const overLimit = length > ADVOCATE_MESSAGE_MAX_LENGTH;
   const canSend = !disabled && !streaming && !creating && value.trim().length > 0 && !overLimit;
+  // Streaming/creating (readOnly) and the usage cap (disabled) all mean "not accepting input right
+  // now" — tinted as one field, not just the textarea, so the counter row doesn't stay white while
+  // the textarea greys out above it.
+  const tinted = streaming || creating || disabled;
 
   const submit = () => {
     if (!canSend) return;
@@ -79,6 +83,7 @@ export function Composer({
         className={cn(
           'rounded-card border border-brand-slate-200 bg-white transition-colors',
           'focus-within:border-brand-teal-400 focus-within:ring-[3px] focus-within:ring-brand-teal-50',
+          tinted && 'bg-brand-slate-50',
           overLimit && 'border-brand-danger-200',
         )}
       >
@@ -100,9 +105,9 @@ export function Composer({
               : `Ask about ${childFirstName}'s plan, a document, or what to do next…`
           }
           className={cn(
-            'w-full resize-y rounded-t-card bg-transparent px-3 py-2 text-sm text-brand-slate-800 placeholder:text-brand-slate-300',
+            'w-full max-h-[40vh] resize-y rounded-t-card bg-transparent px-3 py-2 text-sm text-brand-slate-800 placeholder:text-brand-slate-500',
             'focus:outline-none',
-            'disabled:cursor-not-allowed disabled:bg-brand-slate-50 read-only:bg-brand-slate-50',
+            'disabled:cursor-not-allowed',
           )}
           data-testid="advocate-composer-input"
         />

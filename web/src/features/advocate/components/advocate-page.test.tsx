@@ -237,16 +237,19 @@ describe('AdvocatePage', () => {
 
     // Exactly one scroller in the conversation area — MessageList's own region
     // owns the scroll; the panel does not add a second wrapping scroller.
-    const scrollers = panel.querySelectorAll('[class*="overflow-y-auto"]');
+    const scrollers = within(panel).getAllByRole('region', { name: 'Conversation' });
     expect(scrollers).toHaveLength(1);
     expect(scrollers[0]).toBe(screen.getByTestId('advocate-messages'));
   });
 
   it('lets thread titles wrap onto two lines instead of truncating', async () => {
+    const longTitle =
+      'A conversation title long enough that the old single-line truncate-with-ellipsis behavior would have cut it short';
+    api.listAdvocateThreads.mockResolvedValue({ success: true, data: [thread(1, longTitle)] });
     renderPage();
     const rail = await screen.findByTestId('advocate-thread-list');
-    const title = within(rail).getByText('PWN question');
-    expect(title).toHaveClass('line-clamp-2');
+    // Rendered in full (not sliced with an ellipsis) — CSS handles any two-line wrapping, not JS truncation.
+    const title = within(rail).getByText(longTitle);
     expect(title.className).not.toMatch(/\btruncate\b/);
   });
 
@@ -525,7 +528,7 @@ describe('AdvocatePage', () => {
     expect(lastStream().body.text).toBe('Line one');
   });
 
-  it('hides the composer and thread actions from a viewer', async () => {
+  it('hides the composer and thread actions from a viewer, but still shows a read-only thread and its disclaimer', async () => {
     renderPage('viewer');
     await screen.findByTestId('advocate-thread-list');
     expect(screen.getByTestId('advocate-viewer-notice')).toBeInTheDocument();
@@ -533,6 +536,13 @@ describe('AdvocatePage', () => {
     expect(screen.queryByTestId('advocate-new-thread')).not.toBeInTheDocument();
     expect(screen.queryByTestId('advocate-example')).not.toBeInTheDocument();
     expect(screen.queryByTestId('advocate-thread-1-menu')).not.toBeInTheDocument();
+
+    // Regression guard: a read-only collaborator can still open an existing thread and must still
+    // see its disclaimer — the message-region regrouping around `showDisclaimer` must not drop it
+    // just because the composer (and its dock) never render for a viewer.
+    fireEvent.click(screen.getByTestId('advocate-thread-1-open'));
+    await screen.findByTestId('advocate-assistant-message');
+    expect(screen.getByTestId('advocate-disclaimer')).toHaveTextContent('Not legal advice.');
   });
 
   it('hands suggestions to existing flows: journal drawer prefilled, prep question copied with a toast', async () => {

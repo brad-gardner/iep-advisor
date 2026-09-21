@@ -61,12 +61,18 @@ export function ThreadList({
       data-testid="advocate-thread-list"
     >
       <div className="flex items-center justify-between gap-2 px-1">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-brand-slate-500">Conversations</p>
+        {/* Inside the phone Drawer (`variant="plain"`) the Drawer's own <h2> already announces
+            "Conversations", and so does the <ul> below — a third caption here would have a
+            screen reader hear it three times, so it renders only for the desktop rail. */}
+        {variant === 'panel' && (
+          <p className="text-[11px] font-medium uppercase tracking-wide text-brand-slate-500">Conversations</p>
+        )}
         {canAsk && (
           <button
             type="button"
             onClick={onNew}
             disabled={busy}
+            aria-label="New conversation"
             className="flex items-center gap-1 rounded-button px-2 py-1 text-xs font-medium text-brand-teal-600 transition-colors hover:bg-brand-teal-50 focus:outline-none focus:ring-1 focus:ring-brand-teal-400 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
             data-testid="advocate-new-thread"
           >
@@ -95,7 +101,7 @@ export function ThreadList({
       )}
 
       {threads && threads.length > 0 && (
-        <ul className="space-y-1" aria-label="Conversations">
+        <ul className="space-y-1">
           {threads.map((t) => {
             const selected = t.id === selectedId;
             return (
