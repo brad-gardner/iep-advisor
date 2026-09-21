@@ -362,9 +362,9 @@ describe('AdvocatePage', () => {
     const innerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
     const scrollY = Object.getOwnPropertyDescriptor(window, 'scrollY');
 
-    const setPage = (y: number) => {
+    const setPage = (y: number, event: 'scroll' | 'resize' = 'scroll') => {
       Object.defineProperty(window, 'scrollY', { value: y, configurable: true });
-      fireEvent.scroll(window);
+      fireEvent(window, new Event(event));
     };
 
     try {
@@ -412,6 +412,8 @@ describe('AdvocatePage', () => {
       fireEvent.click(jump);
       expect(targets).toContain(tail);
       expect(screen.queryByTestId('advocate-jump-latest')).not.toBeInTheDocument();
+      // Taking the offer must not drop focus to <body>: the button unmounts itself on click.
+      expect(screen.getByTestId('advocate-messages')).toHaveFocus();
 
       // Sending re-pins the page on its own, from wherever the reader happens to be — not because
       // they scrolled back first. (386 would be within PAGE_PIN_THRESHOLD_PX of the 430 maximum and
@@ -421,6 +423,31 @@ describe('AdvocatePage', () => {
       typeAndSend('And in writing?');
       await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(2));
       expect(targets).toContain(tail);
+
+      // Scroll away again, let the second answer land off-screen, and this time arrive at the
+      // bottom without taking the offer: it has to clear itself. `resize` as well as `scroll`,
+      // because a rotation or the keyboard can put the reader at the bottom without either.
+      setPage(0);
+      api.getAdvocateThread.mockImplementation((id: number) =>
+        Promise.resolve(
+          id === 1 ? detail(1, [userMsg(11, 'What is PWN?'), answer, { ...answer, id: 33 }, { ...answer, id: 44 }]) : detail(id, []),
+        ),
+      );
+      await act(async () => {
+        lastStream().handlers.onDone({
+          messageId: 44,
+          contentMarkdown: answer.contentMarkdown,
+          citations: [],
+          suggestions: [],
+          truncated: false,
+          disclaimer: 'Not legal advice.',
+        });
+        lastStream().resolve();
+        await Promise.resolve();
+      });
+      await screen.findByTestId('advocate-jump-latest');
+      setPage(386, 'resize');
+      expect(screen.queryByTestId('advocate-jump-latest')).not.toBeInTheDocument();
     } finally {
       spy.mockRestore();
       if (innerHeight) Object.defineProperty(window, 'innerHeight', innerHeight);

@@ -87,10 +87,22 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
   const seenCountRef = useRef(messages.length);
   const [unseenAnswer, setUnseenAnswer] = useState(false);
 
+  /**
+   * The offer below is the reader's way back to an answer that landed off-screen — so it has to go
+   * away when they get there by any route, not only by taking it. The two scroll handlers are the
+   * only things that observe "back at the bottom", so they clear it; `setUnseenAnswer` is a stable
+   * setter and React bails out when the value is unchanged, so calling it on every scroll and
+   * resize frame costs nothing.
+   */
+  const clearOfferIfArrived = () => {
+    if (pinnedRef.current && pagePinnedRef.current) setUnseenAnswer(false);
+  };
+
   const onScroll = () => {
     const el = scrollerRef.current;
     if (!el) return;
     pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= PIN_THRESHOLD_PX;
+    clearOfferIfArrived();
   };
 
   useEffect(() => {
@@ -99,6 +111,7 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
       // A page that cannot scroll (every width from `md` up, where the panel is height-bound) is
       // always "at the bottom" — the guard must not disable following there.
       pagePinnedRef.current = max <= 0 || max - window.scrollY <= PAGE_PIN_THRESHOLD_PX;
+      clearOfferIfArrived();
     };
 
     // `resize` as well as `scroll`: the page can stop being at its bottom (or start being at it)
@@ -143,6 +156,11 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
     pinnedRef.current = true;
     pagePinnedRef.current = true;
     setUnseenAnswer(false);
+    // Taking the offer unmounts the button, which would drop focus to `<body>` for anyone who
+    // reached it by keyboard. Hand focus to the conversation instead — it is already a focusable
+    // `region`, and it is where the answer they just asked for is. `preventScroll` leaves the
+    // positioning to the call below rather than having two scrolls fight.
+    scrollerRef.current?.focus({ preventScroll: true });
     tailRef.current?.scrollIntoView({ block: 'nearest' });
   };
 
@@ -234,10 +252,12 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
       </div>
 
       {/*
-        Only reachable below `md`: from `md` up the page cannot scroll, so `pagePinnedRef` is always
-        true and a new message always scrolls, leaving nothing unseen. It rides the panel's sticky
-        bottom edge, offset by the measured dock height so it sits just above the composer rather
-        than behind it.
+        Only reachable where the page can scroll past the pin threshold — phones, and a desktop
+        window under about 670px tall (see the note on the page-pin effect above). `pinnedRef` is
+        force-set true whenever `messages.length` changes, so a scrolled-away *conversation region*
+        alone never raises this; it takes a scrolled-away page. It rides the panel's sticky bottom
+        edge, offset by the measured dock height so it sits just above the composer rather than
+        behind it.
       */}
       {unseenAnswer && (
         <div className="pointer-events-none sticky bottom-[var(--advocate-dock-h,10rem)] z-10 flex justify-center">
