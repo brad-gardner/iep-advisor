@@ -382,11 +382,19 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
-// Pilot-gates plan, phase 3: `dotnet run --project IepAssistant.Api -- seed-demo [--reset]`. Handled
-// right after the host is built (so the full DI graph — every real service DemoSeeder drives — is
+// Pilot-gates plan, phase 3: `dotnet run --project IepAssistant.Api -- seed-demo [--reset|--fresh]`.
+// Handled right after the host is built (so the full DI graph — every real service DemoSeeder drives — is
 // available) and before the normal request pipeline is configured; the process exits here instead of
 // falling through to app.Run(). Refused in Production (fictional PII-shaped data has no business there).
-if (args.Length > 0 && string.Equals(args[0], "seed-demo", StringComparison.OrdinalIgnoreCase))
+//
+//   seed-demo           create the demo district (no-op if one already exists)
+//   seed-demo --reset   remove it
+//   seed-demo --fresh   remove and recreate it — the one command to run between demos
+// The verb is looked for anywhere in args, not just at args[0]: `dotnet run --urls … -- seed-demo`
+// forwards the host options AHEAD of the verb, and silently starting a web server instead of seeding is a
+// trap worth closing. Only the arguments AFTER the verb are read as seeder options.
+var seedVerbIndex = Array.FindIndex(args, a => string.Equals(a, "seed-demo", StringComparison.OrdinalIgnoreCase));
+if (seedVerbIndex >= 0)
 {
     if (app.Environment.IsProduction())
     {
@@ -394,7 +402,20 @@ if (args.Length > 0 && string.Equals(args[0], "seed-demo", StringComparison.Ordi
         Environment.Exit(1);
     }
 
-    var reset = args.Skip(1).Any(a => string.Equals(a, "--reset", StringComparison.OrdinalIgnoreCase));
+    var flags = args.Skip(seedVerbIndex + 1).ToList();
+    var unknown = flags.FirstOrDefault(a =>
+        !a.Equals("--reset", StringComparison.OrdinalIgnoreCase) &&
+        !a.Equals("--fresh", StringComparison.OrdinalIgnoreCase) &&
+        !a.Equals("--reseed", StringComparison.OrdinalIgnoreCase));
+    if (unknown != null)
+    {
+        Console.Error.WriteLine($"Unknown option '{unknown}'. Usage: seed-demo [--reset | --fresh]");
+        Environment.Exit(1);
+    }
+
+    var fresh = flags.Any(a => a.Equals("--fresh", StringComparison.OrdinalIgnoreCase)
+                               || a.Equals("--reseed", StringComparison.OrdinalIgnoreCase));
+    var resetOnly = !fresh && flags.Any(a => a.Equals("--reset", StringComparison.OrdinalIgnoreCase));
 
     // Hosted services (PDF render worker, outbound email worker, audit worker, …) must actually be
     // running during the seed so a finalized IEP's PDF really gets queued and rendered, exactly as it
@@ -404,27 +425,45 @@ if (args.Length > 0 && string.Equals(args[0], "seed-demo", StringComparison.Ordi
     await app.StartAsync();
 
     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-    DemoSeedResult seedResult;
-    using (var scope = app.Services.CreateScope())
+
+    // --fresh runs both operations in one process, each in its own DI scope: the reset's DbContext has
+    // tracked and deleted the old district's entities, and the seed must start from a clean change tracker.
+    DemoSeedResult? resetResult = null;
+    if (resetOnly || fresh)
     {
-        var seeder = scope.ServiceProvider.GetRequiredService<IDemoSeeder>();
-        seedResult = reset ? await seeder.ResetAsync() : await seeder.SeedAsync();
+        using var resetScope = app.Services.CreateScope();
+        resetResult = await resetScope.ServiceProvider.GetRequiredService<IDemoSeeder>().ResetAsync();
+    }
+
+    // A reset-only run reports the reset as its outcome; so does a --fresh whose reset failed, since
+    // seeding on top of a half-removed district would only compound the failure.
+    DemoSeedResult seedResult;
+    if (resetOnly || resetResult is { Success: false })
+    {
+        seedResult = resetResult!;
+    }
+    else
+    {
+        using var seedScope = app.Services.CreateScope();
+        seedResult = await seedScope.ServiceProvider.GetRequiredService<IDemoSeeder>().SeedAsync();
     }
     stopwatch.Stop();
 
     await app.StopAsync();
 
     Console.WriteLine();
+    if (resetResult != null && !ReferenceEquals(resetResult, seedResult))
+        Console.WriteLine(resetResult.Message);
     Console.WriteLine(seedResult.Message);
     Console.WriteLine($"Elapsed: {stopwatch.Elapsed.TotalSeconds:F1}s");
 
     if (seedResult.Logins.Count > 0)
     {
         Console.WriteLine();
-        Console.WriteLine("Demo logins:");
-        Console.WriteLine($"{"Role",-24}{"Email",-42}Password");
+        Console.WriteLine("Demo logins (also kept in docs/demo/maple-ridge-demo-district.md):");
+        Console.WriteLine($"{"Role",-58}{"Email",-46}Password");
         foreach (var login in seedResult.Logins)
-            Console.WriteLine($"{login.Role,-24}{login.Email,-42}{login.Password}");
+            Console.WriteLine($"{login.Role,-58}{login.Email,-46}{login.Password}");
     }
 
     Environment.Exit(seedResult.Success ? 0 : 1);

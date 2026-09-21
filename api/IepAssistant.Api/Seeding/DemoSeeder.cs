@@ -21,8 +21,13 @@ namespace IepAssistant.Api.Seeding;
 public class DemoSeeder : IDemoSeeder
 {
     public const string DemoPassword = "Demo!2026pw";
-    private const string DistrictName = "Maple Ridge Local Schools";
-    private const string EmailDomain = "mapleridge.example";
+
+    /// <summary>The district itself, its staff, students and families are defined in <see cref="DemoRoster"/>.</summary>
+    private const string DistrictName = DemoRoster.DistrictName;
+
+    /// <summary>Reserved fictional domain every demo account uses — the anchor <see cref="ResetAsync"/>
+    /// sweeps on, so it must never be a domain a real user could hold.</summary>
+    private const string EmailDomain = DemoRoster.EmailDomain;
 
     private readonly ApplicationDbContext _context;
     private readonly IAuthService _authService;
@@ -102,7 +107,9 @@ public class DemoSeeder : IDemoSeeder
         var existing = await _context.Districts.AsNoTracking().FirstOrDefaultAsync(d => d.IsDemo, ct);
         if (existing != null)
             return DemoSeedResult.NoOpResult(
-                $"Demo district '{existing.Name}' (id {existing.Id}) already exists — nothing to do. Run `seed-demo --reset` first to rebuild it.");
+                $"Demo district '{existing.Name}' (id {existing.Id}) already exists — nothing to do. Run `seed-demo --fresh` to rebuild it, or `seed-demo --reset` to remove it.");
+
+        DemoRoster.Validate();
 
         var logins = new List<DemoLoginRow>();
 
@@ -112,21 +119,32 @@ public class DemoSeeder : IDemoSeeder
         var schoolIds = await CreateSchoolsAsync(districtAdminUserId, ct);
         _logger.LogInformation("Demo seed: creating staff…");
         var staff = await CreateStaffAsync(districtAdminUserId, schoolIds, logins, ct);
-        _logger.LogInformation("Demo seed: creating students + teams…");
+        _logger.LogInformation("Demo seed: creating students + IEP teams…");
         var students = await CreateStudentsAsync(districtAdminUserId, schoolIds, staff, ct);
-        _logger.LogInformation("Demo seed: creating documents (IEPs/ETRs) + goals…");
-        await CreateDocumentsAsync(districtAdminUserId, students, ct);
+
+        // Order matters, and it is the order a district lives in: families are linked before meetings are
+        // scheduled (so a meeting's default participant list includes the parent and the student account
+        // the way it would in real use), and the team meets before this year's IEP is finalized (so a
+        // finalized document's PDF header carries the date of the meeting behind it).
+        _logger.LogInformation("Demo seed: linking families + the student account…");
+        await LinkFamiliesAsync(students, logins, ct);
         _logger.LogInformation("Demo seed: creating meetings…");
-        await CreateMeetingsAsync(districtAdminUserId, students, ct);
-        _logger.LogInformation("Demo seed: creating family engagement (parents + student account)…");
-        await CreateFamilyEngagementAsync(districtAdminUserId, staff, students, logins, ct);
-        _logger.LogInformation("Demo seed: creating evaluation case…");
-        await CreateEvaluationCaseAsync(districtAdminUserId, students, ct);
-        _logger.LogInformation("Demo seed: creating contact attempts…");
+        var meetings = await CreateMeetingsAsync(districtAdminUserId, students, ct);
+        _logger.LogInformation("Demo seed: creating documents (IEPs/ETRs) + goals…");
+        var documents = await CreateDocumentsAsync(districtAdminUserId, students, ct);
+        _logger.LogInformation("Demo seed: creating evaluation cases…");
+        var evaluationCases = await CreateEvaluationCasesAsync(districtAdminUserId, students, ct);
+        _logger.LogInformation("Demo seed: sharing drafts with the engaged families…");
+        await ShareDraftsWithFamiliesAsync(students, ct);
+        _logger.LogInformation("Demo seed: recording family contact attempts…");
         await CreateContactAttemptsAsync(districtAdminUserId, students, ct);
 
-        var message = $"Seeded demo district '{DistrictName}' (id {districtId}): {schoolIds.Count} schools, " +
-                      $"{staff.Count + 1} staff, {students.Count} students."; // +1: staff excludes the district admin
+        var message =
+            $"Seeded demo district '{DistrictName}' (id {districtId}): {schoolIds.Count} schools, " +
+            $"{staff.Count + 1} staff, {students.Count} students, " +
+            $"{documents.FinalizedIeps} finalized IEPs, {documents.FinalizedEtrs + evaluationCases.FinalizedEtrs} finalized ETRs, " +
+            $"{documents.DraftIeps + evaluationCases.DraftIeps} IEPs in progress, {evaluationCases.Cases} evaluation cases, " +
+            $"{meetings} meetings, {DemoRoster.Parents.Length} families, 1 student account.";
         return DemoSeedResult.Ok(message, logins);
     }
 
@@ -134,15 +152,15 @@ public class DemoSeeder : IDemoSeeder
 
     private async Task<(int DistrictId, int AdminUserId)> CreateDistrictAndAdminAsync(List<DemoLoginRow> logins, CancellationToken ct)
     {
-        const string email = $"dana.superintendent@{EmailDomain}";
+        var admin = DemoRoster.DistrictAdmin;
         var register = await _authService.RegisterDistrictAsync(new RegisterDistrictModel
         {
-            Email = email,
+            Email = admin.Email,
             Password = DemoPassword,
-            FirstName = "Dana",
-            LastName = "Superintendent",
+            FirstName = admin.FirstName,
+            LastName = admin.LastName,
             DistrictName = DistrictName,
-            StateCode = "OH"
+            StateCode = DemoRoster.StateCode
         }, ct);
 
         if (!register.Success || register.AuthResult == null)
@@ -163,7 +181,7 @@ public class DemoSeeder : IDemoSeeder
         district.RequireMfaForMagicLink = true;
         await _context.SaveChangesAsync(ct);
 
-        logins.Add(new DemoLoginRow("District Admin", email, DemoPassword));
+        logins.Add(new DemoLoginRow(admin.Title, admin.Email, DemoPassword));
         return (districtId, adminUserId);
     }
 
@@ -171,13 +189,13 @@ public class DemoSeeder : IDemoSeeder
 
     private async Task<List<int>> CreateSchoolsAsync(int districtAdminUserId, CancellationToken ct)
     {
-        var names = new[] { "Maple Ridge Elementary", "Maple Ridge Middle School", "Maple Ridge High School" };
         var ids = new List<int>();
-        foreach (var name in names)
+        foreach (var school in DemoRoster.Schools)
         {
-            var result = await _districtService.CreateSchoolAsync(districtAdminUserId, new CreateSchoolModel { Name = name, StateCode = "OH" }, ct);
+            var result = await _districtService.CreateSchoolAsync(districtAdminUserId,
+                new CreateSchoolModel { Name = school.Name, StateCode = DemoRoster.StateCode }, ct);
             if (!result.Success || result.Data == null)
-                throw new InvalidOperationException($"Failed to create school '{name}': {result.Message}");
+                throw new InvalidOperationException($"Failed to create school '{school.Name}': {result.Message}");
             ids.Add(result.Data.Id);
         }
         return ids;
@@ -185,176 +203,264 @@ public class DemoSeeder : IDemoSeeder
 
     // ================================================================================= Staff
 
-    public sealed record DemoStaff(int UserId, int StaffProfileId, int OrgRoleId, int? SchoolId, string Email, string FirstName, string LastName);
+    internal sealed record DemoStaff(int UserId, int StaffProfileId, int OrgRoleId, int? SchoolId, string Email, string FirstName, string LastName, string Title)
+    {
+        public string FullName => $"{FirstName} {LastName}";
+    }
 
     private async Task<List<DemoStaff>> CreateStaffAsync(int districtAdminUserId, List<int> schoolIds, List<DemoLoginRow> logins, CancellationToken ct)
     {
         var staff = new List<DemoStaff>();
-
-        var schoolAdmin = await InviteAndAcceptStaffAsync(districtAdminUserId, $"pat.principal@{EmailDomain}", "Pat", "Principal", OrgRoleIds.SchoolAdmin, schoolIds[0], ct);
-        staff.Add(schoolAdmin);
-        logins.Add(new DemoLoginRow("School Admin", schoolAdmin.Email, DemoPassword));
-
-        var teacherNames = new[] { ("jordan.teacher", "Jordan", "Rivera"), ("morgan.teacher", "Morgan", "Chen"), ("casey.teacher", "Casey", "Nguyen") };
-        for (var i = 0; i < teacherNames.Length; i++)
+        foreach (var spec in DemoRoster.Staff)
         {
-            var (local, first, last) = teacherNames[i];
-            var teacher = await InviteAndAcceptStaffAsync(districtAdminUserId, $"{local}@{EmailDomain}", first, last, OrgRoleIds.Teacher, schoolIds[i % schoolIds.Count], ct);
-            staff.Add(teacher);
-            logins.Add(new DemoLoginRow("Teacher / Case Manager", teacher.Email, DemoPassword));
+            var created = await InviteAndAcceptStaffAsync(districtAdminUserId, spec, schoolIds[spec.SchoolIndex!.Value], ct);
+            staff.Add(created);
+            logins.Add(new DemoLoginRow(spec.Title, created.Email, DemoPassword));
         }
-
-        var providerNames = new[] { ("sam.slp", "Sam", "Okafor"), ("robin.ot", "Robin", "Alvarez") };
-        for (var i = 0; i < providerNames.Length; i++)
-        {
-            var (local, first, last) = providerNames[i];
-            var provider = await InviteAndAcceptStaffAsync(districtAdminUserId, $"{local}@{EmailDomain}", first, last, OrgRoleIds.RelatedServiceProvider, schoolIds[i % schoolIds.Count], ct);
-            staff.Add(provider);
-            logins.Add(new DemoLoginRow("Related Service Provider", provider.Email, DemoPassword));
-        }
-
-        var genEdNames = new[] { ("avery.gened", "Avery", "Thompson"), ("riley.gened", "Riley", "Patel") };
-        for (var i = 0; i < genEdNames.Length; i++)
-        {
-            var (local, first, last) = genEdNames[i];
-            var genEd = await InviteAndAcceptStaffAsync(districtAdminUserId, $"{local}@{EmailDomain}", first, last, OrgRoleIds.GeneralEducator, schoolIds[i % schoolIds.Count], ct);
-            staff.Add(genEd);
-            logins.Add(new DemoLoginRow("General Educator", genEd.Email, DemoPassword));
-        }
-
         return staff;
     }
 
-    private async Task<DemoStaff> InviteAndAcceptStaffAsync(int callerUserId, string email, string firstName, string lastName, int orgRoleId, int? schoolId, CancellationToken ct)
+    private async Task<DemoStaff> InviteAndAcceptStaffAsync(int callerUserId, DemoRoster.StaffSpec spec, int schoolId, CancellationToken ct)
     {
-        var invite = await _staffInviteService.InviteAsync(callerUserId, new CreateStaffInviteModel { Email = email, OrgRoleId = orgRoleId, SchoolId = schoolId }, ct);
+        var invite = await _staffInviteService.InviteAsync(callerUserId,
+            new CreateStaffInviteModel { Email = spec.Email, OrgRoleId = spec.OrgRoleId, SchoolId = schoolId }, ct);
         if (!invite.Success)
-            throw new InvalidOperationException($"Failed to invite staff '{email}': {invite.Message}");
+            throw new InvalidOperationException($"Failed to invite staff '{spec.Email}': {invite.Message}");
 
-        var rawToken = await ExtractLatestTokenAsync(email, "StaffInvite", ct);
-        var accept = await _staffInviteService.AcceptAsync(new AcceptStaffInviteModel { Token = rawToken, FirstName = firstName, LastName = lastName, Password = DemoPassword }, ct);
+        var rawToken = await ExtractLatestTokenAsync(spec.Email, "StaffInvite", ct);
+        var accept = await _staffInviteService.AcceptAsync(new AcceptStaffInviteModel
+        {
+            Token = rawToken,
+            FirstName = spec.FirstName,
+            LastName = spec.LastName,
+            Password = DemoPassword
+        }, ct);
         if (!accept.Success || accept.AuthResult == null)
-            throw new InvalidOperationException($"Failed to accept staff invite for '{email}': {accept.Message}");
+            throw new InvalidOperationException($"Failed to accept staff invite for '{spec.Email}': {accept.Message}");
 
         var userId = accept.AuthResult.User.Id;
         var staffProfileId = await _context.StaffProfiles.Where(sp => sp.UserId == userId).Select(sp => sp.Id).FirstAsync(ct);
-        return new DemoStaff(userId, staffProfileId, orgRoleId, schoolId, email, firstName, lastName);
+        return new DemoStaff(userId, staffProfileId, spec.OrgRoleId, schoolId, spec.Email, spec.FirstName, spec.LastName, spec.Title);
     }
 
-    // ================================================================================= Students
+    // ================================================================================= Students + teams
 
-    public sealed record DemoStudent(int Id, int SchoolId, string FirstName, string LastName, int CaseManagerStaffProfileId, bool HasIep, bool HasEtr);
-
-    private static readonly string[] FirstNames =
+    /// <param name="TeamMemberNames">Name + team role of everyone on this student's team, for the
+    /// "Meeting participants" table inside their documents.</param>
+    internal sealed record DemoStudent(
+        int Id,
+        int Index,
+        int SchoolId,
+        int SchoolIndex,
+        string FirstName,
+        string LastName,
+        GradeLevel Grade,
+        DisabilityCategory? Disability,
+        DemoRoster.Track Track,
+        DemoStaff CaseManager,
+        DemoStaff? Evaluator,
+        IReadOnlyList<(string Name, string Role)> TeamMemberNames,
+        DateTime? AnnualReviewDueDate,
+        DateTime? EtrDate)
     {
-        "Aiden", "Bella", "Carlos", "Daniela", "Ethan", "Fiona", "Gavin", "Hannah", "Isaac", "Julia",
-        "Kaleb", "Layla", "Mason", "Nadia", "Owen", "Priya", "Quinn", "Ruby", "Samuel", "Talia",
-        "Uriel", "Violet", "Wesley", "Ximena", "Yusuf", "Zoe", "Adrian", "Brooke", "Caleb", "Destiny",
-        "Elias", "Faith", "Gabriel", "Harper", "Ian", "Jasmine", "Kevin", "Lucia", "Marcus", "Nora"
-    };
-
-    private static readonly string[] LastNames =
-    {
-        "Bennett", "Carter", "Diaz", "Edwards", "Flores", "Grant", "Hayes", "Ibarra", "Jenkins", "Kim",
-        "Lopez", "Mitchell", "Nguyen", "Ortiz", "Parker", "Quinones", "Reyes", "Sanders", "Torres", "Underwood"
-    };
-
-    private static readonly GradeLevel[] ElementaryGrades = { GradeLevel.K, GradeLevel.G1, GradeLevel.G2, GradeLevel.G3, GradeLevel.G4, GradeLevel.G5 };
-    private static readonly GradeLevel[] MiddleGrades = { GradeLevel.G6, GradeLevel.G7, GradeLevel.G8 };
-    private static readonly GradeLevel[] HighGrades = { GradeLevel.G9, GradeLevel.G10, GradeLevel.G11, GradeLevel.G12 };
-    private static readonly DisabilityCategory[] Disabilities = Enum.GetValues<DisabilityCategory>();
+        public string FullName => $"{FirstName} {LastName}";
+        public bool GetsFinalizedIep => Track is DemoRoster.Track.EstablishedIep or DemoRoster.Track.IepWithRecentEtr;
+        public string SchoolName => DemoRoster.Schools[SchoolIndex].Name;
+    }
 
     private async Task<List<DemoStudent>> CreateStudentsAsync(int districtAdminUserId, List<int> schoolIds, List<DemoStaff> staff, CancellationToken ct)
     {
-        var teachers = staff.Where(s => s.OrgRoleId == OrgRoleIds.Teacher).ToList();
-        var providers = staff.Where(s => s.OrgRoleId == OrgRoleIds.RelatedServiceProvider).ToList();
-        var genEds = staff.Where(s => s.OrgRoleId == OrgRoleIds.GeneralEducator).ToList();
-
         var students = new List<DemoStudent>();
         var today = DateTime.UtcNow.Date;
+        var caseManagerTurn = new Dictionary<int, int>();
 
-        const int total = 40;
-        for (var i = 0; i < total; i++)
+        for (var i = 0; i < DemoRoster.Students.Length; i++)
         {
-            var schoolIndex = i < 14 ? 0 : i < 27 ? 1 : 2;
-            var schoolId = schoolIds[schoolIndex];
-            var gradeBand = schoolIndex == 0 ? ElementaryGrades : schoolIndex == 1 ? MiddleGrades : HighGrades;
-            var grade = gradeBand[i % gradeBand.Length];
-            var disability = Disabilities[i % Disabilities.Length];
-            var firstName = FirstNames[i % FirstNames.Length];
-            var lastName = LastNames[(i * 7) % LastNames.Length];
+            var spec = DemoRoster.Students[i];
+            var schoolId = schoolIds[spec.SchoolIndex];
 
-            // Spread review/reevaluation dates over roughly ±90 days from today, including some already
-            // overdue (negative offsets), per the plan-8 contract.
-            var offsetDays = (i * 180 / (total - 1)) - 90;
+            // Compliance dates by where the student is in the process. Annual reviews are spread from
+            // 40 days overdue to 110 days out so the dashboard has genuinely overdue, due-soon and
+            // comfortable rows rather than one uniform band.
+            var reviewOffset = ReviewOffsetDays(i, DemoRoster.Students.Length);
+            DateTime? iepDate = null, annualReviewDue = null, etrDate = null, reevaluationDue = null;
+            switch (spec.Track)
+            {
+                case DemoRoster.Track.EstablishedIep:
+                case DemoRoster.Track.IepWithRecentEtr:
+                    iepDate = today.AddDays(reviewOffset - 365);
+                    annualReviewDue = today.AddDays(reviewOffset);
+                    etrDate = spec.Track == DemoRoster.Track.IepWithRecentEtr ? today.AddDays(-21) : today.AddDays(reviewOffset - 700);
+                    reevaluationDue = etrDate.Value.AddYears(3);
+                    break;
+                case DemoRoster.Track.DraftIep:
+                    // Newly eligible: an ETR on file, an IEP due within the month, none written yet.
+                    etrDate = today.AddDays(-24);
+                    reevaluationDue = etrDate.Value.AddYears(3);
+                    annualReviewDue = today.AddDays(6 + i % 18);
+                    break;
+                case DemoRoster.Track.EvaluationEtrComplete:
+                    etrDate = today.AddDays(-7);
+                    reevaluationDue = etrDate.Value.AddYears(3);
+                    annualReviewDue = today.AddDays(23);
+                    break;
+                case DemoRoster.Track.EvaluationInProgress:
+                    break; // nothing on file yet
+            }
 
             var createResult = await _educatorService.CreateStudentAsync(districtAdminUserId, new CreateSchoolStudentModel
             {
-                FirstName = firstName,
-                LastName = lastName,
-                DateOfBirth = today.AddYears(-(5 + GradeIndex(grade))).AddDays(-i),
+                FirstName = spec.FirstName,
+                LastName = spec.LastName,
+                DateOfBirth = BirthDateFor(spec.Grade, i, today),
                 ExternalStudentId = $"MR-{1000 + i}",
-                GradeLevel = grade,
-                DisabilityCategory = disability,
-                HomeLanguage = "en",
-                IepDate = today.AddDays(offsetDays - 365),
-                AnnualReviewDueDate = today.AddDays(offsetDays),
-                EtrDate = today.AddDays(offsetDays - 700),
-                ReevaluationDueDate = today.AddDays(offsetDays + 20),
+                GradeLevel = spec.Grade,
+                DisabilityCategory = spec.Disability,
+                HomeLanguage = HomeLanguageFor(i),
+                IepDate = iepDate,
+                AnnualReviewDueDate = annualReviewDue,
+                EtrDate = etrDate,
+                ReevaluationDueDate = reevaluationDue,
                 SchoolId = schoolId
             }, ct);
 
             if (!createResult.Success || createResult.Data == null)
-                throw new InvalidOperationException($"Failed to create student '{firstName} {lastName}': {createResult.Message}");
+                throw new InvalidOperationException($"Failed to create student '{spec.FirstName} {spec.LastName}': {createResult.Message}");
 
             var studentId = createResult.Data.Id;
 
-            // Case manager: the teacher based at THIS student's school (StudentTeamWriter.ValidateTeamCandidate
-            // requires a Teacher/GeneralEducator to match the student's SchoolId — only RelatedServiceProvider
-            // is exempt — so this must follow school assignment, not a global round-robin across all 3 teachers).
-            var caseManager = teachers[schoolIndex];
-            var addCaseManager = await _studentTeamService.AddMemberAsync(districtAdminUserId, studentId, new AddTeamMemberModel
-            {
-                StaffProfileId = caseManager.StaffProfileId,
-                TeamRole = TeamRole.CaseManager,
-                IsLead = true
-            }, ct);
-            if (!addCaseManager.Success)
-                throw new InvalidOperationException($"Failed to assign case manager for student {studentId}: {addCaseManager.Message}");
+            // ---- IEP team ----------------------------------------------------------------------
+            // StudentTeamWriter.ValidateTeamCandidate requires every role except RelatedServiceProvider
+            // to be based at THIS student's school, so the case manager, LEA representative and general
+            // educator are all chosen from this building; the therapists and psychologist serve all three.
+            var buildingCaseManagers = DemoRoster.CaseManagersAt(spec.SchoolIndex).ToList();
+            var turn = caseManagerTurn.TryGetValue(spec.SchoolIndex, out var t) ? t : 0;
+            caseManagerTurn[spec.SchoolIndex] = turn + 1;
+            var caseManagerSpec = buildingCaseManagers[turn % buildingCaseManagers.Count];
+            var caseManager = Match(staff, caseManagerSpec);
 
-            // A slice of students also get a related-service provider or general educator on their team,
-            // for realism (not required by the plan, but cheap and makes team rosters look genuine).
-            // RelatedServiceProvider is exempt from the same-school rule (may serve any school in the
-            // district), so round-robin is fine there; GeneralEducator is NOT exempt, so it must match
-            // this student's school like the case manager above (skipped if no genEd is based here).
-            if (i < 10)
+            var teamNames = new List<(string Name, string Role)>();
+            await AddTeamMemberAsync(districtAdminUserId, studentId, caseManager, TeamRole.CaseManager, teamNames, isLead: true, ct);
+
+            var principal = Match(staff, DemoRoster.Staff.First(s => s.OrgRoleId == OrgRoleIds.SchoolAdmin && s.SchoolIndex == spec.SchoolIndex));
+            await AddTeamMemberAsync(districtAdminUserId, studentId, principal, TeamRole.LeaRepresentative, teamNames, isLead: false, ct);
+
+            var generalEducator = Match(staff, DemoRoster.Staff.First(s => s.OrgRoleId == OrgRoleIds.GeneralEducator && s.SchoolIndex == spec.SchoolIndex));
+            await AddTeamMemberAsync(districtAdminUserId, studentId, generalEducator, TeamRole.GeneralEducationTeacher, teamNames, isLead: false, ct);
+
+            DemoStaff? evaluator = null;
+            foreach (var (providerSpec, teamRole) in ProvidersFor(spec) )
             {
-                var provider = providers[i % providers.Count];
-                await _studentTeamService.AddMemberAsync(districtAdminUserId, studentId, new AddTeamMemberModel
-                {
-                    StaffProfileId = provider.StaffProfileId,
-                    TeamRole = provider.FirstName == "Sam" ? TeamRole.SpeechLanguagePathologist : TeamRole.OccupationalTherapist
-                }, ct);
-            }
-            else if (i < 20)
-            {
-                var genEd = genEds.FirstOrDefault(g => g.SchoolId == schoolId);
-                if (genEd != null)
-                    await _studentTeamService.AddMemberAsync(districtAdminUserId, studentId, new AddTeamMemberModel
-                    {
-                        StaffProfileId = genEd.StaffProfileId,
-                        TeamRole = TeamRole.GeneralEducationTeacher
-                    }, ct);
+                var provider = Match(staff, providerSpec);
+                await AddTeamMemberAsync(districtAdminUserId, studentId, provider, teamRole, teamNames, isLead: false, ct);
+                evaluator ??= provider;
             }
 
-            students.Add(new DemoStudent(studentId, schoolId, firstName, lastName, caseManager.StaffProfileId, HasIep: i < 15, HasEtr: i is >= 15 and < 20));
+            students.Add(new DemoStudent(
+                studentId, i, schoolId, spec.SchoolIndex, spec.FirstName, spec.LastName, spec.Grade, spec.Disability,
+                spec.Track, caseManager, evaluator ?? Match(staff, DemoRoster.Psychologist), teamNames,
+                annualReviewDue, etrDate));
 
             if ((i + 1) % 10 == 0)
-                _logger.LogInformation("Demo seed: created {Count}/{Total} students…", i + 1, total);
+                _logger.LogInformation("Demo seed: created {Count}/{Total} students…", i + 1, DemoRoster.Students.Length);
         }
 
         return students;
     }
+
+    /// <summary>The related-service staff a student's disability actually calls for, with the team role
+    /// each of them holds. The school psychologist joins the teams of students being evaluated and those
+    /// whose disability is identified through her assessments.</summary>
+    private static IEnumerable<(DemoRoster.StaffSpec Spec, TeamRole Role)> ProvidersFor(DemoRoster.StudentSpec spec)
+    {
+        switch (spec.Disability)
+        {
+            case DisabilityCategory.SpeechOrLanguageImpairment:
+                yield return (DemoRoster.Slp, TeamRole.SpeechLanguagePathologist);
+                break;
+            case DisabilityCategory.Autism:
+                yield return (DemoRoster.Slp, TeamRole.SpeechLanguagePathologist);
+                yield return (DemoRoster.Psychologist, TeamRole.SchoolPsychologist);
+                break;
+            case DisabilityCategory.DevelopmentalDelay:
+                yield return (DemoRoster.Slp, TeamRole.SpeechLanguagePathologist);
+                yield return (DemoRoster.OccupationalTherapist, TeamRole.OccupationalTherapist);
+                break;
+            case DisabilityCategory.EmotionalDisturbance:
+                yield return (DemoRoster.Psychologist, TeamRole.SchoolPsychologist);
+                break;
+            case DisabilityCategory.IntellectualDisability:
+                yield return (DemoRoster.Psychologist, TeamRole.SchoolPsychologist);
+                yield return (DemoRoster.Slp, TeamRole.SpeechLanguagePathologist);
+                break;
+            case DisabilityCategory.MultipleDisabilities:
+                yield return (DemoRoster.Slp, TeamRole.SpeechLanguagePathologist);
+                yield return (DemoRoster.OccupationalTherapist, TeamRole.OccupationalTherapist);
+                yield return (DemoRoster.PhysicalTherapist, TeamRole.PhysicalTherapist);
+                break;
+            case DisabilityCategory.OrthopedicImpairment:
+                yield return (DemoRoster.PhysicalTherapist, TeamRole.PhysicalTherapist);
+                yield return (DemoRoster.OccupationalTherapist, TeamRole.OccupationalTherapist);
+                break;
+            case DisabilityCategory.TraumaticBrainInjury:
+                yield return (DemoRoster.OccupationalTherapist, TeamRole.OccupationalTherapist);
+                yield return (DemoRoster.Psychologist, TeamRole.SchoolPsychologist);
+                break;
+            case DisabilityCategory.SpecificLearningDisability:
+            case DisabilityCategory.OtherHealthImpairment:
+                yield return (DemoRoster.Psychologist, TeamRole.SchoolPsychologist);
+                break;
+            case null:
+                // Still being evaluated — the psychologist leads the assessment work.
+                yield return (DemoRoster.Psychologist, TeamRole.SchoolPsychologist);
+                yield return (DemoRoster.Slp, TeamRole.SpeechLanguagePathologist);
+                break;
+            default:
+                yield return (DemoRoster.OccupationalTherapist, TeamRole.OccupationalTherapist);
+                break;
+        }
+    }
+
+    private async Task AddTeamMemberAsync(int actingUserId, int studentId, DemoStaff member, TeamRole role,
+        List<(string Name, string Role)> teamNames, bool isLead, CancellationToken ct)
+    {
+        var result = await _studentTeamService.AddMemberAsync(actingUserId, studentId, new AddTeamMemberModel
+        {
+            StaffProfileId = member.StaffProfileId,
+            TeamRole = role,
+            IsLead = isLead
+        }, ct);
+
+        if (!result.Success)
+        {
+            if (isLead)
+                throw new InvalidOperationException($"Failed to assign case manager for student {studentId}: {result.Message}");
+            _logger.LogWarning("Demo seed: could not add {Role} to student {StudentId}: {Message}", role, studentId, result.Message);
+            return;
+        }
+
+        teamNames.Add((member.FullName, role.ToDisplay()));
+    }
+
+    private static DemoStaff Match(List<DemoStaff> staff, DemoRoster.StaffSpec spec) =>
+        staff.First(s => s.Email == spec.Email);
+
+    /// <summary>Annual reviews spread from 40 days overdue to 110 days out, so the compliance view has
+    /// overdue, due-soon and healthy rows.</summary>
+    private static int ReviewOffsetDays(int index, int total) => (index * 150 / Math.Max(1, total - 1)) - 40;
+
+    private static DateTime BirthDateFor(GradeLevel grade, int index, DateTime today) =>
+        today.AddYears(-(5 + GradeIndex(grade))).AddDays(-(index * 7 % 300));
+
+    /// <summary>A handful of families speak a language other than English at home — enough that the
+    /// interpreter and translated-notice parts of the product have something to show. Indexes into
+    /// <see cref="DemoRoster.Students"/>, chosen so the language suits the family's name.</summary>
+    private static string HomeLanguageFor(int index) => index switch
+    {
+        2 or 13 or 26 => "es",  // Diaz, Torres, Castillo
+        19 => "hmn",            // Xiong
+        _ => "en"
+    };
 
     private static int GradeIndex(GradeLevel grade) => grade switch
     {
@@ -366,328 +472,1029 @@ public class DemoSeeder : IDemoSeeder
 
     // ================================================================================= Documents (IEPs/ETRs) + goals
 
-    private async Task CreateDocumentsAsync(int actingUserId, List<DemoStudent> students, CancellationToken ct)
+    internal sealed record DemoDocumentCounts(int FinalizedIeps, int FinalizedEtrs, int DraftIeps);
+
+    private async Task<DemoDocumentCounts> CreateDocumentsAsync(int actingUserId, List<DemoStudent> students, CancellationToken ct)
     {
         var iepTypeId = await _context.DocumentTypes.Where(t => t.Key == "IEP").Select(t => t.Id).FirstAsync(ct);
         var etrTypeId = await _context.DocumentTypes.Where(t => t.Key == "ETR").Select(t => t.Id).FirstAsync(ct);
 
-        var iepCount = 0;
-        foreach (var student in students.Where(s => s.HasIep))
+        int finalizedIeps = 0, finalizedEtrs = 0, draftIeps = 0;
+
+        foreach (var student in students)
         {
-            await CreateFinalizedIepAsync(actingUserId, student, iepTypeId, ct);
-            iepCount++;
-            _logger.LogInformation("Demo seed: finalized IEP {Count} for student {StudentId}.", iepCount, student.Id);
+            switch (student.Track)
+            {
+                case DemoRoster.Track.IepWithRecentEtr:
+                    // Reevaluated first, then this year's IEP written from it — the real order of events.
+                    await CreateFinalizedEtrAsync(actingUserId, student, etrTypeId, EvaluationCaseKind.Reevaluation, ct);
+                    finalizedEtrs++;
+                    await CreateIepAsync(actingUserId, student, iepTypeId, finalize: true, ct);
+                    finalizedIeps++;
+                    break;
+
+                case DemoRoster.Track.EstablishedIep:
+                    await CreateIepAsync(actingUserId, student, iepTypeId, finalize: true, ct);
+                    finalizedIeps++;
+                    break;
+
+                case DemoRoster.Track.DraftIep:
+                    await CreateIepAsync(actingUserId, student, iepTypeId, finalize: false, ct);
+                    draftIeps++;
+                    break;
+
+                case DemoRoster.Track.EvaluationEtrComplete:
+                case DemoRoster.Track.EvaluationInProgress:
+                    break; // handled by CreateEvaluationCasesAsync, which owns the whole referral flow
+            }
+
+            var done = finalizedIeps + finalizedEtrs + draftIeps;
+            if (done > 0 && done % 10 == 0)
+                _logger.LogInformation("Demo seed: wrote {Count} documents…", done);
         }
 
-        var etrCount = 0;
-        foreach (var student in students.Where(s => s.HasEtr))
-        {
-            await CreateFinalizedEtrAsync(actingUserId, student, etrTypeId, ct);
-            etrCount++;
-            _logger.LogInformation("Demo seed: finalized ETR {Count} for student {StudentId}.", etrCount, student.Id);
-        }
+        return new DemoDocumentCounts(finalizedIeps, finalizedEtrs, draftIeps);
     }
 
-    private async Task CreateFinalizedIepAsync(int actingUserId, DemoStudent student, int iepTypeId, CancellationToken ct)
+    /// <summary>Writes a complete Ohio IEP for the student and either finalizes it (an IEP in force, with
+    /// a rendered PDF and projected goal records) or leaves it as the draft a case manager is still
+    /// working on.</summary>
+    private async Task<int> CreateIepAsync(int actingUserId, DemoStudent student, int iepTypeId, bool finalize, CancellationToken ct)
     {
         var create = await _documentInstanceService.CreateAsync(student.Id, iepTypeId, actingUserId, ct);
         if (!create.Success || create.Data == null)
             throw new InvalidOperationException($"Failed to create IEP draft for student {student.Id}: {create.Message}");
 
-        var semantics = await LoadSemanticsAsync(create.Data.DocumentTemplateVersionId, ct);
-        var patch = new Dictionary<string, JsonElement>();
+        var form = await LoadFormAsync(create.Data.DocumentTemplateVersionId, ct);
+        var today = DateTime.UtcNow.Date;
+        var meetingDate = student.AnnualReviewDueDate?.AddYears(-1) ?? today.AddDays(-14);
+        if (!finalize)
+            meetingDate = student.AnnualReviewDueDate ?? today.AddDays(10); // the meeting this draft is being written for
 
-        SetScalar(patch, semantics, FieldSemantics.StudentProfile,
-            $"{student.FirstName} {student.LastName} is a student at Maple Ridge who benefits from consistent, individualized support across the school day.");
-        SetScalar(patch, semantics, FieldSemantics.PresentLevels,
-            $"{student.FirstName} currently participates in the general curriculum with support. Recent classroom-based assessments show steady, gradual progress toward grade-level expectations.");
+        var name = student.FirstName;
+        var disability = student.Disability;
+        var goals = DemoIepContent.GoalsFor(disability, student.Grade, name);
 
-        SetTable(patch, semantics, FieldSemantics.Goals, new[]
+        form.Text(FieldSemantics.StudentProfile,
+            $"{student.FullName} — date of birth on file, grade {student.Grade.ToDisplay()} at {student.SchoolName}, {DistrictName}. " +
+            $"Primary disability category: {(disability?.ToDisplay() ?? "eligibility determination in progress")}.");
+
+        form.SelectWhereLabel("Meeting type", finalize ? "Annual Review" : "Initial IEP");
+        form.Date(FieldSemantics.MeetingDate, meetingDate);
+        form.Date(FieldSemantics.EffectiveDates, meetingDate);
+        form.DateWhereLabel("IEP effective end date", meetingDate.AddYears(1).AddDays(-1));
+        form.DateWhereLabel("Next annual review due", meetingDate.AddYears(1));
+        if (student.EtrDate.HasValue)
+            form.DateWhereLabel("Next re-evaluation (ETR) due", student.EtrDate.Value.AddYears(3));
+
+        form.Text(FieldSemantics.FuturePlanning,
+            $"{name}'s family wants {name} to finish school with the reading, math and self-advocacy skills to take the next step confidently. " +
+            (DemoIepContent.IsSecondary(student.Grade)
+                ? $"{name} would like to continue into a two-year program after graduation and hold a part-time job while studying."
+                : $"{name} enjoys school, and the team wants {name} to keep pace with classmates in the general education classroom with the supports in this plan."));
+
+        form.Text(FieldSemantics.SpecialFactors, SpecialFactorsNarrative(name, disability));
+        ApplySpecialFactorChecks(form, disability);
+
+        form.Text(FieldSemantics.PresentLevels, PresentLevelsNarrative(student, goals));
+        form.TextWhereLabel("Parent and student concerns",
+            $"{name}'s family asks that homework stay manageable at home and that they hear about progress before the next report card rather than at the annual review. " +
+            $"{name} says the work is easier when directions are written down as well as spoken.");
+        form.Text(FieldSemantics.Eligibility,
+            student.EtrDate.HasValue
+                ? $"The evaluation team report dated {student.EtrDate.Value:MMMM d, yyyy} found {name} eligible under {(disability?.ToDisplay() ?? "the category under review")}. " +
+                  "Progress-monitoring data collected since then is summarised in the present levels above."
+                : $"The team reviewed existing evaluation data and classroom progress data for {name}.");
+
+        var esyNeeded = disability is DisabilityCategory.IntellectualDisability or DisabilityCategory.MultipleDisabilities or DisabilityCategory.Autism;
+        form.Select(FieldSemantics.ExtendedSchoolYear, esyNeeded ? "Needed" : "Not needed");
+        form.TextWhereLabel("ESY rationale",
+            esyNeeded
+                ? $"Recoupment data from last summer shows {name} loses skills over an extended break and needs more than eight weeks to recover them. Extended school year services will continue the communication and functional goals four mornings a week in July."
+                : $"The team reviewed regression and recoupment data and found no evidence that {name} loses critical skills over breaks. Extended school year services are not required at this time.");
+
+        var transition = DemoIepContent.TransitionFor(student.Grade, name);
+        if (transition.Count > 0)
         {
-            new Dictionary<string, string>
+            form.TextWhereLabel("Age-appropriate transition assessments",
+                $"{name} completed a career interest inventory and a self-determination scale this year. Results point toward hands-on technical fields and show that {name} needs practice asking for accommodations without adult prompting.");
+            form.Table(FieldSemantics.Transition, transition.Select(t => new Dictionary<string, string>
             {
-                [ColumnSemantics.Domain] = "Reading",
-                [ColumnSemantics.GoalText] = $"Given a grade-level passage, {student.FirstName} will read aloud with 95% accuracy on 4 of 5 trials.",
-                [ColumnSemantics.Baseline] = $"{student.FirstName} currently reads with 78% accuracy on grade-level passages.",
-                [ColumnSemantics.TargetCriteria] = "95% accuracy on 4 of 5 consecutive probes.",
-                [ColumnSemantics.MeasurementMethod] = "Weekly curriculum-based reading probes.",
-                [ColumnSemantics.Timeframe] = "By the next annual review."
-            },
-            new Dictionary<string, string>
-            {
-                [ColumnSemantics.Domain] = "Math",
-                [ColumnSemantics.GoalText] = $"{student.FirstName} will solve grade-level multi-step word problems with 80% accuracy on 3 of 4 trials.",
-                [ColumnSemantics.Baseline] = $"{student.FirstName} currently solves multi-step word problems with 55% accuracy.",
-                [ColumnSemantics.TargetCriteria] = "80% accuracy across 3 consecutive probes.",
-                [ColumnSemantics.MeasurementMethod] = "Bi-weekly math probes scored against a rubric.",
-                [ColumnSemantics.Timeframe] = "By the next annual review."
-            }
-        });
+                [ColumnSemantics.GoalArea] = t.GoalArea,
+                [ColumnSemantics.TransitionServices] = t.Services
+            }));
+            form.TextWhereLabel("Course of study",
+                $"{name} is on track for a diploma, taking the required core courses with support plus the engineering-technology career pathway sequence.");
+        }
 
-        SetTable(patch, semantics, FieldSemantics.Services, new[]
+        form.Table(FieldSemantics.Goals, goals.Select(g => new Dictionary<string, string>
         {
-            new Dictionary<string, string>
-            {
-                [ColumnSemantics.ServiceType] = "Specialized Reading Instruction",
-                [ColumnSemantics.Frequency] = "4x per week",
-                [ColumnSemantics.Duration] = "30 minutes",
-                [ColumnSemantics.Location] = "Resource room",
-                [ColumnSemantics.ProviderRole] = "Intervention Specialist"
-            }
-        });
+            [ColumnSemantics.Domain] = g.Domain,
+            [ColumnSemantics.GoalText] = g.GoalText,
+            [ColumnSemantics.Baseline] = g.Baseline,
+            [ColumnSemantics.TargetCriteria] = g.TargetCriteria,
+            [ColumnSemantics.MeasurementMethod] = g.MeasurementMethod,
+            [ColumnSemantics.Timeframe] = g.Timeframe
+        }));
+        form.Text(FieldSemantics.ProgressMonitoring,
+            "Progress toward each annual goal is measured as described in the goal and reported to the family in writing at the end of every grading period, with a copy kept in the student's record.");
 
-        SetTable(patch, semantics, FieldSemantics.Accommodations, new[]
+        form.Table(FieldSemantics.Services, DemoIepContent.ServicesFor(disability, student.Grade).Select(s => new Dictionary<string, string>
         {
-            new Dictionary<string, string> { [ColumnSemantics.Category] = "Presentation", [ColumnSemantics.Accommodation] = "Extended time (1.5x) on tests and quizzes" },
-            new Dictionary<string, string> { [ColumnSemantics.Category] = "Setting", [ColumnSemantics.Accommodation] = "Preferential seating near instruction" }
-        });
+            [ColumnSemantics.ServiceType] = s.ServiceType,
+            [ColumnSemantics.Frequency] = s.Frequency,
+            [ColumnSemantics.Duration] = s.Duration,
+            [ColumnSemantics.Location] = s.Location,
+            [ColumnSemantics.ProviderRole] = s.ProviderRole,
+            [ColumnSemantics.StartDate] = meetingDate.ToString("yyyy-MM-dd"),
+            [ColumnSemantics.EndDate] = meetingDate.AddYears(1).AddDays(-1).ToString("yyyy-MM-dd")
+        }));
 
-        if (patch.Count > 0)
+        form.Table(FieldSemantics.Accommodations, DemoIepContent.AccommodationsFor(disability, student.Grade).Select(a => new Dictionary<string, string>
         {
-            var save = await _documentInstanceService.SaveValuesAsync(create.Data.Id, patch, create.Data.RowVersion, actingUserId, ct);
+            [ColumnSemantics.Category] = a.Category,
+            [ColumnSemantics.Accommodation] = a.Text
+        }));
+
+        form.TextWhereLabel("Modifications",
+            disability is DisabilityCategory.IntellectualDisability or DisabilityCategory.MultipleDisabilities
+                ? "Grade-level content is modified in depth and breadth, with reduced numbers of items and alternate materials aligned to the extended standards."
+                : "No modifications to grade-level content are required; the accommodations above provide access to the general curriculum.");
+        form.TextWhereLabel("Support for school personnel",
+            "Consultation from the intervention specialist for general education teachers twice per grading period, plus one building in-service on the accommodations in this IEP.");
+
+        var transportationNeeded = disability is DisabilityCategory.OrthopedicImpairment or DisabilityCategory.MultipleDisabilities;
+        form.Select(FieldSemantics.Transportation, transportationNeeded ? "Needed" : "Not needed");
+        form.TextWhereLabel("Transportation details",
+            transportationNeeded
+                ? "Wheelchair-accessible bus with a lift, door-to-door service, and an aide on board for the length of the route."
+                : "No specialized transportation is required; the student rides the regular bus route.");
+
+        form.TextWhereLabel("Participation in nonacademic and extracurricular activities",
+            $"{name} takes part in assemblies, field trips, lunch, recess and club activities with classmates, with the same accommodations that apply during instruction.");
+        form.TextWhereLabel("General factors considered",
+            $"The team considered {name}'s strengths, the family's concerns, the most recent evaluation results and {name}'s academic, developmental and functional needs in writing this plan.");
+
+        form.Text(FieldSemantics.Lre, LreNarrative(name, disability));
+        form.Text(FieldSemantics.Placement,
+            disability is DisabilityCategory.IntellectualDisability or DisabilityCategory.MultipleDisabilities
+                ? $"{name} is outside the general education setting for approximately 60% of the school day to receive functional academics and related services."
+                : $"{name} is outside the general education setting for approximately 15% of the school day, for specially designed instruction and related services.");
+
+        form.Text(FieldSemantics.Testing,
+            disability is DisabilityCategory.IntellectualDisability or DisabilityCategory.MultipleDisabilities
+                ? "The student participates in the Alternate Assessment for Students with Significant Cognitive Disabilities (AASCD), for which the team confirms the eligibility criteria are met."
+                : "The student participates in all statewide and district-wide assessments with the accommodations listed in this IEP: extended time, small-group setting and directions read aloud.");
+        form.CheckWhereLabel("Alternate assessment", disability is DisabilityCategory.IntellectualDisability or DisabilityCategory.MultipleDisabilities);
+
+        form.Table(FieldSemantics.Participants, ParticipantRows(student, meetingDate));
+
+        form.Text(FieldSemantics.Signatures,
+            "Parent/guardian attended the meeting, received a copy of this IEP and a copy of the procedural safeguards notice, and consented to the services described.");
+        form.CheckWhereLabel("Parent received a copy of procedural safeguards", true);
+        form.CheckWhereLabel("Parent received a copy of the IEP", true);
+
+        if (form.HasValues)
+        {
+            var save = await _documentInstanceService.SaveValuesAsync(create.Data.Id, form.Patch, create.Data.RowVersion, actingUserId, ct);
             if (!save.Success)
                 throw new InvalidOperationException($"Failed to save IEP values for student {student.Id}: {save.Message}");
         }
 
-        var finalize = await _authoredDocumentVersionService.FinalizeAsync(create.Data.Id, actingUserId, ct);
-        if (!finalize.Success || finalize.Data == null)
-            throw new InvalidOperationException($"Failed to finalize IEP for student {student.Id}: {finalize.Message}");
+        if (!finalize)
+            return create.Data.Id;
 
-        await _pdfQueue.EnqueueAsync(finalize.Data.Id, CancellationToken.None);
+        var finalized = await _authoredDocumentVersionService.FinalizeAsync(create.Data.Id, actingUserId, ct);
+        if (!finalized.Success || finalized.Data == null)
+            throw new InvalidOperationException($"Failed to finalize IEP for student {student.Id}: {finalized.Message}");
 
-        await AddGoalObservationsAsync(actingUserId, student.Id, ct);
+        await _pdfQueue.EnqueueAsync(finalized.Data.Id, CancellationToken.None);
+        await AddGoalObservationsAsync(actingUserId, student, goals, ct);
+        return create.Data.Id;
     }
 
-    private async Task CreateFinalizedEtrAsync(int actingUserId, DemoStudent student, int etrTypeId, CancellationToken ct)
+    /// <summary>Writes and finalizes an Ohio ETR. Returns the finalized version id so an evaluation case
+    /// can cite it in its determination.</summary>
+    private async Task<int> CreateFinalizedEtrAsync(int actingUserId, DemoStudent student, int etrTypeId, EvaluationCaseKind kind, CancellationToken ct)
     {
         var create = await _documentInstanceService.CreateAsync(student.Id, etrTypeId, actingUserId, ct);
         if (!create.Success || create.Data == null)
             throw new InvalidOperationException($"Failed to create ETR draft for student {student.Id}: {create.Message}");
 
-        var semantics = await LoadSemanticsAsync(create.Data.DocumentTemplateVersionId, ct);
-        var patch = new Dictionary<string, JsonElement>();
+        var form = await LoadFormAsync(create.Data.DocumentTemplateVersionId, ct);
+        var etrDate = student.EtrDate ?? DateTime.UtcNow.Date.AddDays(-7);
+        var name = student.FirstName;
+        var disability = student.Disability;
 
-        SetScalar(patch, semantics, FieldSemantics.ReferralReason,
-            $"{student.FirstName} {student.LastName} was referred for evaluation due to continued difficulty accessing grade-level instruction despite classroom interventions.");
-        SetScalar(patch, semantics, FieldSemantics.TeamSummary,
-            $"The evaluation team reviewed classroom data, standardized assessment results, and family input for {student.FirstName}. Findings support continued specially designed instruction.");
+        form.Text(FieldSemantics.StudentProfile,
+            $"{student.FullName} — grade {student.Grade.ToDisplay()} at {student.SchoolName}, {DistrictName}.");
+        form.SelectWhereLabel("Evaluation type", kind == EvaluationCaseKind.Reevaluation ? "Reevaluation" : "Initial Evaluation");
+        form.DateWhereLabel("Date of referral", etrDate.AddDays(-70));
+        form.DateWhereLabel("Date parent consent received", etrDate.AddDays(-58));
+        form.Date(FieldSemantics.MeetingDate, etrDate);
+        form.DateWhereLabel("Next re-evaluation due", etrDate.AddYears(3));
 
-        if (patch.Count > 0)
+        form.Text(FieldSemantics.ReferralReason,
+            kind == EvaluationCaseKind.Reevaluation
+                ? $"{student.FullName} is due for a three-year reevaluation. The team also wanted current data on whether the present services still match {name}'s needs."
+                : $"{student.FullName} was referred by the building intervention assistance team after eight weeks of tiered intervention produced limited progress in the areas of concern below.");
+        form.Text(FieldSemantics.EvaluationPlan,
+            "Areas assessed: cognitive ability, academic achievement, communication, social-emotional and behavioural functioning, and fine-motor skills where indicated. " +
+            "Existing data reviewed: intervention progress-monitoring graphs, two years of state and district assessment results, attendance, classroom work samples and parent input gathered by interview.");
+
+        form.Table(FieldSemantics.EvaluatorReports, EvaluatorReportRows(student));
+
+        form.Text(FieldSemantics.TeamSummary,
+            $"Taken together, the assessments place {name}'s cognitive ability within the average range with significantly weaker performance in the areas of concern, " +
+            "a pattern consistent across the evaluator reports, classroom work samples and progress-monitoring data. Parent and teacher rating scales agree on the areas of need.");
+        form.Text(FieldSemantics.PresentLevels,
+            $"{name} needs explicit, systematic instruction in the areas identified above, accommodations that reduce the reading and writing load of grade-level tasks, and " +
+            "progress monitoring often enough to show whether the instruction is working within a grading period.");
+        form.TextWhereLabel("Implications for instruction and progress monitoring",
+            "Instruction should be delivered in a small group at least four times a week, with weekly curriculum-based measurement graphed against an aim line and reviewed by the team every six weeks.");
+
+        form.Select(FieldSemantics.EligibilityDetermination, "Eligible");
+        if (disability.HasValue)
+            form.Select(FieldSemantics.Eligibility, EtrEligibilityOption(disability.Value));
+        form.TextWhereLabel("Documentation of eligibility criteria",
+            $"The team documents that {name} meets the Ohio Operating Standards criteria for {(disability?.ToDisplay() ?? "the identified category")}: " +
+            "the assessment data show the required pattern of need, the condition adversely affects educational performance, and the need for specially designed instruction is established. " +
+            "The team also confirmed the determination is not primarily the result of a lack of appropriate instruction or of limited English proficiency.");
+        form.CheckWhereLabel("Adverse effect on educational performance", true);
+        form.CheckWhereLabel("Need for specially designed instruction", true);
+        form.CheckWhereLabel("Determination is not primarily the result", true);
+
+        form.Table(FieldSemantics.Participants, ParticipantRows(student, etrDate));
+        form.CheckWhereLabel("Parent received a copy of the ETR", true);
+        form.CheckWhereLabel("Parent received a copy of procedural safeguards", true);
+
+        if (form.HasValues)
         {
-            var save = await _documentInstanceService.SaveValuesAsync(create.Data.Id, patch, create.Data.RowVersion, actingUserId, ct);
+            var save = await _documentInstanceService.SaveValuesAsync(create.Data.Id, form.Patch, create.Data.RowVersion, actingUserId, ct);
             if (!save.Success)
                 throw new InvalidOperationException($"Failed to save ETR values for student {student.Id}: {save.Message}");
         }
 
-        var finalize = await _authoredDocumentVersionService.FinalizeAsync(create.Data.Id, actingUserId, ct);
-        if (!finalize.Success || finalize.Data == null)
-            throw new InvalidOperationException($"Failed to finalize ETR for student {student.Id}: {finalize.Message}");
+        var finalized = await _authoredDocumentVersionService.FinalizeAsync(create.Data.Id, actingUserId, ct);
+        if (!finalized.Success || finalized.Data == null)
+            throw new InvalidOperationException($"Failed to finalize ETR for student {student.Id}: {finalized.Message}");
 
-        await _pdfQueue.EnqueueAsync(finalize.Data.Id, CancellationToken.None);
+        await _pdfQueue.EnqueueAsync(finalized.Data.Id, CancellationToken.None);
+        return finalized.Data.Id;
     }
 
-    private async Task AddGoalObservationsAsync(int actingUserId, int studentId, CancellationToken ct)
+    // --------------------------------------------------------------------- Narrative helpers
+
+    private static string SpecialFactorsNarrative(string name, DisabilityCategory? disability) => disability switch
     {
-        var goals = await _goalRecordService.GetForStudentAsync(actingUserId, studentId, ct);
+        DisabilityCategory.EmotionalDisturbance =>
+            $"{name}'s behaviour can impede learning. A positive behaviour support plan is in place, with a taught de-escalation routine, a break pass and daily check-in/check-out.",
+        DisabilityCategory.Autism =>
+            $"{name} has communication needs and benefits from predictability. A visual schedule, advance notice of changes and a quiet break space are used across the school day.",
+        DisabilityCategory.HearingImpairment or DisabilityCategory.Deafness =>
+            $"{name} is hard of hearing. Personal hearing technology is checked daily, captioned media is used, and staff keep a clear line of sight when speaking.",
+        DisabilityCategory.VisualImpairment =>
+            $"{name} is visually impaired. Enlarged high-contrast print, screen magnification and a screen reader are available in every setting.",
+        DisabilityCategory.MultipleDisabilities =>
+            $"{name} has communication needs and uses assistive technology. The communication device travels with {name} and is honoured in every setting; the positioning schedule is followed as written.",
+        DisabilityCategory.SpeechOrLanguageImpairment =>
+            $"{name} has communication needs addressed through direct speech-language therapy and classroom strategies that give extra time to formulate responses.",
+        DisabilityCategory.TraumaticBrainInjury =>
+            $"{name} uses assistive technology and written checklists to support memory and organization, with scheduled rest breaks to manage fatigue.",
+        _ =>
+            $"None of the special instructional factors apply to {name} at this time; the accommodations in this plan address the identified needs."
+    };
+
+    private static void ApplySpecialFactorChecks(DemoDocumentForm form, DisabilityCategory? disability)
+    {
+        form.CheckWhereLabel("Behavior impedes learning", disability is DisabilityCategory.EmotionalDisturbance or DisabilityCategory.Autism);
+        form.CheckWhereLabel("Limited English proficiency", false);
+        form.CheckWhereLabel("Blind or visually impaired", disability is DisabilityCategory.VisualImpairment);
+        form.CheckWhereLabel("Communication needs", disability is DisabilityCategory.SpeechOrLanguageImpairment or DisabilityCategory.Autism
+            or DisabilityCategory.MultipleDisabilities or DisabilityCategory.IntellectualDisability);
+        form.CheckWhereLabel("Deaf or hard of hearing", disability is DisabilityCategory.HearingImpairment or DisabilityCategory.Deafness);
+        form.CheckWhereLabel("Assistive technology", disability is DisabilityCategory.VisualImpairment or DisabilityCategory.OrthopedicImpairment
+            or DisabilityCategory.MultipleDisabilities or DisabilityCategory.TraumaticBrainInjury);
+    }
+
+    private static string PresentLevelsNarrative(DemoStudent student, IReadOnlyList<DemoIepContent.GoalPlan> goals)
+    {
+        var name = student.FirstName;
+        var areas = string.Join(", ", goals.Select(g => g.Domain.ToLowerInvariant()));
+        var baselines = string.Join(" ", goals.Select(g => g.Baseline));
+        return $"{name} is a grade {student.Grade.ToDisplay()} student at {student.SchoolName} who is well liked by classmates and works hard when expectations are clear. " +
+               $"Current areas of need are {areas}. {baselines} " +
+               $"In the general education classroom {name} participates in whole-group instruction and, with the accommodations in this plan, completes the same assignments as classmates in most subjects.";
+    }
+
+    private static string LreNarrative(string name, DisabilityCategory? disability) =>
+        disability is DisabilityCategory.IntellectualDisability or DisabilityCategory.MultipleDisabilities
+            ? $"The team considered full-time general education with supports first. {name} needs functional academics and related services that cannot be delivered in the general education classroom without removing the content's purpose, so {name} receives those in a small group and joins classmates for homeroom, specials, lunch, recess and electives."
+            : $"The team considered general education with consultation only, and found {name} needs explicit small-group instruction that cannot be delivered in the general education classroom without reducing instructional time for the class. {name} is therefore served in the resource room for that instruction and remains with classmates for the rest of the school day.";
+
+    /// <summary>Meeting-participant rows: the student's team, the family, and the student themselves once
+    /// transition planning applies.</summary>
+    private static List<Dictionary<string, string>> ParticipantRows(DemoStudent student, DateTime meetingDate)
+    {
+        var rows = student.TeamMemberNames
+            .Select(m => new Dictionary<string, string>
+            {
+                [ColumnSemantics.ParticipantName] = m.Name,
+                [ColumnSemantics.ParticipantRole] = m.Role
+            })
+            .ToList();
+
+        var parent = DemoRoster.Parents.FirstOrDefault(p => p.StudentIndex == student.Index);
+        if (parent != null)
+            rows.Add(new Dictionary<string, string>
+            {
+                [ColumnSemantics.ParticipantName] = $"{parent.FirstName} {parent.LastName}",
+                [ColumnSemantics.ParticipantRole] = "Parent/Guardian"
+            });
+
+        if (DemoIepContent.IsSecondary(student.Grade))
+            rows.Add(new Dictionary<string, string>
+            {
+                [ColumnSemantics.ParticipantName] = student.FullName,
+                [ColumnSemantics.ParticipantRole] = "Student"
+            });
+
+        return rows;
+    }
+
+    private static List<Dictionary<string, string>> EvaluatorReportRows(DemoStudent student)
+    {
+        var name = student.FirstName;
+        var psychologist = $"{DemoRoster.Psychologist.FirstName} {DemoRoster.Psychologist.LastName}, School Psychologist";
+        var slp = $"{DemoRoster.Slp.FirstName} {DemoRoster.Slp.LastName}, Speech-Language Pathologist";
+        var caseManager = $"{student.CaseManager.FullName}, Intervention Specialist";
+
+        var rows = new List<Dictionary<string, string>>
+        {
+            new()
+            {
+                [ColumnSemantics.EvaluationDomain] = "Cognitive ability",
+                [ColumnSemantics.EvaluatorName] = psychologist,
+                [ColumnSemantics.Findings] = $"Standardised cognitive assessment places {name}'s overall ability within the average range, with processing speed and working memory below the other index scores."
+            },
+            new()
+            {
+                [ColumnSemantics.EvaluationDomain] = "Academic achievement",
+                [ColumnSemantics.EvaluatorName] = caseManager,
+                [ColumnSemantics.Findings] = $"Achievement testing and curriculum-based measurement place {name} below grade-level expectations in the areas of concern, with a gap that has widened over two years despite tiered intervention."
+            },
+            new()
+            {
+                [ColumnSemantics.EvaluationDomain] = "Observation in the learning environment",
+                [ColumnSemantics.EvaluatorName] = psychologist,
+                [ColumnSemantics.Findings] = $"Two classroom observations during core instruction show {name} on task for roughly half of the observed intervals and relying on neighbours to start written work."
+            }
+        };
+
+        if (student.Disability is DisabilityCategory.SpeechOrLanguageImpairment or DisabilityCategory.Autism
+            or DisabilityCategory.IntellectualDisability or DisabilityCategory.MultipleDisabilities or null)
+            rows.Add(new Dictionary<string, string>
+            {
+                [ColumnSemantics.EvaluationDomain] = "Communication",
+                [ColumnSemantics.EvaluatorName] = slp,
+                [ColumnSemantics.Findings] = $"Language testing and a conversational sample show {name}'s receptive language within expectations and expressive language and intelligibility below them."
+            });
+
+        return rows;
+    }
+
+    private static string EtrEligibilityOption(DisabilityCategory category) => category switch
+    {
+        // The Ohio ETR form's option list words these two as a single choice.
+        DisabilityCategory.HearingImpairment or DisabilityCategory.Deafness => "Deafness (Hearing Impairment)",
+        _ => category.ToDisplay()
+    };
+
+    // --------------------------------------------------------------------- Goal progress data
+
+    /// <summary>Progress observations against the goals this IEP just projected into goal records: a rising
+    /// trend for most students, a flat one for a few, so the progress view has something to interpret.</summary>
+    private async Task AddGoalObservationsAsync(int actingUserId, DemoStudent student, IReadOnlyList<DemoIepContent.GoalPlan> plans, CancellationToken ct)
+    {
+        var goals = await _goalRecordService.GetForStudentAsync(actingUserId, student.Id, ct);
         if (!goals.Success || goals.Data == null)
             return;
 
-        var random = new Random(studentId); // deterministic per student
+        var random = new Random(student.Id); // deterministic per student
+        var stalled = student.Index % 7 == 3; // roughly one student in seven is not making progress
+
         foreach (var goal in goals.Data)
         {
-            var observationCount = 2 + random.Next(3); // 2-4 observations
+            var unit = plans.FirstOrDefault(p => p.Domain == goal.Domain)?.Unit ?? "% accuracy";
+            var observationCount = 4 + random.Next(3); // 4-6 observations, fortnightly
+            var start = 45 + random.Next(20);
             for (var i = 0; i < observationCount; i++)
             {
+                var growth = stalled ? random.Next(-2, 3) : (i * (4 + random.Next(4)));
                 await _goalRecordService.AddObservationAsync(actingUserId, goal.Id, new CreateGoalObservationModel
                 {
                     ObservedAt = DateTime.UtcNow.AddDays(-((observationCount - i) * 14)),
-                    Value = 60 + random.Next(35),
-                    Unit = goal.Domain == "Math" ? "% accuracy" : "WCPM",
-                    Note = "Weekly progress-monitoring probe."
+                    Value = Math.Clamp(start + growth, 0, 100),
+                    Unit = unit,
+                    Note = i == observationCount - 1 && stalled
+                        ? "Progress-monitoring probe — trend is flat; team to review the intervention."
+                        : "Fortnightly progress-monitoring probe."
                 }, ct);
             }
         }
     }
 
-    /// <summary>Reads the pinned template version's semantic field/column map, the same mechanism
-    /// <c>GoalRecordService.ProjectOnFinalizeAsync</c> uses to find "the Goals table" without a hardcoded
-    /// FieldKey.</summary>
-    private async Task<IReadOnlyDictionary<string, SemanticField>> LoadSemanticsAsync(int templateVersionId, CancellationToken ct)
+    // --------------------------------------------------------------------- Template form helper
+
+    /// <summary>
+    /// A pinned template version's fields, addressable by semantic tag (the same mechanism
+    /// <c>GoalRecordService.ProjectOnFinalizeAsync</c> uses to find "the Goals table") or, for the fields an
+    /// Ohio form carries without one, by a distinctive fragment of their label. Every setter is a no-op when
+    /// the template has no such field, so the seeder never depends on one particular template revision.
+    /// </summary>
+    private sealed class DemoDocumentForm
+    {
+        private readonly IReadOnlyDictionary<string, SemanticField> _semantics;
+        private readonly IReadOnlyList<(Guid Key, FieldType Type, string Label)> _fields;
+        private readonly Dictionary<string, JsonElement> _patch = new();
+        private readonly ILogger _logger;
+
+        public DemoDocumentForm(IReadOnlyDictionary<string, SemanticField> semantics,
+            IReadOnlyList<(Guid Key, FieldType Type, string Label)> fields, ILogger logger)
+        {
+            _semantics = semantics;
+            _fields = fields;
+            _logger = logger;
+        }
+
+        public IReadOnlyDictionary<string, JsonElement> Patch => _patch;
+        public bool HasValues => _patch.Count > 0;
+
+        public void Text(string semantic, string value) => SetBySemantic(semantic, value, FieldType.Text, FieldType.RichText);
+
+        public void Select(string semantic, string option) => SetBySemantic(semantic, option, FieldType.Select);
+
+        public void Date(string semantic, DateTime value) => SetBySemantic(semantic, value.ToString("yyyy-MM-dd"), FieldType.Date);
+
+        public void Table(string semantic, IEnumerable<IReadOnlyDictionary<string, string>> rows)
+        {
+            if (!_semantics.TryGetValue(semantic, out var field) || field.FieldType != FieldType.Table)
+                return;
+
+            var mapped = new List<Dictionary<string, string>>();
+            foreach (var row in rows)
+            {
+                var cells = new Dictionary<string, string>();
+                foreach (var (columnSemantic, value) in row)
+                    if (field.Columns.TryGetValue(columnSemantic, out var columnKey))
+                        cells[columnKey.ToString()] = value;
+                if (cells.Count > 0)
+                    mapped.Add(cells);
+            }
+
+            if (mapped.Count > 0)
+                _patch[field.FieldKey.ToString()] = JsonSerializer.SerializeToElement(mapped);
+        }
+
+        public void TextWhereLabel(string labelFragment, string value) => SetByLabel(labelFragment, JsonSerializer.SerializeToElement(value), FieldType.Text, FieldType.RichText);
+
+        public void SelectWhereLabel(string labelFragment, string option) => SetByLabel(labelFragment, JsonSerializer.SerializeToElement(option), FieldType.Select);
+
+        public void DateWhereLabel(string labelFragment, DateTime value) => SetByLabel(labelFragment, JsonSerializer.SerializeToElement(value.ToString("yyyy-MM-dd")), FieldType.Date);
+
+        public void CheckWhereLabel(string labelFragment, bool value) => SetByLabel(labelFragment, JsonSerializer.SerializeToElement(value), FieldType.Checkbox);
+
+        private void SetBySemantic(string semantic, string value, params FieldType[] allowed)
+        {
+            if (!_semantics.TryGetValue(semantic, out var field) || !allowed.Contains(field.FieldType))
+                return;
+            _patch[field.FieldKey.ToString()] = JsonSerializer.SerializeToElement(value);
+        }
+
+        /// <summary>Sets the single field whose label contains <paramref name="labelFragment"/>. A fragment
+        /// that matches none, or more than one, is skipped and logged — the demo document simply leaves that
+        /// field blank rather than guessing.</summary>
+        private void SetByLabel(string labelFragment, JsonElement value, params FieldType[] allowed)
+        {
+            var matches = _fields
+                .Where(f => allowed.Contains(f.Type) && f.Label.Contains(labelFragment, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (matches.Count != 1)
+            {
+                _logger.LogDebug("Demo seed: template has {Count} fields matching '{Fragment}' — leaving it blank.", matches.Count, labelFragment);
+                return;
+            }
+            _patch[matches[0].Key.ToString()] = value;
+        }
+    }
+
+    private async Task<DemoDocumentForm> LoadFormAsync(int templateVersionId, CancellationToken ct)
     {
         var sections = await _context.TemplateSections
             .Where(s => s.DocumentTemplateVersionId == templateVersionId)
             .Include(s => s.Fields)
             .OrderBy(s => s.DisplayOrder)
             .ToListAsync(ct);
-        return TemplateSemanticsReader.Read(sections);
+
+        var fields = sections
+            .OrderBy(s => s.DisplayOrder)
+            .SelectMany(s => s.Fields.OrderBy(f => f.DisplayOrder))
+            .Select(f => (f.FieldKey, f.FieldType, f.Label))
+            .ToList();
+
+        return new DemoDocumentForm(TemplateSemanticsReader.Read(sections), fields, _logger);
     }
 
-    /// <summary>Sets a Text/RichText field's value from the semantic map, if the template has one tagged
-    /// with that semantic. Select/Date/Checkbox are intentionally left untouched (no confirmed literal
-    /// option strings to fabricate safely) — the seeded templates have no required fields, so leaving
-    /// them blank never blocks finalize.</summary>
-    private static void SetScalar(Dictionary<string, JsonElement> patch, IReadOnlyDictionary<string, SemanticField> semantics, string semanticKey, string value)
-    {
-        if (!semantics.TryGetValue(semanticKey, out var field))
-            return;
-        if (field.FieldType is FieldType.Text or FieldType.RichText)
-            patch[field.FieldKey.ToString()] = JsonSerializer.SerializeToElement(value);
-    }
+    // ================================================================================= Evaluation cases
 
-    /// <summary>Sets a Table field's rows from column-semantic-keyed dictionaries, resolving each column's
-    /// columnKey via the semantic map. Unresolvable columns are simply omitted from that row.</summary>
-    private static void SetTable(Dictionary<string, JsonElement> patch, IReadOnlyDictionary<string, SemanticField> semantics, string semanticKey, IEnumerable<Dictionary<string, string>> rows)
-    {
-        if (!semantics.TryGetValue(semanticKey, out var field) || field.FieldType != FieldType.Table)
-            return;
+    internal sealed record DemoEvaluationCounts(int Cases, int FinalizedEtrs, int DraftIeps);
 
-        var mappedRows = new List<Dictionary<string, string>>();
-        foreach (var row in rows)
+    /// <summary>
+    /// The referral side of the district: initial evaluations at every stage of the 60-day clock, and the
+    /// closed reevaluation cases behind the students whose ETR was just completed. Each one is driven
+    /// through the real case service in the order a district works it — referral, consent requested,
+    /// consent received, evaluator assignments, ETR, determination, IEP handoff.
+    /// </summary>
+    private async Task<DemoEvaluationCounts> CreateEvaluationCasesAsync(int actingUserId, List<DemoStudent> students, CancellationToken ct)
+    {
+        var today = DateTime.UtcNow.Date;
+        var etrTypeId = await _context.DocumentTypes.Where(t => t.Key == "ETR").Select(t => t.Id).FirstAsync(ct);
+        int cases = 0, etrs = 0, draftIeps = 0;
+
+        // ---- Initial evaluations that finished: consent, assessments, ETR, eligibility, first IEP ----
+        foreach (var student in students.Where(s => s.Track == DemoRoster.Track.EvaluationEtrComplete))
         {
-            var mapped = new Dictionary<string, string>();
-            foreach (var (columnSemantic, value) in row)
-                if (field.Columns.TryGetValue(columnSemantic, out var columnKey))
-                    mapped[columnKey.ToString()] = value;
-            if (mapped.Count > 0)
-                mappedRows.Add(mapped);
+            var etrDate = student.EtrDate ?? today.AddDays(-7);
+            if (!await OpenCaseAsync(actingUserId, student, EvaluationCaseKind.Initial, etrDate.AddDays(-70),
+                    $"Referred by the building intervention assistance team after tiered intervention produced limited progress.", ct))
+                continue;
+            cases++;
+
+            await _evaluationCaseService.RequestConsentAsync(actingUserId, student.Id, etrDate.AddDays(-64), ct);
+            await _evaluationCaseService.ReceiveConsentAsync(actingUserId, student.Id, new ReceiveConsentModel { ReceivedAt = etrDate.AddDays(-58) }, ct);
+            await AddEvaluatorAssignmentsAsync(actingUserId, student, etrDate.AddDays(-14), submittedOn: etrDate.AddDays(-16), ct);
+
+            var etrVersionId = await CreateFinalizedEtrAsync(actingUserId, student, etrTypeId, EvaluationCaseKind.Initial, ct);
+            etrs++;
+
+            var determine = await _evaluationCaseService.DetermineAsync(actingUserId, student.Id, new DetermineEvaluationModel
+            {
+                Outcome = EligibilityOutcome.Eligible,
+                DeterminationDate = etrDate,
+                Rationale = $"The team found {student.FirstName} eligible under {(student.Disability?.ToDisplay() ?? "the identified category")}: " +
+                            "the assessment data show the required pattern of need, the condition adversely affects educational performance, and specially designed instruction is required.",
+                EtrAuthoredVersionId = etrVersionId
+            }, ct);
+            if (!determine.Success)
+                _logger.LogWarning("Demo seed: could not record determination for student {StudentId}: {Message}", student.Id, determine.Message);
+
+            // The first IEP, started from the ETR the team just wrote and still in progress.
+            var iep = await _evaluationCaseService.CreateIepFromEtrAsync(actingUserId, student.Id, ct);
+            if (iep.Success)
+                draftIeps++;
+            else
+                _logger.LogWarning("Demo seed: could not start the IEP from the ETR for student {StudentId}: {Message}", student.Id, iep.Message);
         }
 
-        if (mappedRows.Count > 0)
-            patch[field.FieldKey.ToString()] = JsonSerializer.SerializeToElement(mappedRows);
+        // ---- Initial evaluations still running: one awaiting consent, one mid-assessment ----
+        var inProgress = students.Where(s => s.Track == DemoRoster.Track.EvaluationInProgress).ToList();
+        for (var i = 0; i < inProgress.Count; i++)
+        {
+            var student = inProgress[i];
+            var awaitingConsent = i % 2 == 0;
+            var referralDate = awaitingConsent ? today.AddDays(-9) : today.AddDays(-38);
+
+            if (!await OpenCaseAsync(actingUserId, student, EvaluationCaseKind.Initial, referralDate,
+                    awaitingConsent
+                        ? "Parent request for an initial evaluation, received in writing."
+                        : "Referred by the classroom teacher after six weeks of Tier 3 intervention with limited response.", ct))
+                continue;
+            cases++;
+
+            await _evaluationCaseService.RequestConsentAsync(actingUserId, student.Id, referralDate.AddDays(2), ct);
+            if (awaitingConsent)
+                continue; // consent has not come back yet — the state a district chases
+
+            await _evaluationCaseService.ReceiveConsentAsync(actingUserId, student.Id, new ReceiveConsentModel { ReceivedAt = referralDate.AddDays(8) }, ct);
+            // One assessment in, one already past its internal due date — the evaluator-overdue case.
+            await AddEvaluatorAssignmentsAsync(actingUserId, student, today.AddDays(-4), submittedOn: null, ct);
+        }
+
+        // ---- Reevaluations that closed out behind this year's IEP ----
+        foreach (var student in students.Where(s => s.Track == DemoRoster.Track.IepWithRecentEtr))
+        {
+            var etrDate = student.EtrDate ?? today.AddDays(-21);
+            if (!await OpenCaseAsync(actingUserId, student, EvaluationCaseKind.Reevaluation, etrDate.AddDays(-70),
+                    "Three-year reevaluation due; the team also wanted current data on whether the present services still match the student's needs.", ct))
+                continue;
+            cases++;
+
+            await _evaluationCaseService.RequestConsentAsync(actingUserId, student.Id, etrDate.AddDays(-64), ct);
+            await _evaluationCaseService.ReceiveConsentAsync(actingUserId, student.Id, new ReceiveConsentModel { ReceivedAt = etrDate.AddDays(-58) }, ct);
+            await AddEvaluatorAssignmentsAsync(actingUserId, student, etrDate.AddDays(-14), submittedOn: etrDate.AddDays(-17), ct);
+
+            var etrVersionId = await _context.AuthoredDocumentVersions.AsNoTracking()
+                .Where(v => v.SchoolStudentId == student.Id && v.DocumentType.Key == "ETR")
+                .OrderByDescending(v => v.Id)
+                .Select(v => (int?)v.Id)
+                .FirstOrDefaultAsync(ct);
+
+            await _evaluationCaseService.DetermineAsync(actingUserId, student.Id, new DetermineEvaluationModel
+            {
+                Outcome = EligibilityOutcome.Eligible,
+                DeterminationDate = etrDate,
+                Rationale = $"{student.FirstName} continues to meet the eligibility criteria for {(student.Disability?.ToDisplay() ?? "the identified category")} and continues to require specially designed instruction.",
+                EtrAuthoredVersionId = etrVersionId
+            }, ct);
+            await _evaluationCaseService.CloseAsync(actingUserId, student.Id, ct);
+        }
+
+        return new DemoEvaluationCounts(cases, etrs, draftIeps);
+    }
+
+    private async Task<bool> OpenCaseAsync(int actingUserId, DemoStudent student, EvaluationCaseKind kind, DateTime referralDate, string referralSource, CancellationToken ct)
+    {
+        var result = await _evaluationCaseService.CreateAsync(actingUserId, student.Id, new CreateEvaluationCaseModel
+        {
+            Kind = kind,
+            ReferralDate = referralDate,
+            ReferralSource = referralSource
+        }, ct);
+
+        if (result.Success)
+            return true;
+
+        _logger.LogWarning("Demo seed: could not open an evaluation case for student {StudentId}: {Message}", student.Id, result.Message);
+        return false;
+    }
+
+    /// <summary>One assignment per evaluator on the student's team. <paramref name="submittedOn"/> null
+    /// leaves them outstanding (so a case shows work still owed, and an overdue one once the due date has
+    /// passed); a date marks every assignment but the last as submitted.</summary>
+    private async Task AddEvaluatorAssignmentsAsync(int actingUserId, DemoStudent student, DateTime dueDate, DateTime? submittedOn, CancellationToken ct)
+    {
+        var assignments = new List<(int UserId, string Domain)>
+        {
+            (student.Evaluator?.UserId ?? student.CaseManager.UserId, "Cognitive ability and observation"),
+            (student.CaseManager.UserId, "Academic achievement")
+        };
+
+        for (var i = 0; i < assignments.Count; i++)
+        {
+            var (userId, domain) = assignments[i];
+            var created = await _evaluationCaseService.AddAssignmentAsync(actingUserId, student.Id, new CreateEvaluatorAssignmentModel
+            {
+                UserId = userId,
+                Domain = domain,
+                DueDate = dueDate
+            }, ct);
+
+            if (!created.Success || created.Data == null)
+            {
+                _logger.LogWarning("Demo seed: could not add the '{Domain}' assignment for student {StudentId}: {Message}", domain, student.Id, created.Message);
+                continue;
+            }
+
+            // The last assignment stays outstanding when nothing has been submitted yet.
+            var submit = submittedOn ?? (i < assignments.Count - 1 ? dueDate.AddDays(-2) : (DateTime?)null);
+            if (submit == null)
+                continue;
+
+            await _evaluationCaseService.UpdateAssignmentAsync(actingUserId, created.Data.Id, new UpdateEvaluatorAssignmentModel
+            {
+                SubmittedAt = submit,
+                Notes = "Report uploaded to the shared evaluation folder and summarised in the ETR."
+            }, ct);
+        }
     }
 
     // ================================================================================= Meetings
 
-    private async Task CreateMeetingsAsync(int actingUserId, List<DemoStudent> students, CancellationToken ct)
+    /// <summary>
+    /// Meetings a district would have on its calendar right now: four already held (with the decisions the
+    /// team recorded and attendance taken), eight scheduled over the next month, and two still proposed
+    /// while the family settles on a time. Each is created by the student's own case manager, so the
+    /// "my meetings" view is populated for the staff logins as well as the admin's.
+    /// </summary>
+    private async Task<int> CreateMeetingsAsync(int actingUserId, List<DemoStudent> students, CancellationToken ct)
     {
-        var meetingStudents = students.Where(s => s.HasIep).Take(6).ToList();
-        if (meetingStudents.Count == 0)
-            return;
+        var withIep = students.Where(s => s.GetsFinalizedIep).ToList();
+        if (withIep.Count == 0)
+            return 0;
 
-        var now = DateTime.UtcNow;
-        var meetingTypes = new[] { MeetingType.AnnualReview, MeetingType.Amendment, MeetingType.InitialIep, MeetingType.Reevaluation, MeetingType.Transition, MeetingType.AnnualReview };
+        var today = DateTime.UtcNow.Date;
+        var created = 0;
 
-        for (var i = 0; i < meetingStudents.Count; i++)
+        // ---- Held, with decisions ----
+        var heldPlan = new (int Offset, MeetingType Type)[]
         {
-            var student = meetingStudents[i];
-            var startsAt = now.AddDays(2 + i * 5).Date.AddHours(14); // spread across the next ~30 days
-            var create = await _meetingService.CreateAsync(actingUserId, student.Id, new CreateMeetingModel
-            {
-                Type = meetingTypes[i % meetingTypes.Length],
-                Title = $"{meetingTypes[i % meetingTypes.Length]} Meeting — {student.FirstName} {student.LastName}",
-                StartsAtUtc = startsAt,
-                DurationMinutes = 60,
-                Location = "Maple Ridge conference room",
-                Notes = "Demo seed data."
-            }, ct);
+            (-45, MeetingType.AnnualReview),
+            (-31, MeetingType.Amendment),
+            (-18, MeetingType.AnnualReview),
+            (-9, MeetingType.Transition)
+        };
+        for (var i = 0; i < heldPlan.Length && i < withIep.Count; i++)
+        {
+            var (offset, type) = heldPlan[i];
+            var student = PickMeetingStudent(withIep);
+            var meeting = await ScheduleMeetingAsync(student, type, today.AddDays(offset).AddHours(14), "Demo seed data.", ct);
+            if (meeting == null)
+                continue;
+            created++;
 
-            if (!create.Success || create.Data == null)
+            var held = await _meetingService.SetStatusAsync(student.CaseManager.UserId, meeting.Id, MeetingStatus.Held, ct);
+            if (!held.Success || held.Data == null)
             {
-                _logger.LogWarning("Demo seed: failed to create meeting for student {StudentId}: {Message}", student.Id, create.Message);
+                _logger.LogWarning("Demo seed: could not mark meeting {MeetingId} as held: {Message}", meeting.Id, held.Message);
                 continue;
             }
 
-            if (i == 0)
-            {
-                var held = await _meetingService.SetStatusAsync(actingUserId, create.Data.Id, MeetingStatus.Held, ct);
-                if (held.Success)
+            await RecordFullAttendanceAsync(student, held.Data, ct);
+            foreach (var (text, outcome) in DecisionsFor(student, type))
+                await _meetingDecisionService.CreateAsync(student.CaseManager.UserId, meeting.Id, new CreateMeetingDecisionModel
                 {
-                    await _meetingDecisionService.CreateAsync(actingUserId, create.Data.Id, new CreateMeetingDecisionModel
-                    {
-                        Text = "Team agreed to add specialized reading instruction 4x/week.",
-                        Outcome = MeetingDecisionOutcome.Agreed
-                    }, ct);
-                    await _meetingDecisionService.CreateAsync(actingUserId, create.Data.Id, new CreateMeetingDecisionModel
-                    {
-                        Text = "Family requested additional data on math progress before the next review.",
-                        Outcome = MeetingDecisionOutcome.Deferred
-                    }, ct);
-                }
-            }
+                    Text = text,
+                    Outcome = outcome
+                }, ct);
+        }
+
+        // ---- Scheduled over the next month ----
+        // Each type is drawn from a pool it makes sense for: an eligibility meeting for a student who is
+        // actually being evaluated, an initial IEP for one who was just found eligible, a transition
+        // meeting for a high-schooler.
+        var beingEvaluated = students.Where(s => s.Track is DemoRoster.Track.EvaluationInProgress or DemoRoster.Track.EvaluationEtrComplete).ToList();
+        var newlyEligible = students.Where(s => s.Track is DemoRoster.Track.DraftIep or DemoRoster.Track.EvaluationEtrComplete).ToList();
+        var secondary = students.Where(s => s.GetsFinalizedIep && DemoIepContent.IsSecondary(s.Grade)).ToList();
+
+        var upcomingPlan = new (int Offset, MeetingType Type, List<DemoStudent> Pool)[]
+        {
+            (3, MeetingType.AnnualReview, withIep),
+            (6, MeetingType.EtrEligibility, beingEvaluated.Count > 0 ? beingEvaluated : withIep),
+            (9, MeetingType.AnnualReview, withIep),
+            (13, MeetingType.Amendment, withIep),
+            (17, MeetingType.InitialIep, newlyEligible.Count > 0 ? newlyEligible : withIep),
+            (20, MeetingType.AnnualReview, withIep),
+            (24, MeetingType.Reevaluation, withIep),
+            (28, MeetingType.Transition, secondary.Count > 0 ? secondary : withIep)
+        };
+        for (var i = 0; i < upcomingPlan.Length; i++)
+        {
+            var (offset, type, pool) = upcomingPlan[i];
+            var student = PickMeetingStudent(pool);
+            var meeting = await ScheduleMeetingAsync(student, type, today.AddDays(offset).AddHours(i % 2 == 0 ? 14 : 9), null, ct);
+            if (meeting == null)
+                continue;
+            created++;
+            await RecordRsvpsAsync(meeting, familyReplies: i != 3, ct);
+        }
+
+        // ---- Further out, still waiting on the family to settle on a time ----
+        // These stay Scheduled: MeetingService.SetStatusAsync accepts only Scheduled/Held/Continued, so
+        // MeetingStatus.Proposed is not reachable through the real service and the seeder does not fake it.
+        // The note carries the "waiting on the family" state instead.
+        for (var i = 0; i < 2; i++)
+        {
+            var student = PickMeetingStudent(withIep);
+            var meeting = await ScheduleMeetingAsync(student, MeetingType.AnnualReview, today.AddDays(34 + i * 4).AddHours(15),
+                "Three times offered to the family; waiting on a reply before this date is confirmed.", ct);
+            if (meeting != null)
+                created++;
+        }
+
+        return created;
+    }
+
+    /// <summary>Students already given a meeting, so no student ends up with three of them.</summary>
+    private readonly HashSet<int> _studentsWithAMeeting = new();
+
+    /// <summary>
+    /// Picks who this meeting is for. Students whose family is linked come first, so the participant list
+    /// a meeting builds by default actually shows the parent (and, for a high-schooler with an account, the
+    /// student) the way a real IEP meeting invitation does. After that it spreads deterministically across
+    /// buildings and case managers, and never gives the same student two meetings while others have none.
+    /// </summary>
+    private DemoStudent PickMeetingStudent(List<DemoStudent> pool)
+    {
+        var ordered = pool
+            .OrderByDescending(HasLinkedFamily)
+            .ThenBy(s => (s.Index * 13 + 7) % 41)
+            .ToList();
+
+        var pick = ordered.FirstOrDefault(s => !_studentsWithAMeeting.Contains(s.Id)) ?? ordered[0];
+        _studentsWithAMeeting.Add(pick.Id);
+        return pick;
+    }
+
+    private static bool HasLinkedFamily(DemoStudent student) =>
+        DemoRoster.Parents.Any(p => p.StudentIndex == student.Index && p.Engagement != DemoRoster.FamilyEngagement.InvitePending);
+
+    private async Task<MeetingModel?> ScheduleMeetingAsync(DemoStudent student, MeetingType type, DateTime startsAtUtc, string? notes, CancellationToken ct)
+    {
+        var result = await _meetingService.CreateAsync(student.CaseManager.UserId, student.Id, new CreateMeetingModel
+        {
+            Type = type,
+            Title = $"{type.ToDisplay()} — {student.FullName}",
+            StartsAtUtc = startsAtUtc,
+            DurationMinutes = type == MeetingType.Amendment ? 30 : 60,
+            Location = $"{student.SchoolName} conference room",
+            Notes = notes
+        }, ct);
+
+        if (result.Success && result.Data != null)
+            return result.Data;
+
+        _logger.LogWarning("Demo seed: failed to create a {Type} meeting for student {StudentId}: {Message}", type, student.Id, result.Message);
+        return null;
+    }
+
+    /// <summary>
+    /// Everyone attended, except — on a roster large enough for it — one related-service provider excused
+    /// under IDEA's written-agreement rule, having sent written input instead. Never the family or the
+    /// student: an excused parent is the wrong thing to show in a demo, and it is not the case the excusal
+    /// rule exists for.
+    /// </summary>
+    private async Task RecordFullAttendanceAsync(DemoStudent student, MeetingModel meeting, CancellationToken ct)
+    {
+        if (meeting.Participants == null || meeting.Participants.Count == 0)
+            return;
+
+        var excusable = meeting.Participants.LastOrDefault(p =>
+            !p.IsFamily && !p.IsStudent &&
+            p.TeamRole is TeamRole.SpeechLanguagePathologist or TeamRole.OccupationalTherapist
+                or TeamRole.PhysicalTherapist or TeamRole.SchoolPsychologist);
+        var excusedParticipantId = meeting.Participants.Count > 4 ? excusable?.Id : null;
+
+        var items = meeting.Participants.Select(p => new AttendanceItemModel
+        {
+            ParticipantId = p.Id,
+            Attended = p.Id != excusedParticipantId,
+            ExcusalNote = p.Id == excusedParticipantId
+                ? "Excused by written agreement with the parent; written input was provided to the team instead."
+                : null
+        }).ToList();
+
+        var result = await _meetingService.RecordAttendanceAsync(student.CaseManager.UserId, meeting.Id, items, ct);
+        if (!result.Success)
+            _logger.LogWarning("Demo seed: could not record attendance for meeting {MeetingId}: {Message}", meeting.Id, result.Message);
+    }
+
+    /// <summary>
+    /// RSVPs on an upcoming meeting, each submitted by the participant themselves (the service only lets a
+    /// caller answer for their own row). The team accepts; the family accepts on all but one meeting, which
+    /// is left unanswered so the "no reply yet" state has an example.
+    /// </summary>
+    private async Task RecordRsvpsAsync(MeetingModel meeting, bool familyReplies, CancellationToken ct)
+    {
+        if (meeting.Participants == null)
+            return;
+
+        foreach (var participant in meeting.Participants.Where(p => p.UserId != null))
+        {
+            if ((participant.IsFamily || participant.IsStudent) && !familyReplies)
+                continue;
+
+            var status = participant.TeamRole == TeamRole.LeaRepresentative ? InviteStatus.Tentative : InviteStatus.Accepted;
+            var result = await _meetingService.RsvpAsync(participant.UserId!.Value, meeting.Id, status, ct);
+            if (!result.Success)
+                _logger.LogWarning("Demo seed: could not record an RSVP on meeting {MeetingId}: {Message}", meeting.Id, result.Message);
         }
     }
 
-    // ================================================================================= Family engagement (parents + student account)
-
-    private async Task CreateFamilyEngagementAsync(int actingUserId, List<DemoStaff> staff, List<DemoStudent> students, List<DemoLoginRow> logins, CancellationToken ct)
+    private static IEnumerable<(string Text, MeetingDecisionOutcome Outcome)> DecisionsFor(DemoStudent student, MeetingType type)
     {
-        var iepStudents = students.Where(s => s.HasIep).ToList();
-        if (iepStudents.Count < 2)
-            return;
+        var name = student.FirstName;
+        switch (type)
+        {
+            case MeetingType.Amendment:
+                yield return ($"Team agreed to add 30 minutes of specialized reading instruction four times a week for {name}.", MeetingDecisionOutcome.Agreed);
+                yield return ("Family asked for the amended IEP in writing before it takes effect; the case manager will send it this week.", MeetingDecisionOutcome.Agreed);
+                break;
+            case MeetingType.Transition:
+                yield return ($"Team agreed to refer {name} to Opportunities for Ohioans with Disabilities before the next annual review.", MeetingDecisionOutcome.Agreed);
+                yield return ("Decision on a shortened school day deferred until the team reviews attendance data in six weeks.", MeetingDecisionOutcome.Deferred);
+                break;
+            default:
+                yield return ($"Team agreed to continue the current services and goals for {name}, with the reading goal raised to a 95% accuracy criterion.", MeetingDecisionOutcome.Agreed);
+                yield return ("Family requested additional math progress data before agreeing to reduce resource-room time.", MeetingDecisionOutcome.Deferred);
+                yield return ("Team did not agree on extended school year services; the family's written objection is attached to the record.", MeetingDecisionOutcome.Disagreed);
+                break;
+        }
+    }
 
-        // Parent 1: fully engaged — linked, shared revision, 2 responses, 1 acknowledgement.
-        var studentA = iepStudents[0];
-        const string parent1Email = $"jamie.parent@{EmailDomain}";
-        var parent1UserId = await CreateAccountUserAsync(parent1Email, "Jamie", "Rivera", ct);
+    // ================================================================================= Family engagement
 
-        var invite1 = await _childLinkService.InviteParentAsync(actingUserId, studentA.Id, parent1Email, ct);
-        if (!invite1.Success)
-            throw new InvalidOperationException($"Failed to invite parent1: {invite1.Message}");
-        var token1 = await ExtractLatestTokenAsync(parent1Email, "SchoolLinkInvite", ct);
-        var accept1 = await _childLinkService.AcceptInviteAsync(parent1UserId, token1, null, ct);
-        if (!accept1.Success)
-            throw new InvalidOperationException($"Failed to accept parent1 link: {accept1.Message}");
+    /// <summary>Parent user id of each engaged family, by student index — set by
+    /// <see cref="LinkFamiliesAsync"/> and read by <see cref="ShareDraftsWithFamiliesAsync"/> once the
+    /// documents those families are asked to review exist.</summary>
+    private readonly Dictionary<int, int> _engagedParentUserIdByStudentIndex = new();
 
-        logins.Add(new DemoLoginRow("Parent (linked + engaged)", parent1Email, DemoPassword));
+    private async Task LinkFamiliesAsync(List<DemoStudent> students, List<DemoLoginRow> logins, CancellationToken ct)
+    {
+        foreach (var parent in DemoRoster.Parents)
+        {
+            var student = students[parent.StudentIndex];
+            var caseManagerUserId = student.CaseManager.UserId;
 
-        // studentA only ever had one DocumentInstance created for them (the IEP) — IEP and ETR students
-        // are disjoint groups in CreateStudentsAsync. The Draft instance stays Status=Draft even after
-        // finalize (AuthoredDocumentVersionService re-opens it), so sharing it shares the finalized values.
+            var invite = await _childLinkService.InviteParentAsync(caseManagerUserId, student.Id, parent.Email, ct);
+            if (!invite.Success)
+            {
+                _logger.LogWarning("Demo seed: could not invite parent {Email}: {Message}", parent.Email, invite.Message);
+                continue;
+            }
+
+            if (parent.Engagement == DemoRoster.FamilyEngagement.InvitePending)
+            {
+                // Deliberately left unaccepted: the pending-invite row a district follows up on. No account
+                // exists for this address, so it is not a login.
+                logins.Add(new DemoLoginRow($"Parent of {student.FullName} — INVITE PENDING, cannot log in", parent.Email, "(invite not accepted)"));
+                continue;
+            }
+
+            var parentUserId = await CreateAccountUserAsync(parent.Email, parent.FirstName, parent.LastName, ct);
+            var token = await ExtractLatestTokenAsync(parent.Email, "SchoolLinkInvite", ct);
+            var accept = await _childLinkService.AcceptInviteAsync(parentUserId, token, null, ct);
+            if (!accept.Success)
+                throw new InvalidOperationException($"Failed to accept the parent link for '{parent.Email}': {accept.Message}");
+
+            var label = parent.Engagement == DemoRoster.FamilyEngagement.ReviewedDraft
+                ? $"Parent of {student.FullName} (sent a draft, has replied)"
+                : $"Parent of {student.FullName}";
+            logins.Add(new DemoLoginRow(label, parent.Email, DemoPassword));
+
+            if (parent.Engagement == DemoRoster.FamilyEngagement.ReviewedDraft)
+                _engagedParentUserIdByStudentIndex[parent.StudentIndex] = parentUserId;
+        }
+
+        await CreateStudentAccountAsync(students, logins, ct);
+    }
+
+    private async Task ShareDraftsWithFamiliesAsync(List<DemoStudent> students, CancellationToken ct)
+    {
+        foreach (var (studentIndex, parentUserId) in _engagedParentUserIdByStudentIndex)
+            await ShareDraftWithParentAsync(students[studentIndex], parentUserId, ct);
+    }
+
+    /// <summary>Sends the student's IEP to the family and records the conversation that came back: two
+    /// questions, an agreement, and the family's acknowledgement that they have read it.</summary>
+    private async Task ShareDraftWithParentAsync(DemoStudent student, int parentUserId, CancellationToken ct)
+    {
+        // The Draft instance stays Status=Draft after finalize (AuthoredDocumentVersionService re-opens it),
+        // so sharing it shares the finalized values the family would actually see.
         var instanceId = await _context.DocumentInstances
-            .Where(d => d.SchoolStudentId == studentA.Id)
-            .Select(d => d.Id)
-            .FirstAsync(ct);
-
-        var share = await _draftSharingService.ShareAsync(actingUserId, instanceId, "Please review the latest IEP draft and let us know your thoughts.", ct);
-        if (share.Success && share.Data != null)
+            .Where(d => d.SchoolStudentId == student.Id)
+            .OrderByDescending(d => d.Id)
+            .Select(d => (int?)d.Id)
+            .FirstOrDefaultAsync(ct);
+        if (instanceId == null)
         {
-            await _draftResponseService.CreateAsync(parent1UserId, share.Data.Id, new CreateDraftResponseModel
-            {
-                Kind = DraftResponseKind.Question,
-                Text = "Can you say more about how the reading goal will be measured?"
-            }, ct);
-            await _draftResponseService.CreateAsync(parent1UserId, share.Data.Id, new CreateDraftResponseModel
-            {
-                Kind = DraftResponseKind.Agree,
-                Text = "The math goal looks great — thank you!"
-            }, ct);
-            await _draftSharingService.AcknowledgeAsync(parent1UserId, share.Data.Id, ct);
-        }
-        else
-        {
-            _logger.LogWarning("Demo seed: failed to share draft for student {StudentId}: {Message}", studentA.Id, share.Message);
+            _logger.LogWarning("Demo seed: student {StudentId} has no document to share with the family.", student.Id);
+            return;
         }
 
-        // Parent 2: linked only (no engagement) — a different student.
-        var studentB = iepStudents[1];
-        const string parent2Email = $"morgan.parent@{EmailDomain}";
-        var parent2UserId = await CreateAccountUserAsync(parent2Email, "Morgan", "Diaz", ct);
+        var share = await _draftSharingService.ShareAsync(student.CaseManager.UserId, instanceId.Value,
+            $"Here is the draft IEP ahead of {student.FirstName}'s meeting. Please read the goals and services sections and tell us what you think — questions are welcome.", ct);
+        if (!share.Success || share.Data == null)
+        {
+            _logger.LogWarning("Demo seed: failed to share the draft for student {StudentId}: {Message}", student.Id, share.Message);
+            return;
+        }
 
-        var invite2 = await _childLinkService.InviteParentAsync(actingUserId, studentB.Id, parent2Email, ct);
-        if (!invite2.Success)
-            throw new InvalidOperationException($"Failed to invite parent2: {invite2.Message}");
-        var token2 = await ExtractLatestTokenAsync(parent2Email, "SchoolLinkInvite", ct);
-        var accept2 = await _childLinkService.AcceptInviteAsync(parent2UserId, token2, null, ct);
-        if (!accept2.Success)
-            throw new InvalidOperationException($"Failed to accept parent2 link: {accept2.Message}");
+        await _draftResponseService.CreateAsync(parentUserId, share.Data.Id, new CreateDraftResponseModel
+        {
+            Kind = DraftResponseKind.Question,
+            Text = "Can you say more about how the reading goal will be measured, and how often we will hear about progress?"
+        }, ct);
+        await _draftResponseService.CreateAsync(parentUserId, share.Data.Id, new CreateDraftResponseModel
+        {
+            Kind = DraftResponseKind.Question,
+            Text = $"Who will be delivering the specialized instruction, and will {student.FirstName} miss any part of the general education class to attend?"
+        }, ct);
+        await _draftResponseService.CreateAsync(parentUserId, share.Data.Id, new CreateDraftResponseModel
+        {
+            Kind = DraftResponseKind.Agree,
+            Text = "The math goal and the accommodations look right to us — thank you for writing them so clearly."
+        }, ct);
+        await _draftSharingService.AcknowledgeAsync(parentUserId, share.Data.Id, ct);
+    }
 
-        logins.Add(new DemoLoginRow("Parent (linked)", parent2Email, DemoPassword));
+    /// <summary>One high-school student with their own account, invited by their case manager, so the
+    /// student view of transition planning can be demonstrated.</summary>
+    private async Task CreateStudentAccountAsync(List<DemoStudent> students, List<DemoLoginRow> logins, CancellationToken ct)
+    {
+        var student = students[DemoRoster.StudentAccountStudentIndex];
+        var email = DemoRoster.StudentAccountEmail;
+        var studentUserId = await CreateAccountUserAsync(email, student.FirstName, student.LastName, ct);
 
-        // 1 student account: a third student, invited by their case-manager teacher.
-        var studentC = iepStudents.Count > 2 ? iepStudents[2] : iepStudents[0];
-        const string studentEmail = $"riley.student@{EmailDomain}";
-        var studentUserId = await CreateAccountUserAsync(studentEmail, "Riley", "Student", ct);
+        var invite = await _studentInviteService.InviteFromEducatorAsync(student.CaseManager.UserId, student.Id, email, ct);
+        if (!invite.Success)
+            throw new InvalidOperationException($"Failed to invite the student account: {invite.Message}");
 
-        var caseManagerUserId = staff.First(s => s.StaffProfileId == studentC.CaseManagerStaffProfileId).UserId;
-        var studentInvite = await _studentInviteService.InviteFromEducatorAsync(caseManagerUserId, studentC.Id, studentEmail, ct);
-        if (!studentInvite.Success)
-            throw new InvalidOperationException($"Failed to invite student account: {studentInvite.Message}");
-        var studentToken = await ExtractLatestTokenAsync(studentEmail, "StudentInvite", ct);
-        var studentAccept = await _studentInviteService.AcceptInviteAsync(studentUserId, studentToken, consentAccepted: true, ct);
-        if (!studentAccept.Success)
-            throw new InvalidOperationException($"Failed to accept student invite: {studentAccept.Message}");
+        var token = await ExtractLatestTokenAsync(email, "StudentInvite", ct);
+        var accept = await _studentInviteService.AcceptInviteAsync(studentUserId, token, consentAccepted: true, ct);
+        if (!accept.Success)
+            throw new InvalidOperationException($"Failed to accept the student invite: {accept.Message}");
 
-        logins.Add(new DemoLoginRow("Student account", studentEmail, DemoPassword));
+        logins.Add(new DemoLoginRow($"Student — {student.FullName}, grade {student.Grade.ToDisplay()}", email, DemoPassword));
     }
 
     /// <summary>
@@ -716,46 +1523,41 @@ public class DemoSeeder : IDemoSeeder
         return await _context.Users.Where(u => u.Email == email).Select(u => u.Id).FirstAsync(ct);
     }
 
-    // ================================================================================= Evaluation case + contact attempts
+    // ================================================================================= Contact attempts
 
-    private async Task CreateEvaluationCaseAsync(int actingUserId, List<DemoStudent> students, CancellationToken ct)
-    {
-        var student = students.Skip(20).FirstOrDefault() ?? students.LastOrDefault();
-        if (student == null)
-            return;
-
-        var result = await _evaluationCaseService.CreateAsync(actingUserId, student.Id, new CreateEvaluationCaseModel
-        {
-            Kind = EvaluationCaseKind.Initial,
-            ReferralDate = DateTime.UtcNow.AddDays(-10),
-            ReferralSource = "Teacher referral — reading and math concerns raised in RTI meeting."
-        }, ct);
-
-        if (!result.Success)
-            _logger.LogWarning("Demo seed: failed to create evaluation case for student {StudentId}: {Message}", student.Id, result.Message);
-    }
-
+    /// <summary>The documented outreach behind the meetings: the record a district needs when a family does
+    /// not respond. Recorded by the case manager who made the call.</summary>
     private async Task CreateContactAttemptsAsync(int actingUserId, List<DemoStudent> students, CancellationToken ct)
     {
-        var targets = students.Where(s => s.HasIep).Take(4).ToList();
-        var methods = new[] { FamilyContactMethod.Phone, FamilyContactMethod.Email, FamilyContactMethod.Letter, FamilyContactMethod.InPerson };
-        var outcomes = new[] { FamilyContactOutcome.Reached, FamilyContactOutcome.LeftMessage, FamilyContactOutcome.NoAnswer, FamilyContactOutcome.Reached };
-
-        for (var i = 0; i < targets.Count; i++)
+        var attempts = new (int Seed, int DaysAgo, FamilyContactMethod Method, FamilyContactOutcome Outcome, string Note)[]
         {
-            var result = await _familyContactService.RecordContactAttemptAsync(actingUserId, targets[i].Id, new CreateFamilyContactAttemptModel
+            (0, 3, FamilyContactMethod.Phone, FamilyContactOutcome.Reached, "Called to confirm the annual review date and time; family confirmed."),
+            (5, 6, FamilyContactMethod.Email, FamilyContactOutcome.Reached, "Emailed the draft IEP and the procedural safeguards notice."),
+            (9, 8, FamilyContactMethod.Phone, FamilyContactOutcome.LeftMessage, "First attempt to schedule the annual review; left a voicemail."),
+            (9, 5, FamilyContactMethod.Phone, FamilyContactOutcome.NoAnswer, "Second attempt to schedule; no answer, no voicemail available."),
+            (9, 2, FamilyContactMethod.Letter, FamilyContactOutcome.LeftMessage, "Third attempt: written notice of the proposed meeting date mailed home."),
+            (14, 11, FamilyContactMethod.InPerson, FamilyContactOutcome.Reached, "Spoke with the parent at pick-up; agreed on a morning meeting."),
+            (19, 4, FamilyContactMethod.Phone, FamilyContactOutcome.Reached, "Discussed the progress-monitoring data ahead of the meeting."),
+            (23, 13, FamilyContactMethod.Email, FamilyContactOutcome.NoAnswer, "Emailed three proposed meeting times; no reply yet."),
+            (28, 7, FamilyContactMethod.Phone, FamilyContactOutcome.Reached, "Interpreter arranged for the meeting at the family's request."),
+            (33, 9, FamilyContactMethod.Phone, FamilyContactOutcome.LeftMessage, "Left a message about the evaluation consent form.")
+        };
+
+        foreach (var (seed, daysAgo, method, outcome, note) in attempts)
+        {
+            var student = students[seed % students.Count];
+            var result = await _familyContactService.RecordContactAttemptAsync(student.CaseManager.UserId, student.Id, new CreateFamilyContactAttemptModel
             {
-                AttemptedAt = DateTime.UtcNow.AddDays(-(3 + i * 5)),
-                Method = methods[i % methods.Length],
-                Outcome = outcomes[i % outcomes.Length],
-                Note = "Demo seed data — routine check-in ahead of the annual review."
+                AttemptedAt = DateTime.UtcNow.AddDays(-daysAgo),
+                Method = method,
+                Outcome = outcome,
+                Note = note
             }, ct);
 
             if (!result.Success)
-                _logger.LogWarning("Demo seed: failed to record contact attempt for student {StudentId}: {Message}", targets[i].Id, result.Message);
+                _logger.LogWarning("Demo seed: failed to record a contact attempt for student {StudentId}: {Message}", student.Id, result.Message);
         }
     }
-
     // ================================================================================= ResetAsync
 
     /// <summary>The four SQL Server INSTEAD OF UPDATE/DELETE triggers from migration
@@ -832,6 +1634,15 @@ public class DemoSeeder : IDemoSeeder
             .Where(u => u.Email.ToLower().EndsWith("@" + EmailDomain))
             .Select(u => u.Id)
             .ToListAsync(ct);
+
+        // Every account this demo district owns: its staff, the parents whose only footprint is this
+        // district, its student account(s), and anything left on the reserved fictional domain.
+        var demoAccountUserIds = staffUserIds
+            .Concat(demoOnlyParentUserIds)
+            .Concat(studentAccountUserIds)
+            .Concat(strandedDemoEmailUserIds)
+            .Distinct()
+            .ToList();
 
         var isSqlServer = _context.Database.IsSqlServer();
 
@@ -938,6 +1749,27 @@ public class DemoSeeder : IDemoSeeder
                 .ToListAsync(ct);
             var allChildProfileIds = childProfileIds.Concat(strandedChildProfileIds).Distinct().ToList();
 
+            // ---- Parent-product rows that block the ChildProfile/User/District deletes ----
+            // These five FKs are NO ACTION, so a row in any of them stops the delete below; everything else
+            // hanging off a ChildProfile (journal entries, prep questions, advocacy goals, analysis runs)
+            // cascades and needs no help. Usage records matter most in practice: they appear the moment
+            // anyone actually demos an AI feature, which is exactly when the next reset has to work.
+            _context.UsageRecords.RemoveRange(await _context.UsageRecords
+                .Where(r => (r.ChildProfileId != null && allChildProfileIds.Contains(r.ChildProfileId.Value))
+                            || demoAccountUserIds.Contains(r.UserId)
+                            || r.DistrictId == districtId)
+                .ToListAsync(ct));
+            _context.AdvocateThreads.RemoveRange(await _context.AdvocateThreads
+                .Where(t => allChildProfileIds.Contains(t.ChildProfileId) || demoAccountUserIds.Contains(t.ParentUserId))
+                .ToListAsync(ct));
+            _context.MeetingPrepChecklists.RemoveRange(await _context.MeetingPrepChecklists
+                .Where(c => allChildProfileIds.Contains(c.ChildProfileId)).ToListAsync(ct));
+            _context.ProgressReports.RemoveRange(await _context.ProgressReports
+                .Where(r => allChildProfileIds.Contains(r.ChildProfileId)).ToListAsync(ct));
+            _context.StudentWorkspaces.RemoveRange(await _context.StudentWorkspaces
+                .Where(w => demoAccountUserIds.Contains(w.UserId)).ToListAsync(ct));
+            await _context.SaveChangesAsync(ct);
+
             _context.ChildAccesses.RemoveRange(await _context.ChildAccesses.Where(a => allChildProfileIds.Contains(a.ChildProfileId)).ToListAsync(ct));
             await _context.SaveChangesAsync(ct);
             _context.ChildProfiles.RemoveRange(await _context.ChildProfiles.Where(cp => allChildProfileIds.Contains(cp.Id)).ToListAsync(ct));
@@ -964,12 +1796,7 @@ public class DemoSeeder : IDemoSeeder
             await _context.SaveChangesAsync(ct);
 
             // ---- Users whose only footprint was this demo district ----
-            var userIdsToDelete = staffUserIds
-                .Concat(demoOnlyParentUserIds)
-                .Concat(studentAccountUserIds)
-                .Concat(strandedDemoEmailUserIds)
-                .Distinct()
-                .ToList();
+            var userIdsToDelete = demoAccountUserIds;
 
             // BetaInviteCode.RedeemedByUserId is FK Restrict — CreateAccountUserAsync inserts one of
             // these per parent/student account (the closed-beta gate RegisterAsync requires); they must
@@ -996,7 +1823,21 @@ public class DemoSeeder : IDemoSeeder
         catch
         {
             _immutabilityBypass.Enabled = false;
-            await transaction.RollbackAsync(ct);
+
+            // A transport-level failure against Azure SQL kills the connection, and with it the
+            // transaction — the server has already rolled it back. Rolling back again throws "This
+            // SqlTransaction has completed", which would replace the exception that actually explains what
+            // happened. The rollback is still attempted, because an ordinary failure (a constraint, say)
+            // leaves a live transaction that must be undone.
+            try
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            catch (Exception rollbackFailure)
+            {
+                _logger.LogWarning(rollbackFailure, "Demo reset: the transaction could not be rolled back explicitly — the connection had already ended it.");
+            }
+
             throw;
         }
     }
@@ -1021,6 +1862,22 @@ public class DemoSeeder : IDemoSeeder
         await _context.SaveChangesAsync(ct);
 
         var childProfileIds = await _context.ChildProfiles.Where(cp => strandedUserIds.Contains(cp.UserId)).Select(cp => cp.Id).ToListAsync(ct);
+
+        // Same NO ACTION references ResetAsync clears — see the comment there.
+        _context.UsageRecords.RemoveRange(await _context.UsageRecords
+            .Where(r => (r.ChildProfileId != null && childProfileIds.Contains(r.ChildProfileId.Value)) || strandedUserIds.Contains(r.UserId))
+            .ToListAsync(ct));
+        _context.AdvocateThreads.RemoveRange(await _context.AdvocateThreads
+            .Where(t => childProfileIds.Contains(t.ChildProfileId) || strandedUserIds.Contains(t.ParentUserId))
+            .ToListAsync(ct));
+        _context.MeetingPrepChecklists.RemoveRange(await _context.MeetingPrepChecklists
+            .Where(c => childProfileIds.Contains(c.ChildProfileId)).ToListAsync(ct));
+        _context.ProgressReports.RemoveRange(await _context.ProgressReports
+            .Where(r => childProfileIds.Contains(r.ChildProfileId)).ToListAsync(ct));
+        _context.StudentWorkspaces.RemoveRange(await _context.StudentWorkspaces
+            .Where(w => strandedUserIds.Contains(w.UserId)).ToListAsync(ct));
+        await _context.SaveChangesAsync(ct);
+
         _context.ChildAccesses.RemoveRange(await _context.ChildAccesses.Where(a => childProfileIds.Contains(a.ChildProfileId)).ToListAsync(ct));
         await _context.SaveChangesAsync(ct);
         _context.ChildProfiles.RemoveRange(await _context.ChildProfiles.Where(cp => childProfileIds.Contains(cp.Id)).ToListAsync(ct));
