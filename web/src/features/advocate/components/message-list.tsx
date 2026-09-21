@@ -73,8 +73,8 @@ const PAGE_PIN_THRESHOLD_PX = 96;
  * never fires, `pinnedRef` stays true, and every streamed token would drag the
  * page back down (measured: page 386 -> reader scrolls to 0 -> next delta
  * snaps it to 386 again). `pagePinnedRef` closes that: the page follows the
- * stream only while the reader has left it near the bottom, and a new message
- * re-pins both because the reader asked for it.
+ * stream only while the reader has left it near the bottom, and sending re-pins
+ * it because the reader asked for that.
  */
 export function MessageList({ childId, messages, pending, streaming, announcement, handlers }: MessageListProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -90,25 +90,44 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
   };
 
   useEffect(() => {
-    const onPageScroll = () => {
+    const measurePage = () => {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       // A page that cannot scroll (every width from `md` up, where the panel is height-bound) is
       // always "at the bottom" — the guard must not disable following there.
       pagePinnedRef.current = max <= 0 || max - window.scrollY <= PAGE_PIN_THRESHOLD_PX;
     };
 
-    window.addEventListener('scroll', onPageScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onPageScroll);
+    // `resize` as well as `scroll`: the page can stop being at its bottom (or start being at it)
+    // with no scroll event at all — a rotation, the virtual keyboard, or the notice row mounting
+    // and changing the document's height. Without it a stale `false` would silently stop the
+    // stream from following until the reader happened to scroll again.
+    window.addEventListener('scroll', measurePage, { passive: true });
+    window.addEventListener('resize', measurePage, { passive: true });
+    window.visualViewport?.addEventListener('resize', measurePage);
+    return () => {
+      window.removeEventListener('scroll', measurePage);
+      window.removeEventListener('resize', measurePage);
+      window.visualViewport?.removeEventListener('resize', measurePage);
+    };
   }, []);
 
-  // A new message always pins (the reader asked for it); streaming text only
-  // follows while already pinned. Both surfaces re-pin together: a send made
-  // from the docked composer can leave the page mid-thread, and the answer to
-  // it still belongs on screen.
+  // A new message always pins the conversation itself (the reader asked for it); streaming text
+  // only follows while already pinned.
   useLayoutEffect(() => {
     pinnedRef.current = true;
-    pagePinnedRef.current = true;
   }, [messages.length, pending]);
+
+  /**
+   * The page is re-pinned when the reader *sends*, and deliberately not when an answer lands.
+   * Settling an answer also changes `messages.length`, so folding the page into the rule above
+   * would move the whole page — a thousand pixels, page header included — at the one moment a
+   * reader who scrolled away to re-read something is least expecting it. On `md` and up the page
+   * cannot scroll at all, so `pagePinnedRef` is always true there and completion still re-pins
+   * exactly as it did before; this only changes the phone case the sticky dock introduced.
+   */
+  useLayoutEffect(() => {
+    if (pending) pagePinnedRef.current = true;
+  }, [pending]);
 
   useEffect(() => {
     if (pinnedRef.current && pagePinnedRef.current) tailRef.current?.scrollIntoView({ block: 'nearest' });

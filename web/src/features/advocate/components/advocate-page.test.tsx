@@ -245,6 +245,15 @@ describe('AdvocatePage', () => {
     const overflowing = panel.querySelectorAll('[class*="overflow-y-auto"]');
     expect(overflowing).toHaveLength(1);
     expect(overflowing[0]).toBe(scrollers[0]);
+
+    // Guards the class, which is as far as jsdom can go — it has no layout, so the clipping itself
+    // cannot be measured here. The sr-only speaker labels inside the bubbles are `position:
+    // absolute`, and an absolutely-positioned box is only clipped by an ancestor's `overflow` when
+    // that ancestor is also its containing block. Dropping `relative` lets them lay out against the
+    // initial containing block instead: measured at 400x820 with four messages they landed ~857px
+    // below the content and pushed `documentElement.scrollHeight` from 1250 to 2107, which is both
+    // dead phone scroll and a broken page-bottom test for the pin guard.
+    expect(scrollers[0]).toHaveClass('relative');
   });
 
   it('publishes the summed height of everything the sticky dock paints over', async () => {
@@ -375,11 +384,34 @@ describe('AdvocatePage', () => {
       act(() => lastStream().handlers.onDelta('They have to tell you '));
       expect(targets).not.toContain(tail);
 
+      // The answer landing must not re-pin the page either: settling changes `messages.length`,
+      // and folding the page into the "a new message always pins" rule would move the whole page
+      // at the one moment the reader is least expecting it.
+      api.getAdvocateThread.mockImplementation((id: number) =>
+        Promise.resolve(id === 1 ? detail(1, [userMsg(11, 'What is PWN?'), answer, { ...answer, id: 33 }]) : detail(id, [])),
+      );
+      targets.length = 0;
+      await act(async () => {
+        lastStream().handlers.onDone({
+          messageId: 33,
+          contentMarkdown: answer.contentMarkdown,
+          citations: [],
+          suggestions: [],
+          truncated: false,
+          disclaimer: 'Not legal advice.',
+        });
+        lastStream().resolve();
+        await Promise.resolve();
+      });
+      expect(targets).not.toContain(tail);
+
       // Back near the page bottom (a `block: 'nearest'` scroll settles ~44px short of the maximum,
-      // which is why the page threshold is looser than the scroller's) — following resumes.
+      // which is why the page threshold is looser than the scroller's) — following resumes on the
+      // next send.
       setPage(386);
       targets.length = 0;
-      act(() => lastStream().handlers.onDelta('in writing.'));
+      typeAndSend('And in writing?');
+      await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(2));
       expect(targets).toContain(tail);
     } finally {
       spy.mockRestore();
@@ -594,6 +626,10 @@ describe('AdvocatePage', () => {
     expect(screen.getByTestId('subscribe-button')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Have an invite code?' })).toHaveAttribute('href', '/redeem-invite');
     expect(composer()).toBeDisabled();
+    // The cap is the third leg of the composer's `tinted` OR (streaming || creating || disabled);
+    // the other two are covered by the tint test above.
+    expect(composer().parentElement).toHaveClass('bg-brand-slate-50');
+    expect(composer().parentElement).not.toHaveClass('bg-white');
     expect(screen.getByTestId('advocate-send')).toBeDisabled();
     expect(screen.queryByTestId('advocate-user-message-pending')).not.toBeInTheDocument();
     expect(screen.getByTestId('advocate-send-error')).toHaveTextContent('You have used all of this year’s advocate messages.');
