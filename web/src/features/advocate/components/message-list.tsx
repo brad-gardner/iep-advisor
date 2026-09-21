@@ -1,4 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Markdown } from '@/components/ui/markdown';
 import { markdownToPlainText } from '../lib/plain-text';
 import type { AdvocateAnnouncement, PendingMessage, StreamingAnswer } from '../hooks/use-advocate-thread';
@@ -82,6 +84,8 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
   const announcementText = useMemo(() => (announcement ? markdownToPlainText(announcement.text) : ''), [announcement]);
   const pinnedRef = useRef(true);
   const pagePinnedRef = useRef(true);
+  const seenCountRef = useRef(messages.length);
+  const [unseenAnswer, setUnseenAnswer] = useState(false);
 
   const onScroll = () => {
     const el = scrollerRef.current;
@@ -129,8 +133,24 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
     if (pending) pagePinnedRef.current = true;
   }, [pending]);
 
+  const showLatest = () => {
+    pinnedRef.current = true;
+    pagePinnedRef.current = true;
+    setUnseenAnswer(false);
+    tailRef.current?.scrollIntoView({ block: 'nearest' });
+  };
+
   useEffect(() => {
-    if (pinnedRef.current && pagePinnedRef.current) tailRef.current?.scrollIntoView({ block: 'nearest' });
+    if (pinnedRef.current && pagePinnedRef.current) {
+      tailRef.current?.scrollIntoView({ block: 'nearest' });
+      setUnseenAnswer(false);
+    } else if (messages.length > seenCountRef.current) {
+      // An answer landed somewhere the reader is not looking. The rule above deliberately does not
+      // move them; the offer below is what replaces the jump, so completion is not left announced
+      // only to assistive tech.
+      setUnseenAnswer(true);
+    }
+    seenCountRef.current = messages.length;
   }, [messages, pending, streaming]);
 
   return (
@@ -206,6 +226,28 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
           data-testid="advocate-scroll-tail"
         />
       </div>
+
+      {/*
+        Only reachable below `md`: from `md` up the page cannot scroll, so `pagePinnedRef` is always
+        true and a new message always scrolls, leaving nothing unseen. It rides the panel's sticky
+        bottom edge, offset by the measured dock height so it sits just above the composer rather
+        than behind it.
+      */}
+      {unseenAnswer && (
+        <div className="pointer-events-none sticky bottom-[var(--advocate-dock-h,10rem)] z-10 flex justify-center">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="pointer-events-auto shadow-sm"
+            onClick={showLatest}
+            data-testid="advocate-jump-latest"
+          >
+            <ArrowDown className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+            New answer
+          </Button>
+        </div>
+      )}
 
       {/* Outside the conversation region on purpose: a status node under an aria-busy ancestor is
           dropped by some AT (Gecko/NVDA) rather than replayed, so the region carries no aria-busy and

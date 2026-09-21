@@ -405,10 +405,18 @@ describe('AdvocatePage', () => {
       });
       expect(targets).not.toContain(tail);
 
-      // Back near the page bottom (a `block: 'nearest'` scroll settles ~44px short of the maximum,
-      // which is why the page threshold is looser than the scroller's) — following resumes on the
-      // next send.
-      setPage(386);
+      // ...but it is offered rather than silently withheld: the sr-only status node announces the
+      // answer to AT, and this is the sighted equivalent.
+      const jump = await screen.findByTestId('advocate-jump-latest');
+      targets.length = 0;
+      fireEvent.click(jump);
+      expect(targets).toContain(tail);
+      expect(screen.queryByTestId('advocate-jump-latest')).not.toBeInTheDocument();
+
+      // Sending re-pins the page on its own, from wherever the reader happens to be — not because
+      // they scrolled back first. (386 would be within PAGE_PIN_THRESHOLD_PX of the 430 maximum and
+      // so would pin through the ordinary scroll path, proving nothing about the send rule.)
+      setPage(0);
       targets.length = 0;
       typeAndSend('And in writing?');
       await waitFor(() => expect(api.streamAdvocateMessage).toHaveBeenCalledTimes(2));
