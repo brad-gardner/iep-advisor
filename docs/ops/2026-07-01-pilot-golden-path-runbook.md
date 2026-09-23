@@ -10,7 +10,7 @@
 - [ ] Web running at `https://localhost:5200` (`cd web && npx vite --port 5200`) — the value of `App:FrontendUrl`; invite links are built from it, so `5173` will not match.
 - [ ] `Email:ExposeLinksForTesting = true` in dev so invite URLs surface in API responses (set in `appsettings.Development.json`). Outbound email is queued in `OutboundEmails`; without ACS the worker logs "would be sent" and the row is marked Sent. Failures are visible at `/admin/email`.
 - [ ] DB migrations applied (`dotnet ef database update --project IepAssistant.Domain --startup-project IepAssistant.Api` from `api/`).
-- [ ] **Demo district (optional, recommended for a demo):** `dotnet run --project IepAssistant.Api -- seed-demo` (add `--reset` to wipe and recreate). Prints the logins; every account uses the printed password. Refused in Production.
+- [ ] **Demo district (optional, recommended for a demo):** `dotnet run --project IepAssistant.Api --no-launch-profile -- seed-demo` (`--fresh` to reset it back to its starting state between demos, `--reset` to remove it). Prints the logins; every account uses the printed password. Refused in Production. Contents, logins and a demo script: [`docs/demo/maple-ridge-demo-district.md`](../demo/maple-ridge-demo-district.md).
 
 ## Happy path
 

@@ -33,15 +33,24 @@ ASPNETCORE_ENVIRONMENT=Development dotnet ef database update --project IepAssist
 
 ### Demo district
 
-`seed-demo` creates the fictional **Maple Ridge Local Schools** (3 schools, 9 staff, 40 students, finalized OH
-IEPs/ETRs with goals and observations, meetings, a linked parent with a shared draft, an evaluation case). All accounts
-use the password printed by the command. Refused in Production.
+`seed-demo` creates the fictional **Maple Ridge Local Schools**: 3 buildings, 17 staff across every role, 42 students
+with IEP teams, 35 finalized Ohio IEPs and 6 ETRs (goals, services, accommodations and transition plans that vary by
+disability), 5 IEPs mid-authoring, 8 evaluation cases at every stage of the clock, 14 meetings (4 held, 10 upcoming), 7 linked families and a
+student account. Every account uses the password the command prints. Refused in Production.
 
 ```bash
 cd api
-ASPNETCORE_ENVIRONMENT=Development dotnet run --project IepAssistant.Api -- seed-demo          # create
-ASPNETCORE_ENVIRONMENT=Development dotnet run --project IepAssistant.Api -- seed-demo --reset  # remove and recreate
+export ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=https://localhost:7251
+dotnet run --project IepAssistant.Api --no-launch-profile -- seed-demo           # create
+dotnet run --project IepAssistant.Api --no-launch-profile -- seed-demo --fresh   # reset back to its starting state
+dotnet run --project IepAssistant.Api --no-launch-profile -- seed-demo --reset   # remove it
 ```
+
+`--fresh` is the one command to run between demos: it removes the district and rebuilds it, rolling every date forward
+so meetings are always in the next month and the overdue reviews are always genuinely overdue. Logins, contents and a
+demo script are in [`docs/demo/maple-ridge-demo-district.md`](docs/demo/maple-ridge-demo-district.md) with a
+[spreadsheet of the accounts](docs/demo/maple-ridge-demo-logins.xlsx). The roster itself (who exists) lives in
+`api/IepAssistant.Api/Seeding/DemoRoster.cs`.
 
 ## Checks
 
