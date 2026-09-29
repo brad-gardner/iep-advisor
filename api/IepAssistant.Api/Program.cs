@@ -13,6 +13,7 @@ using Elastic.Ingest.Elasticsearch;
 using Elastic.Ingest.Elasticsearch.DataStreams;
 using Elastic.Serilog.Sinks;
 using Elastic.Transport;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Api.Middleware;
 using IepAssistant.Api.Seeding;
 using IepAssistant.Domain;
@@ -122,33 +123,10 @@ builder.Services.AddHttpClient("Claude", client =>
 {
     client.Timeout = TimeSpan.FromMinutes(15);
 })
-// A non-streaming call sends nothing while Claude writes the whole answer. Azure drops outbound
-// connections idle for ~4 minutes without telling either end, so a long analysis hung until the
-// 15-minute timeout. TCP keepalive probes count as traffic and hold the connection open — the same
-// thing Anthropic's official SDKs do.
+// TCP keepalive so Azure's ~4-minute idle drop cannot silently kill a long non-streaming call.
 .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
 {
-    ConnectCallback = async (context, cancellationToken) =>
-    {
-        var socket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp)
-        {
-            NoDelay = true,
-        };
-        try
-        {
-            socket.SetSocketOption(System.Net.Sockets.SocketOptionLevel.Socket, System.Net.Sockets.SocketOptionName.KeepAlive, true);
-            socket.SetSocketOption(System.Net.Sockets.SocketOptionLevel.Tcp, System.Net.Sockets.SocketOptionName.TcpKeepAliveTime, 60);
-            socket.SetSocketOption(System.Net.Sockets.SocketOptionLevel.Tcp, System.Net.Sockets.SocketOptionName.TcpKeepAliveInterval, 30);
-            socket.SetSocketOption(System.Net.Sockets.SocketOptionLevel.Tcp, System.Net.Sockets.SocketOptionName.TcpKeepAliveRetryCount, 5);
-            await socket.ConnectAsync(context.DnsEndPoint, cancellationToken);
-            return new System.Net.Sockets.NetworkStream(socket, ownsSocket: true);
-        }
-        catch
-        {
-            socket.Dispose();
-            throw;
-        }
-    },
+    ConnectCallback = KeepAliveConnect.ConnectAsync,
 });
 
 // Background processing
