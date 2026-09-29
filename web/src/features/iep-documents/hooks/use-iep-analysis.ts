@@ -3,6 +3,8 @@ import type { IepAnalysis } from "@/types/api";
 import { getAnalysis, triggerAnalysis } from "../api/iep-documents-api";
 import { usePolling } from "@/hooks/use-polling";
 
+const ANALYSIS_MAX_POLLS = 180;
+
 export function useIepAnalysis(documentId: number) {
   const [analysis, setAnalysis] = useState<IepAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,7 +68,9 @@ export function useIepAnalysis(documentId: number) {
 
   const isInProgress =
     analysis?.status === "analyzing" || analysis?.status === "pending";
-  usePolling(pollStatus, 5000, isInProgress);
+  // A full analysis runs several minutes; the default 5-minute cap froze the page on
+  // "Analyzing" while the server was still working. Match the server's 15-minute Claude timeout.
+  usePolling(pollStatus, 5000, isInProgress, ANALYSIS_MAX_POLLS);
 
   return { analysis, isLoading, isTriggering, trigger, reload: load };
 }

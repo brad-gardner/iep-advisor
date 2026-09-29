@@ -7,6 +7,7 @@ export function usePolling(
   fn: () => Promise<void>,
   intervalMs: number = DEFAULT_INTERVAL,
   enabled: boolean = false,
+  maxPolls: number = MAX_POLLS,
 ) {
   const pollCountRef = useRef(0);
   const fnRef = useRef(fn);
@@ -23,7 +24,7 @@ export function usePolling(
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     function scheduleNext() {
-      if (pollCountRef.current >= MAX_POLLS) return;
+      if (pollCountRef.current >= maxPolls) return;
       timeoutId = setTimeout(async () => {
         if (document.visibilityState === "hidden") {
           scheduleNext();
@@ -40,5 +41,5 @@ export function usePolling(
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [enabled, intervalMs]);
+  }, [enabled, intervalMs, maxPolls]);
 }

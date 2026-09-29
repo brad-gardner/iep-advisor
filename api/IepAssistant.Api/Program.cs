@@ -121,6 +121,34 @@ builder.Services.AddOptions<AnthropicOptions>()
 builder.Services.AddHttpClient("Claude", client =>
 {
     client.Timeout = TimeSpan.FromMinutes(15);
+})
+// A non-streaming call sends nothing while Claude writes the whole answer. Azure drops outbound
+// connections idle for ~4 minutes without telling either end, so a long analysis hung until the
+// 15-minute timeout. TCP keepalive probes count as traffic and hold the connection open — the same
+// thing Anthropic's official SDKs do.
+.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+{
+    ConnectCallback = async (context, cancellationToken) =>
+    {
+        var socket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp)
+        {
+            NoDelay = true,
+        };
+        try
+        {
+            socket.SetSocketOption(System.Net.Sockets.SocketOptionLevel.Socket, System.Net.Sockets.SocketOptionName.KeepAlive, true);
+            socket.SetSocketOption(System.Net.Sockets.SocketOptionLevel.Tcp, System.Net.Sockets.SocketOptionName.TcpKeepAliveTime, 60);
+            socket.SetSocketOption(System.Net.Sockets.SocketOptionLevel.Tcp, System.Net.Sockets.SocketOptionName.TcpKeepAliveInterval, 30);
+            socket.SetSocketOption(System.Net.Sockets.SocketOptionLevel.Tcp, System.Net.Sockets.SocketOptionName.TcpKeepAliveRetryCount, 5);
+            await socket.ConnectAsync(context.DnsEndPoint, cancellationToken);
+            return new System.Net.Sockets.NetworkStream(socket, ownsSocket: true);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
+    },
 });
 
 // Background processing
