@@ -112,8 +112,8 @@ public class IepAnalysisService : IIepAnalysisService
         }
 
         // Atomically check limit and record usage to prevent race conditions
-        var usageRecorded = await _subscriptionService.TryRecordUsageAsync(userId, document.ChildProfileId, "analysis", 5, cancellationToken);
-        if (!usageRecorded)
+        var usageRecordId = await _subscriptionService.TryReserveUsageAsync(userId, document.ChildProfileId, "analysis", 5, cancellationToken);
+        if (usageRecordId is null)
         {
             _logger.LogWarning("Analysis limit reached for user {UserId}, child {ChildId}", userId, document.ChildProfileId);
             var errorAnalysis = await _context.IepAnalyses
@@ -162,6 +162,7 @@ public class IepAnalysisService : IIepAnalysisService
                 analysis.Status = "error";
                 analysis.ErrorMessage = "No parsed sections found. Document must be parsed before analysis.";
                 await _context.SaveChangesAsync(cancellationToken);
+                await _subscriptionService.ReleaseUsageByIdAsync(usageRecordId.Value, cancellationToken);
                 return;
             }
 
@@ -177,6 +178,7 @@ public class IepAnalysisService : IIepAnalysisService
                 analysis.Status = "error";
                 analysis.ErrorMessage = "Failed to generate analysis.";
                 await _context.SaveChangesAsync(cancellationToken);
+                await _subscriptionService.ReleaseUsageByIdAsync(usageRecordId.Value, cancellationToken);
                 return;
             }
 
@@ -216,6 +218,9 @@ public class IepAnalysisService : IIepAnalysisService
             analysis.Status = "error";
             analysis.ErrorMessage = "An unexpected error occurred during analysis.";
             await _context.SaveChangesAsync(cancellationToken);
+            // A failed run is not the parent's to pay for: give the unit back. CancellationToken.None
+            // so a shutdown mid-run still refunds.
+            await _subscriptionService.ReleaseUsageByIdAsync(usageRecordId.Value, CancellationToken.None);
         }
     }
 

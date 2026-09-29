@@ -7,6 +7,7 @@ import {
 import type { MeetingPrepChecklist, CheckItemRequest } from "@/types/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { formatDate } from "@/lib/format-date";
 import { Notice } from "@/components/ui/notice";
 import { Spinner } from "@/components/ui/spinner";
 import { ChecklistSection } from "./checklist-section";
@@ -212,6 +213,17 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
           include updated insights.
         </Notice>
       )}
+
+      {/* What the checklist was grounded in */}
+      <p className="text-[13px] text-brand-slate-600" data-testid="meeting-prep-source">
+        {displayChecklist.iepDocumentId
+          ? displayChecklist.iepDocumentDate
+            ? `Based on the IEP dated ${formatDate(displayChecklist.iepDocumentDate.slice(0, 10))} and your goals`
+            : "Based on your IEP and your goals"
+          : displayChecklist.etrDocumentId
+            ? "Based on your ETR and your goals"
+            : "Based on your goals — no IEP on file yet"}
+      </p>
 
       {/* Progress bar + regenerate */}
       <div className="space-y-2" data-testid="meeting-prep-progress">

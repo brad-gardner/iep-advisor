@@ -47,6 +47,8 @@ public class MeetingPrepChecklistModel
     public int Id { get; set; }
     public int ChildProfileId { get; set; }
     public int? IepDocumentId { get; set; }
+    /// <summary>Date of the IEP the checklist was built from (its IEP date, else upload date).</summary>
+    public DateTime? IepDocumentDate { get; set; }
     public int? EtrDocumentId { get; set; }
     public DateTime? MeetingDate { get; set; }
     public string Status { get; set; } = string.Empty;
