@@ -228,7 +228,7 @@ Rules:
             SystemPrompt = systemPrompt,
             UserText = "Parse this IEP document and return structured JSON. Extract every section completely, including all test scores, evaluation data, and assessment results.",
             PdfDocument = pdfBytes,
-            MaxTokens = 16384,
+            MaxTokens = 32000,
         }, cancellationToken);
 
         if (string.IsNullOrEmpty(responseText))

@@ -218,7 +218,7 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
             SystemPrompt = systemPrompt,
             UserText = userText,
             PdfDocument = pdfBytes,
-            MaxTokens = 16384,
+            MaxTokens = 32000,
         }, cancellationToken);
 
         if (string.IsNullOrEmpty(responseText))

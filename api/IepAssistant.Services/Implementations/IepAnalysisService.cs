@@ -408,7 +408,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         {
             SystemPrompt = systemPrompt,
             UserText = $"Analyze this IEP document and provide a comprehensive analysis for the parent.\n\n{iepContent}",
-            MaxTokens = 16384,
+            MaxTokens = 32000,
         }, cancellationToken);
 
         if (string.IsNullOrEmpty(responseText))

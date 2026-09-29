@@ -113,6 +113,15 @@ public class ClaudeClient : IClaudeClient
             throw new ClaudeApiException(ClaudeFailureKind.InvalidResponse);
         }
 
+        // Callers parse this text as JSON, so a max_tokens stop surfaces there only as a bare
+        // "reached end of data" parse error. Name the real cause (no content: it carries PII).
+        if (response.StopReason == "max_tokens")
+        {
+            _logger.LogWarning(
+                "Claude hit max_tokens ({MaxTokens}) for model {Model}; response truncated at {Length} chars",
+                request.MaxTokens, model, responseText.Length);
+        }
+
         return responseText;
     }
 
