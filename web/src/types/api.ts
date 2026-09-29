@@ -315,6 +315,8 @@ export interface MeetingPrepChecklist {
   id: number;
   childProfileId: number;
   iepDocumentId: number | null;
+  /** Date of the IEP the checklist was built from (IEP date, else upload date). */
+  iepDocumentDate?: string | null;
   etrDocumentId: number | null;
   meetingDate?: string | null;
   status: "pending" | "generating" | "completed" | "error";

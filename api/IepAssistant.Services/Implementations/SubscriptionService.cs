@@ -223,8 +223,12 @@ public class SubscriptionService : ISubscriptionService
                 ur.CreatedAt >= subscriptionStart,
                 ct);
 
-        return count < AnalysisLimitPerChild;
+        return count < AnalysisLimitPerChild || IsExemptFromUsageLimits(user);
     }
+
+    // Platform admins test and demo the AI features all day; a per-child cap meant for paying
+    // parents only gets in their way. Their usage is still recorded.
+    private static bool IsExemptFromUsageLimits(User user) => user.Role == UserRole.Admin;
 
     public async Task RecordUsageAsync(int userId, int childId, string operationType, CancellationToken ct = default)
     {
@@ -265,7 +269,7 @@ public class SubscriptionService : ISubscriptionService
                     ur.CreatedAt >= subscriptionStart,
                     ct);
 
-            if (count >= limit)
+            if (count >= limit && !IsExemptFromUsageLimits(user))
             {
                 await transaction.RollbackAsync(ct);
                 return null;

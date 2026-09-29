@@ -150,6 +150,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             return [];
 
         var checklists = await _context.Set<MeetingPrepChecklist>()
+            .Include(m => m.IepDocument)
             .Where(m => m.ChildProfileId == childId && m.IsActive)
             .OrderByDescending(m => m.CreatedAt)
             .ToListAsync(ct);
@@ -161,6 +162,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
     {
         var checklist = await _context.Set<MeetingPrepChecklist>()
             .Include(m => m.ChildProfile)
+            .Include(m => m.IepDocument)
             .FirstOrDefaultAsync(m => m.Id == id && m.IsActive, ct);
 
         if (checklist == null)
@@ -178,10 +180,20 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         if (!await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, ct))
             return ServiceResult<int>.FailureResult("Child profile not found");
 
+        // The child page is the only place meeting prep is generated from, so ground it in the
+        // child's most recent parsed IEP (and, through Mode A, that IEP's analysis). Goals-only is
+        // the fallback for a child with no IEP on file.
+        var latestIepId = await _context.IepDocuments
+            .Where(d => d.ChildProfileId == childId && d.IsActive && d.Status == "parsed")
+            .OrderByDescending(d => d.IepDate ?? d.UploadDate)
+            .ThenByDescending(d => d.Id)
+            .Select(d => (int?)d.Id)
+            .FirstOrDefaultAsync(ct);
+
         var checklist = new MeetingPrepChecklist
         {
             ChildProfileId = childId,
-            IepDocumentId = null,
+            IepDocumentId = latestIepId,
             MeetingDate = meetingDate,
             Status = "pending",
             CreatedById = userId,
@@ -353,7 +365,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
                     .ToListAsync(ct);
 
                 var analysis = await _context.IepAnalyses
-                    .Where(a => a.IepDocumentId == checklist.IepDocumentId)
+                    .Where(a => a.IepDocumentId == checklist.IepDocumentId && a.Status == "completed")
                     .OrderByDescending(a => a.CreatedAt)
                     .FirstOrDefaultAsync(ct);
 
@@ -570,7 +582,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             sb.AppendLine();
         }
 
-        sb.AppendLine("The parent has an upcoming IEP meeting and has not yet received the IEP document, but has defined their priorities for their child.");
+        sb.AppendLine("The parent has an upcoming IEP meeting. No IEP document is on file in this app for the child, so work from the parent's stated priorities; do not assume whether the parent has or has not seen an IEP or a draft.");
         sb.AppendLine();
         sb.AppendLine("Generate a focused meeting preparation checklist as JSON with three sections: questionsToAsk, redFlagsToRaise, preparationNotes.");
         sb.AppendLine("Each item should have: text (the actionable item), context (why this matters), and legalBasis (relevant IDEA provision, or null if not applicable).");
@@ -722,6 +734,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             Id = entity.Id,
             ChildProfileId = entity.ChildProfileId,
             IepDocumentId = entity.IepDocumentId,
+            IepDocumentDate = entity.IepDocument == null ? null : entity.IepDocument.IepDate ?? entity.IepDocument.UploadDate,
             EtrDocumentId = entity.EtrDocumentId,
             MeetingDate = entity.MeetingDate,
             Status = entity.Status,
