@@ -171,6 +171,11 @@ public class AnalysisRunSectionModel
 /// carries for the latest run that included one particular source, plus the two things a document page
 /// needs that a plain run read does not: the run's OTHER sources (for a "part of a larger analysis" note)
 /// and whether the run is stale for THIS document.
+/// Behavior note on the inherited <see cref="AnalysisRunModel.Sections"/>: unlike a plain run read (which
+/// carries every source's sections), here it is scoped to ONLY the requested source's own sections for a
+/// multi-source run — a deliberate payload-size reduction (it is also what avoids an AnalysisRunSource ×
+/// AnalysisRunSection cartesian join server-side). The web already filters rendered sections by
+/// <c>analysisRunSourceId</c>, so this is transparent to existing consumers.
 /// </summary>
 public class AnalysisRunLatestModel : AnalysisRunModel
 {

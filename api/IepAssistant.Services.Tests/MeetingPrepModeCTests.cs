@@ -152,6 +152,11 @@ public class MeetingPrepModeCTests
         // The run's red flags, promoted from this single-source run's own call.
         Assert.Contains("Missing adaptive domain", prompt);
 
+        // Every analysis-derived block is wrapped in <etr_analysis> tags (item H), matching main's
+        // pre-refactor behavior and the tag the system prompt's SECURITY sentence already names.
+        Assert.Contains("<etr_analysis>", prompt);
+        Assert.Contains("</etr_analysis>", prompt);
+
         using var verify = fixture.CreateContext();
         var checklist2 = verify.Set<MeetingPrepChecklist>().Single(c => c.Id == checklistId);
         Assert.Equal("completed", checklist2.Status);

@@ -50,10 +50,17 @@ public class IepComparisonService : IIepComparisonService
         var sectionCountMap = sectionCounts.ToDictionary(x => x.IepDocumentId, x => x.Count);
         var goalCountMap = goalCounts.ToDictionary(x => x.IepDocumentId, x => x.Count);
 
+        // Batched (two queries total, regardless of document count) rather than one
+        // GetLatestCompletedRunRedFlagsAsync call per document — a child with many IEPs would
+        // otherwise issue 2*N queries just to build this timeline.
+        var redFlagsByDocumentId = await GetLatestCompletedRunRedFlagsBatchAsync(childId, documentIds, ct);
+
         var entries = new List<TimelineEntry>();
         foreach (var d in documents)
         {
-            var (hasAnalysis, redFlags) = await GetLatestCompletedRunRedFlagsAsync(d.Id, ct);
+            var (hasAnalysis, redFlags) = redFlagsByDocumentId.TryGetValue(d.Id, out var found)
+                ? found
+                : (false, []);
 
             entries.Add(new TimelineEntry
             {
@@ -116,7 +123,7 @@ public class IepComparisonService : IIepComparisonService
 
         var goalChanges = CompareGoals(olderSections, newerSections);
         var sectionChanges = CompareSections(olderSections, newerSections);
-        var redFlagResolution = await CompareRedFlagsAsync(older.Id, newer.Id, ct);
+        var redFlagResolution = await CompareRedFlagsAsync(iep1.ChildProfileId, older.Id, newer.Id, ct);
 
         var olderGoalCount = olderSections.SelectMany(s => s.Goals).Count();
         var newerGoalCount = newerSections.SelectMany(s => s.Goals).Count();
@@ -266,10 +273,10 @@ public class IepComparisonService : IIepComparisonService
         };
     }
 
-    private async Task<RedFlagResolution> CompareRedFlagsAsync(int olderIepId, int newerIepId, CancellationToken ct)
+    private async Task<RedFlagResolution> CompareRedFlagsAsync(int childId, int olderIepId, int newerIepId, CancellationToken ct)
     {
-        var (_, olderFlags) = await GetLatestCompletedRunRedFlagsAsync(olderIepId, ct);
-        var (_, newerFlags) = await GetLatestCompletedRunRedFlagsAsync(newerIepId, ct);
+        var (_, olderFlags) = await GetLatestCompletedRunRedFlagsAsync(childId, olderIepId, ct);
+        var (_, newerFlags) = await GetLatestCompletedRunRedFlagsAsync(childId, newerIepId, ct);
 
         if (olderFlags.Count == 0 && newerFlags.Count == 0)
             return new RedFlagResolution();
@@ -337,18 +344,85 @@ public class IepComparisonService : IIepComparisonService
     }
 
     /// <summary>
+    /// Batched version of <see cref="GetLatestCompletedRunRedFlagsAsync"/> for the timeline view: one
+    /// query finds the latest COMPLETED source per document id (scoped to this child), one more fetches
+    /// those sources' own ordinary sections — two queries total regardless of how many documents the
+    /// child has, instead of one <see cref="GetLatestCompletedRunRedFlagsAsync"/> call (itself two
+    /// queries) per document.
+    /// </summary>
+    private async Task<Dictionary<int, (bool HasAnalysis, List<RedFlag> RedFlags)>> GetLatestCompletedRunRedFlagsBatchAsync(
+        int childId, List<int> documentIds, CancellationToken ct)
+    {
+        var result = new Dictionary<int, (bool, List<RedFlag>)>();
+        if (documentIds.Count == 0)
+            return result;
+
+        var candidates = await _context.AnalysisRunSources
+            .AsNoTracking()
+            .Where(s => s.SourceType == AnalysisSourceType.IepDocument
+                        && documentIds.Contains(s.SourceId)
+                        && s.Status == AnalysisRunSourceStatus.Completed
+                        && s.AnalysisRun.Status == AnalysisRunStatus.Completed
+                        && s.AnalysisRun.ChildProfileId == childId)
+            .Select(s => new
+            {
+                s.Id,
+                s.SourceId,
+                s.AnalysisRunId,
+                RunCreatedAt = s.AnalysisRun.CreatedAt,
+                RunOverallRedFlags = s.AnalysisRun.OverallRedFlags,
+                SourceCount = s.AnalysisRun.Sources.Count
+            })
+            .ToListAsync(ct);
+
+        // Keep only the latest completed source per document id — ties broken by AnalysisRunId, same
+        // tiebreak GetLatestCompletedRunRedFlagsAsync uses via OrderByDescending+First.
+        var latestPerDocument = candidates
+            .GroupBy(c => c.SourceId)
+            .Select(g => g.OrderByDescending(c => c.RunCreatedAt).ThenByDescending(c => c.AnalysisRunId).First())
+            .ToList();
+
+        if (latestPerDocument.Count == 0)
+            return result;
+
+        var sourceIds = latestPerDocument.Select(c => c.Id).ToList();
+
+        var sectionRows = await _context.AnalysisRunSections
+            .AsNoTracking()
+            .Where(sec => sec.AnalysisRunSourceId != null && sourceIds.Contains(sec.AnalysisRunSourceId.Value)
+                          && sec.SectionKind != AnalysisRunSectionKinds.IepGoals)
+            .Select(sec => new { sec.AnalysisRunSourceId, sec.Analysis })
+            .ToListAsync(ct);
+
+        var sectionsBySourceId = sectionRows
+            .GroupBy(r => r.AnalysisRunSourceId!.Value)
+            .ToDictionary(g => g.Key, g => g.Select(r => r.Analysis).ToList());
+
+        foreach (var c in latestPerDocument)
+        {
+            var sectionJson = sectionsBySourceId.GetValueOrDefault(c.Id, []);
+            var redFlags = AnalysisRunRedFlagRollup.Combine(c.RunOverallRedFlags, c.SourceCount, sectionJson);
+            result[c.SourceId] = (true, redFlags);
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// This one IEP document's own red flags, read from the latest COMPLETED analysis run that includes
     /// it (that source's own sections' red flags, plus the run's OverallRedFlags only when the run is
     /// single-source — see <see cref="AnalysisRunRedFlagRollup"/>). Replaces the retired per-document
     /// IepAnalysis row this comparison used to read. <c>HasAnalysis</c> is true whenever such a run
-    /// exists, regardless of whether it happens to carry zero red flags.
+    /// exists, regardless of whether it happens to carry zero red flags. Used only by the two-document
+    /// compare path; the timeline view uses the batched <see cref="GetLatestCompletedRunRedFlagsBatchAsync"/>.
     /// </summary>
-    private async Task<(bool HasAnalysis, List<RedFlag> RedFlags)> GetLatestCompletedRunRedFlagsAsync(int iepDocumentId, CancellationToken ct)
+    private async Task<(bool HasAnalysis, List<RedFlag> RedFlags)> GetLatestCompletedRunRedFlagsAsync(int childId, int iepDocumentId, CancellationToken ct)
     {
         var source = await _context.AnalysisRunSources
             .AsNoTracking()
             .Where(s => s.SourceType == AnalysisSourceType.IepDocument && s.SourceId == iepDocumentId
-                        && s.Status == AnalysisRunSourceStatus.Completed && s.AnalysisRun.Status == AnalysisRunStatus.Completed)
+                        && s.Status == AnalysisRunSourceStatus.Completed && s.AnalysisRun.Status == AnalysisRunStatus.Completed
+                        && s.AnalysisRun.ChildProfileId == childId)
             .OrderByDescending(s => s.AnalysisRun.CreatedAt)
             .ThenByDescending(s => s.AnalysisRunId)
             .Select(s => new

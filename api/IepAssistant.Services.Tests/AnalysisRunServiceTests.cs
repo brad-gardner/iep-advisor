@@ -314,6 +314,46 @@ public class AnalysisRunServiceTests
             u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis"));
     }
 
+    [Fact]
+    public async Task CreateRunAsync_WithMoreThanFiveSources_Fails_NoUsageReserved()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepIds = Enumerable.Range(0, 6).Select(_ => _fixture.SeedIepDocument()).ToList();
+
+        using var context = _fixture.CreateContext();
+        var service = BuildService(context, new FakeClaudeClient(null));
+
+        var result = await service.CreateRunAsync(
+            _fixture.ChildId, _fixture.OwnerUserId,
+            iepIds.Select(id => new AnalysisRunSourceRef(AnalysisSourceType.IepDocument, id)).ToList(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("Choose up to 5 documents for one analysis.", result.Message);
+        Assert.Equal(0, context.AnalysisRuns.Count());
+        Assert.Equal(0, context.UsageRecords.Count(u =>
+            u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis"));
+    }
+
+    [Fact]
+    public async Task CreateRunAsync_SixSourcesThatDedupeToFive_Succeeds()
+    {
+        // The cap is checked AFTER deduping identical (type, id) references, not before.
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepIds = Enumerable.Range(0, 5).Select(_ => _fixture.SeedIepDocument()).ToList();
+
+        using var context = _fixture.CreateContext();
+        var service = BuildService(context, new FakeClaudeClient(null));
+
+        var sources = iepIds.Select(id => new AnalysisRunSourceRef(AnalysisSourceType.IepDocument, id)).ToList();
+        sources.Add(sources[0]); // duplicate of the first — dedupes back down to 5
+
+        var result = await service.CreateRunAsync(_fixture.ChildId, _fixture.OwnerUserId, sources, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(5, context.AnalysisRunSources.Count(s => s.AnalysisRunId == result.Data!.Id));
+    }
+
     // --- ExecuteRunAsync: one Claude call per source, then one synthesis call when 2+ complete. ---
 
     [Fact]
@@ -454,8 +494,10 @@ public class AnalysisRunServiceTests
     }
 
     [Fact]
-    public async Task ExecuteRunAsync_AllSourcesFail_RunErrorsAndRefunds()
+    public async Task ExecuteRunAsync_AllSourcesFail_MixedFailureKinds_RunErrorsAndRefunds()
     {
+        // Restored carve-out (item D): a MIXED all-failed run (some InvalidResponse, some a real
+        // provider/transient failure) still refunds — only an all-InvalidResponse failure does not.
         using var _fixture = new AnalysisRunTestFixture();
         var iepId = _fixture.SeedIepDocument();
         var etrId = _fixture.SeedEtrDocument();
@@ -482,7 +524,7 @@ public class AnalysisRunServiceTests
             runId = created.Data!.Id;
         }
 
-        // One throws, one returns an unparseable (null) response — both count as a source failure.
+        // One throws a real provider failure, one returns an unparseable (null) response.
         var client = new ScriptedClaudeClient(
             () => throw new ClaudeApiException(ClaudeFailureKind.Transient),
             () => null);
@@ -496,7 +538,7 @@ public class AnalysisRunServiceTests
         using var verifyContext = _fixture.CreateContext();
         var run = verifyContext.AnalysisRuns.Find(runId)!;
         Assert.Equal(AnalysisRunStatus.Error, run.Status);
-        Assert.Null(run.UsageRecordId); // refunded — every source failed
+        Assert.Null(run.UsageRecordId); // refunded — not every failure was InvalidResponse
 
         var usageAfter = verifyContext.UsageRecords.Count(u =>
             u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
@@ -507,13 +549,53 @@ public class AnalysisRunServiceTests
     }
 
     [Fact]
-    public async Task ExecuteRunAsync_NullClaudeResponse_SingleSource_ErrorsAndRefunds()
+    public async Task ExecuteRunAsync_AllSourcesFail_AllTransient_MultiSource_RunErrorsAndRefunds()
     {
-        // Phase 1 behavior change from the pre-refactor single-call engine: "every source failed"
-        // now ALWAYS refunds (accepted decision), regardless of failure kind — including
-        // InvalidResponse. The old single-call engine deliberately did NOT refund InvalidResponse
-        // (todos/P2-02), to stop one always-unparseable call from being retried for free; that
-        // carve-out no longer applies once a run can contain several independently-failing sources.
+        // Pure provider/transient failures (no InvalidResponse at all) must refund — same rule as the
+        // mixed case, exercised here with no InvalidResponse present at all.
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+        var etrId = _fixture.SeedEtrDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef>
+                {
+                    new(AnalysisSourceType.IepDocument, iepId),
+                    new(AnalysisSourceType.EtrDocument, etrId),
+                },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        var client = new ScriptedClaudeClient(
+            () => throw new ClaudeApiException(ClaudeFailureKind.Transient),
+            () => throw new ClaudeApiException(ClaudeFailureKind.RateLimited));
+
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, client);
+            await execService.ExecuteRunAsync(runId, CancellationToken.None);
+        }
+
+        using var verifyContext = _fixture.CreateContext();
+        var run = verifyContext.AnalysisRuns.Find(runId)!;
+        Assert.Equal(AnalysisRunStatus.Error, run.Status);
+        Assert.Null(run.UsageRecordId); // refunded — no InvalidResponse at all
+    }
+
+    [Fact]
+    public async Task ExecuteRunAsync_NullClaudeResponse_SingleSource_ErrorsWithoutRefund()
+    {
+        // Restored carve-out (item D, todos/P2-02's original rationale): when EVERY source failed and
+        // EVERY failure was specifically an unparseable Claude response, the call was still genuinely
+        // billed and a document engineered to always produce unparseable JSON must not become a free
+        // retry loop — refundQuota: false. A MIXED or all-transient all-failure still refunds (see the
+        // tests above).
         using var _fixture = new AnalysisRunTestFixture();
         var iepId = _fixture.SeedIepDocument();
 
@@ -546,11 +628,11 @@ public class AnalysisRunServiceTests
         Assert.Equal(AnalysisRunStatus.Error, run.Status);
         // Single-source run: the run's ErrorMessage is that one source's own specific failure reason.
         Assert.Equal(ClaudeFailureMessages.InvalidResponse, run.ErrorMessage);
-        Assert.Null(run.UsageRecordId);
+        Assert.NotNull(run.UsageRecordId); // NOT refunded — every failure was InvalidResponse
 
         var usageAfter = verifyContext.UsageRecords.Count(u =>
             u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
-        Assert.Equal(usageBefore, usageAfter);
+        Assert.Equal(usageBefore + 1, usageAfter); // consumed, not refunded
 
         var source = verifyContext.AnalysisRunSources.Single(s => s.AnalysisRunId == runId);
         Assert.Equal(AnalysisRunSourceStatus.Error, source.Status);
@@ -644,6 +726,113 @@ public class AnalysisRunServiceTests
         Assert.NotNull(payload);
         Assert.Single(payload!.GoalAnalyses);
         Assert.Equal(validGoalId, payload.GoalAnalyses[0].GoalId);
+    }
+
+    [Fact]
+    public async Task ExecuteRunAsync_NullListsInClaudeResponse_AreNormalizedToEmpty_NoNullReferenceException()
+    {
+        // Claude is free to return an explicit JSON null for an array field instead of omitting it or
+        // returning [] — System.Text.Json overwrites the C# default [] initializer with null in that
+        // case. Unnormalized, BuildSynthesisUserText dereferences response.Sections.Count for every
+        // completed source feeding the synthesis call, which would NRE and take the whole run down.
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+        var etrId = _fixture.SeedEtrDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef>
+                {
+                    new(AnalysisSourceType.IepDocument, iepId),
+                    new(AnalysisSourceType.EtrDocument, etrId),
+                },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        const string sourceWithNulls = """
+            {
+              "overallSummary": "Summary.",
+              "sections": null,
+              "goalAnalyses": null,
+              "overallRedFlags": null
+            }
+            """;
+        const string synthesisWithNulls = """
+            {
+              "overallSummary": "Combined.",
+              "crossDocSynthesis": null,
+              "overallRedFlags": null
+            }
+            """;
+
+        var client = new ScriptedClaudeClient(sourceWithNulls, sourceWithNulls, synthesisWithNulls);
+
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, client);
+            await execService.ExecuteRunAsync(runId, CancellationToken.None); // must not throw
+        }
+
+        using var verifyContext = _fixture.CreateContext();
+        var run = verifyContext.AnalysisRuns.Find(runId)!;
+        Assert.Equal(AnalysisRunStatus.Completed, run.Status);
+        Assert.Equal("[]", run.OverallRedFlags); // normalized, not the literal string "null"
+    }
+
+    [Fact]
+    public async Task ExecuteRunAsync_ReservedOrEmptySectionKind_IsSanitized()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef> { new(AnalysisSourceType.IepDocument, iepId) },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        // An ordinary section whose sectionKind collides with a reserved, structurally distinct typed
+        // kind this engine uses (iep_goals is an object, not an AnalysisRunSectionResult); one with
+        // mixed case and punctuation that should just be sanitized, not forced to "other"; and one
+        // that is empty after sanitization.
+        const string response = """
+            {
+              "overallSummary": "Summary.",
+              "sections": [
+                { "sectionKind": "IEP_GOALS", "plainLanguageSummary": "x", "keyPoints": [], "redFlags": [], "legalReferences": [] },
+                { "sectionKind": "Weird Kind!! With Spaces", "plainLanguageSummary": "y", "keyPoints": [], "redFlags": [], "legalReferences": [] },
+                { "sectionKind": "", "plainLanguageSummary": "z", "keyPoints": [], "redFlags": [], "legalReferences": [] }
+              ],
+              "overallRedFlags": []
+            }
+            """;
+
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, new ScriptedClaudeClient(response));
+            await execService.ExecuteRunAsync(runId, CancellationToken.None);
+        }
+
+        using var verifyContext = _fixture.CreateContext();
+        var sections = verifyContext.AnalysisRunSections
+            .Where(s => s.AnalysisRunId == runId)
+            .OrderBy(s => s.DisplayOrder)
+            .ToList();
+
+        Assert.Equal(3, sections.Count);
+        Assert.Equal("other", sections[0].SectionKind); // collided with the reserved iep_goals kind
+        Assert.Equal("weirdkindwithspaces", sections[1].SectionKind); // sanitized, not forced to "other"
+        Assert.Equal("other", sections[2].SectionKind); // empty after sanitization
     }
 
     [Fact]
@@ -1118,6 +1307,179 @@ public class AnalysisRunServiceTests
         Assert.NotNull(freshAfter.UsageRecordId);
     }
 
+    [Fact]
+    public async Task ExecuteRunAsync_Heartbeat_RefreshesUpdatedAtBeforeEachSourceCallAndBeforeSynthesis()
+    {
+        // Each Claude call is capped well under the sweep's 30-minute stale threshold by HttpClient's
+        // own timeout, but WITHOUT a heartbeat the run's UpdatedAt is only stamped once, on entering
+        // Running — so a long multi-source run could still look stale to the sweep partway through.
+        // This backdates UpdatedAt inside the FIRST source call's own responder (simulating 31 minutes
+        // of "no progress" since the run entered Running) and proves the SECOND source call's own
+        // heartbeat — stamped before that call is dispatched — had already refreshed it, and likewise
+        // for the synthesis call.
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+        var etrId = _fixture.SeedEtrDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef>
+                {
+                    new(AnalysisSourceType.IepDocument, iepId),
+                    new(AnalysisSourceType.EtrDocument, etrId),
+                },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        void AssertUpdatedAtIsFresh()
+        {
+            using var check = _fixture.CreateContext();
+            var updatedAt = check.AnalysisRuns.AsNoTracking().Single(r => r.Id == runId).UpdatedAt;
+            Assert.True(updatedAt > DateTime.UtcNow.AddMinutes(-1), "Expected the run's heartbeat to have refreshed UpdatedAt before this call.");
+        }
+
+        var client = new ScriptedClaudeClient(
+            () =>
+            {
+                using var backdate = _fixture.CreateContext();
+                backdate.Database.ExecuteSqlInterpolated(
+                    $"UPDATE AnalysisRuns SET UpdatedAt = {DateTime.UtcNow.AddMinutes(-31)} WHERE Id = {runId}");
+                return BuildSourceJson("present_levels", summary: "IEP summary.");
+            },
+            () =>
+            {
+                AssertUpdatedAtIsFresh(); // the second source call's own heartbeat already fired
+                return BuildSourceJson("eligibility", summary: "ETR summary.");
+            },
+            () =>
+            {
+                AssertUpdatedAtIsFresh(); // the synthesis call's own heartbeat already fired
+                return BuildSynthesisJson();
+            });
+
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, client);
+            await execService.ExecuteRunAsync(runId, CancellationToken.None);
+        }
+
+        Assert.Equal(3, client.CallCount);
+        using var verifyContext = _fixture.CreateContext();
+        Assert.Equal(AnalysisRunStatus.Completed, verifyContext.AnalysisRuns.Find(runId)!.Status);
+    }
+
+    [Fact]
+    public async Task ExecuteRunAsync_SweepWinsTerminalRace_ExecutorsLateCompletedWriteIsDropped_NoDoubleRefund()
+    {
+        // Simulates the sweep failing (and refunding) a run WHILE the executor's single Claude call is
+        // still "in flight" (a separate AnalysisRunService instance — its own DbContext — races in from
+        // inside the scripted Claude responder, exactly as FailStaleRunsAsync would from a different
+        // scope). When the executor's call "returns" and it tries to complete the run, it must lose:
+        // the sweep's Error state and its single refund must be the only visible effect.
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef> { new(AnalysisSourceType.IepDocument, iepId) },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        const string sweepMessage = "The analysis took too long to complete. Please try again.";
+
+        var client = new ScriptedClaudeClient(() =>
+        {
+            using var sweepContext = _fixture.CreateContext();
+            var sweepService = BuildService(sweepContext, new FakeClaudeClient(null));
+            sweepService.FailRunAsync(runId, sweepMessage, refundQuota: true, ct: CancellationToken.None)
+                .GetAwaiter().GetResult();
+            return BuildSourceJson();
+        });
+
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, client);
+            await execService.ExecuteRunAsync(runId, CancellationToken.None);
+        }
+
+        using var verifyContext = _fixture.CreateContext();
+        var run = verifyContext.AnalysisRuns.Find(runId)!;
+
+        // The sweep's Error transition wins; the executor's later Completed write must not overwrite it.
+        Assert.Equal(AnalysisRunStatus.Error, run.Status);
+        Assert.Equal(sweepMessage, run.ErrorMessage);
+        Assert.Null(run.OverallSummary); // the executor's result was never persisted
+        Assert.Null(run.UsageRecordId); // released exactly once, by the sweep
+
+        var usageAfter = verifyContext.UsageRecords.Count(u =>
+            u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
+        Assert.Equal(0, usageAfter); // refunded once — not left dangling, not double-refunded
+    }
+
+    [Fact]
+    public async Task FailRunAsync_MarksEveryPendingOrRunningSourceAsError()
+    {
+        // A run can be failed (host shutdown, the sweep, an unexpected exception) while one of its
+        // sources is still sitting at Pending/Running — that source must flip to Error in the same
+        // transition, or a document page polling it would wait forever.
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+        var etrId = _fixture.SeedEtrDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef>
+                {
+                    new(AnalysisSourceType.IepDocument, iepId),
+                    new(AnalysisSourceType.EtrDocument, etrId),
+                },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        // Simulate the run having made it partway through execution: one source Completed, the other
+        // still Running — without actually running ExecuteRunAsync (raw SQL, like the stale-sweep test
+        // above, so the auditing override does not get in the way).
+        using (var setup = _fixture.CreateContext())
+        {
+            await setup.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE AnalysisRuns SET Status = 'Running' WHERE Id = {runId}");
+            var sources = setup.AnalysisRunSources.Where(s => s.AnalysisRunId == runId).OrderBy(s => s.Id).ToList();
+            sources[0].Status = AnalysisRunSourceStatus.Completed;
+            sources[1].Status = AnalysisRunSourceStatus.Running;
+            setup.SaveChanges();
+        }
+
+        using (var failContext = _fixture.CreateContext())
+        {
+            var failService = BuildService(failContext, new FakeClaudeClient(null));
+            await failService.FailRunAsync(runId, "An unexpected error occurred during analysis.", refundQuota: true, ct: CancellationToken.None);
+        }
+
+        using var verifyContext = _fixture.CreateContext();
+        var run = verifyContext.AnalysisRuns.Find(runId)!;
+        Assert.Equal(AnalysisRunStatus.Error, run.Status);
+
+        var finalSources = verifyContext.AnalysisRunSources.Where(s => s.AnalysisRunId == runId).OrderBy(s => s.Id).ToList();
+        Assert.Equal(AnalysisRunSourceStatus.Completed, finalSources[0].Status); // already-terminal source untouched
+        Assert.Equal(AnalysisRunSourceStatus.Error, finalSources[1].Status); // still-Running source flipped to Error
+        Assert.NotNull(finalSources[1].ErrorMessage);
+    }
+
     // --- GetLatestForSourceAsync: the document-page "latest run including this document" read. ---
 
     private async Task<int> CreateAndExecuteSingleSourceRunAsync(
@@ -1203,6 +1565,58 @@ public class AnalysisRunServiceTests
         Assert.Equal(etrId, other.SourceId);
         Assert.False(string.IsNullOrWhiteSpace(other.Label));
         Assert.False(result.Data!.Stale);
+    }
+
+    [Fact]
+    public async Task GetLatestForSourceAsync_MultiSourceRun_SectionsAreScopedToTheRequestedSourceOnly()
+    {
+        // Item I: the projection-based rewrite no longer Include(Sources).Include(Sections)'s the
+        // whole run (which would carry every source's sections in a cartesian join with every source's
+        // SourceContentSnapshot) — only the MATCHED source's own sections come back.
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+        var etrId = _fixture.SeedEtrDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef>
+                {
+                    new(AnalysisSourceType.IepDocument, iepId),
+                    new(AnalysisSourceType.EtrDocument, etrId),
+                },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, new ScriptedClaudeClient(
+                BuildSourceJson("present_levels"), BuildSourceJson("eligibility"), BuildSynthesisJson()));
+            await execService.ExecuteRunAsync(runId, CancellationToken.None);
+        }
+
+        using var readContext = _fixture.CreateContext();
+        var readService = BuildService(readContext, new FakeClaudeClient(null));
+        var iepResult = await readService.GetLatestForSourceAsync(
+            _fixture.ChildId, AnalysisSourceType.IepDocument, iepId, _fixture.OwnerUserId, CancellationToken.None);
+        var etrResult = await readService.GetLatestForSourceAsync(
+            _fixture.ChildId, AnalysisSourceType.EtrDocument, etrId, _fixture.OwnerUserId, CancellationToken.None);
+
+        Assert.True(iepResult.Success);
+        Assert.True(etrResult.Success);
+
+        var iepSourceId = iepResult.Data!.Sources.Single(s => s.SourceType == nameof(AnalysisSourceType.IepDocument)).Id;
+        var etrSourceId = etrResult.Data!.Sources.Single(s => s.SourceType == nameof(AnalysisSourceType.EtrDocument)).Id;
+
+        Assert.NotEmpty(iepResult.Data!.Sections);
+        Assert.All(iepResult.Data!.Sections, s => Assert.Equal(iepSourceId, s.AnalysisRunSourceId));
+
+        Assert.NotEmpty(etrResult.Data!.Sections);
+        Assert.All(etrResult.Data!.Sections, s => Assert.Equal(etrSourceId, s.AnalysisRunSourceId));
     }
 
     [Fact]

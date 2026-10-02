@@ -3,8 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Domain.Repositories;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Models;
 using Xunit;
 
 namespace IepAssistant.Services.Tests;
@@ -14,14 +16,33 @@ public class AnalysisRunBackfillTests
     private static AnalysisRunBackfillService BuildService(ApplicationDbContext context)
         => new(context, NullLogger<AnalysisRunBackfillService>.Instance);
 
+    // A hand-written fake — no Moq, matching AnalysisRunServiceTests' convention — used only to build
+    // an AnalysisRunService for reading back a backfilled run; Claude is never actually called.
+    private sealed class NullClaudeClient : IClaudeClient
+    {
+        public Task<string?> CompleteAsync(ClaudeCompletionRequest request, CancellationToken cancellationToken = default)
+            => Task.FromResult<string?>(null);
+    }
+
+    private static AnalysisRunService BuildAnalysisRunService(ApplicationDbContext context) => new(
+        context,
+        new AccessService(context),
+        new SubscriptionService(context, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), NullLogger<SubscriptionService>.Instance),
+        new ParentAdvocacyGoalRepository(context),
+        new NullClaudeClient(),
+        NullLogger<AnalysisRunService>.Instance);
+
     private static int SeedIepAnalysis(
         ApplicationDbContext context,
         int iepDocumentId,
         string status = "completed",
         string? sectionAnalyses = null,
         string? goalAnalyses = null,
-        string? errorMessage = null)
+        string? errorMessage = null,
+        DateTime? updatedAt = null,
+        string overallRedFlags = "[\"flag\"]")
     {
+        var createdAt = new DateTime(2025, 4, 1, 12, 0, 0, DateTimeKind.Utc);
         var analysis = new IepAnalysis
         {
             IepDocumentId = iepDocumentId,
@@ -29,11 +50,15 @@ public class AnalysisRunBackfillTests
             SectionAnalyses = sectionAnalyses,
             GoalAnalyses = goalAnalyses,
             OverallSummary = "IEP overall summary",
-            OverallRedFlags = "[\"flag\"]",
+            OverallRedFlags = overallRedFlags,
             AdvocacyGapAnalysis = "{\"gap\":true}",
             ParentGoalsSnapshot = "[{\"goal\":\"read\"}]",
             ErrorMessage = errorMessage,
-            CreatedAt = new DateTime(2025, 4, 1, 12, 0, 0, DateTimeKind.Utc)
+            CreatedAt = createdAt,
+            // Defaults to CreatedAt so tests that do not care about the CreatedAt/UpdatedAt distinction
+            // (most of them) see the same value either way — item F's backfilled run CreatedAt comes
+            // from UpdatedAt, the legacy engine's "last touched" timestamp.
+            UpdatedAt = updatedAt ?? createdAt
         };
         context.IepAnalyses.Add(analysis);
         context.SaveChanges();
@@ -45,8 +70,10 @@ public class AnalysisRunBackfillTests
         int etrDocumentId,
         string status = "completed",
         string? assessmentCompleteness = null,
-        string? eligibilityReview = null)
+        string? eligibilityReview = null,
+        DateTime? updatedAt = null)
     {
+        var createdAt = new DateTime(2024, 12, 1, 9, 0, 0, DateTimeKind.Utc);
         var analysis = new EtrAnalysis
         {
             EtrDocumentId = etrDocumentId,
@@ -57,7 +84,8 @@ public class AnalysisRunBackfillTests
             OverallRedFlags = "[\"etr flag\"]",
             AdvocacyGapAnalysis = "{\"gap\":false}",
             ParentGoalsSnapshot = "[{\"goal\":\"math\"}]",
-            CreatedAt = new DateTime(2024, 12, 1, 9, 0, 0, DateTimeKind.Utc)
+            CreatedAt = createdAt,
+            UpdatedAt = updatedAt ?? createdAt
         };
         context.EtrAnalyses.Add(analysis);
         context.SaveChanges();
@@ -122,8 +150,16 @@ public class AnalysisRunBackfillTests
         Assert.Equal(3, iepSections.Count);
         Assert.Equal("present_levels", iepSections[0].SectionKind);
         Assert.Equal("services", iepSections[1].SectionKind);
-        Assert.Equal("annual_goals", iepSections[2].SectionKind);
+        // Item E: the create path now writes the FINAL iep_goals OBJECT shape in one pass, not the
+        // legacy annual_goals ARRAY shape.
+        Assert.Equal(AnalysisRunSectionKinds.IepGoals, iepSections[2].SectionKind);
         Assert.All(iepSections, s => Assert.Equal(iepSource.Id, s.AnalysisRunSourceId));
+
+        using (var goalsDoc = JsonDocument.Parse(iepSections[2].Analysis!))
+        {
+            var goalAnalyses = goalsDoc.RootElement.GetProperty("goalAnalyses");
+            Assert.Equal(JsonValueKind.Array, goalAnalyses.ValueKind); // {goalAnalyses:[...]}, not a bare array
+        }
 
         var etrRun = verify.AnalysisRuns.Single(r => r.BackfillSourceKey!.StartsWith("EtrAnalysis:"));
         var etrSource = verify.AnalysisRunSources.Single(s => s.AnalysisRunId == etrRun.Id);
@@ -136,8 +172,10 @@ public class AnalysisRunBackfillTests
             .OrderBy(s => s.DisplayOrder)
             .ToList();
         Assert.Equal(2, etrSections.Count);
-        Assert.Equal("assessment_completeness", etrSections[0].SectionKind);
-        Assert.Equal("eligibility", etrSections[1].SectionKind);
+        // Item E: the create path now writes the FINAL etr_completeness / etr_eligibility typed shapes
+        // in one pass, not the legacy snake_case assessment_completeness / eligibility shape.
+        Assert.Equal(AnalysisRunSectionKinds.EtrCompleteness, etrSections[0].SectionKind);
+        Assert.Equal(AnalysisRunSectionKinds.EtrEligibility, etrSections[1].SectionKind);
 
         // Carried-across fields. The AnalysisRun model has no suggested-questions concept
         // at all (the legacy SuggestedQuestions column was dropped in P2a), so there is
@@ -149,6 +187,59 @@ public class AnalysisRunBackfillTests
         Assert.Equal("[{\"goal\":\"read\"}]", iepRun.ParentGoalsSnapshot);
         Assert.Null(iepRun.CrossDocSynthesis);
         Assert.Equal(new DateTime(2025, 4, 1, 12, 0, 0, DateTimeKind.Utc), iepRun.CreatedAt, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task BackfillAsync_UsesLegacyUpdatedAt_NotCreatedAt_AsRunCreatedAt_SoLatestForSourceIsNotFalselyStale()
+    {
+        // Item F: the legacy engines updated their row IN PLACE on every re-analysis, so UpdatedAt —
+        // not CreatedAt — is the time the analysis a parent is actually looking at last ran. Using
+        // CreatedAt instead would make a long-lived legacy row's backfilled run look falsely stale
+        // against a document that was edited any time after that FIRST (possibly long-superseded)
+        // analysis, even though the analysis itself (per UpdatedAt) ran after the edit.
+        using var fixture = new AnalysisRunTestFixture();
+        var iepDocId = fixture.SeedIepDocument();
+
+        var legacyCreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var documentUpdatedAt = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var legacyUpdatedAt = new DateTime(2025, 9, 1, 0, 0, 0, DateTimeKind.Utc); // the actual re-analysis time
+
+        int legacyId;
+        using (var seed = fixture.CreateContext())
+        {
+            // A valid (empty) RedFlag array, not the shared helper's placeholder "[\"flag\"]" — this
+            // test reads the backfilled run back through GetLatestForSourceAsync, which deserializes
+            // OverallRedFlags as List<RedFlag>, not the shared helper default's bare string array.
+            legacyId = SeedIepAnalysis(seed, iepDocId, updatedAt: legacyUpdatedAt, overallRedFlags: "[]");
+        }
+        using (var mutate = fixture.CreateContext())
+        {
+            // SeedIepAnalysis's CreatedAt default (2025-04-01) sits BETWEEN documentUpdatedAt and
+            // legacyUpdatedAt, which would not exercise this bug — set it explicitly to BEFORE the
+            // document's own edit, as "legacy CreatedAt < document UpdatedAt < legacy UpdatedAt" requires.
+            var legacy = mutate.IepAnalyses.Single(a => a.Id == legacyId);
+            legacy.CreatedAt = legacyCreatedAt;
+            legacy.UpdatedAt = legacyUpdatedAt;
+            mutate.SaveChanges(); // sync SaveChanges bypasses the auditing override, so these stick
+
+            await mutate.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE IepDocuments SET UpdatedAt = {documentUpdatedAt} WHERE Id = {iepDocId}");
+        }
+
+        using (var context = fixture.CreateContext())
+        {
+            await BuildService(context).BackfillAsync();
+        }
+
+        using var verify = fixture.CreateContext();
+        var run = verify.AnalysisRuns.Single(r => r.BackfillSourceKey == $"IepAnalysis:{legacyId}");
+        Assert.Equal(legacyUpdatedAt, run.CreatedAt, TimeSpan.FromSeconds(1));
+
+        var result = await BuildAnalysisRunService(verify).GetLatestForSourceAsync(
+            fixture.ChildId, AnalysisSourceType.IepDocument, iepDocId, fixture.OwnerUserId, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.False(result.Data!.Stale);
     }
 
     [Fact]
@@ -379,9 +470,10 @@ public class AnalysisRunBackfillTests
             var run = verify.AnalysisRuns.Single(r => r.BackfillSourceKey == $"EtrAnalysis:{legacyId}");
             runId = run.Id;
             Assert.Equal(AnalysisRunStatus.Error, run.Status);
-            // The initial create path deliberately keeps the OLD snake_case section kinds (mirrors the
-            // IEP annual_goals array staying untouched on create) — converged on the NEXT pass below.
-            Assert.Contains(verify.AnalysisRunSections.Where(s => s.AnalysisRunId == runId), s => s.SectionKind == "assessment_completeness");
+            // Item E: the create path now writes the FINAL etr_completeness shape immediately, not the
+            // legacy snake_case assessment_completeness shape — the rebuild this test exercises below
+            // is driven purely by the content actually changing (legacy.UpdatedAt moving past the run's).
+            Assert.Contains(verify.AnalysisRunSections.Where(s => s.AnalysisRunId == runId), s => s.SectionKind == AnalysisRunSectionKinds.EtrCompleteness);
         }
 
         // The legacy analysis is re-run and completes successfully some time later, with a mix of
@@ -522,5 +614,93 @@ public class AnalysisRunBackfillTests
         var run = verify.AnalysisRuns.Single(r => r.BackfillSourceKey != null);
         Assert.Equal(0, verify.AnalysisRunSections.Count(s => s.AnalysisRunId == run.Id));
         Assert.Equal(1, verify.AnalysisRunSources.Count(s => s.AnalysisRunId == run.Id));
+    }
+
+    [Fact]
+    public async Task BackfillAsync_MidBatchRebuild_DoesNotLosePendingCreatesRestoredCreatedAt()
+    {
+        // Item G: a single batch can contain BOTH new legacy rows needing CREATE and an existing
+        // backfilled run needing REBUILD. Before the fix, a rebuild encountered mid-batch would flush
+        // (via its own SaveChangesAsync calls, same DbContext) and then DETACH (via its own
+        // ChangeTracker.Clear()) any creates already accumulated earlier in the SAME batch, before
+        // PersistBatchAsync's restore step ("p.Run.CreatedAt = p.RunCreatedAt") could apply to a
+        // still-tracked entity — silently leaving those runs' CreatedAt at "now" instead of the
+        // intended legacy timestamp.
+        using var fixture = new AnalysisRunTestFixture();
+        var iepDocB = fixture.SeedIepDocument();
+        var iepDocC = fixture.SeedIepDocument();
+        var iepDocA = fixture.SeedIepDocument();
+
+        var legacyBUpdatedAt = new DateTime(2025, 2, 1, 0, 0, 0, DateTimeKind.Utc);
+        var legacyCUpdatedAt = new DateTime(2025, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        int legacyBId, legacyCId, legacyAId;
+        using (var seed = fixture.CreateContext())
+        {
+            // B and C are seeded first (lower ids), so the batch's OrderBy(a => a.Id) processes them
+            // — and accumulates their creates into `pending` — BEFORE it reaches A's rebuild.
+            legacyBId = SeedIepAnalysis(seed, iepDocB, updatedAt: legacyBUpdatedAt);
+            legacyCId = SeedIepAnalysis(seed, iepDocC, updatedAt: legacyCUpdatedAt);
+            legacyAId = SeedIepAnalysis(seed, iepDocA,
+                goalAnalyses: """[{"goalId":1,"goalText":"g","overallRating":"green","plainLanguageSummary":"p"}]""");
+        }
+
+        // A is already backfilled (from some earlier pass this test does not replay) but its run still
+        // holds the legacy annual_goals ARRAY shape, which forces a rebuild regardless of UpdatedAt.
+        using (var seedRun = fixture.CreateContext())
+        {
+            var staleRun = new AnalysisRun
+            {
+                ChildProfileId = fixture.ChildId,
+                Status = AnalysisRunStatus.Error,
+                BackfillSourceKey = $"IepAnalysis:{legacyAId}"
+            };
+            seedRun.AnalysisRuns.Add(staleRun);
+            seedRun.SaveChanges();
+
+            seedRun.AnalysisRunSources.Add(new AnalysisRunSource
+            {
+                AnalysisRunId = staleRun.Id,
+                SourceType = AnalysisSourceType.IepDocument,
+                SourceId = iepDocA,
+                SourceLabel = "old",
+                Status = AnalysisRunSourceStatus.Error
+            });
+            seedRun.SaveChanges();
+
+            seedRun.AnalysisRunSections.Add(new AnalysisRunSection
+            {
+                AnalysisRunId = staleRun.Id,
+                SectionKind = "annual_goals",
+                Analysis = "[]",
+                DisplayOrder = 0
+            });
+            seedRun.SaveChanges();
+        }
+
+        BackfillResult result;
+        using (var context = fixture.CreateContext())
+        {
+            result = await BuildService(context).BackfillAsync();
+        }
+
+        Assert.Equal(2, result.Created); // B and C
+        Assert.Equal(1, result.Updated); // A rebuilt
+
+        using var verify = fixture.CreateContext();
+
+        var runB = verify.AnalysisRuns.Single(r => r.BackfillSourceKey == $"IepAnalysis:{legacyBId}");
+        var runC = verify.AnalysisRuns.Single(r => r.BackfillSourceKey == $"IepAnalysis:{legacyCId}");
+
+        // The crux of the bug: B and C's CreatedAt must be their OWN legacy UpdatedAt, not "now" (what
+        // the auditing interceptor stamps on insert, and what a detached entity would be stuck with).
+        Assert.Equal(legacyBUpdatedAt, runB.CreatedAt, TimeSpan.FromSeconds(5));
+        Assert.Equal(legacyCUpdatedAt, runC.CreatedAt, TimeSpan.FromSeconds(5));
+
+        var runA = verify.AnalysisRuns.Single(r => r.BackfillSourceKey == $"IepAnalysis:{legacyAId}");
+        Assert.Equal(AnalysisRunStatus.Completed, runA.Status);
+        var sectionsA = verify.AnalysisRunSections.Where(s => s.AnalysisRunId == runA.Id).ToList();
+        Assert.Contains(sectionsA, s => s.SectionKind == AnalysisRunSectionKinds.IepGoals);
+        Assert.DoesNotContain(sectionsA, s => s.SectionKind == "annual_goals");
     }
 }

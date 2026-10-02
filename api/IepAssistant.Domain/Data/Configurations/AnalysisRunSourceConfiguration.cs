@@ -31,5 +31,11 @@ public class AnalysisRunSourceConfiguration : IEntityTypeConfiguration<AnalysisR
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(s => s.AnalysisRunId);
+
+        // Covers MeetingPrepService's and IepComparisonService's "latest completed source for this
+        // document" lookups (SourceType + SourceId, filtering/returning AnalysisRunId and Status)
+        // without a key lookup back to the table.
+        builder.HasIndex(s => new { s.SourceType, s.SourceId })
+            .IncludeProperties(s => new { s.AnalysisRunId, s.Status });
     }
 }

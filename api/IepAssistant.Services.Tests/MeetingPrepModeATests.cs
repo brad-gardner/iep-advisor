@@ -152,6 +152,11 @@ public class MeetingPrepModeATests
         Assert.Contains("Needs a clearer measurement method.", prompt);
         Assert.Contains("\"overallRating\":\"yellow\"", prompt);
 
+        // Every analysis-derived block is wrapped in <iep_analysis> tags (item H), matching the
+        // established pattern for untrusted/data-only content the system prompt also names.
+        Assert.Contains("<iep_analysis>", prompt);
+        Assert.Contains("</iep_analysis>", prompt);
+
         using var verify = fixture.CreateContext();
         var checklist2 = verify.Set<MeetingPrepChecklist>().Single(c => c.Id == checklistId);
         Assert.Equal("completed", checklist2.Status);

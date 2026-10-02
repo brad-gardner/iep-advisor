@@ -113,6 +113,37 @@ public class IepComparisonServiceTests
     }
 
     [Fact]
+    public async Task GetTimelineAsync_MultipleDocuments_EachGetsItsOwnLatestRunRedFlags()
+    {
+        // Item K: GetTimelineAsync now batches the "latest completed run's red flags per document"
+        // lookup (one query for the latest source per document, one for those sources' sections)
+        // instead of querying per document in a loop. This is the regression risk that batching
+        // introduces: documents' red flags must never leak into each other via the GroupBy.
+        using var fixture = new AnalysisRunTestFixture();
+        var iepId1 = fixture.SeedIepDocument();
+        var iepId2 = fixture.SeedIepDocument();
+
+        using (var context = fixture.CreateContext())
+        {
+            AddCompletedRun(context, fixture.ChildId, iepId1,
+                runOverallRedFlagsJson: """[{"severity":"red","title":"A"}]""");
+            AddCompletedRun(context, fixture.ChildId, iepId2,
+                runOverallRedFlagsJson: """[{"severity":"yellow","title":"B"},{"severity":"yellow","title":"C"}]""");
+        }
+
+        using var context2 = fixture.CreateContext();
+        var result = await Service(context2).GetTimelineAsync(fixture.ChildId, fixture.OwnerUserId, CancellationToken.None);
+
+        Assert.Equal(2, result!.Ieps.Count);
+        var entry1 = result.Ieps.Single(e => e.Id == iepId1);
+        var entry2 = result.Ieps.Single(e => e.Id == iepId2);
+        Assert.True(entry1.HasAnalysis);
+        Assert.Equal(1, entry1.RedFlagCount);
+        Assert.True(entry2.HasAnalysis);
+        Assert.Equal(2, entry2.RedFlagCount);
+    }
+
+    [Fact]
     public async Task GetTimelineAsync_NoCompletedRun_HasAnalysisFalse_ZeroRedFlags()
     {
         using var fixture = new AnalysisRunTestFixture();

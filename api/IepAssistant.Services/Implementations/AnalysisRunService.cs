@@ -21,6 +21,11 @@ public class AnalysisRunService : IAnalysisRunService
 
     private const string AnalysisOperation = "analysis";
     private const int AnalysisLimitPerChild = 5;
+    // Caps how large a single run can be: each source is its own Claude call (plus a synthesis call
+    // when 2+ complete), so an unbounded source count is an unbounded per-request bill and an
+    // unbounded run duration against the stale-run sweep's threshold.
+    private const int MaxSourcesPerRun = 5;
+    private const string TooManySourcesMessage = "Choose up to 5 documents for one analysis.";
 
     private static readonly JsonSerializerOptions CamelCaseOptions = new()
     {
@@ -89,6 +94,9 @@ public class AnalysisRunService : IAnalysisRunService
 
         if (hadDuplicates)
             warnings.Add("Duplicate documents were selected and have been combined.");
+
+        if (dedupedSources.Count > MaxSourcesPerRun)
+            return ServiceResult<AnalysisRunModel>.FailureResult(TooManySourcesMessage);
 
         // Atomic check-and-reserve of one quota unit (reserve on create, release on error).
         // The returned id is stored on the run so refunds are scoped to THIS run's reservation,
@@ -185,16 +193,23 @@ public class AnalysisRunService : IAnalysisRunService
 
             var completed = new List<CompletedSource>();
             var sourceFailureMessages = new List<string>();
+            var sourceFailureKinds = new List<ClaudeFailureKind>();
             var displayOrder = 0;
 
             foreach (var source in run.Sources.OrderBy(s => s.Id))
             {
                 source.Status = AnalysisRunSourceStatus.Running;
                 source.ErrorMessage = null;
+                // Heartbeat (see the class-level race-safety note on FailRunAsync): stamped before
+                // EVERY source call, not just once on entering Running, so the 30-min stale-run sweep
+                // only catches a run with no progress for 30 minutes — each individual call below is
+                // itself capped well under that by HttpClient's own timeout.
+                run.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync(ct);
 
                 SourceAnalysisResponse? sourceResult = null;
                 string? failureMessage = null;
+                ClaudeFailureKind? failureKind = null;
 
                 try
                 {
@@ -211,12 +226,21 @@ public class AnalysisRunService : IAnalysisRunService
                     if (sourceResult == null)
                     {
                         // Unparseable JSON from Claude is exactly ClaudeFailureKind.InvalidResponse.
-                        // The kind is not persisted on the source row (no schema dependency in this
-                        // phase) but it is logged structurally so triage stays a log query.
+                        failureKind = ClaudeFailureKind.InvalidResponse;
                         failureMessage = ClaudeFailureMessages.InvalidResponse;
                         _logger.LogError(
                             "AnalysisRun {RunId} source {SourceId} failed with {Kind}: Claude response could not be parsed",
                             run.Id, source.Id, ClaudeFailureKind.InvalidResponse);
+                    }
+                    else
+                    {
+                        // Claude is free to return an explicit JSON null for an array field instead of
+                        // omitting it or returning []; System.Text.Json overwrites the C# default []
+                        // initializer with null in that case. Normalize every list (and sanitize each
+                        // ordinary section's sectionKind) right after a successful parse so nothing
+                        // downstream — the synthesis prompt builder, the client-facing model — ever
+                        // has to defend against a null list or an attacker/model-supplied kind again.
+                        NormalizeNulls(sourceResult);
                     }
                 }
                 catch (ClaudeApiException ex) when (!ct.IsCancellationRequested)
@@ -229,6 +253,7 @@ public class AnalysisRunService : IAnalysisRunService
                     // through to the OperationCanceledException arm on the outer try below, which
                     // fails the WHOLE run rather than just this source (host shutdown is not a
                     // partial-failure scenario).
+                    failureKind = ex.Kind;
                     failureMessage = ex.UserMessage;
                     _logger.LogError(ex, "AnalysisRun {RunId} source {SourceId} failed with {Kind}", run.Id, source.Id, ex.Kind);
                 }
@@ -240,91 +265,115 @@ public class AnalysisRunService : IAnalysisRunService
                     source.ErrorMessage = message;
                     await _context.SaveChangesAsync(ct);
                     sourceFailureMessages.Add(message);
+                    sourceFailureKinds.Add(failureKind ?? ClaudeFailureKind.Unknown);
                     continue;
                 }
 
-                // IEP sources only: validate every model-returned goalId against this document's
-                // CURRENT goals before persisting — never trust a model-returned id
-                // (docs/solutions/logic-errors/2026-09-16-family-draft-sharing-untrusted-ids-in-prompts-…).
-                // Unknown ids are dropped; only the dropped COUNT is logged, never goal content (PII).
-                if (source.SourceType == AnalysisSourceType.IepDocument && sourceResult.GoalAnalyses.Count > 0)
+                // Validating and persisting this source's structured output is wrapped separately from
+                // the Claude call above: the call itself succeeded (and was genuinely billed), so a
+                // failure here — a DB constraint, an unexpected shape — must fail only THIS source,
+                // never the whole run and never the other sources' already-good work.
+                try
                 {
-                    var validGoalIds = await _context.Goals
-                        .Where(g => g.IepSection.IepDocumentId == source.SourceId)
-                        .Select(g => g.Id)
-                        .ToListAsync(ct);
-                    var validGoalIdSet = new HashSet<int>(validGoalIds);
-
-                    var filteredGoals = sourceResult.GoalAnalyses.Where(g => validGoalIdSet.Contains(g.GoalId)).ToList();
-                    var droppedCount = sourceResult.GoalAnalyses.Count - filteredGoals.Count;
-                    if (droppedCount > 0)
+                    // IEP sources only: validate every model-returned goalId against this document's
+                    // CURRENT goals before persisting — never trust a model-returned id
+                    // (docs/solutions/logic-errors/2026-09-16-family-draft-sharing-untrusted-ids-in-prompts-…).
+                    // Unknown ids are dropped; only the dropped COUNT is logged, never goal content (PII).
+                    if (source.SourceType == AnalysisSourceType.IepDocument && sourceResult.GoalAnalyses.Count > 0)
                     {
-                        _logger.LogWarning(
-                            "AnalysisRun {RunId} source {SourceId}: dropped {DroppedCount} goal rating(s) with an unrecognized goalId",
-                            run.Id, source.Id, droppedCount);
+                        var validGoalIds = await _context.Goals
+                            .Where(g => g.IepSection.IepDocumentId == source.SourceId)
+                            .Select(g => g.Id)
+                            .ToListAsync(ct);
+                        var validGoalIdSet = new HashSet<int>(validGoalIds);
+
+                        var filteredGoals = sourceResult.GoalAnalyses.Where(g => validGoalIdSet.Contains(g.GoalId)).ToList();
+                        var droppedCount = sourceResult.GoalAnalyses.Count - filteredGoals.Count;
+                        if (droppedCount > 0)
+                        {
+                            _logger.LogWarning(
+                                "AnalysisRun {RunId} source {SourceId}: dropped {DroppedCount} goal rating(s) with an unrecognized goalId",
+                                run.Id, source.Id, droppedCount);
+                        }
+
+                        if (filteredGoals.Count > 0)
+                        {
+                            await _context.AnalysisRunSections.AddAsync(new AnalysisRunSection
+                            {
+                                AnalysisRunId = run.Id,
+                                AnalysisRunSourceId = source.Id,
+                                SectionKind = AnalysisRunSectionKinds.IepGoals,
+                                Analysis = JsonSerializer.Serialize(
+                                    new IepGoalsSectionPayload { GoalAnalyses = filteredGoals }, CamelCaseOptions),
+                                DisplayOrder = displayOrder++
+                            }, ct);
+                        }
                     }
 
-                    if (filteredGoals.Count > 0)
+                    // ETR sources only: the ETR-specific prompt's two typed sections, persisted the same
+                    // way as iep_goals above — standalone sections, never folded into sourceResult.Sections.
+                    // Either or both may be absent if Claude omitted them; that is not a source failure.
+                    if (source.SourceType == AnalysisSourceType.EtrDocument)
+                    {
+                        if (sourceResult.EtrCompleteness != null)
+                        {
+                            await _context.AnalysisRunSections.AddAsync(new AnalysisRunSection
+                            {
+                                AnalysisRunId = run.Id,
+                                AnalysisRunSourceId = source.Id,
+                                SectionKind = AnalysisRunSectionKinds.EtrCompleteness,
+                                Analysis = JsonSerializer.Serialize(sourceResult.EtrCompleteness, CamelCaseOptions),
+                                DisplayOrder = displayOrder++
+                            }, ct);
+                        }
+
+                        if (sourceResult.EtrEligibility != null)
+                        {
+                            await _context.AnalysisRunSections.AddAsync(new AnalysisRunSection
+                            {
+                                AnalysisRunId = run.Id,
+                                AnalysisRunSourceId = source.Id,
+                                SectionKind = AnalysisRunSectionKinds.EtrEligibility,
+                                Analysis = JsonSerializer.Serialize(sourceResult.EtrEligibility, CamelCaseOptions),
+                                DisplayOrder = displayOrder++
+                            }, ct);
+                        }
+                    }
+
+                    foreach (var sectionResult in sourceResult.Sections)
                     {
                         await _context.AnalysisRunSections.AddAsync(new AnalysisRunSection
                         {
                             AnalysisRunId = run.Id,
                             AnalysisRunSourceId = source.Id,
-                            SectionKind = AnalysisRunSectionKinds.IepGoals,
-                            Analysis = JsonSerializer.Serialize(
-                                new IepGoalsSectionPayload { GoalAnalyses = filteredGoals }, CamelCaseOptions),
+                            SectionKind = sectionResult.SectionKind,
+                            Analysis = JsonSerializer.Serialize(sectionResult, CamelCaseOptions),
                             DisplayOrder = displayOrder++
                         }, ct);
                     }
-                }
 
-                // ETR sources only: the ETR-specific prompt's two typed sections, persisted the same
-                // way as iep_goals above — standalone sections, never folded into sourceResult.Sections.
-                // Either or both may be absent if Claude omitted them; that is not a source failure.
-                if (source.SourceType == AnalysisSourceType.EtrDocument)
+                    source.Status = AnalysisRunSourceStatus.Completed;
+                    source.ErrorMessage = null;
+                    await _context.SaveChangesAsync(ct);
+
+                    completed.Add(new CompletedSource(source, sourceResult));
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    if (sourceResult.EtrCompleteness != null)
-                    {
-                        await _context.AnalysisRunSections.AddAsync(new AnalysisRunSection
-                        {
-                            AnalysisRunId = run.Id,
-                            AnalysisRunSourceId = source.Id,
-                            SectionKind = AnalysisRunSectionKinds.EtrCompleteness,
-                            Analysis = JsonSerializer.Serialize(sourceResult.EtrCompleteness, CamelCaseOptions),
-                            DisplayOrder = displayOrder++
-                        }, ct);
-                    }
+                    _logger.LogError(ex, "AnalysisRun {RunId} source {SourceId} failed while persisting its analysis", run.Id, source.Id);
 
-                    if (sourceResult.EtrEligibility != null)
-                    {
-                        await _context.AnalysisRunSections.AddAsync(new AnalysisRunSection
-                        {
-                            AnalysisRunId = run.Id,
-                            AnalysisRunSourceId = source.Id,
-                            SectionKind = AnalysisRunSectionKinds.EtrEligibility,
-                            Analysis = JsonSerializer.Serialize(sourceResult.EtrEligibility, CamelCaseOptions),
-                            DisplayOrder = displayOrder++
-                        }, ct);
-                    }
+                    // Drop this iteration's own not-yet-saved section inserts so the recovery save
+                    // below never tries to flush a partially-built row alongside the Error status.
+                    foreach (var entry in _context.ChangeTracker.Entries<AnalysisRunSection>().Where(e => e.State == EntityState.Added).ToList())
+                        entry.State = EntityState.Detached;
+
+                    source.Status = AnalysisRunSourceStatus.Error;
+                    source.ErrorMessage = ClaudeFailureMessages.Unknown;
+                    await _context.SaveChangesAsync(ct);
+
+                    sourceFailureMessages.Add(source.ErrorMessage);
+                    sourceFailureKinds.Add(ClaudeFailureKind.Unknown);
                 }
-
-                foreach (var sectionResult in sourceResult.Sections)
-                {
-                    await _context.AnalysisRunSections.AddAsync(new AnalysisRunSection
-                    {
-                        AnalysisRunId = run.Id,
-                        AnalysisRunSourceId = source.Id,
-                        SectionKind = sectionResult.SectionKind,
-                        Analysis = JsonSerializer.Serialize(sectionResult, CamelCaseOptions),
-                        DisplayOrder = displayOrder++
-                    }, ct);
-                }
-
-                source.Status = AnalysisRunSourceStatus.Completed;
-                source.ErrorMessage = null;
-                await _context.SaveChangesAsync(ct);
-
-                completed.Add(new CompletedSource(source, sourceResult));
             }
 
             if (completed.Count == 0)
@@ -333,13 +382,16 @@ public class AnalysisRunService : IAnalysisRunService
                 // UserMessage (preserving the pre-refactor single-call behavior parents already see);
                 // a multi-source all-failure uses a combined message since no one reason dominates.
                 var runMessage = sourceFailureMessages.Count == 1 ? sourceFailureMessages[0] : AllSourcesFailedMessage;
-                // CancellationToken.None: see FailRunAsync's doc comment. refundQuota: true always —
-                // when every source fails, the unit is refunded regardless of failure kind (this
-                // supersedes the old single-call InvalidResponse carve-out: that rule existed to stop
-                // a single always-unparseable call from being retried for free, but a run can now
-                // contain several sources, so "all failed" is itself already a meaningfully rarer,
-                // real failure worth refunding).
-                await FailRunAsync(run.Id, runMessage, refundQuota: true, ct: CancellationToken.None);
+                // Restored carve-out (todos/P2-02, the pre-refactor single-call engine's rule): when
+                // EVERY source failed and EVERY one of those failures was specifically an unparseable
+                // Claude response, the call(s) were still genuinely billed and a document engineered to
+                // always produce unparseable JSON must not be a free retry loop — refundQuota: false.
+                // Any OTHER failure kind present (a transient/provider failure, alone or mixed with an
+                // InvalidResponse) still refunds, since that is a real service failure, not something a
+                // caller can reliably manufacture for free retries. CancellationToken.None: see
+                // FailRunAsync's doc comment.
+                var allUnparseable = sourceFailureKinds.Count > 0 && sourceFailureKinds.All(k => k == ClaudeFailureKind.InvalidResponse);
+                await FailRunAsync(run.Id, runMessage, refundQuota: !allUnparseable, ct: CancellationToken.None);
                 return;
             }
 
@@ -368,12 +420,40 @@ public class AnalysisRunService : IAnalysisRunService
             }
             else
             {
+                // Heartbeat before the synthesis call (see the per-source loop's matching comment) —
+                // the last of this run's Claude calls, so the last point the sweep needs to be held off.
+                run.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync(ct);
+
                 await RunSynthesisAsync(run, completed, hasParentGoals, parentGoals, ct);
             }
 
-            run.Status = AnalysisRunStatus.Completed;
-            run.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync(ct);
+            // Conditional terminal write (see FailRunAsync's doc comment for the full race-safety
+            // rationale shared by both terminal paths): only applies if the run is still Running or
+            // Pending. If the stale-run sweep already failed (and refunded) this run while this
+            // execution was still in flight, rowsAffected is 0 and this result must be dropped — never
+            // overwrite an Error row with a late Completed, and never touch usage on the loser's path
+            // (there is nothing to touch here: a successful completion never refunds).
+            var completedAt = DateTime.UtcNow;
+            var rowsAffected = await _context.AnalysisRuns
+                .Where(r => r.Id == run.Id && (r.Status == AnalysisRunStatus.Running || r.Status == AnalysisRunStatus.Pending))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.Status, AnalysisRunStatus.Completed)
+                    .SetProperty(r => r.UpdatedAt, completedAt)
+                    .SetProperty(r => r.ErrorMessage, run.ErrorMessage)
+                    .SetProperty(r => r.OverallSummary, run.OverallSummary)
+                    .SetProperty(r => r.CrossDocSynthesis, run.CrossDocSynthesis)
+                    .SetProperty(r => r.OverallRedFlags, run.OverallRedFlags)
+                    .SetProperty(r => r.AdvocacyGapAnalysis, run.AdvocacyGapAnalysis)
+                    .SetProperty(r => r.ParentGoalsSnapshot, run.ParentGoalsSnapshot), ct);
+
+            if (rowsAffected == 0)
+            {
+                _logger.LogWarning(
+                    "AnalysisRun {RunId} finished with {CompletedCount}/{TotalCount} source(s) but lost the terminal-transition race (no longer Running/Pending); its result was discarded",
+                    runId, completed.Count, run.Sources.Count);
+                return;
+            }
 
             _logger.LogInformation(
                 "AnalysisRun {RunId} completed with {CompletedCount}/{TotalCount} source(s)",
@@ -433,6 +513,10 @@ public class AnalysisRunService : IAnalysisRunService
                     "AnalysisRun {RunId} synthesis failed with {Kind}: Claude response could not be parsed",
                     run.Id, ClaudeFailureKind.InvalidResponse);
             }
+            else
+            {
+                NormalizeNulls(synthesis);
+            }
         }
         catch (ClaudeApiException ex) when (!ct.IsCancellationRequested)
         {
@@ -470,11 +554,13 @@ public class AnalysisRunService : IAnalysisRunService
     }
 
     /// <summary>
-    /// Fails (and refunds) every run still Running whose UpdatedAt — stamped exactly once, when the
-    /// run enters Running (see ExecuteRunAsync) — is older than <paramref name="staleAfter"/>. Called
-    /// every 5 minutes by AnalysisRunWorker's periodic sweep so a hung Claude call (past the HTTP
-    /// client's own timeout, e.g. a dropped connection that never raised) does not strand a run — and
-    /// its reserved quota unit — until the next process restart.
+    /// Fails (and refunds) every run still Running whose UpdatedAt — stamped on entering Running and
+    /// again as a heartbeat before every source call and before the synthesis call (see
+    /// ExecuteRunAsync) — is older than <paramref name="staleAfter"/>. Called every 5 minutes by
+    /// AnalysisRunWorker's periodic sweep so a hung Claude call (past the HTTP client's own timeout,
+    /// e.g. a dropped connection that never raised) does not strand a run — and its reserved quota
+    /// unit — until the next process restart. The heartbeat means this only ever catches a run with no
+    /// progress for the full threshold, not merely a long multi-source run still actively working.
     /// </summary>
     public async Task FailStaleRunsAsync(TimeSpan staleAfter, CancellationToken ct = default)
     {
@@ -507,11 +593,34 @@ public class AnalysisRunService : IAnalysisRunService
         if (role == null)
             return ServiceResult<List<AnalysisRunModel>>.FailureResult("You do not have access to this child.");
 
+        // Projected, not Include(r => r.Sources): the list view never needs SourceContentSnapshot (the
+        // full extracted document text) and never needed Sections either — just metadata per run.
         var runs = await _context.AnalysisRuns
             .AsNoTracking()
             .Where(r => r.ChildProfileId == childId)
-            .Include(r => r.Sources)
             .OrderByDescending(r => r.CreatedAt)
+            .Select(r => new AnalysisRun
+            {
+                Id = r.Id,
+                ChildProfileId = r.ChildProfileId,
+                Status = r.Status,
+                OverallSummary = r.OverallSummary,
+                CrossDocSynthesis = r.CrossDocSynthesis,
+                OverallRedFlags = r.OverallRedFlags,
+                AdvocacyGapAnalysis = r.AdvocacyGapAnalysis,
+                ParentGoalsSnapshot = r.ParentGoalsSnapshot,
+                ErrorMessage = r.ErrorMessage,
+                CreatedAt = r.CreatedAt,
+                Sources = r.Sources.Select(s => new AnalysisRunSource
+                {
+                    Id = s.Id,
+                    SourceType = s.SourceType,
+                    SourceId = s.SourceId,
+                    SourceLabel = s.SourceLabel,
+                    Status = s.Status,
+                    ErrorMessage = s.ErrorMessage
+                }).ToList()
+            })
             .ToListAsync(ct);
 
         var models = runs.Select(r => MapToModel(r, includeSections: false)).ToList();
@@ -520,11 +629,46 @@ public class AnalysisRunService : IAnalysisRunService
 
     public async Task<ServiceResult<AnalysisRunModel>> GetRunAsync(int runId, int userId, CancellationToken ct = default)
     {
+        // Projected rather than Include(r => r.Sources).Include(r => r.Sections): that combination
+        // joins two sibling collections in one query by default, so EVERY section row carries a
+        // duplicated copy of every source row's SourceContentSnapshot (the full extracted document
+        // text) in the cartesian product. Projecting each collection separately (still into the real
+        // entity shape, so MapToModel/PopulateModel need no changes) makes EF issue them as their own
+        // correlated queries instead, and SourceContentSnapshot is simply never selected at all.
         var run = await _context.AnalysisRuns
             .AsNoTracking()
-            .Include(r => r.Sources)
-            .Include(r => r.Sections)
-            .FirstOrDefaultAsync(r => r.Id == runId, ct);
+            .Where(r => r.Id == runId)
+            .Select(r => new AnalysisRun
+            {
+                Id = r.Id,
+                ChildProfileId = r.ChildProfileId,
+                Status = r.Status,
+                OverallSummary = r.OverallSummary,
+                CrossDocSynthesis = r.CrossDocSynthesis,
+                OverallRedFlags = r.OverallRedFlags,
+                AdvocacyGapAnalysis = r.AdvocacyGapAnalysis,
+                ParentGoalsSnapshot = r.ParentGoalsSnapshot,
+                ErrorMessage = r.ErrorMessage,
+                CreatedAt = r.CreatedAt,
+                Sources = r.Sources.Select(s => new AnalysisRunSource
+                {
+                    Id = s.Id,
+                    SourceType = s.SourceType,
+                    SourceId = s.SourceId,
+                    SourceLabel = s.SourceLabel,
+                    Status = s.Status,
+                    ErrorMessage = s.ErrorMessage
+                }).ToList(),
+                Sections = r.Sections.Select(sec => new AnalysisRunSection
+                {
+                    Id = sec.Id,
+                    AnalysisRunSourceId = sec.AnalysisRunSourceId,
+                    SectionKind = sec.SectionKind,
+                    Analysis = sec.Analysis,
+                    DisplayOrder = sec.DisplayOrder
+                }).ToList()
+            })
+            .FirstOrDefaultAsync(ct);
 
         if (run == null)
             return ServiceResult<AnalysisRunModel>.FailureResult("Analysis run not found.");
@@ -549,13 +693,37 @@ public class AnalysisRunService : IAnalysisRunService
         if (!await SourceBelongsToChildAsync(childId, sourceType, sourceId, ct))
             return ServiceResult<AnalysisRunLatestModel>.FailureResult("Analysis run not found.");
 
+        // Run-level fields + every source's METADATA ONLY (never SourceContentSnapshot) — see
+        // GetRunAsync's comment for why Include(Sources).Include(Sections) is avoided. Sections are
+        // fetched separately below, scoped to just the matched source (item I / behavior change: see
+        // AnalysisRunLatestModel.Sections's doc comment).
         var run = await _context.AnalysisRuns
             .AsNoTracking()
-            .Include(r => r.Sources)
-            .Include(r => r.Sections)
             .Where(r => r.ChildProfileId == childId && r.Sources.Any(s => s.SourceType == sourceType && s.SourceId == sourceId))
             .OrderByDescending(r => r.CreatedAt)
             .ThenByDescending(r => r.Id)
+            .Select(r => new AnalysisRun
+            {
+                Id = r.Id,
+                ChildProfileId = r.ChildProfileId,
+                Status = r.Status,
+                OverallSummary = r.OverallSummary,
+                CrossDocSynthesis = r.CrossDocSynthesis,
+                OverallRedFlags = r.OverallRedFlags,
+                AdvocacyGapAnalysis = r.AdvocacyGapAnalysis,
+                ParentGoalsSnapshot = r.ParentGoalsSnapshot,
+                ErrorMessage = r.ErrorMessage,
+                CreatedAt = r.CreatedAt,
+                Sources = r.Sources.Select(s => new AnalysisRunSource
+                {
+                    Id = s.Id,
+                    SourceType = s.SourceType,
+                    SourceId = s.SourceId,
+                    SourceLabel = s.SourceLabel,
+                    Status = s.Status,
+                    ErrorMessage = s.ErrorMessage
+                }).ToList()
+            })
             .FirstOrDefaultAsync(ct);
 
         if (run == null)
@@ -571,6 +739,23 @@ public class AnalysisRunService : IAnalysisRunService
                 Label = s.SourceLabel
             })
             .ToList();
+
+        // Only the matched source's OWN sections — a deliberate behavior change from the previous
+        // Include(Sections), which loaded every source's sections for a multi-source run. The web
+        // already filters the sections it renders by analysisRunSourceId, so this is a payload-size
+        // reduction (and the thing that stops the cartesian join), not a contract break.
+        run.Sections = await _context.AnalysisRunSections
+            .AsNoTracking()
+            .Where(sec => sec.AnalysisRunId == run.Id && sec.AnalysisRunSourceId == matchedSource.Id)
+            .Select(sec => new AnalysisRunSection
+            {
+                Id = sec.Id,
+                AnalysisRunSourceId = sec.AnalysisRunSourceId,
+                SectionKind = sec.SectionKind,
+                Analysis = sec.Analysis,
+                DisplayOrder = sec.DisplayOrder
+            })
+            .ToListAsync(ct);
 
         var stale = await IsStaleAsync(sourceType, sourceId, matchedSource, run, ct);
 
@@ -1178,13 +1363,148 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
         }
     }
 
+    // --- Null-list normalization & section-kind sanitization (model-returned JSON is never trusted
+    // to actually match the schema it was asked for) ---
+    //
+    // Every List<T> property below is declared with a `= []` default, but System.Text.Json overwrites
+    // that default with an explicit JSON `null` rather than leaving it alone — Claude is free to return
+    // `"sections": null` instead of omitting the key or returning `[]`. Left unnormalized, a null list
+    // here is not just a cosmetic gap in the client-facing model: BuildSynthesisUserText dereferences
+    // `response.Sections.Count` (and similar) for every COMPLETED source feeding the synthesis call, so
+    // an unnormalized null would throw a NullReferenceException and take the rest of a multi-source run
+    // down with it. Called immediately after a successful parse, once, so nothing downstream has to
+    // defend against this again.
+
+    private static void NormalizeNulls(SourceAnalysisResponse response)
+    {
+        response.Sections ??= [];
+        foreach (var section in response.Sections)
+            NormalizeNulls(section);
+
+        response.GoalAnalyses ??= [];
+        foreach (var goal in response.GoalAnalyses)
+            NormalizeNulls(goal);
+
+        response.OverallRedFlags ??= [];
+
+        if (response.EtrCompleteness != null)
+            NormalizeNulls(response.EtrCompleteness);
+
+        if (response.EtrEligibility != null)
+            NormalizeNulls(response.EtrEligibility);
+
+        if (response.AdvocacyGapAnalysis != null)
+            NormalizeNulls(response.AdvocacyGapAnalysis);
+    }
+
+    private static void NormalizeNulls(AnalysisRunSynthesisResponse response)
+    {
+        response.OverallRedFlags ??= [];
+
+        if (response.CrossDocSynthesis != null)
+        {
+            response.CrossDocSynthesis.Timeline ??= [];
+            response.CrossDocSynthesis.Contradictions ??= [];
+        }
+
+        if (response.AdvocacyGapAnalysis != null)
+            NormalizeNulls(response.AdvocacyGapAnalysis);
+    }
+
+    private static void NormalizeNulls(AnalysisRunSectionResult section)
+    {
+        section.KeyPoints ??= [];
+        section.RedFlags ??= [];
+        section.LegalReferences ??= [];
+        // Model-returned, never trusted: lowercase, strip to [a-z0-9_], cap length, and never let an
+        // ordinary section silently collide with one of this engine's structurally distinct typed
+        // section kinds (iep_goals / etr_completeness / etr_eligibility each have their own object
+        // shape, not an AnalysisRunSectionResult — see AnalysisRunSectionKinds and MapSectionToModel).
+        section.SectionKind = SanitizeSectionKind(section.SectionKind);
+    }
+
+    private static void NormalizeNulls(GoalAnalysisResult goal)
+    {
+        goal.Strengths ??= [];
+        goal.Concerns ??= [];
+        goal.SuggestedImprovements ??= [];
+    }
+
+    private static void NormalizeNulls(EtrCompletenessSectionPayload payload)
+    {
+        payload.EvaluatedDomains ??= [];
+        foreach (var domain in payload.EvaluatedDomains)
+            domain.ToolsUsed ??= [];
+
+        payload.MissingDomains ??= [];
+    }
+
+    private static void NormalizeNulls(EtrEligibilitySectionPayload payload)
+    {
+        payload.SupportingEvidence ??= [];
+        payload.ContradictingEvidence ??= [];
+        payload.AlternativeConsiderations ??= [];
+    }
+
+    private static void NormalizeNulls(AdvocacyGapAnalysisResponse gap)
+    {
+        gap.GoalAlignments ??= [];
+        foreach (var alignment in gap.GoalAlignments)
+            alignment.AlignedIepGoals ??= [];
+    }
+
+    /// <summary>Sanitizes a model-returned ordinary sectionKind: lowercase, keep only [a-z0-9_],
+    /// truncate to the column's 50-char max, and remap an empty or reserved result to "other" so it can
+    /// never collide with one of this engine's structurally distinct typed section kinds.</summary>
+    private static string SanitizeSectionKind(string? kind)
+    {
+        if (string.IsNullOrWhiteSpace(kind))
+            return "other";
+
+        var filtered = new string(kind
+            .ToLowerInvariant()
+            .Where(c => (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')
+            .ToArray());
+
+        if (filtered.Length > 50)
+            filtered = filtered[..50];
+
+        if (filtered.Length == 0)
+            return "other";
+
+        return filtered switch
+        {
+            AnalysisRunSectionKinds.IepGoals or AnalysisRunSectionKinds.EtrCompleteness or AnalysisRunSectionKinds.EtrEligibility => "other",
+            _ => filtered
+        };
+    }
+
     /// <summary>
     /// Transitions a run to Error and, unless <paramref name="refundQuota"/> is false, refunds its
     /// reserved quota unit. Idempotent: a no-op if the run is already terminal (Completed/Error).
+    /// Also marks every source of the run still Pending/Running as Error, so a document page polling
+    /// a specific source's status is not left waiting on a run that will never resume.
     ///
     /// <paramref name="ct"/> is deliberately <see cref="CancellationToken.None"/> at every call site
     /// (a Claude/parse failure, host shutdown, an unexpected exception, or the orphan sweep): this
     /// method's refund must never be abortable, or the reserved unit leaks with no recovery path.
+    ///
+    /// Race safety: this is one of two writers that can reach a run's terminal state — the other is
+    /// ExecuteRunAsync's own successful-completion write. Both races are resolved the same way: the
+    /// actual status transition is a conditional <c>ExecuteUpdateAsync</c> scoped to
+    /// <c>WHERE Status IN (Running, Pending)</c>, and only the writer whose update actually affects a
+    /// row — i.e. whichever one runs first — may act further (here: mark sources Error and release the
+    /// usage unit). The loser's update affects zero rows and it returns having changed nothing and
+    /// refunded nothing, so a late sweep can never undo (or re-refund) a run the executor already
+    /// completed, and a late "Completed" write from the executor can never resurrect (or silently
+    /// consume twice) a run the sweep already failed. The conditional update and the usage release are
+    /// wrapped in one DB transaction so they commit — or roll back — together: if
+    /// ReleaseUsageByIdAsync throws, or the process is killed before commit, NOTHING here persists and
+    /// the run is left exactly as it was (still Running/Pending), safe for the next sweep pass or the
+    /// executor itself to retry the whole transition from scratch. This replaces the previous
+    /// "release the usage row before committing Status=Error" ordering trick (todos/P2-03): a real
+    /// transaction gives the same crash-recovery guarantee without the TOCTOU gap a plain read-then-write
+    /// has against a second writer on a different connection.
     /// </summary>
     public async Task FailRunAsync(int runId, string message, bool refundQuota = true, CancellationToken ct = default)
     {
@@ -1196,37 +1516,65 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
         // clearing is safe.
         _context.ChangeTracker.Clear();
 
-        var run = await _context.AnalysisRuns.FirstOrDefaultAsync(r => r.Id == runId, ct);
-        if (run == null)
+        // Cheap pre-check outside any transaction: the overwhelmingly common case (a run that has not
+        // raced anything) skips opening a transaction entirely, and an ALREADY-terminal run (the other
+        // writer already won, or this is a genuinely duplicate call) is a true no-op with no side effects.
+        var existing = await _context.AnalysisRuns
+            .AsNoTracking()
+            .Where(r => r.Id == runId)
+            .Select(r => new { r.UsageRecordId, r.Status })
+            .FirstOrDefaultAsync(ct);
+
+        if (existing == null)
         {
             _logger.LogWarning("FailRunAsync: AnalysisRun {RunId} not found", runId);
             return;
         }
 
-        // Idempotent: only act on runs that have not already reached a terminal state.
-        if (run.Status is AnalysisRunStatus.Completed or AnalysisRunStatus.Error)
+        if (existing.Status is AnalysisRunStatus.Completed or AnalysisRunStatus.Error)
             return;
 
-        var usageRecordId = run.UsageRecordId;
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
 
-        // todos/P2-03: release the usage row BEFORE committing Status=Error/UsageRecordId=null, not
-        // after. If ReleaseUsageByIdAsync throws (DB blip, connection reset) or the process is killed
-        // between the two, this ordering leaves the run non-terminal with UsageRecordId still set —
-        // recoverable, because the next sweep re-enters this method and tries the release again
-        // (ReleaseUsageByIdAsync no-ops if the row is already gone) before completing the transition.
-        // The old order (commit first, delete second) could instead lose the usage row forever: the
-        // run would already be terminal, so no sweep would ever retry the release.
-        if (refundQuota && usageRecordId.HasValue)
-            await _subscriptionService.ReleaseUsageByIdAsync(usageRecordId.Value, ct);
+        var now = DateTime.UtcNow;
+        var statusStillInFlight = _context.AnalysisRuns
+            .Where(r => r.Id == runId && (r.Status == AnalysisRunStatus.Running || r.Status == AnalysisRunStatus.Pending));
 
-        run.Status = AnalysisRunStatus.Error;
-        run.ErrorMessage = message;
-        run.UpdatedAt = DateTime.UtcNow;
         // refundQuota: false leaves UsageRecordId untouched — the reservation is intentionally kept
-        // (consumed, not refunded) rather than released above.
-        if (refundQuota)
-            run.UsageRecordId = null;
-        await _context.SaveChangesAsync(ct);
+        // (consumed, not refunded) rather than cleared below.
+        var rowsAffected = refundQuota
+            ? await statusStillInFlight.ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.Status, AnalysisRunStatus.Error)
+                .SetProperty(r => r.ErrorMessage, message)
+                .SetProperty(r => r.UpdatedAt, now)
+                .SetProperty(r => r.UsageRecordId, (int?)null), ct)
+            : await statusStillInFlight.ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.Status, AnalysisRunStatus.Error)
+                .SetProperty(r => r.ErrorMessage, message)
+                .SetProperty(r => r.UpdatedAt, now), ct);
+
+        if (rowsAffected == 0)
+        {
+            // Lost the race: another writer (almost certainly ExecuteRunAsync's own terminal write)
+            // already moved this run to a terminal state since the pre-check above. Nothing was
+            // committed by the update itself (it matched no row); disposing without committing rolls
+            // the transaction back, so this is a clean no-op.
+            return;
+        }
+
+        // Every source still Pending/Running is now orphaned — its parent run will never resume, so a
+        // document page polling that one source's status must stop waiting on it too.
+        await _context.AnalysisRunSources
+            .Where(s => s.AnalysisRunId == runId
+                        && (s.Status == AnalysisRunSourceStatus.Pending || s.Status == AnalysisRunSourceStatus.Running))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.Status, AnalysisRunSourceStatus.Error)
+                .SetProperty(x => x.ErrorMessage, message), ct);
+
+        if (refundQuota && existing.UsageRecordId.HasValue)
+            await _subscriptionService.ReleaseUsageByIdAsync(existing.UsageRecordId.Value, ct);
+
+        await transaction.CommitAsync(ct);
     }
 
     // --- Mapping ---

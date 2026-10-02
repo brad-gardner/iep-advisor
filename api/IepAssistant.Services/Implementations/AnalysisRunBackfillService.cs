@@ -52,13 +52,16 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
     }
 
     // A run plus the loose section definitions whose AnalysisRunSourceId can only be set after the
-    // run + its single source are saved (the source Id is database-generated). LegacyCreatedAt is
+    // run + its single source are saved (the source Id is database-generated). RunCreatedAt is
     // restored after the first save because the auditing SaveChanges override stamps CreatedAt to now.
+    // It is the legacy row's UpdatedAt, not its CreatedAt: the legacy engines updated their row in
+    // place on every re-analysis, so UpdatedAt is the time the analysis the parent is actually seeing
+    // last ran — CreatedAt would instead be the time of the FIRST (possibly long-superseded) analysis.
     private sealed record PendingRun(
         AnalysisRun Run,
         AnalysisRunSource Source,
         List<AnalysisRunSection> Sections,
-        DateTime LegacyCreatedAt);
+        DateTime RunCreatedAt);
 
     private async Task<BackfillResult> BackfillIepAsync(CancellationToken ct)
     {
@@ -112,6 +115,14 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
                         continue;
                     }
 
+                    // Flush (and fully commit, with their CreatedAt restored) any creates already
+                    // accumulated earlier in THIS batch before the rebuild below touches the shared
+                    // context — RebuildIepRunAsync's own SaveChangesAsync calls would otherwise flush
+                    // those pending Added AnalysisRun rows too (same DbContext), and its final
+                    // ChangeTracker.Clear() would then detach them before PersistBatchAsync gets a
+                    // chance to restore their CreatedAt, silently leaving it at "now".
+                    await FlushPendingCreatesAsync(pending, ct);
+
                     await RebuildIepRunAsync(existingRun, legacy, doc, ct);
                     updated++;
                     continue;
@@ -129,8 +140,7 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
                     ParentGoalsSnapshot = legacy.ParentGoalsSnapshot,
                     CrossDocSynthesis = null,
                     BackfillSourceKey = key,
-                    ErrorMessage = errorMessage,
-                    CreatedAt = legacy.CreatedAt
+                    ErrorMessage = errorMessage
                 };
 
                 var source = new AnalysisRunSource
@@ -146,20 +156,28 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
                 };
                 run.Sources.Add(source);
 
+                // Final shapes in one pass: the same converter RebuildIepRunAsync uses, not the old
+                // annual_goals ARRAY shape — a freshly created run must never need a second backfill
+                // pass just to reach the shape the live engine itself produces.
                 var sections = BuildSectionsFromJsonArray(legacy.SectionAnalyses, legacy.Id, "IepAnalysis");
 
                 if (!string.IsNullOrWhiteSpace(legacy.GoalAnalyses))
                 {
-                    sections.Add(new AnalysisRunSection
+                    var goalsJson = BuildIepGoalsSectionJson(legacy.GoalAnalyses, legacy.Id);
+                    if (goalsJson != null)
                     {
-                        SectionKind = "annual_goals",
-                        Analysis = legacy.GoalAnalyses,
-                        DisplayOrder = sections.Count
-                    });
+                        sections.Add(new AnalysisRunSection
+                        {
+                            SectionKind = AnalysisRunSectionKinds.IepGoals,
+                            Analysis = goalsJson,
+                            DisplayOrder = sections.Count
+                        });
+                    }
                 }
 
                 _context.AnalysisRuns.Add(run);
-                pending.Add(new PendingRun(run, source, sections, legacy.CreatedAt));
+                // RunCreatedAt is the legacy row's UpdatedAt, not CreatedAt — see PendingRun's doc comment.
+                pending.Add(new PendingRun(run, source, sections, legacy.UpdatedAt));
                 created++;
             }
 
@@ -198,11 +216,9 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
 
     /// <summary>
     /// Rebuilds one already-backfilled IEP run's sources and sections from the legacy row's CURRENT
-    /// data, in place: same run id, old sources/sections removed and replaced in one transaction. Unlike
-    /// the initial create path, the goal ratings are converted to the <c>iep_goals</c> OBJECT shape here
-    /// (the create path is left emitting the old <c>annual_goals</c> array shape — see the type doc
-    /// comment — so a freshly created run converges to the new shape on the NEXT backfill pass, the same
-    /// one this method already handles).
+    /// data, in place: same run id, old sources/sections removed and replaced in one transaction. The
+    /// goal ratings are converted to the <c>iep_goals</c> OBJECT shape here using the same converter the
+    /// (now final-shape-on-create) create path above uses.
     /// </summary>
     private async Task RebuildIepRunAsync(AnalysisRun run, IepAnalysis legacy, IepDocument doc, CancellationToken ct)
     {
@@ -220,6 +236,14 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
         run.OverallRedFlags = legacy.OverallRedFlags;
         run.AdvocacyGapAnalysis = legacy.AdvocacyGapAnalysis;
         run.ParentGoalsSnapshot = legacy.ParentGoalsSnapshot;
+        // The legacy engines updated their row in place on re-analysis, so UpdatedAt — not CreatedAt —
+        // is the time THIS (possibly re-run) analysis actually produced the data above.
+        run.CreatedAt = legacy.UpdatedAt;
+        // Explicit, not left to the auditing interceptor: if every scalar above happens to already
+        // match (a rebuild triggered only by the OLD shape check, with no actual content change), EF
+        // would see no modified property and never mark this entity Modified — leaving UpdatedAt stale
+        // and this same "needs rebuild" shape check re-triggering on every future boot.
+        run.UpdatedAt = DateTime.UtcNow;
 
         var newSource = new AnalysisRunSource
         {
@@ -342,6 +366,11 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
                         continue;
                     }
 
+                    // See the matching comment in BackfillIepAsync: flush (and commit, CreatedAt
+                    // restored) any creates already accumulated earlier in this batch BEFORE the
+                    // rebuild's own SaveChangesAsync/ChangeTracker.Clear() calls can detach them first.
+                    await FlushPendingCreatesAsync(pending, ct);
+
                     await RebuildEtrRunAsync(existingRun, legacy, doc, ct);
                     updated++;
                     continue;
@@ -354,13 +383,12 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
                     ChildProfileId = doc.ChildProfileId,
                     Status = status,
                     OverallSummary = legacy.OverallSummary,
-                    OverallRedFlags = legacy.OverallRedFlags,
+                    OverallRedFlags = NormalizeEtrRedFlagsJson(legacy.OverallRedFlags, legacy.Id),
                     AdvocacyGapAnalysis = legacy.AdvocacyGapAnalysis,
                     ParentGoalsSnapshot = legacy.ParentGoalsSnapshot,
                     CrossDocSynthesis = null,
                     BackfillSourceKey = key,
-                    ErrorMessage = errorMessage,
-                    CreatedAt = legacy.CreatedAt
+                    ErrorMessage = errorMessage
                 };
 
                 var source = new AnalysisRunSource
@@ -375,34 +403,37 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
                 };
                 run.Sources.Add(source);
 
-                // The initial create path deliberately keeps the OLD snake_case section kinds and the
-                // legacy (high/medium/low) red-flag shape untouched — exactly like the IEP create
-                // path keeps the old annual_goals array shape (see RebuildIepRunAsync's doc comment).
-                // NeedsEtrRebuild below recognizes these old section kind names, so a freshly created
-                // run converges to the new etr_completeness / etr_eligibility shape and normalized red
-                // flags on the NEXT backfill pass — the same one this method already handles.
+                // Final shapes in one pass — the same converters RebuildEtrRunAsync uses, not the old
+                // snake_case assessment_completeness/eligibility shape or the legacy high/medium/low red
+                // flag severities. A freshly created run must never need a second backfill pass just to
+                // reach the shape the live engine itself produces.
                 var sections = new List<AnalysisRunSection>();
-                if (!string.IsNullOrWhiteSpace(legacy.AssessmentCompleteness))
+
+                var completenessJson = BuildEtrCompletenessSectionJson(legacy.AssessmentCompleteness, legacy.Id);
+                if (completenessJson != null)
                 {
                     sections.Add(new AnalysisRunSection
                     {
-                        SectionKind = "assessment_completeness",
-                        Analysis = legacy.AssessmentCompleteness,
+                        SectionKind = AnalysisRunSectionKinds.EtrCompleteness,
+                        Analysis = completenessJson,
                         DisplayOrder = sections.Count
                     });
                 }
-                if (!string.IsNullOrWhiteSpace(legacy.EligibilityReview))
+
+                var eligibilityJson = BuildEtrEligibilitySectionJson(legacy.EligibilityReview, legacy.Id);
+                if (eligibilityJson != null)
                 {
                     sections.Add(new AnalysisRunSection
                     {
-                        SectionKind = "eligibility",
-                        Analysis = legacy.EligibilityReview,
+                        SectionKind = AnalysisRunSectionKinds.EtrEligibility,
+                        Analysis = eligibilityJson,
                         DisplayOrder = sections.Count
                     });
                 }
 
                 _context.AnalysisRuns.Add(run);
-                pending.Add(new PendingRun(run, source, sections, legacy.CreatedAt));
+                // RunCreatedAt is the legacy row's UpdatedAt, not CreatedAt — see PendingRun's doc comment.
+                pending.Add(new PendingRun(run, source, sections, legacy.UpdatedAt));
                 created++;
             }
 
@@ -449,6 +480,13 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
         run.OverallRedFlags = NormalizeEtrRedFlagsJson(legacy.OverallRedFlags, legacy.Id);
         run.AdvocacyGapAnalysis = legacy.AdvocacyGapAnalysis;
         run.ParentGoalsSnapshot = legacy.ParentGoalsSnapshot;
+        // The legacy engines updated their row in place on re-analysis, so UpdatedAt — not CreatedAt —
+        // is the time THIS (possibly re-run) analysis actually produced the data above.
+        run.CreatedAt = legacy.UpdatedAt;
+        // Explicit, not left to the auditing interceptor: see RebuildIepRunAsync's matching comment —
+        // a rebuild triggered only by the OLD shape check, with no actual content change, would
+        // otherwise leave every scalar unchanged and EF would never mark this entity Modified.
+        run.UpdatedAt = DateTime.UtcNow;
 
         var newSource = new AnalysisRunSource
         {
@@ -611,8 +649,46 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
 
     /// <summary>
     /// Saves the runs (+ their single source) to obtain database-generated keys, then attaches the
-    /// loose sections (which carry an int? AnalysisRunSourceId, not a navigation) and saves again.
-    /// Clears the change tracker so each batch stays bounded in memory.
+    /// loose sections (which carry an int? AnalysisRunSourceId, not a navigation) and saves again,
+    /// restoring each run's intended CreatedAt (overwritten by the auditing interceptor on insert).
+    /// Deliberately does NOT clear the change tracker — <see cref="PersistBatchAsync"/> does that once
+    /// all of a batch's work (creates AND any rebuilds) is done; a mid-batch rebuild calls this directly
+    /// first so its own SaveChangesAsync/ChangeTracker.Clear() never detaches these pending creates
+    /// before their CreatedAt is restored. Clears <paramref name="pending"/> itself so the caller's list
+    /// is safe to keep accumulating into.
+    /// </summary>
+    private async Task FlushPendingCreatesAsync(List<PendingRun> pending, CancellationToken ct)
+    {
+        if (pending.Count == 0)
+            return;
+
+        // First save: AnalysisRun + AnalysisRunSource get their generated Ids. The auditing
+        // SaveChanges override stamps CreatedAt to now; we restore the intended value below.
+        await _context.SaveChangesAsync(ct);
+
+        foreach (var p in pending)
+        {
+            // Restore the intended CreatedAt (overwritten by the auditing interceptor on insert).
+            p.Run.CreatedAt = p.RunCreatedAt;
+
+            foreach (var section in p.Sections)
+            {
+                section.AnalysisRunId = p.Run.Id;
+                section.AnalysisRunSourceId = p.Source.Id;
+                _context.AnalysisRunSections.Add(section);
+            }
+        }
+
+        // Second save: sections linked to the now-persisted run + source, plus the restored
+        // CreatedAt (the run is now Modified, so the override leaves CreatedAt untouched).
+        await _context.SaveChangesAsync(ct);
+
+        pending.Clear();
+    }
+
+    /// <summary>
+    /// Finishes a batch: flushes any still-pending creates (see <see cref="FlushPendingCreatesAsync"/>)
+    /// and clears the change tracker so each batch stays bounded in memory.
     /// </summary>
     private async Task PersistBatchAsync(
         List<PendingRun> pending,
@@ -623,29 +699,7 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
         string legacyType,
         CancellationToken ct)
     {
-        if (pending.Count > 0)
-        {
-            // First save: AnalysisRun + AnalysisRunSource get their generated Ids. The auditing
-            // SaveChanges override stamps CreatedAt to now; we restore the legacy value below.
-            await _context.SaveChangesAsync(ct);
-
-            foreach (var p in pending)
-            {
-                // Restore the legacy CreatedAt (overwritten by the auditing interceptor on insert).
-                p.Run.CreatedAt = p.LegacyCreatedAt;
-
-                foreach (var section in p.Sections)
-                {
-                    section.AnalysisRunId = p.Run.Id;
-                    section.AnalysisRunSourceId = p.Source.Id;
-                    _context.AnalysisRunSections.Add(section);
-                }
-            }
-
-            // Second save: sections linked to the now-persisted run + source, plus the restored
-            // CreatedAt (the run is now Modified, so the override leaves CreatedAt untouched).
-            await _context.SaveChangesAsync(ct);
-        }
+        await FlushPendingCreatesAsync(pending, ct);
 
         _context.ChangeTracker.Clear();
 
