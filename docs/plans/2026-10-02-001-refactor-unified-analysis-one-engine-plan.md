@@ -1,7 +1,7 @@
 ---
 title: "refactor: Unified analysis — AnalysisRun as the one engine, viewed from child and document pages"
 type: refactor
-status: active
+status: completed
 date: 2026-10-02
 origin: docs/brainstorms/2026-10-02-unified-analysis-navigation-brainstorm.md
 design: docs/designs/2026-10-02-unified-analysis-design.md
@@ -249,15 +249,39 @@ erDiagram
 
 #### Phase 4: Export, stats, legacy lockdown, E2E
 
-- [ ] `AccountService.cs:84,155`: the export includes `AnalysisRuns` (+ sources and sections) for the user's children; legacy rows still exported while they exist.
-- [ ] `AdminController.cs:243-246`: stats count runs (keep legacy counts labelled "legacy").
-- [ ] Legacy lockdown: no code path writes `IepAnalyses` / `EtrAnalyses` (grep-verified; an architecture test asserting no `Add`/`Update` on those sets outside the backfill reader is optional). Add a todo for the drop migration (follow-up release).
-- [ ] `e2e/tests/iep-analysis.spec.ts` rewritten: analyze from the IEP page → goal ratings visible → "View full analysis" / child timeline show the same run.
-- [ ] `docs/` updates: the wiki pages describing analysis (via `/sht:docs`), and a `docs/solutions/` entry for the 2026-09-29 output-budget + keepalive learnings if not already captured.
+- [x] `AccountService.cs:84,155`: the export includes `AnalysisRuns` (+ sources and sections) for the user's children; legacy rows still exported while they exist.
+- [x] `AdminController.cs:243-246`: stats count runs (keep legacy counts labelled "legacy").
+- [x] Legacy lockdown: no code path writes `IepAnalyses` / `EtrAnalyses` (grep-verified; an architecture test asserting no `Add`/`Update` on those sets outside the backfill reader is optional). Add a todo for the drop migration (follow-up release).
+- [x] `e2e/tests/iep-analysis.spec.ts` rewritten: analyze from the IEP page → goal ratings visible → "View full analysis" / child timeline show the same run.
+- [ ] `docs/` updates: the wiki pages describing analysis (via `/sht:docs`), and a `docs/solutions/` entry for the 2026-09-29 output-budget + keepalive learnings if not already captured. *(Owned by the pipeline's compound and docs stages.)*
 
 **Testing checkpoint:** export test includes runs; e2e green in CI.
 
 **Success:** a data export for user 4 contains Jacob's runs; nothing writes the legacy tables.
+
+## Operational Validation (post-deploy)
+
+- **Logs (Elastic, `app-logs-iepadvisor-api-production`):**
+  - `log.logger:*AnalysisRun*` for run start/complete/fail;
+  - `message:"Claude hit max_tokens"` (should be zero);
+  - `message:"AnalysisRun backfill"` at startup — expect `Updated` > 0 on the first boot (stale copies such as run 15 rebuilt), then 0;
+  - the stale-run sweep's "failed stale run" lines (should be rare).
+- **Database (QA):**
+  - `SELECT Status, COUNT(*) FROM AnalysisRuns GROUP BY Status`;
+  - `AnalysisRunSources` with `Status IN ('Pending','Running')` older than 35 minutes should be 0;
+  - run 15 (child 1) should read `Completed` with an `iep_goals` section after deploy;
+  - no new rows in `IepAnalyses` / `EtrAnalyses` after deploy.
+- **Healthy:**
+  - "Analyze this IEP" on document 35 completes in about 5–8 minutes;
+  - the IEP tab and the child tab (`?run=`) show the same run;
+  - the usage count rises by 1 per run;
+  - meeting prep Regenerate cites goal ratings.
+- **Failure signals / mitigation:**
+  - runs stuck `Running` (the sweep should fail and refund them at 30 minutes);
+  - IEP/ETR Analysis tabs showing errors for documents that were analyzed before;
+  - backfill exceptions at startup.
+  - **Mitigation:** revert the merge. The legacy tables are untouched, read-only history and can serve as the rollback source; set `Backfill:AnalysisRunsEnabled=false` if the re-sync misbehaves.
+- **Window / owner:** first QA session after deploy (Brad), plus 1 week of watching for stuck runs.
 
 ## Alternative Approaches Considered
 
