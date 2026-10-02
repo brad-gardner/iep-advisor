@@ -1,5 +1,6 @@
 import type {
   AdvocacyGapAnalysis,
+  GoalAnalysis,
   LegalReference,
   ParentGoalSnapshot,
   RedFlag,
@@ -28,6 +29,10 @@ export interface AnalysisRunSource {
   sourceType: string;
   sourceId: number;
   sourceLabel: string | null;
+  /** Shares its value set with AnalysisRunStatus (Pending|Running|Completed|Error). */
+  status: AnalysisRunStatus;
+  /** User-safe failure text; set only when status is "Error". */
+  errorMessage: string | null;
 }
 
 export interface AnalysisRunSection {
@@ -35,6 +40,9 @@ export interface AnalysisRunSection {
   analysisRunSourceId: number | null;
   sectionKind: string;
   analysis: AnalysisRunSectionAnalysis | null;
+  /** Populated only when sectionKind is "iep_goals"; null otherwise, including
+   * when that section's JSON failed to deserialize. */
+  goalAnalyses: GoalAnalysis[] | null;
   displayOrder: number;
 }
 

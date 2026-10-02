@@ -53,6 +53,14 @@ export function RunDetail({ childId, runId, canAsk = false }: RunDetailProps) {
   const isError = run.status === "Error";
   const isInFlight = run.status === "Pending" || run.status === "Running";
 
+  const completedOrErroredSources = run.sources.filter(
+    (source) => source.status === "Completed" || source.status === "Error"
+  ).length;
+  const sourceProgressLabel =
+    run.sources.length > 0
+      ? `${completedOrErroredSources} of ${run.sources.length} documents analyzed.`
+      : null;
+
   return (
     <div className="space-y-6" data-testid="analysis-run-detail">
       <div className="flex flex-wrap items-center gap-3">
@@ -78,12 +86,21 @@ export function RunDetail({ childId, runId, canAsk = false }: RunDetailProps) {
       {isInFlight && pollTimedOut && (
         <Notice variant="info" title="Still working…">
           This analysis is taking longer than usual. Check back shortly.
+          {sourceProgressLabel && ` ${sourceProgressLabel}`}
         </Notice>
       )}
 
       {isInFlight && !pollTimedOut && (
         <Notice variant="info" title="Analysis in progress">
-          We're analyzing your documents. This page updates automatically.
+          {sourceProgressLabel
+            ? `${sourceProgressLabel} This page updates automatically.`
+            : "We're analyzing your documents. This page updates automatically."}
+        </Notice>
+      )}
+
+      {isComplete && run.errorMessage && (
+        <Notice variant="info" title="Analysis completed with a note">
+          {run.errorMessage}
         </Notice>
       )}
 
@@ -103,8 +120,10 @@ export function RunDetail({ childId, runId, canAsk = false }: RunDetailProps) {
           {run.sources.map((source) => (
             <RunSourceSections
               key={source.id}
+              childId={childId}
               source={source}
               sections={sectionsBySource.get(source.id) ?? []}
+              canAsk={canAsk}
             />
           ))}
 

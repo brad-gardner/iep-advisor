@@ -171,11 +171,11 @@ erDiagram
 - [x] 30-minute runtime sweep in `api/IepAssistant.Api/BackgroundServices/AnalysisRunWorker.cs`.
 
 **Web:**
-- [ ] `web/src/features/analysis/types.ts`: source status, goal-analyses payload.
-- [ ] `run-source-sections.tsx`: renders `AnalysisGoalsList` for IEP sources; failed-source notice; each source header links to `/children/:childId/ieps/:id` or `/etrs/:id` (progress report → its IEP's progress-report route).
-- [ ] `run-detail.tsx`: "N of M documents analyzed" while running.
-- [ ] `child-analysis-tab.tsx`: selected run ↔ `?run=` search param (replace, not push, on auto-select); unknown run id → latest + info notice.
-- [ ] `use-analysis-run.ts` / `use-analysis-runs.ts`: 15-minute cap (180 polls), shared `ANALYSIS_MAX_POLLS` constant reused from `use-iep-analysis.ts`.
+- [x] `web/src/features/analysis/types.ts`: source status, goal-analyses payload.
+- [x] `run-source-sections.tsx`: renders `AnalysisGoalsList` for IEP sources; failed-source notice; each source header links to `/children/:childId/ieps/:id` or `/etrs/:id` (progress report → its IEP's progress-report route).
+- [x] `run-detail.tsx`: "N of M documents analyzed" while running.
+- [x] `child-analysis-tab.tsx`: selected run ↔ `?run=` search param (replace, not push, on auto-select); unknown run id → latest + info notice.
+- [x] `use-analysis-run.ts` / `use-analysis-runs.ts`: 15-minute cap (180 polls), shared `ANALYSIS_MAX_POLLS` constant reused from `use-iep-analysis.ts`.
 
 **Testing checkpoint:**
 - `AnalysisRunServiceTests`: fake `IClaudeClient` returning per-call responses. Cover:

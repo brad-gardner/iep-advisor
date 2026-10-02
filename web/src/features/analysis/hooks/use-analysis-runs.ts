@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { usePolling } from "@/hooks/use-polling";
+import { usePolling, ANALYSIS_MAX_POLLS } from "@/hooks/use-polling";
 import { listRuns } from "../api/analysis-runs-api";
 import { isTerminalStatus, type AnalysisRun } from "../types";
 
-// usePolling caps at ~5 minutes (60 polls x 5s). Past that we stop spinning
-// and surface a "still working" state instead.
+// Polling caps at 15 minutes (ANALYSIS_MAX_POLLS x 5s), matching the server's
+// Claude timeout for a full run. Past that we stop spinning and surface a
+// "still working" state instead.
 const POLL_INTERVAL_MS = 5000;
-const POLL_TIMEOUT_MS = 5 * 60 * 1000;
+const POLL_TIMEOUT_MS = ANALYSIS_MAX_POLLS * POLL_INTERVAL_MS;
 
 export function useAnalysisRuns(childId: number) {
   const [runs, setRuns] = useState<AnalysisRun[]>([]);
@@ -54,8 +55,8 @@ export function useAnalysisRuns(childId: number) {
     }
   }, [hasInFlight, pollingStartedAt]);
 
-  // usePolling silently stops at its ~5-min cap, so we trip the timeout with our
-  // own timer to flip the UI into a "still working" state rather than spinning.
+  // usePolling silently stops at its cap, so we trip the timeout with our own
+  // timer to flip the UI into a "still working" state rather than spinning.
   useEffect(() => {
     if (pollingStartedAt === null) return;
     const elapsed = Date.now() - pollingStartedAt;
@@ -67,7 +68,12 @@ export function useAnalysisRuns(childId: number) {
   }, [pollingStartedAt]);
 
   // Stop polling once we hit the cap; the UI shows a "still working" notice.
-  usePolling(refreshInBackground, POLL_INTERVAL_MS, hasInFlight && !pollTimedOut);
+  usePolling(
+    refreshInBackground,
+    POLL_INTERVAL_MS,
+    hasInFlight && !pollTimedOut,
+    ANALYSIS_MAX_POLLS
+  );
 
   return { runs, isLoading, reload, hasInFlight, pollTimedOut };
 }

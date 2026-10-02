@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { IepAnalysis } from "@/types/api";
 import { getAnalysis, triggerAnalysis } from "../api/iep-documents-api";
-import { usePolling } from "@/hooks/use-polling";
-
-const ANALYSIS_MAX_POLLS = 180;
+import { usePolling, ANALYSIS_MAX_POLLS } from "@/hooks/use-polling";
 
 export function useIepAnalysis(documentId: number) {
   const [analysis, setAnalysis] = useState<IepAnalysis | null>(null);
