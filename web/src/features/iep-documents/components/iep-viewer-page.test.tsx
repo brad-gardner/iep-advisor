@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { GoalAnalysis, IepDocument, SmartCriterion } from '@/types/api';
 import type { AnalysisRunLatest } from '@/features/analysis/types';
+import { makeRunSection } from '@/features/analysis/test/fixtures';
 
 const api = vi.hoisted(() => ({
   getIepDocument: vi.fn(),
@@ -71,14 +72,12 @@ const analysisRun: AnalysisRunLatest = {
   parentGoalsSnapshot: [],
   sources: [analysisSource],
   sections: [
-    {
+    makeRunSection({
       id: 1,
       analysisRunSourceId: analysisSource.id,
       sectionKind: 'iep_goals',
-      analysis: null,
       goalAnalyses: [goal(340, 'Reading'), goal(341, 'Math')],
-      displayOrder: 0,
-    },
+    }),
   ],
   errorMessage: null,
   createdAt: '2026-03-05T00:00:00Z',

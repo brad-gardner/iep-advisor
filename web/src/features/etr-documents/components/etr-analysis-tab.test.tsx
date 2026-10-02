@@ -82,6 +82,7 @@ interface RenderOverrides {
   otherSources?: AnalysisRunLatest['otherSources'];
   stale?: boolean;
   isLoading?: boolean;
+  loadError?: string | null;
   isTriggering?: boolean;
   triggerError?: string | null;
   onTrigger?: () => void;
@@ -101,6 +102,7 @@ function renderTab(overrides: RenderOverrides = {}) {
     otherSources: overrides.otherSources ?? [],
     stale: overrides.stale ?? false,
     isLoading: overrides.isLoading ?? false,
+    loadError: overrides.loadError ?? null,
     isTriggering: overrides.isTriggering ?? false,
     triggerError: overrides.triggerError ?? null,
     onTrigger,
@@ -126,9 +128,21 @@ describe('EtrAnalysisTab', () => {
 
   it('surfaces a trigger error (e.g. subscription required) on top of the empty state', () => {
     renderTab({ run: null, triggerError: 'Active subscription required' });
-    expect(screen.getByTestId('analysis-trigger-error')).toHaveTextContent(
-      'Active subscription required',
-    );
+    const notice = screen.getByTestId('analysis-trigger-error');
+    expect(notice).toHaveTextContent('Active subscription required');
+    expect(notice).toHaveAttribute('role', 'alert');
+  });
+
+  it('shows a retry notice instead of the Analyze button when the run failed to load (not just "never analyzed")', () => {
+    const { onReload } = renderTab({ run: null, loadError: 'Could not load this analysis.' });
+
+    const notice = screen.getByTestId('analysis-load-error');
+    expect(notice).toHaveTextContent('Could not load this analysis.');
+    expect(notice).toHaveAttribute('role', 'alert');
+    expect(screen.queryByTestId('etr-analyze-button')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('analysis-load-retry'));
+    expect(onReload).toHaveBeenCalledTimes(1);
   });
 
   it('shows the processing card while the run (or this source) is still in progress', () => {

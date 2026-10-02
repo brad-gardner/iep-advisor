@@ -55,6 +55,7 @@ export function EtrViewerPage() {
     otherSources: analysisOtherSources,
     stale: analysisStale,
     isLoading: analysisLoading,
+    loadError: analysisLoadError,
     isTriggering,
     triggerError,
     trigger: triggerAnalysis,
@@ -253,6 +254,7 @@ export function EtrViewerPage() {
           otherSources={analysisOtherSources}
           stale={analysisStale}
           isLoading={analysisLoading}
+          loadError={analysisLoadError}
           isTriggering={isTriggering}
           triggerError={triggerError}
           onTrigger={triggerAnalysis}

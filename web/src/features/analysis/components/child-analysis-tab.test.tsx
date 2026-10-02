@@ -101,9 +101,9 @@ describe("ChildAnalysisTab — run selection via ?run=", () => {
 
   it("falls back to the latest run and shows an info notice when the run id is unknown", async () => {
     renderTab("/children/4/analysis?run=999");
-    expect(await screen.findByTestId("analysis-run-not-found")).toHaveTextContent(
-      "That analysis couldn't be found — showing the latest."
-    );
+    const notice = await screen.findByTestId("analysis-run-not-found");
+    expect(notice).toHaveTextContent("That analysis couldn't be found — showing the latest.");
+    expect(notice).toHaveAttribute("role", "status");
     expect(screen.getByTestId("run-detail")).toHaveTextContent("2");
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("run=2"));
   });
@@ -113,5 +113,31 @@ describe("ChildAnalysisTab — run selection via ?run=", () => {
     expect(await screen.findByTestId("run-detail")).toHaveTextContent("2");
     expect(screen.queryByTestId("analysis-run-not-found")).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("run=2"));
+  });
+
+  it("does not show the not-found notice when the child has no runs at all (nothing to fall back to)", async () => {
+    analysisRunsHook.useAnalysisRuns.mockReturnValue({
+      runs: [],
+      isLoading: false,
+      reload: vi.fn(),
+      hasInFlight: false,
+      pollTimedOut: false,
+    });
+    renderTab("/children/4/analysis?run=999");
+    await screen.findByText("No analysis selected");
+    expect(screen.queryByTestId("analysis-run-not-found")).not.toBeInTheDocument();
+  });
+
+  it("shows the still-working notice with role=status when polling has timed out", () => {
+    analysisRunsHook.useAnalysisRuns.mockReturnValue({
+      runs,
+      isLoading: false,
+      reload: vi.fn(),
+      hasInFlight: true,
+      pollTimedOut: true,
+    });
+    renderTab("/children/4/analysis?run=1");
+    const notice = screen.getByText("Still working…").closest('[role="status"]');
+    expect(notice).not.toBeNull();
   });
 });

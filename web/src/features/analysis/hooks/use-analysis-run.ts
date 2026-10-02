@@ -1,17 +1,27 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePolling, ANALYSIS_MAX_POLLS } from "@/hooks/use-polling";
 import { getRun } from "../api/analysis-runs-api";
 import { isTerminalStatus, type AnalysisRun } from "../types";
 
 const POLL_INTERVAL_MS = 5000;
-// Matches the server's 15-minute Claude timeout for a full run (see
-// ANALYSIS_MAX_POLLS) rather than usePolling's shorter default cap.
+// A client-side UX cap, not a mirror of the server's timeout: the server
+// fails a run after 30 minutes of no progress. Past this (shorter) cap we
+// stop spinning and flip the UI into a "still working" state instead.
 const POLL_TIMEOUT_MS = ANALYSIS_MAX_POLLS * POLL_INTERVAL_MS;
 
 export function useAnalysisRun(childId: number, runId: number | null) {
   const [run, setRun] = useState<AnalysisRun | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [pollingStartedAt, setPollingStartedAt] = useState<number | null>(null);
+
+  // The most recently requested run id, read when a response arrives rather
+  // than captured in the request's closure — so a response for a run the
+  // caller has since moved away from (rapid run switching) is dropped
+  // instead of overwriting the newly selected run (latest-wins).
+  const runIdRef = useRef(runId);
+  useEffect(() => {
+    runIdRef.current = runId;
+  }, [runId]);
 
   const reload = useCallback(async () => {
     if (!childId || runId === null) {
@@ -21,7 +31,9 @@ export function useAnalysisRun(childId: number, runId: number | null) {
     setIsLoading(true);
     try {
       const res = await getRun(childId, runId);
-      if (res.success && res.data) setRun(res.data);
+      if (res.success && res.data && res.data.id === runIdRef.current) {
+        setRun(res.data);
+      }
     } catch {
       // handled by interceptor
     } finally {
@@ -37,7 +49,9 @@ export function useAnalysisRun(childId: number, runId: number | null) {
     if (!childId || runId === null) return;
     try {
       const res = await getRun(childId, runId);
-      if (res.success && res.data) setRun(res.data);
+      if (res.success && res.data && res.data.id === runIdRef.current) {
+        setRun(res.data);
+      }
     } catch {
       // ignore transient polling errors
     }

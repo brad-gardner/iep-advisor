@@ -31,6 +31,10 @@ interface EtrAnalysisTabProps {
   otherSources: AnalysisRunOtherSource[];
   stale: boolean;
   isLoading: boolean;
+  /** Set when loading the latest run failed for a reason other than "never
+   * analyzed" — the previously loaded `run` (if any) is still shown; offer a
+   * retry via `onReload`. */
+  loadError?: string | null;
   isTriggering: boolean;
   triggerError: string | null;
   onTrigger: () => void;
@@ -68,6 +72,7 @@ export function EtrAnalysisTab({
   otherSources,
   stale,
   isLoading,
+  loadError = null,
   isTriggering,
   triggerError,
   onTrigger,
@@ -83,8 +88,29 @@ export function EtrAnalysisTab({
   );
 
   const triggerErrorNotice = triggerError && (
-    <Notice variant="error" title="Unable to run analysis" data-testid="analysis-trigger-error">
+    <Notice
+      variant="error"
+      title="Unable to run analysis"
+      role="alert"
+      data-testid="analysis-trigger-error"
+    >
       {triggerError}
+    </Notice>
+  );
+
+  const loadErrorNotice = loadError && (
+    <Notice
+      variant="error"
+      title="Unable to load analysis"
+      role="alert"
+      data-testid="analysis-load-error"
+    >
+      {loadError}
+      <div className="mt-3">
+        <Button variant="secondary" size="sm" onClick={onReload} data-testid="analysis-load-retry">
+          Try again
+        </Button>
+      </div>
     </Notice>
   );
 
@@ -96,12 +122,14 @@ export function EtrAnalysisTab({
     );
   }
 
-  // Never analyzed: no run has ever included this ETR.
+  // Never analyzed: no run has ever included this ETR. A load error here
+  // means we don't actually know that — showing the Analyze button could
+  // kick off a duplicate run, so offer a retry instead.
   if (!run) {
     return (
       <>
         {triggerErrorNotice}
-        <EtrAnalysisEmptyState onTrigger={onTrigger} isTriggering={isTriggering} />
+        {loadErrorNotice || <EtrAnalysisEmptyState onTrigger={onTrigger} isTriggering={isTriggering} />}
       </>
     );
   }
@@ -112,6 +140,7 @@ export function EtrAnalysisTab({
     return (
       <>
         {triggerErrorNotice}
+        {loadErrorNotice}
         <EtrAnalysisProcessing onReload={onReload} />
       </>
     );
@@ -121,6 +150,7 @@ export function EtrAnalysisTab({
     return (
       <>
         {triggerErrorNotice}
+        {loadErrorNotice}
         <div className="flex flex-col items-center justify-center py-16 px-4">
           <Card className="max-w-md text-center">
             <Notice variant="error" title="Analysis Failed">
@@ -142,6 +172,7 @@ export function EtrAnalysisTab({
     return (
       <>
         {triggerErrorNotice}
+        {loadErrorNotice}
         <div className="flex flex-col items-center justify-center py-16 px-4">
           <Card className="max-w-md text-center">
             <Notice variant="warning" title="Couldn't analyze this document">
@@ -226,6 +257,7 @@ export function EtrAnalysisTab({
   return (
     <div className="space-y-4" data-testid="etr-analysis-tab">
       {triggerErrorNotice}
+      {loadErrorNotice}
 
       {isMultiSource && (
         <Notice

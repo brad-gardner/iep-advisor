@@ -78,6 +78,7 @@ export function RunSourceSections({
               goalAnalyses={goalAnalyses}
               childId={childId}
               canAsk={canAsk}
+              headingLevel={3}
             />
           )}
           {ordered.map((section) =>

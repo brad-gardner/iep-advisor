@@ -6,18 +6,13 @@ import { useToast } from "@/components/ui/toast";
 import type { ChildOutletContext } from "@/features/children/components/child-detail-page";
 import { useAnalysisRuns } from "../hooks/use-analysis-runs";
 import { createRun } from "../api/analysis-runs-api";
+import { mapCreateError } from "../lib/map-create-error";
 import { SourcePicker } from "./source-picker";
 import { RunHistoryList } from "./run-history-list";
 import { RunDetail } from "./run-detail";
 import type { CreateAnalysisRunRequest } from "../types";
 
 const RUN_PARAM = "run";
-
-function mapCreateError(status: number | undefined, message?: string): string {
-  if (status === 402) return "Active subscription required";
-  if (status === 403) return "You don't have permission";
-  return message || "Could not start analysis";
-}
 
 /** A run id from the URL: digits only, else not a usable selection. */
 function parseRunId(value: string | null): number | null {
@@ -83,7 +78,10 @@ export function ChildAnalysisTab() {
       setNotice({ checkedRunId: requestedRunId, show: false, correctedTo: null });
     }
   }
-  const runNotFound = notice.show;
+  // Only meaningful when there's actually a "latest" to fall back to —
+  // with no runs at all for this child there's nothing to redirect to, so
+  // the notice would be misleading.
+  const runNotFound = notice.show && latestRunId !== null;
 
   // The one actual side effect: push the URL to a good run id when it's
   // missing (auto-select the latest, replacing so it doesn't add a history
@@ -140,11 +138,12 @@ export function ChildAnalysisTab() {
         <Notice
           variant="info"
           title="That analysis couldn't be found — showing the latest."
+          role="status"
           data-testid="analysis-run-not-found"
         />
       )}
       {hasInFlight && pollTimedOut && (
-        <Notice variant="info" title="Still working…">
+        <Notice variant="info" title="Still working…" role="status">
           An analysis is taking longer than usual. It will appear here once it
           finishes.
         </Notice>
@@ -169,7 +168,12 @@ export function ChildAnalysisTab() {
 
         <div>
           {selectedRunId !== null ? (
-            <RunDetail childId={childId} runId={selectedRunId} canAsk={!isViewer} />
+            <RunDetail
+              key={selectedRunId}
+              childId={childId}
+              runId={selectedRunId}
+              canAsk={!isViewer}
+            />
           ) : (
             <Notice variant="info" title="No analysis selected">
               Select a past analysis or run a new one to see results here.

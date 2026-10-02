@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import type { GoalAnalysis, SmartCriterion } from "@/types/api";
 import { RunSourceSections } from "./run-source-sections";
 import type { AnalysisRunSection, AnalysisRunSource } from "../types";
+import { makeRunSection } from "../test/fixtures";
 
 const ok: SmartCriterion = { rating: "green", explanation: "fine" };
 
@@ -44,20 +45,25 @@ function renderSource(source: AnalysisRunSource, sections: AnalysisRunSection[],
 describe("RunSourceSections", () => {
   it("renders goal ratings for an IEP source with an iep_goals section", () => {
     const sections: AnalysisRunSection[] = [
-      {
+      makeRunSection({
         id: 10,
         analysisRunSourceId: 1,
         sectionKind: "iep_goals",
-        analysis: null,
         goalAnalyses: [makeGoal(340), makeGoal(341)],
-        displayOrder: 0,
-      },
+      }),
     ];
     renderSource(makeSource(), sections);
 
-    expect(screen.getByText("Goal Analysis (2 goals)")).toBeInTheDocument();
     expect(screen.getByTestId("analysis-goal-340")).toBeInTheDocument();
     expect(screen.getByTestId("analysis-goal-341")).toBeInTheDocument();
+    // The source label is the h2 for this card; the nested goal list heading
+    // is an h3 so the two don't collide as sibling top-level headings.
+    expect(
+      screen.getByRole("heading", { level: 2, name: "IEP Mar 2026" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 3, name: "Goal Analysis (2 goals)" })
+    ).toBeInTheDocument();
   });
 
   it("shows a warning notice instead of sections for a failed source", () => {

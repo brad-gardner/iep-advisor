@@ -73,6 +73,7 @@ export function IepViewerPage() {
     otherSources: analysisOtherSources,
     stale: analysisStale,
     isLoading: analysisLoading,
+    loadError: analysisLoadError,
     isTriggering,
     triggerError,
     trigger: triggerAnalysis,
@@ -415,7 +416,7 @@ export function IepViewerPage() {
               }`}
             >
               Analysis
-              {analysisRun?.status === "Completed" && (
+              {analysisSource?.status === "Completed" && (
                 <span className="ml-2 inline-block w-2 h-2 rounded-full bg-brand-teal-500" />
               )}
             </button>
@@ -458,6 +459,7 @@ export function IepViewerPage() {
               otherSources={analysisOtherSources}
               stale={analysisStale}
               isLoading={analysisLoading}
+              loadError={analysisLoadError}
               isTriggering={isTriggering}
               triggerError={triggerError}
               onTrigger={triggerAnalysis}

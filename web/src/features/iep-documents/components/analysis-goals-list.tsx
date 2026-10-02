@@ -5,9 +5,18 @@ interface AnalysisGoalsListProps {
   goalAnalyses: GoalAnalysis[];
   childId?: number;
   canAsk?: boolean;
+  /** Heading level for "Goal Analysis (N goals)" — 2 (default) when this is
+   * the top-level heading for its view, 3 when nested under another h2
+   * (e.g. a source's own label on the child-level run detail page). */
+  headingLevel?: 2 | 3;
 }
 
-export function AnalysisGoalsList({ goalAnalyses, childId, canAsk }: AnalysisGoalsListProps) {
+export function AnalysisGoalsList({
+  goalAnalyses,
+  childId,
+  canAsk,
+  headingLevel = 2,
+}: AnalysisGoalsListProps) {
   if (goalAnalyses.length === 0) {
     return (
       <div className="text-center py-8">
@@ -19,13 +28,14 @@ export function AnalysisGoalsList({ goalAnalyses, childId, canAsk }: AnalysisGoa
   const greenCount = goalAnalyses.filter((g) => g.overallRating === 'green').length;
   const yellowCount = goalAnalyses.filter((g) => g.overallRating === 'yellow').length;
   const redCount = goalAnalyses.filter((g) => g.overallRating === 'red').length;
+  const Heading = headingLevel === 3 ? 'h3' : 'h2';
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-serif text-[22px] font-semibold mb-2 text-brand-slate-800">
+        <Heading className="font-serif text-[22px] font-semibold mb-2 text-brand-slate-800">
           Goal Analysis ({goalAnalyses.length} goals)
-        </h2>
+        </Heading>
         <div className="flex gap-4 text-[13px] font-medium">
           {greenCount > 0 && (
             <span className="text-brand-teal-600">{greenCount} strong</span>

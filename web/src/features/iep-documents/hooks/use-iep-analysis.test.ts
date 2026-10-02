@@ -48,6 +48,8 @@ describe('useIepAnalysis', () => {
           sectionKind: 'iep_goals',
           analysis: null,
           goalAnalyses: [{ goalId: 340 }],
+          etrCompleteness: null,
+          etrEligibility: null,
           displayOrder: 0,
         },
       ],
