@@ -305,7 +305,13 @@ public sealed class AdvocateToolset : IToolExecutor
             .Select(d => new
             {
                 d.Id, d.EvaluationDate, d.UploadDate, d.Status, d.EvaluationType, d.DocumentState,
-                AnalysisStatus = _context.EtrAnalyses.Where(a => a.EtrDocumentId == d.Id).OrderByDescending(a => a.Id).Select(a => a.Status).FirstOrDefault()
+                // The latest analysis run (any status) that includes this document, not the retired
+                // per-document EtrAnalysis row — a run's PER-SOURCE status (see the IEP query above).
+                AnalysisStatus = _context.AnalysisRunSources
+                    .Where(s => s.SourceType == AnalysisSourceType.EtrDocument && s.SourceId == d.Id && s.AnalysisRun.ChildProfileId == _childId)
+                    .OrderByDescending(s => s.AnalysisRun.CreatedAt).ThenByDescending(s => s.AnalysisRunId)
+                    .Select(s => (AnalysisRunSourceStatus?)s.Status)
+                    .FirstOrDefault()
             })
             .ToListAsync(ct);
         var reports = await _context.ProgressReports.AsNoTracking()
@@ -358,7 +364,7 @@ public sealed class AdvocateToolset : IToolExecutor
                 ["evaluationDate"] = Date(d.EvaluationDate),
                 ["uploadDate"] = Date(d.UploadDate),
                 ["status"] = Str(d.Status, MaxLabelChars),
-                ["analysisStatus"] = d.AnalysisStatus == null ? "none" : Str(d.AnalysisStatus, MaxLabelChars),
+                ["analysisStatus"] = d.AnalysisStatus == null ? "none" : Str(d.AnalysisStatus.Value.ToString().ToLowerInvariant(), MaxLabelChars),
                 ["evaluationType"] = Str(d.EvaluationType, MaxLabelChars),
                 ["documentState"] = Str(d.DocumentState, MaxLabelChars)
             });
@@ -532,23 +538,72 @@ public sealed class AdvocateToolset : IToolExecutor
         return new ToolPayload(payload, goalAlignments, redFlags, sectionAnalyses, goalAnalyses);
     }
 
+    /// <summary>ETR analysis now comes entirely from runs (not the retired per-document EtrAnalysis
+    /// row): the latest run (any status) that includes this document, read through THAT document's own
+    /// source — mirrors <see cref="GetIepAnalysisAsync"/>, with <c>etr_completeness</c> /
+    /// <c>etr_eligibility</c> typed sections in place of IEP goal ratings.</summary>
     private async Task<ToolPayload> GetEtrAnalysisAsync(int etrId, CancellationToken ct)
     {
         var etr = await RequireEtrAsync(etrId, ct);
         var documentRef = Register("etr", etr.Id, EtrLabel(etr.EvaluationDate, etr.UploadDate));
 
-        var analysis = await _context.EtrAnalyses.AsNoTracking()
-            .Where(a => a.EtrDocumentId == etr.Id)
-            .OrderByDescending(a => a.Id)
-            .Select(a => new { a.Id, a.Status, a.OverallSummary, a.AssessmentCompleteness, a.EligibilityReview, a.OverallRedFlags, a.AdvocacyGapAnalysis })
+        var source = await _context.AnalysisRunSources.AsNoTracking()
+            .Where(s => s.SourceType == AnalysisSourceType.EtrDocument && s.SourceId == etr.Id && s.AnalysisRun.ChildProfileId == _childId)
+            .OrderByDescending(s => s.AnalysisRun.CreatedAt).ThenByDescending(s => s.AnalysisRunId)
+            .Select(s => new
+            {
+                s.Id,
+                s.AnalysisRunId,
+                s.Status,
+                RunCreatedAt = s.AnalysisRun.CreatedAt,
+                RunOverallRedFlags = s.AnalysisRun.OverallRedFlags,
+                RunAdvocacyGapAnalysis = s.AnalysisRun.AdvocacyGapAnalysis,
+                SourceCount = s.AnalysisRun.Sources.Count
+            })
             .FirstOrDefaultAsync(ct);
-        if (analysis == null || !IsCompleted(analysis.Status))
-            return NoAnalysis(documentRef, analysis?.Status);
 
-        var sourceRef = Register("etr_analysis", analysis.Id, $"Analysis of {Labels[documentRef]}", documentRef);
-        var redFlags = ParseArray(analysis.OverallRedFlags);
-        var run = await LatestRunSectionsAsync(AnalysisSourceType.EtrDocument, etr.Id, ct);
-        var advocacyGapAnalysis = ParseOrText(analysis.AdvocacyGapAnalysis);
+        if (source == null || source.Status != AnalysisRunSourceStatus.Completed)
+            return NoAnalysis(documentRef, source?.Status.ToString().ToLowerInvariant());
+
+        var sourceRef = Register("analysis_run", source.AnalysisRunId, $"Analysis of {Labels[documentRef]}", documentRef);
+
+        var sectionRows = await _context.AnalysisRunSections.AsNoTracking()
+            .Where(sec => sec.AnalysisRunId == source.AnalysisRunId && sec.AnalysisRunSourceId == source.Id)
+            .OrderBy(sec => sec.DisplayOrder).ThenBy(sec => sec.Id)
+            .Select(sec => new { sec.SectionKind, sec.Analysis })
+            .ToListAsync(ct);
+
+        var sectionAnalyses = new JsonArray();
+        var ordinarySectionJson = new List<string?>();
+        JsonNode? assessmentCompleteness = null;
+        JsonNode? eligibilityReview = null;
+
+        foreach (var row in sectionRows)
+        {
+            if (row.SectionKind == AnalysisRunSectionKinds.EtrCompleteness)
+            {
+                assessmentCompleteness = ParseOrText(row.Analysis);
+            }
+            else if (row.SectionKind == AnalysisRunSectionKinds.EtrEligibility)
+            {
+                eligibilityReview = ParseOrText(row.Analysis);
+            }
+            else
+            {
+                sectionAnalyses.Add(new JsonObject
+                {
+                    ["sectionKind"] = Str(row.SectionKind, MaxLabelChars),
+                    ["analysis"] = ParseOrText(row.Analysis)
+                });
+                ordinarySectionJson.Add(row.Analysis);
+            }
+        }
+
+        // This document's OWN red flags: see GetIepAnalysisAsync's matching comment.
+        var redFlagsList = AnalysisRunRedFlagRollup.Combine(source.RunOverallRedFlags, source.SourceCount, ordinarySectionJson);
+        var redFlags = ParseArray(JsonSerializer.Serialize(redFlagsList));
+
+        var advocacyGapAnalysis = ParseOrText(source.RunAdvocacyGapAnalysis);
         var goalAlignments = NestedArray(advocacyGapAnalysis, "goalAlignments");
 
         var payload = new JsonObject
@@ -556,15 +611,15 @@ public sealed class AdvocateToolset : IToolExecutor
             ["sourceRef"] = sourceRef,
             ["documentRef"] = documentRef,
             ["status"] = "completed",
-            ["overallSummary"] = Str(analysis.OverallSummary, 1_500),
-            ["assessmentCompleteness"] = ParseOrText(analysis.AssessmentCompleteness),
-            ["eligibilityReview"] = ParseOrText(analysis.EligibilityReview),
+            ["ranOn"] = Date(source.RunCreatedAt),
             ["overallRedFlags"] = redFlags,
-            ["advocacyGapAnalysis"] = advocacyGapAnalysis,
-            ["analysisRun"] = run.Payload
+            ["assessmentCompleteness"] = assessmentCompleteness,
+            ["eligibilityReview"] = eligibilityReview,
+            ["sectionAnalyses"] = sectionAnalyses,
+            ["advocacyGapAnalysis"] = advocacyGapAnalysis
         };
         // Least valuable first: see GetIepAnalysisAsync.
-        return new ToolPayload(payload, run.Sections, goalAlignments, redFlags);
+        return new ToolPayload(payload, goalAlignments, redFlags, sectionAnalyses);
     }
 
     private async Task<ToolPayload> GetProgressReportAnalysisAsync(int reportId, CancellationToken ct)

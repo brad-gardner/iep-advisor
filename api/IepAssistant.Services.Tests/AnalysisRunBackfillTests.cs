@@ -355,6 +355,150 @@ public class AnalysisRunBackfillTests
     }
 
     [Fact]
+    public async Task BackfillAsync_RebuildsStaleEtrRunInPlace_ConvertsSnakeCaseSectionsAndNormalizesRedFlagSeverity()
+    {
+        using var fixture = new AnalysisRunTestFixture();
+        var etrDocId = fixture.SeedEtrDocument();
+
+        int legacyId;
+        using (var seed = fixture.CreateContext())
+        {
+            legacyId = SeedEtrAnalysis(seed, etrDocId, status: "error",
+                assessmentCompleteness: """{"evaluated_domains":[],"missing_domains":[],"overall_completeness_rating":"thin"}""",
+                eligibilityReview: """{"stated_category":null,"stated_conclusion":null,"data_supports_conclusion":false,"supporting_evidence":[],"contradicting_evidence":[],"alternative_considerations":[]}""");
+        }
+
+        int runId;
+        using (var context = fixture.CreateContext())
+        {
+            var first = await BuildService(context).BackfillAsync();
+            Assert.Equal(1, first.Created);
+        }
+        using (var verify = fixture.CreateContext())
+        {
+            var run = verify.AnalysisRuns.Single(r => r.BackfillSourceKey == $"EtrAnalysis:{legacyId}");
+            runId = run.Id;
+            Assert.Equal(AnalysisRunStatus.Error, run.Status);
+            // The initial create path deliberately keeps the OLD snake_case section kinds (mirrors the
+            // IEP annual_goals array staying untouched on create) — converged on the NEXT pass below.
+            Assert.Contains(verify.AnalysisRunSections.Where(s => s.AnalysisRunId == runId), s => s.SectionKind == "assessment_completeness");
+        }
+
+        // The legacy analysis is re-run and completes successfully some time later, with a mix of
+        // high/medium/low red flags to exercise the severity normalization (high -> red, medium/low -> yellow).
+        using (var update = fixture.CreateContext())
+        {
+            var legacy = update.EtrAnalyses.Single(a => a.Id == legacyId);
+            legacy.Status = "completed";
+            legacy.ErrorMessage = null;
+            legacy.OverallSummary = "Updated after re-analysis";
+            legacy.AssessmentCompleteness = """
+                {"evaluated_domains":[{"domain":"Cognitive","tools_used":["WISC-V"],"adequacy_rating":"strong","notes":"solid"}],"missing_domains":[],"overall_completeness_rating":"strong"}
+                """;
+            legacy.EligibilityReview = """
+                {"stated_category":"Specific Learning Disability","stated_conclusion":"qualifies","data_supports_conclusion":true,"supporting_evidence":[],"contradicting_evidence":[],"alternative_considerations":[]}
+                """;
+            legacy.OverallRedFlags = """
+                [
+                  {"severity":"high","category":"missing_domain","finding":"No adaptive testing","why_it_matters":"Adaptive concerns were raised by the parent.","parent_right_implicated":"Right to request an IEE"},
+                  {"severity":"medium","category":"outdated_testing","finding":"Cognitive testing is 4 years old","why_it_matters":"May not reflect current functioning."},
+                  {"severity":"low","category":"procedural","finding":"Minor formatting issue","why_it_matters":"Cosmetic only."}
+                ]
+                """;
+            legacy.UpdatedAt = DateTime.UtcNow.AddHours(1);
+            update.SaveChanges();
+        }
+
+        BackfillResult second;
+        using (var context = fixture.CreateContext())
+        {
+            second = await BuildService(context).BackfillAsync();
+        }
+
+        Assert.Equal(0, second.Created);
+        Assert.Equal(1, second.Updated);
+        Assert.Equal(0, second.SkippedExisting);
+
+        using var final = fixture.CreateContext();
+        var rebuilt = final.AnalysisRuns.Single(r => r.BackfillSourceKey == $"EtrAnalysis:{legacyId}");
+        Assert.Equal(runId, rebuilt.Id); // same run id — rebuilt in place, not a new run
+        Assert.Equal(AnalysisRunStatus.Completed, rebuilt.Status);
+        Assert.Null(rebuilt.ErrorMessage);
+        Assert.Equal("Updated after re-analysis", rebuilt.OverallSummary);
+
+        var sources = final.AnalysisRunSources.Where(s => s.AnalysisRunId == runId).ToList();
+        var source = Assert.Single(sources);
+        Assert.Equal(AnalysisRunSourceStatus.Completed, source.Status);
+
+        var sections = final.AnalysisRunSections.Where(s => s.AnalysisRunId == runId).ToList();
+        Assert.DoesNotContain(sections, s => s.SectionKind is "assessment_completeness" or "eligibility"); // old shape gone
+
+        var completenessSection = Assert.Single(sections, s => s.SectionKind == "etr_completeness");
+        using (var completenessDoc = JsonDocument.Parse(completenessSection.Analysis!))
+        {
+            Assert.Equal("strong", completenessDoc.RootElement.GetProperty("overallCompletenessRating").GetString());
+            var evaluatedDomains = completenessDoc.RootElement.GetProperty("evaluatedDomains");
+            Assert.Equal(1, evaluatedDomains.GetArrayLength());
+            Assert.Equal("Cognitive", evaluatedDomains[0].GetProperty("domain").GetString());
+        }
+
+        var eligibilitySection = Assert.Single(sections, s => s.SectionKind == "etr_eligibility");
+        using (var eligibilityDoc = JsonDocument.Parse(eligibilitySection.Analysis!))
+        {
+            Assert.Equal("Specific Learning Disability", eligibilityDoc.RootElement.GetProperty("statedCategory").GetString());
+            Assert.True(eligibilityDoc.RootElement.GetProperty("dataSupportsConclusion").GetBoolean());
+        }
+
+        // Severity mapping: high -> red; medium and low -> yellow. finding -> title; why_it_matters ->
+        // description; parent_right_implicated -> legalBasis.
+        using var redFlagsDoc = JsonDocument.Parse(rebuilt.OverallRedFlags!);
+        var flags = redFlagsDoc.RootElement.EnumerateArray().ToList();
+        Assert.Equal(3, flags.Count);
+        Assert.Equal("red", flags[0].GetProperty("severity").GetString());
+        Assert.Equal("No adaptive testing", flags[0].GetProperty("title").GetString());
+        Assert.Equal("Adaptive concerns were raised by the parent.", flags[0].GetProperty("description").GetString());
+        Assert.Equal("Right to request an IEE", flags[0].GetProperty("legalBasis").GetString());
+        Assert.Equal("yellow", flags[1].GetProperty("severity").GetString());
+        Assert.Equal("yellow", flags[2].GetProperty("severity").GetString());
+    }
+
+    [Fact]
+    public async Task BackfillAsync_LeavesUpToDateEtrRun_Untouched()
+    {
+        using var fixture = new AnalysisRunTestFixture();
+        var etrDocId = fixture.SeedEtrDocument();
+
+        using (var seed = fixture.CreateContext())
+        {
+            // No AssessmentCompleteness/EligibilityReview at all, so there is no legacy section shape
+            // to trigger a rebuild, and the row is not touched again after the first backfill.
+            SeedEtrAnalysis(seed, etrDocId);
+        }
+
+        int runId;
+        using (var context = fixture.CreateContext())
+        {
+            await BuildService(context).BackfillAsync();
+        }
+        using (var verify = fixture.CreateContext())
+        {
+            runId = verify.AnalysisRuns.Single(r => r.BackfillSourceKey != null).Id;
+        }
+
+        BackfillResult second;
+        using (var context = fixture.CreateContext())
+        {
+            second = await BuildService(context).BackfillAsync();
+        }
+
+        Assert.Equal(0, second.Updated);
+        Assert.Equal(1, second.SkippedExisting);
+
+        using var final = fixture.CreateContext();
+        Assert.Equal(runId, final.AnalysisRuns.Single(r => r.BackfillSourceKey != null).Id);
+    }
+
+    [Fact]
     public async Task BackfillAsync_DoesNotAbort_OnMalformedSectionJson()
     {
         using var fixture = new AnalysisRunTestFixture();

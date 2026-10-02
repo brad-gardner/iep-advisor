@@ -229,10 +229,10 @@ erDiagram
 #### Phase 3: ETR page becomes a view of runs (+ ETR consumers, ETR re-sync, metering)
 
 **Backend:**
-- [ ] ETR source prompt returns `etr_completeness`, `etr_eligibility` and red flags (severity normalized to the run's red/yellow).
-- [ ] Remove `CheckEtrAnalysisLimitAsync` (`EtrAnalysisService.cs:73-80`, `EtrDocumentsController.cs:244`) and the legacy ETR analyze/analysis endpoints, queue and worker.
-- [ ] ETR re-sync upsert: snake_case → typed sections.
-- [ ] Meeting prep ETR mode (`MeetingPrepService.cs:350-353, 634-658`) and advocate ETR paths read runs.
+- [x] ETR source prompt returns `etr_completeness`, `etr_eligibility` and red flags (severity normalized to the run's red/yellow).
+- [x] Remove `CheckEtrAnalysisLimitAsync` (`EtrAnalysisService.cs:73-80`, `EtrDocumentsController.cs:244`) and the legacy ETR analyze/analysis endpoints, queue and worker.
+- [x] ETR re-sync upsert: snake_case → typed sections.
+- [x] Meeting prep ETR mode (`MeetingPrepService.cs:350-353, 634-658`) and advocate ETR paths read runs.
 
 **Web:**
 - [ ] `web/src/features/etr-documents/hooks/use-etr-analysis.ts` + `etr-analysis-tab.tsx` → run slice; reuse `etr-analysis-overview.tsx` for completeness and eligibility; same multi-document / stale / failed states.

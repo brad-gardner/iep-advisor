@@ -341,18 +341,18 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
 
             if (checklist.EtrDocumentId.HasValue)
             {
-                // Mode C: Anchored to an ETR — eligibility-focused meeting prep.
+                // Mode C: Anchored to an ETR — eligibility-focused meeting prep. With the latest
+                // completed analysis run that includes this ETR (mirrors Mode A's IEP read below; the
+                // legacy EtrAnalysis read here had NO status filter — reading only a COMPLETED run is
+                // an intentional tightening, not an oversight).
                 var sections = await _context.EtrSections
                     .Where(s => s.EtrDocumentId == checklist.EtrDocumentId)
                     .OrderBy(s => s.DisplayOrder)
                     .ToListAsync(ct);
 
-                var etrAnalysis = await _context.EtrAnalyses
-                    .Where(a => a.EtrDocumentId == checklist.EtrDocumentId)
-                    .OrderByDescending(a => a.CreatedAt)
-                    .FirstOrDefaultAsync(ct);
+                var runContext = await BuildEtrRunAnalysisContextAsync(child.Id, checklist.EtrDocumentId.Value, ct);
 
-                prompt = BuildEtrPrompt(child, checklist.EtrDocument!, parentGoals, sections, etrAnalysis);
+                prompt = BuildEtrPrompt(child, checklist.EtrDocument!, parentGoals, sections, runContext);
                 systemPrompt = EtrSystemPrompt;
             }
             else if (checklist.IepDocumentId.HasValue)
@@ -517,6 +517,64 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         return new IepRunAnalysisContext(source.RunOverallRedFlags, source.SourceCount, ordinarySections, goalAnalysesJson);
     }
 
+    /// <summary>
+    /// The latest COMPLETED analysis run that includes this ETR document (its own source also
+    /// Completed), reduced to what Mode C's prompt needs — equivalent info to what it used to read off
+    /// the retired per-document EtrAnalysis row (OverallSummary, AssessmentCompleteness,
+    /// EligibilityReview, OverallRedFlags): this source's own ordinary sections, the run's red flags
+    /// ONLY when the run has exactly one source (see <see cref="IepRunAnalysisContext"/>'s matching
+    /// note), and this source's own <c>etr_completeness</c> / <c>etr_eligibility</c> sections. Null when
+    /// no completed run includes this document.
+    /// </summary>
+    private sealed record EtrRunAnalysisContext(
+        string? RunOverallRedFlagsJson,
+        int SourceCount,
+        List<(string SectionKind, string? AnalysisJson)> Sections,
+        string? EtrCompletenessJson,
+        string? EtrEligibilityJson);
+
+    private async Task<EtrRunAnalysisContext?> BuildEtrRunAnalysisContextAsync(int childId, int etrDocumentId, CancellationToken ct)
+    {
+        var source = await _context.AnalysisRunSources.AsNoTracking()
+            .Where(s => s.SourceType == AnalysisSourceType.EtrDocument && s.SourceId == etrDocumentId
+                        && s.Status == AnalysisRunSourceStatus.Completed
+                        && s.AnalysisRun.ChildProfileId == childId && s.AnalysisRun.Status == AnalysisRunStatus.Completed)
+            .OrderByDescending(s => s.AnalysisRun.CreatedAt)
+            .ThenByDescending(s => s.AnalysisRunId)
+            .Select(s => new
+            {
+                s.Id,
+                s.AnalysisRunId,
+                RunOverallRedFlags = s.AnalysisRun.OverallRedFlags,
+                SourceCount = s.AnalysisRun.Sources.Count
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (source == null)
+            return null;
+
+        var sectionRows = await _context.AnalysisRunSections.AsNoTracking()
+            .Where(sec => sec.AnalysisRunId == source.AnalysisRunId && sec.AnalysisRunSourceId == source.Id)
+            .OrderBy(sec => sec.DisplayOrder).ThenBy(sec => sec.Id)
+            .Select(sec => new { sec.SectionKind, sec.Analysis })
+            .ToListAsync(ct);
+
+        var ordinarySections = new List<(string SectionKind, string? AnalysisJson)>();
+        string? etrCompletenessJson = null;
+        string? etrEligibilityJson = null;
+        foreach (var row in sectionRows)
+        {
+            if (row.SectionKind == AnalysisRunSectionKinds.EtrCompleteness)
+                etrCompletenessJson = row.Analysis;
+            else if (row.SectionKind == AnalysisRunSectionKinds.EtrEligibility)
+                etrEligibilityJson = row.Analysis;
+            else
+                ordinarySections.Add((row.SectionKind, row.Analysis));
+        }
+
+        return new EtrRunAnalysisContext(source.RunOverallRedFlags, source.SourceCount, ordinarySections, etrCompletenessJson, etrEligibilityJson);
+    }
+
     private static string BuildModeAPrompt(
         ChildProfile child,
         IepDocument document,
@@ -662,7 +720,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         EtrDocument etr,
         List<ParentAdvocacyGoal> parentGoals,
         List<EtrSection> sections,
-        EtrAnalysis? analysis)
+        EtrRunAnalysisContext? runContext)
     {
         var sb = new StringBuilder();
 
@@ -693,33 +751,46 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             sb.AppendLine();
         }
 
-        if (analysis != null)
+        if (runContext != null)
         {
-            if (!string.IsNullOrEmpty(analysis.OverallSummary))
+            if (runContext.Sections.Count > 0)
             {
                 sb.AppendLine("ETR ANALYSIS SUMMARY:");
-                sb.AppendLine($"<etr_analysis>{analysis.OverallSummary}</etr_analysis>");
+                foreach (var (sectionKind, analysisJson) in runContext.Sections)
+                {
+                    var section = DeserializeSectionResult(analysisJson);
+                    if (section == null)
+                        continue;
+
+                    sb.AppendLine($"- {sectionKind}: {section.PlainLanguageSummary}");
+                    if (section.KeyPoints.Count > 0)
+                        sb.AppendLine($"  Key points: {string.Join("; ", section.KeyPoints)}");
+                    foreach (var flag in section.RedFlags)
+                        sb.AppendLine($"  [{flag.Severity}] {flag.Title}: {flag.Description}");
+                }
                 sb.AppendLine();
             }
 
-            if (!string.IsNullOrEmpty(analysis.AssessmentCompleteness))
+            if (!string.IsNullOrEmpty(runContext.EtrCompletenessJson))
             {
                 sb.AppendLine("ASSESSMENT COMPLETENESS (gaps / concerns identified by prior AI analysis):");
-                sb.AppendLine($"<etr_analysis>{analysis.AssessmentCompleteness}</etr_analysis>");
+                sb.AppendLine(runContext.EtrCompletenessJson);
                 sb.AppendLine();
             }
 
-            if (!string.IsNullOrEmpty(analysis.EligibilityReview))
+            if (!string.IsNullOrEmpty(runContext.EtrEligibilityJson))
             {
                 sb.AppendLine("ELIGIBILITY REVIEW:");
-                sb.AppendLine($"<etr_analysis>{analysis.EligibilityReview}</etr_analysis>");
+                sb.AppendLine(runContext.EtrEligibilityJson);
                 sb.AppendLine();
             }
 
-            if (!string.IsNullOrEmpty(analysis.OverallRedFlags))
+            // A multi-source run's OverallRedFlags is the cross-document synthesis view, not specific to
+            // this document — only a single-source run's (promoted from this document's own call) belongs here.
+            if (runContext.SourceCount == 1 && !string.IsNullOrEmpty(runContext.RunOverallRedFlagsJson))
             {
                 sb.AppendLine("RED FLAGS FROM ETR ANALYSIS:");
-                sb.AppendLine($"<etr_analysis>{analysis.OverallRedFlags}</etr_analysis>");
+                sb.AppendLine(runContext.RunOverallRedFlagsJson);
                 sb.AppendLine();
             }
         }

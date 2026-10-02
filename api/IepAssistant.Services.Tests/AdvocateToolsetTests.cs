@@ -998,7 +998,17 @@ public sealed class AdvocateToolsetTests : IDisposable
         var etrId = SeedEtr(childId, new DateTime(2025, 9, 1));
         using (var ctx = CreateContext())
         {
-            ctx.EtrAnalyses.Add(new EtrAnalysis { EtrDocumentId = etrId, Status = "analyzing" });
+            // ETR analysis now comes from a run, not the retired per-document EtrAnalysis row — a
+            // Running source (sibling of GetDocumentAnalysis_Iep_SourceNotCompleted_ReturnsItsOwnStatus
+            // below) exercises the same "not completed" path the legacy "analyzing" status used to.
+            var run = new AnalysisRun { ChildProfileId = childId, Status = AnalysisRunStatus.Running };
+            ctx.AnalysisRuns.Add(run);
+            ctx.SaveChanges();
+            ctx.AnalysisRunSources.Add(new AnalysisRunSource
+            {
+                AnalysisRunId = run.Id, SourceType = AnalysisSourceType.EtrDocument, SourceId = etrId,
+                SourceLabel = "ETR", Status = AnalysisRunSourceStatus.Running
+            });
             ctx.SaveChanges();
         }
 
@@ -1010,7 +1020,7 @@ public sealed class AdvocateToolsetTests : IDisposable
         Assert.Equal($"iep:{iepId}", iep.RootElement.GetProperty("documentRef").GetString());
 
         using var etr = await RunAsync(toolset, "get_document_analysis", $$"""{"documentType":"etr","documentId":{{etrId}}}""");
-        Assert.Equal("analyzing", etr.RootElement.GetProperty("status").GetString());
+        Assert.Equal("running", etr.RootElement.GetProperty("status").GetString());
         Assert.Contains("run an analysis", etr.RootElement.GetProperty("hint").GetString());
         Assert.DoesNotContain(toolset.ReturnedRefs, r => r.Contains("_analysis:"));
     }
@@ -1086,6 +1096,74 @@ public sealed class AdvocateToolsetTests : IDisposable
         Assert.Equal("present_levels", presentLevels.GetProperty("sectionKind").GetString());
         Assert.Equal("Reads at grade 2.", presentLevels.GetProperty("analysis").GetProperty("plainLanguageSummary").GetString());
         Assert.Equal("not json at all", root.GetProperty("advocacyGapAnalysis").GetString());
+        Assert.Contains($"analysis_run:{runId}", toolset.ReturnedRefs);
+    }
+
+    [Fact]
+    public async Task GetDocumentAnalysis_Etr_Completed_ReadsRun_IncludesCompletenessAndEligibility()
+    {
+        var (userId, childId) = SeedChild("analysis-etr");
+        var etrId = SeedEtr(childId, new DateTime(2025, 9, 1));
+        int runId;
+        using (var ctx = CreateContext())
+        {
+            // ETR analysis now comes entirely from the latest run (single-source here, so its
+            // OverallRedFlags is promoted from this document's own call and belongs in the output) —
+            // mirrors GetDocumentAnalysis_Completed_ParsesStoredJson... above for IEPs.
+            var run = new AnalysisRun
+            {
+                ChildProfileId = childId, Status = AnalysisRunStatus.Completed,
+                OverallRedFlags = $$"""[{"severity":"red","title":"Missing domain","description":"{{Injection}}","legalBasis":"34 CFR 300.304"}]"""
+            };
+            ctx.AnalysisRuns.Add(run);
+            ctx.SaveChanges();
+            var source = new AnalysisRunSource
+            {
+                AnalysisRunId = run.Id, SourceType = AnalysisSourceType.EtrDocument, SourceId = etrId,
+                SourceLabel = "ETR", Status = AnalysisRunSourceStatus.Completed
+            };
+            ctx.AnalysisRunSources.Add(source);
+            ctx.SaveChanges();
+            ctx.AnalysisRunSections.AddRange(
+                new AnalysisRunSection
+                {
+                    AnalysisRunId = run.Id, AnalysisRunSourceId = source.Id, SectionKind = "eligibility",
+                    Analysis = """{"sectionKind":"eligibility","plainLanguageSummary":"The team found SLD.","keyPoints":["WISC-V administered"],"redFlags":[],"legalReferences":[]}""",
+                    DisplayOrder = 0
+                },
+                new AnalysisRunSection
+                {
+                    AnalysisRunId = run.Id, AnalysisRunSourceId = source.Id, SectionKind = AnalysisRunSectionKinds.EtrCompleteness,
+                    Analysis = """{"evaluatedDomains":[{"domain":"Cognitive","toolsUsed":["WISC-V"],"adequacyRating":"strong"}],"missingDomains":[],"overallCompletenessRating":"strong"}""",
+                    DisplayOrder = 1
+                },
+                new AnalysisRunSection
+                {
+                    AnalysisRunId = run.Id, AnalysisRunSourceId = source.Id, SectionKind = AnalysisRunSectionKinds.EtrEligibility,
+                    Analysis = """{"statedCategory":"Specific Learning Disability","statedConclusion":"qualifies","dataSupportsConclusion":true,"supportingEvidence":[],"contradictingEvidence":[],"alternativeConsiderations":[]}""",
+                    DisplayOrder = 2
+                });
+            ctx.SaveChanges();
+            runId = run.Id;
+        }
+
+        using var toolCtx = CreateContext();
+        var toolset = CreateToolset(toolCtx, childId, userId, null);
+        using var doc = await RunAsync(toolset, "get_document_analysis", $$"""{"documentType":"etr","documentId":{{etrId}}}""");
+        var root = doc.RootElement;
+
+        Assert.Equal($"analysis_run:{runId}", root.GetProperty("sourceRef").GetString());
+        Assert.Equal($"etr:{etrId}", root.GetProperty("documentRef").GetString());
+        Assert.Equal("completed", root.GetProperty("status").GetString());
+        Assert.Contains("&lt;instructions&gt;", root.GetProperty("overallRedFlags")[0].GetProperty("description").GetString());
+
+        Assert.Equal("strong", root.GetProperty("assessmentCompleteness").GetProperty("overallCompletenessRating").GetString());
+        Assert.Equal("Specific Learning Disability", root.GetProperty("eligibilityReview").GetProperty("statedCategory").GetString());
+
+        var sections = root.GetProperty("sectionAnalyses").EnumerateArray().ToList();
+        var eligibilitySection = Assert.Single(sections);
+        Assert.Equal("eligibility", eligibilitySection.GetProperty("sectionKind").GetString());
+        Assert.Equal("The team found SLD.", eligibilitySection.GetProperty("analysis").GetProperty("plainLanguageSummary").GetString());
         Assert.Contains($"analysis_run:{runId}", toolset.ReturnedRefs);
     }
 
@@ -1355,7 +1433,6 @@ public sealed class AdvocateToolsetTests : IDisposable
         int meetingId, prepId, advocacyGoalId;
         using (var ctx = CreateContext())
         {
-            ctx.EtrAnalyses.Add(new EtrAnalysis { EtrDocumentId = etrId, Status = "completed", OverallSummary = "Thorough.", OverallRedFlags = "[]" });
             ctx.ProgressReportAnalyses.Add(new ProgressReportAnalysis { ProgressReportId = reportId, Status = "completed", Summary = "Slow." });
             var meeting = new Meeting { SchoolStudentId = school.StudentId, Type = MeetingType.AnnualReview, Title = "Annual review " + Injection, StartsAtUtc = DateTime.UtcNow.AddDays(10), Location = "Room 4", CreatedByUserId = school.TeacherId };
             var past = new Meeting { SchoolStudentId = school.StudentId, Type = MeetingType.Other, Title = "Last year", StartsAtUtc = DateTime.UtcNow.AddDays(-300), Status = MeetingStatus.Held, CreatedByUserId = school.TeacherId };
@@ -1379,14 +1456,25 @@ public sealed class AdvocateToolsetTests : IDisposable
             prepId = prep.Id;
             advocacyGoalId = advocacyGoal.Id;
 
-            // IEP analysis now comes from a run, not the retired per-document IepAnalysis row.
-            var run = new AnalysisRun { ChildProfileId = childId, Status = AnalysisRunStatus.Completed, OverallRedFlags = "[]" };
-            ctx.AnalysisRuns.Add(run);
+            // IEP and ETR analysis now come from runs, not the retired per-document IepAnalysis /
+            // EtrAnalysis rows — both are "analysis_run" citations (no more "etr_analysis" kind).
+            var iepRun = new AnalysisRun { ChildProfileId = childId, Status = AnalysisRunStatus.Completed, OverallRedFlags = "[]" };
+            ctx.AnalysisRuns.Add(iepRun);
             ctx.SaveChanges();
             ctx.AnalysisRunSources.Add(new AnalysisRunSource
             {
-                AnalysisRunId = run.Id, SourceType = AnalysisSourceType.IepDocument, SourceId = iepId,
+                AnalysisRunId = iepRun.Id, SourceType = AnalysisSourceType.IepDocument, SourceId = iepId,
                 SourceLabel = "IEP", Status = AnalysisRunSourceStatus.Completed
+            });
+            ctx.SaveChanges();
+
+            var etrRun = new AnalysisRun { ChildProfileId = childId, Status = AnalysisRunStatus.Completed, OverallSummary = "Thorough.", OverallRedFlags = "[]" };
+            ctx.AnalysisRuns.Add(etrRun);
+            ctx.SaveChanges();
+            ctx.AnalysisRunSources.Add(new AnalysisRunSource
+            {
+                AnalysisRunId = etrRun.Id, SourceType = AnalysisSourceType.EtrDocument, SourceId = etrId,
+                SourceLabel = "ETR", Status = AnalysisRunSourceStatus.Completed
             });
             ctx.SaveChanges();
         }
@@ -1433,8 +1521,9 @@ public sealed class AdvocateToolsetTests : IDisposable
 
         Assert.Superset(new HashSet<string>
         {
-            // "iep_analysis" is gone: IEP analysis citations are now "analysis_run" (the run itself).
-            "kb", "child", "iep", "etr", "progress_report", "authored_version", "shared_draft", "analysis_run", "etr_analysis",
+            // "iep_analysis" and "etr_analysis" are both gone: IEP and ETR analysis citations are now
+            // "analysis_run" (the run itself) for both document types.
+            "kb", "child", "iep", "etr", "progress_report", "authored_version", "shared_draft", "analysis_run",
             "progress_report_analysis", "iep_section", "etr_section", "goal", "goal_record", "comparison", "journal", "contribution",
             "advocacy_goal", "meeting_prep", "prep_question", "meeting"
         }, seenKinds);
@@ -1444,12 +1533,14 @@ public sealed class AdvocateToolsetTests : IDisposable
         Assert.Equal(new[] { new AdvocateCitationParent("iep", iepId) }, parentByKind["goal"]);
         Assert.Equal(new[] { new AdvocateCitationParent("iep", iepId) }, parentByKind["iep_section"]);
         Assert.Equal(new[] { new AdvocateCitationParent("etr", etrId) }, parentByKind["etr_section"]);
-        Assert.Equal(new[] { new AdvocateCitationParent("iep", iepId) }, parentByKind["analysis_run"]);
-        Assert.Equal(new[] { new AdvocateCitationParent("etr", etrId) }, parentByKind["etr_analysis"]);
+        // Two analysis_run citations in this run — one for the IEP, one for the ETR.
+        Assert.Equal(
+            new[] { new AdvocateCitationParent("iep", iepId), new AdvocateCitationParent("etr", etrId) },
+            parentByKind["analysis_run"]);
         Assert.Equal(new[] { new AdvocateCitationParent("iep", iepId) }, parentByKind["progress_report"]);
         Assert.Equal(new[] { new AdvocateCitationParent("progress_report", reportId) }, parentByKind["progress_report_analysis"]);
         Assert.Equal(
-            new HashSet<string> { "goal", "iep_section", "etr_section", "analysis_run", "etr_analysis", "progress_report", "progress_report_analysis" },
+            new HashSet<string> { "goal", "iep_section", "etr_section", "analysis_run", "progress_report", "progress_report_analysis" },
             parentByKind.Keys.ToHashSet());
         Assert.All(toolset.Parents.Keys, r => Assert.Contains(r, toolset.ReturnedRefs));
 

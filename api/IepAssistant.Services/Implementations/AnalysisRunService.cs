@@ -278,6 +278,36 @@ public class AnalysisRunService : IAnalysisRunService
                     }
                 }
 
+                // ETR sources only: the ETR-specific prompt's two typed sections, persisted the same
+                // way as iep_goals above — standalone sections, never folded into sourceResult.Sections.
+                // Either or both may be absent if Claude omitted them; that is not a source failure.
+                if (source.SourceType == AnalysisSourceType.EtrDocument)
+                {
+                    if (sourceResult.EtrCompleteness != null)
+                    {
+                        await _context.AnalysisRunSections.AddAsync(new AnalysisRunSection
+                        {
+                            AnalysisRunId = run.Id,
+                            AnalysisRunSourceId = source.Id,
+                            SectionKind = AnalysisRunSectionKinds.EtrCompleteness,
+                            Analysis = JsonSerializer.Serialize(sourceResult.EtrCompleteness, CamelCaseOptions),
+                            DisplayOrder = displayOrder++
+                        }, ct);
+                    }
+
+                    if (sourceResult.EtrEligibility != null)
+                    {
+                        await _context.AnalysisRunSections.AddAsync(new AnalysisRunSection
+                        {
+                            AnalysisRunId = run.Id,
+                            AnalysisRunSourceId = source.Id,
+                            SectionKind = AnalysisRunSectionKinds.EtrEligibility,
+                            Analysis = JsonSerializer.Serialize(sourceResult.EtrEligibility, CamelCaseOptions),
+                            DisplayOrder = displayOrder++
+                        }, ct);
+                    }
+                }
+
                 foreach (var sectionResult in sourceResult.Sections)
                 {
                     await _context.AnalysisRunSections.AddAsync(new AnalysisRunSection
@@ -737,9 +767,14 @@ public class AnalysisRunService : IAnalysisRunService
     private (string SystemPrompt, string UserText) BuildSourcePrompt(
         AnalysisRunSource source, bool hasParentGoals, List<ParentAdvocacyGoal> parentGoals)
     {
-        var systemPrompt = source.SourceType == AnalysisSourceType.IepDocument
-            ? BuildIepSourceSystemPrompt(hasParentGoals)
-            : BuildGenericSourceSystemPrompt(hasParentGoals);
+        var systemPrompt = source.SourceType switch
+        {
+            AnalysisSourceType.IepDocument => BuildIepSourceSystemPrompt(hasParentGoals),
+            // Progress reports and any other source type keep the generic section prompt
+            // (docs/designs/2026-10-02-unified-analysis-design.md).
+            AnalysisSourceType.EtrDocument => BuildEtrSourceSystemPrompt(hasParentGoals),
+            _ => BuildGenericSourceSystemPrompt(hasParentGoals)
+        };
         var userText = BuildSourceUserText(source, hasParentGoals, parentGoals);
         return (systemPrompt, userText);
     }
@@ -877,6 +912,98 @@ Return ONLY valid JSON (no markdown, no code fences) with this structure:
   ]");
 
         AppendAdvocacyGapSchema(sb, hasParentGoals);
+        AppendSharedGuidance(sb);
+        return sb.ToString();
+    }
+
+    // ETR-specific source prompt (Phase 3: unified-analysis refactor): the same overallSummary /
+    // sections / overallRedFlags shape as every other source call, plus two typed keys —
+    // etrCompleteness and etrEligibility — mirroring the retired per-document EtrAnalysisService's
+    // four-pillar output (assessment_completeness / eligibility_review), but camelCase like every
+    // other typed section in this engine. overallRedFlags here already uses this engine's red/yellow
+    // severity scale, so (unlike the legacy high/medium/low scale) no runtime translation is needed —
+    // only the backfill's conversion of OLD stored EtrRedFlag rows needs that mapping.
+    private static string BuildEtrSourceSystemPrompt(bool hasParentGoals)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(@"You are an expert analyst of Evaluation Team Reports (ETRs) — the multidisciplinary evaluation documents U.S. public schools use to determine whether a student is eligible for special education under IDEA. You are helping a PARENT advocate for their child. ETRs are ELIGIBILITY evaluations: they determine disability category and whether special education is warranted. ETRs do NOT contain IEP goals, services, or placement decisions — do not critique the document for missing those.
+
+You are given ONE ETR source document, presented as:
+=== SOURCE: {label} (type=EtrDocument, sourceId={id}) ===
+followed by that document's content.
+
+Return ONLY valid JSON (no markdown, no code fences) with this structure:
+
+{
+  ""overallSummary"": ""A 2-4 sentence plain-language summary of what this ETR concludes and what the parent should focus on."",
+
+  ""sections"": [
+    {
+      ""sectionKind"": ""a short snake_case label for this section, e.g. evaluation_overview, present_levels, eligibility, procedural"",
+      ""plainLanguageSummary"": ""A clear, jargon-free explanation of what this section says and what it means for the child."",
+      ""keyPoints"": [""Important takeaway 1"", ""Important takeaway 2""],
+      ""redFlags"": [
+        { ""severity"": ""yellow"" | ""red"", ""title"": ""Brief title"", ""description"": ""What the concern is and why it matters"", ""legalBasis"": ""Relevant IDEA provision, if applicable"" }
+      ],
+      ""legalReferences"": [
+        { ""provision"": ""e.g., 34 CFR 300.304"", ""summary"": ""What this provision requires and how it relates to this section"" }
+      ]
+    }
+  ],
+
+  ""etrCompleteness"": {
+    ""evaluatedDomains"": [
+      {
+        ""domain"": ""e.g., Cognitive, Academic Achievement, Behavioral/Social-Emotional, Adaptive, Communication/Speech-Language, Motor/Sensory, Health/Vision/Hearing"",
+        ""toolsUsed"": [""WISC-V"", ""BASC-3""],
+        ""adequacyRating"": ""strong"" | ""adequate"" | ""thin"" | ""missing"",
+        ""notes"": ""Short note on why the rating was given""
+      }
+    ],
+    ""missingDomains"": [
+      { ""domain"": ""e.g., Adaptive behavior"", ""rationale"": ""Why this domain should have been evaluated given the presenting concerns"" }
+    ],
+    ""overallCompletenessRating"": ""strong"" | ""adequate"" | ""thin"" | ""concerning""
+  },
+
+  ""etrEligibility"": {
+    ""statedCategory"": ""The disability category the team stated (or null if not stated)"",
+    ""statedConclusion"": ""qualifies / does not qualify / deferred / etc., as stated"",
+    ""dataSupportsConclusion"": true or false,
+    ""supportingEvidence"": [""Specific data points from the report that support the stated conclusion""],
+    ""contradictingEvidence"": [""Specific data points from the report that contradict or complicate the stated conclusion""],
+    ""alternativeConsiderations"": [""Other disability categories or determinations the data could reasonably support""],
+    ""notes"": ""Short summary of the eligibility analysis""
+  },
+
+  ""overallRedFlags"": [
+    { ""severity"": ""yellow"" | ""red"", ""title"": ""Brief title of a document-level concern"", ""description"": ""Why this is a concern and what the parent should know"", ""legalBasis"": ""Relevant IDEA or legal provision"" }
+  ]");
+
+        AppendAdvocacyGapSchema(sb, hasParentGoals);
+
+        sb.AppendLine(@"
+KEY CONTEXT — IDEA disability categories the team may rely on:
+Autism, Deaf-Blindness, Deafness, Emotional Disturbance, Hearing Impairment, Intellectual Disability,
+Multiple Disabilities, Orthopedic Impairment, Other Health Impairment, Specific Learning Disability,
+Speech or Language Impairment, Traumatic Brain Injury, Visual Impairment (including Blindness),
+Developmental Delay (ages 3 through 9 at state/LEA discretion).
+
+CHILD FIND / SUSPECTED AREAS OF DISABILITY RULE:
+Under IDEA (34 CFR 300.304(c)(4), 300.301), a child must be assessed in ALL areas related to the suspected
+disability. If the referral reason, background, parent input, or any evaluator's notes raise concern about a
+domain (e.g., attention, adaptive functioning, language pragmatics, sensory processing), that domain must be
+evaluated. Flag under-evaluation any time a domain of concern was raised but not formally assessed with an
+appropriate tool. This is one of the most important issues to surface for a parent.
+
+ANALYSIS PRINCIPLES:
+- Do NOT invent data. Every finding must be traceable to content in the ETR sections provided.
+- Be honest about what the data shows. If the data genuinely supports the team's conclusion, say so; do not
+  manufacture concerns. If the data does NOT support it, say that clearly and explain why.
+- Watch for outdated testing (over 3 years old generally warrants re-evaluation), boilerplate/copy-paste
+  language with no individualized findings, missing domains given the referral concerns, procedural issues
+  (missing signatures, late timelines, no parent consent documentation), and thin/single-source evaluations.");
+
         AppendSharedGuidance(sb);
         return sb.ToString();
     }
@@ -1161,6 +1288,14 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
         if (section.SectionKind == AnalysisRunSectionKinds.IepGoals)
         {
             model.GoalAnalyses = DeserializeOrNull<IepGoalsSectionPayload>(section.Analysis)?.GoalAnalyses;
+        }
+        else if (section.SectionKind == AnalysisRunSectionKinds.EtrCompleteness)
+        {
+            model.EtrCompleteness = DeserializeOrNull<EtrCompletenessSectionPayload>(section.Analysis);
+        }
+        else if (section.SectionKind == AnalysisRunSectionKinds.EtrEligibility)
+        {
+            model.EtrEligibility = DeserializeOrNull<EtrEligibilitySectionPayload>(section.Analysis);
         }
         else
         {

@@ -143,6 +143,42 @@ public class AnalysisRunServiceTests
         }}";
     }
 
+    /// <summary>Builds a canned ETR per-source call response: the same base shape as
+    /// <see cref="BuildSourceJson"/> plus the two ETR-only typed keys, etrCompleteness and
+    /// etrEligibility.</summary>
+    private static string BuildEtrSourceJson(
+        string sectionKind = "eligibility",
+        string summary = "ETR structured summary text.",
+        string completenessRating = "strong",
+        string eligibilityCategory = "Specific Learning Disability") => $@"{{
+          ""overallSummary"": ""{summary}"",
+          ""sections"": [
+            {{
+              ""sectionKind"": ""{sectionKind}"",
+              ""plainLanguageSummary"": ""Section summary"",
+              ""keyPoints"": [""point""],
+              ""redFlags"": [],
+              ""legalReferences"": []
+            }}
+          ],
+          ""etrCompleteness"": {{
+            ""evaluatedDomains"": [
+              {{ ""domain"": ""Cognitive"", ""toolsUsed"": [""WISC-V""], ""adequacyRating"": ""{completenessRating}"", ""notes"": ""x"" }}
+            ],
+            ""missingDomains"": [],
+            ""overallCompletenessRating"": ""{completenessRating}""
+          }},
+          ""etrEligibility"": {{
+            ""statedCategory"": ""{eligibilityCategory}"",
+            ""statedConclusion"": ""qualifies"",
+            ""dataSupportsConclusion"": true,
+            ""supportingEvidence"": [],
+            ""contradictingEvidence"": [],
+            ""alternativeConsiderations"": []
+          }},
+          ""overallRedFlags"": []
+        }}";
+
     private static string BuildSynthesisJson() => @"{
       ""overallSummary"": ""Combined summary."",
       ""crossDocSynthesis"": { ""summary"": ""combined"", ""timeline"": [""t1""], ""contradictions"": [], ""progression"": ""improving"" },
@@ -239,6 +275,43 @@ public class AnalysisRunServiceTests
         var usageAfter = verifyContext.UsageRecords.Count(u =>
             u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
         Assert.Equal(usageBefore, usageAfter); // reservation refunded, no net usage
+    }
+
+    [Fact]
+    public async Task CreateRunAsync_EtrOnlySource_ConsumesOneAnalysisUnit_AndSixthIsRefusedForNonAdmin()
+    {
+        // ETR sources are metered exactly like IEP sources: BuildSourceSnapshotAsync and the usage
+        // reservation in CreateRunAsync do not branch on source type at all — this is a regression
+        // test proving that stays true now that the legacy, unmetered ETR analyze endpoint is gone.
+        using var _fixture = new AnalysisRunTestFixture();
+        var etrId = _fixture.SeedEtrDocument();
+
+        using var context = _fixture.CreateContext();
+        var service = BuildService(context, new FakeClaudeClient(null));
+
+        for (var i = 0; i < 5; i++)
+        {
+            var result = await service.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef> { new(AnalysisSourceType.EtrDocument, etrId) },
+                CancellationToken.None);
+            Assert.True(result.Success);
+        }
+
+        Assert.Equal(5, context.UsageRecords.Count(u =>
+            u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis"));
+        Assert.Equal(5, context.AnalysisRuns.Count());
+
+        // The fixture's seeded owner is a Parent (User.Role's default) — not exempt from the per-child cap.
+        var sixth = await service.CreateRunAsync(
+            _fixture.ChildId, _fixture.OwnerUserId,
+            new List<AnalysisRunSourceRef> { new(AnalysisSourceType.EtrDocument, etrId) },
+            CancellationToken.None);
+
+        Assert.False(sixth.Success);
+        Assert.Equal(5, context.AnalysisRuns.Count());
+        Assert.Equal(5, context.UsageRecords.Count(u =>
+            u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis"));
     }
 
     // --- ExecuteRunAsync: one Claude call per source, then one synthesis call when 2+ complete. ---
@@ -625,6 +698,58 @@ public class AnalysisRunServiceTests
         var sourceModel = Assert.Single(result.Data!.Sources);
         Assert.Equal(nameof(AnalysisRunSourceStatus.Completed), sourceModel.Status);
         Assert.Null(sourceModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task ExecuteRunAsync_EtrSource_PersistsCompletenessAndEligibilitySections_RoundTripsThroughGetRunAsync()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var etrId = _fixture.SeedEtrDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef> { new(AnalysisSourceType.EtrDocument, etrId) },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, new ScriptedClaudeClient(BuildEtrSourceJson()));
+            await execService.ExecuteRunAsync(runId, CancellationToken.None);
+        }
+
+        using var readContext = _fixture.CreateContext();
+        var readService = BuildService(readContext, new FakeClaudeClient(null));
+        var result = await readService.GetRunAsync(runId, _fixture.OwnerUserId, CancellationToken.None);
+
+        Assert.True(result.Success);
+        var run = result.Data!;
+
+        var completenessSection = run.Sections.Single(s => s.SectionKind == AnalysisRunSectionKinds.EtrCompleteness);
+        Assert.Null(completenessSection.Analysis); // the ordinary payload stays null for this kind
+        Assert.NotNull(completenessSection.EtrCompleteness);
+        Assert.Equal("strong", completenessSection.EtrCompleteness!.OverallCompletenessRating);
+        Assert.Single(completenessSection.EtrCompleteness.EvaluatedDomains);
+
+        var eligibilitySection = run.Sections.Single(s => s.SectionKind == AnalysisRunSectionKinds.EtrEligibility);
+        Assert.Null(eligibilitySection.Analysis);
+        Assert.NotNull(eligibilitySection.EtrEligibility);
+        Assert.Equal("Specific Learning Disability", eligibilitySection.EtrEligibility!.StatedCategory);
+        Assert.True(eligibilitySection.EtrEligibility.DataSupportsConclusion);
+
+        // An ordinary section keeps the Analysis shape, not either ETR typed payload.
+        var ordinarySection = run.Sections.Single(s => s.SectionKind == "eligibility");
+        Assert.NotNull(ordinarySection.Analysis);
+        Assert.Null(ordinarySection.EtrCompleteness);
+        Assert.Null(ordinarySection.EtrEligibility);
+
+        using var verifyContext = _fixture.CreateContext();
+        Assert.Equal(AnalysisRunStatus.Completed, verifyContext.AnalysisRuns.Find(runId)!.Status);
     }
 
     [Fact]
@@ -1134,6 +1259,45 @@ public class AnalysisRunServiceTests
 
         Assert.True(result.Success);
         Assert.True(result.Data!.Stale);
+    }
+
+    [Fact]
+    public async Task GetLatestForSourceAsync_EtrSource_IncludesCompletenessAndEligibilitySections()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var etrId = _fixture.SeedEtrDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef> { new(AnalysisSourceType.EtrDocument, etrId) },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, new ScriptedClaudeClient(BuildEtrSourceJson()));
+            await execService.ExecuteRunAsync(runId, CancellationToken.None);
+        }
+
+        using var readContext = _fixture.CreateContext();
+        var readService = BuildService(readContext, new FakeClaudeClient(null));
+        var result = await readService.GetLatestForSourceAsync(
+            _fixture.ChildId, AnalysisSourceType.EtrDocument, etrId, _fixture.OwnerUserId, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(runId, result.Data!.Id);
+        Assert.False(result.Data!.Stale);
+
+        var completenessSection = result.Data!.Sections.Single(s => s.SectionKind == AnalysisRunSectionKinds.EtrCompleteness);
+        Assert.Equal("strong", completenessSection.EtrCompleteness!.OverallCompletenessRating);
+
+        var eligibilitySection = result.Data!.Sections.Single(s => s.SectionKind == AnalysisRunSectionKinds.EtrEligibility);
+        Assert.Equal("Specific Learning Disability", eligibilitySection.EtrEligibility!.StatedCategory);
     }
 
     [Fact]

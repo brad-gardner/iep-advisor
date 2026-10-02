@@ -174,6 +174,8 @@ public class AnalysisRunController : ControllerBase
             SectionKind = s.SectionKind,
             Analysis = s.Analysis,
             GoalAnalyses = s.GoalAnalyses,
+            EtrCompleteness = s.EtrCompleteness,
+            EtrEligibility = s.EtrEligibility,
             DisplayOrder = s.DisplayOrder
         }).ToList();
     }

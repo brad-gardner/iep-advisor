@@ -112,6 +112,74 @@ public class EtrSuggestedQuestion
     public string Rationale { get; set; } = string.Empty;
 }
 
+// --- Unified-engine typed section payloads (Phase 3: unified-analysis refactor) ---
+//
+// The ETR per-source Claude call (AnalysisRunService's ETR-specific source prompt) returns these two
+// typed objects alongside its ordinary sections and overallRedFlags, persisted as the etr_completeness /
+// etr_eligibility AnalysisRunSection kinds. They mirror AssessmentCompletenessResult /
+// EligibilityReviewResult above field-for-field, but camelCase — every other typed section in the
+// unified engine (iep_goals included) is camelCase, unlike the legacy engine's snake_case.
+
+public class EtrCompletenessSectionPayload
+{
+    [JsonPropertyName("evaluatedDomains")]
+    public List<EtrEvaluatedDomain> EvaluatedDomains { get; set; } = [];
+
+    [JsonPropertyName("missingDomains")]
+    public List<EtrMissingDomain> MissingDomains { get; set; } = [];
+
+    [JsonPropertyName("overallCompletenessRating")]
+    public string OverallCompletenessRating { get; set; } = "adequate"; // strong|adequate|thin|concerning
+}
+
+public class EtrEvaluatedDomain
+{
+    [JsonPropertyName("domain")]
+    public string Domain { get; set; } = string.Empty;
+
+    [JsonPropertyName("toolsUsed")]
+    public List<string> ToolsUsed { get; set; } = [];
+
+    [JsonPropertyName("adequacyRating")]
+    public string AdequacyRating { get; set; } = "adequate"; // strong|adequate|thin|missing
+
+    [JsonPropertyName("notes")]
+    public string? Notes { get; set; }
+}
+
+public class EtrMissingDomain
+{
+    [JsonPropertyName("domain")]
+    public string Domain { get; set; } = string.Empty;
+
+    [JsonPropertyName("rationale")]
+    public string Rationale { get; set; } = string.Empty;
+}
+
+public class EtrEligibilitySectionPayload
+{
+    [JsonPropertyName("statedCategory")]
+    public string? StatedCategory { get; set; }
+
+    [JsonPropertyName("statedConclusion")]
+    public string? StatedConclusion { get; set; }
+
+    [JsonPropertyName("dataSupportsConclusion")]
+    public bool DataSupportsConclusion { get; set; }
+
+    [JsonPropertyName("supportingEvidence")]
+    public List<string> SupportingEvidence { get; set; } = [];
+
+    [JsonPropertyName("contradictingEvidence")]
+    public List<string> ContradictingEvidence { get; set; } = [];
+
+    [JsonPropertyName("alternativeConsiderations")]
+    public List<string> AlternativeConsiderations { get; set; } = [];
+
+    [JsonPropertyName("notes")]
+    public string? Notes { get; set; }
+}
+
 // Service output model returned to controller
 
 public class EtrAnalysisModel

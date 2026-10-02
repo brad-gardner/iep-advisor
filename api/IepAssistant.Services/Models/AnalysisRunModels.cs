@@ -29,6 +29,16 @@ public class SourceAnalysisResponse
     [JsonPropertyName("goalAnalyses")]
     public List<GoalAnalysisResult> GoalAnalyses { get; set; } = [];
 
+    /// <summary>ETR sources only (the ETR-specific prompt asks for this; null for every other source
+    /// type). Persisted as a standalone <c>etr_completeness</c> section.</summary>
+    [JsonPropertyName("etrCompleteness")]
+    public EtrCompletenessSectionPayload? EtrCompleteness { get; set; }
+
+    /// <summary>ETR sources only; null for every other source type. Persisted as a standalone
+    /// <c>etr_eligibility</c> section.</summary>
+    [JsonPropertyName("etrEligibility")]
+    public EtrEligibilitySectionPayload? EtrEligibility { get; set; }
+
     [JsonPropertyName("overallRedFlags")]
     public List<RedFlag> OverallRedFlags { get; set; } = [];
 
@@ -64,6 +74,8 @@ public class IepGoalsSectionPayload
 public static class AnalysisRunSectionKinds
 {
     public const string IepGoals = "iep_goals";
+    public const string EtrCompleteness = "etr_completeness";
+    public const string EtrEligibility = "etr_eligibility";
 }
 
 public class AnalysisRunSectionResult
@@ -140,6 +152,14 @@ public class AnalysisRunSectionModel
     /// <summary>Populated only when <see cref="SectionKind"/> is <c>iep_goals</c>; null otherwise,
     /// including when the section's JSON failed to deserialize.</summary>
     public List<GoalAnalysisResult>? GoalAnalyses { get; set; }
+
+    /// <summary>Populated only when <see cref="SectionKind"/> is <c>etr_completeness</c>; null
+    /// otherwise, including when the section's JSON failed to deserialize.</summary>
+    public EtrCompletenessSectionPayload? EtrCompleteness { get; set; }
+
+    /// <summary>Populated only when <see cref="SectionKind"/> is <c>etr_eligibility</c>; null
+    /// otherwise, including when the section's JSON failed to deserialize.</summary>
+    public EtrEligibilitySectionPayload? EtrEligibility { get; set; }
 
     public int DisplayOrder { get; set; }
 }

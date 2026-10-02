@@ -35,6 +35,8 @@ public class AnalysisRunSectionDto
     public string SectionKind { get; set; } = string.Empty;
     public AnalysisRunSectionResult? Analysis { get; set; }
     public List<GoalAnalysisResult>? GoalAnalyses { get; set; }
+    public EtrCompletenessSectionPayload? EtrCompleteness { get; set; }
+    public EtrEligibilitySectionPayload? EtrEligibility { get; set; }
     public int DisplayOrder { get; set; }
 }
 
