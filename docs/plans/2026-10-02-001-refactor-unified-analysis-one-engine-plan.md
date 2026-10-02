@@ -235,8 +235,8 @@ erDiagram
 - [x] Meeting prep ETR mode (`MeetingPrepService.cs:350-353, 634-658`) and advocate ETR paths read runs.
 
 **Web:**
-- [ ] `web/src/features/etr-documents/hooks/use-etr-analysis.ts` + `etr-analysis-tab.tsx` → run slice; reuse `etr-analysis-overview.tsx` for completeness and eligibility; same multi-document / stale / failed states.
-- [ ] Delete `parse-analysis.ts` if no longer used.
+- [x] `web/src/features/etr-documents/hooks/use-etr-analysis.ts` + `etr-analysis-tab.tsx` → run slice; reuse `etr-analysis-overview.tsx` for completeness and eligibility; same multi-document / stale / failed states.
+- [x] Delete `parse-analysis.ts` if no longer used.
 
 **Testing checkpoint:**
 - ETR source parse;

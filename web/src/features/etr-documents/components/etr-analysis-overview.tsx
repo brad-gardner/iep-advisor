@@ -1,8 +1,13 @@
 import { AlertTriangle, CheckCircle2, XCircle, FileSearch } from 'lucide-react';
-import type { ParsedEtrAnalysis } from '../lib/parse-analysis';
+import type { RedFlag } from '@/types/api';
+import type { EtrCompletenessPayload, EtrEligibilityPayload } from '@/features/analysis/types';
+import { RedFlagCard } from '@/features/iep-documents/components/red-flag-card';
 
 interface EtrAnalysisOverviewProps {
-  parsed: ParsedEtrAnalysis;
+  overallSummary: string;
+  redFlags: RedFlag[];
+  completeness: EtrCompletenessPayload | null;
+  eligibility: EtrEligibilityPayload | null;
 }
 
 interface StatTileProps {
@@ -54,12 +59,15 @@ function StatTile({ label, value, Icon, tone }: StatTileProps) {
   );
 }
 
-export function EtrAnalysisOverview({ parsed }: EtrAnalysisOverviewProps) {
-  const { overallSummary, redFlags, assessmentCompleteness, eligibilityReview } = parsed;
-
-  const highFlagCount = redFlags.filter((f) => f.severity === 'high').length;
-  const missingDomainCount = assessmentCompleteness?.missing_domains.length ?? 0;
-  const supported = eligibilityReview?.data_supports_conclusion ?? null;
+export function EtrAnalysisOverview({
+  overallSummary,
+  redFlags,
+  completeness,
+  eligibility,
+}: EtrAnalysisOverviewProps) {
+  const urgentFlagCount = redFlags.filter((f) => f.severity === 'red').length;
+  const missingDomainCount = completeness?.missingDomains.length ?? 0;
+  const supported = eligibility?.dataSupportsConclusion ?? null;
 
   return (
     <div className="space-y-6" data-testid="etr-analysis-overview">
@@ -80,15 +88,15 @@ export function EtrAnalysisOverview({ parsed }: EtrAnalysisOverviewProps) {
           value={
             <span>
               {redFlags.length}
-              {highFlagCount > 0 && (
+              {urgentFlagCount > 0 && (
                 <span className="text-[11px] font-normal text-brand-danger-700 ml-1.5">
-                  ({highFlagCount} high)
+                  ({urgentFlagCount} urgent)
                 </span>
               )}
             </span>
           }
           Icon={AlertTriangle}
-          tone={highFlagCount > 0 ? 'red' : redFlags.length > 0 ? 'amber' : 'slate'}
+          tone={urgentFlagCount > 0 ? 'red' : redFlags.length > 0 ? 'amber' : 'slate'}
         />
         <StatTile
           label="Missing Domains"
@@ -109,6 +117,19 @@ export function EtrAnalysisOverview({ parsed }: EtrAnalysisOverviewProps) {
           tone={supported === null ? 'slate' : supported ? 'teal' : 'red'}
         />
       </section>
+
+      {redFlags.length > 0 && (
+        <section>
+          <h2 className="font-serif text-[22px] font-semibold mb-3 text-brand-slate-800">
+            Areas of Concern ({redFlags.length})
+          </h2>
+          <div className="space-y-3">
+            {redFlags.map((flag, i) => (
+              <RedFlagCard key={i} redFlag={flag} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

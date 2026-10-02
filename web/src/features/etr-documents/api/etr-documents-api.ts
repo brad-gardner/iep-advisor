@@ -2,7 +2,6 @@ import { apiClient } from '@/lib/api-client';
 import type { ApiResponse } from '@/types/api';
 import type {
   CreateEtrRequest,
-  EtrAnalysis,
   EtrDocument,
   EtrDocumentListItem,
   EtrSection,
@@ -91,17 +90,5 @@ export async function getSections(id: number): Promise<ApiResponse<EtrSection[]>
 
 export async function reprocess(id: number): Promise<ApiResponse<null>> {
   const response = await apiClient.post<ApiResponse<null>>(`/api/etrs/${id}/process`);
-  return response.data;
-}
-
-export async function startAnalysis(id: number): Promise<ApiResponse<null>> {
-  const response = await apiClient.post<ApiResponse<null>>(`/api/etrs/${id}/analyze`);
-  return response.data;
-}
-
-export async function getAnalysis(id: number): Promise<ApiResponse<EtrAnalysis>> {
-  const response = await apiClient.get<ApiResponse<EtrAnalysis>>(
-    `/api/etrs/${id}/analysis`
-  );
   return response.data;
 }

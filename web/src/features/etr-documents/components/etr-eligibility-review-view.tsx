@@ -1,9 +1,9 @@
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import type { EligibilityReview } from '../types';
+import type { EtrEligibilityPayload } from '@/features/analysis/types';
 
 interface EtrEligibilityReviewViewProps {
-  data: EligibilityReview;
+  data: EtrEligibilityPayload;
 }
 
 function EvidenceList({
@@ -41,7 +41,7 @@ function EvidenceList({
 }
 
 export function EtrEligibilityReviewView({ data }: EtrEligibilityReviewViewProps) {
-  const supported = data.data_supports_conclusion;
+  const supported = data.dataSupportsConclusion;
 
   return (
     <div className="space-y-6" data-testid="etr-eligibility-review">
@@ -56,7 +56,7 @@ export function EtrEligibilityReviewView({ data }: EtrEligibilityReviewViewProps
               Stated Category
             </dt>
             <dd className="text-sm font-medium text-brand-slate-800 mt-1">
-              {data.stated_category || '—'}
+              {data.statedCategory || '—'}
             </dd>
           </div>
           <div className="bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200">
@@ -64,7 +64,7 @@ export function EtrEligibilityReviewView({ data }: EtrEligibilityReviewViewProps
               Stated Conclusion
             </dt>
             <dd className="text-sm font-medium text-brand-slate-800 mt-1">
-              {data.stated_conclusion || '—'}
+              {data.statedConclusion || '—'}
             </dd>
           </div>
         </div>
@@ -114,17 +114,17 @@ export function EtrEligibilityReviewView({ data }: EtrEligibilityReviewViewProps
       <section className="space-y-5">
         <EvidenceList
           title="Supporting Evidence"
-          items={data.supporting_evidence}
+          items={data.supportingEvidence}
           tone="support"
         />
         <EvidenceList
           title="Contradicting Evidence"
-          items={data.contradicting_evidence}
+          items={data.contradictingEvidence}
           tone="contra"
         />
         <EvidenceList
           title="Alternative Considerations"
-          items={data.alternative_considerations}
+          items={data.alternativeConsiderations}
           tone="neutral"
         />
       </section>

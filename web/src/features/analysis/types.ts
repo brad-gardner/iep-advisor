@@ -35,6 +35,40 @@ export interface AnalysisRunSource {
   errorMessage: string | null;
 }
 
+/** One evaluated domain within an `etr_completeness` section's payload. */
+export interface EtrEvaluatedDomain {
+  domain: string;
+  toolsUsed: string[];
+  /** "strong" | "adequate" | "thin" | "missing" (server-validated; treat as an open string). */
+  adequacyRating: string;
+  notes: string | null;
+}
+
+/** One domain the ETR didn't evaluate, within an `etr_completeness` section's payload. */
+export interface EtrMissingDomain {
+  domain: string;
+  rationale: string;
+}
+
+/** The `etr_completeness` section's typed payload. */
+export interface EtrCompletenessPayload {
+  evaluatedDomains: EtrEvaluatedDomain[];
+  missingDomains: EtrMissingDomain[];
+  /** "strong" | "adequate" | "thin" | "concerning" (server-validated; treat as an open string). */
+  overallCompletenessRating: string;
+}
+
+/** The `etr_eligibility` section's typed payload. */
+export interface EtrEligibilityPayload {
+  statedCategory: string | null;
+  statedConclusion: string | null;
+  dataSupportsConclusion: boolean;
+  supportingEvidence: string[];
+  contradictingEvidence: string[];
+  alternativeConsiderations: string[];
+  notes: string | null;
+}
+
 export interface AnalysisRunSection {
   id: number;
   analysisRunSourceId: number | null;
@@ -43,6 +77,12 @@ export interface AnalysisRunSection {
   /** Populated only when sectionKind is "iep_goals"; null otherwise, including
    * when that section's JSON failed to deserialize. */
   goalAnalyses: GoalAnalysis[] | null;
+  /** Populated only when sectionKind is "etr_completeness"; null otherwise,
+   * including when that section's JSON failed to deserialize. */
+  etrCompleteness: EtrCompletenessPayload | null;
+  /** Populated only when sectionKind is "etr_eligibility"; null otherwise,
+   * including when that section's JSON failed to deserialize. */
+  etrEligibility: EtrEligibilityPayload | null;
   displayOrder: number;
 }
 

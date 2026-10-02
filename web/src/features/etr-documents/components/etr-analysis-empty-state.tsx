@@ -2,11 +2,11 @@ import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface EtrAnalysisEmptyStateProps {
-  onStart: () => void;
+  onTrigger: () => void;
   isTriggering: boolean;
 }
 
-export function EtrAnalysisEmptyState({ onStart, isTriggering }: EtrAnalysisEmptyStateProps) {
+export function EtrAnalysisEmptyState({ onTrigger, isTriggering }: EtrAnalysisEmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
       <div className="w-12 h-12 rounded-full bg-brand-teal-50 flex items-center justify-center mb-4">
@@ -16,11 +16,11 @@ export function EtrAnalysisEmptyState({ onStart, isTriggering }: EtrAnalysisEmpt
         Analyze this ETR
       </h3>
       <p className="text-brand-slate-500 text-sm text-center max-w-md mb-6">
-        We'll review assessment completeness, eligibility determination, red flags,
-        and generate suggested questions for your ETR meeting.
+        Get a comprehensive analysis of this evaluation, including assessment
+        completeness, eligibility review, and potential concerns.
       </p>
-      <Button onClick={onStart} disabled={isTriggering} data-testid="etr-analyze-button">
-        {isTriggering ? 'Starting Analysis...' : 'Run analysis'}
+      <Button onClick={onTrigger} loading={isTriggering} data-testid="etr-analyze-button">
+        Analyze ETR
       </Button>
     </div>
   );

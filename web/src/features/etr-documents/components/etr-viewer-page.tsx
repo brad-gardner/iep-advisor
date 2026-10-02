@@ -13,6 +13,7 @@ import { FileX } from 'lucide-react';
 import { useEtrDocument } from '../hooks/use-etr-documents';
 import { useEtrProcessing } from '../hooks/use-etr-processing';
 import { useEtrSections } from '../hooks/use-etr-sections';
+import { useEtrAnalysis } from '../hooks/use-etr-analysis';
 import { getDownloadUrl } from '../api/etr-documents-api';
 import {
   DOCUMENT_STATE_LABELS,
@@ -44,6 +45,21 @@ export function EtrViewerPage() {
     documentId,
     status
   );
+
+  const {
+    run: analysisRun,
+    source: analysisSource,
+    sections: analysisSections,
+    completeness: analysisCompleteness,
+    eligibility: analysisEligibility,
+    otherSources: analysisOtherSources,
+    stale: analysisStale,
+    isLoading: analysisLoading,
+    isTriggering,
+    triggerError,
+    trigger: triggerAnalysis,
+    reload: reloadAnalysis,
+  } = useEtrAnalysis(etr?.childProfileId ?? 0, documentId);
 
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [notesExpanded, setNotesExpanded] = useState(false);
@@ -228,8 +244,19 @@ export function EtrViewerPage() {
 
       {activeTab === 'analysis' && !analysisTabDisabled && (
         <EtrAnalysisTab
-          etrId={documentId}
-          childProfileId={etr.childProfileId}
+          childId={etr.childProfileId}
+          run={analysisRun}
+          source={analysisSource}
+          sections={analysisSections}
+          completeness={analysisCompleteness}
+          eligibility={analysisEligibility}
+          otherSources={analysisOtherSources}
+          stale={analysisStale}
+          isLoading={analysisLoading}
+          isTriggering={isTriggering}
+          triggerError={triggerError}
+          onTrigger={triggerAnalysis}
+          onReload={reloadAnalysis}
         />
       )}
     </div>
