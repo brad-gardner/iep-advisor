@@ -1,0 +1,70 @@
+meta {
+  name: List analysis runs for child
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/children/{{childId}}/analysis-runs
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # GET /api/children/{childId}/analysis-runs
+
+  Every analysis run for this child, newest first. Used to build the child-level Analysis tab's run
+  picker (`?run=`).
+
+  ## Responses
+
+  - `200` — `data: AnalysisRunDto[]`. `sections` is always `[]` here regardless of the run's actual
+    sections — this endpoint never loads section rows; use `GetById` for a run's full detail.
+  - `400` — the caller has no access to this child at all ("You do not have access to this child.").
+    Note this is `400`, not `404` — `GetByChild`'s failure message doesn't contain "permission", so
+    `MapFailure` falls through to its default rather than the `403` a missing-role message gets
+    elsewhere in this controller.
+  - `401` — missing/invalid bearer token.
+
+  ```json
+  {
+    "success": true,
+    "message": null,
+    "data": [
+      {
+        "id": 101,
+        "childProfileId": 1,
+        "status": "Completed",
+        "overallSummary": "Both documents show consistent reading goals with gaps in progress data.",
+        "crossDocSynthesis": {
+          "summary": "The ETR's evaluation data aligns with the IEP's present levels.",
+          "timeline": ["ETR completed 2026-03-15", "IEP finalized 2026-05-01"],
+          "contradictions": [],
+          "progression": "Reading fluency improved since the ETR baseline."
+        },
+        "overallRedFlags": [
+          { "severity": "yellow", "title": "Missing progress data", "description": "No progress monitoring data since July.", "legalBasis": null }
+        ],
+        "advocacyGapAnalysis": null,
+        "parentGoalsSnapshot": [],
+        "sources": [
+          { "id": 201, "sourceType": "IepDocument", "sourceId": 35, "sourceLabel": "IEP dated 2026-05-01", "status": "Completed", "errorMessage": null },
+          { "id": 202, "sourceType": "EtrDocument", "sourceId": 9, "sourceLabel": "ETR dated 2026-03-15", "status": "Completed", "errorMessage": null }
+        ],
+        "sections": [],
+        "errorMessage": null,
+        "createdAt": "2026-10-02T14:00:00Z"
+      }
+    ],
+    "errors": []
+  }
+  ```
+}

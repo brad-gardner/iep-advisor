@@ -1,0 +1,91 @@
+meta {
+  name: Create analysis run
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/children/{{childId}}/analysis-runs
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "sources": [
+      {
+        "sourceType": "IepDocument",
+        "sourceId": {{iepDocumentId}}
+      },
+      {
+        "sourceType": "EtrDocument",
+        "sourceId": {{etrDocumentId}}
+      }
+    ]
+  }
+}
+
+docs {
+  # POST /api/children/{childId}/analysis-runs
+
+  Queues a new analysis run over one or more documents for this child and enqueues it for background
+  execution (`GetById`/`GetByChild` poll for completion — this endpoint does not wait for the run to
+  finish). Body is `CreateAnalysisRunRequest`. Rate-limited (`analysis-run` policy): 20 requests per
+  15 minutes per user.
+
+  ## Body
+
+  - `sources` (required, 1+) — each entry is `{ sourceType, sourceId }`.
+    - `sourceType` — `IepDocument | EtrDocument | ProgressReport` (case-insensitive string, not the
+      numeric enum). `SharedDraftRevision` is a valid `AnalysisSourceType` elsewhere in the app but is
+      never accepted here — it feeds a separate lightweight explanation path, not this engine.
+    - `sourceId` — must belong to this child; a source that doesn't resolve is dropped with a warning
+      rather than failing the whole request (see `message` below).
+  - Duplicate `{ sourceType, sourceId }` entries are combined into one, noted in `message`.
+
+  ## Responses
+
+  - `201` — `Location: /api/children/{childId}/analysis-runs/{runId}`; `data: AnalysisRunDto` with
+    `status: "Pending"`, each listed source `status: "Pending"`, and `sections: []` (nothing has run
+    yet). `message` carries a non-fatal warning when sources were deduped or silently dropped (e.g.
+    "Duplicate documents were selected and have been combined.").
+  - `400` — no `sources`, an invalid `sourceType` string, the child not found, the per-child analysis
+    limit reached (5 runs), or every selected source failed to resolve.
+  - `401` — missing/invalid bearer token.
+  - `402` — "Active subscription required." (billed to the child profile's owner, not the caller).
+  - `403` — caller has Viewer access to the child but not Collaborator+.
+
+  ```json
+  {
+    "success": true,
+    "message": "Analysis run queued",
+    "data": {
+      "id": 101,
+      "childProfileId": 1,
+      "status": "Pending",
+      "overallSummary": null,
+      "crossDocSynthesis": null,
+      "overallRedFlags": [],
+      "advocacyGapAnalysis": null,
+      "parentGoalsSnapshot": [],
+      "sources": [
+        { "id": 201, "sourceType": "IepDocument", "sourceId": 35, "sourceLabel": "IEP dated 2026-05-01", "status": "Pending", "errorMessage": null },
+        { "id": 202, "sourceType": "EtrDocument", "sourceId": 9, "sourceLabel": "ETR dated 2026-03-15", "status": "Pending", "errorMessage": null }
+      ],
+      "sections": [],
+      "errorMessage": null,
+      "createdAt": "2026-10-02T14:00:00Z"
+    },
+    "errors": []
+  }
+  ```
+}

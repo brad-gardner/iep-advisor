@@ -1,0 +1,141 @@
+meta {
+  name: Get analysis run by id
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/children/{{childId}}/analysis-runs/{{runId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # GET /api/children/{childId}/analysis-runs/{runId}
+
+  One run's full detail, including its sections — used by the child-level Analysis tab when a
+  specific run is selected (`?run=`). Note `childId` in the route is not re-checked against the run
+  (`GetRunAsync` looks the run up by `runId` alone and authorizes against the run's *own*
+  `childProfileId`); a mismatched `childId` in the URL still returns the run as long as the caller
+  has access to the child the run actually belongs to.
+
+  ## Responses
+
+  - `200` — `data: AnalysisRunDto`, with `sections` populated (ordered by `displayOrder`):
+    - Ordinary sections (`sectionKind` e.g. `present_levels`, `services`, `evaluation_results`, …,
+      a short snake_case label chosen by the model) populate `analysis` (an
+      `AnalysisRunSectionResult`: `plainLanguageSummary`, `keyPoints[]`, `redFlags[]`,
+      `legalReferences[]`); `goalAnalyses`/`etrCompleteness`/`etrEligibility` are `null`.
+    - `sectionKind: "iep_goals"` (IEP sources only, one per IEP source with any ratings) instead
+      populates `goalAnalyses[]` and leaves `analysis` `null`. Every `goalAnalyses[].goalId` is
+      validated against the source IEP's current goals server-side before being persisted.
+    - `sectionKind: "etr_completeness"` / `"etr_eligibility"` (ETR sources only, at most one of each
+      per ETR source) instead populate `etrCompleteness` / `etrEligibility` respectively; either may
+      be absent if the model omitted it, which is not a source failure.
+    - A section whose stored JSON fails to deserialize maps to all of `analysis`/`goalAnalyses`/
+      `etrCompleteness`/`etrEligibility` being `null` rather than throwing.
+  - `sources[]` — one per selected document: `status` (`Pending | Running | Completed | Error`) and
+    `errorMessage` track that source's own Claude call independently of the run's overall `status` —
+    one source can be `Error` while the run as a whole is `Completed` with the rest.
+  - `401` — missing/invalid bearer token.
+  - `404` — run not found, or the caller has no access to the child the run belongs to.
+
+  ```json
+  {
+    "success": true,
+    "message": null,
+    "data": {
+      "id": 101,
+      "childProfileId": 1,
+      "status": "Completed",
+      "overallSummary": "Both documents show consistent reading goals with gaps in progress data.",
+      "crossDocSynthesis": {
+        "summary": "The ETR's evaluation data aligns with the IEP's present levels.",
+        "timeline": ["ETR completed 2026-03-15", "IEP finalized 2026-05-01"],
+        "contradictions": [],
+        "progression": "Reading fluency improved since the ETR baseline."
+      },
+      "overallRedFlags": [
+        { "severity": "yellow", "title": "Missing progress data", "description": "No progress monitoring data since July.", "legalBasis": null }
+      ],
+      "advocacyGapAnalysis": {
+        "summary": "Most parent goals are at least partially addressed.",
+        "goalAlignments": [
+          {
+            "parentGoalText": "Read at grade level by end of year",
+            "parentGoalCategory": "Academic",
+            "alignmentStatus": "partially_addressed",
+            "alignedIepGoals": ["Student will read 80 WPM with 90% accuracy"],
+            "explanation": "The IEP goal addresses fluency but not comprehension.",
+            "recommendation": "Ask the team to add a comprehension benchmark."
+          }
+        ]
+      },
+      "parentGoalsSnapshot": [
+        { "id": 5, "goalText": "Read at grade level by end of year", "category": "Academic", "displayOrder": 0 }
+      ],
+      "sources": [
+        { "id": 201, "sourceType": "IepDocument", "sourceId": 35, "sourceLabel": "IEP dated 2026-05-01", "status": "Completed", "errorMessage": null },
+        { "id": 202, "sourceType": "EtrDocument", "sourceId": 9, "sourceLabel": "ETR dated 2026-03-15", "status": "Error", "errorMessage": "Claude response could not be parsed." }
+      ],
+      "sections": [
+        {
+          "id": 301,
+          "analysisRunSourceId": 201,
+          "sectionKind": "present_levels",
+          "analysis": {
+            "sectionKind": "present_levels",
+            "plainLanguageSummary": "Reading is the primary area of need; math is at grade level.",
+            "keyPoints": ["Reading fluency below grade level", "Math at grade level"],
+            "redFlags": [],
+            "legalReferences": []
+          },
+          "goalAnalyses": null,
+          "etrCompleteness": null,
+          "etrEligibility": null,
+          "displayOrder": 0
+        },
+        {
+          "id": 302,
+          "analysisRunSourceId": 201,
+          "sectionKind": "iep_goals",
+          "analysis": null,
+          "goalAnalyses": [
+            {
+              "goalId": 77,
+              "goalText": "Student will read 80 WPM with 90% accuracy",
+              "domain": "Reading",
+              "smartAnalysis": {
+                "specific": { "rating": "green", "explanation": "Clearly defines the skill and criteria." },
+                "measurable": { "rating": "green", "explanation": "WPM and accuracy are both quantified." },
+                "achievable": { "rating": "yellow", "explanation": "No baseline cited to judge the jump." },
+                "relevant": { "rating": "green", "explanation": "Tied to the present-levels reading concern." },
+                "timeBound": { "rating": "green", "explanation": "Annual goal with a stated review date." }
+              },
+              "overallRating": "green",
+              "plainLanguageSummary": "A clear, measurable reading fluency goal.",
+              "strengths": ["Specific rate and accuracy targets"],
+              "concerns": ["No stated baseline"],
+              "suggestedImprovements": ["Add the student's current WPM as a baseline"]
+            }
+          ],
+          "etrCompleteness": null,
+          "etrEligibility": null,
+          "displayOrder": 1
+        }
+      ],
+      "errorMessage": null,
+      "createdAt": "2026-10-02T14:00:00Z"
+    },
+    "errors": []
+  }
+  ```
+}

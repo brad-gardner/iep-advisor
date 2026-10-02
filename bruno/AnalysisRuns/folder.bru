@@ -1,0 +1,23 @@
+meta {
+  name: AnalysisRuns
+  seq: 4
+}
+
+docs {
+  `AnalysisRunController` — the unified analysis engine. One Claude call runs per selected source
+  document (IEP, ETR, or progress report) and a synthesis call runs once 2+ sources complete, so a
+  single `AnalysisRun` can span multiple documents for a child and carry a cross-document summary.
+
+  Replaces the legacy per-document endpoints (`POST/GET /api/ieps/{id}/analyze|analysis`,
+  `POST/GET /api/etrs/{id}/analyze|analysis`), which are removed — there were no Bruno requests for
+  them to retire.
+
+  Access: Viewer+ can list/read runs; Collaborator+ is required to create one. Every created run
+  reserves one unit of the child's analysis quota (5 per child) regardless of outcome — a run whose
+  sources all fail is refunded, a partially-successful run is not.
+
+  `AnalysisRunController.MapFailure` maps a failed service call to a status code by sniffing the
+  message text, not a typed error: a message containing "subscription" → `402`, "permission" → `403`,
+  anything else (including "Child not found.") → `400`. `GetById` and `GetLatestForSource` don't use
+  `MapFailure` — every failure on those two (not found, no access, or no matching run) is `404`.
+}
