@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { GoalAnalysis, SmartCriterion } from '@/types/api';
 import type {
@@ -120,13 +120,23 @@ describe('AnalysisTab', () => {
   it('shows a retry notice instead of the Analyze button when the run failed to load (not just "never analyzed")', () => {
     const { onReload } = renderTab({ run: null, loadError: 'Could not load this analysis.' });
 
-    const notice = screen.getByTestId('analysis-load-error');
+    const notice = screen.getByRole('alert');
     expect(notice).toHaveTextContent('Could not load this analysis.');
-    expect(notice).toHaveAttribute('role', 'alert');
+    const retryButton = within(notice).getByRole('button', { name: 'Try again' });
     expect(screen.queryByTestId('analyze-button')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('analysis-load-retry'));
+    fireEvent.click(retryButton);
     expect(onReload).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the load-error notice (and its Try again control) mounted instead of swapping to the spinner while a retry is in flight', () => {
+    renderTab({ run: null, loadError: 'Could not load this analysis.', isLoading: true });
+
+    const notice = screen.getByRole('alert');
+    const retryButton = within(notice).getByRole('button', { name: 'Try again' });
+    expect(retryButton).toBeDisabled();
+    expect(retryButton).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByText('Loading analysis…')).not.toBeInTheDocument();
   });
 
   it('keeps showing a previously loaded run alongside a load-error retry notice when a background refresh fails', () => {

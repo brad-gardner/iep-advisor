@@ -44,13 +44,17 @@ docs {
 
   ## Body
 
-  - `sources` (required, 1+) — each entry is `{ sourceType, sourceId }`.
+  - `sources` (required, 1+, max 5) — each entry is `{ sourceType, sourceId }`.
     - `sourceType` — `IepDocument | EtrDocument | ProgressReport` (case-insensitive string, not the
       numeric enum). `SharedDraftRevision` is a valid `AnalysisSourceType` elsewhere in the app but is
       never accepted here — it feeds a separate lightweight explanation path, not this engine.
     - `sourceId` — must belong to this child; a source that doesn't resolve is dropped with a warning
       rather than failing the whole request (see `message` below).
   - Duplicate `{ sourceType, sourceId }` entries are combined into one, noted in `message`.
+  - The 5-entry max is counted on `sources` as submitted, *before* de-duplication — `[MaxLength(5)]`
+    on `CreateAnalysisRunRequest.Sources`. Five identical entries (deduped to one) is fine; six entries
+    of any kind, even six copies of the same source, fails model validation. See the `400` entry below
+    for the distinct response shape this produces.
 
   ## Responses
 
@@ -58,11 +62,25 @@ docs {
     `status: "Pending"`, each listed source `status: "Pending"`, and `sections: []` (nothing has run
     yet). `message` carries a non-fatal warning when sources were deduped or silently dropped (e.g.
     "Duplicate documents were selected and have been combined.").
-  - `400` — no `sources`, an invalid `sourceType` string, the child not found, the per-child analysis
-    limit reached (5 runs), or every selected source failed to resolve.
+  - `400` — two distinct shapes:
+    - More than 5 entries in `sources` fails `[MaxLength(5)]` model validation. Because this
+      controller is `[ApiController]`-annotated, ASP.NET Core's automatic model-validation filter
+      returns its own `ValidationProblemDetails` body *before* the action method runs — not the
+      `ApiResponse` envelope every other response on this endpoint uses:
+      `{ "errors": { "Sources": ["Choose up to 5 documents for one analysis."] }, "title": "One or more validation errors occurred.", "status": 400, ... }`.
+    - Every other `400` is an `ApiResponse<object>` with `success: false` and the failure in `message`:
+      no `sources`, an invalid `sourceType` string, "Child not found." (only for a child the caller has
+      access to that has since been deactivated — see `403` below for a child that doesn't exist or
+      the caller can't access at all), the per-child analysis limit reached (5 runs — `message`:
+      "Analysis limit reached for this child.", unrelated to the 5-source-per-request cap above), or
+      every selected source failed to resolve.
   - `401` — missing/invalid bearer token.
   - `402` — "Active subscription required." (billed to the child profile's owner, not the caller).
-  - `403` — caller has Viewer access to the child but not Collaborator+.
+  - `403` — the Collaborator+ access check runs before the child is loaded, so this covers both "no
+    access at all" and "access below Collaborator" (e.g. Viewer) for any `childId` — including one that
+    doesn't exist, which resolves to the same "no role found" as no access.
+  - `429` — `analysis-run` rate limit (20 requests / 15 minutes per user); empty body, no
+    `OnRejected` handler is configured for this policy.
 
   ```json
   {

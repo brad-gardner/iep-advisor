@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import type { ChildProfile } from "@/types/api";
-import type { AnalysisRun } from "../types";
+import type { AnalysisRun, CreateAnalysisRunRequest } from "../types";
 
 const toast = vi.hoisted(() => ({ show: vi.fn() }));
 vi.mock("@/components/ui/toast", () => ({ useToast: () => toast }));
@@ -13,7 +13,13 @@ vi.mock("../hooks/use-analysis-runs", () => analysisRunsHook);
 const analysisRunsApi = vi.hoisted(() => ({ createRun: vi.fn() }));
 vi.mock("../api/analysis-runs-api", () => analysisRunsApi);
 
-vi.mock("./source-picker", () => ({ SourcePicker: () => null }));
+vi.mock("./source-picker", () => ({
+  SourcePicker: ({ onRun }: { onRun: (payload: CreateAnalysisRunRequest) => void }) => (
+    <button data-testid="trigger-run" onClick={() => onRun({ sources: [] })}>
+      Run
+    </button>
+  ),
+}));
 
 vi.mock("./run-detail", () => ({
   RunDetail: ({ runId }: { runId: number }) => <div data-testid="run-detail">{runId}</div>,
@@ -139,5 +145,35 @@ describe("ChildAnalysisTab — run selection via ?run=", () => {
     renderTab("/children/4/analysis?run=1");
     const notice = screen.getByText("Still working…").closest('[role="status"]');
     expect(notice).not.toBeNull();
+  });
+
+  it("surfaces a run-creation failure as an alert (not a status message)", async () => {
+    analysisRunsApi.createRun.mockResolvedValueOnce({
+      success: false,
+      message: "Could not start analysis",
+    });
+    renderTab("/children/4/analysis?run=1");
+    fireEvent.click(screen.getByTestId("trigger-run"));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Could not start analysis");
+  });
+
+  it("surfaces a duplicate-source warning as a status message when the run still starts", async () => {
+    analysisRunsApi.createRun.mockResolvedValueOnce({
+      success: true,
+      message: "Duplicate documents were selected and have been combined.",
+      data: makeRun(3, "2026-09-25T00:00:00Z"),
+    });
+    renderTab("/children/4/analysis?run=1");
+    fireEvent.click(screen.getByTestId("trigger-run"));
+
+    // `getByRole("status")` would also match the `<output>` location probe
+    // used by this test file, so locate by the notice's own text instead.
+    const title = await screen.findByText("Heads up");
+    const notice = title.closest('[role="status"]');
+    expect(notice).not.toBeNull();
+    expect(notice).toHaveTextContent("Duplicate documents were selected and have been combined.");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

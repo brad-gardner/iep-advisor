@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePolling, ANALYSIS_MAX_POLLS } from "@/hooks/use-polling";
 import { createRun, getLatestForSource } from "../api/analysis-runs-api";
 import { mapCreateError } from "../lib/map-create-error";
@@ -62,6 +62,23 @@ export function useSourceAnalysis(
   const [isTriggering, setIsTriggering] = useState(false);
   const [triggerError, setTriggerError] = useState<string | null>(null);
 
+  // Bumped by load(), trigger(), and a childId/sourceType/sourceId change,
+  // and read back once a load/poll request settles — a response whose
+  // generation has since gone stale (superseded by a newer load, a trigger
+  // seed, or a source change) is dropped instead of clobbering fresher
+  // state. Same pattern as use-analysis-runs.ts.
+  const generationRef = useRef(0);
+
+  // A new source resets state immediately rather than showing the previous
+  // source's run (or misjudging staleness against it) while the new
+  // source's request is in flight.
+  useEffect(() => {
+    generationRef.current += 1;
+    setRun(null);
+    setLoadError(null);
+    setIsLoading(true);
+  }, [childId, sourceType, sourceId]);
+
   const applyLatestResult = useCallback(
     (res: Awaited<ReturnType<typeof getLatestForSource>>) => {
       if (res.success && res.data) {
@@ -95,14 +112,17 @@ export function useSourceAnalysis(
       // fetch (once childId/sourceId become valid) gets to run.
       return;
     }
+    const generation = ++generationRef.current;
     setIsLoading(true);
     try {
       const res = await getLatestForSource(childId, sourceType, sourceId);
+      if (generation !== generationRef.current) return;
       applyLatestResult(res);
     } catch (err) {
+      if (generation !== generationRef.current) return;
       handleLoadError(err);
     } finally {
-      setIsLoading(false);
+      if (generation === generationRef.current) setIsLoading(false);
     }
   }, [childId, sourceType, sourceId, applyLatestResult, handleLoadError]);
 
@@ -112,10 +132,13 @@ export function useSourceAnalysis(
 
   const refreshInBackground = useCallback(async () => {
     if (!childId || !sourceId) return;
+    const generation = generationRef.current;
     try {
       const res = await getLatestForSource(childId, sourceType, sourceId);
+      if (generation !== generationRef.current) return;
       applyLatestResult(res);
     } catch (err) {
+      if (generation !== generationRef.current) return;
       handleLoadError(err);
     }
   }, [childId, sourceType, sourceId, applyLatestResult, handleLoadError]);
@@ -139,6 +162,11 @@ export function useSourceAnalysis(
         sources: [{ sourceType, sourceId }],
       });
       if (res.success && res.data) {
+        // Bump the generation before seeding so that any older in-flight
+        // load/poll request (e.g. a reload kicked off just before this
+        // trigger) is dropped on arrival instead of overwriting the run
+        // we're about to seed.
+        generationRef.current += 1;
         // Seed in-flight state from the create response immediately: a
         // failed follow-up load (a non-404 error) must not drop this back to
         // null/"never analyzed", and polling should start right away rather

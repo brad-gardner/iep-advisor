@@ -14,7 +14,9 @@ docs {
 
   Access: Viewer+ can list/read runs; Collaborator+ is required to create one. Every created run
   reserves one unit of the child's analysis quota (5 per child) regardless of outcome — a run whose
-  sources all fail is refunded, a partially-successful run is not.
+  sources all fail is refunded unless any failure was an unparseable model response (then the unit is
+  kept, since a document engineered to always produce unparseable JSON must not be a free retry loop);
+  a partially successful run is not refunded.
 
   `AnalysisRunController.MapFailure` maps a failed service call to a status code by sniffing the
   message text, not a typed error: a message containing "subscription" → `402`, "permission" → `403`,

@@ -129,11 +129,15 @@ export function ChildAnalysisTab() {
   return (
     <div className="space-y-6">
       {error && (
-        <Notice variant="error" title="Unable to run analysis">
+        <Notice variant="error" title="Unable to run analysis" role="alert">
           {error}
         </Notice>
       )}
-      {warning && <Notice variant="warning" title="Heads up">{warning}</Notice>}
+      {warning && (
+        <Notice variant="warning" title="Heads up" role="status">
+          {warning}
+        </Notice>
+      )}
       {runNotFound && (
         <Notice
           variant="info"

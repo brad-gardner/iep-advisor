@@ -107,14 +107,25 @@ export function EtrAnalysisTab({
     >
       {loadError}
       <div className="mt-3">
-        <Button variant="secondary" size="sm" onClick={onReload} data-testid="analysis-load-retry">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onReload}
+          loading={isLoading}
+          data-testid="analysis-load-retry"
+        >
           Try again
         </Button>
       </div>
     </Notice>
   );
 
-  if (isLoading && !run) {
+  // While there's no run yet and a load error is showing, a retry
+  // (`isLoading` going back to true) must not swap this notice out for the
+  // bare spinner below — that would unmount the "Try again" control the
+  // user just activated and drop focus off a live control. The notice
+  // (with its button now in a loading state) stays mounted instead.
+  if (isLoading && !run && !loadError) {
     return (
       <div className="flex justify-center py-12">
         <Spinner label="Loading analysis…" />

@@ -27,8 +27,10 @@ docs {
   # GET /api/children/{childId}/analysis-runs/latest
 
   NEW (unified-analysis refactor) — replaces `GET /api/ieps/{id}/analysis` and
-  `GET /api/etrs/{id}/analysis`. The most recent run that included this document as a source,
-  everything `GetById` returns for that run, plus the two things a document page needs that a plain
+  `GET /api/etrs/{id}/analysis`. The most recent run that included this document as a source, in the
+  same shape `GetById` returns — see `GetById` for how `sections` is structured (ordinary sections,
+  `iep_goals`, `etr_completeness`/`etr_eligibility`) — except `sections` here holds only the requested
+  source's own sections, not every source's. Plus the two things a document page needs that a plain
   run read doesn't: the run's other sources, and whether the run is stale for *this* document.
 
   ## Query
@@ -41,7 +43,10 @@ docs {
 
   ## Responses
 
-  - `200` — `data: AnalysisRunLatestDto`: every `AnalysisRunDto` field plus —
+  - `200` — `data: AnalysisRunLatestDto`: every `AnalysisRunDto` field (see `GetById` for the full
+    `sections` shape), except `sections` is filtered to only the sections belonging to the requested
+    `sourceType`/`sourceId` (`sources` and `otherSources` still list every source in the run — only
+    `sections` is narrowed). Plus two additions a document page needs that a plain run read doesn't:
     - `otherSources` — the run's sources other than the one matched, each `{ sourceType, sourceId, label }`,
       for a "part of a larger analysis, also covering …" note.
     - `stale` — `true` when the document has moved on since this run: it was reprocessed after the run
@@ -106,42 +111,6 @@ docs {
           "etrCompleteness": null,
           "etrEligibility": null,
           "displayOrder": 0
-        },
-        {
-          "id": 302,
-          "analysisRunSourceId": 202,
-          "sectionKind": "etr_completeness",
-          "analysis": null,
-          "goalAnalyses": null,
-          "etrCompleteness": {
-            "evaluatedDomains": [
-              { "domain": "Academic Achievement", "toolsUsed": ["WIAT-4"], "adequacyRating": "adequate", "notes": null }
-            ],
-            "missingDomains": [
-              { "domain": "Social/Emotional", "rationale": "No rating scale or observation data included." }
-            ],
-            "overallCompletenessRating": "thin"
-          },
-          "etrEligibility": null,
-          "displayOrder": 1
-        },
-        {
-          "id": 303,
-          "analysisRunSourceId": 202,
-          "sectionKind": "etr_eligibility",
-          "analysis": null,
-          "goalAnalyses": null,
-          "etrCompleteness": null,
-          "etrEligibility": {
-            "statedCategory": "Specific Learning Disability",
-            "statedConclusion": "Eligible",
-            "dataSupportsConclusion": true,
-            "supportingEvidence": ["WIAT-4 scores show a significant achievement gap"],
-            "contradictingEvidence": [],
-            "alternativeConsiderations": [],
-            "notes": null
-          },
-          "displayOrder": 2
         }
       ],
       "errorMessage": null,
