@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/api-client';
-import type { ApiResponse, CreateIepRequest, IepAnalysis, IepDocument, IepSection, UpdateIepMetadataRequest } from '@/types/api';
+import type { ApiResponse, CreateIepRequest, IepDocument, IepSection, UpdateIepMetadataRequest } from '@/types/api';
 
 export async function getIepDocuments(childId: number): Promise<ApiResponse<IepDocument[]>> {
   const response = await apiClient.get<ApiResponse<IepDocument[]>>(
@@ -66,17 +66,5 @@ export async function getIepSections(documentId: number): Promise<ApiResponse<Ie
 
 export async function reprocessIep(documentId: number): Promise<ApiResponse<null>> {
   const response = await apiClient.post<ApiResponse<null>>(`/api/ieps/${documentId}/process`);
-  return response.data;
-}
-
-export async function triggerAnalysis(documentId: number): Promise<ApiResponse<null>> {
-  const response = await apiClient.post<ApiResponse<null>>(`/api/ieps/${documentId}/analyze`);
-  return response.data;
-}
-
-export async function getAnalysis(documentId: number): Promise<ApiResponse<IepAnalysis>> {
-  const response = await apiClient.get<ApiResponse<IepAnalysis>>(
-    `/api/ieps/${documentId}/analysis`
-  );
   return response.data;
 }

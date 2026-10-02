@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import type { GoalAnalysis, IepAnalysis, IepDocument, SmartCriterion } from '@/types/api';
+import type { GoalAnalysis, IepDocument, SmartCriterion } from '@/types/api';
+import type { AnalysisRunLatest } from '@/features/analysis/types';
 
 const api = vi.hoisted(() => ({
   getIepDocument: vi.fn(),
@@ -9,15 +10,15 @@ const api = vi.hoisted(() => ({
   getIepDocuments: vi.fn(),
   getDownloadUrl: vi.fn(),
   reprocessIep: vi.fn(),
-  getAnalysis: vi.fn(),
-  triggerAnalysis: vi.fn(),
 }));
 vi.mock('../api/iep-documents-api', () => api);
 const childrenApi = vi.hoisted(() => ({ getChild: vi.fn(), setCurrentIep: vi.fn() }));
 vi.mock('@/features/children/api/children-api', () => childrenApi);
-vi.mock('@/features/advocacy-goals/hooks/use-advocacy-goals', () => ({
-  useAdvocacyGoals: () => ({ goals: [], isLoading: false, reload: vi.fn() }),
+const analysisRunsApi = vi.hoisted(() => ({
+  getLatestForSource: vi.fn(),
+  createRun: vi.fn(),
 }));
+vi.mock('@/features/analysis/api/analysis-runs-api', () => analysisRunsApi);
 vi.mock('@/components/ui/pdf-viewer', () => ({ PdfViewer: () => <div data-testid="pdf-viewer" /> }));
 vi.mock('@/features/progress-reports/components/progress-reports-tab', () => ({ ProgressReportsTab: () => null }));
 
@@ -50,18 +51,39 @@ const goal = (goalId: number, domain: string): GoalAnalysis => ({
   suggestedImprovements: [],
 });
 
-const analysis: IepAnalysis = {
+const analysisSource = {
+  id: 501,
+  sourceType: 'IepDocument',
+  sourceId: 12,
+  sourceLabel: 'spring-iep.pdf',
+  status: 'Completed' as const,
+  errorMessage: null,
+};
+
+const analysisRun: AnalysisRunLatest = {
   id: 1,
-  iepDocumentId: 12,
-  status: 'completed',
+  childProfileId: 4,
+  status: 'Completed',
   overallSummary: 'Summary',
-  sectionAnalyses: [],
-  goalAnalyses: [goal(340, 'Reading'), goal(341, 'Math')],
+  crossDocSynthesis: null,
   overallRedFlags: [],
   advocacyGapAnalysis: null,
-  parentGoalsSnapshot: null,
+  parentGoalsSnapshot: [],
+  sources: [analysisSource],
+  sections: [
+    {
+      id: 1,
+      analysisRunSourceId: analysisSource.id,
+      sectionKind: 'iep_goals',
+      analysis: null,
+      goalAnalyses: [goal(340, 'Reading'), goal(341, 'Math')],
+      displayOrder: 0,
+    },
+  ],
   errorMessage: null,
   createdAt: '2026-03-05T00:00:00Z',
+  otherSources: [],
+  stale: false,
 };
 
 function renderPage(url: string) {
@@ -80,7 +102,7 @@ describe('IepViewerPage — advocate launchers and goal deep links', () => {
     api.getIepDocument.mockResolvedValue({ success: true, data: iep });
     api.getIepSections.mockResolvedValue({ success: true, data: [{ id: 1, sectionType: 'annual_goals', rawText: null, parsedContent: null, displayOrder: 0, goals: [] }] });
     api.getIepDocuments.mockResolvedValue({ success: true, data: [iep] });
-    api.getAnalysis.mockResolvedValue({ success: true, data: analysis });
+    analysisRunsApi.getLatestForSource.mockResolvedValue({ success: true, data: analysisRun });
     childrenApi.getChild.mockResolvedValue({ success: true, data: { id: 4, role: 'owner', currentIepDocumentId: 12 } });
   });
 

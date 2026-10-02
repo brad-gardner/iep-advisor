@@ -1,28 +1,38 @@
 import { useMemo, useState } from 'react';
-import type { AdvocacyGoal, IepAnalysis } from '@/types/api';
+import { Link } from 'react-router-dom';
+import type { GoalAnalysis } from '@/types/api';
+import type {
+  AnalysisRunLatest,
+  AnalysisRunOtherSource,
+  AnalysisRunSection,
+  AnalysisRunSource,
+} from '@/features/analysis/types';
+import { RunSectionDetail } from '@/features/analysis/components/run-section-detail';
 import { AnalysisEmptyState } from './analysis-empty-state';
 import { AnalysisProcessing } from './analysis-processing';
 import { AnalysisOverview } from './analysis-overview';
-import { AnalysisSectionDetail } from './analysis-section-detail';
 import { AnalysisGoalsList } from './analysis-goals-list';
 import { AdvocacyGapAnalysisSection } from './advocacy-gap-analysis';
-import { StaleAnalysisBanner } from './stale-analysis-banner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 
 interface AnalysisTabProps {
-  analysis: IepAnalysis | null;
+  childId: number;
+  run: AnalysisRunLatest | null;
+  source: AnalysisRunSource | null;
+  sections: AnalysisRunSection[];
+  goalAnalyses: GoalAnalysis[] | null;
+  otherSources: AnalysisRunOtherSource[];
+  stale: boolean;
   isLoading: boolean;
   isTriggering: boolean;
-  advocacyGoals: AdvocacyGoal[];
+  triggerError: string | null;
   onTrigger: () => void;
   onReload: () => void;
   /** Which view opens first — a `#goal-…` deep link starts on the goal list. */
   initialView?: 'overview' | 'goals';
-  /** For the per-goal "Ask the advocate" launcher. */
-  childId?: number;
   canAsk?: boolean;
 }
 
@@ -41,39 +51,41 @@ const SECTION_LABELS: Record<string, string> = {
   other: 'Other',
 };
 
+function otherSourceLabel(source: AnalysisRunOtherSource): string {
+  return source.label ?? `${source.sourceType} #${source.sourceId}`;
+}
+
 export function AnalysisTab({
-  analysis,
+  childId,
+  run,
+  source,
+  sections,
+  goalAnalyses,
+  otherSources,
+  stale,
   isLoading,
   isTriggering,
-  advocacyGoals,
+  triggerError,
   onTrigger,
   onReload,
   initialView = 'overview',
-  childId,
   canAsk,
 }: AnalysisTabProps) {
   const [activeView, setActiveView] = useState<string>(initialView);
 
-  // Staleness detection: goals changed after analysis was created
-  const isStale = useMemo(() => {
-    if (!analysis || analysis.status !== 'completed') return false;
-    if (advocacyGoals.length === 0 && (!analysis.parentGoalsSnapshot || analysis.parentGoalsSnapshot.length === 0)) return false;
+  // Ordinary (non-`iep_goals`) sections for this document, in display order.
+  const ordered = useMemo(
+    () => [...sections].sort((a, b) => a.displayOrder - b.displayOrder),
+    [sections],
+  );
 
-    const analysisTime = new Date(analysis.createdAt).getTime();
+  const triggerErrorNotice = triggerError && (
+    <Notice variant="error" title="Unable to run analysis" data-testid="analysis-trigger-error">
+      {triggerError}
+    </Notice>
+  );
 
-    const goalsChangedAfter = advocacyGoals.some((g) => {
-      const created = new Date(g.createdAt).getTime();
-      const updated = new Date(g.updatedAt).getTime();
-      return created > analysisTime || updated > analysisTime;
-    });
-
-    const snapshotCount = analysis.parentGoalsSnapshot?.length ?? 0;
-    const countDiffers = advocacyGoals.length !== snapshotCount;
-
-    return goalsChangedAfter || countDiffers;
-  }, [analysis, advocacyGoals]);
-
-  if (isLoading) {
+  if (isLoading && !run) {
     return (
       <div className="flex justify-center py-12">
         <Spinner label="Loading analysis…" />
@@ -81,33 +93,83 @@ export function AnalysisTab({
     );
   }
 
-  if (!analysis || analysis.status === 'pending' || analysis.status === 'analyzing') {
-    if (analysis?.status === 'analyzing' || analysis?.status === 'pending') {
-      return <AnalysisProcessing onReload={onReload} />;
-    }
-    return <AnalysisEmptyState onTrigger={onTrigger} isTriggering={isTriggering} />;
-  }
-
-  if (analysis.status === 'error') {
+  // Never analyzed: no run has ever included this document.
+  if (!run) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 px-4">
-        <Card className="max-w-md text-center">
-          <Notice variant="error" title="Analysis Failed">
-            {analysis.errorMessage || 'An error occurred during analysis.'}
-          </Notice>
-          <div className="mt-4">
-            <Button onClick={onTrigger} loading={isTriggering}>
-              Retry Analysis
-            </Button>
-          </div>
-        </Card>
-      </div>
+      <>
+        {triggerErrorNotice}
+        <AnalysisEmptyState onTrigger={onTrigger} isTriggering={isTriggering} />
+      </>
     );
   }
 
-  const sectionTypes = analysis.sectionAnalyses.map((sa) => sa.sectionType);
-  const hasGoals = analysis.goalAnalyses.length > 0;
-  const hasGapAnalysis = analysis.advocacyGapAnalysis != null;
+  const runInFlight = run.status === 'Pending' || run.status === 'Running';
+  const sourceInFlight = source?.status === 'Pending' || source?.status === 'Running';
+  if (runInFlight || sourceInFlight) {
+    return (
+      <>
+        {triggerErrorNotice}
+        <AnalysisProcessing onReload={onReload} />
+      </>
+    );
+  }
+
+  if (run.status === 'Error') {
+    return (
+      <>
+        {triggerErrorNotice}
+        <div className="flex flex-col items-center justify-center py-16 px-4">
+          <Card className="max-w-md text-center">
+            <Notice variant="error" title="Analysis Failed">
+              {run.errorMessage || 'An error occurred during analysis.'}
+            </Notice>
+            <div className="mt-4">
+              <Button onClick={onTrigger} loading={isTriggering} data-testid="analyze-button">
+                Retry Analysis
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </>
+    );
+  }
+
+  // This document's own source failed within an otherwise-completed run.
+  if (source?.status === 'Error') {
+    return (
+      <>
+        {triggerErrorNotice}
+        <div className="flex flex-col items-center justify-center py-16 px-4">
+          <Card className="max-w-md text-center">
+            <Notice variant="warning" title="Couldn't analyze this document">
+              {source.errorMessage || 'Something went wrong while analyzing this document.'}
+            </Notice>
+            <div className="mt-4">
+              <Button onClick={onTrigger} loading={isTriggering} data-testid="analyze-button">
+                Analyze this IEP
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </>
+    );
+  }
+
+  // Completed, with this document's own analysis available.
+  const isMultiSource = otherSources.length > 0;
+  const hasGoals = (goalAnalyses?.length ?? 0) > 0;
+  const hasGapAnalysis = run.advocacyGapAnalysis != null;
+  const sectionKinds = ordered.map((s) => s.sectionKind);
+
+  const overviewSummary = isMultiSource
+    ? ordered
+        .map((s) => s.analysis?.plainLanguageSummary)
+        .filter((summary): summary is string => Boolean(summary))
+        .join('\n\n')
+    : run.overallSummary ?? '';
+  const overviewRedFlags = isMultiSource
+    ? ordered.flatMap((s) => s.analysis?.redFlags ?? [])
+    : run.overallRedFlags;
 
   const sidebarButton = (key: string, label: string, count?: number) => (
     <button
@@ -130,63 +192,88 @@ export function AnalysisTab({
   const renderContent = () => {
     if (activeView === 'overview') {
       return (
-        <>
-          {isStale && (
-            <div className="mb-6">
-              <StaleAnalysisBanner onReanalyze={onTrigger} isReanalyzing={isTriggering} />
-            </div>
-          )}
-          <AnalysisOverview
-            overallSummary={analysis.overallSummary || ''}
-            overallRedFlags={analysis.overallRedFlags}
-          />
-        </>
+        <AnalysisOverview overallSummary={overviewSummary} overallRedFlags={overviewRedFlags} />
       );
     }
 
-    if (activeView === 'gap-analysis' && analysis.advocacyGapAnalysis) {
-      return <AdvocacyGapAnalysisSection gapAnalysis={analysis.advocacyGapAnalysis} />;
+    if (activeView === 'gap-analysis' && run.advocacyGapAnalysis) {
+      return <AdvocacyGapAnalysisSection gapAnalysis={run.advocacyGapAnalysis} />;
     }
 
     if (activeView === 'goals') {
-      return <AnalysisGoalsList goalAnalyses={analysis.goalAnalyses} childId={childId} canAsk={canAsk} />;
+      return (
+        <AnalysisGoalsList goalAnalyses={goalAnalyses ?? []} childId={childId} canAsk={canAsk} />
+      );
     }
 
-    const sectionAnalysis = analysis.sectionAnalyses.find(
-      (sa) => sa.sectionType === activeView
-    );
-    if (sectionAnalysis) {
-      return <AnalysisSectionDetail sectionAnalysis={sectionAnalysis} />;
+    const matchedSection = ordered.find((s) => s.sectionKind === activeView);
+    if (matchedSection && matchedSection.analysis) {
+      return <RunSectionDetail section={matchedSection.analysis} />;
     }
 
     return null;
   };
 
   return (
-    <div className="flex gap-4 min-h-[500px]">
-      <nav className="w-56 shrink-0 space-y-0.5">
-        {sidebarButton('overview', 'Overview')}
+    <div className="space-y-4">
+      {triggerErrorNotice}
 
-        {hasGapAnalysis &&
-          sidebarButton(
-            'gap-analysis',
-            'Your Goals',
-            analysis.advocacyGapAnalysis?.goalAlignments.length ?? 0
+      {isMultiSource && (
+        <Notice
+          variant="info"
+          title={`Part of an analysis with ${otherSources.map(otherSourceLabel).join(', ')}`}
+          data-testid="analysis-multi-source-info"
+        >
+          <Link
+            to={`/children/${childId}/analysis?run=${run.id}`}
+            className="font-medium text-brand-teal-600 underline underline-offset-2 hover:text-brand-teal-700 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal-500"
+          >
+            View full analysis →
+          </Link>
+        </Notice>
+      )}
+
+      {stale && (
+        <div className="flex flex-wrap items-center justify-between gap-4" data-testid="analysis-stale-banner">
+          <div className="min-w-[16rem] flex-1">
+            <Notice variant="warning" title="Analysis may be outdated">
+              This analysis was made before the IEP was last updated. Re-analyze to refresh it.
+            </Notice>
+          </div>
+          <Button
+            variant="amber"
+            onClick={onTrigger}
+            loading={isTriggering}
+            data-testid="reanalyze-button"
+            className="shrink-0"
+          >
+            Re-analyze
+          </Button>
+        </div>
+      )}
+
+      <div className="flex gap-4 min-h-[500px]">
+        <nav className="w-56 shrink-0 space-y-0.5">
+          {sidebarButton('overview', 'Overview')}
+
+          {hasGapAnalysis &&
+            sidebarButton(
+              'gap-analysis',
+              'Your Goals',
+              run.advocacyGapAnalysis?.goalAlignments.length ?? 0,
+            )}
+
+          {hasGoals && sidebarButton('goals', 'Goal Analysis', goalAnalyses?.length ?? 0)}
+
+          <div className="border-t border-brand-slate-200 my-2" />
+
+          {sectionKinds.map((kind) =>
+            sidebarButton(kind, SECTION_LABELS[kind] || kind),
           )}
+        </nav>
 
-        {hasGoals &&
-          sidebarButton('goals', 'Goal Analysis', analysis.goalAnalyses.length)}
-
-        <div className="border-t border-brand-slate-200 my-2" />
-
-        {sectionTypes.map((type) =>
-          sidebarButton(type, SECTION_LABELS[type] || type)
-        )}
-      </nav>
-
-      <Card className="flex-1 overflow-y-auto">
-        {renderContent()}
-      </Card>
+        <Card className="flex-1 overflow-y-auto">{renderContent()}</Card>
+      </div>
     </div>
   );
 }

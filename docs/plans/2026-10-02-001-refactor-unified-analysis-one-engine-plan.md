@@ -207,13 +207,13 @@ erDiagram
 - [x] **IEP comparison** (`IepComparisonService.cs:56-60, 299-310`): red flags and counts from each IEP's latest completed run (that source's section red flags + run-level red flags when single-source).
 
 **Web:**
-- [ ] `web/src/features/iep-documents/hooks/use-iep-analysis.ts` → reads the `latest` endpoint; `trigger` posts a single-source run.
-- [ ] `analysis-tab.tsx`: maps the run slice onto the existing sidebar (Overview, Your Goals, Goal Analysis, sections) plus:
+- [x] `web/src/features/iep-documents/hooks/use-iep-analysis.ts` → reads the `latest` endpoint; `trigger` posts a single-source run.
+- [x] `analysis-tab.tsx`: maps the run slice onto the existing sidebar (Overview, Your Goals, Goal Analysis, sections) plus:
   - a multi-document info line + "View full analysis" (`/children/:childId/analysis?run=:id`);
   - a stale `Notice`;
   - a failed-source state.
-- [ ] `analysis-processing.tsx`: copy "This usually takes a few minutes."
-- [ ] `iep-viewer-page.tsx`: unchanged tab list; `#goal-{id}` deep links keep working off `iep_goals`.
+- [x] `analysis-processing.tsx`: copy "This usually takes a few minutes."
+- [x] `iep-viewer-page.tsx`: unchanged tab list; `#goal-{id}` deep links keep working off `iep_goals`.
 
 **Testing checkpoint:**
 - Service tests:

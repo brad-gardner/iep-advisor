@@ -72,6 +72,21 @@ export interface CreateAnalysisRunRequest {
   sources: { sourceType: AnalysisSourceType; sourceId: number }[];
 }
 
+/** One other source included in a run returned by the `latest` endpoint — for
+ * the "part of a larger analysis" note on a document page. */
+export interface AnalysisRunOtherSource {
+  sourceType: string;
+  sourceId: number;
+  label: string | null;
+}
+
+/** The `GET .../analysis-runs/latest` response: the full run plus the run's
+ * other sources and whether it is stale for the document that was queried. */
+export interface AnalysisRunLatest extends AnalysisRun {
+  otherSources: AnalysisRunOtherSource[];
+  stale: boolean;
+}
+
 export const TERMINAL_STATUSES: ReadonlySet<AnalysisRunStatus> = new Set([
   "Completed",
   "Error",

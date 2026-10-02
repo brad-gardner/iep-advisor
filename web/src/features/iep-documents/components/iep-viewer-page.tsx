@@ -22,7 +22,6 @@ import { usePolling } from "@/hooks/use-polling";
 import { Badge } from "@/components/ui/badge";
 import { Markdown } from "@/components/ui/markdown";
 import { useIepAnalysis } from "../hooks/use-iep-analysis";
-import { useAdvocacyGoals } from "@/features/advocacy-goals/hooks/use-advocacy-goals";
 import { AnalysisTab } from "./analysis-tab";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -67,16 +66,18 @@ export function IepViewerPage() {
   const compareRef = useRef<HTMLDivElement>(null);
 
   const {
-    analysis,
+    run: analysisRun,
+    source: analysisSource,
+    sections: analysisSections,
+    goalAnalyses,
+    otherSources: analysisOtherSources,
+    stale: analysisStale,
     isLoading: analysisLoading,
     isTriggering,
+    triggerError,
     trigger: triggerAnalysis,
     reload: reloadAnalysis,
-  } = useIepAnalysis(documentId);
-
-  const { goals: advocacyGoals } = useAdvocacyGoals(
-    document?.childProfileId ?? 0,
-  );
+  } = useIepAnalysis(document?.childProfileId ?? 0, documentId);
 
   // Meeting Prep lives at the child level now (standalone tab), so it is no
   // longer rendered embedded inside the document viewer.
@@ -123,10 +124,10 @@ export function IepViewerPage() {
 
   // Bring the deep-linked goal card into view once the analysis has rendered it.
   useEffect(() => {
-    if (!goalDeepLink || activeTab !== "analysis" || analysis?.status !== "completed") return;
+    if (!goalDeepLink || activeTab !== "analysis" || !goalAnalyses || goalAnalyses.length === 0) return;
     const el = window.document.getElementById(hash.slice(1));
     if (el && typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "start" });
-  }, [goalDeepLink, hash, activeTab, analysis?.status]);
+  }, [goalDeepLink, hash, activeTab, goalAnalyses]);
 
   // Load other IEPs for comparison when document is available
   useEffect(() => {
@@ -414,7 +415,7 @@ export function IepViewerPage() {
               }`}
             >
               Analysis
-              {analysis?.status === "completed" && (
+              {analysisRun?.status === "Completed" && (
                 <span className="ml-2 inline-block w-2 h-2 rounded-full bg-brand-teal-500" />
               )}
             </button>
@@ -449,14 +450,19 @@ export function IepViewerPage() {
 
           {activeTab === "analysis" && (
             <AnalysisTab
-              analysis={analysis}
+              childId={document.childProfileId}
+              run={analysisRun}
+              source={analysisSource}
+              sections={analysisSections}
+              goalAnalyses={goalAnalyses}
+              otherSources={analysisOtherSources}
+              stale={analysisStale}
               isLoading={analysisLoading}
               isTriggering={isTriggering}
-              advocacyGoals={advocacyGoals}
+              triggerError={triggerError}
               onTrigger={triggerAnalysis}
               onReload={reloadAnalysis}
               initialView={goalDeepLink ? "goals" : undefined}
-              childId={document.childProfileId}
               canAsk={childRole !== null && childRole !== "viewer"}
             />
           )}
