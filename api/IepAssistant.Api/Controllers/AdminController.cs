@@ -239,11 +239,19 @@ public class AdminController : ControllerBase
             .Select(g => new { Type = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Type, x => x.Count, ct);
 
-        // Analyses
+        // Analyses (legacy IepAnalyses — superseded by AnalysisRun; kept read-only for one release per
+        // the unified-analysis plan). Field names are unchanged for web backward compatibility; see
+        // AnalysisRuns below for the current engine's counts.
         var totalAnalyses = await _db.IepAnalyses.AsNoTracking().CountAsync(ct);
         var analysesCompleted = await _db.IepAnalyses.AsNoTracking().CountAsync(a => a.Status == "completed", ct);
         var analysesError = await _db.IepAnalyses.AsNoTracking().CountAsync(a => a.Status == "error", ct);
         var analysesLast7Days = await _db.IepAnalyses.AsNoTracking().CountAsync(a => a.CreatedAt >= sevenDaysAgo, ct);
+
+        // Analysis Runs (current engine)
+        var totalAnalysisRuns = await _db.AnalysisRuns.AsNoTracking().CountAsync(ct);
+        var analysisRunsCompleted = await _db.AnalysisRuns.AsNoTracking().CountAsync(r => r.Status == AnalysisRunStatus.Completed, ct);
+        var analysisRunsError = await _db.AnalysisRuns.AsNoTracking().CountAsync(r => r.Status == AnalysisRunStatus.Error, ct);
+        var analysisRunsLast7Days = await _db.AnalysisRuns.AsNoTracking().CountAsync(r => r.CreatedAt >= sevenDaysAgo, ct);
 
         // Advocacy Goals
         var totalGoals = await _db.ParentAdvocacyGoals.AsNoTracking().CountAsync(g => g.IsActive, ct);
@@ -284,6 +292,10 @@ public class AdminController : ControllerBase
             TotalAnalyses = totalAnalyses,
             AnalysesCompleted = analysesCompleted,
             AnalysesError = analysesError,
+            TotalAnalysisRuns = totalAnalysisRuns,
+            AnalysisRunsCompleted = analysisRunsCompleted,
+            AnalysisRunsError = analysisRunsError,
+            AnalysisRunsLast7Days = analysisRunsLast7Days,
             TotalGoals = totalGoals,
             TotalChecklists = totalChecklists,
             ChecklistsCompleted = checklistsCompleted,

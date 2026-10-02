@@ -86,6 +86,27 @@ public class AccountService : IAccountService
             .Where(a => documentIds.Contains(a.IepDocumentId))
             .ToListAsync(ct);
 
+        // AnalysisRun is the current analysis engine (replaces IepAnalysis/EtrAnalysis going forward);
+        // both are exported while the legacy tables still exist (Future Considerations, unified-analysis
+        // plan phase 4). Runs are child-scoped (a run can cover an IEP and an ETR together), so they are
+        // queried the same way as advocacyGoals below rather than nested under iepDocuments.
+        var analysisRuns = await _context.AnalysisRuns
+            .AsNoTracking()
+            .Where(r => childIds.Contains(r.ChildProfileId))
+            .ToListAsync(ct);
+
+        var analysisRunIds = analysisRuns.Select(r => r.Id).ToList();
+
+        var analysisRunSources = await _context.AnalysisRunSources
+            .AsNoTracking()
+            .Where(s => analysisRunIds.Contains(s.AnalysisRunId))
+            .ToListAsync(ct);
+
+        var analysisRunSections = await _context.AnalysisRunSections
+            .AsNoTracking()
+            .Where(s => analysisRunIds.Contains(s.AnalysisRunId))
+            .ToListAsync(ct);
+
         var advocacyGoals = await _context.ParentAdvocacyGoals
             .AsNoTracking()
             .Where(g => childIds.Contains(g.ChildProfileId))
@@ -165,6 +186,50 @@ public class AccountService : IAccountService
                         a.AdvocacyGapAnalysis,
                         a.ParentGoalsSnapshot,
                         a.CreatedAt
+                    })
+            }),
+            // Current engine (unified-analysis plan). SourceContentSnapshot is included (not excluded
+            // as "already covered by the document export"): that is only true for IepDocument sources,
+            // whose text is already exported via iepDocuments[].sections above — ETR and progress-report
+            // sources have no other representation in this export, and this export does not include
+            // EtrDocuments/EtrSections at all (pre-existing gap, out of scope here). Omitting the
+            // snapshot uniformly would silently drop the only copy of ETR-sourced content, so it is kept
+            // for every source type; the resulting duplication for IEP sources is an acceptable tradeoff
+            // for export completeness.
+            analysisRuns = analysisRuns.Select(r => new
+            {
+                r.Id,
+                r.ChildProfileId,
+                Status = r.Status.ToString(),
+                r.OverallSummary,
+                r.CrossDocSynthesis,
+                r.OverallRedFlags,
+                r.AdvocacyGapAnalysis,
+                r.ParentGoalsSnapshot,
+                r.ErrorMessage,
+                r.CreatedAt,
+                r.UpdatedAt,
+                sources = analysisRunSources
+                    .Where(s => s.AnalysisRunId == r.Id)
+                    .Select(s => new
+                    {
+                        s.Id,
+                        SourceType = s.SourceType.ToString(),
+                        s.SourceId,
+                        s.SourceLabel,
+                        s.SourceContentSnapshot,
+                        Status = s.Status.ToString(),
+                        s.ErrorMessage
+                    }),
+                sections = analysisRunSections
+                    .Where(s => s.AnalysisRunId == r.Id)
+                    .Select(s => new
+                    {
+                        s.Id,
+                        s.AnalysisRunSourceId,
+                        s.SectionKind,
+                        s.Analysis,
+                        s.DisplayOrder
                     })
             }),
             parentAdvocacyGoals = advocacyGoals.Select(g => new

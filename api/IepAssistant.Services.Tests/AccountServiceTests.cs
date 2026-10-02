@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -75,6 +76,27 @@ public sealed class AccountServiceTests : IDisposable
         return user.Id;
     }
 
+    /// <summary>Seeds a child the user owns via an accepted, active Owner <see cref="ChildAccess"/> —
+    /// the same authz plane ExportDataAsync's children query reads (AccountServiceTests, export test).</summary>
+    private int SeedOwnedChild(ApplicationDbContext ctx, int userId, string firstName)
+    {
+        var child = new ChildProfile { UserId = userId, FirstName = firstName, LastName = "Child", IsActive = true };
+        ctx.ChildProfiles.Add(child);
+        ctx.SaveChanges();
+
+        ctx.ChildAccesses.Add(new ChildAccess
+        {
+            ChildProfileId = child.Id,
+            UserId = userId,
+            Role = AccessRole.Owner,
+            IsActive = true,
+            AcceptedAt = DateTime.UtcNow
+        });
+        ctx.SaveChanges();
+
+        return child.Id;
+    }
+
     [Fact]
     public async Task ScheduleDeletion_DeactivatesAccount_AndEmailsASignedCancelLink()
     {
@@ -98,6 +120,77 @@ public sealed class AccountServiceTests : IDisposable
         Assert.NotNull(user.DeletionRequestedAt);
         Assert.NotNull(email.LastCancelUrl);
         Assert.Contains("/account/cancel-deletion?token=", email.LastCancelUrl);
+    }
+
+    /// <summary>Unified-analysis plan, phase 4: the export must carry a child's AnalysisRuns (with their
+    /// Sources and Sections) alongside the legacy IepAnalyses, and must not leak another user's child's
+    /// runs — the same child-scoping bug class ChildAccess exists to prevent elsewhere in the export.</summary>
+    [Fact]
+    public async Task ExportData_IncludesTheChildsAnalysisRuns_WithSourcesAndSections_NotAnotherUsersChild()
+    {
+        int userId, childId, runId;
+        using (var ctx = CreateContext())
+        {
+            userId = SeedActiveParent(ctx, "parent@example.com");
+            childId = SeedOwnedChild(ctx, userId, "Jacob");
+
+            var run = new AnalysisRun
+            {
+                ChildProfileId = childId,
+                Status = AnalysisRunStatus.Completed,
+                OverallSummary = "Looks good overall.",
+            };
+            ctx.AnalysisRuns.Add(run);
+            ctx.SaveChanges();
+            runId = run.Id;
+
+            ctx.AnalysisRunSources.Add(new AnalysisRunSource
+            {
+                AnalysisRunId = run.Id,
+                SourceType = AnalysisSourceType.IepDocument,
+                SourceId = 999,
+                SourceLabel = "IEP — Annual Review",
+                SourceContentSnapshot = "Extracted IEP text for the run.",
+                Status = AnalysisRunSourceStatus.Completed
+            });
+            ctx.AnalysisRunSections.Add(new AnalysisRunSection
+            {
+                AnalysisRunId = run.Id,
+                SectionKind = "iep_goals",
+                Analysis = "{\"goals\":[]}",
+                DisplayOrder = 0
+            });
+            ctx.SaveChanges();
+
+            // A second user's child has its own run — must never show up in the first user's export.
+            var otherUserId = SeedActiveParent(ctx, "other@example.com");
+            var otherChildId = SeedOwnedChild(ctx, otherUserId, "OtherKid");
+            ctx.AnalysisRuns.Add(new AnalysisRun { ChildProfileId = otherChildId, Status = AnalysisRunStatus.Completed });
+            ctx.SaveChanges();
+        }
+
+        using var exportCtx = CreateContext();
+        var (service, _) = CreateService(exportCtx);
+        var data = await service.ExportDataAsync(userId);
+
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(data));
+        var runs = doc.RootElement.GetProperty("analysisRuns");
+        Assert.Equal(1, runs.GetArrayLength()); // not the other user's child's run
+
+        var exportedRun = runs[0];
+        Assert.Equal(runId, exportedRun.GetProperty("Id").GetInt32());
+        Assert.Equal(childId, exportedRun.GetProperty("ChildProfileId").GetInt32());
+        Assert.Equal("Completed", exportedRun.GetProperty("Status").GetString());
+
+        var sources = exportedRun.GetProperty("sources");
+        Assert.Equal(1, sources.GetArrayLength());
+        Assert.Equal("IepDocument", sources[0].GetProperty("SourceType").GetString());
+        Assert.Equal("Extracted IEP text for the run.", sources[0].GetProperty("SourceContentSnapshot").GetString());
+
+        var sections = exportedRun.GetProperty("sections");
+        Assert.Equal(1, sections.GetArrayLength());
+        Assert.Equal("iep_goals", sections[0].GetProperty("SectionKind").GetString());
+        Assert.Equal("{\"goals\":[]}", sections[0].GetProperty("Analysis").GetString());
     }
 
     [Fact]
