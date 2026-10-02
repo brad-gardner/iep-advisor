@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -58,9 +58,17 @@ const obligationItem: CalendarItemDto = {
 };
 
 describe('EducatorCalendarPage', () => {
+  // The fixtures live in September 2026 and the page opens on the current month, so pin "today"
+  // there. Only Date is faked: user-event and findBy* still need real timers.
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-10T12:00:00'));
     vi.clearAllMocks();
     calendarApi.listCalendarItems.mockResolvedValue({ success: true, data: [meetingItem, obligationItem] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('loads the current month range and renders meeting + obligation items', async () => {
