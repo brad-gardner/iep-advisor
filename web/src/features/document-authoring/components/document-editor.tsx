@@ -16,19 +16,22 @@ import type { DocumentInstance } from '../hooks/use-document-instance';
 import { DocumentFlushContext } from '../hooks/flush-registry-context';
 import { DocumentEditorContext, type ActiveFieldTarget } from '../hooks/document-editor-context';
 import { EvidenceDrawer } from './evidence-drawer';
+import type { CompletenessItem } from '../lib/completeness';
 import { computeCompleteness } from '../lib/completeness';
-import { jumpToSection, sectionDomId } from '../lib/section-dom';
+import { jumpToSection } from '../lib/section-dom';
 import { stepSection, useActiveSection } from '../hooks/use-active-section';
+import { useSectionEditing } from '../hooks/use-section-editing';
 import { useDocumentChat } from '../hooks/use-document-chat';
 import { useStudentShareableEntries } from '../hooks/use-student-shareable-entries';
-import { useMediaQuery } from '@/hooks/use-media-query';
 import type { DocumentInstanceDetailDto, DocumentInstanceStatus } from '../types';
-import { DocumentField } from './field-renderers/document-field';
 import { FinalizeDocumentSection } from './finalize-document-section';
 import { ChatPanel } from './chat/chat-panel';
+import { CompletenessStrip } from './completeness-strip';
 import { ProposedEditsPanel } from './proposed-edits-panel';
+import { SectionCard } from './section-card';
 import { SectionNavigator } from './section-navigator';
-import { CompletenessPanel } from './completeness-panel';
+
+const IDLE_FLUSH_MS = 5000;
 
 const statusVariant: Record<DocumentInstanceStatus, 'neutral' | 'warning' | 'success'> = {
   Draft: 'neutral',
@@ -45,11 +48,11 @@ interface DocumentEditorProps {
 }
 
 /**
- * Renders the pinned template version as an editable form: a sticky section
- * navigator, sections in order, fields in order via their per-`FieldType`
- * renderer (each with inline AI help where it applies), an advisory
- * completeness panel, and the document-scoped assistant in a drawer. A 409
- * latches a reload banner; reloading remounts every input (keyed by
+ * Renders the pinned template version read-first: a completeness strip under
+ * the header, a sticky section navigator plus a wide content column, each
+ * section read-only with its own Edit → Done / Discard toggle (`SectionCard`
+ * + `useSectionEditing`), and the document-scoped assistant in a drawer. A 409
+ * latches a reload banner; reloading remounts every section (keyed by
  * `reloadKey`) so stale local values can't overwrite fresher server state.
  */
 export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
@@ -61,16 +64,37 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
   const [chatOpen, setChatOpen] = useState(false);
   // The thread is owned here (not by the panel) so it survives open/close.
   const chat = useDocumentChat(detail.id);
-  // Wide screens get a non-modal side column so the educator can act on an
-  // answer while it stays visible; narrow screens use the Drawer.
-  const wide = useMediaQuery('(min-width: 1280px)');
 
-  // One registry per instance: each field registers its autosave flush so a
-  // finalize can drain every pending edit before snapshotting.
+  // One registry per instance: each section registers ITS OWN nested flush
+  // registry here (see SectionCard), so a finalize can drain every pending
+  // edit — in every open section — before snapshotting.
   const flushRegistry = useFlushRegistry();
   // Best-effort flush of pending edits on a hard unload (tab close / refresh).
   // In-app navigation is covered by each field's unmount flush (useRegisterFlush).
   useFlushOnNavigate(flushRegistry);
+
+  // Which sections are in edit mode. Several can be open at once; each
+  // SectionCard keeps its own snapshot/save-state and reads its openness here.
+  const sectionEditing = useSectionEditing();
+
+  // Idle flush: while at least one section is open, periodically drain any
+  // debounced edit that hasn't reached its own 700ms autosave yet — a safety
+  // net against a very long pause mid-edit, independent of Done/finalize.
+  useEffect(() => {
+    if (!sectionEditing.anyOpen) return undefined;
+    const timer = setInterval(() => {
+      void flushRegistry.flushAll();
+    }, IDLE_FLUSH_MS);
+    return () => clearInterval(timer);
+  }, [sectionEditing.anyOpen, flushRegistry]);
+
+  // Finalize flushes every open section's pending edits, then closes them —
+  // the snapshot it takes afterward should never be sitting behind an editor
+  // the educator thinks they're still "in".
+  const flushAndCloseBeforeFinalize = useCallback(async () => {
+    await flushRegistry.flushAll();
+    sectionEditing.closeAll();
+  }, [flushRegistry, sectionEditing]);
 
   // Completeness is derived from the last server-normalized values (updated on
   // every successful save), so it tracks what is actually persisted.
@@ -78,26 +102,46 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
     () => computeCompleteness(detail.templateVersion, detail.values),
     [detail.templateVersion, detail.values]
   );
+  const itemsBySection = useMemo(() => {
+    const map = new Map<number, CompletenessItem[]>();
+    for (const item of completeness.items) {
+      const existing = map.get(item.sectionId);
+      if (existing) existing.push(item);
+      else map.set(item.sectionId, [item]);
+    }
+    return map;
+  }, [completeness.items]);
 
   // One owner for "which section am I in": the navigator highlights it and
-  // the [ / ] shortcut steps relative to it.
+  // the [ / ] shortcut steps relative to it; "E" opens it for editing.
   const sectionIds = useMemo(() => sections.map((s) => s.id), [sections]);
   const { activeId, setActive } = useActiveSection(sectionIds);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== '[' && e.key !== ']') return;
       if (e.metaKey || e.ctrlKey || e.altKey) return; // Cmd+[ / Cmd+] are browser back/forward
       if (e.target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
       if (document.querySelector('dialog[open]')) return; // a modal owns the keyboard
-      const next = stepSection(sectionIds, activeId, e.key === ']' ? 1 : -1);
-      if (next == null) return;
-      e.preventDefault();
-      jumpToSection(next);
-      setActive(next);
+
+      if (e.key === '[' || e.key === ']') {
+        const next = stepSection(sectionIds, activeId, e.key === ']' ? 1 : -1);
+        if (next == null) return;
+        e.preventDefault();
+        jumpToSection(next);
+        setActive(next);
+        return;
+      }
+
+      // "E" opens the active section for editing — it only ever opens; Done and
+      // Discard changes stay explicit buttons so a shortcut never silently
+      // saves or discards.
+      if ((e.key === 'e' || e.key === 'E') && activeId != null && !readOnly && !conflict) {
+        e.preventDefault();
+        sectionEditing.toggle(activeId);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sectionIds, activeId, setActive]);
+  }, [sectionIds, activeId, setActive, sectionEditing, readOnly, conflict]);
 
   // Shared, lazily-loaded cache for every "Pull from student" button.
   const shareableEntries = useStudentShareableEntries(detail.schoolStudentId);
@@ -120,7 +164,7 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
   return (
     <DocumentEditorContext.Provider value={editorContext}>
       <DocumentFlushContext.Provider value={flushRegistry}>
-        <div className="space-y-6">
+        <div className="-mx-4 space-y-6 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <h1 className="font-serif text-2xl text-brand-slate-800">{detail.documentTypeDisplayName}</h1>
@@ -150,7 +194,7 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
                 data-testid="document-chat-open"
               >
                 <MessageSquare className="mr-1 h-4 w-4" aria-hidden="true" />
-                {chatOpen && wide ? 'Hide assistant' : 'Ask the assistant'}
+                {chatOpen ? 'Hide assistant' : 'Ask the assistant'}
               </Button>
             </div>
           </div>
@@ -163,6 +207,8 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
               {detail.effectiveDate && <p className="mt-1">Effective {formatDate(detail.effectiveDate)}</p>}
             </Notice>
           )}
+
+          <CompletenessStrip summary={completeness} updating={saveStatus === 'saving'} />
 
           <ProposedEditsPanel instanceId={detail.id} templateVersion={detail.templateVersion} />
 
@@ -188,13 +234,7 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
             </Notice>
           )}
 
-          <div
-            className={
-              wide && chatOpen
-                ? 'grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)_16rem_22rem]'
-                : 'grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)_16rem]'
-            }
-          >
+          <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
             <SectionNavigator sections={sections} activeId={activeId} onJump={setActive} />
 
             <div className="min-w-0 space-y-6">
@@ -203,39 +243,19 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
                   There is nothing to fill in yet.
                 </Notice>
               ) : (
-                sections.map((section) => {
-                  const fields = [...section.fields].sort((a, b) => a.displayOrder - b.displayOrder);
-                  return (
-                    <Card
-                      key={section.id}
-                      id={sectionDomId(section.id)}
-                      tabIndex={-1}
-                      className="scroll-mt-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
-                      data-testid={`section-${section.id}`}
-                    >
-                      <h2 className="mb-4 font-serif text-lg text-brand-slate-800">
-                        {section.title || 'Untitled section'}
-                      </h2>
-                      {fields.length === 0 ? (
-                        <p className="text-sm text-brand-slate-500">No fields.</p>
-                      ) : (
-                        <div className="space-y-4">
-                          {fields.map((field) => (
-                            // Keyed by reloadKey so a post-conflict reload remounts the
-                            // input with server truth (stale local state can't persist).
-                            <DocumentField
-                              key={`${field.id}:${reloadKey}`}
-                              field={field}
-                              value={detail.values[field.fieldKey]}
-                              disabled={readOnly || conflict}
-                              onSave={saveValues}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </Card>
-                  );
-                })
+                sections.map((section) => (
+                  <SectionCard
+                    key={`${section.id}:${reloadKey}`}
+                    section={section}
+                    values={detail.values}
+                    disabled={readOnly || conflict}
+                    saveValues={saveValues}
+                    isOpen={sectionEditing.isOpen(section.id)}
+                    onOpen={() => sectionEditing.open(section.id)}
+                    onClose={() => sectionEditing.close(section.id)}
+                    items={itemsBySection.get(section.id) ?? []}
+                  />
+                ))
               )}
 
               <Card>
@@ -249,19 +269,11 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
                   documentTypeId={detail.documentTypeId}
                   documentTypeDisplayName={detail.documentTypeDisplayName}
                   status={detail.status}
-                  flushBeforeFinalize={flushRegistry.flushAll}
+                  flushBeforeFinalize={flushAndCloseBeforeFinalize}
                   getSaveState={getSaveState}
                 />
               </Card>
             </div>
-
-            <CompletenessPanel summary={completeness} />
-
-            {wide && chatOpen && (
-              <div className="lg:sticky lg:top-4 lg:self-start lg:h-[calc(100vh-3rem)]">
-                <ChatPanel chat={chat} onClose={() => setChatOpen(false)} />
-              </div>
-            )}
           </div>
         </div>
 
@@ -272,13 +284,11 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
           activeField={readOnly || conflict ? null : activeField}
         />
 
-        {!wide && (
-          <Drawer open={chatOpen} onClose={() => setChatOpen(false)} title="Assistant">
-            <div className="h-[70vh]">
-              <ChatPanel chat={chat} />
-            </div>
-          </Drawer>
-        )}
+        <Drawer open={chatOpen} onClose={() => setChatOpen(false)} title="Assistant">
+          <div className="h-[70vh]">
+            <ChatPanel chat={chat} />
+          </div>
+        </Drawer>
       </DocumentFlushContext.Provider>
     </DocumentEditorContext.Provider>
   );

@@ -116,13 +116,13 @@ Decided in the design (see design doc):
 
 #### Phase 1: Page frame + read-first sections with Edit / Done / Discard
 
-- [ ] `CompletenessStrip` replaces `CompletenessPanel` (jump links reuse `lib/section-dom.ts` `jumpToField`/`jumpToSection`; "updating…" flag from the section editing state)
-- [ ] `document-editor.tsx` two-column layout with max width; chat in `Drawer`; header save state
-- [ ] Read renderers for every field type, plus a generic table read view (the semantic views come in later phases)
-- [ ] `useSectionEditing` + section card header (Edit / Saving / Saved / Discard / Done); multiple open sections; "E" shortcut; focus management
-- [ ] Discard: snapshot at Edit, confirm when autosaves landed, single `saveValues` restore
-- [ ] Idle flush (5s) while sections are open; flush-on-navigate unchanged; Finalize flushes all and closes open sections
-- [ ] Tests (Vitest): read render per field type; Edit/Done/Discard; multi-open; flush on Done; Discard restore + confirm; completeness strip states + jump; chat drawer; keyboard/focus. A first `document-editor.test.tsx` integration test (none exists today).
+- [x] `CompletenessStrip` replaces `CompletenessPanel` (jump links reuse `lib/section-dom.ts` `jumpToField`/`jumpToSection`; "updating…" flag from the section editing state)
+- [x] `document-editor.tsx` two-column layout with max width; chat in `Drawer`; header save state
+- [x] Read renderers for every field type, plus a generic table read view (the semantic views come in later phases)
+- [x] `useSectionEditing` + section card header (Edit / Saving / Saved / Discard / Done); multiple open sections; "E" shortcut; focus management
+- [x] Discard: snapshot at Edit, confirm when autosaves landed, single `saveValues` restore
+- [x] Idle flush (5s) while sections are open; flush-on-navigate unchanged; Finalize flushes all and closes open sections
+- [x] Tests (Vitest): read render per field type; Edit/Done/Discard; multi-open; flush on Done; Discard restore + confirm; completeness strip states + jump; chat drawer; keyboard/focus. A first `document-editor.test.tsx` integration test (none exists today).
 
 **Checkpoint:** at 1920×1080 the page matches the mockup frame; editing a narrative section autosaves, Done closes it, and Discard restores it; reload shows saved content in read mode.
 

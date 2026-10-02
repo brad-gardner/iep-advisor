@@ -20,6 +20,14 @@ if (typeof Element.prototype.scrollIntoView !== 'function') {
   Element.prototype.scrollIntoView = vi.fn();
 }
 
+// Same gap for `Element.prototype.scrollTo` (as opposed to `window.scrollTo`
+// above) — a scrollable pane that pins itself to the bottom as content grows
+// (e.g. the document assistant's chat thread) calls it on its own container
+// element, which jsdom leaves undefined.
+if (typeof Element.prototype.scrollTo !== 'function') {
+  Element.prototype.scrollTo = vi.fn();
+}
+
 // jsdom implements Element.getClientRects/getBoundingClientRect but not
 // Range's — ProseMirror's `coordsAtPos` (used by the real RichTextEditor's
 // `.focus()` command, which scrolls the new selection into view) measures a

@@ -27,7 +27,10 @@ export interface CompletenessSummary {
 
 type Row = Record<string, unknown>;
 
-function isBlank(v: unknown): boolean {
+/** Shared blank-value rule: empty/whitespace strings, nullish, and empty arrays
+ *  are "no content yet". Exported so read-mode renderers can show the same
+ *  "Not set" / "Not started" treatment the completeness rules use. */
+export function isBlank(v: unknown): boolean {
   if (v == null) return true;
   if (typeof v === 'string') return v.replace(/<[^>]+>/g, '').trim() === '';
   if (typeof v === 'boolean') return false;
