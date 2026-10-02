@@ -62,7 +62,7 @@ export function useSourceAnalysis(
   const [isTriggering, setIsTriggering] = useState(false);
   const [triggerError, setTriggerError] = useState<string | null>(null);
 
-  // Bumped by load(), trigger(), and a childId/sourceType/sourceId change,
+  // Bumped by load() (including the load for a new childId/sourceType/sourceId) and trigger(),
   // and read back once a load/poll request settles — a response whose
   // generation has since gone stale (superseded by a newer load, a trigger
   // seed, or a source change) is dropped instead of clobbering fresher
@@ -71,13 +71,19 @@ export function useSourceAnalysis(
 
   // A new source resets state immediately rather than showing the previous
   // source's run (or misjudging staleness against it) while the new
-  // source's request is in flight.
-  useEffect(() => {
-    generationRef.current += 1;
+  // source's request is in flight. Adjusted during render (React's
+  // documented pattern for resetting state on a prop change) rather than in
+  // an effect; load() — re-created for the new ids — bumps the generation,
+  // which drops any response still in flight for the old source.
+  const sourceKey = `${childId}:${sourceType}:${sourceId}`;
+  const [loadedSourceKey, setLoadedSourceKey] = useState(sourceKey);
+  if (loadedSourceKey !== sourceKey) {
+    setLoadedSourceKey(sourceKey);
     setRun(null);
     setLoadError(null);
+    setTriggerError(null);
     setIsLoading(true);
-  }, [childId, sourceType, sourceId]);
+  }
 
   const applyLatestResult = useCallback(
     (res: Awaited<ReturnType<typeof getLatestForSource>>) => {
@@ -105,6 +111,9 @@ export function useSourceAnalysis(
   }, []);
 
   const load = useCallback(async () => {
+    // Bumped before the id check so that even a not-yet-valid source
+    // invalidates any response still in flight for the previous one.
+    const generation = ++generationRef.current;
     if (!childId || !sourceId) {
       // Not a real id yet (e.g. the page's own document/childId hasn't
       // loaded) — stay in the loading state rather than flipping to false
@@ -112,7 +121,6 @@ export function useSourceAnalysis(
       // fetch (once childId/sourceId become valid) gets to run.
       return;
     }
-    const generation = ++generationRef.current;
     setIsLoading(true);
     try {
       const res = await getLatestForSource(childId, sourceType, sourceId);
