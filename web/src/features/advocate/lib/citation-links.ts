@@ -37,13 +37,18 @@ export function citationHref(citation: AdvocateCitation, childId: number): strin
       return `/children/${childId}/authored-versions/${id}`;
     case 'shared_draft':
       return `/children/${childId}/shared-drafts/${id}`;
+    case 'analysis_run':
+      // The server's id is the run itself, so the citation can open that exact
+      // run on the child's analysis tab.
+      return `/children/${childId}/analysis?run=${id}`;
     case 'iep_analysis':
     case 'etr_analysis':
     case 'progress_report_analysis':
-    case 'analysis_run':
-      // Every analysis kind lands on the analysis tab. A progress_report_analysis
-      // parent is the progress_report itself, which is not enough to build the
-      // report viewer route (that needs the IEP id) — so it goes here too.
+      // Legacy citations (from threads predating AnalysisRun) have no run id
+      // to link to — land on the analysis tab generally. A
+      // progress_report_analysis parent is the progress_report itself, which
+      // is not enough to build the report viewer route (that needs the IEP
+      // id) either — so it goes here too.
       return `/children/${childId}/analysis`;
     case 'iep_section':
       // The IEP page shows the PDF and per-type analysis, not per-section

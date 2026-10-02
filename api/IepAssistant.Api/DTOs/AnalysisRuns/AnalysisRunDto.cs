@@ -24,6 +24,8 @@ public class AnalysisRunSourceDto
     public string SourceType { get; set; } = string.Empty;
     public int SourceId { get; set; }
     public string? SourceLabel { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string? ErrorMessage { get; set; }
 }
 
 public class AnalysisRunSectionDto
@@ -32,5 +34,24 @@ public class AnalysisRunSectionDto
     public int? AnalysisRunSourceId { get; set; }
     public string SectionKind { get; set; } = string.Empty;
     public AnalysisRunSectionResult? Analysis { get; set; }
+    public List<GoalAnalysisResult>? GoalAnalyses { get; set; }
+    public EtrCompletenessSectionPayload? EtrCompleteness { get; set; }
+    public EtrEligibilitySectionPayload? EtrEligibility { get; set; }
     public int DisplayOrder { get; set; }
+}
+
+/// <summary>The <c>GET .../analysis-runs/latest</c> response: every <see cref="AnalysisRunDto"/> field,
+/// plus the run's other sources (for a "part of a larger analysis" note) and whether it is stale for the
+/// requested document.</summary>
+public class AnalysisRunLatestDto : AnalysisRunDto
+{
+    public List<AnalysisRunOtherSourceDto> OtherSources { get; set; } = [];
+    public bool Stale { get; set; }
+}
+
+public class AnalysisRunOtherSourceDto
+{
+    public string SourceType { get; set; } = string.Empty;
+    public int SourceId { get; set; }
+    public string? Label { get; set; }
 }

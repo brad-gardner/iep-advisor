@@ -1,12 +1,12 @@
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import type { AdequacyRating, AssessmentCompleteness } from '../types';
+import type { EtrCompletenessPayload } from '@/features/analysis/types';
 
 interface EtrAssessmentCompletenessViewProps {
-  data: AssessmentCompleteness;
+  data: EtrCompletenessPayload;
 }
 
-function adequacyBadge(rating: AdequacyRating) {
+function adequacyBadge(rating: string) {
   switch (rating) {
     case 'strong':
       return { variant: 'success' as const, label: 'Strong' };
@@ -14,15 +14,16 @@ function adequacyBadge(rating: AdequacyRating) {
       return { variant: 'info' as const, label: 'Adequate' };
     case 'thin':
       return { variant: 'warning' as const, label: 'Thin' };
+    case 'missing':
     case 'concerning':
-      return { variant: 'error' as const, label: 'Concerning' };
+      return { variant: 'error' as const, label: rating === 'missing' ? 'Missing' : 'Concerning' };
     default:
       return { variant: 'neutral' as const, label: String(rating || 'Unknown') };
   }
 }
 
 export function EtrAssessmentCompletenessView({ data }: EtrAssessmentCompletenessViewProps) {
-  const overall = adequacyBadge(data.overall_completeness_rating);
+  const overall = adequacyBadge(data.overallCompletenessRating);
 
   return (
     <div className="space-y-6" data-testid="etr-assessment-completeness">
@@ -42,17 +43,15 @@ export function EtrAssessmentCompletenessView({ data }: EtrAssessmentCompletenes
 
       <section>
         <h3 className="text-sm font-semibold text-brand-slate-800 mb-2">
-          Evaluated Domains ({data.evaluated_domains.length})
+          Evaluated Domains ({data.evaluatedDomains.length})
         </h3>
-        {data.evaluated_domains.length === 0 ? (
+        {data.evaluatedDomains.length === 0 ? (
           <p className="text-sm text-brand-slate-500">No evaluated domains reported.</p>
         ) : (
           <div className="space-y-2">
-            {data.evaluated_domains.map((d, i) => {
-              const b = adequacyBadge(d.adequacy_rating);
-              const tools = Array.isArray(d.tools_used)
-                ? d.tools_used.join(', ')
-                : d.tools_used;
+            {data.evaluatedDomains.map((d, i) => {
+              const b = adequacyBadge(d.adequacyRating);
+              const tools = d.toolsUsed.join(', ');
               return (
                 <div
                   key={i}
@@ -92,15 +91,15 @@ export function EtrAssessmentCompletenessView({ data }: EtrAssessmentCompletenes
 
       <section>
         <h3 className="text-sm font-semibold text-brand-slate-800 mb-2">
-          Missing or Under-Evaluated Domains ({data.missing_domains.length})
+          Missing or Under-Evaluated Domains ({data.missingDomains.length})
         </h3>
-        {data.missing_domains.length === 0 ? (
+        {data.missingDomains.length === 0 ? (
           <p className="text-sm text-brand-slate-500">
             No missing domains identified.
           </p>
         ) : (
           <div className="space-y-2">
-            {data.missing_domains.map((m, i) => (
+            {data.missingDomains.map((m, i) => (
               <div
                 key={i}
                 className="rounded-card border border-brand-amber-100 bg-brand-amber-50 p-3"

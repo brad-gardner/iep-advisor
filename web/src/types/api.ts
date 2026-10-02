@@ -220,20 +220,11 @@ export interface ReorderAdvocacyGoalsRequest {
 }
 
 // IEP Analysis types
-
-export interface IepAnalysis {
-  id: number;
-  iepDocumentId: number;
-  status: "pending" | "analyzing" | "completed" | "error";
-  overallSummary: string | null;
-  sectionAnalyses: SectionAnalysis[];
-  goalAnalyses: GoalAnalysis[];
-  overallRedFlags: RedFlag[];
-  advocacyGapAnalysis: AdvocacyGapAnalysis | null;
-  parentGoalsSnapshot: ParentGoalSnapshot[] | null;
-  errorMessage: string | null;
-  createdAt: string;
-}
+//
+// IepAnalysis (the legacy single-row-per-document container) was removed when
+// the IEP document page moved onto AnalysisRun (web/src/features/analysis/types.ts).
+// The section/goal/red-flag shapes below are engine-agnostic and still shared
+// by the run types and the ETR/progress-report legacy engines.
 
 export interface AdvocacyGapAnalysis {
   summary: string;

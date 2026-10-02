@@ -28,8 +28,6 @@ public static class DependencyInjection
         services.AddScoped<IEtrDocumentService, EtrDocumentService>();
         services.AddScoped<IIepProcessingService, IepProcessingService>();
         services.AddScoped<IEtrProcessingService, EtrProcessingService>();
-        services.AddScoped<IIepAnalysisService, IepAnalysisService>();
-        services.AddScoped<IEtrAnalysisService, EtrAnalysisService>();
         services.AddScoped<IParentAdvocacyGoalService, ParentAdvocacyGoalService>();
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IMeetingPrepService, MeetingPrepService>();

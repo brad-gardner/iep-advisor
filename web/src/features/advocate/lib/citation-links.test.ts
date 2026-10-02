@@ -23,7 +23,7 @@ describe('citationHref', () => {
     ['iep_analysis', { kind: 'iep', id: 3 }, '/children/4/analysis'],
     ['etr_analysis', { kind: 'etr', id: 3 }, '/children/4/analysis'],
     ['progress_report_analysis', { kind: 'progress_report', id: 3 }, '/children/4/analysis'],
-    ['analysis_run', null, '/children/4/analysis'],
+    ['analysis_run', null, '/children/4/analysis?run=12'],
     ['iep_section', { kind: 'iep', id: 3 }, '/children/4/ieps/3'],
     ['iep_section', null, '/children/4/ieps'],
     ['etr_section', { kind: 'etr', id: 3 }, '/children/4/etrs/3'],

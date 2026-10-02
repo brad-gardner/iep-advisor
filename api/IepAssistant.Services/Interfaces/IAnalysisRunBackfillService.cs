@@ -10,5 +10,8 @@ public interface IAnalysisRunBackfillService
     Task<BackfillResult> BackfillAsync(CancellationToken ct = default);
 }
 
-/// <summary>Counts reported by a single <see cref="IAnalysisRunBackfillService.BackfillAsync"/> pass.</summary>
-public sealed record BackfillResult(int Created, int SkippedExisting, int SkippedOrphan);
+/// <summary>Counts reported by a single <see cref="IAnalysisRunBackfillService.BackfillAsync"/> pass.
+/// <paramref name="Updated"/> counts IEP runs rebuilt in place because the legacy row changed since the
+/// first backfill, or the run still held the pre-conversion <c>annual_goals</c> array shape (ETR rows are
+/// not yet upserted — <c>SkippedExisting</c> covers them as before).</summary>
+public sealed record BackfillResult(int Created, int SkippedExisting, int SkippedOrphan, int Updated = 0);

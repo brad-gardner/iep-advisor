@@ -43,8 +43,8 @@ public class AnalysisRunBackfillHostedService : BackgroundService
             var result = await service.BackfillAsync(stoppingToken);
 
             _logger.LogInformation(
-                "AnalysisRun backfill finished: Created={Created}, SkippedExisting={SkippedExisting}, SkippedOrphan={SkippedOrphan}",
-                result.Created, result.SkippedExisting, result.SkippedOrphan);
+                "AnalysisRun backfill finished: Created={Created}, Updated={Updated}, SkippedExisting={SkippedExisting}, SkippedOrphan={SkippedOrphan}",
+                result.Created, result.Updated, result.SkippedExisting, result.SkippedOrphan);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {

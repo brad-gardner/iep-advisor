@@ -13,7 +13,7 @@ export function AnalysisProcessing({ onReload }: AnalysisProcessingProps) {
         Analyzing Your IEP
       </h3>
       <p className="text-brand-slate-500 text-sm text-center max-w-md mb-6">
-        This typically takes 30-60 seconds. We're reviewing each section, evaluating
+        This usually takes a few minutes. We're reviewing each section, evaluating
         goals against SMART criteria, and identifying areas that may need attention.
       </p>
       <Button variant="ghost" onClick={onReload}>

@@ -11,9 +11,8 @@ export function EtrMeetingPrepTab({
   etrId,
   childProfileId,
 }: EtrMeetingPrepTabProps) {
-  const { analysis } = useEtrAnalysis(etrId);
-  const analysisCreatedAt =
-    analysis?.status === 'completed' ? analysis.createdAt : null;
+  const { run, source } = useEtrAnalysis(childProfileId, etrId);
+  const analysisCreatedAt = source?.status === 'Completed' ? run?.createdAt ?? null : null;
 
   const {
     checklist,

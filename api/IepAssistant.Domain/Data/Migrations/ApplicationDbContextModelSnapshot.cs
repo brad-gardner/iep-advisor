@@ -282,6 +282,10 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Property<int>("AnalysisRunId")
                         .HasColumnType("int");
 
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("SourceContentSnapshot")
                         .HasColumnType("nvarchar(max)");
 
@@ -297,9 +301,20 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Pending");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AnalysisRunId");
+
+                    b.HasIndex("SourceType", "SourceId");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("SourceType", "SourceId"), new[] { "AnalysisRunId", "Status" });
 
                     b.ToTable("AnalysisRunSources");
                 });

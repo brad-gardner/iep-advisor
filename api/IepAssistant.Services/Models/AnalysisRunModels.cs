@@ -8,16 +8,50 @@ namespace IepAssistant.Services.Models;
 public sealed record AnalysisRunSourceRef(AnalysisSourceType SourceType, int SourceId);
 
 // --- Claude response deserialization models (the JSON shape the LLM returns) ---
+//
+// Phase 1 (unified-analysis refactor): the engine now makes ONE Claude call per source, then one
+// synthesis call when 2+ sources complete. SourceAnalysisResponse is the per-source call's shape;
+// AnalysisRunSynthesisResponse is the synthesis call's shape. Neither carries the other source's
+// content — the synthesis call is fed each completed source's *structured* output, never raw
+// documents (docs/designs/2026-10-02-unified-analysis-design.md).
 
-public class AnalysisRunResponse
+/// <summary>Response shape for a single per-source Claude call (one IEP, ETR, or progress report).</summary>
+public class SourceAnalysisResponse
 {
     [JsonPropertyName("overallSummary")]
     public string OverallSummary { get; set; } = string.Empty;
 
-    [JsonPropertyName("sources")]
-    public List<AnalysisRunSourceResult> Sources { get; set; } = [];
+    [JsonPropertyName("sections")]
+    public List<AnalysisRunSectionResult> Sections { get; set; } = [];
 
-    // null for single-source runs
+    /// <summary>IEP sources only (the IEP-specific prompt asks for this; empty for every other
+    /// source type). Persisted as a standalone <c>iep_goals</c> section, never an ordinary section.</summary>
+    [JsonPropertyName("goalAnalyses")]
+    public List<GoalAnalysisResult> GoalAnalyses { get; set; } = [];
+
+    /// <summary>ETR sources only (the ETR-specific prompt asks for this; null for every other source
+    /// type). Persisted as a standalone <c>etr_completeness</c> section.</summary>
+    [JsonPropertyName("etrCompleteness")]
+    public EtrCompletenessSectionPayload? EtrCompleteness { get; set; }
+
+    /// <summary>ETR sources only; null for every other source type. Persisted as a standalone
+    /// <c>etr_eligibility</c> section.</summary>
+    [JsonPropertyName("etrEligibility")]
+    public EtrEligibilitySectionPayload? EtrEligibility { get; set; }
+
+    [JsonPropertyName("overallRedFlags")]
+    public List<RedFlag> OverallRedFlags { get; set; } = [];
+
+    [JsonPropertyName("advocacyGapAnalysis")]
+    public AdvocacyGapAnalysisResponse? AdvocacyGapAnalysis { get; set; }
+}
+
+/// <summary>Response shape for the synthesis call made when 2+ sources complete.</summary>
+public class AnalysisRunSynthesisResponse
+{
+    [JsonPropertyName("overallSummary")]
+    public string OverallSummary { get; set; } = string.Empty;
+
     [JsonPropertyName("crossDocSynthesis")]
     public CrossDocSynthesisResult? CrossDocSynthesis { get; set; }
 
@@ -28,16 +62,53 @@ public class AnalysisRunResponse
     public AdvocacyGapAnalysisResponse? AdvocacyGapAnalysis { get; set; }
 }
 
-public class AnalysisRunSourceResult
+/// <summary>The JSON shape stored in an <c>iep_goals</c> <see cref="AnalysisRunSectionModel"/> row —
+/// an object, not an array, so it round-trips distinctly from ordinary sections.</summary>
+public class IepGoalsSectionPayload
 {
-    [JsonPropertyName("sourceType")]
-    public string SourceType { get; set; } = string.Empty;
+    [JsonPropertyName("goalAnalyses")]
+    public List<GoalAnalysisResult> GoalAnalyses { get; set; } = [];
+}
 
-    [JsonPropertyName("sourceId")]
-    public int SourceId { get; set; }
+/// <summary>Section-kind string constants shared between the prompt builders and the read mapping.</summary>
+public static class AnalysisRunSectionKinds
+{
+    public const string IepGoals = "iep_goals";
+    public const string EtrCompleteness = "etr_completeness";
+    public const string EtrEligibility = "etr_eligibility";
 
-    [JsonPropertyName("sections")]
-    public List<AnalysisRunSectionResult> Sections { get; set; } = [];
+    /// <summary>
+    /// Sanitizes an ordinary sectionKind — model-returned (the live engine, <c>AnalysisRunService</c>)
+    /// or legacy-data-returned (the backfill, <c>AnalysisRunBackfillService</c>'s
+    /// <c>BuildSectionsFromJsonArray</c>) — neither of which is ever trusted to actually match the
+    /// expected shape: lowercase, keep only [a-z0-9_], truncate to the column's 50-char max, and remap
+    /// an empty or reserved result to "other" so it can never collide with one of this engine's
+    /// structurally distinct typed section kinds (iep_goals / etr_completeness / etr_eligibility each
+    /// have their own object shape, not an AnalysisRunSectionResult). Shared so both callers apply
+    /// exactly the same rule.
+    /// </summary>
+    internal static string Sanitize(string? kind)
+    {
+        if (string.IsNullOrWhiteSpace(kind))
+            return "other";
+
+        var filtered = new string(kind
+            .ToLowerInvariant()
+            .Where(c => (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')
+            .ToArray());
+
+        if (filtered.Length > 50)
+            filtered = filtered[..50];
+
+        if (filtered.Length == 0)
+            return "other";
+
+        return filtered switch
+        {
+            IepGoals or EtrCompleteness or EtrEligibility => "other",
+            _ => filtered
+        };
+    }
 }
 
 public class AnalysisRunSectionResult
@@ -97,6 +168,8 @@ public class AnalysisRunSourceModel
     public string SourceType { get; set; } = string.Empty;
     public int SourceId { get; set; }
     public string? SourceLabel { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string? ErrorMessage { get; set; }
 }
 
 public class AnalysisRunSectionModel
@@ -104,6 +177,56 @@ public class AnalysisRunSectionModel
     public int Id { get; set; }
     public int? AnalysisRunSourceId { get; set; }
     public string SectionKind { get; set; } = string.Empty;
+
+    /// <summary>Populated for every ordinary section kind; null for <c>iep_goals</c> (use
+    /// <see cref="GoalAnalyses"/> instead) and for a section whose JSON failed to deserialize.</summary>
     public AnalysisRunSectionResult? Analysis { get; set; }
+
+    /// <summary>Populated only when <see cref="SectionKind"/> is <c>iep_goals</c>; null otherwise,
+    /// including when the section's JSON failed to deserialize.</summary>
+    public List<GoalAnalysisResult>? GoalAnalyses { get; set; }
+
+    /// <summary>Populated only when <see cref="SectionKind"/> is <c>etr_completeness</c>; null
+    /// otherwise, including when the section's JSON failed to deserialize.</summary>
+    public EtrCompletenessSectionPayload? EtrCompleteness { get; set; }
+
+    /// <summary>Populated only when <see cref="SectionKind"/> is <c>etr_eligibility</c>; null
+    /// otherwise, including when the section's JSON failed to deserialize.</summary>
+    public EtrEligibilitySectionPayload? EtrEligibility { get; set; }
+
     public int DisplayOrder { get; set; }
+}
+
+// --- "latest run for a document" read model (Phase 2: document-page view) ---
+
+/// <summary>
+/// <see cref="IAnalysisRunService.GetLatestForSourceAsync"/>'s result: everything <see cref="AnalysisRunModel"/>
+/// carries for the latest run that included one particular source, plus the two things a document page
+/// needs that a plain run read does not: the run's OTHER sources (for a "part of a larger analysis" note)
+/// and whether the run is stale for THIS document.
+/// Behavior note on the inherited <see cref="AnalysisRunModel.Sections"/>: unlike a plain run read (which
+/// carries every source's sections), here it is scoped to ONLY the requested source's own sections for a
+/// multi-source run — a deliberate payload-size reduction (it is also what avoids an AnalysisRunSource ×
+/// AnalysisRunSection cartesian join server-side). The web already filters rendered sections by
+/// <c>analysisRunSourceId</c>, so this is transparent to existing consumers.
+/// </summary>
+public class AnalysisRunLatestModel : AnalysisRunModel
+{
+    public List<AnalysisRunOtherSourceModel> OtherSources { get; set; } = [];
+
+    /// <summary>
+    /// True when the document has moved on since this run: it was reprocessed after the run started
+    /// (its UpdatedAt is later than the run's CreatedAt), or — IEP sources only — the run's
+    /// <c>iep_goals</c> section for this source rates a goalId that is no longer among the document's
+    /// current goals.
+    /// </summary>
+    public bool Stale { get; set; }
+}
+
+/// <summary>One of a multi-source run's OTHER sources — enough to label and link to it.</summary>
+public class AnalysisRunOtherSourceModel
+{
+    public string SourceType { get; set; } = string.Empty;
+    public int SourceId { get; set; }
+    public string? Label { get; set; }
 }

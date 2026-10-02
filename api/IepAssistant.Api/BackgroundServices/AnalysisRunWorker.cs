@@ -33,6 +33,13 @@ public class AnalysisRunWorker : BackgroundService
         _logger = logger;
     }
 
+    // How often the runtime sweep checks for runs stuck in Running, and how long a run may stay
+    // Running before the sweep fails (and refunds) it. The startup-only ReconcileOrphanedRunsAsync
+    // below still catches a crash/restart; this sweep additionally catches a run hung WITHOUT a
+    // restart — e.g. a dropped connection past the HTTP client's own timeout that never raised.
+    private static readonly TimeSpan StaleSweepInterval = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StaleRunThreshold = TimeSpan.FromMinutes(30);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Analysis Run Worker started");
@@ -42,6 +49,15 @@ public class AnalysisRunWorker : BackgroundService
         // we fail+refund each one before resuming normal processing.
         await ReconcileOrphanedRunsAsync(stoppingToken);
 
+        // The queue consumer and the stale-run sweep run concurrently for the lifetime of the host;
+        // either throwing a non-cancellation exception would otherwise go unnoticed with Task.Run.
+        await Task.WhenAll(
+            ConsumeQueueAsync(stoppingToken),
+            RunStaleSweepLoopAsync(stoppingToken));
+    }
+
+    private async Task ConsumeQueueAsync(CancellationToken stoppingToken)
+    {
         await foreach (var runId in _queue.DequeueAllAsync(stoppingToken))
         {
             try
@@ -70,6 +86,36 @@ public class AnalysisRunWorker : BackgroundService
                     _logger.LogError(failEx, "Failed to reconcile interrupted analysis run {RunId}", runId);
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Every <see cref="StaleSweepInterval"/>, fails (and refunds) any run stuck Running for longer
+    /// than <see cref="StaleRunThreshold"/> — see <c>AnalysisRunService.FailStaleRunsAsync</c> for the
+    /// "which timestamp counts as the start of Running" reasoning.
+    /// </summary>
+    private async Task RunStaleSweepLoopAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(StaleSweepInterval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stoppingToken))
+            {
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var service = scope.ServiceProvider.GetRequiredService<IAnalysisRunService>();
+                    await service.FailStaleRunsAsync(StaleRunThreshold, stoppingToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error running the stale analysis run sweep");
+                }
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Normal shutdown.
         }
     }
 

@@ -1,0 +1,126 @@
+meta {
+  name: Get latest analysis run for source
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/children/{{childId}}/analysis-runs/latest?sourceType=IepDocument&sourceId={{iepDocumentId}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  sourceType: IepDocument
+  sourceId: {{iepDocumentId}}
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # GET /api/children/{childId}/analysis-runs/latest
+
+  NEW (unified-analysis refactor) — replaces `GET /api/ieps/{id}/analysis` and
+  `GET /api/etrs/{id}/analysis`. The most recent run that included this document as a source, in the
+  same shape `GetById` returns — see `GetById` for how `sections` is structured (ordinary sections,
+  `iep_goals`, `etr_completeness`/`etr_eligibility`) — except `sections` here holds only the requested
+  source's own sections, not every source's. Plus the two things a document page needs that a plain
+  run read doesn't: the run's other sources, and whether the run is stale for *this* document.
+
+  ## Query
+
+  - `sourceType` (required) — `IepDocument | EtrDocument` for this page's two callers (the enum also
+    has `ProgressReport`/`SharedDraftRevision`, but neither document page queries by those). Invalid
+    value → `400`.
+  - `sourceId` (required) — must belong to this child; an id from another child (or a document type
+    that doesn't exist) resolves the same as "no run found" → `404`, never a cross-child leak.
+
+  ## Responses
+
+  - `200` — `data: AnalysisRunLatestDto`: every `AnalysisRunDto` field (see `GetById` for the full
+    `sections` shape), except `sections` is filtered to only the sections belonging to the requested
+    `sourceType`/`sourceId` (`sources` and `otherSources` still list every source in the run — only
+    `sections` is narrowed). Plus two additions a document page needs that a plain run read doesn't:
+    - `otherSources` — the run's sources other than the one matched, each `{ sourceType, sourceId, label }`,
+      for a "part of a larger analysis, also covering …" note.
+    - `stale` — `true` when the document has moved on since this run: it was reprocessed after the run
+      started (document `updatedAt` later than the run's `createdAt`), or — IEP sources only — the
+      run's `iep_goals` section for this source rates a `goalId` that is no longer among the document's
+      current goals.
+  - `400` — invalid `sourceType`.
+  - `401` — missing/invalid bearer token.
+  - `404` — child not found or no access to it, `sourceId` doesn't belong to this child, or no run
+    includes this document yet ("No analysis found for this document."). This endpoint always returns
+    `404` on failure (unlike `Create`/`GetByChild`, it never maps to `400`/`402`/`403`).
+
+  ```json
+  {
+    "success": true,
+    "message": null,
+    "data": {
+      "id": 101,
+      "childProfileId": 1,
+      "status": "Completed",
+      "overallSummary": "Both documents show consistent reading goals with gaps in progress data.",
+      "crossDocSynthesis": {
+        "summary": "The ETR's evaluation data aligns with the IEP's present levels.",
+        "timeline": ["ETR completed 2026-03-15", "IEP finalized 2026-05-01"],
+        "contradictions": [],
+        "progression": "Reading fluency improved since the ETR baseline."
+      },
+      "overallRedFlags": [],
+      "advocacyGapAnalysis": null,
+      "parentGoalsSnapshot": [
+        { "id": 5, "goalText": "Read at grade level by end of year", "category": "Academic", "displayOrder": 0 }
+      ],
+      "sources": [
+        { "id": 201, "sourceType": "IepDocument", "sourceId": 35, "sourceLabel": "IEP dated 2026-05-01", "status": "Completed", "errorMessage": null },
+        { "id": 202, "sourceType": "EtrDocument", "sourceId": 9, "sourceLabel": "ETR dated 2026-03-15", "status": "Completed", "errorMessage": null }
+      ],
+      "sections": [
+        {
+          "id": 301,
+          "analysisRunSourceId": 201,
+          "sectionKind": "iep_goals",
+          "analysis": null,
+          "goalAnalyses": [
+            {
+              "goalId": 77,
+              "goalText": "Student will read 80 WPM with 90% accuracy",
+              "domain": "Reading",
+              "smartAnalysis": {
+                "specific": { "rating": "green", "explanation": "Clearly defines the skill and criteria." },
+                "measurable": { "rating": "green", "explanation": "WPM and accuracy are both quantified." },
+                "achievable": { "rating": "yellow", "explanation": "No baseline cited to judge the jump." },
+                "relevant": { "rating": "green", "explanation": "Tied to the present-levels reading concern." },
+                "timeBound": { "rating": "green", "explanation": "Annual goal with a stated review date." }
+              },
+              "overallRating": "green",
+              "plainLanguageSummary": "A clear, measurable reading fluency goal.",
+              "strengths": ["Specific rate and accuracy targets"],
+              "concerns": ["No stated baseline"],
+              "suggestedImprovements": ["Add the student's current WPM as a baseline"]
+            }
+          ],
+          "etrCompleteness": null,
+          "etrEligibility": null,
+          "displayOrder": 0
+        }
+      ],
+      "errorMessage": null,
+      "createdAt": "2026-10-02T14:00:00Z",
+      "otherSources": [
+        { "sourceType": "EtrDocument", "sourceId": 9, "label": "ETR dated 2026-03-15" }
+      ],
+      "stale": false
+    },
+    "errors": []
+  }
+  ```
+}

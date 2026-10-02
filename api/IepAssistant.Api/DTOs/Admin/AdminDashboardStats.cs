@@ -18,10 +18,16 @@ public class AdminDashboardStats
     public int DocumentsCreated { get; set; }
     public int DocumentsError { get; set; }
 
-    // Analyses
+    // Analyses (legacy IepAnalyses — superseded by AnalysisRun; see AnalysisRuns below)
     public int TotalAnalyses { get; set; }
     public int AnalysesCompleted { get; set; }
     public int AnalysesError { get; set; }
+
+    // Analysis Runs (current engine)
+    public int TotalAnalysisRuns { get; set; }
+    public int AnalysisRunsCompleted { get; set; }
+    public int AnalysisRunsError { get; set; }
+    public int AnalysisRunsLast7Days { get; set; }
 
     // Advocacy Goals
     public int TotalGoals { get; set; }
