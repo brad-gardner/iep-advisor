@@ -194,17 +194,17 @@ erDiagram
 #### Phase 2: IEP page becomes a view of runs (+ IEP consumers, IEP re-sync)
 
 **Backend:**
-- [ ] `latest` endpoint (above) in `api/IepAssistant.Api/Controllers/AnalysisRunController.cs` + `AnalysisRunService.GetLatestForSourceAsync` (Collaborator-or-Viewer read, same access check as `GetRunAsync`).
-- [ ] Remove `POST/GET api/ieps/{id}/analyze|analysis` (`IepDocumentsController.cs:215-257`), `IepAnalysisQueue`, `IepAnalysisWorker` (`Program.cs` registrations), and `IepAnalysisService.AnalyzeDocumentAsync`.
+- [x] `latest` endpoint (above) in `api/IepAssistant.Api/Controllers/AnalysisRunController.cs` + `AnalysisRunService.GetLatestForSourceAsync` (Collaborator-or-Viewer read, same access check as `GetRunAsync`).
+- [x] Remove `POST/GET api/ieps/{id}/analyze|analysis` (`IepDocumentsController.cs:215-257`), `IepAnalysisQueue`, `IepAnalysisWorker` (`Program.cs` registrations), and `IepAnalysisService.AnalyzeDocumentAsync`.
   - Keep the read-only model mapping only if a consumer still needs it after this phase; otherwise delete the service.
-- [ ] Re-sync becomes an upsert for `IepAnalysis` rows (`AnalysisRunBackfillService.cs`): `annual_goals` array → `iep_goals` object; stale runs rebuilt in place.
-- [ ] **Meeting prep Mode A** (`MeetingPrepService.cs:367-370, 505-522`): latest *completed* run including the checklist's IEP. Prompt input from that source's sections, red flags and `iep_goals`. No completed run → sections only (today's no-analysis path).
-- [ ] **Advocate** (`AdvocateToolset.cs:291-301, 443-502, 575-600`):
+- [x] Re-sync becomes an upsert for `IepAnalysis` rows (`AnalysisRunBackfillService.cs`): `annual_goals` array → `iep_goals` object; stale runs rebuilt in place.
+- [x] **Meeting prep Mode A** (`MeetingPrepService.cs:367-370, 505-522`): latest *completed* run including the checklist's IEP. Prompt input from that source's sections, red flags and `iep_goals`. No completed run → sections only (today's no-analysis path).
+- [x] **Advocate** (`AdvocateToolset.cs:291-301, 443-502, 575-600`):
   - document list status and the analysis tool read runs;
   - goal citations come from the `iep_goals` section;
   - `citation-links.ts` (web) builds `/children/:id/analysis?run=:runId` for `analysis_run` citations;
   - `iep_analysis` citations map to the re-synced run (by `BackfillSourceKey`) when present.
-- [ ] **IEP comparison** (`IepComparisonService.cs:56-60, 299-310`): red flags and counts from each IEP's latest completed run (that source's section red flags + run-level red flags when single-source).
+- [x] **IEP comparison** (`IepComparisonService.cs:56-60, 299-310`): red flags and counts from each IEP's latest completed run (that source's section red flags + run-level red flags when single-source).
 
 **Web:**
 - [ ] `web/src/features/iep-documents/hooks/use-iep-analysis.ts` → reads the `latest` endpoint; `trigger` posts a single-source run.

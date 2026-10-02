@@ -506,6 +506,107 @@ public class AnalysisRunService : IAnalysisRunService
         return ServiceResult<AnalysisRunModel>.SuccessResult(MapToModel(run, includeSections: true));
     }
 
+    public async Task<ServiceResult<AnalysisRunLatestModel>> GetLatestForSourceAsync(
+        int childId, AnalysisSourceType sourceType, int sourceId, int userId, CancellationToken ct = default)
+    {
+        var role = await _accessService.GetRoleAsync(childId, userId, ct);
+        if (role == null)
+            return ServiceResult<AnalysisRunLatestModel>.FailureResult("Analysis run not found.");
+
+        // sourceId is untrusted client input: verify it actually names a document belonging to THIS
+        // child before any run is returned, so a document id from another child's record (or a
+        // stranger's) can never be used to read a run across the access boundary.
+        if (!await SourceBelongsToChildAsync(childId, sourceType, sourceId, ct))
+            return ServiceResult<AnalysisRunLatestModel>.FailureResult("Analysis run not found.");
+
+        var run = await _context.AnalysisRuns
+            .AsNoTracking()
+            .Include(r => r.Sources)
+            .Include(r => r.Sections)
+            .Where(r => r.ChildProfileId == childId && r.Sources.Any(s => s.SourceType == sourceType && s.SourceId == sourceId))
+            .OrderByDescending(r => r.CreatedAt)
+            .ThenByDescending(r => r.Id)
+            .FirstOrDefaultAsync(ct);
+
+        if (run == null)
+            return ServiceResult<AnalysisRunLatestModel>.FailureResult("No analysis found for this document.");
+
+        var matchedSource = run.Sources.First(s => s.SourceType == sourceType && s.SourceId == sourceId);
+        var otherSources = run.Sources
+            .Where(s => s.Id != matchedSource.Id)
+            .Select(s => new AnalysisRunOtherSourceModel
+            {
+                SourceType = s.SourceType.ToString(),
+                SourceId = s.SourceId,
+                Label = s.SourceLabel
+            })
+            .ToList();
+
+        var stale = await IsStaleAsync(sourceType, sourceId, matchedSource, run, ct);
+
+        var model = new AnalysisRunLatestModel { OtherSources = otherSources, Stale = stale };
+        PopulateModel(model, run, includeSections: true);
+        return ServiceResult<AnalysisRunLatestModel>.SuccessResult(model);
+    }
+
+    /// <summary>Whether <paramref name="sourceId"/> genuinely names a <paramref name="sourceType"/> document
+    /// belonging to <paramref name="childId"/> — the one check standing between an untrusted client-supplied
+    /// id and a cross-child run leak. A source type this method does not yet recognize is never "found"
+    /// (a false negative here is a 404, not a data-safety issue).</summary>
+    private Task<bool> SourceBelongsToChildAsync(int childId, AnalysisSourceType sourceType, int sourceId, CancellationToken ct) =>
+        sourceType switch
+        {
+            AnalysisSourceType.IepDocument => _context.IepDocuments.AnyAsync(d => d.Id == sourceId && d.ChildProfileId == childId && d.IsActive, ct),
+            AnalysisSourceType.EtrDocument => _context.EtrDocuments.AnyAsync(d => d.Id == sourceId && d.ChildProfileId == childId && d.IsActive, ct),
+            _ => Task.FromResult(false)
+        };
+
+    /// <summary>
+    /// "Stale" = the document has moved on since this run: its UpdatedAt is later than the run's
+    /// CreatedAt (reprocessed since), or — IEP sources only — the run's <c>iep_goals</c> section for this
+    /// source rates a goalId that is no longer among the document's CURRENT goals (re-processing adds
+    /// goals without deleting old ones per <c>IepProcessingService</c>, but a goal id can still disappear,
+    /// e.g. a full re-parse). ETR sources only get the UpdatedAt rule (ETR sections are Phase 3).
+    /// </summary>
+    private async Task<bool> IsStaleAsync(
+        AnalysisSourceType sourceType, int sourceId, AnalysisRunSource matchedSource, AnalysisRun run, CancellationToken ct)
+    {
+        DateTime? documentUpdatedAt = sourceType switch
+        {
+            AnalysisSourceType.IepDocument => await _context.IepDocuments
+                .Where(d => d.Id == sourceId).Select(d => (DateTime?)d.UpdatedAt).FirstOrDefaultAsync(ct),
+            AnalysisSourceType.EtrDocument => await _context.EtrDocuments
+                .Where(d => d.Id == sourceId).Select(d => (DateTime?)d.UpdatedAt).FirstOrDefaultAsync(ct),
+            _ => null
+        };
+
+        if (documentUpdatedAt.HasValue && documentUpdatedAt.Value > run.CreatedAt)
+            return true;
+
+        if (sourceType != AnalysisSourceType.IepDocument)
+            return false;
+
+        var goalsSectionJson = run.Sections
+            .Where(s => s.AnalysisRunSourceId == matchedSource.Id && s.SectionKind == AnalysisRunSectionKinds.IepGoals)
+            .Select(s => s.Analysis)
+            .FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(goalsSectionJson))
+            return false;
+
+        var payload = DeserializeOrNull<IepGoalsSectionPayload>(goalsSectionJson);
+        if (payload == null || payload.GoalAnalyses.Count == 0)
+            return false;
+
+        var referencedGoalIds = payload.GoalAnalyses.Select(g => g.GoalId).ToHashSet();
+        var currentGoalIds = await _context.Goals
+            .Where(g => g.IepSection.IepDocumentId == sourceId)
+            .Select(g => g.Id)
+            .ToListAsync(ct);
+        var currentGoalIdSet = new HashSet<int>(currentGoalIds);
+
+        return referencedGoalIds.Any(id => !currentGoalIdSet.Contains(id));
+    }
+
     // --- Snapshot building ---
 
     private async Task<(string Label, string Content)?> BuildSourceSnapshotAsync(
@@ -591,7 +692,7 @@ public class AnalysisRunService : IAnalysisRunService
         return (label, sb.ToString());
     }
 
-    // Mirrors IepAnalysisService.BuildIepContentForAnalysis (document content only; parent
+    // Mirrors the retired per-document IEP analysis engine's content builder (document content only; parent
     // goals are added separately at the run level so they apply across all sources).
     private static string BuildIepContent(List<IepSection> sections)
     {
@@ -1005,28 +1106,35 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
 
     private static AnalysisRunModel MapToModel(AnalysisRun run, bool includeSections)
     {
-        var model = new AnalysisRunModel
+        var model = new AnalysisRunModel();
+        PopulateModel(model, run, includeSections);
+        return model;
+    }
+
+    /// <summary>Fills in every <see cref="AnalysisRunModel"/> field on <paramref name="model"/> from
+    /// <paramref name="run"/> — shared by <see cref="MapToModel"/> and <see cref="GetLatestForSourceAsync"/>
+    /// (which populates the same base fields onto an <see cref="AnalysisRunLatestModel"/>).</summary>
+    private static void PopulateModel(AnalysisRunModel model, AnalysisRun run, bool includeSections)
+    {
+        model.Id = run.Id;
+        model.ChildProfileId = run.ChildProfileId;
+        model.Status = run.Status.ToString();
+        model.OverallSummary = run.OverallSummary;
+        model.CrossDocSynthesis = DeserializeOrNull<CrossDocSynthesisResult>(run.CrossDocSynthesis);
+        model.OverallRedFlags = DeserializeOrEmpty<List<RedFlag>>(run.OverallRedFlags);
+        model.AdvocacyGapAnalysis = DeserializeOrNull<AdvocacyGapAnalysisResponse>(run.AdvocacyGapAnalysis);
+        model.ParentGoalsSnapshot = DeserializeOrEmpty<List<ParentGoalSnapshot>>(run.ParentGoalsSnapshot);
+        model.ErrorMessage = run.ErrorMessage;
+        model.CreatedAt = run.CreatedAt;
+        model.Sources = run.Sources.Select(s => new AnalysisRunSourceModel
         {
-            Id = run.Id,
-            ChildProfileId = run.ChildProfileId,
-            Status = run.Status.ToString(),
-            OverallSummary = run.OverallSummary,
-            CrossDocSynthesis = DeserializeOrNull<CrossDocSynthesisResult>(run.CrossDocSynthesis),
-            OverallRedFlags = DeserializeOrEmpty<List<RedFlag>>(run.OverallRedFlags),
-            AdvocacyGapAnalysis = DeserializeOrNull<AdvocacyGapAnalysisResponse>(run.AdvocacyGapAnalysis),
-            ParentGoalsSnapshot = DeserializeOrEmpty<List<ParentGoalSnapshot>>(run.ParentGoalsSnapshot),
-            ErrorMessage = run.ErrorMessage,
-            CreatedAt = run.CreatedAt,
-            Sources = run.Sources.Select(s => new AnalysisRunSourceModel
-            {
-                Id = s.Id,
-                SourceType = s.SourceType.ToString(),
-                SourceId = s.SourceId,
-                SourceLabel = s.SourceLabel,
-                Status = s.Status.ToString(),
-                ErrorMessage = s.ErrorMessage
-            }).ToList()
-        };
+            Id = s.Id,
+            SourceType = s.SourceType.ToString(),
+            SourceId = s.SourceId,
+            SourceLabel = s.SourceLabel,
+            Status = s.Status.ToString(),
+            ErrorMessage = s.ErrorMessage
+        }).ToList();
 
         if (includeSections)
         {
@@ -1035,8 +1143,6 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
                 .Select(MapSectionToModel)
                 .ToList();
         }
-
-        return model;
     }
 
     // SectionKind decides the JSON shape: iep_goals is an object ({ goalAnalyses: [...] }), every

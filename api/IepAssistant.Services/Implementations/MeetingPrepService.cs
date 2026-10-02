@@ -357,19 +357,16 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             }
             else if (checklist.IepDocumentId.HasValue)
             {
-                // Mode A: With IEP analysis
+                // Mode A: with the latest completed analysis run that includes this IEP.
                 var sections = await _context.IepSections
                     .Where(s => s.IepDocumentId == checklist.IepDocumentId)
                     .Include(s => s.Goals)
                     .OrderBy(s => s.DisplayOrder)
                     .ToListAsync(ct);
 
-                var analysis = await _context.IepAnalyses
-                    .Where(a => a.IepDocumentId == checklist.IepDocumentId && a.Status == "completed")
-                    .OrderByDescending(a => a.CreatedAt)
-                    .FirstOrDefaultAsync(ct);
+                var runContext = await BuildIepRunAnalysisContextAsync(child.Id, checklist.IepDocumentId.Value, ct);
 
-                prompt = BuildModeAPrompt(child, checklist.IepDocument!, parentGoals, sections, analysis);
+                prompt = BuildModeAPrompt(child, checklist.IepDocument!, parentGoals, sections, runContext);
                 systemPrompt = IepSystemPrompt;
             }
             else
@@ -466,12 +463,66 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         return ServiceResult.SuccessResult("Checklist deleted");
     }
 
+    /// <summary>
+    /// The latest COMPLETED analysis run that includes this IEP document (its own source also
+    /// Completed), reduced to what Mode A's prompt needs — equivalent info to what it used to read off
+    /// the retired per-document IepAnalysis row (OverallSummary, OverallRedFlags, GoalAnalyses): this
+    /// source's own sections (summary/key points/red flags), the run's red flags ONLY when the run has
+    /// exactly one source (a multi-source run's OverallRedFlags is the cross-document synthesis view,
+    /// not specific to this document), and this source's own <c>iep_goals</c> ratings. Null when no
+    /// completed run includes this document.
+    /// </summary>
+    private sealed record IepRunAnalysisContext(
+        string? RunOverallRedFlagsJson,
+        int SourceCount,
+        List<(string SectionKind, string? AnalysisJson)> Sections,
+        string? GoalAnalysesJson);
+
+    private async Task<IepRunAnalysisContext?> BuildIepRunAnalysisContextAsync(int childId, int iepDocumentId, CancellationToken ct)
+    {
+        var source = await _context.AnalysisRunSources.AsNoTracking()
+            .Where(s => s.SourceType == AnalysisSourceType.IepDocument && s.SourceId == iepDocumentId
+                        && s.Status == AnalysisRunSourceStatus.Completed
+                        && s.AnalysisRun.ChildProfileId == childId && s.AnalysisRun.Status == AnalysisRunStatus.Completed)
+            .OrderByDescending(s => s.AnalysisRun.CreatedAt)
+            .ThenByDescending(s => s.AnalysisRunId)
+            .Select(s => new
+            {
+                s.Id,
+                s.AnalysisRunId,
+                RunOverallRedFlags = s.AnalysisRun.OverallRedFlags,
+                SourceCount = s.AnalysisRun.Sources.Count
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (source == null)
+            return null;
+
+        var sectionRows = await _context.AnalysisRunSections.AsNoTracking()
+            .Where(sec => sec.AnalysisRunId == source.AnalysisRunId && sec.AnalysisRunSourceId == source.Id)
+            .OrderBy(sec => sec.DisplayOrder).ThenBy(sec => sec.Id)
+            .Select(sec => new { sec.SectionKind, sec.Analysis })
+            .ToListAsync(ct);
+
+        var ordinarySections = new List<(string SectionKind, string? AnalysisJson)>();
+        string? goalAnalysesJson = null;
+        foreach (var row in sectionRows)
+        {
+            if (row.SectionKind == AnalysisRunSectionKinds.IepGoals)
+                goalAnalysesJson = row.Analysis;
+            else
+                ordinarySections.Add((row.SectionKind, row.Analysis));
+        }
+
+        return new IepRunAnalysisContext(source.RunOverallRedFlags, source.SourceCount, ordinarySections, goalAnalysesJson);
+    }
+
     private static string BuildModeAPrompt(
         ChildProfile child,
         IepDocument document,
         List<ParentAdvocacyGoal> parentGoals,
         List<IepSection> sections,
-        IepAnalysis? analysis)
+        IepRunAnalysisContext? runContext)
     {
         var sb = new StringBuilder();
 
@@ -500,26 +551,39 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             sb.AppendLine();
         }
 
-        if (analysis != null)
+        if (runContext != null)
         {
-            if (!string.IsNullOrEmpty(analysis.OverallSummary))
+            if (runContext.Sections.Count > 0)
             {
                 sb.AppendLine("IEP ANALYSIS SUMMARY:");
-                sb.AppendLine(analysis.OverallSummary);
+                foreach (var (sectionKind, analysisJson) in runContext.Sections)
+                {
+                    var section = DeserializeSectionResult(analysisJson);
+                    if (section == null)
+                        continue;
+
+                    sb.AppendLine($"- {sectionKind}: {section.PlainLanguageSummary}");
+                    if (section.KeyPoints.Count > 0)
+                        sb.AppendLine($"  Key points: {string.Join("; ", section.KeyPoints)}");
+                    foreach (var flag in section.RedFlags)
+                        sb.AppendLine($"  [{flag.Severity}] {flag.Title}: {flag.Description}");
+                }
                 sb.AppendLine();
             }
 
-            if (!string.IsNullOrEmpty(analysis.OverallRedFlags))
+            // A multi-source run's OverallRedFlags is the cross-document synthesis view, not specific to
+            // this document — only a single-source run's (promoted from this document's own call) belongs here.
+            if (runContext.SourceCount == 1 && !string.IsNullOrEmpty(runContext.RunOverallRedFlagsJson))
             {
                 sb.AppendLine("RED FLAGS IDENTIFIED:");
-                sb.AppendLine(analysis.OverallRedFlags);
+                sb.AppendLine(runContext.RunOverallRedFlagsJson);
                 sb.AppendLine();
             }
 
-            if (!string.IsNullOrEmpty(analysis.GoalAnalyses))
+            if (!string.IsNullOrEmpty(runContext.GoalAnalysesJson))
             {
                 sb.AppendLine("GOAL ANALYSIS CONCERNS:");
-                sb.AppendLine(analysis.GoalAnalyses);
+                sb.AppendLine(runContext.GoalAnalysesJson);
                 sb.AppendLine();
             }
         }
@@ -762,6 +826,21 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         catch (JsonException)
         {
             return [];
+        }
+    }
+
+    private static AnalysisRunSectionResult? DeserializeSectionResult(string? json)
+    {
+        if (string.IsNullOrEmpty(json))
+            return null;
+
+        try
+        {
+            return JsonSerializer.Deserialize<AnalysisRunSectionResult>(json, CaseInsensitiveOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 }

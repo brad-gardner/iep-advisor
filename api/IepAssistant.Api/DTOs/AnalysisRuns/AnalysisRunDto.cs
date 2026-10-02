@@ -37,3 +37,19 @@ public class AnalysisRunSectionDto
     public List<GoalAnalysisResult>? GoalAnalyses { get; set; }
     public int DisplayOrder { get; set; }
 }
+
+/// <summary>The <c>GET .../analysis-runs/latest</c> response: every <see cref="AnalysisRunDto"/> field,
+/// plus the run's other sources (for a "part of a larger analysis" note) and whether it is stale for the
+/// requested document.</summary>
+public class AnalysisRunLatestDto : AnalysisRunDto
+{
+    public List<AnalysisRunOtherSourceDto> OtherSources { get; set; } = [];
+    public bool Stale { get; set; }
+}
+
+public class AnalysisRunOtherSourceDto
+{
+    public string SourceType { get; set; } = string.Empty;
+    public int SourceId { get; set; }
+    public string? Label { get; set; }
+}

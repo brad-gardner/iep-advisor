@@ -143,3 +143,32 @@ public class AnalysisRunSectionModel
 
     public int DisplayOrder { get; set; }
 }
+
+// --- "latest run for a document" read model (Phase 2: document-page view) ---
+
+/// <summary>
+/// <see cref="IAnalysisRunService.GetLatestForSourceAsync"/>'s result: everything <see cref="AnalysisRunModel"/>
+/// carries for the latest run that included one particular source, plus the two things a document page
+/// needs that a plain run read does not: the run's OTHER sources (for a "part of a larger analysis" note)
+/// and whether the run is stale for THIS document.
+/// </summary>
+public class AnalysisRunLatestModel : AnalysisRunModel
+{
+    public List<AnalysisRunOtherSourceModel> OtherSources { get; set; } = [];
+
+    /// <summary>
+    /// True when the document has moved on since this run: it was reprocessed after the run started
+    /// (its UpdatedAt is later than the run's CreatedAt), or — IEP sources only — the run's
+    /// <c>iep_goals</c> section for this source rates a goalId that is no longer among the document's
+    /// current goals.
+    /// </summary>
+    public bool Stale { get; set; }
+}
+
+/// <summary>One of a multi-source run's OTHER sources — enough to label and link to it.</summary>
+public class AnalysisRunOtherSourceModel
+{
+    public string SourceType { get; set; } = string.Empty;
+    public int SourceId { get; set; }
+    public string? Label { get; set; }
+}

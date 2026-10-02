@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
@@ -11,6 +12,12 @@ namespace IepAssistant.Services.Implementations;
 /// Migrates legacy <see cref="IepAnalysis"/> / <see cref="EtrAnalysis"/> rows into single-source
 /// <see cref="AnalysisRun"/> rows. Processes in batches (resumable: a crash mid-run leaves already
 /// committed batches intact, and re-running skips them via the unique <c>BackfillSourceKey</c>).
+/// For <see cref="IepAnalysis"/> rows this is an upsert: a legacy row already backfilled is left alone
+/// unless it changed since (its <c>UpdatedAt</c> moved on) or its run still holds the pre-conversion
+/// <c>annual_goals</c> array shape, in which case the run's sources and sections are rebuilt in place —
+/// same run id — from the legacy row's current data. <see cref="EtrAnalysis"/> rows are not upserted yet
+/// (ETR section conversion is Phase 3); only their initial create path is touched, to set the new
+/// source's Status correctly.
 /// </summary>
 public class AnalysisRunBackfillService : IAnalysisRunBackfillService
 {
@@ -35,11 +42,12 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
         var result = new BackfillResult(
             iep.Created + etr.Created,
             iep.SkippedExisting + etr.SkippedExisting,
-            iep.SkippedOrphan + etr.SkippedOrphan);
+            iep.SkippedOrphan + etr.SkippedOrphan,
+            iep.Updated + etr.Updated);
 
         _logger.LogInformation(
-            "AnalysisRun backfill complete: Created={Created}, SkippedExisting={SkippedExisting}, SkippedOrphan={SkippedOrphan}",
-            result.Created, result.SkippedExisting, result.SkippedOrphan);
+            "AnalysisRun backfill complete: Created={Created}, Updated={Updated}, SkippedExisting={SkippedExisting}, SkippedOrphan={SkippedOrphan}",
+            result.Created, result.Updated, result.SkippedExisting, result.SkippedOrphan);
 
         return result;
     }
@@ -55,7 +63,7 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
 
     private async Task<BackfillResult> BackfillIepAsync(CancellationToken ct)
     {
-        int created = 0, skippedExisting = 0, skippedOrphan = 0;
+        int created = 0, skippedExisting = 0, skippedOrphan = 0, updated = 0;
         var lastId = 0;
 
         while (true)
@@ -79,11 +87,10 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
                 lastId = legacy.Id;
                 var key = $"IepAnalysis:{legacy.Id}";
 
-                if (await _context.AnalysisRuns.AnyAsync(r => r.BackfillSourceKey == key, ct))
-                {
-                    skippedExisting++;
-                    continue;
-                }
+                var existingRun = await _context.AnalysisRuns
+                    .Include(r => r.Sources)
+                    .Include(r => r.Sections)
+                    .FirstOrDefaultAsync(r => r.BackfillSourceKey == key, ct);
 
                 var doc = await _context.IepDocuments
                     .AsNoTracking()
@@ -95,6 +102,19 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
                         "Skipping orphaned IepAnalysis {Id}: IepDocument {DocId} not found",
                         legacy.Id, legacy.IepDocumentId);
                     skippedOrphan++;
+                    continue;
+                }
+
+                if (existingRun != null)
+                {
+                    if (!NeedsIepRebuild(legacy, existingRun))
+                    {
+                        skippedExisting++;
+                        continue;
+                    }
+
+                    await RebuildIepRunAsync(existingRun, legacy, doc, ct);
+                    updated++;
                     continue;
                 }
 
@@ -119,7 +139,11 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
                     SourceType = AnalysisSourceType.IepDocument,
                     SourceId = legacy.IepDocumentId,
                     SourceLabel = $"IEP — {doc.MeetingType} {doc.IepDate:yyyy-MM-dd}",
-                    SourceContentSnapshot = null
+                    SourceContentSnapshot = null,
+                    // Phase-1 P3: a freshly backfilled source must not be left at its default Pending —
+                    // the migration's one-time data step only fixed rows that existed AT migration time
+                    // (AddAnalysisRunSourceStatus), not rows this hosted service inserts on later boots.
+                    Status = status == AnalysisRunStatus.Completed ? AnalysisRunSourceStatus.Completed : AnalysisRunSourceStatus.Error
                 };
                 run.Sources.Add(source);
 
@@ -146,8 +170,126 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
                 break;
         }
 
-        return new BackfillResult(created, skippedExisting, skippedOrphan);
+        return new BackfillResult(created, skippedExisting, skippedOrphan, updated);
     }
+
+    /// <summary>A previously backfilled run needs rebuilding when the legacy row changed since (its
+    /// <c>UpdatedAt</c> moved past the run's own last-touched timestamp), or the run still holds the
+    /// pre-conversion <c>annual_goals</c> ARRAY shape that <c>AnalysisRunSectionResult</c> cannot read.</summary>
+    private static bool NeedsIepRebuild(IepAnalysis legacy, AnalysisRun run) =>
+        legacy.UpdatedAt > run.UpdatedAt || HasLegacyGoalArrayShape(run);
+
+    private static bool HasLegacyGoalArrayShape(AnalysisRun run) =>
+        run.Sections.Any(s => s.SectionKind == "annual_goals" && IsJsonArray(s.Analysis));
+
+    private static bool IsJsonArray(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.ValueKind == JsonValueKind.Array;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Rebuilds one already-backfilled IEP run's sources and sections from the legacy row's CURRENT
+    /// data, in place: same run id, old sources/sections removed and replaced in one transaction. Unlike
+    /// the initial create path, the goal ratings are converted to the <c>iep_goals</c> OBJECT shape here
+    /// (the create path is left emitting the old <c>annual_goals</c> array shape — see the type doc
+    /// comment — so a freshly created run converges to the new shape on the NEXT backfill pass, the same
+    /// one this method already handles).
+    /// </summary>
+    private async Task RebuildIepRunAsync(AnalysisRun run, IepAnalysis legacy, IepDocument doc, CancellationToken ct)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+
+        _context.AnalysisRunSections.RemoveRange(run.Sections);
+        _context.AnalysisRunSources.RemoveRange(run.Sources);
+
+        var (status, errorMessage) = MapStatus(legacy.Status, legacy.ErrorMessage);
+        var sourceStatus = status == AnalysisRunStatus.Completed ? AnalysisRunSourceStatus.Completed : AnalysisRunSourceStatus.Error;
+
+        run.Status = status;
+        run.ErrorMessage = errorMessage;
+        run.OverallSummary = legacy.OverallSummary;
+        run.OverallRedFlags = legacy.OverallRedFlags;
+        run.AdvocacyGapAnalysis = legacy.AdvocacyGapAnalysis;
+        run.ParentGoalsSnapshot = legacy.ParentGoalsSnapshot;
+
+        var newSource = new AnalysisRunSource
+        {
+            AnalysisRunId = run.Id,
+            SourceType = AnalysisSourceType.IepDocument,
+            SourceId = legacy.IepDocumentId,
+            SourceLabel = $"IEP — {doc.MeetingType} {doc.IepDate:yyyy-MM-dd}",
+            SourceContentSnapshot = null,
+            Status = sourceStatus
+        };
+        _context.AnalysisRunSources.Add(newSource);
+
+        // First save: the removals commit and newSource gets its generated Id, which the sections below
+        // need as their AnalysisRunSourceId (a plain FK-by-value column, not a navigation EF can fix up).
+        await _context.SaveChangesAsync(ct);
+
+        var newSections = BuildSectionsFromJsonArray(legacy.SectionAnalyses, legacy.Id, "IepAnalysis");
+
+        if (!string.IsNullOrWhiteSpace(legacy.GoalAnalyses))
+        {
+            var goalsJson = BuildIepGoalsSectionJson(legacy.GoalAnalyses, legacy.Id);
+            if (goalsJson != null)
+            {
+                newSections.Add(new AnalysisRunSection
+                {
+                    SectionKind = AnalysisRunSectionKinds.IepGoals,
+                    Analysis = goalsJson,
+                    DisplayOrder = newSections.Count
+                });
+            }
+        }
+
+        foreach (var section in newSections)
+        {
+            section.AnalysisRunId = run.Id;
+            section.AnalysisRunSourceId = newSource.Id;
+            _context.AnalysisRunSections.Add(section);
+        }
+
+        await _context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+
+        _context.ChangeTracker.Clear();
+    }
+
+    /// <summary>Converts a legacy <c>GoalAnalyses</c> JSON ARRAY into the <c>iep_goals</c> section's OBJECT
+    /// shape (<c>{ "goalAnalyses": [...] }</c>), round-tripping through the real <see cref="GoalAnalysisResult"/>
+    /// shape so the stored JSON matches exactly what the live engine itself produces. Malformed legacy JSON
+    /// is logged and skipped (the run is still rebuilt; it just gets no <c>iep_goals</c> section), matching
+    /// <see cref="BuildSectionsFromJsonArray"/>'s own best-effort handling.</summary>
+    private string? BuildIepGoalsSectionJson(string goalAnalysesJson, int legacyId)
+    {
+        try
+        {
+            var goals = JsonSerializer.Deserialize<List<GoalAnalysisResult>>(goalAnalysesJson, CaseInsensitiveJsonOptions);
+            if (goals is null)
+                return null;
+            return JsonSerializer.Serialize(new IepGoalsSectionPayload { GoalAnalyses = goals }, CamelCaseJsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex,
+                "Could not parse GoalAnalyses for IepAnalysis {LegacyId}; iep_goals section skipped", legacyId);
+            return null;
+        }
+    }
+
+    private static readonly JsonSerializerOptions CaseInsensitiveJsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private static readonly JsonSerializerOptions CamelCaseJsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     private async Task<BackfillResult> BackfillEtrAsync(CancellationToken ct)
     {
@@ -215,7 +357,10 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
                     SourceType = AnalysisSourceType.EtrDocument,
                     SourceId = legacy.EtrDocumentId,
                     SourceLabel = $"ETR — {doc.EvaluationType} {doc.EvaluationDate:yyyy-MM-dd}",
-                    SourceContentSnapshot = null
+                    SourceContentSnapshot = null,
+                    // Phase-1 P3 (see the IEP path above): do not leave a freshly backfilled source at
+                    // its default Pending. ETR section conversion itself stays legacy-shaped (Phase 3).
+                    Status = status == AnalysisRunStatus.Completed ? AnalysisRunSourceStatus.Completed : AnalysisRunSourceStatus.Error
                 };
                 run.Sources.Add(source);
 

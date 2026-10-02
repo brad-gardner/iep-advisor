@@ -73,7 +73,30 @@ public class AnalysisRunController : ControllerBase
         return Ok(ApiResponse<IEnumerable<AnalysisRunDto>>.SuccessResponse(dtos));
     }
 
-    [HttpGet("api/children/{childId}/analysis-runs/{runId}")]
+    // Declared ahead of GetById so the literal "latest" segment is matched before {runId:int} is even
+    // considered — ASP.NET Core's routing already prefers a literal segment over a parameter at the same
+    // position regardless of declaration order, but the explicit :int constraint on GetById below removes
+    // any ambiguity rather than relying on that precedence alone.
+    [HttpGet("api/children/{childId}/analysis-runs/latest")]
+    [ProducesResponseType(typeof(ApiResponse<AnalysisRunLatestDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetLatestForSource(
+        int childId, [FromQuery] string sourceType, [FromQuery] int sourceId, CancellationToken cancellationToken)
+    {
+        if (!Enum.TryParse<AnalysisSourceType>(sourceType, ignoreCase: true, out var parsedType))
+            return BadRequest(ApiResponse<object>.Error($"Invalid source type: {sourceType}"));
+
+        var userId = User.GetUserId();
+        var result = await _analysisRunService.GetLatestForSourceAsync(childId, parsedType, sourceId, userId, cancellationToken);
+
+        if (!result.Success)
+            return NotFound(ApiResponse<object>.Error(result.Message ?? "No analysis found for this document"));
+
+        return Ok(ApiResponse<AnalysisRunLatestDto>.SuccessResponse(MapToLatestDto(result.Data!)));
+    }
+
+    [HttpGet("api/children/{childId}/analysis-runs/{runId:int}")]
     [ProducesResponseType(typeof(ApiResponse<AnalysisRunDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int childId, int runId, CancellationToken cancellationToken)
@@ -100,19 +123,42 @@ public class AnalysisRunController : ControllerBase
         return BadRequest(ApiResponse<object>.Error(message));
     }
 
-    private static AnalysisRunDto MapToDto(AnalysisRunModel model) => new()
+    private static AnalysisRunDto MapToDto(AnalysisRunModel model)
     {
-        Id = model.Id,
-        ChildProfileId = model.ChildProfileId,
-        Status = model.Status,
-        OverallSummary = model.OverallSummary,
-        CrossDocSynthesis = model.CrossDocSynthesis,
-        OverallRedFlags = model.OverallRedFlags,
-        AdvocacyGapAnalysis = model.AdvocacyGapAnalysis,
-        ParentGoalsSnapshot = model.ParentGoalsSnapshot,
-        ErrorMessage = model.ErrorMessage,
-        CreatedAt = model.CreatedAt,
-        Sources = model.Sources.Select(s => new AnalysisRunSourceDto
+        var dto = new AnalysisRunDto();
+        PopulateDto(dto, model);
+        return dto;
+    }
+
+    private static AnalysisRunLatestDto MapToLatestDto(AnalysisRunLatestModel model)
+    {
+        var dto = new AnalysisRunLatestDto
+        {
+            Stale = model.Stale,
+            OtherSources = model.OtherSources.Select(s => new AnalysisRunOtherSourceDto
+            {
+                SourceType = s.SourceType,
+                SourceId = s.SourceId,
+                Label = s.Label
+            }).ToList()
+        };
+        PopulateDto(dto, model);
+        return dto;
+    }
+
+    private static void PopulateDto(AnalysisRunDto dto, AnalysisRunModel model)
+    {
+        dto.Id = model.Id;
+        dto.ChildProfileId = model.ChildProfileId;
+        dto.Status = model.Status;
+        dto.OverallSummary = model.OverallSummary;
+        dto.CrossDocSynthesis = model.CrossDocSynthesis;
+        dto.OverallRedFlags = model.OverallRedFlags;
+        dto.AdvocacyGapAnalysis = model.AdvocacyGapAnalysis;
+        dto.ParentGoalsSnapshot = model.ParentGoalsSnapshot;
+        dto.ErrorMessage = model.ErrorMessage;
+        dto.CreatedAt = model.CreatedAt;
+        dto.Sources = model.Sources.Select(s => new AnalysisRunSourceDto
         {
             Id = s.Id,
             SourceType = s.SourceType,
@@ -120,8 +166,8 @@ public class AnalysisRunController : ControllerBase
             SourceLabel = s.SourceLabel,
             Status = s.Status,
             ErrorMessage = s.ErrorMessage
-        }).ToList(),
-        Sections = model.Sections.Select(s => new AnalysisRunSectionDto
+        }).ToList();
+        dto.Sections = model.Sections.Select(s => new AnalysisRunSectionDto
         {
             Id = s.Id,
             AnalysisRunSourceId = s.AnalysisRunSourceId,
@@ -129,6 +175,6 @@ public class AnalysisRunController : ControllerBase
             Analysis = s.Analysis,
             GoalAnalyses = s.GoalAnalyses,
             DisplayOrder = s.DisplayOrder
-        }).ToList()
-    };
+        }).ToList();
+    }
 }

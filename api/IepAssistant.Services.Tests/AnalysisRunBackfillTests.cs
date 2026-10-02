@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using IepAssistant.Domain.Data;
@@ -244,6 +245,113 @@ public class AnalysisRunBackfillTests
         var run = verify.AnalysisRuns.Single(r => r.BackfillSourceKey != null);
         Assert.Equal(expectedStatus, run.Status);
         Assert.Equal(expectedError, run.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task BackfillAsync_RebuildsStaleRunInPlace_WhenLegacyUpdatedAfterFirstBackfill()
+    {
+        using var fixture = new AnalysisRunTestFixture();
+        var iepDocId = fixture.SeedIepDocument();
+
+        int legacyId;
+        using (var seed = fixture.CreateContext())
+        {
+            legacyId = SeedIepAnalysis(seed, iepDocId, status: "error", errorMessage: "boom");
+        }
+
+        int runId;
+        using (var context = fixture.CreateContext())
+        {
+            var first = await BuildService(context).BackfillAsync();
+            Assert.Equal(1, first.Created);
+        }
+        using (var verify = fixture.CreateContext())
+        {
+            var run = verify.AnalysisRuns.Single(r => r.BackfillSourceKey == $"IepAnalysis:{legacyId}");
+            runId = run.Id;
+            Assert.Equal(AnalysisRunStatus.Error, run.Status);
+        }
+
+        // The legacy analysis is re-run and completes successfully some time later — its UpdatedAt
+        // moves past the run's own last-touched timestamp (set via sync SaveChanges, which — unlike
+        // the service's own SaveChangesAsync — does not go through the auditing override, so the
+        // explicit value sticks).
+        using (var update = fixture.CreateContext())
+        {
+            var legacy = update.IepAnalyses.Single(a => a.Id == legacyId);
+            legacy.Status = "completed";
+            legacy.ErrorMessage = null;
+            legacy.OverallSummary = "Updated after re-analysis";
+            legacy.GoalAnalyses = """[{"goalId":1,"goalText":"Read 100 wpm","overallRating":"green","plainLanguageSummary":"Clear and measurable."}]""";
+            legacy.UpdatedAt = DateTime.UtcNow.AddHours(1);
+            update.SaveChanges();
+        }
+
+        BackfillResult second;
+        using (var context = fixture.CreateContext())
+        {
+            second = await BuildService(context).BackfillAsync();
+        }
+
+        Assert.Equal(0, second.Created);
+        Assert.Equal(1, second.Updated);
+        Assert.Equal(0, second.SkippedExisting);
+
+        using var final = fixture.CreateContext();
+        var rebuilt = final.AnalysisRuns.Single(r => r.BackfillSourceKey == $"IepAnalysis:{legacyId}");
+        Assert.Equal(runId, rebuilt.Id); // same run id — rebuilt in place, not a new run
+        Assert.Equal(AnalysisRunStatus.Completed, rebuilt.Status); // status flips Error -> Completed
+        Assert.Null(rebuilt.ErrorMessage);
+        Assert.Equal("Updated after re-analysis", rebuilt.OverallSummary);
+
+        var sources = final.AnalysisRunSources.Where(s => s.AnalysisRunId == runId).ToList();
+        var source = Assert.Single(sources);
+        Assert.Equal(AnalysisRunSourceStatus.Completed, source.Status); // source Status set, not left Pending
+
+        var sections = final.AnalysisRunSections.Where(s => s.AnalysisRunId == runId).ToList();
+        Assert.DoesNotContain(sections, s => s.SectionKind == "annual_goals"); // old array shape gone
+        var goalsSection = Assert.Single(sections, s => s.SectionKind == "iep_goals"); // converted to the object shape
+        using var goalsDoc = JsonDocument.Parse(goalsSection.Analysis!);
+        var goalAnalyses = goalsDoc.RootElement.GetProperty("goalAnalyses");
+        Assert.Equal(JsonValueKind.Array, goalAnalyses.ValueKind); // {goalAnalyses:[...]}, not a bare array
+        Assert.Equal(1, goalAnalyses.GetArrayLength());
+        Assert.Equal("green", goalAnalyses[0].GetProperty("overallRating").GetString());
+    }
+
+    [Fact]
+    public async Task BackfillAsync_LeavesUpToDateRun_Untouched()
+    {
+        using var fixture = new AnalysisRunTestFixture();
+        var iepDocId = fixture.SeedIepDocument();
+
+        using (var seed = fixture.CreateContext())
+        {
+            SeedIepAnalysis(seed, iepDocId);
+        }
+
+        int runId;
+        using (var context = fixture.CreateContext())
+        {
+            await BuildService(context).BackfillAsync();
+        }
+        using (var verify = fixture.CreateContext())
+        {
+            runId = verify.AnalysisRuns.Single(r => r.BackfillSourceKey != null).Id;
+        }
+
+        BackfillResult second;
+        using (var context = fixture.CreateContext())
+        {
+            second = await BuildService(context).BackfillAsync();
+        }
+
+        // Neither the UpdatedAt rule nor the shape rule fires (SeedIepAnalysis leaves GoalAnalyses
+        // null, so there is no annual_goals section to begin with) — the run is left alone.
+        Assert.Equal(0, second.Updated);
+        Assert.Equal(1, second.SkippedExisting);
+
+        using var final = fixture.CreateContext();
+        Assert.Equal(runId, final.AnalysisRuns.Single(r => r.BackfillSourceKey != null).Id);
     }
 
     [Fact]

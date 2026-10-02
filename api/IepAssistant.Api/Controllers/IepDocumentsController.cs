@@ -16,28 +16,22 @@ public class IepDocumentsController : ControllerBase
 {
     private readonly IIepDocumentService _iepDocumentService;
     private readonly IIepProcessingService _iepProcessingService;
-    private readonly IIepAnalysisService _analysisService;
     private readonly IAccessService _accessService;
     private readonly ISubscriptionService _subscriptionService;
     private readonly IepProcessingQueue _processingQueue;
-    private readonly IepAnalysisQueue _analysisQueue;
 
     public IepDocumentsController(
         IIepDocumentService iepDocumentService,
         IIepProcessingService iepProcessingService,
-        IIepAnalysisService analysisService,
         IAccessService accessService,
         ISubscriptionService subscriptionService,
-        IepProcessingQueue processingQueue,
-        IepAnalysisQueue analysisQueue)
+        IepProcessingQueue processingQueue)
     {
         _iepDocumentService = iepDocumentService;
         _iepProcessingService = iepProcessingService;
-        _analysisService = analysisService;
         _accessService = accessService;
         _subscriptionService = subscriptionService;
         _processingQueue = processingQueue;
-        _analysisQueue = analysisQueue;
     }
 
     [HttpGet("api/children/{childId}/ieps")]
@@ -211,65 +205,6 @@ public class IepDocumentsController : ControllerBase
         await _processingQueue.EnqueueAsync(id, cancellationToken);
         return Accepted(ApiResponse<object>.SuccessResponse(null, "Document queued for processing"));
     }
-
-    [HttpPost("api/ieps/{id}/analyze")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status202Accepted)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Analyze(int id, CancellationToken cancellationToken)
-    {
-        var userId = User.GetUserId();
-        var document = await _iepDocumentService.GetByIdAsync(id, userId, cancellationToken);
-
-        if (document == null)
-            return NotFound(ApiResponse<object>.Error("Document not found"));
-
-        if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return StatusCode(403, ApiResponse<object>.Error("Insufficient permissions"));
-
-        if (document.Status != "parsed")
-            return BadRequest(ApiResponse<object>.Error("Document must be parsed before analysis"));
-
-        // Check subscription
-        if (!await _subscriptionService.HasActiveSubscriptionAsync(userId, cancellationToken))
-            return StatusCode(402, ApiResponse<object>.Error("Active subscription required to analyze IEP documents"));
-
-        // Check per-child analysis limit
-        if (!await _subscriptionService.CanPerformAnalysisAsync(userId, document.ChildProfileId, cancellationToken))
-            return StatusCode(429, ApiResponse<object>.Error("Analysis limit reached for this child. You have used all 5 analyses for this subscription year."));
-
-        await _analysisQueue.EnqueueAsync(id, cancellationToken);
-        return Accepted(ApiResponse<object>.SuccessResponse(null, "Analysis queued"));
-    }
-
-    [HttpGet("api/ieps/{id}/analysis")]
-    [ProducesResponseType(typeof(ApiResponse<IepAnalysisDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetAnalysis(int id, CancellationToken cancellationToken)
-    {
-        var userId = User.GetUserId();
-        var analysis = await _analysisService.GetAnalysisAsync(id, userId, cancellationToken);
-
-        if (analysis == null)
-            return NotFound(ApiResponse<object>.Error("No analysis found for this document"));
-
-        return Ok(ApiResponse<IepAnalysisDto>.SuccessResponse(MapToAnalysisDto(analysis)));
-    }
-
-    private static IepAnalysisDto MapToAnalysisDto(IepAnalysisModel model) => new()
-    {
-        Id = model.Id,
-        IepDocumentId = model.IepDocumentId,
-        Status = model.Status,
-        OverallSummary = model.OverallSummary,
-        SectionAnalyses = model.SectionAnalyses,
-        GoalAnalyses = model.GoalAnalyses,
-        OverallRedFlags = model.OverallRedFlags,
-        AdvocacyGapAnalysis = model.AdvocacyGapAnalysis,
-        ParentGoalsSnapshot = model.ParentGoalsSnapshot,
-        ErrorMessage = model.ErrorMessage,
-        CreatedAt = model.CreatedAt,
-    };
 
     private static IepDocumentDto MapToDto(IepDocumentModel model) => new()
     {

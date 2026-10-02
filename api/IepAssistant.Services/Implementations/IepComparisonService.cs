@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -13,11 +12,6 @@ public class IepComparisonService : IIepComparisonService
     private readonly ApplicationDbContext _context;
     private readonly IChildProfileRepository _childRepository;
     private readonly IAccessService _accessService;
-
-    private static readonly JsonSerializerOptions CaseInsensitiveOptions = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
 
     public IepComparisonService(ApplicationDbContext context, IChildProfileRepository childRepository, IAccessService accessService)
     {
@@ -53,37 +47,15 @@ public class IepComparisonService : IIepComparisonService
             .Select(g => new { IepDocumentId = g.Key, Count = g.Count() })
             .ToListAsync(ct);
 
-        var analyses = await _context.IepAnalyses
-            .AsNoTracking()
-            .Where(a => documentIds.Contains(a.IepDocumentId) && a.Status == "completed")
-            .ToListAsync(ct);
-
         var sectionCountMap = sectionCounts.ToDictionary(x => x.IepDocumentId, x => x.Count);
         var goalCountMap = goalCounts.ToDictionary(x => x.IepDocumentId, x => x.Count);
-        var analysisMap = analyses
-            .GroupBy(a => a.IepDocumentId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(a => a.CreatedAt).First());
 
-        var entries = documents.Select(d =>
+        var entries = new List<TimelineEntry>();
+        foreach (var d in documents)
         {
-            var hasAnalysis = analysisMap.ContainsKey(d.Id);
-            var redFlagCount = 0;
+            var (hasAnalysis, redFlags) = await GetLatestCompletedRunRedFlagsAsync(d.Id, ct);
 
-            if (hasAnalysis && analysisMap[d.Id].OverallRedFlags != null)
-            {
-                try
-                {
-                    var flags = JsonSerializer.Deserialize<List<RedFlag>>(
-                        analysisMap[d.Id].OverallRedFlags!, CaseInsensitiveOptions);
-                    redFlagCount = flags?.Count ?? 0;
-                }
-                catch
-                {
-                    // Ignore deserialization errors
-                }
-            }
-
-            return new TimelineEntry
+            entries.Add(new TimelineEntry
             {
                 Id = d.Id,
                 IepDate = d.IepDate,
@@ -91,10 +63,10 @@ public class IepComparisonService : IIepComparisonService
                 Status = d.Status,
                 GoalCount = goalCountMap.GetValueOrDefault(d.Id),
                 SectionCount = sectionCountMap.GetValueOrDefault(d.Id),
-                RedFlagCount = redFlagCount,
+                RedFlagCount = redFlags.Count,
                 HasAnalysis = hasAnalysis
-            };
-        }).ToList();
+            });
+        }
 
         return new TimelineResult
         {
@@ -296,20 +268,8 @@ public class IepComparisonService : IIepComparisonService
 
     private async Task<RedFlagResolution> CompareRedFlagsAsync(int olderIepId, int newerIepId, CancellationToken ct)
     {
-        var olderAnalysis = await _context.IepAnalyses
-            .AsNoTracking()
-            .Where(a => a.IepDocumentId == olderIepId && a.Status == "completed")
-            .OrderByDescending(a => a.CreatedAt)
-            .FirstOrDefaultAsync(ct);
-
-        var newerAnalysis = await _context.IepAnalyses
-            .AsNoTracking()
-            .Where(a => a.IepDocumentId == newerIepId && a.Status == "completed")
-            .OrderByDescending(a => a.CreatedAt)
-            .FirstOrDefaultAsync(ct);
-
-        var olderFlags = DeserializeRedFlags(olderAnalysis?.OverallRedFlags);
-        var newerFlags = DeserializeRedFlags(newerAnalysis?.OverallRedFlags);
+        var (_, olderFlags) = await GetLatestCompletedRunRedFlagsAsync(olderIepId, ct);
+        var (_, newerFlags) = await GetLatestCompletedRunRedFlagsAsync(newerIepId, ct);
 
         if (olderFlags.Count == 0 && newerFlags.Count == 0)
             return new RedFlagResolution();
@@ -376,18 +336,42 @@ public class IepComparisonService : IIepComparisonService
         };
     }
 
-    private List<RedFlag> DeserializeRedFlags(string? json)
+    /// <summary>
+    /// This one IEP document's own red flags, read from the latest COMPLETED analysis run that includes
+    /// it (that source's own sections' red flags, plus the run's OverallRedFlags only when the run is
+    /// single-source — see <see cref="AnalysisRunRedFlagRollup"/>). Replaces the retired per-document
+    /// IepAnalysis row this comparison used to read. <c>HasAnalysis</c> is true whenever such a run
+    /// exists, regardless of whether it happens to carry zero red flags.
+    /// </summary>
+    private async Task<(bool HasAnalysis, List<RedFlag> RedFlags)> GetLatestCompletedRunRedFlagsAsync(int iepDocumentId, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(json)) return [];
+        var source = await _context.AnalysisRunSources
+            .AsNoTracking()
+            .Where(s => s.SourceType == AnalysisSourceType.IepDocument && s.SourceId == iepDocumentId
+                        && s.Status == AnalysisRunSourceStatus.Completed && s.AnalysisRun.Status == AnalysisRunStatus.Completed)
+            .OrderByDescending(s => s.AnalysisRun.CreatedAt)
+            .ThenByDescending(s => s.AnalysisRunId)
+            .Select(s => new
+            {
+                s.Id,
+                s.AnalysisRunId,
+                RunOverallRedFlags = s.AnalysisRun.OverallRedFlags,
+                SourceCount = s.AnalysisRun.Sources.Count
+            })
+            .FirstOrDefaultAsync(ct);
 
-        try
-        {
-            return JsonSerializer.Deserialize<List<RedFlag>>(json, CaseInsensitiveOptions) ?? [];
-        }
-        catch
-        {
-            return [];
-        }
+        if (source == null)
+            return (false, []);
+
+        var sectionJson = await _context.AnalysisRunSections
+            .AsNoTracking()
+            .Where(sec => sec.AnalysisRunId == source.AnalysisRunId && sec.AnalysisRunSourceId == source.Id
+                          && sec.SectionKind != AnalysisRunSectionKinds.IepGoals)
+            .Select(sec => sec.Analysis)
+            .ToListAsync(ct);
+
+        var redFlags = AnalysisRunRedFlagRollup.Combine(source.RunOverallRedFlags, source.SourceCount, sectionJson);
+        return (true, redFlags);
     }
 
     private static int LevenshteinDistance(string a, string b)

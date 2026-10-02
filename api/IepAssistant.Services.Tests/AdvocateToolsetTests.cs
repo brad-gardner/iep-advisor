@@ -938,7 +938,15 @@ public sealed class AdvocateToolsetTests : IDisposable
         var revision = SeedSharedDraft(school);
         using (var ctx = CreateContext())
         {
-            ctx.IepAnalyses.Add(new IepAnalysis { IepDocumentId = newer, Status = "completed", OverallSummary = "ok" });
+            // IEP analysis status now comes from the latest run that includes the document.
+            var run = new AnalysisRun { ChildProfileId = childId, Status = AnalysisRunStatus.Completed };
+            ctx.AnalysisRuns.Add(run);
+            ctx.SaveChanges();
+            ctx.AnalysisRunSources.Add(new AnalysisRunSource
+            {
+                AnalysisRunId = run.Id, SourceType = AnalysisSourceType.IepDocument, SourceId = newer,
+                SourceLabel = "IEP", Status = AnalysisRunSourceStatus.Completed
+            });
             ctx.SaveChanges();
         }
 
@@ -1016,34 +1024,40 @@ public sealed class AdvocateToolsetTests : IDisposable
         var goalId = SeedGoal(sectionId, "Read 80 wpm");
         var (otherUserId, otherChildId) = SeedChild("analysis-iep-other");
         var otherGoalId = SeedGoal(SeedIepSection(SeedIep(otherChildId, new DateTime(2026, 3, 1)), "annual_goals", "x"), "Other child's goal");
-        int analysisId, runId;
+        int runId;
         using (var ctx = CreateContext())
         {
-            var analysis = new IepAnalysis
+            // IEP analysis now comes entirely from the latest run (single-source here, so its
+            // OverallRedFlags is promoted from this document's own call and belongs in the output).
+            var run = new AnalysisRun
             {
-                IepDocumentId = iepId, Status = "completed",
-                OverallSummary = "Mostly solid. " + Injection,
+                ChildProfileId = childId, Status = AnalysisRunStatus.Completed,
                 OverallRedFlags = $$"""[{"severity":"red","title":"No baseline","description":"{{Injection}}","legalBasis":"34 CFR 300.320"}]""",
-                GoalAnalyses = $$"""[{"goalId":{{goalId}},"goalText":"Read 80 wpm","overallRating":"green","plainLanguageSummary":"Measurable."},{"goalId":{{otherGoalId}},"goalText":"forged","overallRating":"red"}]""",
-                SectionAnalyses = """[{"sectionType":"present_levels","plainLanguageSummary":"Reads at grade 2.","keyPoints":["fluency"]}]""",
                 AdvocacyGapAnalysis = "not json at all"
             };
-            ctx.IepAnalyses.Add(analysis);
-            var run = new AnalysisRun { ChildProfileId = childId, Status = AnalysisRunStatus.Completed, OverallSummary = "Across documents: improving." };
             ctx.AnalysisRuns.Add(run);
-            var stale = new AnalysisRun { ChildProfileId = childId, Status = AnalysisRunStatus.Error };
-            ctx.AnalysisRuns.Add(stale);
             ctx.SaveChanges();
-            var source = new AnalysisRunSource { AnalysisRunId = run.Id, SourceType = AnalysisSourceType.IepDocument, SourceId = iepId, SourceLabel = "IEP" };
-            var staleSource = new AnalysisRunSource { AnalysisRunId = stale.Id, SourceType = AnalysisSourceType.IepDocument, SourceId = iepId };
-            ctx.AnalysisRunSources.AddRange(source, staleSource);
+            var source = new AnalysisRunSource
+            {
+                AnalysisRunId = run.Id, SourceType = AnalysisSourceType.IepDocument, SourceId = iepId,
+                SourceLabel = "IEP", Status = AnalysisRunSourceStatus.Completed
+            };
+            ctx.AnalysisRunSources.Add(source);
             ctx.SaveChanges();
             ctx.AnalysisRunSections.AddRange(
-                new AnalysisRunSection { AnalysisRunId = run.Id, AnalysisRunSourceId = source.Id, SectionKind = "annual_goals", Analysis = """{"plainLanguageSummary":"Goals are measurable."}""", DisplayOrder = 1 },
-                new AnalysisRunSection { AnalysisRunId = run.Id, AnalysisRunSourceId = null, SectionKind = "run_level", Analysis = "{}", DisplayOrder = 0 },
-                new AnalysisRunSection { AnalysisRunId = stale.Id, AnalysisRunSourceId = staleSource.Id, SectionKind = "annual_goals", Analysis = """{"plainLanguageSummary":"stale"}""", DisplayOrder = 0 });
+                new AnalysisRunSection
+                {
+                    AnalysisRunId = run.Id, AnalysisRunSourceId = source.Id, SectionKind = "present_levels",
+                    Analysis = """{"sectionKind":"present_levels","plainLanguageSummary":"Reads at grade 2.","keyPoints":["fluency"],"redFlags":[],"legalReferences":[]}""",
+                    DisplayOrder = 0
+                },
+                new AnalysisRunSection
+                {
+                    AnalysisRunId = run.Id, AnalysisRunSourceId = source.Id, SectionKind = AnalysisRunSectionKinds.IepGoals,
+                    Analysis = $$"""{"goalAnalyses":[{"goalId":{{goalId}},"goalText":"Read 80 wpm","overallRating":"green","plainLanguageSummary":"Measurable."},{"goalId":{{otherGoalId}},"goalText":"forged","overallRating":"red"}]}""",
+                    DisplayOrder = 1
+                });
             ctx.SaveChanges();
-            analysisId = analysis.Id;
             runId = run.Id;
         }
 
@@ -1053,10 +1067,10 @@ public sealed class AdvocateToolsetTests : IDisposable
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
-        Assert.Equal($"iep_analysis:{analysisId}", root.GetProperty("sourceRef").GetString());
+        Assert.Equal($"analysis_run:{runId}", root.GetProperty("sourceRef").GetString());
+        Assert.Equal($"iep:{iepId}", root.GetProperty("documentRef").GetString());
         Assert.Equal("completed", root.GetProperty("status").GetString());
         Assert.DoesNotContain(StringsIn(root), s => s.Contains("<instructions>"));
-        Assert.Contains("&lt;instructions&gt;", root.GetProperty("overallSummary").GetString());
         Assert.Contains("&lt;instructions&gt;", root.GetProperty("overallRedFlags")[0].GetProperty("description").GetString());
         Assert.Equal("34 CFR 300.320", root.GetProperty("overallRedFlags")[0].GetProperty("legalBasis").GetString());
 
@@ -1067,17 +1081,41 @@ public sealed class AdvocateToolsetTests : IDisposable
         Assert.DoesNotContain($"goal:{otherGoalId}", toolset.ReturnedRefs);
         Assert.Equal("Reading goal", toolset.Labels[$"goal:{goalId}"]);
 
-        Assert.Equal("present_levels", root.GetProperty("sectionAnalyses")[0].GetProperty("sectionType").GetString());
+        var sections = root.GetProperty("sectionAnalyses").EnumerateArray().ToList();
+        var presentLevels = Assert.Single(sections);
+        Assert.Equal("present_levels", presentLevels.GetProperty("sectionKind").GetString());
+        Assert.Equal("Reads at grade 2.", presentLevels.GetProperty("analysis").GetProperty("plainLanguageSummary").GetString());
         Assert.Equal("not json at all", root.GetProperty("advocacyGapAnalysis").GetString());
-
-        var runElement = root.GetProperty("analysisRun");
-        Assert.Equal($"analysis_run:{runId}", runElement.GetProperty("sourceRef").GetString());
-        Assert.Equal("Across documents: improving.", runElement.GetProperty("overallSummary").GetString());
-        var section = Assert.Single(runElement.GetProperty("sections").EnumerateArray());
-        Assert.Equal("annual_goals", section.GetProperty("sectionKind").GetString());
-        Assert.Equal("Goals are measurable.", section.GetProperty("analysis").GetProperty("plainLanguageSummary").GetString());
         Assert.Contains($"analysis_run:{runId}", toolset.ReturnedRefs);
-        Assert.Contains($"iep_analysis:{analysisId}", toolset.Labels.Keys);
+    }
+
+    [Fact]
+    public async Task GetDocumentAnalysis_Iep_SourceNotCompleted_ReturnsItsOwnStatus()
+    {
+        var (userId, childId) = SeedChild("analysis-iep-running");
+        var iepId = SeedIep(childId, new DateTime(2026, 3, 1));
+        using (var ctx = CreateContext())
+        {
+            // The overall run can be Completed (a sibling source succeeded) while THIS document's own
+            // source is still in flight — the tool must report THIS source's status, not the run's.
+            var run = new AnalysisRun { ChildProfileId = childId, Status = AnalysisRunStatus.Completed };
+            ctx.AnalysisRuns.Add(run);
+            ctx.SaveChanges();
+            ctx.AnalysisRunSources.Add(new AnalysisRunSource
+            {
+                AnalysisRunId = run.Id, SourceType = AnalysisSourceType.IepDocument, SourceId = iepId,
+                SourceLabel = "IEP", Status = AnalysisRunSourceStatus.Running
+            });
+            ctx.SaveChanges();
+        }
+
+        using var toolCtx = CreateContext();
+        var toolset = CreateToolset(toolCtx, childId, userId, null);
+        using var doc = await RunAsync(toolset, "get_document_analysis", $$"""{"documentType":"iep","documentId":{{iepId}}}""");
+
+        Assert.Equal("running", doc.RootElement.GetProperty("status").GetString());
+        Assert.Contains("run an analysis", doc.RootElement.GetProperty("hint").GetString());
+        Assert.False(doc.RootElement.TryGetProperty("sourceRef", out _));
     }
 
     [Fact]
@@ -1317,7 +1355,6 @@ public sealed class AdvocateToolsetTests : IDisposable
         int meetingId, prepId, advocacyGoalId;
         using (var ctx = CreateContext())
         {
-            ctx.IepAnalyses.Add(new IepAnalysis { IepDocumentId = iepId, Status = "completed", OverallSummary = "Fine.", OverallRedFlags = "[]" });
             ctx.EtrAnalyses.Add(new EtrAnalysis { EtrDocumentId = etrId, Status = "completed", OverallSummary = "Thorough.", OverallRedFlags = "[]" });
             ctx.ProgressReportAnalyses.Add(new ProgressReportAnalysis { ProgressReportId = reportId, Status = "completed", Summary = "Slow." });
             var meeting = new Meeting { SchoolStudentId = school.StudentId, Type = MeetingType.AnnualReview, Title = "Annual review " + Injection, StartsAtUtc = DateTime.UtcNow.AddDays(10), Location = "Room 4", CreatedByUserId = school.TeacherId };
@@ -1341,6 +1378,17 @@ public sealed class AdvocateToolsetTests : IDisposable
             meetingId = meeting.Id;
             prepId = prep.Id;
             advocacyGoalId = advocacyGoal.Id;
+
+            // IEP analysis now comes from a run, not the retired per-document IepAnalysis row.
+            var run = new AnalysisRun { ChildProfileId = childId, Status = AnalysisRunStatus.Completed, OverallRedFlags = "[]" };
+            ctx.AnalysisRuns.Add(run);
+            ctx.SaveChanges();
+            ctx.AnalysisRunSources.Add(new AnalysisRunSource
+            {
+                AnalysisRunId = run.Id, SourceType = AnalysisSourceType.IepDocument, SourceId = iepId,
+                SourceLabel = "IEP", Status = AnalysisRunSourceStatus.Completed
+            });
+            ctx.SaveChanges();
         }
 
         using var toolCtx = CreateContext();
@@ -1385,7 +1433,8 @@ public sealed class AdvocateToolsetTests : IDisposable
 
         Assert.Superset(new HashSet<string>
         {
-            "kb", "child", "iep", "etr", "progress_report", "authored_version", "shared_draft", "iep_analysis", "etr_analysis",
+            // "iep_analysis" is gone: IEP analysis citations are now "analysis_run" (the run itself).
+            "kb", "child", "iep", "etr", "progress_report", "authored_version", "shared_draft", "analysis_run", "etr_analysis",
             "progress_report_analysis", "iep_section", "etr_section", "goal", "goal_record", "comparison", "journal", "contribution",
             "advocacy_goal", "meeting_prep", "prep_question", "meeting"
         }, seenKinds);
@@ -1395,12 +1444,12 @@ public sealed class AdvocateToolsetTests : IDisposable
         Assert.Equal(new[] { new AdvocateCitationParent("iep", iepId) }, parentByKind["goal"]);
         Assert.Equal(new[] { new AdvocateCitationParent("iep", iepId) }, parentByKind["iep_section"]);
         Assert.Equal(new[] { new AdvocateCitationParent("etr", etrId) }, parentByKind["etr_section"]);
-        Assert.Equal(new[] { new AdvocateCitationParent("iep", iepId) }, parentByKind["iep_analysis"]);
+        Assert.Equal(new[] { new AdvocateCitationParent("iep", iepId) }, parentByKind["analysis_run"]);
         Assert.Equal(new[] { new AdvocateCitationParent("etr", etrId) }, parentByKind["etr_analysis"]);
         Assert.Equal(new[] { new AdvocateCitationParent("iep", iepId) }, parentByKind["progress_report"]);
         Assert.Equal(new[] { new AdvocateCitationParent("progress_report", reportId) }, parentByKind["progress_report_analysis"]);
         Assert.Equal(
-            new HashSet<string> { "goal", "iep_section", "etr_section", "iep_analysis", "etr_analysis", "progress_report", "progress_report_analysis" },
+            new HashSet<string> { "goal", "iep_section", "etr_section", "analysis_run", "etr_analysis", "progress_report", "progress_report_analysis" },
             parentByKind.Keys.ToHashSet());
         Assert.All(toolset.Parents.Keys, r => Assert.Contains(r, toolset.ReturnedRefs));
 

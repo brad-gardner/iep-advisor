@@ -1,3 +1,4 @@
+using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Interfaces;
@@ -34,4 +35,15 @@ public interface IAnalysisRunService
     Task<ServiceResult<List<AnalysisRunModel>>> GetRunsAsync(int childId, int userId, CancellationToken ct = default);
 
     Task<ServiceResult<AnalysisRunModel>> GetRunAsync(int runId, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The latest analysis run (any status — unlike <see cref="GetRunAsync"/>'s single-run lookup, this is
+    /// the one a document page polls while its own run is still Pending/Running) whose sources include the
+    /// given (<paramref name="sourceType"/>, <paramref name="sourceId"/>) for this child. Same access rule
+    /// as <see cref="GetRunAsync"/>: any role that can read the child's runs, Viewer included.
+    /// <paramref name="sourceId"/> is untrusted client input, so it is checked against the child before any
+    /// run is returned — a document belonging to another child never leaks a run this way.
+    /// </summary>
+    Task<ServiceResult<AnalysisRunLatestModel>> GetLatestForSourceAsync(
+        int childId, AnalysisSourceType sourceType, int sourceId, int userId, CancellationToken ct = default);
 }

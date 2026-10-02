@@ -288,7 +288,14 @@ public sealed class AdvocateToolset : IToolExecutor
             .Select(d => new
             {
                 d.Id, d.IepDate, d.UploadDate, d.Status, d.MeetingType,
-                AnalysisStatus = _context.IepAnalyses.Where(a => a.IepDocumentId == d.Id).OrderByDescending(a => a.Id).Select(a => a.Status).FirstOrDefault()
+                // The latest analysis run (any status) that includes this document, not the retired
+                // per-document IepAnalysis row — a run's PER-SOURCE status, since a multi-source run can
+                // succeed overall while this one document's own source failed.
+                AnalysisStatus = _context.AnalysisRunSources
+                    .Where(s => s.SourceType == AnalysisSourceType.IepDocument && s.SourceId == d.Id && s.AnalysisRun.ChildProfileId == _childId)
+                    .OrderByDescending(s => s.AnalysisRun.CreatedAt).ThenByDescending(s => s.AnalysisRunId)
+                    .Select(s => (AnalysisRunSourceStatus?)s.Status)
+                    .FirstOrDefault()
             })
             .ToListAsync(ct);
         var etrs = await _context.EtrDocuments.AsNoTracking()
@@ -338,7 +345,7 @@ public sealed class AdvocateToolset : IToolExecutor
                 ["iepDate"] = Date(d.IepDate),
                 ["uploadDate"] = Date(d.UploadDate),
                 ["status"] = Str(d.Status, MaxLabelChars),
-                ["analysisStatus"] = d.AnalysisStatus == null ? "none" : Str(d.AnalysisStatus, MaxLabelChars),
+                ["analysisStatus"] = d.AnalysisStatus == null ? "none" : Str(d.AnalysisStatus.Value.ToString().ToLowerInvariant(), MaxLabelChars),
                 ["meetingType"] = Str(d.MeetingType, MaxLabelChars)
             });
         }
@@ -435,36 +442,78 @@ public sealed class AdvocateToolset : IToolExecutor
         };
     }
 
+    /// <summary>IEP analysis now comes entirely from runs (not the retired per-document IepAnalysis row):
+    /// the latest run (any status) that includes this document, read through THAT document's own source.</summary>
     private async Task<ToolPayload> GetIepAnalysisAsync(int iepId, CancellationToken ct)
     {
         var iep = await RequireIepAsync(iepId, ct);
         var documentRef = Register("iep", iep.Id, IepLabel(iep.IepDate, iep.UploadDate));
 
-        var analysis = await _context.IepAnalyses.AsNoTracking()
-            .Where(a => a.IepDocumentId == iep.Id)
-            .OrderByDescending(a => a.Id)
-            .Select(a => new { a.Id, a.Status, a.OverallSummary, a.OverallRedFlags, a.GoalAnalyses, a.SectionAnalyses, a.AdvocacyGapAnalysis })
+        var source = await _context.AnalysisRunSources.AsNoTracking()
+            .Where(s => s.SourceType == AnalysisSourceType.IepDocument && s.SourceId == iep.Id && s.AnalysisRun.ChildProfileId == _childId)
+            .OrderByDescending(s => s.AnalysisRun.CreatedAt).ThenByDescending(s => s.AnalysisRunId)
+            .Select(s => new
+            {
+                s.Id,
+                s.AnalysisRunId,
+                s.Status,
+                RunCreatedAt = s.AnalysisRun.CreatedAt,
+                RunOverallRedFlags = s.AnalysisRun.OverallRedFlags,
+                RunAdvocacyGapAnalysis = s.AnalysisRun.AdvocacyGapAnalysis,
+                SourceCount = s.AnalysisRun.Sources.Count
+            })
             .FirstOrDefaultAsync(ct);
-        if (analysis == null || !IsCompleted(analysis.Status))
-            return NoAnalysis(documentRef, analysis?.Status);
 
-        var sourceRef = Register("iep_analysis", analysis.Id, $"Analysis of {Labels[documentRef]}", documentRef);
+        if (source == null || source.Status != AnalysisRunSourceStatus.Completed)
+            return NoAnalysis(documentRef, source?.Status.ToString().ToLowerInvariant());
+
+        var sourceRef = Register("analysis_run", source.AnalysisRunId, $"Analysis of {Labels[documentRef]}", documentRef);
+
+        var sectionRows = await _context.AnalysisRunSections.AsNoTracking()
+            .Where(sec => sec.AnalysisRunId == source.AnalysisRunId && sec.AnalysisRunSourceId == source.Id)
+            .OrderBy(sec => sec.DisplayOrder).ThenBy(sec => sec.Id)
+            .Select(sec => new { sec.SectionKind, sec.Analysis })
+            .ToListAsync(ct);
 
         // goalId values inside the stored JSON are only trusted when they are goals of THIS IEP.
         var goalIds = (await _context.Goals.AsNoTracking()
             .Where(g => g.IepSection.IepDocumentId == iep.Id)
             .Select(g => new { g.Id, g.Domain, g.GoalText })
             .ToListAsync(ct)).ToDictionary(g => g.Id, g => g);
-        var goalAnalyses = ParseArray(analysis.GoalAnalyses);
-        foreach (var node in goalAnalyses.OfType<JsonObject>())
+
+        var sectionAnalyses = new JsonArray();
+        var goalAnalyses = new JsonArray();
+        var ordinarySectionJson = new List<string?>();
+
+        foreach (var row in sectionRows)
         {
-            if (node["goalId"] is JsonValue idValue && idValue.TryGetValue<int>(out var goalId) && goalIds.TryGetValue(goalId, out var goal))
-                node["sourceRef"] = Register("goal", goal.Id, GoalLabel(goal.Domain, goal.GoalText), documentRef);
+            if (row.SectionKind == AnalysisRunSectionKinds.IepGoals)
+            {
+                goalAnalyses = DetachArray(ParseOrText(row.Analysis) as JsonObject, "goalAnalyses");
+                foreach (var node in goalAnalyses.OfType<JsonObject>())
+                {
+                    if (node["goalId"] is JsonValue idValue && idValue.TryGetValue<int>(out var goalId) && goalIds.TryGetValue(goalId, out var goal))
+                        node["sourceRef"] = Register("goal", goal.Id, GoalLabel(goal.Domain, goal.GoalText), documentRef);
+                }
+            }
+            else
+            {
+                sectionAnalyses.Add(new JsonObject
+                {
+                    ["sectionKind"] = Str(row.SectionKind, MaxLabelChars),
+                    ["analysis"] = ParseOrText(row.Analysis)
+                });
+                ordinarySectionJson.Add(row.Analysis);
+            }
         }
-        var sectionAnalyses = ParseArray(analysis.SectionAnalyses);
-        var redFlags = ParseArray(analysis.OverallRedFlags);
-        var run = await LatestRunSectionsAsync(AnalysisSourceType.IepDocument, iep.Id, ct);
-        var advocacyGapAnalysis = ParseOrText(analysis.AdvocacyGapAnalysis);
+
+        // This document's OWN red flags: the run's OverallRedFlags only when it is single-source (a
+        // multi-source run's is the cross-document synthesis view), unioned with this source's own
+        // ordinary sections' red flags, which are always document-specific.
+        var redFlagsList = AnalysisRunRedFlagRollup.Combine(source.RunOverallRedFlags, source.SourceCount, ordinarySectionJson);
+        var redFlags = ParseArray(JsonSerializer.Serialize(redFlagsList));
+
+        var advocacyGapAnalysis = ParseOrText(source.RunAdvocacyGapAnalysis);
         var goalAlignments = NestedArray(advocacyGapAnalysis, "goalAlignments");
 
         var payload = new JsonObject
@@ -472,16 +521,15 @@ public sealed class AdvocateToolset : IToolExecutor
             ["sourceRef"] = sourceRef,
             ["documentRef"] = documentRef,
             ["status"] = "completed",
-            ["overallSummary"] = Str(analysis.OverallSummary, 1_500),
+            ["ranOn"] = Date(source.RunCreatedAt),
             ["overallRedFlags"] = redFlags,
             ["goalAnalyses"] = goalAnalyses,
             ["sectionAnalyses"] = sectionAnalyses,
-            ["advocacyGapAnalysis"] = advocacyGapAnalysis,
-            ["analysisRun"] = run.Payload
+            ["advocacyGapAnalysis"] = advocacyGapAnalysis
         };
-        // Least valuable first: cross-document run context, then the parent-priority alignments, then red
-        // flags, then section summaries, then per-goal analyses (the most load-bearing for citations).
-        return new ToolPayload(payload, run.Sections, goalAlignments, redFlags, sectionAnalyses, goalAnalyses);
+        // Least valuable first: the parent-priority alignments, then red flags, then section summaries,
+        // then per-goal analyses (the most load-bearing for citations).
+        return new ToolPayload(payload, goalAlignments, redFlags, sectionAnalyses, goalAnalyses);
     }
 
     private async Task<ToolPayload> GetEtrAnalysisAsync(int etrId, CancellationToken ct)
@@ -1313,6 +1361,20 @@ public sealed class AdvocateToolset : IToolExecutor
     /// </summary>
     private static JsonArray NestedArray(JsonNode? node, string propertyName) =>
         node is JsonObject obj && obj[propertyName] is JsonArray array ? array : new JsonArray();
+
+    /// <summary>
+    /// Like <see cref="NestedArray"/>, but REMOVES the named array from its parent object first, so the
+    /// returned instance can be reattached as its own top-level node in the payload — a <see cref="JsonNode"/>
+    /// may have only one parent at a time, unlike <see cref="NestedArray"/>'s use (left embedded where it
+    /// already lives, only referenced for trimming). Missing or not an array ⇒ a fresh empty array.
+    /// </summary>
+    private static JsonArray DetachArray(JsonObject? obj, string propertyName)
+    {
+        if (obj?[propertyName] is not JsonArray array)
+            return new JsonArray();
+        obj.Remove(propertyName);
+        return array;
+    }
 
     /// <summary>
     /// A stored JSON column → a sanitised copy with every string value entity-escaped and truncated to

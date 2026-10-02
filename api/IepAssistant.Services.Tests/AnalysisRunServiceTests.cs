@@ -992,4 +992,182 @@ public class AnalysisRunServiceTests
         Assert.Equal(AnalysisRunStatus.Running, freshAfter.Status); // untouched — not yet 30 minutes old
         Assert.NotNull(freshAfter.UsageRecordId);
     }
+
+    // --- GetLatestForSourceAsync: the document-page "latest run including this document" read. ---
+
+    private async Task<int> CreateAndExecuteSingleSourceRunAsync(
+        AnalysisRunTestFixture fixture, int iepId, IReadOnlyList<(int GoalId, string Rating)>? goals = null)
+    {
+        int runId;
+        using (var createContext = fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                fixture.ChildId, fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef> { new(AnalysisSourceType.IepDocument, iepId) },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        using (var execContext = fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, new ScriptedClaudeClient(BuildSourceJson(goals: goals)));
+            await execService.ExecuteRunAsync(runId, CancellationToken.None);
+        }
+
+        return runId;
+    }
+
+    [Fact]
+    public async Task GetLatestForSourceAsync_PicksNewestRunIncludingDocument()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+
+        var olderRunId = await CreateAndExecuteSingleSourceRunAsync(_fixture, iepId);
+        var newerRunId = await CreateAndExecuteSingleSourceRunAsync(_fixture, iepId);
+        Assert.True(newerRunId > olderRunId);
+
+        using var readContext = _fixture.CreateContext();
+        var readService = BuildService(readContext, new FakeClaudeClient(null));
+        var result = await readService.GetLatestForSourceAsync(
+            _fixture.ChildId, AnalysisSourceType.IepDocument, iepId, _fixture.OwnerUserId, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(newerRunId, result.Data!.Id);
+    }
+
+    [Fact]
+    public async Task GetLatestForSourceAsync_ReturnsOtherSources_ForMultiSourceRun()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+        var etrId = _fixture.SeedEtrDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef>
+                {
+                    new(AnalysisSourceType.IepDocument, iepId),
+                    new(AnalysisSourceType.EtrDocument, etrId),
+                },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, new ScriptedClaudeClient(
+                BuildSourceJson("present_levels"), BuildSourceJson("eligibility"), BuildSynthesisJson()));
+            await execService.ExecuteRunAsync(runId, CancellationToken.None);
+        }
+
+        using var readContext = _fixture.CreateContext();
+        var readService = BuildService(readContext, new FakeClaudeClient(null));
+        var result = await readService.GetLatestForSourceAsync(
+            _fixture.ChildId, AnalysisSourceType.IepDocument, iepId, _fixture.OwnerUserId, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(runId, result.Data!.Id);
+        var other = Assert.Single(result.Data!.OtherSources);
+        Assert.Equal(nameof(AnalysisSourceType.EtrDocument), other.SourceType);
+        Assert.Equal(etrId, other.SourceId);
+        Assert.False(string.IsNullOrWhiteSpace(other.Label));
+        Assert.False(result.Data!.Stale);
+    }
+
+    [Fact]
+    public async Task GetLatestForSourceAsync_Stale_WhenGoalIdMissingFromCurrentGoals()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+
+        int goalId;
+        using (var context = _fixture.CreateContext())
+        {
+            goalId = context.Goals.Single(g => g.IepSection.IepDocumentId == iepId).Id;
+        }
+
+        var runId = await CreateAndExecuteSingleSourceRunAsync(_fixture, iepId, goals: [(goalId, "green")]);
+
+        // The goal the run rated no longer exists on the document (e.g. a full re-parse).
+        using (var mutate = _fixture.CreateContext())
+        {
+            mutate.Goals.Remove(mutate.Goals.Single(g => g.Id == goalId));
+            mutate.SaveChanges();
+        }
+
+        using var readContext = _fixture.CreateContext();
+        var readService = BuildService(readContext, new FakeClaudeClient(null));
+        var result = await readService.GetLatestForSourceAsync(
+            _fixture.ChildId, AnalysisSourceType.IepDocument, iepId, _fixture.OwnerUserId, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(runId, result.Data!.Id);
+        Assert.True(result.Data!.Stale);
+    }
+
+    [Fact]
+    public async Task GetLatestForSourceAsync_Stale_WhenDocumentUpdatedAfterRun()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+
+        await CreateAndExecuteSingleSourceRunAsync(_fixture, iepId);
+
+        // The document was reprocessed after the run completed. Raw SQL bypasses the auditing
+        // override (which would otherwise stamp UpdatedAt back to "now" on an ordinary EF update).
+        using (var mutate = _fixture.CreateContext())
+        {
+            await mutate.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE IepDocuments SET UpdatedAt = {DateTime.UtcNow.AddMinutes(5)} WHERE Id = {iepId}");
+        }
+
+        using var readContext = _fixture.CreateContext();
+        var readService = BuildService(readContext, new FakeClaudeClient(null));
+        var result = await readService.GetLatestForSourceAsync(
+            _fixture.ChildId, AnalysisSourceType.IepDocument, iepId, _fixture.OwnerUserId, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.True(result.Data!.Stale);
+    }
+
+    [Fact]
+    public async Task GetLatestForSourceAsync_DoesNotReturnRun_ForDocumentOfAnotherChild()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+        await CreateAndExecuteSingleSourceRunAsync(_fixture, iepId);
+
+        int otherChildId;
+        using (var context = _fixture.CreateContext())
+        {
+            var otherChild = new ChildProfile { UserId = _fixture.OwnerUserId, FirstName = "Other", LastName = "Child", IsActive = true };
+            context.ChildProfiles.Add(otherChild);
+            context.SaveChanges();
+            otherChildId = otherChild.Id;
+
+            // The same user genuinely owns otherChildId too — access alone must not be enough to read
+            // the first child's document; this exercises the id-belongs-to-child check specifically,
+            // not merely the access check.
+            context.ChildAccesses.Add(new ChildAccess
+            {
+                ChildProfileId = otherChildId, UserId = _fixture.OwnerUserId, Role = AccessRole.Owner, IsActive = true, AcceptedAt = DateTime.UtcNow
+            });
+            context.SaveChanges();
+        }
+
+        using var readContext = _fixture.CreateContext();
+        var readService = BuildService(readContext, new FakeClaudeClient(null));
+        // The document genuinely belongs to _fixture.ChildId; a request naming a DIFFERENT child
+        // (otherChildId) for the same document id must not leak the run.
+        var result = await readService.GetLatestForSourceAsync(
+            otherChildId, AnalysisSourceType.IepDocument, iepId, _fixture.OwnerUserId, CancellationToken.None);
+
+        Assert.False(result.Success);
+    }
 }
