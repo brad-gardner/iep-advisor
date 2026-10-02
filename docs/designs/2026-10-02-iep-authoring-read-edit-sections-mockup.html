@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IEP authoring — read-first sections (mockup)</title>
+<!-- mockup-v1 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Lora:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: {
+  colors: { brand: {
+    teal: {50:'#EDF8F5',100:'#C8EEE6',200:'#A3E4D7',300:'#6DD4C0',400:'#3BC4A9',500:'#1A9478',600:'#0F6652',700:'#0A4D3E',800:'#06342A'},
+    amber:{50:'#FEF7EC',100:'#FCE8C0',200:'#F9D98A',300:'#F0C050',400:'#D4820F',500:'#A8620A',600:'#7C4808'},
+    slate:{50:'#F5F7F7',100:'#E8ECEC',200:'#D1D8D8',300:'#A8B5B5',400:'#7F9292',500:'#5A6F6F',600:'#3E5252',700:'#2C3C3C',800:'#1E2A2A'},
+    danger:{50:'#FEF2F2',500:'#D2413F',700:'#B91C1C'} } },
+  fontFamily: { serif:['Lora','Georgia','serif'], sans:['DM Sans','system-ui','sans-serif'] },
+  borderRadius: { input:'4px', badge:'6px', button:'8px', card:'12px', modal:'16px' } } } };
+</script>
+<style>
+  body { font-family: 'DM Sans', system-ui, sans-serif; }
+  .prose-read p { margin: 0 0 .5rem; } .prose-read ul { list-style: disc; padding-left: 1.25rem; margin: 0 0 .5rem; }
+  .editor { min-height: 7rem; }
+  [data-mode="read"] .edit-only, [data-mode="edit"] .read-only { display: none; }
+  .clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  :focus-visible { outline: 2px solid #1A9478; outline-offset: 2px; }
+</style>
+</head>
+<body class="bg-[#F3F6F5] text-brand-slate-800" data-mockup-version="v1">
+<div class="flex min-h-screen">
+
+  <!-- App sidebar (unchanged) -->
+  <aside class="w-64 shrink-0 bg-[#1E2A2A] text-brand-slate-200 flex flex-col">
+    <div class="px-6 py-6 flex items-center gap-3">
+      <div class="h-9 w-9 rounded-full bg-brand-teal-500 grid place-items-center text-white font-semibold">✓</div>
+      <div><div class="font-serif text-xl text-white">IEP <span class="text-brand-teal-400">Advisor</span></div>
+      <div class="text-[10px] tracking-widest text-brand-slate-300">NAVIGATE WITH CONFIDENCE</div></div>
+    </div>
+    <nav class="px-3 space-y-1 text-sm">
+      <a class="block px-3 py-2 rounded-button hover:bg-white/5">Home</a>
+      <a class="block px-3 py-2 rounded-button bg-white/10 text-white">Students</a>
+      <a class="block px-3 py-2 rounded-button hover:bg-white/5">Calendar</a>
+      <a class="block px-3 py-2 rounded-button hover:bg-white/5">Notifications</a>
+      <a class="block px-3 py-2 rounded-button hover:bg-white/5">Knowledge Base</a>
+    </nav>
+    <div class="mt-auto px-6 py-5 text-xs text-brand-slate-300">Brad Gardner<br><span class="text-brand-slate-400">brad+district@sht.dev</span></div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 min-w-0 px-10 py-8">
+    <div class="max-w-[1400px] mx-auto">
+      <a class="text-sm text-brand-teal-600 hover:underline" href="#">← Back to documents</a>
+
+      <!-- Tabs -->
+      <div class="mt-5 flex gap-6 border-b border-brand-slate-200 text-sm" role="tablist">
+        <button class="pb-2 border-b-2 border-brand-teal-500 font-medium" role="tab" aria-selected="true">Edit</button>
+        <button class="pb-2 text-brand-slate-500" role="tab">Converge</button>
+      </div>
+
+      <!-- Header -->
+      <header class="mt-6 flex flex-wrap items-center gap-3">
+        <h1 class="font-serif text-3xl">IEP — Jordan Ellis</h1>
+        <span class="text-xs px-2 py-0.5 rounded-badge border border-brand-slate-300 text-brand-slate-600">Draft</span>
+        <span class="text-xs text-brand-slate-500" aria-live="polite">All changes saved · 2 min ago</span>
+        <div class="ml-auto flex gap-2 text-sm">
+          <button class="px-3 py-1.5 rounded-button border border-brand-teal-500 text-brand-teal-600">Share with family</button>
+          <button class="px-3 py-1.5 rounded-button border border-brand-teal-500 text-brand-teal-600">Evidence</button>
+          <button class="px-3 py-1.5 rounded-button border border-brand-teal-500 text-brand-teal-600" onclick="toggleChat()">Ask the assistant</button>
+        </div>
+      </header>
+
+      <!-- Completeness strip (moved from right rail) -->
+      <section class="mt-5 rounded-card border border-brand-slate-200 bg-white" aria-label="Completeness">
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3">
+          <div class="flex items-baseline gap-2"><span class="font-serif text-lg">Completeness</span><span class="text-2xl font-semibold text-brand-teal-600">64%</span></div>
+          <div class="flex-1 min-w-[12rem] h-2 rounded-full bg-brand-slate-100"><div class="h-2 rounded-full bg-brand-teal-500" style="width:64%"></div></div>
+          <span class="inline-flex items-center gap-1.5 text-sm"><span class="h-2 w-2 rounded-full bg-brand-danger-500"></span>2 required</span>
+          <span class="inline-flex items-center gap-1.5 text-sm"><span class="h-2 w-2 rounded-full bg-brand-amber-400"></span>4 advisory</span>
+          <button class="text-sm text-brand-teal-600 hover:underline" aria-expanded="false" onclick="this.closest('section').querySelector('.items').classList.toggle('hidden'); this.setAttribute('aria-expanded', this.getAttribute('aria-expanded')==='true'?'false':'true')">Show items ▾</button>
+        </div>
+        <ul class="items hidden border-t border-brand-slate-100 px-5 py-3 grid gap-2 sm:grid-cols-2 text-sm">
+          <li><a href="#eligibility" class="text-brand-danger-700 hover:underline">Required · Eligibility — disability category is empty</a></li>
+          <li><a href="#placement" class="text-brand-danger-700 hover:underline">Required · Placement — LRE explanation is empty</a></li>
+          <li><a href="#goals" class="text-brand-amber-600 hover:underline">Advisory · Goal 2 has no owner</a></li>
+          <li><a href="#goals" class="text-brand-amber-600 hover:underline">Advisory · Goal 2 has no objectives</a></li>
+          <li><a href="#services" class="text-brand-amber-600 hover:underline">Advisory · Occupational therapy service has no owner</a></li>
+          <li><a href="#transition" class="text-brand-amber-600 hover:underline">Advisory · Transition item carried forward — review it</a></li>
+        </ul>
+      </section>
+
+      <!-- Proposed edits -->
+      <details class="mt-4 rounded-card border border-brand-slate-200 bg-white px-5 py-3 text-sm">
+        <summary class="cursor-pointer font-medium">Proposed edits from meetings (1)</summary>
+        <p class="mt-2 text-brand-slate-600">Annual review 9/24 — “Add weekly check-in with counselor to Services.”</p>
+      </details>
+
+      <!-- Two-column: nav + wide content -->
+      <div class="mt-6 grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)]">
+        <nav class="lg:sticky lg:top-6 self-start text-sm" aria-label="Sections">
+          <ol class="space-y-0.5">
+            <li><a href="#profile" class="flex items-center justify-between px-3 py-2 rounded-button hover:bg-white"><span>1 Student Profile</span><span class="text-brand-teal-500">●</span></a></li>
+            <li><a href="#present" class="flex items-center justify-between px-3 py-2 rounded-button bg-brand-teal-50 text-brand-teal-700 font-medium"><span>2 Present Levels</span><span class="text-xs">editing</span></a></li>
+            <li><a href="#eligibility" class="flex items-center justify-between px-3 py-2 rounded-button hover:bg-white"><span>3 Eligibility</span><span class="text-brand-danger-500">●</span></a></li>
+            <li><a href="#placement" class="flex items-center justify-between px-3 py-2 rounded-button hover:bg-white"><span>4 Placement</span><span class="text-brand-danger-500">●</span></a></li>
+            <li><a class="flex px-3 py-2 rounded-button hover:bg-white">5 Progress Monitoring</a></li>
+            <li><a class="flex px-3 py-2 rounded-button hover:bg-white">6 Special Factors</a></li>
+            <li><a href="#goals" class="flex items-center justify-between px-3 py-2 rounded-button hover:bg-white"><span>7 Goals</span><span class="text-brand-amber-400">●</span></a></li>
+            <li><a href="#services" class="flex items-center justify-between px-3 py-2 rounded-button hover:bg-white"><span>8 Services</span><span class="text-brand-amber-400">●</span></a></li>
+            <li><a href="#accom" class="flex px-3 py-2 rounded-button hover:bg-white">9 Accommodations</a></li>
+            <li><a href="#transition" class="flex items-center justify-between px-3 py-2 rounded-button hover:bg-white"><span>10 Transition</span><span class="text-brand-amber-400">●</span></a></li>
+          </ol>
+          <p class="mt-3 px-3 text-xs text-brand-slate-500">Press [ / ] to move between sections · E to edit</p>
+        </nav>
+
+        <div class="space-y-6 min-w-0">
+
+          <!-- READ section -->
+          <section id="profile" class="rounded-card border border-brand-slate-200 bg-white" data-mode="read">
+            <header class="flex items-center gap-3 px-6 pt-5">
+              <h2 class="font-serif text-xl">Student Profile</h2>
+              <button class="read-only ml-auto text-sm px-3 py-1.5 rounded-button border border-brand-slate-300 hover:border-brand-teal-500" onclick="setMode(this,'edit')">Edit</button>
+              <div class="edit-only ml-auto flex items-center gap-3 text-sm"><span class="text-brand-slate-500">Saved</span><button class="px-3 py-1.5 rounded-button text-brand-slate-600 hover:underline" onclick="setMode(this,'read')">Discard changes</button><button class="px-3 py-1.5 rounded-button bg-brand-teal-500 text-white" onclick="setMode(this,'read')">Done</button></div>
+            </header>
+            <div class="read-only px-6 pb-6 pt-3 prose-read text-[15px] leading-relaxed text-brand-slate-700">
+              <p>Jordan is a curious, verbal 4th grader who loves building with LEGO and talking about weather. He works best with clear routines and visual schedules, and responds well to specific praise.</p>
+              <ul><li>Strengths: oral vocabulary, math facts, peer relationships in small groups</li><li>Family priorities: reading independence; calmer transitions after recess</li></ul>
+            </div>
+            <div class="edit-only px-6 pb-6 pt-3"><div class="editor rounded-input border border-brand-slate-300 p-3 text-sm text-brand-slate-600">[rich-text editor]</div></div>
+          </section>
+
+          <!-- EDIT section (open) -->
+          <section id="present" class="rounded-card border-2 border-brand-teal-400 bg-white shadow-sm" data-mode="edit">
+            <header class="flex items-center gap-3 px-6 pt-5">
+              <h2 class="font-serif text-xl">Present Levels</h2>
+              <span class="text-xs px-2 py-0.5 rounded-badge bg-brand-teal-50 text-brand-teal-700">Editing</span>
+              <button class="read-only ml-auto text-sm px-3 py-1.5 rounded-button border border-brand-slate-300" onclick="setMode(this,'edit')">Edit</button>
+              <div class="edit-only ml-auto flex items-center gap-3 text-sm"><span class="text-brand-slate-500" aria-live="polite">Saving…</span><button class="px-3 py-1.5 rounded-button text-brand-slate-600 hover:underline" onclick="setMode(this,'read')">Discard changes</button><button class="px-3 py-1.5 rounded-button bg-brand-teal-500 text-white" onclick="setMode(this,'read')">Done</button></div>
+            </header>
+            <div class="read-only px-6 pb-6 pt-3 prose-read text-[15px] text-brand-slate-700"><p>Reading: DIBELS ORF 62 wcpm (benchmark 94)…</p></div>
+            <div class="edit-only px-6 pb-6 pt-3 space-y-5">
+              <div>
+                <label class="text-sm font-medium">Academic achievement</label>
+                <div class="mt-1.5 rounded-input border border-brand-slate-300">
+                  <div class="flex gap-3 border-b border-brand-slate-200 bg-brand-slate-50 px-3 py-1.5 text-sm text-brand-slate-600"><b>B</b><i>I</i><s>S</s><span>H2</span><span>H3</span><span>• list</span><span>1. list</span><span>“ ”</span><span>link</span></div>
+                  <div class="editor p-3 text-[15px] leading-relaxed">Reading: On the fall DIBELS benchmark Jordan read 62 words correct per minute (grade benchmark 94) with 91% accuracy. He decodes CVC and CVCe words reliably but guesses on multisyllabic words…<span class="animate-pulse">|</span></div>
+                </div>
+                <div class="mt-2 flex gap-2 text-sm"><button class="px-3 py-1 rounded-button border border-brand-teal-500 text-brand-teal-600">✦ AI help</button><button class="px-3 py-1 rounded-button border border-brand-slate-300">Pull from student</button></div>
+              </div>
+              <div>
+                <label class="text-sm font-medium">Functional performance</label>
+                <div class="mt-1.5 editor rounded-input border border-brand-slate-300 p-3 text-[15px] text-brand-slate-500">Describe communication, social-emotional and adaptive skills…</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- EMPTY section -->
+          <section id="eligibility" class="rounded-card border border-brand-slate-200 bg-white" data-mode="read">
+            <header class="flex items-center gap-3 px-6 pt-5"><h2 class="font-serif text-xl">Eligibility</h2>
+              <span class="text-xs px-2 py-0.5 rounded-badge bg-brand-danger-50 text-brand-danger-700">1 required item</span>
+              <button class="read-only ml-auto text-sm px-3 py-1.5 rounded-button border border-brand-slate-300" onclick="setMode(this,'edit')">Edit</button>
+              <div class="edit-only ml-auto flex gap-3 text-sm"><button class="px-3 py-1.5 rounded-button bg-brand-teal-500 text-white" onclick="setMode(this,'read')">Done</button></div></header>
+            <div class="read-only px-6 pb-6 pt-3"><p class="text-sm text-brand-slate-500">Not started. <button class="text-brand-teal-600 hover:underline" onclick="setMode(this,'edit')">Start editing</button></p></div>
+            <div class="edit-only px-6 pb-6 pt-3"><div class="editor rounded-input border border-brand-slate-300 p-3 text-sm">[fields]</div></div>
+          </section>
+
+          <!-- GOALS -->
+          <section id="goals" class="rounded-card border border-brand-slate-200 bg-white">
+            <header class="flex items-center gap-3 px-6 pt-5"><h2 class="font-serif text-xl">Goals</h2><span class="text-sm text-brand-slate-500">3 goals</span>
+              <button class="ml-auto text-sm px-3 py-1.5 rounded-button border border-brand-teal-500 text-brand-teal-600">+ Add goal</button></header>
+            <div class="px-6 pb-6 pt-4 space-y-3">
+
+              <!-- Goal card read -->
+              <article class="rounded-card border border-brand-slate-200 p-4 hover:border-brand-slate-300">
+                <div class="flex items-start gap-4">
+                  <div class="h-8 w-8 shrink-0 rounded-full bg-brand-teal-50 text-brand-teal-700 grid place-items-center font-semibold">1</div>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2 text-xs"><span class="px-2 py-0.5 rounded-badge bg-brand-slate-100">Reading fluency</span><span class="px-2 py-0.5 rounded-badge border border-brand-slate-200">Carried from 2025 IEP</span></div>
+                    <p class="mt-2 text-[15px] leading-relaxed clamp-3">By October 2027, given a grade-level passage, Jordan will read aloud at 100 words correct per minute with 95% accuracy across three consecutive weekly probes.</p>
+                    <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-brand-slate-600"><span>📏 Weekly 1-min ORF probe</span><span>🗓 Reports quarterly</span><span>☰ 3 objectives</span></div>
+                  </div>
+                  <div class="text-right">
+                    <div class="flex items-center gap-2 text-sm"><span class="h-7 w-7 rounded-full bg-brand-amber-100 text-brand-amber-600 grid place-items-center text-xs font-semibold">SC</span><span>Steph Case<br><span class="text-xs text-brand-slate-500">Intervention specialist</span></span></div>
+                    <button class="mt-3 text-sm px-3 py-1.5 rounded-button border border-brand-slate-300">Edit goal</button>
+                  </div>
+                </div>
+              </article>
+
+              <!-- Goal 2 focused editor (open) -->
+              <article class="rounded-card border-2 border-brand-teal-400 bg-white shadow-sm" aria-label="Editing goal 2">
+                <header class="flex items-center gap-3 border-b border-brand-slate-100 px-5 py-3">
+                  <div class="h-8 w-8 rounded-full bg-brand-teal-500 text-white grid place-items-center font-semibold">2</div>
+                  <h3 class="font-serif text-lg">Editing goal 2</h3>
+                  <span class="text-sm text-brand-slate-500" aria-live="polite">Saved just now</span>
+                  <div class="ml-auto flex items-center gap-3 text-sm"><button class="text-brand-danger-700 hover:underline">Remove goal…</button><button class="text-brand-slate-600 hover:underline">Discard changes</button><button class="px-3 py-1.5 rounded-button bg-brand-teal-500 text-white">Done</button></div>
+                </header>
+                <div class="grid gap-6 p-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
+                  <div class="space-y-5 min-w-0">
+                    <div class="grid gap-4 sm:grid-cols-2">
+                      <label class="text-sm font-medium">Goal area<select class="mt-1.5 w-full rounded-input border border-brand-slate-300 px-3 py-2 font-normal"><option>Written expression</option></select></label>
+                      <label class="text-sm font-medium">Timeframe<input class="mt-1.5 w-full rounded-input border border-brand-slate-300 px-3 py-2 font-normal" value="By October 2027"></label>
+                    </div>
+                    <div>
+                      <label class="text-sm font-medium">Measurable annual goal</label>
+                      <div class="mt-1.5 rounded-input border border-brand-slate-300"><div class="flex gap-3 border-b border-brand-slate-200 bg-brand-slate-50 px-3 py-1 text-xs text-brand-slate-600"><b>B</b><i>I</i><span>• list</span><span>1. list</span></div>
+                      <div class="editor p-3 text-[15px] leading-relaxed">Given a grade-level writing prompt and a graphic organizer, Jordan will write a 5-sentence paragraph with a topic sentence, three supporting details and a conclusion, scoring 3 of 4 on the district writing rubric in 4 of 5 samples.</div></div>
+                      <div class="mt-2 flex gap-2 text-sm"><button class="px-3 py-1 rounded-button border border-brand-teal-500 text-brand-teal-600">✦ AI help</button><button class="px-3 py-1 rounded-button border border-brand-slate-300">Check SMART</button></div>
+                    </div>
+                    <div class="grid gap-4 md:grid-cols-2">
+                      <div><label class="text-sm font-medium">Baseline</label><div class="mt-1.5 editor rounded-input border border-brand-slate-300 p-3 text-[15px]">Writes 2–3 related sentences without a topic sentence; rubric score 1 of 4 on 3 fall samples.</div></div>
+                      <div><label class="text-sm font-medium">Target / mastery criteria</label><div class="mt-1.5 editor rounded-input border border-brand-slate-300 p-3 text-[15px]">Rubric 3 of 4 in 4 of 5 consecutive samples.</div></div>
+                    </div>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                      <label class="text-sm font-medium">How progress is measured<input class="mt-1.5 w-full rounded-input border border-brand-slate-300 px-3 py-2 font-normal" value="Monthly writing samples scored with district rubric"></label>
+                      <label class="text-sm font-medium">Progress reported<select class="mt-1.5 w-full rounded-input border border-brand-slate-300 px-3 py-2 font-normal"><option>Quarterly, with report cards</option></select></label>
+                    </div>
+
+                    <!-- Objectives -->
+                    <div>
+                      <div class="flex items-center"><h4 class="text-sm font-semibold">Short-term objectives / benchmarks</h4><span class="ml-2 text-xs text-brand-slate-500">ordered</span><button class="ml-auto text-sm text-brand-teal-600 hover:underline">+ Add objective</button></div>
+                      <ol class="mt-2 space-y-2">
+                        <li class="grid grid-cols-[1.5rem_minmax(0,1fr)_12rem_9rem_2rem] items-start gap-3 rounded-input border border-brand-slate-200 p-3">
+                          <span class="cursor-grab text-brand-slate-400" aria-label="Reorder">⋮⋮</span>
+                          <textarea class="min-h-[3rem] rounded-input border border-brand-slate-300 px-2 py-1.5 text-sm" aria-label="Objective 1">Write a topic sentence that matches the prompt</textarea>
+                          <input class="rounded-input border border-brand-slate-300 px-2 py-1.5 text-sm" aria-label="Criteria" value="4 of 5 samples">
+                          <input class="rounded-input border border-brand-slate-300 px-2 py-1.5 text-sm" aria-label="Target date" value="Jan 2027">
+                          <button class="text-brand-slate-400 hover:text-brand-danger-700" aria-label="Remove objective 1">✕</button></li>
+                        <li class="grid grid-cols-[1.5rem_minmax(0,1fr)_12rem_9rem_2rem] items-start gap-3 rounded-input border border-brand-slate-200 p-3">
+                          <span class="cursor-grab text-brand-slate-400">⋮⋮</span>
+                          <textarea class="min-h-[3rem] rounded-input border border-brand-slate-300 px-2 py-1.5 text-sm">Add three supporting details using a graphic organizer</textarea>
+                          <input class="rounded-input border border-brand-slate-300 px-2 py-1.5 text-sm" value="3 of 4 samples">
+                          <input class="rounded-input border border-brand-slate-300 px-2 py-1.5 text-sm" value="Apr 2027">
+                          <button class="text-brand-slate-400">✕</button></li>
+                      </ol>
+                    </div>
+                  </div>
+
+                  <!-- Goal side panel: owner + evidence -->
+                  <aside class="space-y-4">
+                    <div class="rounded-card border border-brand-slate-200 p-4">
+                      <label class="text-sm font-semibold" for="owner2">Owner</label>
+                      <p class="text-xs text-brand-slate-500">Responsible for instruction and progress data</p>
+                      <select id="owner2" class="mt-2 w-full rounded-input border border-brand-amber-400 px-3 py-2 text-sm">
+                        <option>Choose a team member…</option><option>Steph Case — Intervention specialist</option><option>Maria Lopez — General education teacher</option><option>Dev Patel — Speech-language pathologist</option></select>
+                      <p class="mt-1.5 text-xs text-brand-amber-600">No owner yet</p>
+                    </div>
+                    <div class="rounded-card border border-brand-slate-200 p-4 text-sm">
+                      <div class="font-semibold">Evidence</div>
+                      <ul class="mt-2 space-y-1.5 text-brand-slate-600"><li>Fall writing samples (3) · Sep 2026</li><li>Parent note: “writes lists, not paragraphs”</li></ul>
+                      <button class="mt-2 text-brand-teal-600 hover:underline">Open evidence</button>
+                    </div>
+                  </aside>
+                </div>
+              </article>
+
+              <!-- Goal 3 read -->
+              <article class="rounded-card border border-brand-slate-200 p-4">
+                <div class="flex items-start gap-4">
+                  <div class="h-8 w-8 shrink-0 rounded-full bg-brand-teal-50 text-brand-teal-700 grid place-items-center font-semibold">3</div>
+                  <div class="min-w-0 flex-1"><div class="text-xs"><span class="px-2 py-0.5 rounded-badge bg-brand-slate-100">Self-regulation</span></div>
+                    <p class="mt-2 text-[15px] clamp-3">When transitioning from recess, Jordan will use a self-selected calming strategy and begin the next task within 3 minutes on 80% of observed transitions.</p>
+                    <div class="mt-3 flex gap-5 text-sm text-brand-slate-600"><span>📏 Daily point sheet</span><span>🗓 Reports quarterly</span><span>☰ 2 objectives</span></div></div>
+                  <div class="text-right"><div class="flex items-center gap-2 text-sm"><span class="h-7 w-7 rounded-full bg-brand-teal-100 text-brand-teal-700 grid place-items-center text-xs font-semibold">JR</span><span>Jamie Ruiz<br><span class="text-xs text-brand-slate-500">Counselor</span></span></div>
+                  <button class="mt-3 text-sm px-3 py-1.5 rounded-button border border-brand-slate-300">Edit goal</button></div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <!-- SERVICES -->
+          <section id="services" class="rounded-card border border-brand-slate-200 bg-white">
+            <header class="flex items-center gap-3 px-6 pt-5"><h2 class="font-serif text-xl">Services</h2><span class="text-sm text-brand-slate-500">4 services · 255 min/week</span>
+              <button class="ml-auto text-sm px-3 py-1.5 rounded-button border border-brand-teal-500 text-brand-teal-600">+ Add service</button></header>
+            <div class="px-6 pb-6 pt-4 overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="text-left text-xs uppercase tracking-wide text-brand-slate-500"><tr class="border-b border-brand-slate-200"><th class="py-2 pr-4 font-medium">Service</th><th class="py-2 pr-4 font-medium">Frequency</th><th class="py-2 pr-4 font-medium">Setting</th><th class="py-2 pr-4 font-medium">Dates</th><th class="py-2 pr-4 font-medium">Owner</th><th></th></tr></thead>
+                <tbody class="divide-y divide-brand-slate-100">
+                  <tr><td class="py-3 pr-4"><div class="font-medium">Specially designed instruction — Reading</div><div class="text-xs text-brand-slate-500">Intervention specialist</div></td><td class="pr-4">5×/week · 30 min</td><td class="pr-4">Special education setting</td><td class="pr-4">Oct 2026 – Oct 2027</td><td class="pr-4">Steph Case</td><td class="text-right"><button class="px-2.5 py-1 rounded-button border border-brand-slate-300">Edit</button></td></tr>
+                  <tr><td class="py-3 pr-4"><div class="font-medium">Speech-language therapy</div><div class="text-xs text-brand-slate-500">Speech-language pathologist</div></td><td class="pr-4">2×/week · 20 min</td><td class="pr-4">Special education setting</td><td class="pr-4">Oct 2026 – Oct 2027</td><td class="pr-4">Dev Patel</td><td class="text-right"><button class="px-2.5 py-1 rounded-button border border-brand-slate-300">Edit</button></td></tr>
+                  <tr class="bg-brand-teal-50/40"><td colspan="6" class="p-0">
+                    <!-- Service editor (open) -->
+                    <div class="m-2 rounded-card border-2 border-brand-teal-400 bg-white p-4">
+                      <div class="flex items-center gap-3"><h3 class="font-serif text-lg">Editing: Occupational therapy</h3><span class="text-sm text-brand-slate-500">Saved</span>
+                        <div class="ml-auto flex gap-3"><button class="text-brand-danger-700 hover:underline">Remove</button><button class="text-brand-slate-600 hover:underline">Discard changes</button><button class="px-3 py-1.5 rounded-button bg-brand-teal-500 text-white">Done</button></div></div>
+                      <div class="mt-4 grid gap-4 md:grid-cols-3">
+                        <label class="font-medium">Service type<select class="mt-1.5 w-full rounded-input border border-brand-slate-300 px-3 py-2 font-normal"><option>Occupational therapy</option></select></label>
+                        <label class="font-medium">Provider role<select class="mt-1.5 w-full rounded-input border border-brand-slate-300 px-3 py-2 font-normal"><option>Occupational therapist</option></select></label>
+                        <label class="font-medium">Owner<select class="mt-1.5 w-full rounded-input border border-brand-amber-400 px-3 py-2 font-normal"><option>Choose a team member…</option><option>Ana Ito — Occupational therapist</option></select></label>
+                        <div class="font-medium">Frequency<div class="mt-1.5 flex gap-2"><input class="w-20 rounded-input border border-brand-slate-300 px-3 py-2 font-normal" value="1"><span class="self-center font-normal">×</span><select class="flex-1 rounded-input border border-brand-slate-300 px-3 py-2 font-normal"><option>per week</option><option>per month</option></select></div></div>
+                        <label class="font-medium">Minutes per session<input class="mt-1.5 w-full rounded-input border border-brand-slate-300 px-3 py-2 font-normal" value="30"></label>
+                        <label class="font-medium">Setting<select class="mt-1.5 w-full rounded-input border border-brand-slate-300 px-3 py-2 font-normal"><option>General education classroom</option><option>Special education setting</option></select></label>
+                        <label class="font-medium">Start<input type="text" class="mt-1.5 w-full rounded-input border border-brand-slate-300 px-3 py-2 font-normal" value="Oct 12, 2026"></label>
+                        <label class="font-medium">End<input type="text" class="mt-1.5 w-full rounded-input border border-brand-slate-300 px-3 py-2 font-normal" value="Oct 11, 2027"></label>
+                        <label class="font-medium md:col-span-3">Notes<textarea class="mt-1.5 w-full min-h-[4rem] rounded-input border border-brand-slate-300 px-3 py-2 font-normal">Consult with classroom teacher on handwriting tools; push-in during writing block.</textarea></label>
+                      </div>
+                    </div>
+                  </td></tr>
+                  <tr><td class="py-3 pr-4"><div class="font-medium">Counseling</div><div class="text-xs text-brand-slate-500">Counselor</div></td><td class="pr-4">1×/week · 25 min</td><td class="pr-4">Special education setting</td><td class="pr-4">Oct 2026 – Oct 2027</td><td class="pr-4">Jamie Ruiz</td><td class="text-right"><button class="px-2.5 py-1 rounded-button border border-brand-slate-300">Edit</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ACCOMMODATIONS -->
+          <section id="accom" class="rounded-card border border-brand-slate-200 bg-white" data-mode="read">
+            <header class="flex items-center gap-3 px-6 pt-5"><h2 class="font-serif text-xl">Accommodations</h2>
+              <button class="read-only ml-auto text-sm px-3 py-1.5 rounded-button border border-brand-slate-300" onclick="setMode(this,'edit')">Edit</button>
+              <div class="edit-only ml-auto flex gap-3 text-sm"><button class="text-brand-slate-600 hover:underline" onclick="setMode(this,'read')">Discard changes</button><button class="px-3 py-1.5 rounded-button bg-brand-teal-500 text-white" onclick="setMode(this,'read')">Done</button></div></header>
+            <div class="read-only grid gap-6 px-6 pb-6 pt-3 md:grid-cols-2 text-sm">
+              <div><h3 class="text-xs uppercase tracking-wide text-brand-slate-500">Instruction</h3>
+                <ul class="mt-2 space-y-2"><li class="flex justify-between gap-4"><span>Visual schedule and 2-minute transition warnings</span><span class="text-brand-slate-500 whitespace-nowrap">Maria Lopez</span></li><li class="flex justify-between gap-4"><span>Graphic organizers for writing</span><span class="text-brand-slate-500 whitespace-nowrap">Steph Case</span></li></ul></div>
+              <div><h3 class="text-xs uppercase tracking-wide text-brand-slate-500">Testing</h3>
+                <ul class="mt-2 space-y-2"><li class="flex justify-between gap-4"><span>Extended time (1.5×) and small-group setting</span><span class="text-brand-slate-500 whitespace-nowrap">Steph Case</span></li></ul></div>
+            </div>
+            <div class="edit-only px-6 pb-6 pt-3 space-y-3 text-sm">
+              <div class="grid gap-3 md:grid-cols-[10rem_minmax(0,1fr)_14rem_2rem] items-start rounded-input border border-brand-slate-200 p-3">
+                <select class="rounded-input border border-brand-slate-300 px-2 py-2"><option>Instruction</option></select>
+                <textarea class="min-h-[3.5rem] rounded-input border border-brand-slate-300 px-3 py-2">Visual schedule and 2-minute transition warnings</textarea>
+                <select class="rounded-input border border-brand-slate-300 px-2 py-2"><option>Maria Lopez — Gen ed teacher</option></select>
+                <button aria-label="Remove">✕</button></div>
+              <button class="text-brand-teal-600 hover:underline">+ Add accommodation</button>
+            </div>
+          </section>
+
+          <!-- TRANSITION -->
+          <section id="transition" class="rounded-card border border-brand-slate-200 bg-white" data-mode="read">
+            <header class="flex items-center gap-3 px-6 pt-5"><h2 class="font-serif text-xl">Transition</h2>
+              <span class="text-xs px-2 py-0.5 rounded-badge bg-brand-amber-50 text-brand-amber-600">1 item to review</span>
+              <button class="read-only ml-auto text-sm px-3 py-1.5 rounded-button border border-brand-slate-300" onclick="setMode(this,'edit')">Edit</button>
+              <div class="edit-only ml-auto flex gap-3 text-sm"><button class="text-brand-slate-600 hover:underline" onclick="setMode(this,'read')">Discard changes</button><button class="px-3 py-1.5 rounded-button bg-brand-teal-500 text-white" onclick="setMode(this,'read')">Done</button></div></header>
+            <div class="read-only px-6 pb-6 pt-3 text-sm space-y-3">
+              <div class="rounded-input border border-brand-slate-200 p-3"><div class="flex justify-between"><span class="text-xs uppercase tracking-wide text-brand-slate-500">Education / training</span><span class="text-brand-slate-500">Owner: Steph Case</span></div><p class="mt-1">Explore middle-school elective options with interest inventory; tour STEM lab in spring.</p></div>
+            </div>
+            <div class="edit-only px-6 pb-6 pt-3"><div class="editor rounded-input border border-brand-slate-300 p-3 text-sm">[goal area, large services text, owner picker]</div></div>
+          </section>
+
+          <!-- Finalize -->
+          <div class="rounded-card border border-brand-slate-200 bg-white px-6 py-4 flex items-center gap-4"><p class="text-sm text-brand-slate-600">Finalize locks this version and makes it the student's current IEP.</p><button class="ml-auto px-4 py-2 rounded-button bg-brand-teal-500 text-white">Finalize IEP</button></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Chat drawer (replaces 4th column) -->
+  <aside id="chat" class="hidden fixed right-0 top-0 h-full w-[24rem] border-l border-brand-slate-200 bg-white shadow-xl p-5" aria-label="Assistant">
+    <div class="flex items-center"><h2 class="font-serif text-lg">Ask the assistant</h2><button class="ml-auto" onclick="toggleChat()" aria-label="Close">✕</button></div>
+    <p class="mt-3 text-sm text-brand-slate-600">Opens as a drawer so the editing column keeps its width.</p>
+  </aside>
+</div>
+<script>
+function setMode(el, mode) { const s = el.closest('[data-mode]'); s.dataset.mode = mode;
+  s.classList.toggle('border-2', mode==='edit'); s.classList.toggle('border-brand-teal-400', mode==='edit'); }
+function toggleChat() { document.getElementById('chat').classList.toggle('hidden'); }
+</script>
+</body>
+</html>
