@@ -662,6 +662,13 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
         if (pending.Count == 0)
             return;
 
+        // Both saves below are wrapped in one transaction (mirroring RebuildIepRunAsync /
+        // RebuildEtrRunAsync) so they commit — or roll back — together: without this, a crash or
+        // thrown exception between them could leave the run + source committed with NO sections, which
+        // a later pass would never revisit (BackfillSourceKey already exists and NeedsIepRebuild /
+        // NeedsEtrRebuild would see no shape or UpdatedAt change to trigger a rebuild).
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+
         // First save: AnalysisRun + AnalysisRunSource get their generated Ids. The auditing
         // SaveChanges override stamps CreatedAt to now; we restore the intended value below.
         await _context.SaveChangesAsync(ct);
@@ -682,6 +689,7 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
         // Second save: sections linked to the now-persisted run + source, plus the restored
         // CreatedAt (the run is now Modified, so the override leaves CreatedAt untouched).
         await _context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
 
         pending.Clear();
     }
@@ -743,10 +751,14 @@ public class AnalysisRunBackfillService : IAnalysisRunBackfillService
             for (var i = 0; i < elements.Length; i++)
             {
                 var element = elements[i];
-                var sectionKind = element.ValueKind == JsonValueKind.Object
+                var rawSectionKind = element.ValueKind == JsonValueKind.Object
                     && element.TryGetProperty("sectionType", out var st)
-                        ? st.GetString() ?? "other"
-                        : "other";
+                        ? st.GetString()
+                        : null;
+                // Legacy data is never trusted any more than a live model response: the same
+                // sanitization (length cap, [a-z0-9_] only, reserved-kind remap to "other") applies here
+                // — see AnalysisRunSectionKinds.Sanitize's doc comment.
+                var sectionKind = AnalysisRunSectionKinds.Sanitize(rawSectionKind);
 
                 sections.Add(new AnalysisRunSection
                 {

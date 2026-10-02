@@ -76,6 +76,39 @@ public static class AnalysisRunSectionKinds
     public const string IepGoals = "iep_goals";
     public const string EtrCompleteness = "etr_completeness";
     public const string EtrEligibility = "etr_eligibility";
+
+    /// <summary>
+    /// Sanitizes an ordinary sectionKind — model-returned (the live engine, <c>AnalysisRunService</c>)
+    /// or legacy-data-returned (the backfill, <c>AnalysisRunBackfillService</c>'s
+    /// <c>BuildSectionsFromJsonArray</c>) — neither of which is ever trusted to actually match the
+    /// expected shape: lowercase, keep only [a-z0-9_], truncate to the column's 50-char max, and remap
+    /// an empty or reserved result to "other" so it can never collide with one of this engine's
+    /// structurally distinct typed section kinds (iep_goals / etr_completeness / etr_eligibility each
+    /// have their own object shape, not an AnalysisRunSectionResult). Shared so both callers apply
+    /// exactly the same rule.
+    /// </summary>
+    internal static string Sanitize(string? kind)
+    {
+        if (string.IsNullOrWhiteSpace(kind))
+            return "other";
+
+        var filtered = new string(kind
+            .ToLowerInvariant()
+            .Where(c => (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')
+            .ToArray());
+
+        if (filtered.Length > 50)
+            filtered = filtered[..50];
+
+        if (filtered.Length == 0)
+            return "other";
+
+        return filtered switch
+        {
+            IepGoals or EtrCompleteness or EtrEligibility => "other",
+            _ => filtered
+        };
+    }
 }
 
 public class AnalysisRunSectionResult

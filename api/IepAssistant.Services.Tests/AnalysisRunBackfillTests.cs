@@ -617,6 +617,55 @@ public class AnalysisRunBackfillTests
     }
 
     [Fact]
+    public async Task BackfillAsync_SanitizesLegacySectionType_OverlongAndReservedKindsAreNormalized()
+    {
+        // Review pass 2, item 6: BuildSectionsFromJsonArray must apply the SAME sanitization the live
+        // engine applies to a model-returned sectionKind (AnalysisRunSectionKinds.Sanitize) — legacy data
+        // is no more trustworthy than a Claude response. Exercises an over-50-char sectionType (must be
+        // truncated to 50 chars) and a sectionType that collides with one of the engine's reserved,
+        // structurally distinct typed section kinds (must remap to "other" rather than silently
+        // colliding with iep_goals' own object shape).
+        using var fixture = new AnalysisRunTestFixture();
+        var iepDocId = fixture.SeedIepDocument();
+
+        var overlongKind = new string('x', 75);
+        var sectionAnalyses = $$"""
+            [
+              {"sectionType":"{{overlongKind}}","plainLanguageSummary":"Overlong"},
+              {"sectionType":"iep_goals","plainLanguageSummary":"Collides with the reserved kind"}
+            ]
+            """;
+
+        using (var seed = fixture.CreateContext())
+        {
+            SeedIepAnalysis(seed, iepDocId, sectionAnalyses: sectionAnalyses);
+        }
+
+        BackfillResult result;
+        using (var context = fixture.CreateContext())
+        {
+            result = await BuildService(context).BackfillAsync();
+        }
+
+        Assert.Equal(1, result.Created);
+
+        using var verify = fixture.CreateContext();
+        var run = verify.AnalysisRuns.Single(r => r.BackfillSourceKey != null);
+        var sections = verify.AnalysisRunSections
+            .Where(s => s.AnalysisRunId == run.Id)
+            .OrderBy(s => s.DisplayOrder)
+            .ToList();
+
+        Assert.Equal(2, sections.Count);
+        Assert.Equal(50, sections[0].SectionKind.Length);
+        Assert.Equal(overlongKind[..50], sections[0].SectionKind);
+        // Reserved kind collision remaps to "other" — never left as the literal "iep_goals" string on an
+        // ordinary (non-typed) AnalysisRunSection row, which would otherwise be misread as this run's
+        // actual iep_goals section by MapSectionToModel.
+        Assert.Equal("other", sections[1].SectionKind);
+    }
+
+    [Fact]
     public async Task BackfillAsync_MidBatchRebuild_DoesNotLosePendingCreatesRestoredCreatedAt()
     {
         // Item G: a single batch can contain BOTH new legacy rows needing CREATE and an existing

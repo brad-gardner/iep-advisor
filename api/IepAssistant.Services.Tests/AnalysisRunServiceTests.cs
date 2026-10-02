@@ -494,10 +494,12 @@ public class AnalysisRunServiceTests
     }
 
     [Fact]
-    public async Task ExecuteRunAsync_AllSourcesFail_MixedFailureKinds_RunErrorsAndRefunds()
+    public async Task ExecuteRunAsync_AllSourcesFail_MixedFailureKinds_AnyInvalidResponse_RunErrorsNoRefund()
     {
-        // Restored carve-out (item D): a MIXED all-failed run (some InvalidResponse, some a real
-        // provider/transient failure) still refunds — only an all-InvalidResponse failure does not.
+        // Refund rule (review pass 2, item 2 — widened from the original "every failure was
+        // InvalidResponse" carve-out): a MIXED all-failed run with even ONE InvalidResponse failure
+        // (alongside a real provider/transient failure here) must NOT refund — only a run where NO
+        // failure was InvalidResponse refunds (see the all-transient test below).
         using var _fixture = new AnalysisRunTestFixture();
         var iepId = _fixture.SeedIepDocument();
         var etrId = _fixture.SeedEtrDocument();
@@ -538,11 +540,11 @@ public class AnalysisRunServiceTests
         using var verifyContext = _fixture.CreateContext();
         var run = verifyContext.AnalysisRuns.Find(runId)!;
         Assert.Equal(AnalysisRunStatus.Error, run.Status);
-        Assert.Null(run.UsageRecordId); // refunded — not every failure was InvalidResponse
+        Assert.NotNull(run.UsageRecordId); // NOT refunded — one failure was InvalidResponse
 
         var usageAfter = verifyContext.UsageRecords.Count(u =>
             u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis");
-        Assert.Equal(usageBefore, usageAfter);
+        Assert.Equal(usageBefore + 1, usageAfter); // consumed, not refunded
 
         var sources = verifyContext.AnalysisRunSources.Where(s => s.AnalysisRunId == runId).ToList();
         Assert.All(sources, s => Assert.Equal(AnalysisRunSourceStatus.Error, s.Status));
@@ -551,8 +553,9 @@ public class AnalysisRunServiceTests
     [Fact]
     public async Task ExecuteRunAsync_AllSourcesFail_AllTransient_MultiSource_RunErrorsAndRefunds()
     {
-        // Pure provider/transient failures (no InvalidResponse at all) must refund — same rule as the
-        // mixed case, exercised here with no InvalidResponse present at all.
+        // Pure provider/transient failures (no InvalidResponse anywhere) must still refund — the refund
+        // rule only withholds the unit when at least one failure was InvalidResponse (see the mixed-kind
+        // test above, which now expects NO refund because it includes one).
         using var _fixture = new AnalysisRunTestFixture();
         var iepId = _fixture.SeedIepDocument();
         var etrId = _fixture.SeedEtrDocument();
@@ -942,6 +945,65 @@ public class AnalysisRunServiceTests
     }
 
     [Fact]
+    public async Task GetRunAsync_MultiSourceRun_SectionsAreCorrectlyAttributedPerSource_NoCrossContamination()
+    {
+        // Review pass 2, item 1: GetRunAsync now loads Sources and Sections in two SEPARATE queries
+        // (rather than projecting both sibling collections in one query, which EF Core joins into a
+        // cartesian product without QuerySplittingBehavior configured). This is a safety net for that
+        // split: with 2 sources and one section per source, a mistake in the refactor (e.g. querying
+        // sections for the wrong run, or losing the AnalysisRunSourceId linkage) would show up here as
+        // the wrong count or a section attributed to the wrong source.
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+        var etrId = _fixture.SeedEtrDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef>
+                {
+                    new(AnalysisSourceType.IepDocument, iepId),
+                    new(AnalysisSourceType.EtrDocument, etrId),
+                },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        var client = new ScriptedClaudeClient(
+            BuildSourceJson("present_levels", summary: "IEP summary."),
+            BuildSourceJson("eligibility", summary: "ETR summary."),
+            BuildSynthesisJson());
+
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, client);
+            await execService.ExecuteRunAsync(runId, CancellationToken.None);
+        }
+
+        using var readContext = _fixture.CreateContext();
+        var readService = BuildService(readContext, new FakeClaudeClient(null));
+        var result = await readService.GetRunAsync(runId, _fixture.OwnerUserId, CancellationToken.None);
+
+        Assert.True(result.Success);
+        var run = result.Data!;
+
+        Assert.Equal(2, run.Sources.Count);
+        Assert.Equal(2, run.Sections.Count); // exactly one section per source — no cartesian duplication
+
+        var iepSourceId = run.Sources.Single(s => s.SourceType == nameof(AnalysisSourceType.IepDocument)).Id;
+        var etrSourceId = run.Sources.Single(s => s.SourceType == nameof(AnalysisSourceType.EtrDocument)).Id;
+
+        var iepSection = run.Sections.Single(s => s.SectionKind == "present_levels");
+        Assert.Equal(iepSourceId, iepSection.AnalysisRunSourceId);
+
+        var etrSection = run.Sections.Single(s => s.SectionKind == "eligibility");
+        Assert.Equal(etrSourceId, etrSection.AnalysisRunSourceId);
+    }
+
+    [Fact]
     public async Task FailRunAsync_OnCompletedRun_IsNoOp()
     {
         using var _fixture = new AnalysisRunTestFixture();
@@ -1308,6 +1370,99 @@ public class AnalysisRunServiceTests
     }
 
     [Fact]
+    public async Task FailRunAsync_WithUpdatedAtCutoff_LeavesARunAloneThatHeartbeatedAfterTheCutoffWasComputed()
+    {
+        // FailStaleRunsAsync computes its cutoff and SELECTs stale run ids first, then calls
+        // FailRunAsync once per id. If a run heartbeats (makes genuine progress, UpdatedAt moving past
+        // the cutoff) in the window between that SELECT and its own turn in the loop, FailRunAsync's
+        // conditional update must re-check the SAME cutoff — not just Status == Running — so the run is
+        // left alone instead of being wrongly failed and refunded. This exercises that re-check directly
+        // via the updatedAtCutoff parameter, simulating exactly the race FailStaleRunsAsync is exposed to.
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef> { new(AnalysisSourceType.IepDocument, iepId) },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        var cutoff = DateTime.UtcNow.AddMinutes(-30);
+
+        using (var setupContext = _fixture.CreateContext())
+        {
+            // The sweep's SELECT would have seen this run as stale (UpdatedAt before cutoff)...
+            await setupContext.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE AnalysisRuns SET Status = 'Running', UpdatedAt = {cutoff.AddMinutes(-1)} WHERE Id = {runId}");
+        }
+
+        using (var heartbeatContext = _fixture.CreateContext())
+        {
+            // ...but the run heartbeated (made progress) between that SELECT and this call.
+            await heartbeatContext.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE AnalysisRuns SET UpdatedAt = {DateTime.UtcNow} WHERE Id = {runId}");
+        }
+
+        using (var failContext = _fixture.CreateContext())
+        {
+            var failService = BuildService(failContext, new FakeClaudeClient(null));
+            await failService.FailRunAsync(
+                runId, "stale", refundQuota: true, ct: CancellationToken.None, updatedAtCutoff: cutoff);
+        }
+
+        using var verifyContext = _fixture.CreateContext();
+        var run = verifyContext.AnalysisRuns.Find(runId)!;
+        Assert.Equal(AnalysisRunStatus.Running, run.Status); // left alone — no longer actually stale
+        Assert.NotNull(run.UsageRecordId); // not refunded
+    }
+
+    [Fact]
+    public async Task FailRunAsync_WithUpdatedAtCutoff_StillFailsARunThatIsGenuinelyStillStale()
+    {
+        // The mirror image of the test above: when the run's UpdatedAt is still at or before the
+        // cutoff (no heartbeat landed in between), FailRunAsync must proceed exactly as it did before
+        // updatedAtCutoff existed.
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef> { new(AnalysisSourceType.IepDocument, iepId) },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        var cutoff = DateTime.UtcNow.AddMinutes(-30);
+
+        using (var setupContext = _fixture.CreateContext())
+        {
+            await setupContext.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE AnalysisRuns SET Status = 'Running', UpdatedAt = {cutoff.AddMinutes(-1)} WHERE Id = {runId}");
+        }
+
+        using (var failContext = _fixture.CreateContext())
+        {
+            var failService = BuildService(failContext, new FakeClaudeClient(null));
+            await failService.FailRunAsync(
+                runId, "stale", refundQuota: true, ct: CancellationToken.None, updatedAtCutoff: cutoff);
+        }
+
+        using var verifyContext = _fixture.CreateContext();
+        var run = verifyContext.AnalysisRuns.Find(runId)!;
+        Assert.Equal(AnalysisRunStatus.Error, run.Status);
+        Assert.Null(run.UsageRecordId); // refunded — genuinely still stale
+    }
+
+    [Fact]
     public async Task ExecuteRunAsync_Heartbeat_RefreshesUpdatedAtBeforeEachSourceCallAndBeforeSynthesis()
     {
         // Each Claude call is capped well under the sweep's 30-minute stale threshold by HttpClient's
@@ -1371,6 +1526,70 @@ public class AnalysisRunServiceTests
         Assert.Equal(3, client.CallCount);
         using var verifyContext = _fixture.CreateContext();
         Assert.Equal(AnalysisRunStatus.Completed, verifyContext.AnalysisRuns.Find(runId)!.Status);
+    }
+
+    [Fact]
+    public async Task ExecuteRunAsync_SweepWinsMidRun_HeartbeatStopsFurtherProcessing_UntouchedSourceStaysError()
+    {
+        // The per-source heartbeat is now a CONDITIONAL update (Id == runId && Status == Running), not a
+        // tracked save — so if the stale-run sweep fails (and refunds) this run WHILE the first of two
+        // sources is being processed, the heartbeat check guarding the SECOND source must find the run
+        // no longer Running and stop immediately: no Claude call for that second source, and its
+        // Error status (set by the sweep's FailRunAsync, which marks every still-Pending/Running source
+        // Error) must never be touched again by the executor.
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+        var etrId = _fixture.SeedEtrDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            var created = await createService.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef>
+                {
+                    new(AnalysisSourceType.IepDocument, iepId),
+                    new(AnalysisSourceType.EtrDocument, etrId),
+                },
+                CancellationToken.None);
+            runId = created.Data!.Id;
+        }
+
+        const string sweepMessage = "The analysis took too long to complete. Please try again.";
+
+        // Exactly ONE responder is scripted: if the executor made a second Claude call (for the second
+        // source, or a synthesis call), ScriptedClaudeClient would throw "no more scripted responses
+        // were queued" and fail the test outright — CallCount alone wouldn't catch a call made after
+        // this assertion runs, but the queue exhaustion would.
+        var client = new ScriptedClaudeClient(() =>
+        {
+            using var sweepContext = _fixture.CreateContext();
+            var sweepService = BuildService(sweepContext, new FakeClaudeClient(null));
+            sweepService.FailRunAsync(runId, sweepMessage, refundQuota: true, ct: CancellationToken.None)
+                .GetAwaiter().GetResult();
+            return BuildSourceJson("present_levels");
+        });
+
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, client);
+            await execService.ExecuteRunAsync(runId, CancellationToken.None);
+        }
+
+        Assert.Equal(1, client.CallCount); // no further Claude calls after the sweep won
+
+        using var verifyContext = _fixture.CreateContext();
+        var run = verifyContext.AnalysisRuns.Find(runId)!;
+        Assert.Equal(AnalysisRunStatus.Error, run.Status);
+        Assert.Equal(sweepMessage, run.ErrorMessage);
+        Assert.Null(run.UsageRecordId); // refunded by the sweep
+
+        var sources = verifyContext.AnalysisRunSources.Where(s => s.AnalysisRunId == runId).OrderBy(s => s.Id).ToList();
+        // The second source was never reached by the executor once the heartbeat caught the race — it
+        // stays exactly as the sweep's FailRunAsync left it.
+        Assert.Equal(AnalysisRunSourceStatus.Error, sources[1].Status);
+        Assert.Equal(sweepMessage, sources[1].ErrorMessage);
     }
 
     [Fact]
