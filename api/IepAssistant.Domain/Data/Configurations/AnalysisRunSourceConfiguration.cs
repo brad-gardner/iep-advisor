@@ -17,6 +17,14 @@ public class AnalysisRunSourceConfiguration : IEntityTypeConfiguration<AnalysisR
 
         builder.Property(s => s.SourceLabel).HasMaxLength(300);
 
+        builder.Property(s => s.Status)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired()
+            .HasDefaultValue(AnalysisRunSourceStatus.Pending);
+
+        builder.Property(s => s.ErrorMessage).HasMaxLength(500);
+
         builder.HasOne(s => s.AnalysisRun)
             .WithMany(r => r.Sources)
             .HasForeignKey(s => s.AnalysisRunId)

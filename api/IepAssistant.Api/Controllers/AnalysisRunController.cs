@@ -117,7 +117,9 @@ public class AnalysisRunController : ControllerBase
             Id = s.Id,
             SourceType = s.SourceType,
             SourceId = s.SourceId,
-            SourceLabel = s.SourceLabel
+            SourceLabel = s.SourceLabel,
+            Status = s.Status,
+            ErrorMessage = s.ErrorMessage
         }).ToList(),
         Sections = model.Sections.Select(s => new AnalysisRunSectionDto
         {
@@ -125,6 +127,7 @@ public class AnalysisRunController : ControllerBase
             AnalysisRunSourceId = s.AnalysisRunSourceId,
             SectionKind = s.SectionKind,
             Analysis = s.Analysis,
+            GoalAnalyses = s.GoalAnalyses,
             DisplayOrder = s.DisplayOrder
         }).ToList()
     };

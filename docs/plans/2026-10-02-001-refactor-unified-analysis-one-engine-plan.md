@@ -161,14 +161,14 @@ erDiagram
 #### Phase 1: Per-source engine and goal ratings on the child page
 
 **Backend:**
-- [ ] Migration `AddAnalysisRunSourceStatus`: `AnalysisRunSources.Status` (nvarchar(20), default `'Pending'`) + `ErrorMessage` (nvarchar(500) null); data step sets existing rows from their run's status. Reversible `Down`.
+- [x] Migration `AddAnalysisRunSourceStatus`: `AnalysisRunSources.Status` (nvarchar(20), default `'Pending'`) + `ErrorMessage` (nvarchar(500) null); data step sets existing rows from their run's status. Reversible `Down`.
   - `api/IepAssistant.Domain/Entities/AnalysisRunSource.cs`
   - `api/IepAssistant.Domain/Data/Configurations/AnalysisRunSourceConfiguration.cs`
   - `api/IepAssistant.Domain/Data/Migrations/*`
-- [ ] Per-source execution, synthesis, partial-failure and refund rules (`api/IepAssistant.Services/Implementations/AnalysisRunService.cs`):
+- [x] Per-source execution, synthesis, partial-failure and refund rules (`api/IepAssistant.Services/Implementations/AnalysisRunService.cs`):
   - split `BuildPrompt` into `BuildSourcePrompt(source)` (IEP variant asks for `goalAnalyses` using the legacy goal schema from `IepAnalysisService.cs:276-375`) and `BuildSynthesisPrompt(completedSources)`.
-- [ ] `iep_goals` section persistence with `goalId` validation; read mapping by `SectionKind` (`api/IepAssistant.Services/Models/AnalysisRunModels.cs`: `AnalysisRunSectionModel` gains `GoalAnalyses` / typed payloads; `AnalysisRunSourceModel` gains `Status`, `ErrorMessage`).
-- [ ] 30-minute runtime sweep in `api/IepAssistant.Api/BackgroundServices/AnalysisRunWorker.cs`.
+- [x] `iep_goals` section persistence with `goalId` validation; read mapping by `SectionKind` (`api/IepAssistant.Services/Models/AnalysisRunModels.cs`: `AnalysisRunSectionModel` gains `GoalAnalyses` / typed payloads; `AnalysisRunSourceModel` gains `Status`, `ErrorMessage`).
+- [x] 30-minute runtime sweep in `api/IepAssistant.Api/BackgroundServices/AnalysisRunWorker.cs`.
 
 **Web:**
 - [ ] `web/src/features/analysis/types.ts`: source status, goal-analyses payload.

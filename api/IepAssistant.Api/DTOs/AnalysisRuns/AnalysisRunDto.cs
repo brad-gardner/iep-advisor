@@ -24,6 +24,8 @@ public class AnalysisRunSourceDto
     public string SourceType { get; set; } = string.Empty;
     public int SourceId { get; set; }
     public string? SourceLabel { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string? ErrorMessage { get; set; }
 }
 
 public class AnalysisRunSectionDto
@@ -32,5 +34,6 @@ public class AnalysisRunSectionDto
     public int? AnalysisRunSourceId { get; set; }
     public string SectionKind { get; set; } = string.Empty;
     public AnalysisRunSectionResult? Analysis { get; set; }
+    public List<GoalAnalysisResult>? GoalAnalyses { get; set; }
     public int DisplayOrder { get; set; }
 }

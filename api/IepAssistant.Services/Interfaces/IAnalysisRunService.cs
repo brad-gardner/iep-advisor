@@ -22,6 +22,15 @@ public interface IAnalysisRunService
     /// </summary>
     Task FailRunAsync(int runId, string message, bool refundQuota = true, CancellationToken ct = default);
 
+    /// <summary>
+    /// Fails (and refunds) every run still <see cref="Domain.Entities.AnalysisRunStatus.Running"/>
+    /// whose last transition into Running was more than <paramref name="staleAfter"/> ago — a run
+    /// stuck past the HTTP client's own timeout with no process restart to trigger the startup
+    /// reconcile. Called every 5 minutes by <c>AnalysisRunWorker</c>'s periodic sweep; exposed here
+    /// so the 30-minute threshold is independently testable without a live timer.
+    /// </summary>
+    Task FailStaleRunsAsync(TimeSpan staleAfter, CancellationToken ct = default);
+
     Task<ServiceResult<List<AnalysisRunModel>>> GetRunsAsync(int childId, int userId, CancellationToken ct = default);
 
     Task<ServiceResult<AnalysisRunModel>> GetRunAsync(int runId, int userId, CancellationToken ct = default);
