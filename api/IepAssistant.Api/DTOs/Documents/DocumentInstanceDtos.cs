@@ -71,6 +71,28 @@ public class DocumentInstanceValuesDto
 
     /// <summary>Base64-encoded optimistic-concurrency token to echo on the next save.</summary>
     public string? RowVersion { get; set; }
+
+    /// <summary>
+    /// Field-level warnings from normalizing this save (e.g. an owner that is not an active team member
+    /// was dropped). Empty when there is nothing to warn about.
+    /// </summary>
+    public List<DocumentSaveWarningDto> Warnings { get; set; } = new();
+}
+
+/// <summary>One field/row-level save warning (see <see cref="DocumentInstanceValuesDto.Warnings"/>).</summary>
+public class DocumentSaveWarningDto
+{
+    /// <summary>The table field's FieldKey (string GUID) the affected row belongs to.</summary>
+    public string FieldKey { get; set; } = string.Empty;
+
+    /// <summary>The affected row's <c>_rowId</c> (string GUID).</summary>
+    public string RowId { get; set; } = string.Empty;
+
+    /// <summary>Stable machine-readable reason, e.g. <c>"ownerNotTeamMember"</c>.</summary>
+    public string Code { get; set; } = string.Empty;
+
+    /// <summary>Human-readable message, safe to show directly next to the affected control.</summary>
+    public string Message { get; set; } = string.Empty;
 }
 
 public class DocumentInstanceSummaryDto

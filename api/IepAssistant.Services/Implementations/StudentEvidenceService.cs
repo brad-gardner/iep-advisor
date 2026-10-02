@@ -172,13 +172,41 @@ public sealed class StudentEvidenceService : IStudentEvidenceService
                     if (fields.Count == 0) continue;
                     var rowId = row[RowMetaKeys.RowId]?.ToString();
                     var headline = fields.GetValueOrDefault(primary) ?? fields.Values.First();
-                    var detail = string.Join(" | ", fields.Where(kv => kv.Key != primary).Select(kv => $"{kv.Key}: {kv.Value}"));
+                    var detailParts = fields.Where(kv => kv.Key != primary).Select(kv => $"{kv.Key}: {kv.Value}").ToList();
+
+                    // Goal objectives/benchmarks are plain prose, never the owner — included as text so
+                    // AI assist, meeting prep and advocate context see them wherever this goal row is
+                    // summarized (plan 2026-10-02-002). The owner user id is carried on its own typed
+                    // property below and is NEVER joined into detail/Text, so it can never reach a prompt.
+                    List<CarriedObjective>? objectives = null;
+                    if (fieldSemantic == FieldSemantics.Goals && row[RowMetaKeys.Objectives] is JsonArray objectiveRows)
+                    {
+                        objectives = objectiveRows.OfType<JsonObject>()
+                            .Select(o => new CarriedObjective(ObjectiveCellText(o, "description"), ObjectiveCellText(o, "criteria"), ObjectiveCellText(o, "targetDate")))
+                            .Where(o => !string.IsNullOrWhiteSpace(o.Description) || !string.IsNullOrWhiteSpace(o.Criteria) || !string.IsNullOrWhiteSpace(o.TargetDate))
+                            .ToList();
+                        if (objectives.Count > 0)
+                        {
+                            var summary = string.Join("; ", objectives.Select(o =>
+                                string.Join(" — ", new[] { o.Description, o.Criteria, o.TargetDate }.Where(s => !string.IsNullOrWhiteSpace(s)))));
+                            if (!string.IsNullOrWhiteSpace(summary))
+                                detailParts.Add($"objectives: {summary}");
+                        }
+                        else
+                        {
+                            objectives = null;
+                        }
+                    }
+
+                    var ownerUserId = row[RowMetaKeys.OwnerUserId] is JsonValue ov && ov.TryGetValue<int>(out var oid) ? oid : (int?)null;
+
+                    var detail = string.Join(" | ", detailParts);
                     items.Add(new EvidenceItem
                     {
                         Id = NextId(), Kind = kind, SourceType = "AuthoredDocumentVersion", SourceId = version.Id,
                         SourceLabel = label, SourceDate = version.FinalizedAt, AuthorRole = "school",
                         Text = detail.Length > 0 ? $"{headline} ({detail})" : headline,
-                        RowId = rowId, Fields = fields
+                        RowId = rowId, Fields = fields, OwnerUserId = ownerUserId, Objectives = objectives
                     });
                 }
             }
@@ -328,4 +356,8 @@ public sealed class StudentEvidenceService : IStudentEvidenceService
 
     private static string StripHtml(string html)
         => System.Net.WebUtility.HtmlDecode(TagStripper.Replace(html.Replace("</p>", "\n").Replace("<br>", "\n").Replace("<br/>", "\n"), string.Empty)).Trim();
+
+    /// <summary>Reads a plain string property off an objective object (<c>_objectives</c> entry); null if absent/not a string.</summary>
+    private static string? ObjectiveCellText(JsonObject objective, string propertyName)
+        => objective[propertyName] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
 }

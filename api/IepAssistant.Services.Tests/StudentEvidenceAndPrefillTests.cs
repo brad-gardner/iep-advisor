@@ -241,6 +241,98 @@ public sealed class StudentEvidenceAndPrefillTests : IDisposable
         Assert.False(row[RowMetaKeys.Confirmed]!.GetValue<bool>());
     }
 
+    /// <summary>Stamps `_ownerUserId`/`_objectives` onto the seeded goal row of the finalized IEP (plan
+    /// 2026-10-02-002), as though it had been saved with them before finalize.</summary>
+    private void StampGoalRowOwnerAndObjectives(Scenario s, int? ownerUserId, JsonArray? objectives)
+    {
+        using var ctx = CreateContext();
+        var version = ctx.AuthoredDocumentVersions.Single(v => v.Id == s.IepVersionId);
+        var values = (JsonNode.Parse(version.ValuesJson) as JsonObject)!;
+        var sections = ctx.TemplateSections.Include(x => x.Fields).Where(x => x.DocumentTemplateVersionId == version.DocumentTemplateVersionId).ToList();
+        var goals = TemplateSemanticsReader.Read(sections)[FieldSemantics.Goals];
+        var row = (JsonObject)((JsonArray)values[goals.FieldKey.ToString()]!)[0]!;
+        if (ownerUserId is int uid) row[RowMetaKeys.OwnerUserId] = uid;
+        if (objectives != null) row[RowMetaKeys.Objectives] = objectives;
+        version.ValuesJson = values.ToJsonString();
+        ctx.SaveChanges();
+    }
+
+    [Fact]
+    public async Task NewIep_Prefill_CarriesOwner_WhenStillAnActiveTeamMember()
+    {
+        var s = await SeedAsync();
+        StampGoalRowOwnerAndObjectives(s, s.TeacherId, objectives: null);
+        using (var ctx = CreateContext())
+        {
+            ctx.StudentTeamMembers.Add(new StudentTeamMember { SchoolStudentId = s.StudentId, UserId = s.TeacherId, TeamRole = TeamRole.CaseManager, IsActive = true });
+            ctx.SaveChanges();
+        }
+
+        using var verify = CreateContext();
+        var (_, _, _, instances) = Services(verify);
+        var created = await instances.CreateAsync(s.StudentId, IepTypeId, s.TeacherId);
+        Assert.True(created.Success, created.Message);
+
+        var values = JsonNode.Parse(created.Data!.ValuesJson) as JsonObject;
+        var sections = await verify.TemplateSections.Include(x => x.Fields).Where(x => x.DocumentTemplateVersionId == created.Data.DocumentTemplateVersionId).ToListAsync();
+        var sem = TemplateSemanticsReader.Read(sections);
+        var row = (JsonObject)((JsonArray)values![sem[FieldSemantics.Goals].FieldKey.ToString()]!)[0]!;
+        Assert.Equal(s.TeacherId, row[RowMetaKeys.OwnerUserId]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task NewIep_Prefill_DropsOwner_WhenNoLongerAnActiveTeamMember()
+    {
+        var s = await SeedAsync();
+        // The teacher owned the goal when it was finalized, but is NOT on the team at create time — the
+        // SAME ApplyPatch/CoerceTable validation a live save goes through drops it (plan 2026-10-02-002).
+        StampGoalRowOwnerAndObjectives(s, s.TeacherId, objectives: null);
+
+        using var verify = CreateContext();
+        var (_, _, _, instances) = Services(verify);
+        var created = await instances.CreateAsync(s.StudentId, IepTypeId, s.TeacherId);
+        Assert.True(created.Success, created.Message);
+
+        var values = JsonNode.Parse(created.Data!.ValuesJson) as JsonObject;
+        var sections = await verify.TemplateSections.Include(x => x.Fields).Where(x => x.DocumentTemplateVersionId == created.Data.DocumentTemplateVersionId).ToListAsync();
+        var sem = TemplateSemanticsReader.Read(sections);
+        var row = (JsonObject)((JsonArray)values![sem[FieldSemantics.Goals].FieldKey.ToString()]!)[0]!;
+        Assert.False(row.ContainsKey(RowMetaKeys.OwnerUserId));
+    }
+
+    [Fact]
+    public async Task NewIep_Prefill_CarriesObjectives_WithFreshRowIds()
+    {
+        var s = await SeedAsync();
+        var sourceObjectiveId = Guid.NewGuid();
+        var objectives = new JsonArray(new JsonObject
+        {
+            [RowMetaKeys.RowId] = sourceObjectiveId.ToString(),
+            ["description"] = "Read a decodable passage",
+            ["criteria"] = "90% accuracy",
+            ["targetDate"] = "2025-12-01"
+        });
+        StampGoalRowOwnerAndObjectives(s, ownerUserId: null, objectives);
+
+        using var verify = CreateContext();
+        var (_, _, _, instances) = Services(verify);
+        var created = await instances.CreateAsync(s.StudentId, IepTypeId, s.TeacherId);
+        Assert.True(created.Success, created.Message);
+
+        var values = JsonNode.Parse(created.Data!.ValuesJson) as JsonObject;
+        var sections = await verify.TemplateSections.Include(x => x.Fields).Where(x => x.DocumentTemplateVersionId == created.Data.DocumentTemplateVersionId).ToListAsync();
+        var sem = TemplateSemanticsReader.Read(sections);
+        var row = (JsonObject)((JsonArray)values![sem[FieldSemantics.Goals].FieldKey.ToString()]!)[0]!;
+        var carriedObjectives = (JsonArray)row[RowMetaKeys.Objectives]!;
+        var carried = Assert.Single(carriedObjectives.OfType<JsonObject>());
+        Assert.Equal("Read a decodable passage", carried["description"]!.ToString());
+        Assert.Equal("90% accuracy", carried["criteria"]!.ToString());
+        Assert.Equal("2025-12-01", carried["targetDate"]!.ToString());
+        var newObjectiveId = carried[RowMetaKeys.RowId]!.ToString();
+        Assert.True(Guid.TryParse(newObjectiveId, out var parsed) && parsed != Guid.Empty);
+        Assert.NotEqual(sourceObjectiveId.ToString(), newObjectiveId); // re-issued, not copied verbatim
+    }
+
     [Fact]
     public async Task NewEtr_DoesNotCarryIepGoals_AndNewStudentGetsIdentityOnly()
     {

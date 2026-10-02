@@ -22,6 +22,12 @@ public class DocumentInstanceService : IDocumentInstanceService
     /// <summary>Max serialized size of the value-document (cross-cutting G-x.2). ~1 MB of JSON is far beyond any real form.</summary>
     public const int MaxValuesJsonBytes = 1_000_000;
 
+    /// <summary>Max objectives/benchmarks kept per goal row (plan 2026-10-02-002); extras beyond this are dropped, preserving order.</summary>
+    private const int MaxObjectives = 20;
+    private const int MaxObjectiveDescriptionLength = 2000;
+    private const int MaxObjectiveTargetDateLength = 50;
+    private const string OwnerNotTeamMemberWarningCode = "ownerNotTeamMember";
+
     private const string PermissionMessage = "You do not have permission to access this document.";
     private const string InstanceNotFoundMessage = "Document not found.";
     private const string NotDraftEditMessage = "This document can no longer be edited.";
@@ -97,11 +103,15 @@ public class DocumentInstanceService : IDocumentInstanceService
                 if (bundle.Success && bundle.Data != null)
                 {
                     var values = await _prefill.BuildInitialValuesAsync(resolution.Data!.DocumentTemplateVersionId, typeKey, bundle.Data, ct);
-                    // Route through the same coercion as a save so rows get ids and metadata is validated.
+                    // Route through the same coercion as a save so rows get ids and metadata is validated —
+                    // including the owner-on-team check, so a prefilled owner who has left the student's
+                    // team since the source version was finalized is dropped here, not carried in blind.
                     var fields = await LoadFieldsByKeyAsync(resolution.Data.DocumentTemplateVersionId, ct);
+                    var activeTeamUserIds = await LoadActiveTeamUserIdsAsync(schoolStudentId, ct);
                     var patch = values.ToDictionary(kv => kv.Key, kv => JsonSerializer.SerializeToElement(kv.Value));
                     var target = new JsonObject();
-                    var error = ApplyPatch(target, patch, fields);
+                    var prefillWarnings = new List<DocumentSaveWarningModel>();
+                    var error = ApplyPatch(target, patch, fields, activeTeamUserIds, prefillWarnings);
                     if (error == null)
                         initialValues = target.ToJsonString();
                     else
@@ -216,8 +226,17 @@ public class DocumentInstanceService : IDocumentInstanceService
         // Load the pinned version's fields (denormalized version FK) for schema validation.
         var fieldsByKey = await LoadFieldsByKeyAsync(instance.DocumentTemplateVersionId, ct);
 
+        // Active team membership is only needed to validate a `_ownerUserId` on a Table field whose
+        // semantic is owner-eligible (goals/services/accommodations/transition); most autosave ticks
+        // touch narrative fields and never need this, so the query is skipped unless the patch actually
+        // reaches an owner-eligible table (one query per save, only when relevant).
+        var activeTeamUserIds = PatchTouchesOwnerEligibleTable(valuesPatch, fieldsByKey)
+            ? await LoadActiveTeamUserIdsAsync(header.SchoolStudentId, ct)
+            : EmptyUserIdSet;
+
         var merged = ParseValues(instance.ValuesJson);
-        var applyError = ApplyPatch(merged, valuesPatch, fieldsByKey);
+        var warnings = new List<DocumentSaveWarningModel>();
+        var applyError = ApplyPatch(merged, valuesPatch, fieldsByKey, activeTeamUserIds, warnings);
         if (applyError != null)
             return FailValues(applyError);
 
@@ -247,7 +266,8 @@ public class DocumentInstanceService : IDocumentInstanceService
         return ServiceResult<DocumentInstanceValuesModel>.SuccessResult(new DocumentInstanceValuesModel
         {
             ValuesJson = instance.ValuesJson,
-            RowVersion = instance.RowVersion
+            RowVersion = instance.RowVersion,
+            Warnings = warnings
         });
     }
 
@@ -318,7 +338,8 @@ public class DocumentInstanceService : IDocumentInstanceService
     /// RichText is sanitized before storing. A JSON null clears a field.
     /// </summary>
     private static string? ApplyPatch(
-        JsonObject target, IReadOnlyDictionary<string, JsonElement> patch, IReadOnlyDictionary<Guid, TemplateField> fieldsByKey)
+        JsonObject target, IReadOnlyDictionary<string, JsonElement> patch, IReadOnlyDictionary<Guid, TemplateField> fieldsByKey,
+        IReadOnlySet<int> activeTeamUserIds, List<DocumentSaveWarningModel> warnings)
     {
         foreach (var (rawKey, value) in patch)
         {
@@ -326,7 +347,7 @@ public class DocumentInstanceService : IDocumentInstanceService
             if (!Guid.TryParse(rawKey, out var fieldKey) || !fieldsByKey.TryGetValue(fieldKey, out var field))
                 continue;
 
-            var (node, error) = CoerceFieldValue(field, value);
+            var (node, error) = CoerceFieldValue(field, value, activeTeamUserIds, warnings);
             if (error != null)
                 return error;
 
@@ -337,7 +358,8 @@ public class DocumentInstanceService : IDocumentInstanceService
     }
 
     /// <summary>Coerces + validates a top-level field value. Returns (node, null) on success or (null, error) on a type mismatch.</summary>
-    private static (JsonNode? Node, string? Error) CoerceFieldValue(TemplateField field, JsonElement value)
+    private static (JsonNode? Node, string? Error) CoerceFieldValue(
+        TemplateField field, JsonElement value, IReadOnlySet<int> activeTeamUserIds, List<DocumentSaveWarningModel> warnings)
     {
         if (value.ValueKind == JsonValueKind.Null || value.ValueKind == JsonValueKind.Undefined)
             return (null, null); // clear
@@ -350,7 +372,7 @@ public class DocumentInstanceService : IDocumentInstanceService
                 return (JsonValue.Create(RichTextSanitizer.Sanitize(value.GetString())), null);
 
             case FieldType.Table:
-                return CoerceTable(field, value);
+                return CoerceTable(field, value, activeTeamUserIds, warnings);
 
             default:
                 var (scalar, error) = CoerceScalar(field.FieldType, value, field.Label);
@@ -393,13 +415,30 @@ public class DocumentInstanceService : IDocumentInstanceService
         }
     }
 
-    /// <summary>Coerces a Table value: an array of row objects keyed by columnKey. Unknown columns are stripped; each cell is type-checked by its column type.</summary>
-    private static (JsonNode? Node, string? Error) CoerceTable(TemplateField field, JsonElement value)
+    /// <summary>
+    /// Coerces a Table value: an array of row objects keyed by columnKey. Unknown columns are stripped;
+    /// each cell is type-checked by its column type. Two reserved keys get semantic-aware handling beyond
+    /// plain pass-through (plan 2026-10-02-002):
+    /// <list type="bullet">
+    /// <item><c>_ownerUserId</c> is kept only on a row of a <see cref="FieldSemantics.OwnerEligible"/>
+    /// table AND only when the value is an active <paramref name="activeTeamUserIds"/> member; any other
+    /// table's <c>_ownerUserId</c> is dropped silently (same as any other stray reserved key), while an
+    /// owner-eligible table's non-member/invalid value is dropped WITH a warning (the row picked a real
+    /// person who is no longer/never was on the team — worth surfacing next to the picker).</item>
+    /// <item><c>_objectives</c> is normalized (see <see cref="CoerceObjectives"/>) only on a
+    /// <see cref="FieldSemantics.Goals"/> table; elsewhere it is dropped silently.</item>
+    /// </list>
+    /// </summary>
+    private static (JsonNode? Node, string? Error) CoerceTable(
+        TemplateField field, JsonElement value, IReadOnlySet<int> activeTeamUserIds, List<DocumentSaveWarningModel> warnings)
     {
         if (value.ValueKind != JsonValueKind.Array)
             return (null, TypeError(field.Label, "a table (list of rows)"));
 
         var columns = ParseTableColumns(field.ConfigJson);
+        var semantic = TemplateSemanticsReader.ReadField(field.FieldType, field.ConfigJson).Semantic;
+        var ownerEligible = semantic != null && FieldSemantics.OwnerEligible.Contains(semantic);
+        var objectivesEligible = semantic == FieldSemantics.Goals;
 
         var rows = new JsonArray();
         var seenRowIds = new HashSet<Guid>();
@@ -412,6 +451,9 @@ public class DocumentInstanceService : IDocumentInstanceService
             Guid? rowId = null;
             JsonNode? carriedFrom = null;
             bool? confirmed = null;
+            int? ownerUserId = null;
+            var ownerRejected = false;
+            JsonNode? objectives = null;
             foreach (var cell in rowElement.EnumerateObject())
             {
                 // Row identity is carried inside the row object, not as a column. Keep a valid GUID;
@@ -434,6 +476,21 @@ public class DocumentInstanceService : IDocumentInstanceService
                         confirmed = cell.Value.GetBoolean();
                     continue;
                 }
+                if (cell.Name == RowMetaKeys.OwnerUserId)
+                {
+                    if (ownerEligible && cell.Value.ValueKind == JsonValueKind.Number && cell.Value.TryGetInt32(out var uid) && activeTeamUserIds.Contains(uid))
+                        ownerUserId = uid;
+                    else if (ownerEligible && cell.Value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined))
+                        ownerRejected = true; // structurally eligible table, but not an active team member
+                    // else: wrong-semantic table (or an explicit clear) — silently dropped, like any stray key.
+                    continue;
+                }
+                if (cell.Name == RowMetaKeys.Objectives)
+                {
+                    if (objectivesEligible)
+                        objectives = CoerceObjectives(cell.Value);
+                    continue;
+                }
 
                 // Strip unknown / non-guid column keys.
                 if (!Guid.TryParse(cell.Name, out var columnKey) || !columns.TryGetValue(columnKey, out var columnType))
@@ -447,8 +504,9 @@ public class DocumentInstanceService : IDocumentInstanceService
             }
 
             // Skip rows that reduced to nothing (all columns unknown/stripped) so the value-document
-            // does not accumulate junk empty-object rows. A row with only an id is still "nothing".
-            if (row.Count == 0)
+            // does not accumulate junk empty-object rows. A row with only an id is still "nothing" —
+            // but an owner or objectives list is real content, so it alone keeps the row.
+            if (row.Count == 0 && ownerUserId == null && objectives == null)
                 continue;
 
             if (seenRowIds.Contains(rowId ?? Guid.Empty))
@@ -458,10 +516,92 @@ public class DocumentInstanceService : IDocumentInstanceService
             row[RowMetaKeys.RowId] = JsonValue.Create(finalId.ToString());
             if (carriedFrom != null) row[RowMetaKeys.CarriedFrom] = carriedFrom;
             if (confirmed != null) row[RowMetaKeys.Confirmed] = JsonValue.Create(confirmed.Value);
+            if (ownerUserId != null) row[RowMetaKeys.OwnerUserId] = JsonValue.Create(ownerUserId.Value);
+            if (objectives != null) row[RowMetaKeys.Objectives] = objectives;
+            if (ownerRejected)
+            {
+                warnings.Add(new DocumentSaveWarningModel
+                {
+                    FieldKey = field.FieldKey.ToString(),
+                    RowId = finalId.ToString(),
+                    Code = OwnerNotTeamMemberWarningCode,
+                    Message = $"The owner selected for a row in '{field.Label}' is not an active member of the student's team, so it was not saved."
+                });
+            }
             rows.Add(row);
         }
 
         return (rows, null);
+    }
+
+    /// <summary>
+    /// Normalizes a goal row's <c>_objectives</c> cell: an array (capped at <see cref="MaxObjectives"/>,
+    /// extras dropped — order preserved) of <c>{ _rowId, description, criteria, targetDate }</c>. Each
+    /// objective's own <c>_rowId</c> follows the exact same server-assign/dedupe rule as a table row's (so
+    /// a client that omits it, or sends a duplicate, still gets back a stable per-objective identity).
+    /// Unknown keys are dropped; an objective with no description/criteria/targetDate left is dropped
+    /// (mirrors the row "reduced to nothing" rule above). A malformed (non-array) cell yields no
+    /// objectives rather than failing the whole save — reserved-key coercion is lenient, like
+    /// <see cref="CoerceCarriedFrom"/>.
+    /// </summary>
+    private static JsonNode? CoerceObjectives(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Array)
+            return null;
+
+        var result = new JsonArray();
+        var seenIds = new HashSet<Guid>();
+        foreach (var item in value.EnumerateArray())
+        {
+            if (result.Count >= MaxObjectives)
+                break;
+            if (item.ValueKind != JsonValueKind.Object)
+                continue;
+
+            Guid? objectiveId = null;
+            string? description = null;
+            string? criteria = null;
+            string? targetDate = null;
+            foreach (var prop in item.EnumerateObject())
+            {
+                switch (prop.Name)
+                {
+                    case RowMetaKeys.RowId:
+                        if (prop.Value.ValueKind == JsonValueKind.String && Guid.TryParse(prop.Value.GetString(), out var parsed) && parsed != Guid.Empty)
+                            objectiveId = parsed;
+                        break;
+                    case "description":
+                        if (prop.Value.ValueKind == JsonValueKind.String)
+                            description = Truncate(prop.Value.GetString(), MaxObjectiveDescriptionLength)?.Trim();
+                        break;
+                    case "criteria":
+                        if (prop.Value.ValueKind == JsonValueKind.String)
+                            criteria = prop.Value.GetString()?.Trim();
+                        break;
+                    case "targetDate":
+                        if (prop.Value.ValueKind == JsonValueKind.String)
+                            targetDate = Truncate(prop.Value.GetString(), MaxObjectiveTargetDateLength)?.Trim();
+                        break;
+                    // Unknown keys dropped.
+                }
+            }
+
+            if (string.IsNullOrEmpty(description) && string.IsNullOrEmpty(criteria) && string.IsNullOrEmpty(targetDate))
+                continue;
+
+            if (seenIds.Contains(objectiveId ?? Guid.Empty))
+                objectiveId = null;
+            var finalId = objectiveId ?? Guid.NewGuid();
+            seenIds.Add(finalId);
+
+            var objective = new JsonObject { [RowMetaKeys.RowId] = finalId.ToString() };
+            if (description != null) objective["description"] = description;
+            if (criteria != null) objective["criteria"] = criteria;
+            if (targetDate != null) objective["targetDate"] = targetDate;
+            result.Add(objective);
+        }
+
+        return result;
     }
 
     /// <summary>Accepts <c>{ versionId: int, rowId: guid, label?: string, date?: string }</c>; anything else is dropped.</summary>
@@ -501,6 +641,43 @@ public class DocumentInstanceService : IDocumentInstanceService
     }
 
     private static string TypeError(string label, string expected) => $"'{label}' must be {expected}.";
+
+    // ---------------------------------------------------------------- Owner-on-team validation
+
+    private static readonly IReadOnlySet<int> EmptyUserIdSet = new HashSet<int>();
+
+    /// <summary>One query, loaded once per save: every user id currently an ACTIVE <c>StudentTeamMember</c>
+    /// of this student — the allow-list <see cref="CoerceTable"/> validates a row's <c>_ownerUserId</c>
+    /// against.</summary>
+    private async Task<IReadOnlySet<int>> LoadActiveTeamUserIdsAsync(int schoolStudentId, CancellationToken ct)
+    {
+        var ids = await _context.StudentTeamMembers
+            .AsNoTracking()
+            .Where(m => m.SchoolStudentId == schoolStudentId && m.IsActive)
+            .Select(m => m.UserId)
+            .ToListAsync(ct);
+        return ids.ToHashSet();
+    }
+
+    /// <summary>
+    /// True when the patch touches at least one Table field whose semantic is
+    /// <see cref="FieldSemantics.OwnerEligible"/> — the only case <see cref="CoerceTable"/> can keep a
+    /// <c>_ownerUserId</c>, so this gates the one team-membership query a save might need (most autosave
+    /// ticks touch a narrative field and skip it entirely).
+    /// </summary>
+    private static bool PatchTouchesOwnerEligibleTable(
+        IReadOnlyDictionary<string, JsonElement> patch, IReadOnlyDictionary<Guid, TemplateField> fieldsByKey)
+    {
+        foreach (var rawKey in patch.Keys)
+        {
+            if (!Guid.TryParse(rawKey, out var fieldKey) || !fieldsByKey.TryGetValue(fieldKey, out var field) || field.FieldType != FieldType.Table)
+                continue;
+            var semantic = TemplateSemanticsReader.ReadField(field.FieldType, field.ConfigJson).Semantic;
+            if (semantic != null && FieldSemantics.OwnerEligible.Contains(semantic))
+                return true;
+        }
+        return false;
+    }
 
     // ---------------------------------------------------------------- Concurrency
 

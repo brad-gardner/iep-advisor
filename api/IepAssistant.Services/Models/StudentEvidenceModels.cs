@@ -38,7 +38,26 @@ public sealed class EvidenceItem
     public string? RowId { get; init; }
     /// <summary>For structured rows: semantic → value (goalText, baseline, …) so prefill can remap by semantic.</summary>
     public IReadOnlyDictionary<string, string>? Fields { get; init; }
+
+    /// <summary>
+    /// For a goals/services/accommodations/transition row: its <c>_ownerUserId</c> reserved key, if the
+    /// row had one. NEVER rendered into <see cref="Text"/>/<see cref="Fields"/> or any AI prompt — kept
+    /// only so <see cref="DocumentPrefillService"/> can carry it forward (re-validated against the
+    /// CURRENT team when the prefilled patch is applied, same as a live save).
+    /// </summary>
+    public int? OwnerUserId { get; init; }
+
+    /// <summary>
+    /// For a goals row: its <c>_objectives</c> reserved key, verbatim apart from dropping each
+    /// objective's own <c>_rowId</c> (a fresh id is assigned when the carried row is saved). Null/empty
+    /// for a non-goal row or a goal row with no objectives.
+    /// </summary>
+    public IReadOnlyList<CarriedObjective>? Objectives { get; init; }
 }
+
+/// <summary>One objective/benchmark carried forward by <see cref="EvidenceItem.Objectives"/> — plain
+/// prose only, intentionally without an id (see <see cref="EvidenceItem.Objectives"/>).</summary>
+public sealed record CarriedObjective(string? Description, string? Criteria, string? TargetDate);
 
 public sealed class StudentEvidenceBundle
 {

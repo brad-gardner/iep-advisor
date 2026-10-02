@@ -173,6 +173,10 @@ public class AuthoredDocumentPdfService : IAuthoredDocumentPdfService
                     p.Attended))
                 .ToListAsync(ct);
 
+        // Goal/service/accommodation/transition rows show "Responsible: <role>" — role only, never a name
+        // (plan 2026-10-02-002) — resolved here (DB access) so the document itself stays DB-free.
+        var ownerRoleByUserId = await TeamRoleResolver.LoadRoleByUserIdAsync(_context, schoolStudentId, ct);
+
         return new AuthoredDocumentPdfHeaderContext(
             StateCode: stateCode,
             DocumentTypeKey: documentTypeKey,
@@ -185,6 +189,7 @@ public class AuthoredDocumentPdfService : IAuthoredDocumentPdfService
             MeetingDate: latestHeldMeeting?.StartsAtUtc,
             Participants: participants,
             AmendsVersionNumber: amendsVersionNumber,
-            EffectiveDate: effectiveDate);
+            EffectiveDate: effectiveDate,
+            OwnerRoleByUserId: ownerRoleByUserId);
     }
 }

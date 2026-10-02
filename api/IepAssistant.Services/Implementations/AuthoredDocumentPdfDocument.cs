@@ -31,7 +31,14 @@ public sealed record AuthoredDocumentPdfHeaderContext(
     DateTime? MeetingDate,
     IReadOnlyList<AuthoredDocumentPdfParticipant> Participants,
     int? AmendsVersionNumber,
-    DateTime? EffectiveDate)
+    DateTime? EffectiveDate,
+    /// <summary>
+    /// userId → TeamRole display name, resolved by <see cref="AuthoredDocumentPdfService"/> (DB access
+    /// stays outside this DB-free document). Used to render a goal/service/accommodation/transition row's
+    /// <c>_ownerUserId</c> as "Responsible: &lt;role&gt;" — role only, never the person's name (plan
+    /// 2026-10-02-002). A user id with no entry here is rendered as nothing (not "Unknown").
+    /// </summary>
+    IReadOnlyDictionary<int, string>? OwnerRoleByUserId = null)
 {
     public static readonly AuthoredDocumentPdfHeaderContext Empty =
         new(null, string.Empty, string.Empty, null, null, null, null, null, null, Array.Empty<AuthoredDocumentPdfParticipant>(), null, null);
@@ -81,6 +88,7 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
     private readonly TemplateVersionDetailModel _tree;
     private readonly JsonObject _values;
     private readonly AuthoredDocumentPdfHeaderContext _header;
+    private readonly IReadOnlyDictionary<int, string> _ownerRoleByUserId;
     private readonly bool _isOhForm;
     private readonly List<string> _outline = new();
 
@@ -94,6 +102,7 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
         _finalizedAt = finalizedAt;
         _tree = tree;
         _header = header ?? AuthoredDocumentPdfHeaderContext.Empty;
+        _ownerRoleByUserId = _header.OwnerRoleByUserId ?? new Dictionary<int, string>();
         _isOhForm = string.Equals(_header.StateCode, OhStateCode, StringComparison.OrdinalIgnoreCase);
 
         JsonObject values;
@@ -167,6 +176,7 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
         {
             col.Spacing(14);
 
+            var goalNumber = 0;
             foreach (var section in _tree.Sections.OrderBy(s => s.DisplayOrder).ThenBy(s => s.Id))
             {
                 var fields = section.Fields
@@ -181,7 +191,19 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                 Note($"Section: {section.Title}");
                 col.Item().Element(c => SectionHeading(c, section.Title));
                 foreach (var field in fields)
-                    col.Item().Element(c => ComposeField(c, field));
+                {
+                    // Goals render as numbered blocks (owner role + objectives), same as the OH layout —
+                    // the generic grid table has nowhere to put an ordered objectives list.
+                    if (IsGoalsField(field))
+                    {
+                        foreach (var goalBlock in ComposeGoalBlocks(field, ref goalNumber))
+                            col.Item().Element(goalBlock);
+                    }
+                    else
+                    {
+                        col.Item().Element(c => ComposeField(c, field));
+                    }
+                }
             }
         });
     }
@@ -291,12 +313,50 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
         field.FieldType == FieldType.Table
         && TemplateSemanticsReader.ReadField(field.FieldType, field.ConfigJson).Semantic == FieldSemantics.Goals;
 
-    /// <summary>Renders the Goals table as numbered blocks — one column-label-per-line — rather than the
-    /// generic grid table (plan 7, decision 9).</summary>
+    /// <summary>Column semantics whose cell content may be markdown (plan 2026-10-02-002): goal statement,
+    /// baseline, target, accommodation text and transition services — rendered structurally via
+    /// <see cref="ComposeMarkdown"/> rather than as a flattened "Label: **raw markdown**" line.</summary>
+    private static readonly IReadOnlySet<string> MarkdownCapableColumnSemantics = new HashSet<string>(StringComparer.Ordinal)
+    {
+        ColumnSemantics.GoalText, ColumnSemantics.Baseline, ColumnSemantics.TargetCriteria,
+        ColumnSemantics.Accommodation, ColumnSemantics.TransitionServices
+    };
+
+    /// <summary>Resolves a row's <c>_ownerUserId</c> to "Responsible: &lt;role&gt;" — role only, never the
+    /// person's name (plan 2026-10-02-002). Null when the row has no owner or the owner doesn't resolve.</summary>
+    private string? ResolveOwnerRole(JsonObject row) =>
+        row[RowMetaKeys.OwnerUserId] is JsonValue v && v.TryGetValue<int>(out var userId) && _ownerRoleByUserId.TryGetValue(userId, out var role)
+            ? role
+            : null;
+
+    /// <summary>A goal row's objectives as display strings ("description — criteria — targetDate"),
+    /// blank-only entries skipped (plan 2026-10-02-002).</summary>
+    private static List<string> ObjectiveDisplayTexts(JsonObject row)
+    {
+        var result = new List<string>();
+        if (row[RowMetaKeys.Objectives] is not JsonArray objectiveRows)
+            return result;
+
+        foreach (var objectiveRow in objectiveRows.OfType<JsonObject>())
+        {
+            var text = string.Join(" — ", new[] { "description", "criteria", "targetDate" }
+                .Select(key => AsString(objectiveRow[key]))
+                .Where(s => !string.IsNullOrWhiteSpace(s)));
+            if (!string.IsNullOrWhiteSpace(text))
+                result.Add(text);
+        }
+        return result;
+    }
+
+    /// <summary>Renders the Goals table as numbered blocks — one column-label-per-line, markdown cells
+    /// rendered structurally, an owner role line and numbered objectives — rather than the generic grid
+    /// table (plan 7, decision 9; objectives/owner: plan 2026-10-02-002).</summary>
     private IEnumerable<Action<IContainer>> ComposeGoalBlocks(TemplateFieldModel field, ref int goalNumber)
     {
         var rows = GetValue(field.FieldKey) as JsonArray;
         var columnLabels = TemplateSemanticsReader.ReadColumnLabels(field.ConfigJson);
+        var semanticByColumn = TemplateSemanticsReader.ReadColumns(field.FieldType, field.ConfigJson)
+            .ToDictionary(kv => kv.Value, kv => kv.Key);
         var blocks = new List<Action<IContainer>>();
         if (rows == null)
             return blocks;
@@ -306,6 +366,17 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
             goalNumber++;
             var n = goalNumber;
             Note($"Goal {n}");
+
+            // Resolved/computed OUTSIDE the deferred container lambda below (QuestPDF may invoke a
+            // container-building delegate more than once while laying out/measuring a page break) so
+            // Note() — a one-shot test seam — is never double-emitted.
+            var ownerRole = ResolveOwnerRole(rowNode);
+            if (ownerRole != null)
+                Note($"Responsible: {ownerRole}");
+            var objectiveTexts = ObjectiveDisplayTexts(rowNode);
+            if (objectiveTexts.Count > 0)
+                Note($"Objectives: {objectiveTexts.Count}");
+
             blocks.Add(container => container.Column(col =>
             {
                 col.Item().Text($"Goal {n}").Bold().FontSize(11);
@@ -315,7 +386,26 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                     var text = cell is JsonValue v ? v.ToString() : cell?.ToJsonString();
                     if (string.IsNullOrWhiteSpace(text))
                         continue;
-                    col.Item().Text($"{label}: {text}").FontSize(9);
+
+                    if (semanticByColumn.TryGetValue(columnKey, out var colSemantic) && MarkdownCapableColumnSemantics.Contains(colSemantic))
+                    {
+                        col.Item().Text(label).SemiBold().FontSize(9);
+                        col.Item().Element(c => ComposeMarkdown(c, text));
+                    }
+                    else
+                    {
+                        col.Item().Text($"{label}: {text}").FontSize(9);
+                    }
+                }
+
+                if (ownerRole != null)
+                    col.Item().PaddingTop(2).Text($"Responsible: {ownerRole}").FontSize(9).Italic();
+
+                if (objectiveTexts.Count > 0)
+                {
+                    col.Item().PaddingTop(2).Text("Objectives").SemiBold().FontSize(9);
+                    for (var i = 0; i < objectiveTexts.Count; i++)
+                        col.Item().PaddingLeft(10).Text($"{i + 1}. {objectiveTexts[i]}").FontSize(9);
                 }
             }));
         }
@@ -426,6 +516,10 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
     private void ComposeTable(IContainer container, TemplateFieldModel field, JsonArray? rows)
     {
         var columns = ParseColumns(field.ConfigJson);
+        // Goals never reach this generic grid (they render as ComposeGoalBlocks); services,
+        // accommodations and transition do, and get a synthetic "Responsible" column (plan 2026-10-02-002).
+        var semantic = TemplateSemanticsReader.ReadField(field.FieldType, field.ConfigJson).Semantic;
+        var showOwnerColumn = semantic != null && FieldSemantics.OwnerEligible.Contains(semantic);
 
         container.Column(col =>
         {
@@ -445,6 +539,8 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                 {
                     foreach (var _ in columns)
                         def.RelativeColumn();
+                    if (showOwnerColumn)
+                        def.RelativeColumn();
                 });
 
                 // Header repeats on each page (no clipping across page breaks — G-d.2).
@@ -452,6 +548,8 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                 {
                     foreach (var column in columns)
                         HeaderCell(header, column.Label);
+                    if (showOwnerColumn)
+                        HeaderCell(header, "Responsible");
                 });
 
                 if (rows != null)
@@ -463,8 +561,16 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                         {
                             JsonNode? cell = null;
                             row?.TryGetPropertyValue(column.ColumnKey.ToString(), out cell);
-                            BodyCell(table, FormatCell(column, cell));
+
+                            // A cell whose column is tagged as markdown-capable (goal text/baseline/target,
+                            // accommodation, transition services) renders structurally, not as raw syntax.
+                            if (column.Semantic != null && MarkdownCapableColumnSemantics.Contains(column.Semantic))
+                                BodyCellMarkdown(table, AsString(cell));
+                            else
+                                BodyCell(table, FormatCell(column, cell));
                         }
+                        if (showOwnerColumn)
+                            BodyCell(table, row != null ? ResolveOwnerRole(row) ?? string.Empty : string.Empty);
                     }
                 }
             });
@@ -704,6 +810,19 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
 
     private static void BodyCell(TableDescriptor table, string text)
         => table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(text).FontSize(9);
+
+    /// <summary>A table body cell whose content renders structurally from markdown (plan 2026-10-02-002)
+    /// rather than as one flattened <see cref="BodyCell"/> line of raw syntax.</summary>
+    private static void BodyCellMarkdown(TableDescriptor table, string? markdown)
+    {
+        var cell = table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4);
+        if (string.IsNullOrWhiteSpace(markdown))
+        {
+            cell.Text(string.Empty);
+            return;
+        }
+        cell.Element(c => ComposeMarkdown(c, markdown));
+    }
 
     // ---------------------------------------------------------------- Outline (test seam)
 

@@ -218,6 +218,44 @@ public sealed class DraftSharingServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetForParentAsync_RedactsOwnerToRoleOnly_NeverTheName()
+    {
+        var s = Seed("ownerredact");
+        using (var ctx = CreateContext())
+        {
+            ctx.StudentTeamMembers.Add(new StudentTeamMember
+            {
+                SchoolStudentId = s.StudentId, UserId = s.TeacherId, TeamRole = TeamRole.InterventionSpecialist, IsActive = true
+            });
+            var instance = ctx.DocumentInstances.Single(i => i.Id == s.InstanceId);
+            var values = JsonNode.Parse(instance.ValuesJson)!.AsObject();
+            ((JsonArray)values[s.GoalsKey.ToString()]!)[0]!.AsObject()[RowMetaKeys.OwnerUserId] = s.TeacherId;
+            instance.ValuesJson = values.ToJsonString();
+            ctx.SaveChanges();
+        }
+
+        SharedDraftRevisionModel share;
+        using (var ctx = CreateContext())
+        {
+            var services = Services(ctx);
+            var result = await services.Sharing.ShareAsync(s.TeacherId, s.InstanceId, null, default);
+            Assert.True(result.Success, result.Message);
+            share = result.Data!;
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var services = Services(ctx);
+            var detail = await services.Sharing.GetForParentAsync(s.ParentId, share.Id, default);
+            Assert.True(detail.Success, detail.Message);
+            Assert.Contains($"\"{RowMetaKeys.OwnerRole}\":\"Intervention Specialist\"", detail.Data!.ValuesJson);
+            Assert.DoesNotContain(RowMetaKeys.OwnerUserId, detail.Data.ValuesJson);
+            Assert.DoesNotContain("Steph", detail.Data.ValuesJson); // the owner's first name must never reach a family response
+            Assert.DoesNotContain("Case", detail.Data.ValuesJson);  // nor the last name
+        }
+    }
+
+    [Fact]
     public async Task Share_WhenPolicyDisabled_RefusesButPreviewStillListsRecipients()
     {
         var s = Seed("policyoff", policyEnabled: false);
@@ -480,7 +518,10 @@ public sealed class DraftSharingServiceTests : IDisposable
         var boundedServices = Services(ctx2);
         var result = await boundedServices.Sharing.GetForParentAsync(s.ParentId, revisionId, default);
         Assert.True(result.Success, result.Message);
-        Assert.True(counter.Queries <= 8, $"GetForParentAsync issued {counter.Queries} queries");
+        // Budget raised 8 -> 9 (plan 2026-10-02-002): one flat query loads the student's team to redact
+        // `_ownerUserId` to a role-only value before the response ever leaves the server — fixed cost
+        // regardless of row/team count, not a per-row N+1.
+        Assert.True(counter.Queries <= 9, $"GetForParentAsync issued {counter.Queries} queries");
     }
 
     public void Dispose() => _connection.Dispose();

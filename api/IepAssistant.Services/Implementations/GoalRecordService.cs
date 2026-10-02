@@ -68,6 +68,11 @@ public class GoalRecordService : IGoalRecordService
         string? Cell(JsonObject row, string colSemantic) =>
             goalsField.Columns.TryGetValue(colSemantic, out var colKey) ? DraftRowLabeler.CellText(row, colKey) : null;
 
+        // Already validated as an active StudentTeamMember by DocumentInstanceService at save time —
+        // copied verbatim, not re-checked here (plan 2026-10-02-002).
+        static int? OwnerUserId(JsonObject row) =>
+            row[RowMetaKeys.OwnerUserId] is JsonValue v && v.TryGetValue<int>(out var id) ? id : null;
+
         if (rows != null)
         {
             foreach (var row in rows.OfType<JsonObject>())
@@ -89,6 +94,7 @@ public class GoalRecordService : IGoalRecordService
                     TargetCriteria = Cell(row, ColumnSemantics.TargetCriteria),
                     MeasurementMethod = Cell(row, ColumnSemantics.MeasurementMethod),
                     Timeframe = Cell(row, ColumnSemantics.Timeframe),
+                    OwnerUserId = OwnerUserId(row),
                     Status = GoalRecordStatus.Active,
                     ProjectedAt = now,
                     CreatedById = version.FinalizedByUserId,
@@ -329,6 +335,7 @@ public class GoalRecordService : IGoalRecordService
             TargetCriteria = g.TargetCriteria,
             MeasurementMethod = g.MeasurementMethod,
             Timeframe = g.Timeframe,
+            OwnerUserId = g.OwnerUserId,
             Status = g.Status,
             StatusReason = g.StatusReason,
             ReviewedAt = g.ReviewedAt,

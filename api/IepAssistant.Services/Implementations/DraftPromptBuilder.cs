@@ -96,6 +96,13 @@ public static class DraftPromptBuilder
                         .Select(kv => (Label: kv.Value, Text: DraftRowLabeler.CellText(row, kv.Key)))
                         .Where(x => !string.IsNullOrWhiteSpace(x.Text))
                         .Select(x => $"{x.Label}: {x.Text}"));
+
+                    // Objectives/benchmarks are plain prose, included as text wherever a goal row is
+                    // summarized for AI context (plan 2026-10-02-002); the owner is never rendered here —
+                    // `_ownerUserId` has no text form anywhere in this builder.
+                    if (semantic == FieldSemantics.Goals && DraftRowLabeler.ObjectivesSummaryText(row) is { } objectivesText)
+                        cellText = string.IsNullOrWhiteSpace(cellText) ? $"objectives: {objectivesText}" : $"{cellText} | objectives: {objectivesText}";
+
                     if (string.IsNullOrWhiteSpace(cellText)) continue;
 
                     var rowLabel = DraftRowLabeler.LabelForRow(row, columnLabels, columnSemantics, primarySemantic);

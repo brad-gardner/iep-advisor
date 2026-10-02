@@ -366,5 +366,124 @@ public sealed class DocumentCompletenessServiceTests : IDisposable
         Assert.False(result.Success);
     }
 
+    // ----------------------------------------------------------------- Owner + objectives advisories (plan 2026-10-02-002)
+
+    /// <summary>A Goals table tagged with the real "goals" semantic + GoalText column semantic (unlike
+    /// <see cref="ProfileAndGoalsSections"/>'s untagged fixture) plus a Services table tagged "services" —
+    /// the two owner-eligible semantics these tests exercise.</summary>
+    private static List<TemplateSectionModel> SemanticGoalsAndServicesSections() => new()
+    {
+        new TemplateSectionModel
+        {
+            Id = 40, Title = "Goals", DisplayOrder = 0,
+            Fields = new List<TemplateFieldModel>
+            {
+                new()
+                {
+                    Id = 400, FieldKey = GoalsKey, FieldType = FieldType.Table, Label = "Goals", Required = false, DisplayOrder = 0,
+                    ConfigJson = TemplateGraphBuilder.TableConfig(FieldSemantics.Goals, (GoalCol, FieldType.Text, "Goal", ColumnSemantics.GoalText))
+                }
+            }
+        },
+        new TemplateSectionModel
+        {
+            Id = 41, Title = "Services", DisplayOrder = 1,
+            Fields = new List<TemplateFieldModel>
+            {
+                new()
+                {
+                    Id = 410, FieldKey = ServicesKey, FieldType = FieldType.Table, Label = "Services", Required = false, DisplayOrder = 0,
+                    ConfigJson = TemplateGraphBuilder.TableConfig(FieldSemantics.Services, (SvcTypeCol, FieldType.Text, "Service", ColumnSemantics.ServiceType))
+                }
+            }
+        }
+    };
+
+    [Fact]
+    public void Compute_GoalRowWithOwnerAndObjectives_NoAdvisory()
+    {
+        var values = Json(new Dictionary<string, object>
+        {
+            [GoalsKey.ToString()] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    [GoalCol.ToString()] = "Read better",
+                    ["_ownerUserId"] = 7,
+                    ["_objectives"] = new object[] { new Dictionary<string, object?> { ["description"] = "Read a paragraph" } }
+                }
+            }
+        });
+
+        using var ctx = CreateContext();
+        var result = CreateService(ctx).Compute(SemanticGoalsAndServicesSections(), values);
+        Assert.Equal(0, result.AdvisoryMissing);
+        Assert.Equal(0, result.RequiredMissing); // advisory never touches required counts
+    }
+
+    [Fact]
+    public void Compute_GoalRowWithNoOwner_ButWithObjectives_CountsOneAdvisory()
+    {
+        var values = Json(new Dictionary<string, object>
+        {
+            [GoalsKey.ToString()] = new object[]
+            {
+                new Dictionary<string, object?> { [GoalCol.ToString()] = "Read better", ["_objectives"] = new object[] { new Dictionary<string, object?> { ["description"] = "Read a paragraph" } } }
+            }
+        });
+
+        using var ctx = CreateContext();
+        var result = CreateService(ctx).Compute(SemanticGoalsAndServicesSections(), values);
+        Assert.Equal(1, result.AdvisoryMissing); // owner missing only — objectives are present, so that check doesn't also fire
+        Assert.Equal(0, result.RequiredMissing);
+    }
+
+    [Fact]
+    public void Compute_GoalRowWithNoOwnerAndNoObjectives_CountsTwoAdvisories()
+    {
+        var values = Json(new Dictionary<string, object> { [GoalsKey.ToString()] = new object[] { new Dictionary<string, object?> { [GoalCol.ToString()] = "Read better" } } });
+
+        using var ctx = CreateContext();
+        var result = CreateService(ctx).Compute(SemanticGoalsAndServicesSections(), values);
+        // One for "no owner", one for "no objectives" — both advisory-only, both counted.
+        Assert.Equal(2, result.AdvisoryMissing);
+    }
+
+    [Fact]
+    public void Compute_GoalRowWithEmptyObjectivesArray_StillCountsNoObjectivesAdvisory()
+    {
+        var values = Json(new Dictionary<string, object>
+        {
+            [GoalsKey.ToString()] = new object[] { new Dictionary<string, object?> { [GoalCol.ToString()] = "Read better", ["_ownerUserId"] = 7, ["_objectives"] = Array.Empty<object>() } }
+        });
+
+        using var ctx = CreateContext();
+        var result = CreateService(ctx).Compute(SemanticGoalsAndServicesSections(), values);
+        Assert.Equal(1, result.AdvisoryMissing); // owner present (no advisory) but objectives is an empty array (advisory)
+    }
+
+    [Fact]
+    public void Compute_ServiceRowWithNoOwner_CountsOneAdvisory_AndNeverChecksObjectives()
+    {
+        var values = Json(new Dictionary<string, object> { [ServicesKey.ToString()] = new object[] { new Dictionary<string, object?> { [SvcTypeCol.ToString()] = "OT" } } });
+
+        using var ctx = CreateContext();
+        var result = CreateService(ctx).Compute(SemanticGoalsAndServicesSections(), values);
+        Assert.Equal(1, result.AdvisoryMissing); // services: owner advisory only, no "objectives" concept
+    }
+
+    [Fact]
+    public void Compute_UntaggedTable_NeverCountsOwnerOrObjectivesAdvisories()
+    {
+        // ProfileAndGoalsSections' Goals table carries no semantic tag at all (the widely-reused fixture
+        // above) — confirms the new advisory logic is semantic-gated, not "any Table with a missing
+        // reserved key", so every pre-existing completeness test's numbers are undisturbed.
+        var values = Json(new Dictionary<string, object> { [GoalsKey.ToString()] = new object[] { new Dictionary<string, object?> { [GoalCol.ToString()] = "Read better" } } });
+
+        using var ctx = CreateContext();
+        var result = CreateService(ctx).Compute(ProfileAndGoalsSections(), values);
+        Assert.Equal(0, result.AdvisoryMissing);
+    }
+
     public void Dispose() => _connection.Dispose();
 }

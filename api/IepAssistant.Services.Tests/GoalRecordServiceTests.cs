@@ -179,6 +179,31 @@ public sealed class GoalRecordServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task FinalizeAsync_CopiesRowOwnerUserId_OntoGoalRecord()
+    {
+        var s = Seed(nameof(FinalizeAsync_CopiesRowOwnerUserId_OntoGoalRecord));
+        var rowId = Guid.NewGuid();
+        var valuesJson = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            [s.GoalsFieldKey.ToString()] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["_rowId"] = rowId.ToString(),
+                    [s.GoalCol.ToString()] = "Read at grade level",
+                    ["_ownerUserId"] = s.TeacherId
+                }
+            }
+        });
+
+        await SetValuesAndFinalizeAsync(s, valuesJson);
+
+        using var ctx = CreateContext();
+        var record = await ctx.GoalRecords.SingleAsync(g => g.SchoolStudentId == s.StudentId);
+        Assert.Equal(s.TeacherId, record.OwnerUserId);
+    }
+
+    [Fact]
     public async Task FinalizeAsync_CarriedLineage_PriorRecordMarkedCarried()
     {
         var s = Seed(nameof(FinalizeAsync_CarriedLineage_PriorRecordMarkedCarried));

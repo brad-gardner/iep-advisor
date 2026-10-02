@@ -64,6 +64,31 @@ public class DocumentInstanceValuesModel
 
     /// <summary>The rotated optimistic-concurrency token to echo on the next save.</summary>
     public byte[]? RowVersion { get; set; }
+
+    /// <summary>
+    /// Field-level warnings produced while normalizing this save — e.g. a row's <c>_ownerUserId</c> was
+    /// dropped because that user is not an active member of the student's team. Additive (plan
+    /// 2026-10-02-002): empty on every save that had nothing to warn about, including every save before
+    /// this field existed.
+    /// </summary>
+    public IReadOnlyList<DocumentSaveWarningModel> Warnings { get; set; } = Array.Empty<DocumentSaveWarningModel>();
+}
+
+/// <summary>One field/row-level warning surfaced alongside an otherwise-successful save (see
+/// <see cref="DocumentInstanceValuesModel.Warnings"/>).</summary>
+public class DocumentSaveWarningModel
+{
+    /// <summary>The table field's FieldKey (string GUID) the affected row belongs to.</summary>
+    public string FieldKey { get; set; } = string.Empty;
+
+    /// <summary>The affected row's <c>_rowId</c> (string GUID), so the client can surface the warning next to that row's control.</summary>
+    public string RowId { get; set; } = string.Empty;
+
+    /// <summary>Stable machine-readable reason, e.g. <c>"ownerNotTeamMember"</c>.</summary>
+    public string Code { get; set; } = string.Empty;
+
+    /// <summary>Human-readable message, safe to show directly.</summary>
+    public string Message { get; set; } = string.Empty;
 }
 
 /// <summary>List-row view of a student's instances.</summary>

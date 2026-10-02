@@ -47,6 +47,16 @@ public static class FieldSemantics
     {
         Goals, Services, Accommodations, Transition, Participants, EvaluatorReports
     };
+
+    /// <summary>
+    /// Semantics whose rows may carry a <see cref="RowMetaKeys.OwnerUserId"/> (plan 2026-10-02-002,
+    /// "read-first sections, goals/services, item owners"): goals, services, accommodations and
+    /// transition — deliberately NOT participants/evaluator reports (those rows already name a person).
+    /// </summary>
+    public static readonly IReadOnlySet<string> OwnerEligible = new HashSet<string>(StringComparer.Ordinal)
+    {
+        Goals, Services, Accommodations, Transition
+    };
 }
 
 /// <summary>Closed vocabulary for Table column semantics (see <see cref="FieldSemantics"/>).</summary>
@@ -109,5 +119,33 @@ public static class RowMetaKeys
     /// editor treats the row as stale carry-forward.</summary>
     public const string Confirmed = "_confirmed";
 
-    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { RowId, CarriedFrom, Confirmed };
+    /// <summary>
+    /// The user id (number) of the student-team member responsible for this row. Kept only on rows of a
+    /// <see cref="FieldSemantics.OwnerEligible"/> table, and only while that user is an ACTIVE
+    /// <c>StudentTeamMember</c> of the instance's student — <see cref="Implementations.DocumentInstanceService"/>
+    /// re-validates on every save and silently drops a stale/invalid value (with a field-level warning
+    /// when a row's own owner was rejected). Never shown to family/student-facing surfaces — see
+    /// <see cref="OwnerRole"/>.
+    /// </summary>
+    public const string OwnerUserId = "_ownerUserId";
+
+    /// <summary>
+    /// Output-only, role-display substitute for <see cref="OwnerUserId"/> on family/student-facing value
+    /// documents (<c>FamilyFacingValueRedactor</c>): the owner's <c>TeamRole</c> display name, e.g.
+    /// "Intervention Specialist" — never the person's name. Never accepted from a save patch (not a
+    /// column, not special-cased by <c>DocumentInstanceService.CoerceTable</c>, so it is stripped like any
+    /// other unrecognized key if a client ever echoes it back).
+    /// </summary>
+    public const string OwnerRole = "_ownerRole";
+
+    /// <summary>
+    /// Goal rows only (<see cref="FieldSemantics.Goals"/>): an ordered array of objective/benchmark
+    /// objects, each <c>{ _rowId: guid, description: string, criteria: string, targetDate: string }</c>,
+    /// capped at 20. Each objective's own <c>_rowId</c> follows the same server-assign/dedupe rules as a
+    /// table row's (see <see cref="RowId"/>) so the editor can key a stable React list.
+    /// </summary>
+    public const string Objectives = "_objectives";
+
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
+        { RowId, CarriedFrom, Confirmed, OwnerUserId, OwnerRole, Objectives };
 }
