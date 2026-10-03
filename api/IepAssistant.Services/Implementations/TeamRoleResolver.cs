@@ -10,6 +10,18 @@ namespace IepAssistant.Services.Implementations;
 /// 2026-10-02-002): the finalized PDF (<see cref="AuthoredDocumentPdfService"/>) and the family-facing
 /// shared draft (<see cref="FamilyFacingValueRedactor"/> via <c>DraftSharingService</c>).
 /// </summary>
+/// <remarks>
+/// Review pass 2 decision: this intentionally keeps resolving INACTIVE members, rather than being
+/// narrowed to active-only. <see cref="AuthoredDocumentVersionService.FinalizeAsync"/> (via
+/// <see cref="OwnerEligibleRowSanitizer"/>) now strips an inactive owner's <c>_ownerUserId</c> from every
+/// NEWLY finalized version, so a fresh finalize/PDF/GoalRecord simply has no row left to resolve a role
+/// for. The inactive branch here still matters for (1) a version finalized before this fix shipped, whose
+/// frozen ValuesJson may still carry a departed owner and should keep showing "Responsible: &lt;role&gt;"
+/// rather than silently losing that historical detail, and (2) a shared DRAFT (not yet finalized), whose
+/// live ValuesJson can briefly carry a stale owner between a save and the next edit/finalize. Narrowing
+/// this resolver to active-only would not change what a new finalize freezes (already handled upstream)
+/// but WOULD blank out legitimate historical/in-flight role labels — so it stays as a superset lookup.
+/// </remarks>
 public static class TeamRoleResolver
 {
     /// <summary>

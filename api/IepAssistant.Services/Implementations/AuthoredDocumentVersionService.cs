@@ -144,6 +144,22 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
 
             var now = DateTime.UtcNow;
 
+            // 6b. Plan 2026-10-02-002 review pass 2: a row's `_ownerUserId` is only re-validated against
+            // active team membership on a live SAVE (DocumentInstanceService.CoerceTable) or, previously,
+            // for the Goals table specifically at finalize (GoalRecordService.ProjectOnFinalizeAsync). An
+            // owner who left the team between that save and this finalize — or whose stale owner rode in
+            // verbatim via AmendAsync's ValuesJson copy — would otherwise freeze into the immutable version
+            // (and from there into the PDF) on every owner-eligible table, not just Goals. Strip it from
+            // the SNAPSHOT here, once, using the exact same active-membership query GoalRecordService uses
+            // below, so the version, the PDF and the projected GoalRecord can never disagree. The DRAFT
+            // instance's own ValuesJson is deliberately left untouched: it returns to Draft at step 8 and
+            // stays editable, and the same stale owner is cleaned the next time that row is saved (CoerceTable)
+            // or this document is finalized again — mirroring how a non-Goals owner was already handled
+            // before this fix (never retroactively rewritten outside a save/finalize).
+            var activeTeamUserIds = await OwnerEligibleRowSanitizer.LoadActiveTeamUserIdsAsync(_context, instance.SchoolStudentId, ct);
+            var sanitizedValues = OwnerEligibleRowSanitizer.StripInactiveOwners(
+                ValueDocumentJson.Parse(instance.ValuesJson), tree.Data!.Sections, activeTeamUserIds);
+
             // 7. Create the immutable version, snapshotting ValuesJson + the pinned template version id.
             var version = new AuthoredDocumentVersion
             {
@@ -151,7 +167,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
                 DocumentTypeId = instance.DocumentTypeId,
                 DocumentTemplateVersionId = instance.DocumentTemplateVersionId,
                 VersionNumber = versionNumber,
-                ValuesJson = instance.ValuesJson,
+                ValuesJson = sanitizedValues.ToJsonString(),
                 FinalizedByUserId = actingUserId,
                 FinalizedAt = now,
                 // Plan 7, decision 5: an instance created by AmendAsync carries its amendment fields onto
@@ -419,8 +435,9 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         // accommodation lineage) is preserved exactly as it was at finalize time. This does NOT re-check
         // a row's `_ownerUserId` against current active team membership (the copy never goes through
         // DocumentInstanceService.CoerceTable) — a stale/departed owner rides along into the new draft
-        // until either an edit to that table re-validates it (a normal save does) or the next finalize
-        // re-validates it for the Goals table specifically (GoalRecordService.ProjectOnFinalizeAsync).
+        // until either an edit to that table re-validates it (a normal save does) or this draft is
+        // finalized again, at which point AuthoredDocumentVersionService.FinalizeAsync strips it from the
+        // snapshot (OwnerEligibleRowSanitizer, every owner-eligible table — not just Goals).
         var now = DateTime.UtcNow;
         var instance = new DocumentInstance
         {

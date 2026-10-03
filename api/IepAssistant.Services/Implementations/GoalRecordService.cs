@@ -68,18 +68,14 @@ public class GoalRecordService : IGoalRecordService
         string? Cell(JsonObject row, string colSemantic) =>
             goalsField.Columns.TryGetValue(colSemantic, out var colKey) ? DraftRowLabeler.CellText(row, colKey) : null;
 
-        // Re-validated HERE, not just copied verbatim from a save-time check (plan 2026-10-02-002): an
-        // amendment (AuthoredDocumentVersionService.AmendAsync) copies the frozen ValuesJson straight into
-        // the new instance WITHOUT going back through DocumentInstanceService.CoerceTable, so an owner
-        // that was valid when originally saved is never re-checked before landing here; and even a
-        // same-draft finalize can happen long enough after the triggering save that the owner has since
-        // left the team. One query, reused for every goal row.
-        var activeTeamUserIds = (await _context.StudentTeamMembers
-                .AsNoTracking()
-                .Where(m => m.SchoolStudentId == version.SchoolStudentId && m.IsActive)
-                .Select(m => m.UserId)
-                .ToListAsync(ct))
-            .ToHashSet();
+        // Belt-and-suspenders, not the primary gate (plan 2026-10-02-002 review pass 2):
+        // AuthoredDocumentVersionService.FinalizeAsync now strips a stale `_ownerUserId` from EVERY
+        // owner-eligible table — Goals included — on the snapshot BEFORE it is saved as `version.ValuesJson`,
+        // using this exact same active-membership query (OwnerEligibleRowSanitizer). So by the time this
+        // projection runs, a Goals row should never carry an owner who isn't an active team member. Re-check
+        // anyway, from the identical allow-list, so this projection can never disagree with the version/PDF
+        // even if that upstream sanitization is ever bypassed or reordered.
+        var activeTeamUserIds = await OwnerEligibleRowSanitizer.LoadActiveTeamUserIdsAsync(_context, version.SchoolStudentId, ct);
 
         int? OwnerUserId(JsonObject row) =>
             row[RowMetaKeys.OwnerUserId] is JsonValue v && v.TryGetValue<int>(out var id) && activeTeamUserIds.Contains(id) ? id : null;
