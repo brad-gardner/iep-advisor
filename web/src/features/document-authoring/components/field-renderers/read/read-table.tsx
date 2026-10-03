@@ -1,20 +1,38 @@
 import { parseConfig, readColumnOptions, type TableColumn } from '@/features/admin/templates/template-config';
+import { OWNER_ELIGIBLE_SEMANTICS, type FieldSemantic } from '@/features/admin/templates/document-semantics';
 import { formatDate } from '@/lib/format-date';
-import { coerceRows } from '../../../lib/table-rows';
+import { useDocumentEditorContext } from '../../../hooks/document-editor-context';
+import { coerceRows, ownerUserId } from '../../../lib/table-rows';
+import { resolveOwnerDisplay } from '../../../lib/owner-display';
 import type { TableCellValue } from '../../../types';
 import { fieldElementId } from '../types';
+import { ReadAccommodations } from './read-accommodations';
+import { ReadTransitionList } from './read-transition-list';
 import type { ReadFieldRendererProps } from './types';
 
 /**
- * Generic read view for a Table field: one row per entry, one column per
- * configured column. Semantic row blocks (goals, services, …) get their own
- * card/schedule views in later phases — this is the shared fallback that every
- * Table renders with today.
+ * Read view for a Table field. Accommodations and transition rows get their own
+ * grouped layout (`ReadAccommodations` / `ReadTransitionList`); everything else —
+ * including goals and services until their Phase 3/4 card/schedule views land —
+ * falls through to this generic one-row-per-entry table, which appends an Owner
+ * column for any owner-eligible semantic (plan 2026-10-02-002).
  */
-export function ReadTable({ field, value }: ReadFieldRendererProps) {
+export function ReadTable(props: ReadFieldRendererProps) {
+  const { field } = props;
+  const config = parseConfig(field.fieldType, field.configJson);
+  const semantic = config.kind === 'Table' ? config.semantic : undefined;
+
+  if (semantic === 'accommodations') return <ReadAccommodations {...props} />;
+  if (semantic === 'transition') return <ReadTransitionList {...props} />;
+  return <ReadTableGeneric {...props} semantic={semantic} />;
+}
+
+function ReadTableGeneric({ field, value, semantic }: ReadFieldRendererProps & { semantic: FieldSemantic | undefined }) {
   const config = parseConfig(field.fieldType, field.configJson);
   const columns = config.kind === 'Table' ? config.table.columns : [];
   const rows = coerceRows(value);
+  const editor = useDocumentEditorContext();
+  const ownerEligible = semantic != null && OWNER_ELIGIBLE_SEMANTICS.has(semantic);
 
   return (
     <div id={fieldElementId(field.id)} data-testid={`read-field-${field.fieldKey}`}>
@@ -36,18 +54,35 @@ export function ReadTable({ field, value }: ReadFieldRendererProps) {
                     {c.label || 'Column'}
                   </th>
                 ))}
+                {ownerEligible && (
+                  <th scope="col" className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600">
+                    Owner
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.key} className="border-b border-brand-slate-100 last:border-0">
-                  {columns.map((col) => (
-                    <td key={col.columnKey} className="px-3 py-2 align-top text-brand-slate-700">
-                      {formatCell(col, row.cells[col.columnKey])}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {rows.map((row) => {
+                const owner = ownerEligible ? resolveOwnerDisplay(ownerUserId(row), editor?.team) : null;
+                return (
+                  <tr key={row.key} className="border-b border-brand-slate-100 last:border-0">
+                    {columns.map((col) => (
+                      <td key={col.columnKey} className="px-3 py-2 align-top text-brand-slate-700">
+                        {formatCell(col, row.cells[col.columnKey])}
+                      </td>
+                    ))}
+                    {ownerEligible && (
+                      <td className="px-3 py-2 align-top text-brand-slate-700">
+                        {owner ? (
+                          <span className={owner.former ? 'italic text-brand-slate-500' : undefined}>{owner.label}</span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

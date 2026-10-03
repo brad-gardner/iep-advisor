@@ -128,14 +128,14 @@ Decided in the design (see design doc):
 
 #### Phase 2: Owners on goals, services, accommodations, transition
 
-- [ ] `RowMetaKeys.OwnerUserId` (C# + TS); normalization keeps it only for the four semantics when the owner is an active team member; warning otherwise
-- [ ] `TeamMemberSelect` + editor-context team cache; owner shown in the read views (name + role) and in row editors
-- [ ] Accommodations and Transition row editors: auto-growing rich-text prose fields + owner; read views grouped (category / goal area)
-- [ ] Prefill carries owners (drop if no longer on the team)
-- [ ] Migration `AddGoalRecordOwner`; `GoalRecordService` copies the owner at finalize
-- [ ] Family draft rendering + `AuthoredDocumentPdfDocument`: "Responsible: <role>" (role from the team member's `TeamRole`), never the name
-- [ ] Completeness advisory "has no owner" (client + server, parity test)
-- [ ] Tests: normalization (team member kept, non-member dropped, wrong semantic dropped); prefill carry; GoalRecord owner; PDF/draft role-only; completeness parity; picker UI
+- [x] `RowMetaKeys.OwnerUserId` (C# + TS); normalization keeps it only for the four semantics when the owner is an active team member; warning otherwise
+- [x] `TeamMemberSelect` + editor-context team cache; owner shown in the read views (name + role) and in row editors
+- [x] Accommodations and Transition row editors: auto-growing rich-text prose fields + owner; read views grouped (category / goal area)
+- [x] Prefill carries owners (drop if no longer on the team)
+- [x] Migration `AddGoalRecordOwner`; `GoalRecordService` copies the owner at finalize
+- [x] Family draft rendering + `AuthoredDocumentPdfDocument`: "Responsible: <role>" (role from the team member's `TeamRole`), never the name
+- [x] Completeness advisory "has no owner" (client + server, parity test)
+- [x] Tests: normalization (team member kept, non-member dropped, wrong semantic dropped); prefill carry; GoalRecord owner; PDF/draft role-only; completeness parity; picker UI
 
 **Checkpoint:** assign owners in all four sections; reload; create an amendment and confirm the owners carried forward; the PDF shows the role only.
 

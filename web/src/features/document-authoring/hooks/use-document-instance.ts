@@ -3,7 +3,7 @@ import { AxiosError } from 'axios';
 import type { ApiResponse } from '@/types/api';
 import type { AutosaveStatus } from '@/hooks/use-autosave';
 import { getDocument, saveValues as saveValuesApi } from '../api/documents-api';
-import type { DocumentInstanceDetailDto, DocumentValuePatch } from '../types';
+import type { DocumentInstanceDetailDto, DocumentSaveWarningDto, DocumentValuePatch } from '../types';
 
 export interface SaveResult {
   ok: boolean;
@@ -14,6 +14,8 @@ export interface SaveResult {
   /** Server-normalized values after a successful save (e.g. Table rows now carry
    *  their `_rowId`). Fields that keep local state read their own key back. */
   values?: Record<string, unknown>;
+  /** Field/row-level warnings from normalizing this save (e.g. a dropped owner). */
+  warnings?: DocumentSaveWarningDto[];
 }
 const SAVED_LINGER_MS = 1500;
 
@@ -162,7 +164,7 @@ export function useDocumentInstance(instanceId: number) {
           const res = await saveValuesApi(instanceId, patch, current.rowVersion ?? undefined);
           if (res.success && res.data) {
             applySavedValues(res.data.values, res.data.rowVersion);
-            return { ok: true, values: res.data.values };
+            return { ok: true, values: res.data.values, warnings: res.data.warnings };
           }
           return { ok: false, errors: res.errors, message: res.message };
         } catch (err) {

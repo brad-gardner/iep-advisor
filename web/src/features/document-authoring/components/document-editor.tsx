@@ -23,6 +23,7 @@ import { stepSection, useActiveSection } from '../hooks/use-active-section';
 import { useSectionEditing } from '../hooks/use-section-editing';
 import { useDocumentChat } from '../hooks/use-document-chat';
 import { useStudentShareableEntries } from '../hooks/use-student-shareable-entries';
+import { useStudentTeam } from '../hooks/use-student-team';
 import type { DocumentInstanceDetailDto, DocumentInstanceStatus } from '../types';
 import { FinalizeDocumentSection } from './finalize-document-section';
 import { ChatPanel } from './chat/chat-panel';
@@ -145,6 +146,8 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
 
   // Shared, lazily-loaded cache for every "Pull from student" button.
   const shareableEntries = useStudentShareableEntries(detail.schoolStudentId);
+  // Shared, eagerly-loaded cache of the student's team for owner pickers + read views.
+  const team = useStudentTeam(detail.schoolStudentId);
   // The field that last had focus — the Evidence drawer inserts into it.
   const [activeField, setActiveFieldState] = useState<ActiveFieldTarget | null>(null);
   const setActiveField = useCallback((target: ActiveFieldTarget) => setActiveFieldState(target), []);
@@ -157,8 +160,8 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
   // (it owns its own fetch — this just tells it "something changed").
   const [shareVersion, setShareVersion] = useState(0);
   const editorContext = useMemo(
-    () => ({ instanceId: detail.id, studentId: detail.schoolStudentId, shareableEntries, setActiveField, clearActiveField }),
-    [detail.id, detail.schoolStudentId, shareableEntries, setActiveField, clearActiveField]
+    () => ({ instanceId: detail.id, studentId: detail.schoolStudentId, shareableEntries, team, setActiveField, clearActiveField }),
+    [detail.id, detail.schoolStudentId, shareableEntries, team, setActiveField, clearActiveField]
   );
 
   return (

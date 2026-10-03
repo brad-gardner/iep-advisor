@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { StudentShareableEntries } from './use-student-shareable-entries';
+import type { StudentTeamCache } from './use-student-team';
 
 /** The field (or table cell) that most recently had focus, and how to write into it. */
 export interface ActiveFieldTarget {
@@ -21,6 +22,9 @@ export interface DocumentEditorContextValue {
   studentId: number;
   /** Shared, lazily-loaded cache of the student's shareable workspace entries. */
   shareableEntries: StudentShareableEntries;
+  /** Shared, eagerly-loaded cache of the student's IEP team (plan 2026-10-02-002:
+   *  item owners) — owner pickers and read views resolve names/roles from it. */
+  team: StudentTeamCache;
   /** Renderers call this on focus so "Insert" in the Evidence drawer knows where to write. */
   setActiveField: (target: ActiveFieldTarget) => void;
   /** Drops the active target when its id equals `id` or starts with `${id}:` (a field and its cells). */

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { useAutosave } from '@/hooks/use-autosave';
 import {
   parseConfig,
@@ -13,11 +14,27 @@ import { apiErrorMessage } from '@/lib/api-error';
 import type { TableCellValue } from '../../types';
 import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { fieldElementId, type FieldRendererProps } from './types';
-import { ROW_BLOCK_SEMANTICS, type ColumnSemantic, type FieldSemantic } from '@/features/admin/templates/document-semantics';
+import {
+  OWNER_ELIGIBLE_SEMANTICS,
+  ROW_BLOCK_SEMANTICS,
+  ROW_CONFIRMED_KEY,
+  rowBlockItemLabel,
+  type ColumnSemantic,
+} from '@/features/admin/templates/document-semantics';
 import type { AssistKind } from '../../api/assist-types';
 import { FieldAssistBar } from './field-assist-bar';
-import { adoptRowIds, carriedFrom, coerceRows, emptyCells, nextRowKey, rowId, type KeyedRow } from '../../lib/table-rows';
-import { ROW_CONFIRMED_KEY } from '@/features/admin/templates/document-semantics';
+import { TeamMemberSelect } from '../team-member-select';
+import {
+  adoptRowIds,
+  carriedFrom,
+  coerceRows,
+  emptyCells,
+  nextRowKey,
+  ownerUserId,
+  rowId,
+  withOwner,
+  type KeyedRow,
+} from '../../lib/table-rows';
 import { appendText, useDocumentEditorContext } from '../../hooks/document-editor-context';
 
 /**
@@ -50,6 +67,12 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
     setRows(next);
   }, []);
 
+  // Server save warnings for THIS field's rows, keyed by `_rowId` (e.g. an owner
+  // that was not an active team member, so it was dropped — plan 2026-10-02-002).
+  // Replaced wholesale on every save response, so a fixed warning disappears on
+  // the next successful save without needing to be cleared explicitly.
+  const [ownerWarnings, setOwnerWarnings] = useState<Record<string, string>>({});
+
   // The queued autosave value is only a trigger: the payload is read from
   // rowsRef at send time, and ids come back matched to the rows that were sent.
   const autosave = useAutosave<number>(
@@ -58,6 +81,15 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
       const result = await onSave({ [field.fieldKey]: sent.map((r) => r.cells) });
       const saved = result.values?.[field.fieldKey];
       if (saved !== undefined) mutate((current) => adoptRowIds(current, sent, saved));
+      const warnings = (result.warnings ?? []).filter((w) => w.fieldKey === field.fieldKey);
+      // Return the SAME object when there is nothing to change (most saves carry
+      // no warnings) so React can bail out of re-rendering the row block on a
+      // plain successful autosave.
+      setOwnerWarnings((prev) =>
+        warnings.length === 0 && Object.keys(prev).length === 0
+          ? prev
+          : Object.fromEntries(warnings.map((w) => [w.rowId, w.message]))
+      );
     }, [field.fieldKey, onSave, mutate])
   );
   useRegisterFlush(field.fieldKey, autosave.flush);
@@ -84,6 +116,11 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
 
   const keepRow = (rowKey: string) =>
     commit((current) => current.map((r) => (r.key === rowKey ? { ...r, cells: { ...r.cells, [ROW_CONFIRMED_KEY]: true } } : r)), true);
+
+  // Owner is a discrete selection (not continuous typing), so — like keepRow/addRow
+  // above — it flushes immediately rather than waiting for the debounce.
+  const updateOwner = (rowKey: string, nextOwnerUserId: number | undefined) =>
+    commit((current) => current.map((r) => (r.key === rowKey ? { ...r, cells: withOwner(r.cells, nextOwnerUserId) } : r)), true);
 
   const addRow = () => commit((current) => [...current, { key: nextRowKey(), cells: emptyCells(columns) }], true);
   const removeRow = (rowKey: string) => {
@@ -143,7 +180,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
     id: `${field.fieldKey}:${rowKey}:${col.columnKey}`,
     label: () => {
       const index = rowsRef.current.findIndex((r) => r.key === rowKey);
-      return `${blockLabel(blockSemantic)} ${index + 1} — ${col.label || 'field'}`;
+      return `${rowBlockItemLabel(blockSemantic)} ${index + 1} — ${col.label || 'field'}`;
     },
     apply: (text: string) => {
       if (disabledRef.current) return;
@@ -163,6 +200,11 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
   // "Pull from student" and the measurement kind.
   const blockSemantic = config.kind === 'Table' ? config.semantic : undefined;
   const isRowBlock = blockSemantic != null && ROW_BLOCK_SEMANTICS.has(blockSemantic);
+  // Goals, services, accommodations and transition rows get a team-member owner
+  // picker (plan 2026-10-02-002); participants/evaluator reports do not — those
+  // rows already name a person.
+  const ownerEligible = blockSemantic != null && OWNER_ELIGIBLE_SEMANTICS.has(blockSemantic);
+  const editorTeam = editor?.team;
   const primaryColumn =
     columns.find((c) =>
       blockSemantic === 'goals'
@@ -212,7 +254,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                 >
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <span className="flex min-w-0 flex-wrap items-center gap-2 text-[13px] font-medium text-brand-slate-500">
-                      {blockLabel(blockSemantic)} {rowIndex + 1}
+                      {rowBlockItemLabel(blockSemantic)} {rowIndex + 1}
                       {carried && (
                         <span
                           className={
@@ -253,7 +295,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                           const primaryValue = primaryColumn ? row.cells[primaryColumn.columnKey] : undefined;
                           requestRemoveRow(row.key, typeof primaryValue === 'string' ? primaryValue : '');
                         }}
-                        aria-label={`Remove ${blockLabel(blockSemantic).toLowerCase()} ${rowIndex + 1}`}
+                        aria-label={`Remove ${rowBlockItemLabel(blockSemantic).toLowerCase()} ${rowIndex + 1}`}
                         data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
                       >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -281,6 +323,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                             value={row.cells[col.columnKey]}
                             disabled={disabled}
                             multiline={wide}
+                            richText={isRichTextColumn(col.semantic)}
                             inputId={cellId}
                             onChange={(cell) => updateCell(row.key, col.columnKey, cell)}
                             onFocus={col.type === 'Text' ? () => editor?.setActiveField(cellTarget(row.key, col)) : undefined}
@@ -290,6 +333,25 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                       );
                     })}
                   </div>
+                  {ownerEligible && (
+                    <div className="mt-3">
+                      <label
+                        htmlFor={`field-${field.fieldKey}-owner-${rowIndex}`}
+                        className="mb-1 block text-[13px] font-medium text-brand-slate-600"
+                      >
+                        Owner
+                      </label>
+                      <TeamMemberSelect
+                        id={`field-${field.fieldKey}-owner-${rowIndex}`}
+                        team={editorTeam}
+                        value={ownerUserId(row)}
+                        disabled={disabled}
+                        onChange={(uid) => updateOwner(row.key, uid)}
+                        warning={persistedId ? ownerWarnings[persistedId] : undefined}
+                        data-testid={`field-${field.fieldKey}-row-${rowIndex}-owner`}
+                      />
+                    </div>
+                  )}
                   {primaryColumn && persistedId ? (
                     <FieldAssistBar
                       fieldKey={field.fieldKey}
@@ -323,7 +385,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
             data-testid={`field-${field.fieldKey}-add`}
           >
             <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-            Add {blockLabel(blockSemantic).toLowerCase()}
+            Add {rowBlockItemLabel(blockSemantic).toLowerCase()}
           </Button>
         </div>
 
@@ -448,35 +510,22 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
 const cellInputClass =
   'w-full px-2 py-1 bg-white rounded-input text-brand-slate-800 text-sm border border-brand-slate-200 focus:outline-none focus:border-brand-teal-500 focus:ring-[3px] focus:ring-brand-teal-50 transition-colors';
 
-/** Human label for one row of a semantic block ("Goal 2", "Service 1"). */
-function blockLabel(semantic: FieldSemantic | undefined): string {
-  switch (semantic) {
-    case 'goals':
-      return 'Goal';
-    case 'services':
-      return 'Service';
-    case 'accommodations':
-      return 'Accommodation';
-    case 'transition':
-      return 'Transition item';
-    case 'participants':
-      return 'Participant';
-    case 'evaluatorReports':
-      return 'Evaluator report';
-    default:
-      return 'Row';
-  }
-}
-
-/** Columns whose content is prose and deserves a full-width multiline input. */
 /** `_carriedFrom.date` is an ISO `yyyy-MM-dd`; show it the way the Evidence drawer does. */
 function formatCarriedDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString();
 }
 
+/** Columns whose content is prose and deserves a full-width multiline input. */
 function isLongColumn(semantic: ColumnSemantic | undefined): boolean {
   return semantic === 'goalText' || semantic === 'baseline' || semantic === 'targetCriteria' || semantic === 'findings' || semantic === 'transitionServices' || semantic === 'accommodation';
+}
+
+/** Accommodation and transition-services prose get the larger auto-growing rich
+ *  text editor (plan 2026-10-02-002); goal statement/baseline/target stay plain
+ *  textareas until Phase 3's goal editor. */
+function isRichTextColumn(semantic: ColumnSemantic | undefined): boolean {
+  return semantic === 'accommodation' || semantic === 'transitionServices';
 }
 
 function TableCell({
@@ -486,6 +535,7 @@ function TableCell({
   value,
   disabled,
   multiline,
+  richText,
   inputId,
   onFocus,
   onChange,
@@ -498,6 +548,9 @@ function TableCell({
   disabled?: boolean;
   /** Block mode: render prose Text columns as a textarea. */
   multiline?: boolean;
+  /** Block mode: render this Text column as the larger auto-growing rich text
+   *  editor instead of a plain textarea (accommodation / transitionServices). */
+  richText?: boolean;
   /** Block mode: explicit id so the visible label associates with the control. */
   inputId?: string;
   onFocus?: () => void;
@@ -509,6 +562,22 @@ function TableCell({
   const ariaLabel = inputId ? undefined : `${column.label || 'Column'}, row ${rowIndex + 1}`;
   const testId = `field-${fieldKey}-cell-${rowIndex}-${column.columnKey}`;
   const strValue = typeof value === 'string' ? value : '';
+
+  if (richText && column.type === 'Text') {
+    return (
+      <RichTextEditor
+        id={inputId}
+        minRows={4}
+        value={strValue}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        onFocus={onFocus}
+        onChange={onChange}
+        onBlur={onBlur}
+        data-testid={testId}
+      />
+    );
+  }
 
   if (multiline && column.type === 'Text') {
     return (

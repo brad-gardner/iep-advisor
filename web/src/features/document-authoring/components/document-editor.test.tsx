@@ -29,6 +29,13 @@ const shareableEntriesApi = vi.hoisted(() => ({
 }));
 vi.mock('@/features/student/api/shareable-entries-api', () => shareableEntriesApi);
 
+// useStudentTeam (plan 2026-10-02-002) fetches the student's team eagerly on
+// mount — unlike the lazy shareableEntries cache above.
+const educatorApi = vi.hoisted(() => ({
+  getTeam: vi.fn().mockResolvedValue({ success: true, data: [] }),
+}));
+vi.mock('@/features/educator/api/educator-api', () => educatorApi);
+
 const documentsApi = vi.hoisted(() => ({
   listAuthoredVersions: vi.fn().mockResolvedValue({ success: true, data: [] }),
   finalizeDocument: vi.fn(),

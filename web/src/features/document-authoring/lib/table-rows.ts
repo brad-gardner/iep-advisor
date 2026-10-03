@@ -1,4 +1,4 @@
-import { ROW_CARRIED_FROM_KEY, ROW_ID_KEY } from '@/features/admin/templates/document-semantics';
+import { ROW_CARRIED_FROM_KEY, ROW_ID_KEY, ROW_OWNER_USER_ID_KEY } from '@/features/admin/templates/document-semantics';
 import type { TableColumn } from '@/features/admin/templates/template-config';
 import type { TableRowValue } from '../types';
 
@@ -49,6 +49,24 @@ export function readCarriedFrom(raw: unknown): CarriedFrom | undefined {
 export function rowId(row: KeyedRow): string | undefined {
   const id = row.cells[ROW_ID_KEY];
   return typeof id === 'string' && id ? id : undefined;
+}
+
+/** The row's `_ownerUserId` (plan 2026-10-02-002), or undefined when unassigned. */
+export function ownerUserId(row: KeyedRow): number | undefined {
+  const id = row.cells[ROW_OWNER_USER_ID_KEY];
+  return typeof id === 'number' ? id : undefined;
+}
+
+/** Returns `cells` with `_ownerUserId` set, or removed when `userId` is undefined
+ *  (picking "Unassigned"). Never mutates the input. */
+export function withOwner(cells: TableRowValue, userId: number | undefined): TableRowValue {
+  if (userId == null) {
+    if (!(ROW_OWNER_USER_ID_KEY in cells)) return cells;
+    const next = { ...cells };
+    delete next[ROW_OWNER_USER_ID_KEY];
+    return next;
+  }
+  return { ...cells, [ROW_OWNER_USER_ID_KEY]: userId };
 }
 
 /** Rows from a value-document. Persisted rows carry `_rowId`; use it as the key. */
