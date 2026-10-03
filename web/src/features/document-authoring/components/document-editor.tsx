@@ -95,13 +95,18 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
   // flush actually left the document clean: closing first and discovering a
   // failure after would already have thrown away the open editors' local
   // state, with nothing left open to show the educator what still needs
-  // fixing. `handleConfirm` (finalize-document-section.tsx) re-checks the same
-  // state before it will actually finalize.
-  const flushAndCloseBeforeFinalize = useCallback(async () => {
+  // fixing. Returns whether it was safe to proceed — `handleConfirm`
+  // (finalize-document-section.tsx) must not call finalize when this is
+  // false, since `getSaveState()`'s own `hasError` only tracks the single
+  // most-recently-settled save and can read "ok" again once a LATER save
+  // (for a different field) succeeds, even while a section still shows an
+  // unresolved failure (`sectionEditing.hasFailures()`) below.
+  const flushAndCloseBeforeFinalize = useCallback(async (): Promise<boolean> => {
     await flushRegistry.flushAll();
     const state = getSaveState();
-    if (state.hasError || state.conflict || state.pending) return;
+    if (state.hasError || state.conflict || state.pending || sectionEditing.hasFailures()) return false;
     sectionEditing.closeAll();
+    return true;
   }, [flushRegistry, sectionEditing, getSaveState]);
 
   // Completeness is derived from the last server-normalized values (updated on
@@ -279,6 +284,7 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
                     onOpen={() => sectionEditing.open(section.id)}
                     onClose={() => sectionEditing.close(section.id)}
                     items={itemsBySection.get(section.id) ?? []}
+                    registerFailureStatus={(hasFailures) => sectionEditing.registerFailureStatus(section.id, hasFailures)}
                   />
                 ))
               )}

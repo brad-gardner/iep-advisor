@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 export interface SectionEditingController {
   /** Whether `sectionId` is currently in edit mode. */
@@ -13,6 +13,15 @@ export interface SectionEditingController {
   closeAll: () => void;
   /** True while at least one section is open — gates the idle-flush interval. */
   anyOpen: boolean;
+  /** A `SectionCard` registers a getter for "do I currently have an unresolved
+   *  save failure" (same shape as `FlushRegistry.register`: returns an
+   *  unregister cleanup). `hasFailures()` below reads every registered getter
+   *  fresh, so Finalize always sees the latest state without this controller
+   *  needing to re-render on every field save. */
+  registerFailureStatus: (sectionId: number, hasFailures: () => boolean) => () => void;
+  /** True if ANY registered section currently reports an unresolved failure —
+   *  Finalize refuses to close sections (and snapshot) while this is true. */
+  hasFailures: () => boolean;
 }
 
 /**
@@ -44,8 +53,24 @@ export function useSectionEditing(): SectionEditingController {
     setOpenIds((cur) => (cur.size === 0 ? cur : new Set()));
   }, []);
 
+  // Plain ref map, not state: a section's failure status changes on every
+  // field save, far more often than anything here needs to re-render for —
+  // callers (Finalize) only ever read it on demand, right before deciding
+  // whether to close everything.
+  const failureGettersRef = useRef<Map<number, () => boolean>>(new Map());
+  const registerFailureStatus = useCallback((sectionId: number, hasFailures: () => boolean) => {
+    failureGettersRef.current.set(sectionId, hasFailures);
+    return () => {
+      failureGettersRef.current.delete(sectionId);
+    };
+  }, []);
+  const hasFailures = useCallback(
+    () => [...failureGettersRef.current.values()].some((getter) => getter()),
+    []
+  );
+
   return useMemo(
-    () => ({ isOpen, open, close, closeAll, anyOpen: openIds.size > 0 }),
-    [isOpen, open, close, closeAll, openIds]
+    () => ({ isOpen, open, close, closeAll, anyOpen: openIds.size > 0, registerFailureStatus, hasFailures }),
+    [isOpen, open, close, closeAll, openIds, registerFailureStatus, hasFailures]
   );
 }

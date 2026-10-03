@@ -182,6 +182,38 @@ describe('ServicesBlock — schedule row and focused editor', () => {
     expect(sent[0][durationCol]).toBe('45 minutes');
   });
 
+  it('clearing the structured frequency count commits an empty value instead of leaving the last saved text in place', async () => {
+    const onSave = vi.fn().mockResolvedValue({ ok: true, values: {} });
+    renderServices([{ _rowId: 'ID-1', [serviceTypeCol]: 'OT', [frequencyCol]: '2 per week' }], onSave);
+    fireEvent.click(screen.getByTestId(`field-${fieldKey}-row-0-edit`));
+
+    const countInput = screen.getByTestId(`field-${fieldKey}-cell-0-${frequencyCol}`);
+    expect(countInput).toHaveValue(2);
+    fireEvent.change(countInput, { target: { value: '' } });
+    expect(countInput).toHaveValue(null);
+    fireEvent.blur(countInput);
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    const sent = (onSave.mock.calls.at(-1)?.[0] as Record<string, unknown>)[fieldKey] as Array<Record<string, unknown>>;
+    expect(sent[0][frequencyCol]).toBe('');
+  });
+
+  it('clearing the structured duration minutes commits an empty value instead of leaving the last saved text in place', async () => {
+    const onSave = vi.fn().mockResolvedValue({ ok: true, values: {} });
+    renderServices([{ _rowId: 'ID-1', [serviceTypeCol]: 'OT', [durationCol]: '30 minutes' }], onSave);
+    fireEvent.click(screen.getByTestId(`field-${fieldKey}-row-0-edit`));
+
+    const minutesInput = screen.getByTestId(`field-${fieldKey}-cell-0-${durationCol}`);
+    expect(minutesInput).toHaveValue(30);
+    fireEvent.change(minutesInput, { target: { value: '' } });
+    expect(minutesInput).toHaveValue(null);
+    fireEvent.blur(minutesInput);
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    const sent = (onSave.mock.calls.at(-1)?.[0] as Record<string, unknown>)[fieldKey] as Array<Record<string, unknown>>;
+    expect(sent[0][durationCol]).toBe('');
+  });
+
   it('keeps unparseable frequency/duration text in a free-text fallback instead of destroying it', async () => {
     const onSave = vi.fn().mockResolvedValue({ ok: true, values: {} });
     renderServices(

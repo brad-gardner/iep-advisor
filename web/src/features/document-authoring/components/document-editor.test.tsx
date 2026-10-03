@@ -321,4 +321,40 @@ describe('DocumentEditor', () => {
     expect(documentsApi.finalizeDocument).not.toHaveBeenCalled();
     expect(screen.getByTestId('section-1-done')).toBeInTheDocument(); // still open, edit not discarded
   });
+
+  it('Finalize stays blocked by a section\'s failed field even after a DIFFERENT field\'s later save resets the document-level error flag', async () => {
+    documentsApi.finalizeDocument.mockClear();
+    const user = userEvent.setup();
+    render(
+      <Harness
+        initialValues={{ [PROFILE_FIELD]: 'Jordan', [PRESENT_FIELD]: '' }}
+        onSave={(patch) => (PROFILE_FIELD in patch ? { ok: false, message: 'Server unavailable.' } : { ok: true, values: patch })}
+      />
+    );
+
+    // Section 1's field fails and stays open...
+    await user.click(screen.getByTestId('section-1-edit'));
+    await user.type(screen.getByTestId(`field-${PROFILE_FIELD}`), '!');
+    await user.click(screen.getByTestId('section-1-done'));
+    await waitFor(() => expect(screen.getByTestId(`section-1-retry`)).toBeInTheDocument());
+
+    // ...then section 2's field saves fine, which — at the single
+    // last-settled-save `errorRef` use-document-instance.ts keeps — resets the
+    // DOCUMENT-level error flag back to false, even though section 1's own
+    // field never actually recovered.
+    await user.click(screen.getByTestId('section-2-edit'));
+    await user.type(screen.getByTestId(`field-${PRESENT_FIELD}`), 'Doing well.');
+    await user.click(screen.getByTestId('section-2-done'));
+    await waitFor(() => expect(screen.queryByTestId('section-2-done')).not.toBeInTheDocument());
+
+    // Finalize must still refuse — `sectionEditing.hasFailures()` catches what
+    // the (now-reset) document-level flag alone would have missed.
+    await user.click(screen.getByTestId('finalize-button'));
+    await user.click(screen.getByTestId('finalize-confirm'));
+
+    const dialog = screen.getByTestId('finalize-document-dialog');
+    await waitFor(() => expect(within(dialog).getByRole('alert')).toHaveTextContent('could not be saved'));
+    expect(documentsApi.finalizeDocument).not.toHaveBeenCalled();
+    expect(screen.getByTestId('section-1-done')).toBeInTheDocument(); // section 1 still open with its failure
+  });
 });

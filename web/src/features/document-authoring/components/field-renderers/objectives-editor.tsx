@@ -133,7 +133,13 @@ export function ObjectivesEditor({ value, disabled, testIdPrefix, onChange, flus
   const removeObjective = (key: string) => {
     const index = objectives.findIndex((o) => o.key === key);
     mutate((current) => current.filter((o) => o.key !== key), true);
-    setAnnouncement('Objective removed');
+    // Position + remaining count, not a fixed string — a screen reader's live
+    // region only reliably re-announces text that actually changed, and
+    // removing two objectives in a row (often landing on the SAME index each
+    // time, since the next one slides up into the removed slot) previously
+    // sent the exact same "Objective removed" text twice in a row.
+    const remaining = objectives.length - 1;
+    setAnnouncement(`Objective ${index + 1} removed, ${remaining} remaining`);
     requestAnimationFrame(() => {
       const container = containerRef.current;
       if (!container || index === -1) return;

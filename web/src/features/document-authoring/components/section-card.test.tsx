@@ -334,6 +334,43 @@ describe('SectionCard — Discard changes', () => {
   });
 });
 
+describe('SectionCard — Discard confirmation disables editing', () => {
+  it('disables the fields the instant confirmation appears, and disables both confirmation buttons while the restore is in flight', async () => {
+    const user = userEvent.setup();
+    let resolveRestore!: (r: SaveResult) => void;
+    const saveValues = vi
+      .fn()
+      .mockImplementationOnce((patch: Record<string, unknown>) => Promise.resolve(okResult(patch))) // the one flushed edit
+      .mockImplementationOnce(() => new Promise<SaveResult>((resolve) => (resolveRestore = resolve))); // the restore
+    render(<Harness initialValues={{ [FIELD_A]: 'Jordan', [FIELD_B]: '' }} saveValues={saveValues} startOpen />);
+
+    await user.clear(screen.getByTestId(`field-${FIELD_A}`));
+    await user.type(screen.getByTestId(`field-${FIELD_A}`), 'Changed');
+    await user.tab();
+    await waitFor(() => expect(saveValues).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByTestId('section-10-discard'));
+    await screen.findByTestId('section-10-discard-confirm');
+    // Nothing can race the confirmation — both fields are disabled the moment
+    // it appears, before the user ever gets to decide.
+    expect(screen.getByTestId(`field-${FIELD_A}`)).toBeDisabled();
+    expect(screen.getByTestId(`field-${FIELD_B}`)).toBeDisabled();
+
+    const confirmClick = user.click(screen.getByTestId('section-10-discard-confirm'));
+    await waitFor(() => expect(saveValues).toHaveBeenCalledTimes(2));
+    // The restore is now in flight — both buttons are disabled so neither
+    // "Keep editing" nor a second "Discard changes" click can race it.
+    await waitFor(() => expect(screen.getByTestId('section-10-discard-confirm')).toBeDisabled());
+    expect(screen.getByTestId('section-10-discard-cancel')).toBeDisabled();
+    // Still disabled throughout — the restore hasn't resolved yet.
+    expect(screen.getByTestId(`field-${FIELD_A}`)).toBeDisabled();
+
+    resolveRestore(okResult({ [FIELD_A]: 'Jordan', [FIELD_B]: '' }));
+    await confirmClick;
+    await waitFor(() => expect(screen.getByTestId('section-10-edit')).toBeInTheDocument());
+  });
+});
+
 describe('SectionCard — Discard confirmation accessibility', () => {
   it('focuses "Keep editing" when the confirmation appears, returns focus to Discard on cancel, and announces as an alert', async () => {
     const user = userEvent.setup();
@@ -364,9 +401,65 @@ describe('SectionCard — Done with a failed save', () => {
     await user.click(screen.getByTestId('section-10-done'));
 
     await waitFor(() => expect(saveValues).toHaveBeenCalled());
-    expect(await screen.findByRole('alert')).toHaveTextContent('Save failed');
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save Name");
+    expect(screen.getByTestId('section-10-retry')).toBeInTheDocument();
     expect(screen.getByTestId('section-10-done')).toBeInTheDocument(); // still open
     expect(screen.queryByTestId('section-10-edit')).not.toBeInTheDocument();
+  });
+
+  it('field A fails then field B succeeds — Done stays open with the alert still naming A (a later, unrelated success never masks it)', async () => {
+    const user = userEvent.setup();
+    const saveValues = vi
+      .fn()
+      .mockImplementation((patch: Record<string, unknown>) =>
+        Promise.resolve(FIELD_A in patch ? { ok: false, message: 'nope' } : okResult(patch))
+      );
+    render(<Harness initialValues={{ [FIELD_A]: 'Jordan', [FIELD_B]: '' }} saveValues={saveValues} startOpen />);
+
+    await user.clear(screen.getByTestId(`field-${FIELD_A}`));
+    await user.type(screen.getByTestId(`field-${FIELD_A}`), 'Changed');
+    await user.tab(); // blur flushes A immediately — fails
+    await waitFor(() => expect(saveValues).toHaveBeenCalledWith({ [FIELD_A]: 'Changed' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save Name");
+
+    await user.type(screen.getByTestId(`field-${FIELD_B}`), 'JJ');
+    await user.tab(); // blur flushes B immediately — succeeds
+    await waitFor(() => expect(saveValues).toHaveBeenCalledWith({ [FIELD_B]: 'JJ' }));
+
+    // B's success must not clear A's still-outstanding failure.
+    expect(screen.getByRole('alert')).toHaveTextContent("Couldn't save Name");
+
+    await user.click(screen.getByTestId('section-10-done'));
+    expect(screen.getByTestId('section-10-done')).toBeInTheDocument(); // still open
+  });
+
+  it('Retry resends the exact value that failed, and Done can then close once it succeeds', async () => {
+    const user = userEvent.setup();
+    let failNextA = true;
+    const saveValues = vi.fn().mockImplementation((patch: Record<string, unknown>) => {
+      if (FIELD_A in patch && failNextA) {
+        failNextA = false;
+        return Promise.resolve({ ok: false, message: 'nope' });
+      }
+      return Promise.resolve(okResult(patch));
+    });
+    render(<Harness initialValues={{ [FIELD_A]: 'Jordan', [FIELD_B]: '' }} saveValues={saveValues} startOpen />);
+
+    await user.clear(screen.getByTestId(`field-${FIELD_A}`));
+    await user.type(screen.getByTestId(`field-${FIELD_A}`), 'Changed');
+    await user.tab();
+    expect(await screen.findByTestId('section-10-retry')).toBeInTheDocument();
+
+    saveValues.mockClear();
+    await user.click(screen.getByTestId('section-10-retry'));
+    // The retry resends FIELD_A's own last-attempted value — not the stale,
+    // pre-edit value from `values` (that would silently save over the edit
+    // instead of recovering it).
+    await waitFor(() => expect(saveValues).toHaveBeenCalledWith({ [FIELD_A]: 'Changed' }));
+    await waitFor(() => expect(screen.queryByTestId('section-10-retry')).not.toBeInTheDocument());
+
+    await user.click(screen.getByTestId('section-10-done'));
+    expect(screen.getByTestId('section-10-edit')).toBeInTheDocument(); // closed
   });
 
   it('closes once the user fixes the edit and a later Done succeeds, after an earlier attempt failed', async () => {

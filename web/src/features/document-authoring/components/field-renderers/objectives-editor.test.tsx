@@ -90,7 +90,7 @@ describe('ObjectivesEditor — move/remove accessibility', () => {
 
     await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('t-objective-0-description')));
     expect(screen.getByTestId('t-objective-0-description')).toHaveValue('second');
-    expect(screen.getByText('Objective removed')).toBeInTheDocument();
+    expect(screen.getByText('Objective 1 removed, 1 remaining')).toBeInTheDocument();
   });
 
   it('removing the last objective focuses "Add objective" instead (no next item to land on)', async () => {
@@ -107,6 +107,30 @@ describe('ObjectivesEditor — move/remove accessibility', () => {
     await user.click(screen.getByTestId('t-objective-0-remove'));
 
     await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('t-objectives-add')));
-    expect(screen.getByText('Objective removed')).toBeInTheDocument();
+    expect(screen.getByText('Objective 1 removed, 0 remaining')).toBeInTheDocument();
+  });
+
+  it('announces each removal with the position it removed and the count left, even across two removals that land on the same index', async () => {
+    const user = userEvent.setup();
+    render(
+      <ObjectivesEditor
+        value={objectivesOf({ description: 'first' }, { description: 'second' }, { description: 'third' }, { description: 'fourth' })}
+        testIdPrefix="t"
+        onChange={vi.fn()}
+        flush={async () => {}}
+      />
+    );
+
+    // Matches the reported shape: removing the 2nd of 4 leaves 3.
+    await user.click(screen.getByTestId('t-objective-1-remove'));
+    expect(screen.getByText('Objective 2 removed, 3 remaining')).toBeInTheDocument();
+
+    // The next objective slides into index 0 both times — a fixed string
+    // would announce the identical text for both removals.
+    await user.click(screen.getByTestId('t-objective-0-remove'));
+    expect(screen.getByText('Objective 1 removed, 2 remaining')).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('t-objective-0-remove'));
+    expect(screen.getByText('Objective 1 removed, 1 remaining')).toBeInTheDocument();
   });
 });

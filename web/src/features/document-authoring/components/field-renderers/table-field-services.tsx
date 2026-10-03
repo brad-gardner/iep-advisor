@@ -567,8 +567,17 @@ function FrequencyField({
         value={count}
         disabled={disabled}
         onChange={(e) => {
-          setCount(e.target.value);
-          const n = Number(e.target.value);
+          const raw = e.target.value;
+          setCount(raw);
+          // An emptied input must commit '' — otherwise clearing the count
+          // only changes what's displayed, leaving the last normalized "N per
+          // period" text (or a brand-new row's blank placeholder state)
+          // persisted underneath it.
+          if (raw === '') {
+            onChange('');
+            return;
+          }
+          const n = Number(raw);
           if (Number.isFinite(n) && n > 0) onChange(formatFrequencyText({ count: n, period }));
         }}
         onBlur={onBlur}
@@ -663,8 +672,15 @@ function DurationField({
       value={minutes}
       disabled={disabled}
       onChange={(e) => {
-        setMinutes(e.target.value);
-        const n = Number(e.target.value);
+        const raw = e.target.value;
+        setMinutes(raw);
+        // Same as FrequencyField's count: commit '' on clear so it persists
+        // instead of silently keeping the last saved minutes text.
+        if (raw === '') {
+          onChange('');
+          return;
+        }
+        const n = Number(raw);
         if (Number.isFinite(n) && n > 0) onChange(formatDurationText(n));
       }}
       onBlur={onBlur}
