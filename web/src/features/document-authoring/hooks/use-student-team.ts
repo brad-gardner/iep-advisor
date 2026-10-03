@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getTeam } from '@/features/educator/api/educator-api';
 import type { StudentTeamMember } from '@/features/educator/types';
 
@@ -10,6 +10,9 @@ export interface StudentTeamCache {
   members: StudentTeamMember[];
   isLoading: boolean;
   isError: boolean;
+  /** Re-runs the fetch after a failure. Optional so a test fixture that builds
+   *  a `StudentTeamCache` literal (never erroring) doesn't need one. */
+  retry?: () => void;
 }
 
 /**
@@ -31,8 +34,17 @@ export function useStudentTeam(studentId: number): StudentTeamCache {
   // the effect below, which would fire AFTER a render with the previous (now
   // stale) student's members still showing.
   const [loadedForId, setLoadedForId] = useState(studentId);
-  if (studentId !== loadedForId) {
+  // Bumped by `retry()` to re-run the fetch effect below for the SAME student
+  // — `loadedForAttempt` mirrors `loadedForId`'s render-time-reset trick so
+  // this needs no `setState` inside the effect itself (an effect synchronizes
+  // with the external fetch; resetting to "loading" is adjusting state from a
+  // prop/intent change, which belongs at render time, same as the studentId
+  // case right below it — react.dev/learn/you-might-not-need-an-effect).
+  const [attempt, setAttempt] = useState(0);
+  const [loadedForAttempt, setLoadedForAttempt] = useState(attempt);
+  if (studentId !== loadedForId || attempt !== loadedForAttempt) {
     setLoadedForId(studentId);
+    setLoadedForAttempt(attempt);
     setState('loading');
     setMembers([]);
   }
@@ -55,7 +67,16 @@ export function useStudentTeam(studentId: number): StudentTeamCache {
     return () => {
       cancelled = true;
     };
-  }, [studentId]);
+  }, [studentId, attempt]);
 
-  return { members, isLoading: state === 'loading', isError: state === 'error' };
+  const retry = useCallback(() => setAttempt((a) => a + 1), []);
+
+  // Memoized so every owner picker/read view sharing this one cache (it lives
+  // once in the editor context) only re-renders when the team itself actually
+  // changes, not on every unrelated render of whichever component called this
+  // hook.
+  return useMemo(
+    () => ({ members, isLoading: state === 'loading', isError: state === 'error', retry }),
+    [members, state, retry]
+  );
 }

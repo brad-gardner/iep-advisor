@@ -62,16 +62,7 @@ export function ReadGoals({ field, value, onEditRow }: ReadFieldRendererProps) {
   );
 }
 
-function GoalReadCard({
-  row,
-  index,
-  domainLabel,
-  goalText,
-  measurement,
-  timeframe,
-  owner,
-  onEdit,
-}: {
+export interface GoalReadCardProps {
   row: KeyedRow;
   index: number;
   domainLabel: string;
@@ -80,7 +71,37 @@ function GoalReadCard({
   timeframe: unknown;
   owner: ReturnType<typeof resolveOwnerDisplay>;
   onEdit?: () => void;
-}) {
+  /** DOM id for the "Edit goal" button — the focused goal editor
+   *  (table-field-goals.tsx's `GoalEditor`) returns focus here by id when it
+   *  closes. */
+  editButtonId?: string;
+  /** Overrides the default `read-goal-${index}` test-id base — the edit-mode
+   *  card list (table-field-goals.tsx's `GoalsBlock`) reuses this component
+   *  under its own field-scoped ids so existing per-row testids keep working
+   *  unchanged. */
+  testIdPrefix?: string;
+}
+
+/** One goal's summary card — number, area, a clamped goal statement
+ *  (rendered as markdown, same as everywhere else it's displayed), measurement/
+ *  timeframe/objectives-count chips, owner, and a carried-forward/reviewed
+ *  badge, with an optional "Edit goal". Shared between the read view (here)
+ *  and the edit-mode card list, which otherwise drifted into its own,
+ *  separately-maintained copy that rendered the goal statement as raw
+ *  markdown text instead of formatted — plan 2026-10-02-002. */
+export function GoalReadCard({
+  row,
+  index,
+  domainLabel,
+  goalText,
+  measurement,
+  timeframe,
+  owner,
+  onEdit,
+  editButtonId,
+  testIdPrefix,
+}: GoalReadCardProps) {
+  const prefix = testIdPrefix ?? `read-goal-${index}`;
   const carried = carriedFrom(row);
   const reviewed = row.cells[ROW_CONFIRMED_KEY] === true;
   const objectives = row.cells[ROW_OBJECTIVES_KEY];
@@ -92,7 +113,7 @@ function GoalReadCard({
   return (
     <li
       className="rounded-card border border-brand-slate-200 p-4"
-      data-testid={`read-goal-${index}`}
+      data-testid={prefix}
     >
       <div className="flex items-start gap-4">
         <div
@@ -112,7 +133,7 @@ function GoalReadCard({
                   'rounded-badge border px-2 py-0.5',
                   reviewed ? 'border-brand-slate-200 text-brand-slate-500' : 'border-brand-amber-200 bg-brand-amber-50 text-brand-amber-700'
                 )}
-                data-testid={`read-goal-${index}-carried`}
+                data-testid={`${prefix}-carried`}
               >
                 Carried from {carried.label ?? 'prior version'}
                 {carried.date ? ` (${formatCarriedDate(carried.date)})` : ''}
@@ -153,7 +174,14 @@ function GoalReadCard({
             <span className="text-xs text-brand-amber-600">No owner</span>
           )}
           {onEdit && (
-            <Button variant="secondary" size="sm" onClick={onEdit} data-testid={`read-goal-${index}-edit`}>
+            <Button
+              id={editButtonId}
+              variant="secondary"
+              size="sm"
+              onClick={onEdit}
+              aria-label={`Edit goal ${index + 1}`}
+              data-testid={`${prefix}-edit`}
+            >
               Edit goal
             </Button>
           )}

@@ -27,15 +27,16 @@ describe('useSectionEditing', () => {
     expect(result.current.anyOpen).toBe(true);
   });
 
-  it('toggle only ever opens (never silently closes)', () => {
+  it('open is idempotent — opening an already-open section never closes it', () => {
     const { result } = renderHook(() => useSectionEditing());
 
-    act(() => result.current.toggle(5));
+    act(() => result.current.open(5));
     expect(result.current.isOpen(5)).toBe(true);
 
     // Calling it again while already open must not close it — Done/Discard
-    // are the only way to close a section.
-    act(() => result.current.toggle(5));
+    // are the only way to close a section (the "E" shortcut calls `open`
+    // directly, relying on exactly this).
+    act(() => result.current.open(5));
     expect(result.current.isOpen(5)).toBe(true);
   });
 

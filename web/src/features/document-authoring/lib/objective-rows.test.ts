@@ -4,6 +4,7 @@ import {
   adoptRowObjectiveIds,
   coerceObjectives,
   emptyObjective,
+  isKeyedObjective,
   objectiveId,
   toPlainObjectives,
   type KeyedObjective,
@@ -28,6 +29,27 @@ describe('coerceObjectives', () => {
   it('returns an empty list for a non-array value', () => {
     expect(coerceObjectives(undefined)).toEqual([]);
     expect(coerceObjectives('nope')).toEqual([]);
+  });
+
+  it('returns an already-keyed (rich) objective as-is instead of re-deriving it from the plain shape', () => {
+    // Re-mounting the objectives editor (e.g. Done, then Edit goal again) hands
+    // `value` back as whatever this editor itself last committed — the rich
+    // `KeyedObjective` shape, not the server's plain wire shape. Re-deriving it
+    // via `.description`/`.criteria`/`.targetDate` (absent one level up on this
+    // shape) would blank the objective out and mint it a fresh key.
+    const keyed: KeyedObjective = { key: 'objective-7', cells: { _rowId: 'OBJ-1', description: 'Write a sentence', criteria: '4/5', targetDate: 'Jan' } };
+    const objectives = coerceObjectives([keyed]);
+    expect(objectives).toEqual([keyed]);
+    expect(objectives[0]).toBe(keyed); // same object, not rebuilt
+  });
+});
+
+describe('isKeyedObjective', () => {
+  it('distinguishes the rich shape from the plain wire shape and other values', () => {
+    expect(isKeyedObjective({ key: 'objective-1', cells: { description: '', criteria: '', targetDate: '' } })).toBe(true);
+    expect(isKeyedObjective({ _rowId: 'OBJ-1', description: 'x', criteria: '', targetDate: '' })).toBe(false);
+    expect(isKeyedObjective(null)).toBe(false);
+    expect(isKeyedObjective('nope')).toBe(false);
   });
 });
 
@@ -108,6 +130,32 @@ describe('adoptObjectiveIds', () => {
     expect(adoptObjectiveIds(current, current, saved)).toBe(current);
     expect(adoptObjectiveIds(current, current, undefined)).toBe(current);
   });
+
+  it('pairs by the server-kept subset, not raw position, when a blank objective precedes a filled one', () => {
+    // The server drops the blank (reduced to nothing) before assigning ids, so
+    // `saved` is shorter than `sent` AND the blank is not simply trailing —
+    // pairing sent[i] <-> saved[i] by raw index would hand the filled
+    // objective's id to the blank one instead.
+    const blankFirst: KeyedObjective[] = [
+      { key: 'objective-1', cells: { description: '', criteria: '', targetDate: '' } },
+      { key: 'objective-2', cells: { description: 'first', criteria: '', targetDate: '' } },
+    ];
+    const next = adoptObjectiveIds(blankFirst, blankFirst, [{ _rowId: 'OBJ-1', description: 'first' }]);
+    expect(objectiveId(next[0])).toBeUndefined(); // the blank — never actually kept server-side
+    expect(objectiveId(next[1])).toBe('OBJ-1'); // the filled one — correctly paired despite coming second
+  });
+
+  it('never pairs beyond the server cap of 20 surviving objectives', () => {
+    const sent: KeyedObjective[] = Array.from({ length: 21 }, (_, i) => ({
+      key: `objective-${i}`,
+      cells: { description: `d${i}`, criteria: '', targetDate: '' },
+    }));
+    // Only the first 20 are ever assigned ids server-side; the 21st never is.
+    const saved = sent.slice(0, 20).map((o, i) => ({ _rowId: `OBJ-${i}`, description: o.cells.description }));
+    const next = adoptObjectiveIds(sent, sent, saved);
+    expect(objectiveId(next[19])).toBe('OBJ-19');
+    expect(objectiveId(next[20])).toBeUndefined();
+  });
 });
 
 describe('adoptRowObjectiveIds', () => {
@@ -127,6 +175,19 @@ describe('adoptRowObjectiveIds', () => {
     expect(objectiveId(objectives[0])).toBe('OBJ-1');
     expect(objectives[0].key).toBe('objective-1'); // key unchanged
     expect(next[1]).toBe(sentRows[1]); // untouched — no objectives cell to adopt into
+  });
+
+  it('leaves a row whose `_objectives` cell is still the plain wire shape untouched (never opened in the objectives editor this session)', () => {
+    // A goal whose text was edited without ever touching its objectives keeps
+    // the plain, persisted wire shape — it has no client `.key` to pair ids by,
+    // so adoption must skip it rather than try to read `.cells` off a plain entry.
+    const plainObjectives = [{ _rowId: 'OBJ-1', description: 'first', criteria: '', targetDate: '' }];
+    const sentRows: KeyedRow[] = [{ key: 'ID-1', cells: { goal: 'Read better, updated', _objectives: plainObjectives } }];
+    const saved = [{ _rowId: 'ID-1', goal: 'Read better, updated', _objectives: plainObjectives }];
+
+    const next = adoptRowObjectiveIds(sentRows, sentRows, saved);
+    expect(next).toBe(sentRows);
+    expect(next[0].cells._objectives).toBe(plainObjectives);
   });
 
   it('skips a row absent from `sent` (added after the request) and returns the same array when nothing changes', () => {

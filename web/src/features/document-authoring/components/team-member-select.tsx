@@ -26,6 +26,11 @@ const baseSelectClass =
  * the mockup. If the row's current owner is no longer an active team member, an
  * informational (non-selectable) option keeps it visible rather than silently
  * blanking the control — the row stays that way until someone picks a real owner.
+ *
+ * If the team failed to load, the control disables (reassigning blind risks
+ * dropping a still-valid owner) and shows "Owner unavailable" with a retry —
+ * never "Former team member", which asserts something a failed fetch never
+ * actually checked.
  */
 export function TeamMemberSelect({
   id,
@@ -37,6 +42,7 @@ export function TeamMemberSelect({
   'data-testid': testId,
   'aria-label': ariaLabel,
 }: TeamMemberSelectProps) {
+  const isError = team?.isError ?? false;
   const members = team?.members ?? [];
   const active = [...members]
     .filter((m) => m.isActive)
@@ -50,24 +56,41 @@ export function TeamMemberSelect({
         id={id}
         aria-label={ariaLabel}
         value={value != null ? String(value) : ''}
-        disabled={disabled || team?.isLoading}
+        disabled={disabled || team?.isLoading || isError}
         onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
-        className={cn(baseSelectClass, unset ? 'border-brand-amber-400' : 'border-brand-slate-200')}
+        className={cn(baseSelectClass, unset && !isError ? 'border-brand-amber-400' : 'border-brand-slate-200')}
         data-testid={testId}
       >
         <option value="">Unassigned</option>
-        {value != null && !currentIsActive && (
-          <option value={value} disabled>
-            Former team member
-          </option>
-        )}
-        {active.map((m) => (
-          <option key={m.userId} value={m.userId}>
-            {teamMemberName(m)} — {TEAM_ROLE_LABELS[m.teamRole]}
-          </option>
-        ))}
+        {isError
+          ? value != null && (
+              <option value={value} disabled>
+                Owner unavailable
+              </option>
+            )
+          : value != null &&
+            !currentIsActive && (
+              <option value={value} disabled>
+                Former team member
+              </option>
+            )}
+        {!isError &&
+          active.map((m) => (
+            <option key={m.userId} value={m.userId}>
+              {teamMemberName(m)} — {TEAM_ROLE_LABELS[m.teamRole]}
+            </option>
+          ))}
       </select>
-      {unset && <p className="mt-1 text-xs text-brand-amber-600">No owner yet</p>}
+      {isError ? (
+        <p className="mt-1 text-xs text-brand-danger-700" role="alert">
+          Owner unavailable — the team didn't load.{' '}
+          <button type="button" className="underline hover:no-underline" onClick={() => team?.retry?.()}>
+            Retry
+          </button>
+        </p>
+      ) : (
+        unset && <p className="mt-1 text-xs text-brand-amber-600">No owner yet</p>
+      )}
       {warning && (
         <p className="mt-1 text-xs text-brand-danger-700" role="alert">
           {warning}

@@ -91,11 +91,18 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
 
   // Finalize flushes every open section's pending edits, then closes them —
   // the snapshot it takes afterward should never be sitting behind an editor
-  // the educator thinks they're still "in".
+  // the educator thinks they're still "in". But it closes them only when that
+  // flush actually left the document clean: closing first and discovering a
+  // failure after would already have thrown away the open editors' local
+  // state, with nothing left open to show the educator what still needs
+  // fixing. `handleConfirm` (finalize-document-section.tsx) re-checks the same
+  // state before it will actually finalize.
   const flushAndCloseBeforeFinalize = useCallback(async () => {
     await flushRegistry.flushAll();
+    const state = getSaveState();
+    if (state.hasError || state.conflict || state.pending) return;
     sectionEditing.closeAll();
-  }, [flushRegistry, sectionEditing]);
+  }, [flushRegistry, sectionEditing, getSaveState]);
 
   // Completeness is derived from the last server-normalized values (updated on
   // every successful save), so it tracks what is actually persisted.
@@ -120,7 +127,22 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return; // Cmd+[ / Cmd+] are browser back/forward
-      if (e.target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+      // Typing into any editable surface — a plain input/textarea/select, OR a
+      // TipTap rich-text field's contenteditable div (which the INPUT/TEXTAREA/
+      // SELECT tag check alone never catches) — must never be hijacked by a
+      // single-letter shortcut. `isContentEditable` covers the inherited-editable
+      // case a real browser computes for any descendant (e.g. a span inside
+      // ProseMirror's content); `closest('[contenteditable="true"]')` is the
+      // same self-or-ancestor check by the literal attribute TipTap actually
+      // renders — belt and suspenders, and the one jsdom (this suite) supports,
+      // since jsdom does not implement `isContentEditable` at all.
+      if (
+        e.target instanceof HTMLElement &&
+        (e.target.isContentEditable ||
+          e.target.closest('[contenteditable="true"]') ||
+          ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName))
+      )
+        return;
       if (document.querySelector('dialog[open]')) return; // a modal owns the keyboard
 
       if (e.key === '[' || e.key === ']') {
@@ -132,12 +154,12 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
         return;
       }
 
-      // "E" opens the active section for editing — it only ever opens; Done and
-      // Discard changes stay explicit buttons so a shortcut never silently
-      // saves or discards.
+      // "E" opens the active section for editing — it only ever opens (`open`
+      // is a no-op if already open); Done and Discard changes stay explicit
+      // buttons so a shortcut never silently saves or discards.
       if ((e.key === 'e' || e.key === 'E') && activeId != null && !readOnly && !conflict) {
         e.preventDefault();
-        sectionEditing.toggle(activeId);
+        sectionEditing.open(activeId);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -167,7 +189,7 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
   return (
     <DocumentEditorContext.Provider value={editorContext}>
       <DocumentFlushContext.Provider value={flushRegistry}>
-        <div className="-mx-4 space-y-6 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <h1 className="font-serif text-2xl text-brand-slate-800">{detail.documentTypeDisplayName}</h1>

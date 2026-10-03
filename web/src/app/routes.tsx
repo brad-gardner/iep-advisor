@@ -576,7 +576,11 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
-              <MainLayout>
+              {/* Wide: the editor's own nav rail + content column need more
+                  room than the standard page shell affords (plan
+                  2026-10-02-002) — wraps the back-link, tabs AND editor
+                  together (DocumentEditorPage's own outer div) so they align. */}
+              <MainLayout wide>
                 <DocumentEditorPage />
               </MainLayout>
             </RoleRoute>

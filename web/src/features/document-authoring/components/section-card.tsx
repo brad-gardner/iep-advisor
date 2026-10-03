@@ -49,6 +49,18 @@ function snapshotSection(fields: TemplateFieldDto[], values: Record<string, unkn
   return patch;
 }
 
+function discardButtonDomId(sectionId: number): string {
+  return `section-${sectionId}-discard-button`;
+}
+
+/** Cheap structural-equality fallback for "did anything actually change since
+ *  the snapshot" — both sides are built the same way (`snapshotSection`), by
+ *  the same field order, from JSON-safe values, so key order is stable and a
+ *  string comparison is sufficient without pulling in a deep-equal dependency. */
+function patchesEqual(a: DocumentValuePatch, b: DocumentValuePatch): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 /**
  * One section: read-only by default, with its own Edit → Done / Discard
  * changes toggle. Edits autosave while open (each field registers its flush
@@ -80,7 +92,17 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
   const [saveStatus, setSaveStatus] = useState<AutosaveStatus>('idle');
   const pendingCountRef = useRef(0);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [dirty, setDirty] = useState(false);
+  // Whether ANY save has been attempted (dispatched, not necessarily settled)
+  // since this section opened — read synchronously by Discard right after an
+  // `await flushAll()`, where a React STATE flag would be stale (it could only
+  // be set once a save RESOLVES, on a later render this same async handler
+  // can't see yet). Reset on each closed→open transition below.
+  const saveAttemptedRef = useRef(false);
+  // The last-settled save's outcome, mirroring `use-document-instance.ts`'s
+  // own `errorRef` — Done reads this (also after an `await flushAll()`) to
+  // decide whether it's safe to close; `saveStatus` state would be just as
+  // stale as a state-based flag for the same reason.
+  const lastSaveOkRef = useRef(true);
   // Lazy-initialized so a card that mounts ALREADY open (e.g. remounted by a
   // reload-triggered `key` bump while it was open) still has something valid
   // to restore — the closed→open transition below only fires for a LATER
@@ -91,6 +113,7 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [discardError, setDiscardError] = useState<string | null>(null);
   const fieldsBodyRef = useRef<HTMLDivElement>(null);
+  const keepEditingRef = useRef<HTMLButtonElement>(null);
   // Row to focus once a field mounts in edit mode — set when a read-mode row
   // itself requests editing (a goal card's "Edit goal"), rather than the
   // generic Edit button opening the whole section (plan 2026-10-02-002, Phase
@@ -118,6 +141,10 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
   // — several sections can be mid-save independently.
   const wrappedSave = useCallback(
     async (patch: DocumentValuePatch): Promise<SaveResult> => {
+      // Recorded at ENTRY (before the await) so Discard — which can run
+      // `await sectionFlushRegistry.flushAll()` while this call is still in
+      // flight — already sees that a save was attempted, rather than racing it.
+      saveAttemptedRef.current = true;
       pendingCountRef.current += 1;
       setSaveStatus('saving');
       if (savedTimerRef.current) {
@@ -126,10 +153,10 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
       }
       try {
         const result = await saveValues(patch);
+        lastSaveOkRef.current = result.ok;
         pendingCountRef.current -= 1;
         if (pendingCountRef.current === 0) {
           if (result.ok) {
-            setDirty(true);
             setSaveStatus('saved');
             savedTimerRef.current = setTimeout(() => setSaveStatus('idle'), SAVED_LINGER_MS);
           } else {
@@ -138,6 +165,7 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
         }
         return result;
       } catch (err) {
+        lastSaveOkRef.current = false;
         pendingCountRef.current -= 1;
         if (pendingCountRef.current === 0) setSaveStatus('error');
         throw err;
@@ -158,7 +186,6 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
     setWasOpen(isOpen);
     if (isOpen) {
       setSnapshot(snapshotSection(fields, values));
-      setDirty(false);
       setSaveStatus('idle');
       setConfirmingDiscard(false);
       setDiscardError(null);
@@ -174,24 +201,67 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
     const firstRun = !hasMountedRef.current;
     hasMountedRef.current = true;
     if (isOpen) {
+      // Fresh slate for "has a save been attempted / did the last one fail"
+      // each time a section opens — runs before any field below can possibly
+      // have dispatched a save (that needs a user interaction, which can't
+      // happen before this commit), so it never races `wrappedSave`.
+      saveAttemptedRef.current = false;
+      lastSaveOkRef.current = true;
+      // A specific row's own focused editor (e.g. GoalEditor) already claims
+      // focus on its own mount when a row-level edit was requested — moving
+      // focus again here would fight it (and did: the generic query below
+      // can't see a row's inputs before THAT editor is even selected).
+      if (pendingFocusRowKey) return undefined;
       const raf = requestAnimationFrame(() => {
+        // Falls back to a button (e.g. "Add goal", or a card's own "Edit
+        // goal") when the section opened into a view with no input/textarea/
+        // select/contenteditable at all — the Goals/Services card list, before
+        // any row is expanded, is exactly that case.
         fieldsBodyRef.current
-          ?.querySelector<HTMLElement>('input,textarea,select,[contenteditable="true"]')
+          ?.querySelector<HTMLElement>('input,textarea,select,[contenteditable="true"],button')
           ?.focus();
       });
       return () => cancelAnimationFrame(raf);
     }
     if (!firstRun) document.getElementById(editButtonDomId(section.id))?.focus();
     return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pendingFocusRowKey only ever changes in the same commit as isOpen flipping true (see editRow/openSection above), so it needs no dependency entry of its own
   }, [isOpen, section.id]);
+
+  // Focuses "Keep editing" the moment the confirmation appears — it's the
+  // non-destructive default, and a screen reader user landing on a brand-new
+  // row of controls needs a focus target to be told it moved at all. On the
+  // reverse transition (cancelled via "Keep editing", not confirmed-and-closed
+  // — that path's focus is already owned by the isOpen effect above), returns
+  // focus to the Discard button that opened the confirmation. Plain effect,
+  // not a requestAnimationFrame off the click handler: it fires synchronously
+  // in the same commit, so nothing is left armed to later fire against some
+  // OTHER section's same-numbered DOM id once this one closes.
+  const wasConfirmingDiscardRef = useRef(false);
+  useEffect(() => {
+    if (confirmingDiscard) keepEditingRef.current?.focus();
+    else if (wasConfirmingDiscardRef.current) document.getElementById(discardButtonDomId(section.id))?.focus();
+    wasConfirmingDiscardRef.current = confirmingDiscard;
+  }, [confirmingDiscard, section.id]);
 
   const handleDone = async () => {
     await sectionFlushRegistry.flushAll();
+    // A save that's still failing after the flush (including one retried by
+    // the flush itself) leaves the section open with the failure visible
+    // (AutosaveIndicator's "Save failed" pill, role="alert") instead of
+    // quietly discarding the local edit the close would otherwise imply.
+    if (!lastSaveOkRef.current) return;
     onClose();
   };
 
-  const handleDiscardClick = () => {
-    if (!dirty) {
+  const handleDiscardClick = async () => {
+    // Drain any still-pending debounced edit FIRST — otherwise a save that
+    // hasn't reached its own debounce yet (or is mid-flight) can land AFTER
+    // this decides "nothing to discard" and closes, via the unmount flush
+    // that follows, with no restore to undo it.
+    await sectionFlushRegistry.flushAll();
+    const changed = saveAttemptedRef.current || (snapshot != null && !patchesEqual(snapshotSection(fields, values), snapshot));
+    if (!changed) {
       onClose();
       return;
     }
@@ -206,6 +276,9 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
       return;
     }
     setDiscardError(null);
+    // The flush already ran (in handleDiscardClick, before the confirmation
+    // was even shown), so this restore is the only save left — the fields'
+    // own unmount flush that follows `onClose()` has nothing pending to redo.
     const result = await saveValues(snapshot);
     if (result.ok) {
       setConfirmingDiscard(false);
@@ -258,8 +331,15 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
           </Button>
         ) : confirmingDiscard ? (
           <div className="ml-auto flex flex-wrap items-center gap-3 text-sm">
-            <span className="text-brand-slate-700">Discard the changes saved since you started editing?</span>
+            {/* Once a restore attempt has failed, the error message below takes
+                over as the one `role="alert"` — two simultaneous alert regions
+                both fire, which is noisy and (worse) ambiguous to tests and
+                screen readers about which one is the actual news. */}
+            <span className="text-brand-slate-700" role={discardError ? undefined : 'alert'}>
+              Discard the changes saved since you started editing?
+            </span>
             <button
+              ref={keepEditingRef}
               type="button"
               className="text-brand-slate-600 hover:underline"
               onClick={() => setConfirmingDiscard(false)}
@@ -280,9 +360,10 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
           <div className="ml-auto flex items-center gap-3 text-sm">
             <AutosaveIndicator status={saveStatus} />
             <button
+              id={discardButtonDomId(section.id)}
               type="button"
               className="text-brand-slate-600 hover:underline"
-              onClick={handleDiscardClick}
+              onClick={() => void handleDiscardClick()}
               data-testid={`section-${section.id}-discard`}
             >
               Discard changes
@@ -337,7 +418,16 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
       ) : (
         <div className="space-y-4">
           {fields.map((field) => (
-            <ReadField key={field.id} field={field} value={values[field.fieldKey]} onEditRow={editRow} />
+            <ReadField
+              key={field.id}
+              field={field}
+              value={values[field.fieldKey]}
+              onEditRow={editRow}
+              // The section's own heading already names the field when it's
+              // the section's only one — a second, repeated label right below
+              // it is pure noise.
+              hideLabel={fields.length === 1}
+            />
           ))}
         </div>
       )}

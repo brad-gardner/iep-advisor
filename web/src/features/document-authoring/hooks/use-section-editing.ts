@@ -3,13 +3,12 @@ import { useCallback, useMemo, useState } from 'react';
 export interface SectionEditingController {
   /** Whether `sectionId` is currently in edit mode. */
   isOpen: (sectionId: number) => boolean;
-  /** Open a section (Edit, or the "E" shortcut on the active section). No-op if already open. */
+  /** Open a section (Edit, or the "E" shortcut on the active section). No-op if
+   *  already open — the keyboard "E" shortcut never silently discards/saves by
+   *  itself; Done/Discard are explicit buttons. */
   open: (sectionId: number) => void;
   /** Close a section (Done / Discard have already flushed or restored). */
   close: (sectionId: number) => void;
-  /** Open if closed, otherwise a no-op — the keyboard "E" shortcut never
-   *  silently discards/saves by itself; Done/Discard are explicit buttons. */
-  toggle: (sectionId: number) => void;
   /** Close every open section (used by Finalize, after flushing). */
   closeAll: () => void;
   /** True while at least one section is open — gates the idle-flush interval. */
@@ -41,19 +40,12 @@ export function useSectionEditing(): SectionEditingController {
     });
   }, []);
 
-  const toggle = useCallback(
-    (sectionId: number) => {
-      open(sectionId);
-    },
-    [open]
-  );
-
   const closeAll = useCallback(() => {
     setOpenIds((cur) => (cur.size === 0 ? cur : new Set()));
   }, []);
 
   return useMemo(
-    () => ({ isOpen, open, close, toggle, closeAll, anyOpen: openIds.size > 0 }),
-    [isOpen, open, close, toggle, closeAll, openIds]
+    () => ({ isOpen, open, close, closeAll, anyOpen: openIds.size > 0 }),
+    [isOpen, open, close, closeAll, openIds]
   );
 }

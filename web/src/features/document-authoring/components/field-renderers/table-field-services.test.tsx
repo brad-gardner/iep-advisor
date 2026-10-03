@@ -132,6 +132,19 @@ describe('ServicesBlock — schedule row and focused editor', () => {
     expect(onSave).toHaveBeenCalledTimes(1); // add flushes immediately
   });
 
+  it('starts a new service\'s frequency count blank (placeholder only), never displaying an unsaved default', async () => {
+    const onSave = vi.fn().mockResolvedValue({ ok: true, values: {} });
+    renderServices([], onSave);
+    await act(async () => fireEvent.click(screen.getByTestId(`field-${fieldKey}-add`)));
+
+    const countInput = screen.getByTestId(`field-${fieldKey}-cell-0-${frequencyCol}`);
+    expect(countInput).toHaveValue(null); // blank — not defaulted to 1
+    expect(countInput).toHaveAttribute('placeholder', '1');
+    // What's displayed matches what's actually stored: nothing.
+    const sent = (onSave.mock.calls.at(-1)?.[0] as Record<string, unknown>)[fieldKey] as Array<Record<string, unknown>>;
+    expect(sent[0][frequencyCol]).toBe('');
+  });
+
   it('writes normalized frequency text as the count or period changes', async () => {
     const onSave = vi.fn().mockResolvedValue({ ok: true, values: {} });
     renderServices([{ _rowId: 'ID-1', [serviceTypeCol]: 'OT', [frequencyCol]: '2 per week' }], onSave);
@@ -230,7 +243,12 @@ describe('ServicesBlock — schedule row and focused editor', () => {
       ],
       onSave
     );
-    expect(screen.getByTestId(`field-${fieldKey}-row-0-carried`)).toHaveTextContent('Carried from IEP v1');
+    const carried = screen.getByTestId(`field-${fieldKey}-row-0-carried`);
+    expect(carried).toHaveTextContent('Carried from IEP v1');
+    // Same wording as ReadServices (shared ServiceReadRow) — this summary row
+    // used to say "not yet reviewed" instead, a drift from the read view's
+    // "needs review".
+    expect(carried).toHaveTextContent('needs review');
 
     fireEvent.click(screen.getByTestId(`field-${fieldKey}-row-0-edit`));
     expect(screen.getByTestId(`field-${fieldKey}-row-0-keep`)).toBeInTheDocument();
@@ -240,6 +258,19 @@ describe('ServicesBlock — schedule row and focused editor', () => {
     const sent = (onSave.mock.calls.at(-1)?.[0] as Record<string, unknown>)[fieldKey] as Array<Record<string, unknown>>;
     expect(sent[0]._confirmed).toBe(true);
     expect(screen.queryByTestId(`field-${fieldKey}-row-0-keep`)).not.toBeInTheDocument();
+  });
+
+  it('gives the repeated "Edit" buttons a distinguishing aria-label per service', () => {
+    const onSave = vi.fn().mockResolvedValue({ ok: true, values: {} });
+    renderServices(
+      [
+        { _rowId: 'ID-1', [serviceTypeCol]: 'Speech-language therapy' },
+        { _rowId: 'ID-2', [serviceTypeCol]: 'Occupational therapy' },
+      ],
+      onSave
+    );
+    expect(screen.getByRole('button', { name: 'Edit Speech-language therapy' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit Occupational therapy' })).toBeInTheDocument();
   });
 
   it('removes a service immediately, with no confirmation dialog', async () => {

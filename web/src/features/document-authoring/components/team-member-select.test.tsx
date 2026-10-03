@@ -88,4 +88,37 @@ describe('TeamMemberSelect', () => {
     );
     expect(screen.getByTestId('owner-select')).toBeDisabled();
   });
+
+  it('shows "Owner unavailable" with a retry (not "Former team member") when the team failed to load', async () => {
+    const user = userEvent.setup();
+    const retry = vi.fn();
+    render(
+      <TeamMemberSelect
+        team={{ members: [], isLoading: false, isError: true, retry }}
+        value={7}
+        onChange={() => {}}
+        data-testid="owner-select"
+      />
+    );
+
+    expect(screen.getByTestId('owner-select')).toBeDisabled();
+    expect(screen.getByRole('option', { name: 'Owner unavailable' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Former team member' })).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Owner unavailable');
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not show the amber "No owner yet" hint for an unset owner while the team is erroring', () => {
+    render(
+      <TeamMemberSelect
+        team={{ members: [], isLoading: false, isError: true }}
+        value={undefined}
+        onChange={() => {}}
+      />
+    );
+    expect(screen.queryByText('No owner yet')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Owner unavailable');
+  });
 });

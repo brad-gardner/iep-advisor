@@ -11,6 +11,11 @@ export interface ReadFieldRendererProps {
    *  outside an editable `SectionCard` (e.g. a frozen version's read view),
    *  where every read renderer other than `ReadGoals` already ignores it. */
   onEditRow?: (rowKey: string) => void;
+  /** True when this is the only field in its section — the section's own
+   *  heading already names it, so a renderer whose label is purely a repeated
+   *  field name (not one that also carries a count/total, like the Table
+   *  renderers) hides it. Renderers for which that doesn't apply ignore this. */
+  hideLabel?: boolean;
 }
 
 /** Muted "nothing here yet" placeholder, shared across every read renderer so

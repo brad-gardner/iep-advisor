@@ -35,7 +35,7 @@ import {
   withOwner,
   type KeyedRow,
 } from '../../lib/table-rows';
-import { adoptRowObjectiveIds, toPlainObjectives, type KeyedObjective } from '../../lib/objective-rows';
+import { adoptRowObjectiveIds, isKeyedObjective, toPlainObjectives } from '../../lib/objective-rows';
 import { formatCarriedDate, isLongColumn, isRichTextColumn } from '../../lib/table-cell-format';
 import { GoalsBlock } from './table-field-goals';
 import { ServicesBlock } from './table-field-services';
@@ -48,12 +48,19 @@ import { appendText, useDocumentEditorContext } from '../../hooks/document-edito
  * passes through untouched. Keeping the rich shape in `rowsRef` until this
  * boundary is what lets the objectives editor track its own stable keys
  * without a second, competing save path.
+ *
+ * A goal row's `_objectives` cell is only ever the rich shape once THIS
+ * session's objectives editor has actually been opened and mutated it — a
+ * goal whose other fields were edited without ever touching its objectives
+ * still carries the plain wire shape from the server, and must be sent back
+ * exactly as received (`toPlainObjectives` assumes the rich shape and would
+ * throw trying to read a nonexistent `.cells` off a plain entry).
  */
 function toSaveableCells(cells: KeyedRow['cells'], isGoalsTable: boolean): KeyedRow['cells'] {
   if (!isGoalsTable) return cells;
   const objectives = cells[ROW_OBJECTIVES_KEY];
-  if (!Array.isArray(objectives)) return cells;
-  return { ...cells, [ROW_OBJECTIVES_KEY]: toPlainObjectives(objectives as KeyedObjective[]) };
+  if (!Array.isArray(objectives) || objectives.length === 0 || !objectives.every(isKeyedObjective)) return cells;
+  return { ...cells, [ROW_OBJECTIVES_KEY]: toPlainObjectives(objectives) };
 }
 
 /**
@@ -232,17 +239,16 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
   // rows already name a person.
   const ownerEligible = blockSemantic != null && OWNER_ELIGIBLE_SEMANTICS.has(blockSemantic);
   const editorTeam = editor?.team;
+  // Goals and services never reach the generic row-block rendering below (both
+  // return their own dedicated block first, right after this), so only the
+  // semantics that DO are worth matching here.
   const primaryColumn =
     columns.find((c) =>
-      blockSemantic === 'goals'
-        ? c.semantic === 'goalText'
-        : blockSemantic === 'services'
-          ? c.semantic === 'serviceType'
-          : blockSemantic === 'accommodations'
-            ? c.semantic === 'accommodation'
-            : blockSemantic === 'transition'
-              ? c.semantic === 'transitionServices'
-              : false
+      blockSemantic === 'accommodations'
+        ? c.semantic === 'accommodation'
+        : blockSemantic === 'transition'
+          ? c.semantic === 'transitionServices'
+          : false
     ) ?? columns.find((c) => c.type === 'Text');
   const rowKinds: AssistKind[] = blockSemantic === 'goals' ? ['Rewrite', 'Improve', 'SuggestMeasurement'] : ['Rewrite', 'Improve'];
 
@@ -313,9 +319,9 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
   }
 
   // Semantic row blocks (accommodations, transition, …) render as stacked
-  // cards with labelled inputs — a goal has six fields and does not fit a
-  // grid inside the editor column — with AI help and "pull from student" per
-  // row. Untagged tables keep the compact grid.
+  // cards with labelled inputs — several fields per row don't fit a grid
+  // inside the editor column — with AI help and "pull from student" per row.
+  // Untagged tables keep the compact grid.
   if (isRowBlock) {
     const primaryKey = primaryColumn?.columnKey;
     return (
@@ -484,20 +490,6 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
             Add {rowBlockItemLabel(blockSemantic).toLowerCase()}
           </Button>
         </div>
-
-        {isGoalsTable && (
-          <RemoveGoalDialog
-            open={pendingGoalRemoval != null}
-            goalLabel={pendingGoalRemoval?.label ?? ''}
-            loading={goalRemovalSubmitting}
-            error={goalRemovalError}
-            onConfirm={(reason) => void confirmGoalRemoval(reason)}
-            onCancel={() => {
-              pendingGoalRemovalRef.current = null;
-              setPendingGoalRemoval(null);
-            }}
-          />
-        )}
       </div>
     );
   }

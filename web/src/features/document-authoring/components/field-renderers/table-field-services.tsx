@@ -11,13 +11,10 @@ import type { AssistKind } from '../../api/assist-types';
 import type { StudentTeamCache } from '../../hooks/use-student-team';
 import { useDocumentEditorContext } from '../../hooks/document-editor-context';
 import { carriedFrom, emptyCells, nextRowKey, ownerUserId, rowId, withOwner, type KeyedRow } from '../../lib/table-rows';
-import { columnDisplayLabel } from '../../lib/group-rows';
 import { resolveOwnerDisplay } from '../../lib/owner-display';
-import { formatCarriedDate, formatDateRange } from '../../lib/table-cell-format';
 import {
   formatDurationText,
   formatFrequencyText,
-  formatScheduleSummary,
   parseDurationMinutes,
   parseFrequency,
   totalMinutesPerWeek,
@@ -26,6 +23,7 @@ import {
 import type { TableCellValue } from '../../types';
 import { TableCell, cellInputClass } from './table-field';
 import { FieldAssistBar } from './field-assist-bar';
+import { ServiceReadRow } from './read/read-services';
 import { TeamMemberSelect } from '../team-member-select';
 import { fieldElementId } from './types';
 
@@ -202,13 +200,9 @@ export function ServicesBlock({
                     onDone={() => setFocusedRowKey(null)}
                   />
                 ) : (
-                  <ServiceSummaryRow
+                  <ServiceReadRow
                     key={row.key}
-                    fieldKey={field.fieldKey}
                     row={row}
-                    index={index}
-                    disabled={disabled}
-                    editorTeam={editorTeam}
                     serviceTypeCol={serviceTypeCol}
                     providerRoleCol={providerRoleCol}
                     frequencyCol={frequencyCol}
@@ -216,8 +210,23 @@ export function ServicesBlock({
                     locationCol={locationCol}
                     startDateCol={startDateCol}
                     endDateCol={endDateCol}
-                    onKeepRow={onKeepRow}
+                    index={index}
+                    owner={resolveOwnerDisplay(ownerUserId(row), editorTeam)}
                     onEdit={() => setFocusedRowKey(row.key)}
+                    editButtonId={serviceEditButtonDomId(field.fieldKey, row.key)}
+                    testIdPrefix={`field-${field.fieldKey}-row-${index}`}
+                    action={
+                      carriedFrom(row) && row.cells[ROW_CONFIRMED_KEY] !== true && !disabled ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => onKeepRow(row.key)}
+                          data-testid={`field-${field.fieldKey}-row-${index}-keep`}
+                        >
+                          Keep as-is
+                        </Button>
+                      ) : undefined
+                    }
                   />
                 )
               )}
@@ -226,110 +235,6 @@ export function ServicesBlock({
         </div>
       )}
     </div>
-  );
-}
-
-function ServiceSummaryRow({
-  fieldKey,
-  row,
-  index,
-  disabled,
-  editorTeam,
-  serviceTypeCol,
-  providerRoleCol,
-  frequencyCol,
-  durationCol,
-  locationCol,
-  startDateCol,
-  endDateCol,
-  onKeepRow,
-  onEdit,
-}: {
-  fieldKey: string;
-  row: KeyedRow;
-  index: number;
-  disabled?: boolean;
-  editorTeam: StudentTeamCache | undefined;
-  serviceTypeCol: TableColumn | undefined;
-  providerRoleCol: TableColumn | undefined;
-  frequencyCol: TableColumn | undefined;
-  durationCol: TableColumn | undefined;
-  locationCol: TableColumn | undefined;
-  startDateCol: TableColumn | undefined;
-  endDateCol: TableColumn | undefined;
-  onKeepRow: (rowKey: string) => void;
-  onEdit: () => void;
-}) {
-  const serviceTypeLabel = columnDisplayLabel(row, serviceTypeCol, 'Untitled service');
-  const providerRoleLabel = columnDisplayLabel(row, providerRoleCol, '');
-  const scheduleText = formatScheduleSummary(
-    frequencyCol ? asText(row.cells[frequencyCol.columnKey]) : undefined,
-    durationCol ? asText(row.cells[durationCol.columnKey]) : undefined
-  );
-  const settingLabel = columnDisplayLabel(row, locationCol, '');
-  const dateRange = formatDateRange(
-    startDateCol ? asText(row.cells[startDateCol.columnKey]) : undefined,
-    endDateCol ? asText(row.cells[endDateCol.columnKey]) : undefined
-  );
-  const carried = carriedFrom(row);
-  const reviewed = row.cells[ROW_CONFIRMED_KEY] === true;
-  const owner = resolveOwnerDisplay(ownerUserId(row), editorTeam);
-
-  return (
-    <tr className="border-b border-brand-slate-100 last:border-0" data-testid={`field-${fieldKey}-row-${index}`}>
-      <td className="px-3 py-2 align-top">
-        <div className="font-medium text-brand-slate-800">{serviceTypeLabel}</div>
-        {providerRoleLabel && <div className="text-xs text-brand-slate-500">{providerRoleLabel}</div>}
-        {carried && (
-          <div
-            className={cn(
-              'mt-1 inline-block rounded-badge border px-2 py-0.5 text-[11px]',
-              reviewed ? 'border-brand-slate-200 text-brand-slate-500' : 'border-brand-amber-200 bg-brand-amber-50 text-brand-amber-700'
-            )}
-            data-testid={`field-${fieldKey}-row-${index}-carried`}
-          >
-            Carried from {carried.label ?? 'prior version'}
-            {carried.date ? ` (${formatCarriedDate(carried.date)})` : ''}
-            {!reviewed && ' · not yet reviewed'}
-          </div>
-        )}
-      </td>
-      <td className="px-3 py-2 align-top text-brand-slate-700">
-        {scheduleText || <span className="italic text-brand-slate-500">Not set</span>}
-      </td>
-      <td className="px-3 py-2 align-top text-brand-slate-700">{settingLabel || '—'}</td>
-      <td className="px-3 py-2 align-top text-brand-slate-700">{dateRange}</td>
-      <td className="px-3 py-2 align-top">
-        {owner ? (
-          <span className={cn('text-brand-slate-700', owner.former && 'italic')}>{owner.label}</span>
-        ) : (
-          <span className="text-xs text-brand-amber-600">No owner</span>
-        )}
-      </td>
-      <td className="px-3 py-2 text-right align-top">
-        <div className="flex justify-end gap-2">
-          {carried && !reviewed && !disabled && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => onKeepRow(row.key)}
-              data-testid={`field-${fieldKey}-row-${index}-keep`}
-            >
-              Keep as-is
-            </Button>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            id={serviceEditButtonDomId(fieldKey, row.key)}
-            onClick={onEdit}
-            data-testid={`field-${fieldKey}-row-${index}-edit`}
-          >
-            Edit
-          </Button>
-        </div>
-      </td>
-    </tr>
   );
 }
 
@@ -613,7 +518,10 @@ function FrequencyField({
 }) {
   const initialParsed = parseFrequency(value);
   const [mode, setMode] = useState<'structured' | 'free'>(() => (value.trim() === '' || initialParsed ? 'structured' : 'free'));
-  const [count, setCount] = useState(() => String(initialParsed?.count ?? 1));
+  // Blank for an empty/unparsed value (placeholder shows the default count a
+  // keystroke would commit) rather than defaulting the input to "1" — a
+  // brand-new service must never DISPLAY a value nothing has actually saved.
+  const [count, setCount] = useState(() => (initialParsed ? String(initialParsed.count) : ''));
   const [period, setPeriod] = useState<ServicePeriod>(() => initialParsed?.period ?? 'week');
 
   if (mode === 'free') {
@@ -655,6 +563,7 @@ function FrequencyField({
         id={id}
         type="number"
         min={1}
+        placeholder="1"
         value={count}
         disabled={disabled}
         onChange={(e) => {

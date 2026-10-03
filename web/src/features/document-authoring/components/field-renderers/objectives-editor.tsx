@@ -1,17 +1,7 @@
 import { useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { coerceObjectives, emptyObjective, type KeyedObjective } from '../../lib/objective-rows';
-
-function isKeyedObjective(x: unknown): x is KeyedObjective {
-  return (
-    !!x &&
-    typeof x === 'object' &&
-    typeof (x as KeyedObjective).key === 'string' &&
-    !!(x as KeyedObjective).cells &&
-    typeof (x as KeyedObjective).cells === 'object'
-  );
-}
+import { coerceObjectives, emptyObjective, isKeyedObjective, type KeyedObjective } from '../../lib/objective-rows';
 
 /**
  * Merges server-assigned `_rowId`s that `adoptRowObjectiveIds` (table-field.tsx)
@@ -95,6 +85,15 @@ interface ObjectivesEditorProps {
 export function ObjectivesEditor({ value, disabled, testIdPrefix, onChange, flush }: ObjectivesEditorProps) {
   const [objectives, setObjectives] = useState<KeyedObjective[]>(() => coerceObjectives(value));
   const descRefs = useRef(new Map<string, HTMLTextAreaElement>());
+  // Scopes the post-mutation focus lookups below to this editor's own DOM, by
+  // `data-testid` rather than a second per-row ref map — index-addressed,
+  // which is exactly what a move/remove needs since the control to land on is
+  // defined by WHERE an item ends up, not which item it is.
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Polite live-region text for a move/remove — a focus change alone isn't
+  // announced by itself, and the control that ends up focused (an arrow, a
+  // sibling's description, "Add objective") doesn't say what just happened.
+  const [announcement, setAnnouncement] = useState('');
 
   // `value` (the goal row's `_objectives` cell) changes after every save —
   // including one that just adopted a brand-new objective's server id. This
@@ -127,20 +126,58 @@ export function ObjectivesEditor({ value, disabled, testIdPrefix, onChange, flus
     requestAnimationFrame(() => descRefs.current.get(created.key)?.focus());
   };
 
-  const removeObjective = (key: string) => mutate((current) => current.filter((o) => o.key !== key), true);
+  // After removing the objective at `index`, focus the one that slides up
+  // into its slot (its description) so keyboard use can keep working down
+  // the list; with nothing left there (the removed item was last, or the
+  // list is now empty), "Add objective" is the nearest live control.
+  const removeObjective = (key: string) => {
+    const index = objectives.findIndex((o) => o.key === key);
+    mutate((current) => current.filter((o) => o.key !== key), true);
+    setAnnouncement('Objective removed');
+    requestAnimationFrame(() => {
+      const container = containerRef.current;
+      if (!container || index === -1) return;
+      const next = container.querySelector<HTMLElement>(`[data-testid="${testIdPrefix}-objective-${index}-description"]`);
+      if (next) next.focus();
+      else container.querySelector<HTMLElement>(`[data-testid="${testIdPrefix}-objectives-add"]`)?.focus();
+    });
+  };
 
-  const moveObjective = (key: string, direction: -1 | 1) =>
+  const moveObjective = (key: string, direction: -1 | 1) => {
+    const index = objectives.findIndex((o) => o.key === key);
+    const target = index + direction;
+    if (index === -1 || target < 0 || target >= objectives.length) return; // mirrors the disabled-button bounds
+
     mutate((current) => {
-      const index = current.findIndex((o) => o.key === key);
-      const target = index + direction;
-      if (index === -1 || target < 0 || target >= current.length) return current;
+      const i = current.findIndex((o) => o.key === key);
+      const t = i + direction;
+      if (i === -1 || t < 0 || t >= current.length) return current;
       const next = [...current];
-      [next[index], next[target]] = [next[target], next[index]];
+      [next[i], next[t]] = [next[t], next[i]];
       return next;
     }, true);
+    setAnnouncement(`Objective moved to position ${target + 1}`);
+
+    // The arrow the user just pressed may now sit at a list end — its own
+    // direction disabled there (same rule the `disabled` props below use) —
+    // so land on the opposite arrow of the objective that moved, now at
+    // `target`, instead of a button that just went disabled under focus.
+    const pressed = direction === -1 ? 'up' : 'down';
+    const opposite = direction === -1 ? 'down' : 'up';
+    const pressedNowDisabled = (direction === -1 && target === 0) || (direction === 1 && target === objectives.length - 1);
+    const suffix = pressedNowDisabled ? opposite : pressed;
+    requestAnimationFrame(() => {
+      containerRef.current
+        ?.querySelector<HTMLElement>(`[data-testid="${testIdPrefix}-objective-${target}-${suffix}"]`)
+        ?.focus();
+    });
+  };
 
   return (
-    <div>
+    <div ref={containerRef}>
+      <div aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
       <div className="flex items-center">
         <h4 className="text-sm font-semibold text-brand-slate-700">Short-term objectives / benchmarks</h4>
         <span className="ml-2 text-xs text-brand-slate-500">ordered</span>

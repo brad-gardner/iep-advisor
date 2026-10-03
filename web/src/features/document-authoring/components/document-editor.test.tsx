@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { ToastProvider } from '@/components/ui/toast';
 import type { AutosaveStatus } from '@/hooks/use-autosave';
 import type { DocumentInstance, SaveResult } from '../hooks/use-document-instance';
-import type { DocumentInstanceDetailDto, DocumentValuePatch } from '../types';
+import type { AuthoredDocumentVersionSummaryDto, DocumentInstanceDetailDto, DocumentValuePatch } from '../types';
 import { DocumentEditor } from './document-editor';
 
 // Every API this page's descendants touch on mount, stubbed to inert/empty
@@ -90,6 +91,27 @@ function makeDetail(values: Record<string, unknown>): DocumentInstanceDetailDto 
   };
 }
 
+function finalizedVersion(): AuthoredDocumentVersionSummaryDto {
+  return {
+    id: 99,
+    schoolStudentId: 2,
+    documentTypeId: 3,
+    documentTypeKey: 'iep',
+    documentTypeDisplayName: 'IEP',
+    versionNumber: 1,
+    finalizedByUserId: 1,
+    finalizedAt: '2026-01-01T00:00:00Z',
+    pdfRenderStatus: 'Pending',
+    signatureStatus: 'Unsigned',
+    signedArtifactCount: 0,
+    amendsVersionId: null,
+    amendsVersionNumber: null,
+    amendmentReason: null,
+    effectiveDate: null,
+    amendedByVersionIds: [],
+  };
+}
+
 /** Deferred promise so a test can hold a save "in flight" and resolve it on cue. */
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -115,14 +137,22 @@ function Harness({
 }) {
   const [detail, setDetail] = useState(() => makeDetail(initialValues));
   const [saveStatus, setSaveStatus] = useState<AutosaveStatus>('idle');
+  // Mirrors use-document-instance.ts's own pendingRef/errorRef: `getSaveState()`
+  // must reflect the latest settled outcome synchronously (read right after an
+  // `await flushAll()`), which React state read through this closure cannot.
+  const pendingRef = useRef(0);
+  const errorRef = useRef(false);
 
   const saveValues = async (patch: DocumentValuePatch): Promise<SaveResult> => {
+    pendingRef.current += 1;
     setSaveStatus('saving');
     const result = onSave ? await onSave(patch) : { ok: true, values: patch };
     if (result.ok) {
       setDetail((d) => ({ ...d, values: { ...d.values, ...patch } }));
     }
-    setSaveStatus(result.ok ? 'saved' : 'error');
+    errorRef.current = !result.ok;
+    pendingRef.current -= 1;
+    if (pendingRef.current === 0) setSaveStatus(result.ok ? 'saved' : 'error');
     return result;
   };
 
@@ -133,13 +163,17 @@ function Harness({
     readOnly: false,
     saveValues,
     reload: () => {},
-    getSaveState: () => ({ hasError: false, conflict: false, pending: false }),
+    getSaveState: () => ({ hasError: errorRef.current, conflict: false, pending: pendingRef.current > 0 }),
   };
 
   return (
-    <ToastProvider>
-      <DocumentEditor detail={detail} instance={instance} />
-    </ToastProvider>
+    // A successful Finalize renders a <Link> to the new version — needs a
+    // router context even though this harness never navigates.
+    <MemoryRouter>
+      <ToastProvider>
+        <DocumentEditor detail={detail} instance={instance} />
+      </ToastProvider>
+    </MemoryRouter>
   );
 }
 
@@ -221,5 +255,70 @@ describe('DocumentEditor', () => {
 
     await user.click(screen.getByTestId('document-chat-open'));
     await waitFor(() => expect(screen.queryByTestId('chat-panel')).not.toBeInTheDocument());
+  });
+
+  it('does not swallow an "e" keystroke typed into a contenteditable element', async () => {
+    render(<Harness initialValues={{ [PROFILE_FIELD]: 'Jordan', [PRESENT_FIELD]: '' }} />);
+    // Lets this render's own mount-time fetches (SharedBanner, etc.) settle
+    // before the test ends, same as every other (async) test here — this is
+    // the only synchronous one, so it would otherwise log their act() warnings.
+    await screen.findByTestId('completeness-strip');
+
+    const editable = document.createElement('div');
+    // jsdom doesn't implement the `contentEditable` property/`isContentEditable`
+    // at all, so set the literal attribute TipTap actually renders instead.
+    editable.setAttribute('contenteditable', 'true');
+    document.body.appendChild(editable);
+    try {
+      const event = new KeyboardEvent('keydown', { key: 'e', bubbles: true, cancelable: true });
+      editable.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    } finally {
+      document.body.removeChild(editable);
+    }
+  });
+
+  it('Finalize flushes pending edits in every open section, then closes them, when the flush is clean', async () => {
+    const user = userEvent.setup();
+    documentsApi.finalizeDocument.mockResolvedValueOnce({ success: true, data: finalizedVersion() });
+    render(<Harness initialValues={{ [PROFILE_FIELD]: 'Jordan', [PRESENT_FIELD]: '' }} />);
+
+    await user.click(screen.getByTestId('section-1-edit'));
+    await user.click(screen.getByTestId('section-2-edit'));
+    await user.type(screen.getByTestId(`field-${PROFILE_FIELD}`), '!');
+    await user.type(screen.getByTestId(`field-${PRESENT_FIELD}`), 'Doing well.');
+
+    await user.click(screen.getByTestId('finalize-button'));
+    await user.click(screen.getByTestId('finalize-confirm'));
+
+    await waitFor(() => expect(documentsApi.finalizeDocument).toHaveBeenCalled());
+    // Both edits were flushed (not lost) ahead of the snapshot, and both
+    // sections closed once that flush was confirmed clean.
+    await waitFor(() => expect(screen.getByTestId('read-field-profile-field')).toHaveTextContent('Jordan!'));
+    expect(screen.getByTestId('read-field-present-field')).toHaveTextContent('Doing well.');
+    expect(screen.getByTestId('section-1-edit')).toBeInTheDocument();
+    expect(screen.getByTestId('section-2-edit')).toBeInTheDocument();
+  });
+
+  it('Finalize does not close sections, or call finalizeDocument, when the flushed save fails', async () => {
+    documentsApi.finalizeDocument.mockClear(); // isolate from the preceding success test's call count
+    const user = userEvent.setup();
+    render(
+      <Harness
+        initialValues={{ [PROFILE_FIELD]: 'Jordan', [PRESENT_FIELD]: '' }}
+        onSave={() => ({ ok: false, message: 'Server unavailable.' })}
+      />
+    );
+
+    await user.click(screen.getByTestId('section-1-edit'));
+    await user.type(screen.getByTestId(`field-${PROFILE_FIELD}`), '!');
+
+    await user.click(screen.getByTestId('finalize-button'));
+    await user.click(screen.getByTestId('finalize-confirm'));
+
+    const dialog = screen.getByTestId('finalize-document-dialog');
+    await waitFor(() => expect(within(dialog).getByRole('alert')).toHaveTextContent('could not be saved'));
+    expect(documentsApi.finalizeDocument).not.toHaveBeenCalled();
+    expect(screen.getByTestId('section-1-done')).toBeInTheDocument(); // still open, edit not discarded
   });
 });

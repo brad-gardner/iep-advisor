@@ -110,19 +110,7 @@ export function ReadServices({ field, value, onEditRow }: ReadFieldRendererProps
   );
 }
 
-function ServiceReadRow({
-  row,
-  index,
-  serviceTypeCol,
-  providerRoleCol,
-  frequencyCol,
-  durationCol,
-  locationCol,
-  startDateCol,
-  endDateCol,
-  owner,
-  onEdit,
-}: {
+export interface ServiceReadRowProps {
   row: KeyedRow;
   index: number;
   serviceTypeCol: TableColumn | undefined;
@@ -134,7 +122,44 @@ function ServiceReadRow({
   endDateCol: TableColumn | undefined;
   owner: OwnerDisplay | null;
   onEdit?: () => void;
-}) {
+  /** DOM id for the "Edit" button — the focused row editor
+   *  (table-field-services.tsx's `ServiceEditorRow`) returns focus here by id
+   *  when it closes. */
+  editButtonId?: string;
+  /** Overrides the default `read-service-${index}` test-id base — the
+   *  edit-mode schedule table (table-field-services.tsx's `ServicesBlock`)
+   *  reuses this component under its own field-scoped ids so existing
+   *  per-row testids keep working unchanged. */
+  testIdPrefix?: string;
+  /** Extra action rendered before "Edit" — the edit-mode schedule row's "Keep
+   *  as-is" for an unreviewed carried-forward service; the read view has
+   *  nothing to put here. */
+  action?: React.ReactNode;
+}
+
+/** One service's schedule row — type/provider, frequency × minutes, setting,
+ *  dates, owner, a carried-forward/reviewed badge, and an optional "Edit".
+ *  Shared between the read view (here) and the edit-mode schedule table,
+ *  which otherwise drifted into its own, separately-maintained copy (plan
+ *  2026-10-02-002) whose "not yet reviewed" wording had quietly diverged from
+ *  this one's "needs review". */
+export function ServiceReadRow({
+  row,
+  index,
+  serviceTypeCol,
+  providerRoleCol,
+  frequencyCol,
+  durationCol,
+  locationCol,
+  startDateCol,
+  endDateCol,
+  owner,
+  onEdit,
+  editButtonId,
+  testIdPrefix,
+  action,
+}: ServiceReadRowProps) {
+  const prefix = testIdPrefix ?? `read-service-${index}`;
   const serviceTypeLabel = columnDisplayLabel(row, serviceTypeCol, 'Untitled service');
   const providerRoleLabel = columnDisplayLabel(row, providerRoleCol, '');
   const scheduleText = formatScheduleSummary(
@@ -150,7 +175,7 @@ function ServiceReadRow({
   const reviewed = row.cells[ROW_CONFIRMED_KEY] === true;
 
   return (
-    <tr className="border-b border-brand-slate-100 last:border-0" data-testid={`read-service-${index}`}>
+    <tr className="border-b border-brand-slate-100 last:border-0" data-testid={prefix}>
       <td className="px-3 py-2 align-top">
         <div className="font-medium text-brand-slate-800">{serviceTypeLabel}</div>
         {providerRoleLabel && <div className="text-xs text-brand-slate-500">{providerRoleLabel}</div>}
@@ -160,7 +185,7 @@ function ServiceReadRow({
               'mt-1 inline-block rounded-badge border px-2 py-0.5 text-[11px]',
               reviewed ? 'border-brand-slate-200 text-brand-slate-500' : 'border-brand-amber-200 bg-brand-amber-50 text-brand-amber-700'
             )}
-            data-testid={`read-service-${index}-carried`}
+            data-testid={`${prefix}-carried`}
           >
             Carried from {carried.label ?? 'prior version'}
             {carried.date ? ` (${formatCarriedDate(carried.date)})` : ''}
@@ -180,11 +205,23 @@ function ServiceReadRow({
           <span className="text-xs text-brand-amber-600">No owner</span>
         )}
       </td>
-      {onEdit && (
+      {(onEdit || action) && (
         <td className="px-3 py-2 text-right align-top">
-          <Button variant="secondary" size="sm" onClick={onEdit} data-testid={`read-service-${index}-edit`}>
-            Edit
-          </Button>
+          <div className="flex justify-end gap-2">
+            {action}
+            {onEdit && (
+              <Button
+                id={editButtonId}
+                variant="secondary"
+                size="sm"
+                onClick={onEdit}
+                aria-label={`Edit ${serviceTypeLabel}`}
+                data-testid={`${prefix}-edit`}
+              >
+                Edit
+              </Button>
+            )}
+          </div>
         </td>
       )}
     </tr>

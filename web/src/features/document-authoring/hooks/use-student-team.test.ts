@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { useStudentTeam } from './use-student-team';
 
 const educatorApi = vi.hoisted(() => ({
@@ -61,5 +61,31 @@ describe('useStudentTeam', () => {
 
     rerender({ studentId: 2 });
     await waitFor(() => expect(educatorApi.getTeam).toHaveBeenCalledWith(2));
+  });
+
+  it('retry() re-runs the fetch and can recover from an error', async () => {
+    educatorApi.getTeam.mockClear();
+    educatorApi.getTeam.mockRejectedValueOnce(new Error('network error'));
+    const { result } = renderHook(() => useStudentTeam(42));
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    educatorApi.getTeam.mockResolvedValueOnce({ success: true, data: [member] });
+    act(() => result.current.retry?.());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.isError).toBe(false);
+    expect(result.current.members).toEqual([member]);
+    expect(educatorApi.getTeam).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns a memoized object that only changes identity when members/isLoading/isError change', async () => {
+    educatorApi.getTeam.mockClear();
+    educatorApi.getTeam.mockResolvedValueOnce({ success: true, data: [member] });
+    const { result, rerender } = renderHook(() => useStudentTeam(42));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    const first = result.current;
+    rerender();
+    expect(result.current).toBe(first); // same reference — nothing about the team changed
   });
 });

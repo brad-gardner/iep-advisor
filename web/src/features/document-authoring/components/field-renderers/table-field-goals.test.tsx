@@ -109,6 +109,18 @@ describe('GoalsBlock — card list and focused editor', () => {
     expect(screen.getByTestId(`field-${fieldKey}-row-0-edit`)).toBeInTheDocument();
   });
 
+  it('renders the goal statement as formatted markdown in the summary card, not raw markdown text (shared with ReadGoals)', () => {
+    const onSave = vi.fn().mockResolvedValue({ ok: true, values: {} });
+    renderGoals([{ _rowId: 'ID-1', [goalTextCol]: '**Jordan** will read fluently.' }], onSave);
+
+    const card = screen.getByTestId(`field-${fieldKey}-row-0`);
+    expect(within(card).getByText('Jordan').tagName).toBe('STRONG');
+    expect(within(card).queryByText(/\*\*Jordan\*\*/)).not.toBeInTheDocument();
+    // Edit button is given a distinguishing label — repeated "Edit goal" text
+    // is otherwise indistinguishable to a screen reader.
+    expect(within(card).getByRole('button', { name: 'Edit goal 1' })).toBeInTheDocument();
+  });
+
   it('moves focus into the editor on "Edit goal", and back to that button on Done', async () => {
     const onSave = vi.fn().mockResolvedValue({ ok: true, values: {} });
     renderGoals([{ _rowId: 'ID-1', [domainCol]: 'Reading', [goalTextCol]: 'Read 90 wpm' }], onSave);
@@ -265,7 +277,7 @@ describe('GoalsBlock — objectives', () => {
     expect(screen.getByTestId(`${testIdPrefix}-objective-1-down`)).toBeDisabled();
   });
 
-  it('keeps the same textarea mounted and focused while a newly-added objective adopts its server id', async () => {
+  it('keeps the same textarea mounted and focused while a newly-added (still blank) objective\'s save resolves', async () => {
     let resolveSave!: (r: SaveResult) => void;
     const onSave = vi.fn().mockImplementation(() => new Promise<SaveResult>((resolve) => (resolveSave = resolve)));
     openGoal(onSave);
@@ -276,17 +288,12 @@ describe('GoalsBlock — objectives', () => {
     fireEvent.change(descInput, { target: { value: 'Write a topic sentence' } });
 
     await act(async () => {
+      // Realistic: the add's save sent a blank objective (typing into it
+      // happened after dispatch), which a real server drops rather than
+      // assigning it an id — see `adoptObjectiveIds`'s keep-rule.
       resolveSave({
         ok: true,
-        values: {
-          [fieldKey]: [
-            {
-              _rowId: 'ID-1',
-              [goalTextCol]: 'Read better',
-              _objectives: [{ _rowId: 'OBJ-1', description: '', criteria: '', targetDate: '' }],
-            },
-          ],
-        },
+        values: { [fieldKey]: [{ _rowId: 'ID-1', [goalTextCol]: 'Read better', _objectives: [] }] },
       });
     });
 
@@ -298,8 +305,13 @@ describe('GoalsBlock — objectives', () => {
 
   it('sends the adopted objective id (not a fresh one) on the next save', async () => {
     const calls: unknown[] = [];
+    // Mirrors the server's own keep rule instead of a canned response: a
+    // wholly-blank objective is dropped (never assigned an id); anything else
+    // keeps its existing id or is assigned one for the first time.
     const onSave = vi.fn().mockImplementation((patch: Record<string, unknown>) => {
-      calls.push(patch[fieldKey]);
+      const sent = (patch[fieldKey] as Array<Record<string, unknown>>)[0]._objectives as Array<Record<string, unknown>>;
+      calls.push(sent);
+      const kept = sent.filter((o) => o.description || o.criteria || o.targetDate);
       return Promise.resolve({
         ok: true,
         values: {
@@ -307,7 +319,7 @@ describe('GoalsBlock — objectives', () => {
             {
               _rowId: 'ID-1',
               [goalTextCol]: 'Read better',
-              _objectives: [{ _rowId: 'OBJ-1', description: '', criteria: '', targetDate: '' }],
+              _objectives: kept.map((o) => ({ ...o, _rowId: (o._rowId as string | undefined) ?? 'OBJ-1' })),
             },
           ],
         },
@@ -316,15 +328,70 @@ describe('GoalsBlock — objectives', () => {
     openGoal(onSave);
 
     fireEvent.click(screen.getByTestId(`${testIdPrefix}-objectives-add`));
-    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1)); // adopts OBJ-1
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1)); // still blank — nothing kept, nothing adopted
 
     fireEvent.change(screen.getByTestId(`${testIdPrefix}-objective-0-criteria`), { target: { value: '4/5 trials' } });
     fireEvent.blur(screen.getByTestId(`${testIdPrefix}-objective-0-criteria`));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+    // What THIS save sent has no id yet — it's assigned in the response and
+    // adopted only once that response lands.
+    expect(calls[1]).toEqual([{ description: '', criteria: '4/5 trials', targetDate: '' }]);
+    await waitFor(() => expect(screen.getByTestId(`${testIdPrefix}-objective-0-criteria`)).toHaveValue('4/5 trials'));
 
-    const secondSend = calls[1] as Array<Record<string, unknown>>;
-    const objectives = secondSend[0]._objectives as Array<Record<string, unknown>>;
-    expect(objectives).toEqual([{ _rowId: 'OBJ-1', description: '', criteria: '4/5 trials', targetDate: '' }]);
+    fireEvent.change(screen.getByTestId(`${testIdPrefix}-objective-0-date`), { target: { value: 'June' } });
+    fireEvent.blur(screen.getByTestId(`${testIdPrefix}-objective-0-date`));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(3));
+
+    const thirdSend = calls[2] as Array<Record<string, unknown>>;
+    expect(thirdSend).toEqual([{ _rowId: 'OBJ-1', description: '', criteria: '4/5 trials', targetDate: 'June' }]);
+  });
+
+  it('round-trips an edited objective through Done/Edit-goal without blanking its text or losing its adopted id', async () => {
+    const onSave = vi.fn().mockImplementation((patch: Record<string, unknown>) => {
+      const sent = (patch[fieldKey] as Array<Record<string, unknown>>)[0]._objectives as Array<Record<string, unknown>>;
+      return Promise.resolve({
+        ok: true,
+        values: {
+          [fieldKey]: [{ _rowId: 'ID-1', [goalTextCol]: 'Read better', _objectives: sent.map((o) => ({ ...o, _rowId: 'OBJ-1' })) }],
+        },
+      });
+    });
+    openGoal(onSave, [{ _rowId: 'OBJ-1', description: 'first', criteria: '', targetDate: '' }]);
+
+    fireEvent.change(screen.getByTestId(`${testIdPrefix}-objective-0-criteria`), { target: { value: '4/5' } });
+    fireEvent.blur(screen.getByTestId(`${testIdPrefix}-objective-0-criteria`));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+    // Close the focused editor and reopen it.
+    fireEvent.click(screen.getByTestId(`${testIdPrefix}-done`));
+    fireEvent.click(screen.getByTestId(`field-${fieldKey}-row-0-edit`));
+
+    // The objective's text survived the round trip — re-coercing an
+    // already-keyed cell must not blank it out or mint it a fresh key.
+    expect(screen.getByTestId(`${testIdPrefix}-objective-0-description`)).toHaveValue('first');
+    expect(screen.getByTestId(`${testIdPrefix}-objective-0-criteria`)).toHaveValue('4/5');
+
+    fireEvent.change(screen.getByTestId(`${testIdPrefix}-objective-0-date`), { target: { value: 'June' } });
+    fireEvent.blur(screen.getByTestId(`${testIdPrefix}-objective-0-date`));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+
+    const sent = onSave.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    const objectives = (sent[fieldKey] as Array<Record<string, unknown>>)[0]._objectives as Array<Record<string, unknown>>;
+    expect(objectives).toEqual([{ _rowId: 'OBJ-1', description: 'first', criteria: '4/5', targetDate: 'June' }]);
+  });
+
+  it('editing only the goal text leaves a persisted, never-opened objectives list untouched (plain-vs-keyed cast no longer throws)', async () => {
+    const onSave = vi.fn().mockResolvedValue({ ok: true, values: {} });
+    const persisted = [{ _rowId: 'OBJ-1', description: 'Write a sentence', criteria: '4/5', targetDate: 'Jan' }];
+    openGoal(onSave, persisted);
+
+    fireEvent.change(screen.getByRole('textbox', { name: /^Goal\s*\*?$/ }), { target: { value: 'Read better, updated' } });
+    fireEvent.blur(screen.getByRole('textbox', { name: /^Goal\s*\*?$/ }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    const sent = (onSave.mock.calls.at(-1)?.[0] as Record<string, unknown>)[fieldKey] as Array<Record<string, unknown>>;
+    expect(sent[0][goalTextCol]).toBe('Read better, updated');
+    expect(sent[0]._objectives).toEqual(persisted);
   });
 
   it('shows the "no objectives yet" empty state', () => {

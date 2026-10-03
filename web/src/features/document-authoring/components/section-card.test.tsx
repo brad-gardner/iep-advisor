@@ -23,6 +23,56 @@ function section(): TemplateSectionDto {
   };
 }
 
+const GOALS_FIELD = 'goals-field';
+const goalTextCol = 'c1111111-1111-1111-1111-111111111111';
+
+function goalsSection(): TemplateSectionDto {
+  return {
+    id: 20,
+    sectionKey: 'goals',
+    title: 'Goals',
+    displayOrder: 0,
+    fields: [
+      {
+        id: 200,
+        fieldKey: GOALS_FIELD,
+        fieldType: 'Table',
+        label: 'Goals',
+        required: false,
+        displayOrder: 0,
+        configJson: JSON.stringify({
+          semantic: 'goals',
+          columns: [{ columnKey: goalTextCol, type: 'Text', label: 'Goal', required: true, semantic: 'goalText' }],
+        }),
+      },
+    ],
+  };
+}
+
+function GoalsHarness({
+  initialValues,
+  saveValues,
+  startOpen = false,
+}: {
+  initialValues: Record<string, unknown>;
+  saveValues: (patch: Record<string, unknown>) => Promise<SaveResult>;
+  startOpen?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(startOpen);
+  return (
+    <SectionCard
+      section={goalsSection()}
+      values={initialValues}
+      disabled={false}
+      saveValues={saveValues}
+      isOpen={isOpen}
+      onOpen={() => setIsOpen(true)}
+      onClose={() => setIsOpen(false)}
+      items={[]}
+    />
+  );
+}
+
 function okResult(values: Record<string, unknown>): SaveResult {
   return { ok: true, values };
 }
@@ -64,6 +114,31 @@ describe('SectionCard — read mode', () => {
     expect(screen.getByTestId(`read-field-${FIELD_B}`)).toHaveTextContent('Jordan');
     expect(screen.getByTestId('section-10-edit')).toBeInTheDocument();
     expect(screen.queryByTestId('section-10-done')).not.toBeInTheDocument();
+  });
+
+  it('shows each field\'s own label when the section has more than one field, and hides it when the section has exactly one (the section heading already names it)', () => {
+    const { unmount } = render(
+      <Harness initialValues={{ [FIELD_A]: 'Jordan Ellis', [FIELD_B]: 'Jordan' }} saveValues={vi.fn()} />
+    );
+    expect(screen.getByText('Name')).toBeInTheDocument();
+    expect(screen.getByText('Preferred name')).toBeInTheDocument();
+    unmount();
+
+    const oneFieldSection: TemplateSectionDto = { ...section(), fields: [section().fields[0]] };
+    render(
+      <SectionCard
+        section={oneFieldSection}
+        values={{ [FIELD_A]: 'Jordan Ellis' }}
+        disabled={false}
+        saveValues={vi.fn()}
+        isOpen={false}
+        onOpen={() => {}}
+        onClose={() => {}}
+        items={[]}
+      />
+    );
+    expect(screen.queryByText('Name')).not.toBeInTheDocument();
+    expect(screen.getByTestId(`read-field-${FIELD_A}`)).toHaveTextContent('Jordan Ellis');
   });
 
   it('shows "Not started" with a Start editing link when every field is blank', async () => {
@@ -199,5 +274,149 @@ describe('SectionCard — Discard changes', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('changed elsewhere');
     expect(screen.getByTestId('section-10-discard-confirm')).toBeInTheDocument(); // still in the confirm state, still open
+  });
+
+  it('typing then Discarding immediately — before the debounce has even fired — still flushes and restores (nothing is silently kept)', async () => {
+    const user = userEvent.setup();
+    const saveValues = vi.fn().mockImplementation((patch: Record<string, unknown>) => Promise.resolve(okResult(patch)));
+    render(<Harness initialValues={{ [FIELD_A]: 'Jordan', [FIELD_B]: '' }} saveValues={saveValues} startOpen />);
+
+    await user.clear(screen.getByTestId(`field-${FIELD_A}`));
+    await user.type(screen.getByTestId(`field-${FIELD_A}`), 'Changed');
+    // Discard immediately — the 700ms autosave debounce has not fired on its own.
+    await user.click(screen.getByTestId('section-10-discard'));
+
+    expect(await screen.findByTestId('section-10-discard-confirm')).toBeInTheDocument();
+    await user.click(screen.getByTestId('section-10-discard-confirm'));
+
+    await waitFor(() => expect(saveValues).toHaveBeenCalledWith({ [FIELD_A]: 'Jordan', [FIELD_B]: '' }));
+    expect(screen.getByTestId('section-10-edit')).toBeInTheDocument();
+  });
+
+  it('a save already in flight when Discard is clicked is still accounted for (not raced by the unmount flush)', async () => {
+    const user = userEvent.setup();
+    let resolveFirst!: (r: SaveResult) => void;
+    const saveValues = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise<SaveResult>((resolve) => (resolveFirst = resolve)))
+      .mockImplementation((patch: Record<string, unknown>) => Promise.resolve(okResult(patch)));
+    render(<Harness initialValues={{ [FIELD_A]: 'Jordan', [FIELD_B]: '' }} saveValues={saveValues} startOpen />);
+
+    await user.clear(screen.getByTestId(`field-${FIELD_A}`));
+    await user.type(screen.getByTestId(`field-${FIELD_A}`), 'Changed');
+    await user.tab(); // blur flushes immediately — this save is now in flight, unresolved
+    await waitFor(() => expect(saveValues).toHaveBeenCalledTimes(1));
+
+    const discardClick = user.click(screen.getByTestId('section-10-discard'));
+    resolveFirst(okResult({ [FIELD_A]: 'Changed' }));
+    await discardClick;
+
+    expect(await screen.findByTestId('section-10-discard-confirm')).toBeInTheDocument();
+  });
+
+  it('confirm path: the restore is the last save — the field unmounting afterward never resurrects the discarded edit', async () => {
+    const user = userEvent.setup();
+    const calls: Array<Record<string, unknown>> = [];
+    const saveValues = vi.fn().mockImplementation((patch: Record<string, unknown>) => {
+      calls.push(patch);
+      return Promise.resolve(okResult(patch));
+    });
+    render(<Harness initialValues={{ [FIELD_A]: 'Jordan', [FIELD_B]: 'JJ' }} saveValues={saveValues} startOpen />);
+
+    await user.clear(screen.getByTestId(`field-${FIELD_A}`));
+    await user.type(screen.getByTestId(`field-${FIELD_A}`), 'Changed');
+    await user.click(screen.getByTestId('section-10-discard'));
+    await user.click(await screen.findByTestId('section-10-discard-confirm'));
+
+    await waitFor(() => expect(screen.getByTestId('section-10-edit')).toBeInTheDocument());
+    expect(calls.at(-1)).toEqual({ [FIELD_A]: 'Jordan', [FIELD_B]: 'JJ' }); // the restore, landing last
+    expect(calls.filter((c) => c[FIELD_A] === 'Changed')).toHaveLength(1); // the one flushed edit, never repeated after the restore
+  });
+});
+
+describe('SectionCard — Discard confirmation accessibility', () => {
+  it('focuses "Keep editing" when the confirmation appears, returns focus to Discard on cancel, and announces as an alert', async () => {
+    const user = userEvent.setup();
+    const saveValues = vi.fn().mockImplementation((patch: Record<string, unknown>) => Promise.resolve(okResult(patch)));
+    render(<Harness initialValues={{ [FIELD_A]: 'Jordan', [FIELD_B]: '' }} saveValues={saveValues} startOpen />);
+
+    await user.clear(screen.getByTestId(`field-${FIELD_A}`));
+    await user.type(screen.getByTestId(`field-${FIELD_A}`), 'Changed');
+
+    await user.click(screen.getByTestId('section-10-discard'));
+    const keepEditing = await screen.findByTestId('section-10-discard-cancel');
+    await waitFor(() => expect(document.activeElement).toBe(keepEditing));
+    expect(screen.getByRole('alert')).toHaveTextContent('Discard the changes saved since you started editing?');
+
+    await user.click(keepEditing);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('section-10-discard')));
+  });
+});
+
+describe('SectionCard — Done with a failed save', () => {
+  it('does not close when the flushed save fails, and the failure stays visible', async () => {
+    const user = userEvent.setup();
+    const saveValues = vi.fn().mockResolvedValue({ ok: false, message: 'Something went wrong.' });
+    render(<Harness initialValues={{ [FIELD_A]: 'Jordan', [FIELD_B]: '' }} saveValues={saveValues} startOpen />);
+
+    await user.clear(screen.getByTestId(`field-${FIELD_A}`));
+    await user.type(screen.getByTestId(`field-${FIELD_A}`), 'Changed');
+    await user.click(screen.getByTestId('section-10-done'));
+
+    await waitFor(() => expect(saveValues).toHaveBeenCalled());
+    expect(await screen.findByRole('alert')).toHaveTextContent('Save failed');
+    expect(screen.getByTestId('section-10-done')).toBeInTheDocument(); // still open
+    expect(screen.queryByTestId('section-10-edit')).not.toBeInTheDocument();
+  });
+
+  it('closes once the user fixes the edit and a later Done succeeds, after an earlier attempt failed', async () => {
+    const user = userEvent.setup();
+    const saveValues = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, message: 'nope' })
+      .mockResolvedValueOnce(okResult({ [FIELD_A]: 'Changed again' }));
+    render(<Harness initialValues={{ [FIELD_A]: 'Jordan', [FIELD_B]: '' }} saveValues={saveValues} startOpen />);
+
+    await user.clear(screen.getByTestId(`field-${FIELD_A}`));
+    await user.type(screen.getByTestId(`field-${FIELD_A}`), 'Changed');
+    await user.click(screen.getByTestId('section-10-done'));
+    await waitFor(() => expect(saveValues).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId('section-10-done')).toBeInTheDocument(); // still open after the failure
+
+    // {ok: false} is a normal (non-throwing) result, so the field's own
+    // autosave has nothing left queued to retry on its own — Done only
+    // succeeds once there is a new edit to flush.
+    await user.type(screen.getByTestId(`field-${FIELD_A}`), ' again');
+    await user.click(screen.getByTestId('section-10-done'));
+    await waitFor(() => expect(saveValues).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId('section-10-edit')).toBeInTheDocument();
+  });
+});
+
+describe('SectionCard — focus on Edit for a card-list field (Goals/Services)', () => {
+  it('falls back to the first focusable BUTTON when the opened view has no input (card list, nothing expanded)', async () => {
+    const user = userEvent.setup();
+    const saveValues = vi.fn().mockResolvedValue(okResult({}));
+    render(<GoalsHarness initialValues={{ [GOALS_FIELD]: [] }} saveValues={saveValues} />);
+
+    await user.click(screen.getByTestId('section-20-edit'));
+    // No input/textarea/select exists in the empty card-list view — "Add goal"
+    // is the nearest focusable control.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId(`field-${GOALS_FIELD}-add`)));
+  });
+
+  it('skips its own focus entirely when a specific row requested it, instead of fighting that row editor for focus', async () => {
+    const user = userEvent.setup();
+    const saveValues = vi.fn().mockResolvedValue(okResult({}));
+    render(
+      <GoalsHarness initialValues={{ [GOALS_FIELD]: [{ _rowId: 'G-1', [goalTextCol]: 'Read better' }] }} saveValues={saveValues} />
+    );
+
+    // Closed (read mode): the goal's own "Edit goal" requests row-level focus.
+    await user.click(screen.getByTestId('read-goal-0-edit'));
+
+    // The row's own focused editor claims focus on its own mount — never
+    // overridden a tick later by the section's generic "first input" query.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('textbox', { name: /^Goal\s*\*?$/ })));
   });
 });

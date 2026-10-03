@@ -1,13 +1,19 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { NotificationsProvider } from '@/features/notifications/stores/notifications-context';
+import { cn } from '@/lib/cn';
 import { Sidebar } from './sidebar';
 
 interface MainLayoutProps {
   children: React.ReactNode;
+  /** Widens the content column beyond the default `max-w-7xl` — for a route
+   *  whose content (e.g. a two-column editor with its own nav rail) needs more
+   *  room than the standard page shell affords. Keep this a one-file, opt-in
+   *  knob rather than adding more width tiers than a route actually needs. */
+  wide?: boolean;
 }
 
-export function MainLayout({ children }: MainLayoutProps) {
+export function MainLayout({ children, wide }: MainLayoutProps) {
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -27,7 +33,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <Sidebar onLogout={handleLogout} />
 
         <main className="md:ml-64">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-16 md:pt-8">
+          <div className={cn('mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-16 md:pt-8', wide ? 'max-w-[1400px]' : 'max-w-7xl')}>
             {children}
           </div>
         </main>

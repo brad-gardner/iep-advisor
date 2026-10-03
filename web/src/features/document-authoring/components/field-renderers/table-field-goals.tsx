@@ -6,7 +6,6 @@ import { ROW_CONFIRMED_KEY, ROW_OBJECTIVES_KEY } from '@/features/admin/template
 import { Button } from '@/components/ui/button';
 import type { AutosaveStatus } from '@/hooks/use-autosave';
 import { AutosaveIndicator } from '@/features/admin/templates/components/autosave-indicator';
-import { cn } from '@/lib/cn';
 import type { AssistKind } from '../../api/assist-types';
 import type { StudentTeamCache } from '../../hooks/use-student-team';
 import { useDocumentEditorContext } from '../../hooks/document-editor-context';
@@ -15,10 +14,11 @@ import type { KeyedObjective } from '../../lib/objective-rows';
 import type { TableCellValue } from '../../types';
 import { resolveOwnerDisplay } from '../../lib/owner-display';
 import { columnDisplayLabel } from '../../lib/group-rows';
-import { formatCarriedDate, isLongColumn, isRichTextColumn } from '../../lib/table-cell-format';
+import { isLongColumn, isRichTextColumn } from '../../lib/table-cell-format';
 import { TableCell } from './table-field';
 import { FieldAssistBar } from './field-assist-bar';
 import { ObjectivesEditor } from './objectives-editor';
+import { GoalReadCard } from './read/read-goals';
 import { TeamMemberSelect } from '../team-member-select';
 import { fieldElementId } from './types';
 
@@ -72,6 +72,13 @@ export function GoalsBlock({
 }: GoalsBlockProps) {
   const labelId = `${fieldElementId(field.id)}-label`;
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(() => initialFocusRowKey ?? null);
+
+  // Shared with the summary card below (GoalReadCard) — same lookups
+  // GoalEditor makes for its own fields.
+  const domainCol = columns.find((c) => c.semantic === 'domain');
+  const goalTextCol = columns.find((c) => c.semantic === 'goalText');
+  const measurementCol = columns.find((c) => c.semantic === 'measurementMethod');
+  const timeframeCol = columns.find((c) => c.semantic === 'timeframe');
 
   const addGoal = () => {
     const key = nextRowKey();
@@ -131,106 +138,24 @@ export function GoalsBlock({
                 onDone={() => setFocusedRowKey(null)}
               />
             ) : (
-              <GoalSummaryCard
+              <GoalReadCard
                 key={row.key}
-                fieldKey={field.fieldKey}
-                columns={columns}
                 row={row}
                 index={index}
-                editorTeam={editorTeam}
+                domainLabel={domainCol ? columnDisplayLabel(row, domainCol, 'No area set') : ''}
+                goalText={goalTextCol ? row.cells[goalTextCol.columnKey] : undefined}
+                measurement={measurementCol ? row.cells[measurementCol.columnKey] : undefined}
+                timeframe={timeframeCol ? row.cells[timeframeCol.columnKey] : undefined}
+                owner={resolveOwnerDisplay(ownerUserId(row), editorTeam)}
                 onEdit={() => setFocusedRowKey(row.key)}
+                editButtonId={goalEditButtonDomId(field.fieldKey, row.key)}
+                testIdPrefix={`field-${field.fieldKey}-row-${index}`}
               />
             );
           })}
         </ol>
       )}
     </div>
-  );
-}
-
-function GoalSummaryCard({
-  fieldKey,
-  columns,
-  row,
-  index,
-  editorTeam,
-  onEdit,
-}: {
-  fieldKey: string;
-  columns: TableColumn[];
-  row: KeyedRow;
-  index: number;
-  editorTeam: StudentTeamCache | undefined;
-  onEdit: () => void;
-}) {
-  const domainCol = columns.find((c) => c.semantic === 'domain');
-  const goalTextCol = columns.find((c) => c.semantic === 'goalText');
-  const measurementCol = columns.find((c) => c.semantic === 'measurementMethod');
-  const timeframeCol = columns.find((c) => c.semantic === 'timeframe');
-  const text = goalTextCol ? row.cells[goalTextCol.columnKey] : undefined;
-  const measurement = measurementCol ? row.cells[measurementCol.columnKey] : undefined;
-  const timeframe = timeframeCol ? row.cells[timeframeCol.columnKey] : undefined;
-  const objectives = row.cells[ROW_OBJECTIVES_KEY];
-  const objectivesCount = Array.isArray(objectives) ? objectives.length : 0;
-  const carried = carriedFrom(row);
-  const reviewed = row.cells[ROW_CONFIRMED_KEY] === true;
-  const owner = resolveOwnerDisplay(ownerUserId(row), editorTeam);
-
-  return (
-    <li className="rounded-card border border-brand-slate-200 p-4 hover:border-brand-slate-300" data-testid={`field-${fieldKey}-row-${index}`}>
-      <div className="flex items-start gap-4">
-        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-teal-50 text-sm font-semibold text-brand-teal-700" aria-hidden="true">
-          {index + 1}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            {domainCol && (
-              <span className="rounded-badge bg-brand-slate-100 px-2 py-0.5 text-brand-slate-700">
-                {columnDisplayLabel(row, domainCol, 'No area set')}
-              </span>
-            )}
-            {carried && (
-              <span
-                className={cn(
-                  'rounded-badge border px-2 py-0.5',
-                  reviewed ? 'border-brand-slate-200 text-brand-slate-500' : 'border-brand-amber-200 bg-brand-amber-50 text-brand-amber-700'
-                )}
-              >
-                Carried from {carried.label ?? 'prior version'}
-                {carried.date ? ` (${formatCarriedDate(carried.date)})` : ''}
-                {!reviewed && ' · needs review'}
-              </span>
-            )}
-          </div>
-          <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-[15px] leading-relaxed text-brand-slate-800">
-            {typeof text === 'string' && text.trim() ? text : <span className="italic text-brand-slate-500">No goal statement yet</span>}
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-brand-slate-600">
-            {typeof measurement === 'string' && measurement.trim() && <span>{measurement}</span>}
-            {typeof timeframe === 'string' && timeframe.trim() && <span>{timeframe}</span>}
-            <span>
-              {objectivesCount} objective{objectivesCount === 1 ? '' : 's'}
-            </span>
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-2 text-right">
-          {owner ? (
-            <span className={cn('text-sm text-brand-slate-600', owner.former && 'italic')}>{owner.label}</span>
-          ) : (
-            <span className="text-xs text-brand-amber-600">No owner</span>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            id={goalEditButtonDomId(fieldKey, row.key)}
-            onClick={onEdit}
-            data-testid={`field-${fieldKey}-row-${index}-edit`}
-          >
-            Edit goal
-          </Button>
-        </div>
-      </div>
-    </li>
   );
 }
 

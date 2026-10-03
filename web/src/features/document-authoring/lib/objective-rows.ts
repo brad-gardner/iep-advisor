@@ -41,14 +41,36 @@ export function emptyObjective(): KeyedObjective {
   return { key: nextObjectiveKey(), cells: { description: '', criteria: '', targetDate: '' } };
 }
 
-/** Objectives from a goal row's `_objectives` cell (plain JSON, from the server
- *  or an as-yet-untouched row). Persisted objectives carry `_rowId`; use it as
- *  the key, same rule as `coerceRows`. */
+/** Shape guard for the rich, edit-time `KeyedObjective` — as opposed to the
+ *  plain wire shape (`{ _rowId?, description, criteria, targetDate }`). A
+ *  goal row's `_objectives` cell can legitimately hold either, depending on
+ *  whether this editing session has ever touched it (see the module doc
+ *  comment above) — every place that reads the cell needs to tell them apart
+ *  instead of assuming one or the other. */
+export function isKeyedObjective(x: unknown): x is KeyedObjective {
+  return (
+    !!x &&
+    typeof x === 'object' &&
+    typeof (x as KeyedObjective).key === 'string' &&
+    !!(x as KeyedObjective).cells &&
+    typeof (x as KeyedObjective).cells === 'object'
+  );
+}
+
+/** Objectives from a goal row's `_objectives` cell — either the plain JSON
+ *  wire shape (from the server, or an as-yet-untouched row: persisted ones
+ *  carry `_rowId`, used as the key, same rule as `coerceRows`) or the rich
+ *  `KeyedObjective[]` shape already written by this editor earlier in the same
+ *  session (e.g. re-mounting after Done/Edit-goal on an already-edited goal).
+ *  An already-keyed item is returned as-is — re-deriving it from `.description`/
+ *  `.criteria`/`.targetDate` (which live one level deeper, under `.cells`, on
+ *  that shape) would silently blank it out and mint it a fresh key. */
 export function coerceObjectives(value: unknown): KeyedObjective[] {
   if (!Array.isArray(value)) return [];
   return value
     .filter((o): o is Record<string, unknown> => typeof o === 'object' && o !== null)
     .map((raw) => {
+      if (isKeyedObjective(raw)) return raw;
       const id = typeof raw[ROW_ID_KEY] === 'string' && raw[ROW_ID_KEY] ? (raw[ROW_ID_KEY] as string) : undefined;
       return {
         key: id ?? nextObjectiveKey(),
@@ -76,18 +98,38 @@ export function toPlainObjectives(objectives: KeyedObjective[]): Record<string, 
   });
 }
 
+/** Server's own objective count cap (`DocumentInstanceService.MaxObjectives`):
+ *  at most this many SURVIVING (kept) objectives are returned. */
+const MAX_OBJECTIVES = 20;
+
+/** Mirrors the server's `CoerceObjectives` keep-rule client-side: an objective
+ *  reduces to nothing (and is dropped, never assigned an id) when description,
+ *  criteria AND targetDate are all blank after trimming; at most the first
+ *  `MAX_OBJECTIVES` survivors are kept, in order. `saved` lines up positionally
+ *  against exactly this filtered-and-capped list — NOT the raw `sent` order,
+ *  which still has every dropped blank still in it. */
+function keptByServer(sent: KeyedObjective[]): KeyedObjective[] {
+  const kept = sent.filter(
+    (o) => o.cells.description.trim() !== '' || o.cells.criteria.trim() !== '' || o.cells.targetDate.trim() !== ''
+  );
+  return kept.slice(0, MAX_OBJECTIVES);
+}
+
 /**
  * Adopts server-assigned objective ids into the objectives that were SENT
- * (matched by client key against the sent array, index-for-index with the
- * server's response for this row's `_objectives`), never by position in
- * `current` — same invariants as `adoptRowIds`: a key never changes, and an
+ * (matched by client key against the server-KEPT subset of the sent array —
+ * see `keptByServer` — index-for-index with the server's response for this
+ * row's `_objectives`), never by raw position in `sent` and never by position
+ * in `current`. Same invariants as `adoptRowIds`: a key never changes, and an
  * objective that reduced to nothing server-side (blank description/criteria/
- * targetDate) simply gets no id back, same as it never being sent at all.
+ * targetDate) simply gets no id back, same as it never being sent at all —
+ * including when it sits BEFORE a surviving objective in `sent`, which would
+ * otherwise shift every later pairing off by one.
  */
 export function adoptObjectiveIds(current: KeyedObjective[], sent: KeyedObjective[], saved: unknown): KeyedObjective[] {
   if (!Array.isArray(saved)) return current;
   const idByKey = new Map<string, string>();
-  sent.forEach((o, i) => {
+  keptByServer(sent).forEach((o, i) => {
     const savedO = saved[i];
     const id = savedO && typeof savedO === 'object' ? (savedO as Record<string, unknown>)[ROW_ID_KEY] : undefined;
     if (typeof id === 'string' && id) idByKey.set(o.key, id);
@@ -122,15 +164,25 @@ export function adoptRowObjectiveIds(current: KeyedRow[], sent: KeyedRow[], save
     const sentIndex = sent.findIndex((r) => r.key === row.key);
     if (sentIndex === -1) return row;
     const sentObjectives = sent[sentIndex].cells[ROW_OBJECTIVES_KEY];
-    if (!Array.isArray(sentObjectives) || sentObjectives.length === 0) return row;
     const currentObjectives = row.cells[ROW_OBJECTIVES_KEY];
-    if (!Array.isArray(currentObjectives)) return row;
+    // Only the rich `KeyedObjective[]` shape (minted by this session's own
+    // objectives editor) carries a client `.key` to match on — a row whose
+    // `_objectives` cell is still the plain wire shape (never opened in the
+    // objectives editor this session) has nothing of ours to adopt an id onto.
+    if (
+      !Array.isArray(sentObjectives) ||
+      sentObjectives.length === 0 ||
+      !Array.isArray(currentObjectives) ||
+      !sentObjectives.every(isKeyedObjective) ||
+      !currentObjectives.every(isKeyedObjective)
+    )
+      return row;
 
     const savedRow = saved[sentIndex];
     const savedObjectives =
       savedRow && typeof savedRow === 'object' ? (savedRow as Record<string, unknown>)[ROW_OBJECTIVES_KEY] : undefined;
 
-    const adopted = adoptObjectiveIds(currentObjectives as KeyedObjective[], sentObjectives as KeyedObjective[], savedObjectives);
+    const adopted = adoptObjectiveIds(currentObjectives, sentObjectives, savedObjectives);
     if (adopted === currentObjectives) return row;
     changed = true;
     return { key: row.key, cells: { ...row.cells, [ROW_OBJECTIVES_KEY]: adopted } };
