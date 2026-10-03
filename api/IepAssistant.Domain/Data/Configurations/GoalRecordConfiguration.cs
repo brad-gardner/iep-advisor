@@ -36,9 +36,17 @@ public class GoalRecordConfiguration : IEntityTypeConfiguration<GoalRecord>
             .HasForeignKey(g => g.DocumentInstanceId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // SetNull (plan 2026-10-02-002): this is a historical snapshot, not a live assignment — deleting
+        // the owner's account must never block (Restrict) or silently delete (Cascade) the goal record.
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(g => g.OwnerUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // One GoalRecord per (version, lineage) — the projection's core invariant.
         builder.HasIndex(g => new { g.AuthoredDocumentVersionId, g.LineageId }).IsUnique();
         builder.HasIndex(g => new { g.SchoolStudentId, g.Status });
         builder.HasIndex(g => new { g.SchoolStudentId, g.LineageId });
+        builder.HasIndex(g => g.OwnerUserId);
     }
 }

@@ -101,6 +101,33 @@ public sealed class DocumentPrefillService : IDocumentPrefillService
             // Keep the lineage id when the source row had one; CoerceTable assigns a fresh id otherwise.
             if (Guid.TryParse(item.RowId, out var lineage) && lineage != Guid.Empty)
                 row[RowMetaKeys.RowId] = lineage.ToString();
+
+            // Carry the owner forward as a plain candidate value: DocumentInstanceService.ApplyPatch runs
+            // this same patch through CoerceTable when the new instance is created, which re-validates
+            // `_ownerUserId` against the CURRENT team and silently drops it if that person is no longer an
+            // active member — no separate "is still on the team" check needed here.
+            if (item.OwnerUserId is int ownerUserId)
+                row[RowMetaKeys.OwnerUserId] = ownerUserId;
+
+            // Objectives carry over WITHOUT their `_rowId` — CoerceObjectives assigns a fresh id to each,
+            // per the plan's "re-issue objective _rowIds" rule (a carried goal is a new row in a new draft).
+            if (fieldSemantic == FieldSemantics.Goals && item.Objectives is { Count: > 0 })
+            {
+                var objectives = new JsonArray();
+                foreach (var o in item.Objectives)
+                {
+                    if (string.IsNullOrWhiteSpace(o.Description) && string.IsNullOrWhiteSpace(o.Criteria) && string.IsNullOrWhiteSpace(o.TargetDate))
+                        continue;
+                    var objective = new JsonObject();
+                    if (!string.IsNullOrWhiteSpace(o.Description)) objective["description"] = o.Description;
+                    if (!string.IsNullOrWhiteSpace(o.Criteria)) objective["criteria"] = o.Criteria;
+                    if (!string.IsNullOrWhiteSpace(o.TargetDate)) objective["targetDate"] = o.TargetDate;
+                    objectives.Add(objective);
+                }
+                if (objectives.Count > 0)
+                    row[RowMetaKeys.Objectives] = objectives;
+            }
+
             var provenance = new JsonObject
             {
                 ["versionId"] = source.SourceId,

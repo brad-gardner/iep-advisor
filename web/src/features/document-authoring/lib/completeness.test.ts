@@ -84,7 +84,12 @@ describe('computeCompleteness', () => {
     expect(empty.items.map((i) => `${i.severity}:${i.message}`)).toEqual(['required:Services is required']);
 
     const partial = computeCompleteness(servicesTemplate, { [servicesKey]: [{ _rowId: 'r', [svcType]: 'Speech', [svcFreq]: '' }] });
-    expect(partial.items.map((i) => `${i.severity}:${i.message}`)).toEqual(['advisory:Service "Speech" has no frequency']);
+    // Plan 2026-10-02-002: a services row with no `_ownerUserId` also gets the new
+    // "has no owner" advisory, alongside the pre-existing "has no frequency" one.
+    expect(partial.items.map((i) => `${i.severity}:${i.message}`)).toEqual([
+      'advisory:Service "Speech" has no frequency',
+      'advisory:Service "Speech" has no owner',
+    ]);
     expect(partial.items[0].fieldId).toBe(300);
   });
 
@@ -92,10 +97,14 @@ describe('computeCompleteness', () => {
     const result = computeCompleteness(template, {
       [goalsKey]: [{ _rowId: 'r1', [goalCol]: 'Read 90 wpm', [baseCol]: '', [measCol]: 'CBM' }],
     });
+    // Plan 2026-10-02-002: a goal row with neither `_ownerUserId` nor `_objectives`
+    // also gets the new "has no owner" and "has no objectives" advisories.
     expect(result.items.map((i) => `${i.severity}:${i.message}`)).toEqual([
       'required:Present Levels is required',
       'advisory:Goal "Read 90 wpm" has no baseline',
       // no targetCriteria column on this template → nothing to flag
+      'advisory:Goal "Read 90 wpm" has no owner',
+      'advisory:Goal "Read 90 wpm" has no objectives',
     ]);
     expect(result.percent).toBe(50);
   });
@@ -125,5 +134,190 @@ describe('computeCompleteness', () => {
     );
     expect(result.items).toEqual([]);
     expect(result.percent).toBe(100);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Owner + objectives advisories (plan 2026-10-02-002) — parity with
+// api/IepAssistant.Services.Tests/DocumentCompletenessServiceTests.cs's
+// "Compute_GoalRowWith…" / "Compute_ServiceRowWithNoOwner…" fixtures: a Goals
+// table tagged with the real "goals" semantic + a `goalText` column (and
+// nothing else), so only the owner/objectives checks can fire — isolating their
+// count from the pre-existing goalText/baseline/measurement/targetCriteria
+// advisories exercised above.
+// -----------------------------------------------------------------------------
+
+const accommodationsKey = 'f4444444-4444-4444-4444-444444444444';
+const accommodationCol = 'c6666666-6666-6666-6666-666666666666';
+const transitionKey = 'f5555555-5555-5555-5555-555555555555';
+const transitionCol = 'c7777777-7777-7777-7777-777777777777';
+
+const semanticTemplate = {
+  id: 2,
+  versionNumber: 1,
+  status: 'Published',
+  sections: [
+    {
+      id: 40,
+      title: 'Goals',
+      displayOrder: 0,
+      fields: [
+        {
+          id: 400,
+          fieldKey: goalsKey,
+          fieldType: 'Table',
+          label: 'Goals',
+          required: false,
+          displayOrder: 0,
+          configJson: JSON.stringify({
+            semantic: 'goals',
+            columns: [{ columnKey: goalCol, type: 'Text', label: 'Goal', required: false, semantic: 'goalText' }],
+          }),
+        },
+      ],
+    },
+    {
+      id: 41,
+      title: 'Services',
+      displayOrder: 1,
+      fields: [
+        {
+          id: 410,
+          fieldKey: servicesKey,
+          fieldType: 'Table',
+          label: 'Services',
+          required: false,
+          displayOrder: 0,
+          configJson: JSON.stringify({
+            semantic: 'services',
+            columns: [{ columnKey: svcType, type: 'Text', label: 'Service', required: false, semantic: 'serviceType' }],
+          }),
+        },
+      ],
+    },
+    {
+      id: 42,
+      title: 'Accommodations',
+      displayOrder: 2,
+      fields: [
+        {
+          id: 420,
+          fieldKey: accommodationsKey,
+          fieldType: 'Table',
+          label: 'Accommodations',
+          required: false,
+          displayOrder: 0,
+          configJson: JSON.stringify({
+            semantic: 'accommodations',
+            columns: [{ columnKey: accommodationCol, type: 'Text', label: 'Accommodation', required: false, semantic: 'accommodation' }],
+          }),
+        },
+      ],
+    },
+    {
+      id: 43,
+      title: 'Transition',
+      displayOrder: 3,
+      fields: [
+        {
+          id: 430,
+          fieldKey: transitionKey,
+          fieldType: 'Table',
+          label: 'Transition',
+          required: false,
+          displayOrder: 0,
+          configJson: JSON.stringify({
+            semantic: 'transition',
+            columns: [{ columnKey: transitionCol, type: 'Text', label: 'Services', required: false, semantic: 'transitionServices' }],
+          }),
+        },
+      ],
+    },
+  ],
+} as unknown as TemplateVersionDetailDto;
+
+function onlySection(sectionId: number): TemplateVersionDetailDto {
+  return { ...semanticTemplate, sections: semanticTemplate.sections.filter((s) => s.id === sectionId) } as TemplateVersionDetailDto;
+}
+
+describe('computeCompleteness — owner + objectives advisories', () => {
+  it('a goal with an owner and objectives has neither advisory', () => {
+    const result = computeCompleteness(onlySection(40), {
+      [goalsKey]: [{ _rowId: 'r1', [goalCol]: 'Read better', _ownerUserId: 7, _objectives: [{ description: 'Read a paragraph' }] }],
+    });
+    expect(result.items).toEqual([]);
+  });
+
+  it('a goal with objectives but no owner gets exactly the owner advisory', () => {
+    const result = computeCompleteness(onlySection(40), {
+      [goalsKey]: [{ _rowId: 'r1', [goalCol]: 'Read better', _objectives: [{ description: 'Read a paragraph' }] }],
+    });
+    expect(result.items.map((i) => i.message)).toEqual(['Goal "Read better" has no owner']);
+  });
+
+  it('a goal with neither owner nor objectives gets both advisories', () => {
+    const result = computeCompleteness(onlySection(40), {
+      [goalsKey]: [{ _rowId: 'r1', [goalCol]: 'Read better' }],
+    });
+    expect(result.items.map((i) => i.message)).toEqual([
+      'Goal "Read better" has no owner',
+      'Goal "Read better" has no objectives',
+    ]);
+  });
+
+  it('an empty `_objectives` array still counts as "no objectives" (owner present, so only one advisory)', () => {
+    const result = computeCompleteness(onlySection(40), {
+      [goalsKey]: [{ _rowId: 'r1', [goalCol]: 'Read better', _ownerUserId: 7, _objectives: [] }],
+    });
+    expect(result.items.map((i) => i.message)).toEqual(['Goal "Read better" has no objectives']);
+  });
+
+  it('a service with no owner gets exactly one advisory, never an objectives check', () => {
+    const result = computeCompleteness(onlySection(41), {
+      [servicesKey]: [{ _rowId: 'r1', [svcType]: 'OT' }],
+    });
+    expect(result.items.map((i) => i.message)).toEqual(['Service "OT" has no owner']);
+  });
+
+  it('an accommodation with no owner is flagged with the accommodation item label', () => {
+    const result = computeCompleteness(onlySection(42), {
+      [accommodationsKey]: [{ _rowId: 'r1', [accommodationCol]: 'Extended time' }],
+    });
+    expect(result.items.map((i) => i.message)).toEqual(['Accommodation "Extended time" has no owner']);
+  });
+
+  it('a transition item with no owner is flagged with the "Transition item" label', () => {
+    const result = computeCompleteness(onlySection(43), {
+      [transitionKey]: [{ _rowId: 'r1', [transitionCol]: 'Explore electives' }],
+    });
+    expect(result.items.map((i) => i.message)).toEqual(['Transition item "Explore electives" has no owner']);
+  });
+
+  it("an untagged table never counts owner or objectives advisories (mirrors the server's gating)", () => {
+    // A Goals table with a `goalText`-tagged column but NO field-level `semantic`
+    // at all (unlike every other fixture above, which sets `semantic: 'goals'`) —
+    // confirms the new checks are gated on the field's own semantic, not on
+    // having a reserved key missing from an arbitrary table.
+    const untagged = {
+      ...onlySection(40),
+      sections: [
+        {
+          ...onlySection(40).sections[0],
+          fields: [
+            {
+              ...onlySection(40).sections[0].fields[0],
+              configJson: JSON.stringify({
+                columns: [{ columnKey: goalCol, type: 'Text', label: 'Goal', required: false, semantic: 'goalText' }],
+              }),
+            },
+          ],
+        },
+      ],
+    } as unknown as TemplateVersionDetailDto;
+
+    const result = computeCompleteness(untagged, {
+      [goalsKey]: [{ _rowId: 'r1', [goalCol]: 'Read better' }],
+    });
+    expect(result.items.some((i) => /has no (owner|objectives)/.test(i.message))).toBe(false);
   });
 });

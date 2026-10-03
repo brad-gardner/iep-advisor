@@ -144,6 +144,22 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
 
             var now = DateTime.UtcNow;
 
+            // 6b. Plan 2026-10-02-002 review pass 2: a row's `_ownerUserId` is only re-validated against
+            // active team membership on a live SAVE (DocumentInstanceService.CoerceTable) or, previously,
+            // for the Goals table specifically at finalize (GoalRecordService.ProjectOnFinalizeAsync). An
+            // owner who left the team between that save and this finalize — or whose stale owner rode in
+            // verbatim via AmendAsync's ValuesJson copy — would otherwise freeze into the immutable version
+            // (and from there into the PDF) on every owner-eligible table, not just Goals. Strip it from
+            // the SNAPSHOT here, once, using the exact same active-membership query GoalRecordService uses
+            // below, so the version, the PDF and the projected GoalRecord can never disagree. The DRAFT
+            // instance's own ValuesJson is deliberately left untouched: it returns to Draft at step 8 and
+            // stays editable, and the same stale owner is cleaned the next time that row is saved (CoerceTable)
+            // or this document is finalized again — mirroring how a non-Goals owner was already handled
+            // before this fix (never retroactively rewritten outside a save/finalize).
+            var activeTeamUserIds = await OwnerEligibleRowSanitizer.LoadActiveTeamUserIdsAsync(_context, instance.SchoolStudentId, ct);
+            var sanitizedValues = OwnerEligibleRowSanitizer.StripInactiveOwners(
+                ValueDocumentJson.Parse(instance.ValuesJson), tree.Data!.Sections, activeTeamUserIds);
+
             // 7. Create the immutable version, snapshotting ValuesJson + the pinned template version id.
             var version = new AuthoredDocumentVersion
             {
@@ -151,7 +167,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
                 DocumentTypeId = instance.DocumentTypeId,
                 DocumentTemplateVersionId = instance.DocumentTemplateVersionId,
                 VersionNumber = versionNumber,
-                ValuesJson = instance.ValuesJson,
+                ValuesJson = sanitizedValues.ToJsonString(),
                 FinalizedByUserId = actingUserId,
                 FinalizedAt = now,
                 // Plan 7, decision 5: an instance created by AmendAsync carries its amendment fields onto
@@ -307,7 +323,14 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         if (header == null)
             return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(VersionNotFoundMessage);
 
-        if (!await CanReadStudentAsync(actingUserId, header.SchoolStudentId, ct))
+        // Staff (org Viewer+) and a linked parent/student share this same read, but NOT the same
+        // ValuesJson: only staff may see a raw `_ownerUserId` on a goals/services/accommodations/
+        // transition row. A parent/student reader is redacted to role-only, never the person's name —
+        // same rule DraftSharingService.GetForParentAsync applies to a shared draft (plan 2026-10-02-002,
+        // design "Resolved Questions" #1). Tracked separately from CanReadStudentAsync (still used by the
+        // PDF status/download reads below, which never touch ValuesJson and so need no redaction branch).
+        var isStaffAccess = await _orgAccess.CanActOnStudentAsync(actingUserId, header.SchoolStudentId, AccessRole.Viewer, ct);
+        if (!isStaffAccess && !await ParentCanViewStudentAsync(actingUserId, header.SchoolStudentId, ct))
             return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(VersionPermissionMessage);
 
         var version = await _context.AuthoredDocumentVersions
@@ -346,6 +369,15 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(
                 tree.Message ?? "The pinned template version could not be loaded.");
 
+        var valuesJson = version.ValuesJson;
+        if (!isStaffAccess)
+        {
+            var roleByUserId = await TeamRoleResolver.LoadRoleByUserIdAsync(_context, version.SchoolStudentId, ct);
+            valuesJson = FamilyFacingValueRedactor
+                .Redact(ValueDocumentJson.Parse(version.ValuesJson), tree.Data!.Sections, roleByUserId)
+                .ToJsonString();
+        }
+
         var amendedByVersionIds = await _context.AuthoredDocumentVersions.AsNoTracking()
             .Where(v => v.AmendsVersionId == versionId)
             .Select(v => v.Id)
@@ -364,7 +396,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             VersionNumber = version.VersionNumber,
             FinalizedByUserId = version.FinalizedByUserId,
             FinalizedAt = version.FinalizedAt,
-            ValuesJson = version.ValuesJson,
+            ValuesJson = valuesJson,
             PdfRenderStatus = version.PdfRenderStatus,
             PdfBlobUri = version.PdfBlobUri,
             PdfRenderedAt = version.PdfRenderedAt,
@@ -400,7 +432,12 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             return ServiceResult<AmendResultModel>.FailureResult(PermissionMessage);
 
         // Prefilled VERBATIM — the frozen ValuesJson is copied as-is, so every `_rowId` (goal/service/
-        // accommodation lineage) is preserved exactly as it was at finalize time.
+        // accommodation lineage) is preserved exactly as it was at finalize time. This does NOT re-check
+        // a row's `_ownerUserId` against current active team membership (the copy never goes through
+        // DocumentInstanceService.CoerceTable) — a stale/departed owner rides along into the new draft
+        // until either an edit to that table re-validates it (a normal save does) or this draft is
+        // finalized again, at which point AuthoredDocumentVersionService.FinalizeAsync strips it from the
+        // snapshot (OwnerEligibleRowSanitizer, every owner-eligible table — not just Goals).
         var now = DateTime.UtcNow;
         var instance = new DocumentInstance
         {

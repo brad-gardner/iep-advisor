@@ -389,4 +389,234 @@ public sealed class AuthoredDocumentPdfDocumentTests
 
         Assert.Equal(new[] { "Header" }, doc.Outline);
     }
+
+    // ---------------------------------------------------------------- Owners + objectives (plan 2026-10-02-002)
+
+    private static TemplateVersionDetailModel GoalsOnlyTree(Guid goalsKey, string goalsConfig) => new()
+    {
+        VersionNumber = 1,
+        Sections = new List<TemplateSectionModel>
+        {
+            new()
+            {
+                Id = 1, Title = "Goals", DisplayOrder = 0,
+                Fields = new List<TemplateFieldModel>
+                {
+                    new() { Id = 1, FieldKey = goalsKey, FieldType = FieldType.Table, Label = "Goals", Required = false, ConfigJson = goalsConfig, DisplayOrder = 0 }
+                }
+            }
+        }
+    };
+
+    [Fact]
+    public void GenericLayout_GoalsField_RoutesThroughGoalBlocks_WithOwnerRoleAndObjectives()
+    {
+        var goalsKey = Guid.NewGuid();
+        var goalTextCol = Guid.NewGuid();
+        var goalsConfig = Cfg(new TableFieldConfig
+        {
+            Semantic = FieldSemantics.Goals,
+            Columns = new List<TableColumn> { new() { ColumnKey = goalTextCol, Type = FieldType.Text, Label = "Goal", Semantic = ColumnSemantics.GoalText } }
+        });
+        var tree = GoalsOnlyTree(goalsKey, goalsConfig);
+        const int ownerId = 42;
+        var values = $$"""
+        {
+          "{{goalsKey}}": [
+            { "_rowId": "{{Guid.NewGuid()}}", "{{goalTextCol}}": "Read better", "_ownerUserId": {{ownerId}},
+              "_objectives": [
+                { "_rowId": "{{Guid.NewGuid()}}", "description": "Read a decodable passage", "criteria": "90% accuracy", "targetDate": "2026-12-01" },
+                { "_rowId": "{{Guid.NewGuid()}}", "description": "Answer comprehension questions" }
+              ] }
+          ]
+        }
+        """;
+        var header = AuthoredDocumentPdfHeaderContext.Empty with { OwnerRoleByUserId = new Dictionary<int, string> { [ownerId] = "Intervention Specialist" } };
+
+        var doc = new AuthoredDocumentPdfDocument("IEP", 1, new DateTime(2026, 1, 1), tree, values, header);
+        doc.GeneratePdf();
+
+        // No state context => generic layout — but goals STILL render as numbered blocks (not the grid
+        // table), so the objectives list and role-only owner line have somewhere to go.
+        Assert.Contains("Goal 1", doc.Outline);
+        Assert.Contains("Responsible: Intervention Specialist", doc.Outline);
+        Assert.Contains("Objectives: 2", doc.Outline);
+    }
+
+    [Fact]
+    public void GoalBlock_OwnerNotInRoleMap_RendersNoResponsibleLine_AndNeverThrows()
+    {
+        var goalsKey = Guid.NewGuid();
+        var goalTextCol = Guid.NewGuid();
+        var goalsConfig = Cfg(new TableFieldConfig
+        {
+            Semantic = FieldSemantics.Goals,
+            Columns = new List<TableColumn> { new() { ColumnKey = goalTextCol, Type = FieldType.Text, Label = "Goal", Semantic = ColumnSemantics.GoalText } }
+        });
+        var tree = GoalsOnlyTree(goalsKey, goalsConfig);
+        // Owner id 42 is on the row but absent from the role map (e.g. the team record was deleted) —
+        // never "Unknown", just omitted.
+        var values = $$"""{ "{{goalsKey}}": [ { "_rowId": "{{Guid.NewGuid()}}", "{{goalTextCol}}": "Read better", "_ownerUserId": 42 } ] }""";
+
+        var doc = new AuthoredDocumentPdfDocument("IEP", 1, new DateTime(2026, 1, 1), tree, values, AuthoredDocumentPdfHeaderContext.Empty);
+        doc.GeneratePdf();
+
+        Assert.Contains("Goal 1", doc.Outline);
+        Assert.DoesNotContain(doc.Outline, n => n.StartsWith("Responsible:"));
+    }
+
+    [Fact]
+    public void ServicesTable_RendersResponsibleColumnAndMarkdownAccommodationText_WithoutThrowing()
+    {
+        var servicesKey = Guid.NewGuid();
+        var serviceTypeCol = Guid.NewGuid();
+        var servicesConfig = Cfg(new TableFieldConfig
+        {
+            Semantic = FieldSemantics.Services,
+            Columns = new List<TableColumn> { new() { ColumnKey = serviceTypeCol, Type = FieldType.Text, Label = "Service", Semantic = ColumnSemantics.ServiceType } }
+        });
+        var accommodationsKey = Guid.NewGuid();
+        var accommodationCol = Guid.NewGuid();
+        var accommodationsConfig = Cfg(new TableFieldConfig
+        {
+            Semantic = FieldSemantics.Accommodations,
+            Columns = new List<TableColumn> { new() { ColumnKey = accommodationCol, Type = FieldType.Text, Label = "Accommodation", Semantic = ColumnSemantics.Accommodation } }
+        });
+
+        var tree = new TemplateVersionDetailModel
+        {
+            VersionNumber = 1,
+            Sections = new List<TemplateSectionModel>
+            {
+                new()
+                {
+                    Id = 1, Title = "Services", DisplayOrder = 0,
+                    Fields = new List<TemplateFieldModel> { new() { Id = 1, FieldKey = servicesKey, FieldType = FieldType.Table, Label = "Services", ConfigJson = servicesConfig, DisplayOrder = 0 } }
+                },
+                new()
+                {
+                    Id = 2, Title = "Accommodations", DisplayOrder = 1,
+                    Fields = new List<TemplateFieldModel> { new() { Id = 2, FieldKey = accommodationsKey, FieldType = FieldType.Table, Label = "Accommodations", ConfigJson = accommodationsConfig, DisplayOrder = 0 } }
+                }
+            }
+        };
+        const int ownerId = 7;
+        var values = $$"""
+        {
+          "{{servicesKey}}": [ { "_rowId": "{{Guid.NewGuid()}}", "{{serviceTypeCol}}": "Speech therapy", "_ownerUserId": {{ownerId}} } ],
+          "{{accommodationsKey}}": [ { "_rowId": "{{Guid.NewGuid()}}", "{{accommodationCol}}": "**Extended time** on tests\n\n- quiet room\n- large print" } ]
+        }
+        """;
+        var header = AuthoredDocumentPdfHeaderContext.Empty with { OwnerRoleByUserId = new Dictionary<int, string> { [ownerId] = "Speech-Language Pathologist" } };
+
+        var doc = new AuthoredDocumentPdfDocument("IEP", 1, new DateTime(2026, 1, 1), tree, values, header);
+        var bytes = doc.GeneratePdf();
+
+        Assert.NotEmpty(bytes);
+        Assert.Contains("Section: Services", doc.Outline);
+        Assert.Contains("Section: Accommodations", doc.Outline);
+    }
+
+    [Fact]
+    public void OhLayout_ServicesTable_RendersResponsibleColumn_WithoutThrowing()
+    {
+        var servicesKey = Guid.NewGuid();
+        var serviceTypeCol = Guid.NewGuid();
+        var servicesConfig = Cfg(new TableFieldConfig
+        {
+            Semantic = FieldSemantics.Services,
+            Columns = new List<TableColumn> { new() { ColumnKey = serviceTypeCol, Type = FieldType.Text, Label = "Service", Semantic = ColumnSemantics.ServiceType } }
+        });
+        var tree = new TemplateVersionDetailModel
+        {
+            VersionNumber = 1,
+            Sections = new List<TemplateSectionModel>
+            {
+                new()
+                {
+                    Id = 1, Title = "Services", DisplayOrder = 0,
+                    Fields = new List<TemplateFieldModel> { new() { Id = 1, FieldKey = servicesKey, FieldType = FieldType.Table, Label = "Services", ConfigJson = servicesConfig, DisplayOrder = 0 } }
+                }
+            }
+        };
+        const int ownerId = 9;
+        var values = $$"""{ "{{servicesKey}}": [ { "_rowId": "{{Guid.NewGuid()}}", "{{serviceTypeCol}}": "OT", "_ownerUserId": {{ownerId}} } ] }""";
+        var header = (AuthoredDocumentPdfHeaderContext.Empty with
+        {
+            StateCode = "OH",
+            OwnerRoleByUserId = new Dictionary<int, string> { [ownerId] = "Occupational Therapist" }
+        });
+
+        var doc = new AuthoredDocumentPdfDocument("IEP", 1, new DateTime(2026, 1, 1), tree, values, header);
+        var bytes = doc.GeneratePdf();
+
+        Assert.NotEmpty(bytes);
+        Assert.Contains("Table: Services", doc.Outline);
+    }
+
+    // ---------------------------------------------------------------- Markdown-capable column gating (review fix)
+
+    [Fact]
+    public void IsMarkdownCapableColumn_TrueOnlyForTextColumnWithMarkdownSemantic()
+    {
+        var textAccommodation = new TableColumn { ColumnKey = Guid.NewGuid(), Type = FieldType.Text, Label = "Accommodation", Semantic = ColumnSemantics.Accommodation };
+        Assert.True(AuthoredDocumentPdfDocument.IsMarkdownCapableColumn(textAccommodation));
+
+        var textPlain = new TableColumn { ColumnKey = Guid.NewGuid(), Type = FieldType.Text, Label = "Note", Semantic = null };
+        Assert.False(AuthoredDocumentPdfDocument.IsMarkdownCapableColumn(textPlain));
+    }
+
+    /// <summary>
+    /// Column semantic validation never checks a semantic tag against the column's actual FieldType
+    /// (TemplateFieldConfigValidator), so a district template CAN tag a Select or Date column with a
+    /// markdown-capable semantic (e.g. accommodation). Such a column must still be treated as
+    /// FormatCell's territory (option-label lookup / date formatting) — never routed to the raw-markdown
+    /// cell path, which would print the stored option VALUE or raw date string unformatted.
+    /// </summary>
+    [Theory]
+    [InlineData(FieldType.Select)]
+    [InlineData(FieldType.Date)]
+    [InlineData(FieldType.Checkbox)]
+    public void IsMarkdownCapableColumn_FalseForNonTextColumn_EvenWithMarkdownSemantic(FieldType type)
+    {
+        var column = new TableColumn { ColumnKey = Guid.NewGuid(), Type = type, Label = "Accommodation", Semantic = ColumnSemantics.Accommodation };
+        Assert.False(AuthoredDocumentPdfDocument.IsMarkdownCapableColumn(column));
+    }
+
+    [Fact]
+    public void AccommodationsTable_SelectColumnMistaggedAsMarkdown_RendersWithoutThrowing()
+    {
+        var accommodationsKey = Guid.NewGuid();
+        var accommodationCol = Guid.NewGuid();
+        // A Select column mis-tagged with the markdown-capable Accommodation semantic (allowed by
+        // TemplateFieldConfigValidator, which checks only that the semantic string is recognized).
+        var accommodationsConfig = Cfg(new TableFieldConfig
+        {
+            Semantic = FieldSemantics.Accommodations,
+            Columns = new List<TableColumn>
+            {
+                new() { ColumnKey = accommodationCol, Type = FieldType.Select, Label = "Accommodation", Semantic = ColumnSemantics.Accommodation,
+                    ConfigJson = Cfg(new SelectFieldConfig { Options = new List<SelectOption> { new() { Value = "quiet-room", Label = "Quiet room" } } }) }
+            }
+        });
+        var tree = new TemplateVersionDetailModel
+        {
+            VersionNumber = 1,
+            Sections = new List<TemplateSectionModel>
+            {
+                new()
+                {
+                    Id = 1, Title = "Accommodations", DisplayOrder = 0,
+                    Fields = new List<TemplateFieldModel> { new() { Id = 1, FieldKey = accommodationsKey, FieldType = FieldType.Table, Label = "Accommodations", ConfigJson = accommodationsConfig, DisplayOrder = 0 } }
+                }
+            }
+        };
+        var values = $$"""{ "{{accommodationsKey}}": [ { "_rowId": "{{Guid.NewGuid()}}", "{{accommodationCol}}": "quiet-room" } ] }""";
+
+        var doc = new AuthoredDocumentPdfDocument("IEP", 1, new DateTime(2026, 1, 1), tree, values);
+        var bytes = doc.GeneratePdf();
+
+        Assert.NotEmpty(bytes);
+        Assert.Contains("Section: Accommodations", doc.Outline);
+    }
 }

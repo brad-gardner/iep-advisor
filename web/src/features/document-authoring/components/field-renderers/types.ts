@@ -11,6 +11,11 @@ export interface FieldRendererProps {
   disabled?: boolean;
   /** Persist a value patch — the instance hook serializes + threads rowVersion. */
   onSave: (patch: DocumentValuePatch) => Promise<SaveResult>;
+  /** Row to focus as soon as this field mounts already open — set when the
+   *  section was opened via a specific row's "Edit" in read mode (e.g. a goal
+   *  card), rather than the section's generic Edit button. Consumed only by
+   *  the goals-semantic `TableField` branch; every other renderer ignores it. */
+  initialFocusRowKey?: string;
 }
 
 /** Stable DOM id for a field's control (label association / test hooks). */

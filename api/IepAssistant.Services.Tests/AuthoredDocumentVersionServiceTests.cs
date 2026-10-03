@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -468,6 +469,79 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
         Assert.Equal(AuditAction.Finalize, entry.Action);
         Assert.Equal("AuthoredDocumentVersion", entry.ResourceType);
         Assert.Equal(versionId, entry.ResourceId);
+    }
+
+    /// <summary>
+    /// Review pass 2 fix (plan 2026-10-02-002, P3): previously only the Goals table was re-validated
+    /// against active team membership at finalize (GoalRecordService.ProjectOnFinalizeAsync) — a Services/
+    /// Accommodations/Transition row's stale `_ownerUserId` froze verbatim into the immutable version.
+    /// AuthoredDocumentVersionService.FinalizeAsync now strips it from EVERY owner-eligible table's
+    /// snapshot (OwnerEligibleRowSanitizer) before the version is created. Uses a Services-semantic table
+    /// (not Goals) specifically to prove the fix covers tables GoalRecordService never touches.
+    /// </summary>
+    [Fact]
+    public async Task Finalize_StripsInactiveOwner_FromNonGoalsOwnerEligibleTable_KeepsActiveOwner()
+    {
+        var s = SeedSchoolWithStudent("finalize-owner-strip");
+        var keys = SeedServicesTemplate();
+
+        int departedUserId;
+        using (var ctx = CreateContext())
+        {
+            var departed = new User { Email = "departed-owner@example.com", PasswordHash = "x", FirstName = "Dee", LastName = "Parted", Role = UserRole.Educator };
+            ctx.Users.Add(departed);
+            ctx.SaveChanges();
+            departedUserId = departed.Id;
+
+            ctx.StudentTeamMembers.Add(new StudentTeamMember { SchoolStudentId = s.StudentId, UserId = s.CollaboratorUserId, TeamRole = TeamRole.CaseManager, IsActive = true });
+            // Inactive — e.g. the provider left the team after this row was originally saved.
+            ctx.StudentTeamMembers.Add(new StudentTeamMember { SchoolStudentId = s.StudentId, UserId = departedUserId, TeamRole = TeamRole.SpeechLanguagePathologist, IsActive = false });
+            ctx.SaveChanges();
+        }
+
+        var activeRowId = Guid.NewGuid();
+        var inactiveRowId = Guid.NewGuid();
+        var valuesJson = $$"""
+        {
+          "{{keys.ServicesFieldKey}}": [
+            { "_rowId": "{{activeRowId}}", "{{keys.ServiceTypeCol}}": "Speech therapy", "_ownerUserId": {{s.CollaboratorUserId}} },
+            { "_rowId": "{{inactiveRowId}}", "{{keys.ServiceTypeCol}}": "Occupational therapy", "_ownerUserId": {{departedUserId}} }
+          ]
+        }
+        """;
+
+        int instanceId;
+        using (var ctx = CreateContext())
+        {
+            var instance = new DocumentInstance
+            {
+                SchoolStudentId = s.StudentId,
+                DocumentTypeId = IepTypeId,
+                DocumentTemplateVersionId = keys.VersionId,
+                Status = DocumentInstanceStatus.Draft,
+                ValuesJson = valuesJson,
+                RowVersion = Guid.NewGuid().ToByteArray()
+            };
+            ctx.DocumentInstances.Add(instance);
+            ctx.SaveChanges();
+            instanceId = instance.Id;
+        }
+
+        ServiceResult<AuthoredDocumentVersionSummaryModel> result;
+        using (var ctx = CreateContext())
+            result = await CreateService(ctx).FinalizeAsync(instanceId, s.CollaboratorUserId);
+        Assert.True(result.Success, result.Message);
+
+        using (var ctx = CreateContext())
+        {
+            var version = ctx.AuthoredDocumentVersions.Single(v => v.Id == result.Data!.Id);
+            var rows = JsonNode.Parse(version.ValuesJson)!.AsObject()[keys.ServicesFieldKey.ToString()]!.AsArray();
+            var activeRow = rows.OfType<JsonObject>().Single(r => r["_rowId"]!.ToString() == activeRowId.ToString());
+            var inactiveRow = rows.OfType<JsonObject>().Single(r => r["_rowId"]!.ToString() == inactiveRowId.ToString());
+
+            Assert.Equal(s.CollaboratorUserId, activeRow[RowMetaKeys.OwnerUserId]!.GetValue<int>());
+            Assert.Null(inactiveRow[RowMetaKeys.OwnerUserId]);
+        }
     }
 
     // ---------------------------------------------------------------- Numbering backstop + immutability
@@ -975,6 +1049,97 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
             var list = await CreateService(ctx).ListForChildAsync(parent.ChildProfileId, parent.ParentUserId);
             Assert.True(list.Success);
             Assert.Empty(list.Data!); // student A's version never appears for a parent of student B
+        }
+    }
+
+    private sealed record ServicesTemplateKeys(int VersionId, Guid ServicesFieldKey, Guid ServiceTypeCol);
+
+    /// <summary>A Services-semantic table (one Text column, ServiceType-tagged) so a test can exercise the
+    /// `_ownerUserId` family-facing redaction on <see cref="AuthoredDocumentVersionService.GetVersionAsync"/>
+    /// (review fix, plan 2026-10-02-002, P2-2).</summary>
+    private ServicesTemplateKeys SeedServicesTemplate(int docTypeId = IepTypeId)
+    {
+        var servicesFieldKey = Guid.NewGuid();
+        var serviceTypeCol = Guid.NewGuid();
+
+        using var ctx = CreateContext();
+        var version = new DocumentTemplateVersion { VersionNumber = 1, Status = TemplateVersionStatus.Published, PublishedAt = DateTime.UtcNow };
+        ctx.DocumentTemplates.Add(new DocumentTemplate { StateCode = null, DocumentTypeId = docTypeId, Name = "Services template", Versions = { version } });
+        ctx.SaveChanges();
+
+        ctx.TemplateSections.Add(new TemplateSection
+        {
+            DocumentTemplateVersionId = version.Id, SectionKey = Guid.NewGuid(), Title = "Services", DisplayOrder = 0,
+            Fields =
+            {
+                new TemplateField
+                {
+                    DocumentTemplateVersionId = version.Id, FieldKey = servicesFieldKey, FieldType = FieldType.Table, Label = "Services", DisplayOrder = 0,
+                    ConfigJson = TemplateGraphBuilder.TableConfig(FieldSemantics.Services, (serviceTypeCol, FieldType.Text, "Service", ColumnSemantics.ServiceType))
+                }
+            }
+        });
+        ctx.SaveChanges();
+
+        return new ServicesTemplateKeys(version.Id, servicesFieldKey, serviceTypeCol);
+    }
+
+    /// <summary>Inserts a finalized version with an explicit ValuesJson (bypassing finalize validation),
+    /// mirroring <see cref="SeedFinalizedVersion"/> but for a <see cref="ServicesTemplateKeys"/> template
+    /// whose ValuesJson a test builds directly.</summary>
+    private int SeedFinalizedServicesVersion(SchoolScenario s, ServicesTemplateKeys keys, int docTypeId, string valuesJson, int versionNumber = 1)
+    {
+        using var ctx = CreateContext();
+        var version = new AuthoredDocumentVersion
+        {
+            SchoolStudentId = s.StudentId,
+            DocumentTypeId = docTypeId,
+            DocumentTemplateVersionId = keys.VersionId,
+            VersionNumber = versionNumber,
+            ValuesJson = valuesJson,
+            FinalizedByUserId = s.CollaboratorUserId,
+            FinalizedAt = DateTime.UtcNow
+        };
+        ctx.AuthoredDocumentVersions.Add(version);
+        ctx.SaveChanges();
+        return version.Id;
+    }
+
+    [Fact]
+    public async Task ParentLinked_GetVersion_RedactsOwnerToRoleOnly_StaffSeesRawOwner()
+    {
+        var s = SeedSchoolWithStudent("parent-owner-redact");
+        var keys = SeedServicesTemplate();
+        using (var ctx = CreateContext())
+        {
+            ctx.StudentTeamMembers.Add(new StudentTeamMember
+            {
+                SchoolStudentId = s.StudentId, UserId = s.CollaboratorUserId, TeamRole = TeamRole.InterventionSpecialist, IsActive = true
+            });
+            ctx.SaveChanges();
+        }
+        var valuesJson = $$"""
+        { "{{keys.ServicesFieldKey}}": [ { "_rowId": "{{Guid.NewGuid()}}", "{{keys.ServiceTypeCol}}": "Speech therapy", "_ownerUserId": {{s.CollaboratorUserId}} } ] }
+        """;
+        var versionId = SeedFinalizedServicesVersion(s, keys, IepTypeId, valuesJson);
+        var parent = SeedLinkedParent("parent-owner-redact", s.StudentId);
+
+        // Staff still sees the raw owner id — nothing to redact for them.
+        using (var ctx = CreateContext())
+        {
+            var staffGet = await CreateService(ctx).GetVersionAsync(versionId, s.CollaboratorUserId);
+            Assert.True(staffGet.Success, staffGet.Message);
+            Assert.Contains(RowMetaKeys.OwnerUserId, staffGet.Data!.ValuesJson);
+            Assert.DoesNotContain(RowMetaKeys.OwnerRole, staffGet.Data.ValuesJson);
+        }
+
+        // The parent's read is redacted to role-only: never the raw id, never the person's name.
+        using (var ctx = CreateContext())
+        {
+            var parentGet = await CreateService(ctx).GetVersionAsync(versionId, parent.ParentUserId);
+            Assert.True(parentGet.Success, parentGet.Message);
+            Assert.DoesNotContain(RowMetaKeys.OwnerUserId, parentGet.Data!.ValuesJson);
+            Assert.Contains($"\"{RowMetaKeys.OwnerRole}\":\"Intervention Specialist\"", parentGet.Data.ValuesJson);
         }
     }
 

@@ -40,6 +40,7 @@ public class DocumentCompletenessService : IDocumentCompletenessService
         var total = 0;
         var filled = 0;
         var requiredMissing = 0;
+        var advisoryMissing = 0;
 
         foreach (var section in sections.OrderBy(s => s.DisplayOrder))
         {
@@ -79,6 +80,8 @@ public class DocumentCompletenessService : IDocumentCompletenessService
                             }
                         }
                     }
+
+                    advisoryMissing += CountOwnerAndObjectiveAdvisories(field, rows);
                 }
                 else if (field.Required && blank)
                 {
@@ -93,8 +96,39 @@ public class DocumentCompletenessService : IDocumentCompletenessService
             Percent = percent,
             FilledCount = filled,
             TotalCount = total,
-            RequiredMissing = requiredMissing
+            RequiredMissing = requiredMissing,
+            AdvisoryMissing = advisoryMissing
         };
+    }
+
+    /// <summary>
+    /// Advisory-only (plan 2026-10-02-002): the web mirrors this as "Goal/Service/Accommodation/Transition
+    /// item &lt;label&gt; has no owner" and "Goal &lt;label&gt; has no objectives" per-row items; this
+    /// count is the row-count equivalent (no itemized message list server-side — see
+    /// <see cref="DocumentCompletenessModel"/>). Never touches <c>requiredMissing</c>.
+    /// </summary>
+    private static int CountOwnerAndObjectiveAdvisories(TemplateFieldModel field, JsonArray? rows)
+    {
+        if (rows == null || rows.Count == 0)
+            return 0;
+
+        var semantic = TemplateSemanticsReader.ReadField(field.FieldType, field.ConfigJson).Semantic;
+        var ownerEligible = semantic != null && FieldSemantics.OwnerEligible.Contains(semantic);
+        var objectivesEligible = semantic == FieldSemantics.Goals;
+        if (!ownerEligible && !objectivesEligible)
+            return 0;
+
+        var count = 0;
+        foreach (var rowNode in rows)
+        {
+            if (rowNode is not JsonObject row)
+                continue;
+            if (ownerEligible && IsBlank(row[RowMetaKeys.OwnerUserId]))
+                count++;
+            if (objectivesEligible && IsBlank(row[RowMetaKeys.Objectives]))
+                count++;
+        }
+        return count;
     }
 
     public async Task<ServiceResult<DocumentCompletenessModel>> ComputeAsync(int instanceId, CancellationToken ct = default)

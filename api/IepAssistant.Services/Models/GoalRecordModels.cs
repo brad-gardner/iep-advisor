@@ -39,6 +39,10 @@ public class GoalRecordModel
     public string? TargetCriteria { get; set; }
     public string? MeasurementMethod { get; set; }
     public string? Timeframe { get; set; }
+
+    /// <summary>The team member responsible for this goal at finalize time (plan 2026-10-02-002); null when unassigned.</summary>
+    public int? OwnerUserId { get; set; }
+
     public GoalRecordStatus Status { get; set; }
     public string? StatusReason { get; set; }
     public DateTime? ReviewedAt { get; set; }

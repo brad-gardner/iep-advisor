@@ -38,6 +38,15 @@ public class GoalRecord : BaseEntity, IAuditableEntity
     public string? MeasurementMethod { get; set; }
     public string? Timeframe { get; set; }
 
+    /// <summary>
+    /// The goal row's <c>_ownerUserId</c> at finalize time (plan 2026-10-02-002), copied verbatim by
+    /// <c>GoalRecordService.ProjectOnFinalizeAsync</c> — already validated as an active
+    /// <see cref="StudentTeamMember"/> by <c>DocumentInstanceService</c> when the row was last saved.
+    /// Set null on delete of the owning user (<c>ON DELETE SET NULL</c>) rather than blocking the delete
+    /// or cascading into this historical record.
+    /// </summary>
+    public int? OwnerUserId { get; set; }
+
     public GoalRecordStatus Status { get; set; } = GoalRecordStatus.Active;
 
     /// <summary>Set when a human resolves the status (NotMet requires one) or by the finalize

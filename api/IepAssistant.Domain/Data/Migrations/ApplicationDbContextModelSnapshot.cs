@@ -1694,6 +1694,9 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<int?>("OwnerUserId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("ProjectedAt")
                         .HasColumnType("datetime2");
 
@@ -1729,6 +1732,8 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DocumentInstanceId");
+
+                    b.HasIndex("OwnerUserId");
 
                     b.HasIndex("AuthoredDocumentVersionId", "LineageId")
                         .IsUnique();
@@ -5417,6 +5422,11 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasForeignKey("DocumentInstanceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("IepAssistant.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("IepAssistant.Domain.Entities.SchoolStudent", "SchoolStudent")
                         .WithMany()

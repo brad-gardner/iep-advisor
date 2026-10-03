@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { useAutosave } from '@/hooks/use-autosave';
 import {
   parseConfig,
@@ -13,12 +14,54 @@ import { apiErrorMessage } from '@/lib/api-error';
 import type { TableCellValue } from '../../types';
 import { useRegisterFlush } from '../../hooks/flush-registry-context';
 import { fieldElementId, type FieldRendererProps } from './types';
-import { ROW_BLOCK_SEMANTICS, type ColumnSemantic, type FieldSemantic } from '@/features/admin/templates/document-semantics';
+import {
+  OWNER_ELIGIBLE_SEMANTICS,
+  ROW_BLOCK_SEMANTICS,
+  ROW_CONFIRMED_KEY,
+  ROW_OBJECTIVES_KEY,
+  rowBlockItemLabel,
+} from '@/features/admin/templates/document-semantics';
 import type { AssistKind } from '../../api/assist-types';
 import { FieldAssistBar } from './field-assist-bar';
-import { adoptRowIds, carriedFrom, coerceRows, emptyCells, nextRowKey, rowId, type KeyedRow } from '../../lib/table-rows';
-import { ROW_CONFIRMED_KEY } from '@/features/admin/templates/document-semantics';
+import { TeamMemberSelect } from '../team-member-select';
+import {
+  adoptRowIds,
+  carriedFrom,
+  coerceRows,
+  emptyCells,
+  nextRowKey,
+  ownerUserId,
+  rowId,
+  withOwner,
+  type KeyedRow,
+} from '../../lib/table-rows';
+import { adoptRowObjectiveIds, isKeyedObjective, toPlainObjectives } from '../../lib/objective-rows';
+import { formatCarriedDate, isLongColumn, isRichTextColumn } from '../../lib/table-cell-format';
+import { GoalsBlock } from './table-field-goals';
+import { ServicesBlock } from './table-field-services';
 import { appendText, useDocumentEditorContext } from '../../hooks/document-editor-context';
+
+/**
+ * Flattens the goals-editor's rich `KeyedObjective[]` representation of a
+ * row's `_objectives` cell (see `objective-rows.ts`) to the plain wire shape
+ * immediately before a save; every other cell (and every non-goals table)
+ * passes through untouched. Keeping the rich shape in `rowsRef` until this
+ * boundary is what lets the objectives editor track its own stable keys
+ * without a second, competing save path.
+ *
+ * A goal row's `_objectives` cell is only ever the rich shape once THIS
+ * session's objectives editor has actually been opened and mutated it — a
+ * goal whose other fields were edited without ever touching its objectives
+ * still carries the plain wire shape from the server, and must be sent back
+ * exactly as received (`toPlainObjectives` assumes the rich shape and would
+ * throw trying to read a nonexistent `.cells` off a plain entry).
+ */
+function toSaveableCells(cells: KeyedRow['cells'], isGoalsTable: boolean): KeyedRow['cells'] {
+  if (!isGoalsTable) return cells;
+  const objectives = cells[ROW_OBJECTIVES_KEY];
+  if (!Array.isArray(objectives) || objectives.length === 0 || !objectives.every(isKeyedObjective)) return cells;
+  return { ...cells, [ROW_OBJECTIVES_KEY]: toPlainObjectives(objectives) };
+}
 
 /**
  * Repeating-group Table field: one row per array entry, one cell input per
@@ -27,7 +70,7 @@ import { appendText, useDocumentEditorContext } from '../../hooks/document-edito
  * the config's min/max rows for control enablement but never hard-block a
  * partial draft (validation is enforced at finalize in Phase 4).
  */
-export function TableField({ field, value, disabled, onSave }: FieldRendererProps) {
+export function TableField({ field, value, disabled, onSave, initialFocusRowKey }: FieldRendererProps) {
   const config = parseConfig(field.fieldType, field.configJson);
   const table =
     config.kind === 'Table' ? config.table : { columns: [], minRows: undefined, maxRows: undefined };
@@ -50,15 +93,38 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
     setRows(next);
   }, []);
 
+  // Server save warnings for THIS field's rows, keyed by `_rowId` (e.g. an owner
+  // that was not an active team member, so it was dropped — plan 2026-10-02-002).
+  // Replaced wholesale on every save response, so a fixed warning disappears on
+  // the next successful save without needing to be cleared explicitly.
+  const [ownerWarnings, setOwnerWarnings] = useState<Record<string, string>>({});
+
   // The queued autosave value is only a trigger: the payload is read from
   // rowsRef at send time, and ids come back matched to the rows that were sent.
   const autosave = useAutosave<number>(
     useCallback(async () => {
       const sent = rowsRef.current;
-      const result = await onSave({ [field.fieldKey]: sent.map((r) => r.cells) });
+      const result = await onSave({ [field.fieldKey]: sent.map((r) => toSaveableCells(r.cells, isGoalsTable)) });
       const saved = result.values?.[field.fieldKey];
-      if (saved !== undefined) mutate((current) => adoptRowIds(current, sent, saved));
-    }, [field.fieldKey, onSave, mutate])
+      if (saved !== undefined)
+        mutate((current) => {
+          const withRowIds = adoptRowIds(current, sent, saved);
+          // Objective ids are nested one level inside a goal row's own cells,
+          // so they need their own adoption pass after the row's `_rowId` —
+          // see `adoptRowObjectiveIds` for why this can't just be folded into
+          // `adoptRowIds` (it already has its hands full matching row keys).
+          return isGoalsTable ? adoptRowObjectiveIds(withRowIds, sent, saved) : withRowIds;
+        });
+      const warnings = (result.warnings ?? []).filter((w) => w.fieldKey === field.fieldKey);
+      // Return the SAME object when there is nothing to change (most saves carry
+      // no warnings) so React can bail out of re-rendering the row block on a
+      // plain successful autosave.
+      setOwnerWarnings((prev) =>
+        warnings.length === 0 && Object.keys(prev).length === 0
+          ? prev
+          : Object.fromEntries(warnings.map((w) => [w.rowId, w.message]))
+      );
+    }, [field.fieldKey, onSave, mutate, isGoalsTable])
   );
   useRegisterFlush(field.fieldKey, autosave.flush);
 
@@ -84,6 +150,11 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
 
   const keepRow = (rowKey: string) =>
     commit((current) => current.map((r) => (r.key === rowKey ? { ...r, cells: { ...r.cells, [ROW_CONFIRMED_KEY]: true } } : r)), true);
+
+  // Owner is a discrete selection (not continuous typing), so — like keepRow/addRow
+  // above — it flushes immediately rather than waiting for the debounce.
+  const updateOwner = (rowKey: string, nextOwnerUserId: number | undefined) =>
+    commit((current) => current.map((r) => (r.key === rowKey ? { ...r, cells: withOwner(r.cells, nextOwnerUserId) } : r)), true);
 
   const addRow = () => commit((current) => [...current, { key: nextRowKey(), cells: emptyCells(columns) }], true);
   const removeRow = (rowKey: string) => {
@@ -143,7 +214,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
     id: `${field.fieldKey}:${rowKey}:${col.columnKey}`,
     label: () => {
       const index = rowsRef.current.findIndex((r) => r.key === rowKey);
-      return `${blockLabel(blockSemantic)} ${index + 1} — ${col.label || 'field'}`;
+      return `${rowBlockItemLabel(blockSemantic)} ${index + 1} — ${col.label || 'field'}`;
     },
     apply: (text: string) => {
       if (disabledRef.current) return;
@@ -163,24 +234,94 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
   // "Pull from student" and the measurement kind.
   const blockSemantic = config.kind === 'Table' ? config.semantic : undefined;
   const isRowBlock = blockSemantic != null && ROW_BLOCK_SEMANTICS.has(blockSemantic);
+  // Goals, services, accommodations and transition rows get a team-member owner
+  // picker (plan 2026-10-02-002); participants/evaluator reports do not — those
+  // rows already name a person.
+  const ownerEligible = blockSemantic != null && OWNER_ELIGIBLE_SEMANTICS.has(blockSemantic);
+  const editorTeam = editor?.team;
+  // Goals and services never reach the generic row-block rendering below (both
+  // return their own dedicated block first, right after this), so only the
+  // semantics that DO are worth matching here.
   const primaryColumn =
     columns.find((c) =>
-      blockSemantic === 'goals'
-        ? c.semantic === 'goalText'
-        : blockSemantic === 'services'
-          ? c.semantic === 'serviceType'
-          : blockSemantic === 'accommodations'
-            ? c.semantic === 'accommodation'
-            : blockSemantic === 'transition'
-              ? c.semantic === 'transitionServices'
-              : false
+      blockSemantic === 'accommodations'
+        ? c.semantic === 'accommodation'
+        : blockSemantic === 'transition'
+          ? c.semantic === 'transitionServices'
+          : false
     ) ?? columns.find((c) => c.type === 'Text');
   const rowKinds: AssistKind[] = blockSemantic === 'goals' ? ['Rewrite', 'Improve', 'SuggestMeasurement'] : ['Rewrite', 'Improve'];
 
-  // Semantic row blocks (goals, services, accommodations, …) render as stacked
-  // cards with labelled inputs — a goal has six fields and does not fit a
-  // grid inside the editor column — with AI help and "pull from student" per
-  // row. Untagged tables keep the compact grid.
+  // Goals get their own card-list-plus-focused-editor layout (plan
+  // 2026-10-02-002, Phase 3) instead of the generic stacked-card-of-inputs
+  // block below — a goal has too many fields (statement, baseline, target,
+  // measurement, timeframe, owner, objectives) to read as a flat grid, and
+  // only one goal is ever being actively edited at a time.
+  if (blockSemantic === 'goals') {
+    return (
+      <>
+        <GoalsBlock
+          field={field}
+          columns={columns}
+          rows={rows}
+          disabled={disabled}
+          atMax={atMax}
+          editorTeam={editorTeam}
+          ownerWarnings={ownerWarnings}
+          initialFocusRowKey={initialFocusRowKey}
+          saveStatus={autosave.status}
+          commit={commit}
+          onKeepRow={keepRow}
+          onRequestRemove={requestRemoveRow}
+          flush={autosave.flush}
+          cellTarget={cellTarget}
+        />
+        <RemoveGoalDialog
+          open={pendingGoalRemoval != null}
+          goalLabel={pendingGoalRemoval?.label ?? ''}
+          loading={goalRemovalSubmitting}
+          error={goalRemovalError}
+          onConfirm={(reason) => void confirmGoalRemoval(reason)}
+          onCancel={() => {
+            pendingGoalRemovalRef.current = null;
+            setPendingGoalRemoval(null);
+          }}
+        />
+      </>
+    );
+  }
+
+  // Services get the same compact-row-plus-focused-editor treatment as goals
+  // (plan 2026-10-02-002, Phase 4): a schedule row per service, one of which
+  // may be swapped for the full structured `ServiceEditor` — frequency and
+  // duration are written back as normalized text into the template's
+  // existing columns, so the PDF, AI and completeness stay untouched.
+  if (blockSemantic === 'services') {
+    return (
+      <ServicesBlock
+        field={field}
+        columns={columns}
+        rows={rows}
+        disabled={disabled}
+        atMax={atMax}
+        atMin={atMin}
+        editorTeam={editorTeam}
+        ownerWarnings={ownerWarnings}
+        initialFocusRowKey={initialFocusRowKey}
+        saveStatus={autosave.status}
+        commit={commit}
+        onKeepRow={keepRow}
+        onRemoveRow={removeRow}
+        flush={autosave.flush}
+        cellTarget={cellTarget}
+      />
+    );
+  }
+
+  // Semantic row blocks (accommodations, transition, …) render as stacked
+  // cards with labelled inputs — several fields per row don't fit a grid
+  // inside the editor column — with AI help and "pull from student" per row.
+  // Untagged tables keep the compact grid.
   if (isRowBlock) {
     const primaryKey = primaryColumn?.columnKey;
     return (
@@ -212,7 +353,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                 >
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <span className="flex min-w-0 flex-wrap items-center gap-2 text-[13px] font-medium text-brand-slate-500">
-                      {blockLabel(blockSemantic)} {rowIndex + 1}
+                      {rowBlockItemLabel(blockSemantic)} {rowIndex + 1}
                       {carried && (
                         <span
                           className={
@@ -253,7 +394,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                           const primaryValue = primaryColumn ? row.cells[primaryColumn.columnKey] : undefined;
                           requestRemoveRow(row.key, typeof primaryValue === 'string' ? primaryValue : '');
                         }}
-                        aria-label={`Remove ${blockLabel(blockSemantic).toLowerCase()} ${rowIndex + 1}`}
+                        aria-label={`Remove ${rowBlockItemLabel(blockSemantic).toLowerCase()} ${rowIndex + 1}`}
                         data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
                       >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -281,6 +422,7 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                             value={row.cells[col.columnKey]}
                             disabled={disabled}
                             multiline={wide}
+                            richText={isRichTextColumn(col.semantic)}
                             inputId={cellId}
                             onChange={(cell) => updateCell(row.key, col.columnKey, cell)}
                             onFocus={col.type === 'Text' ? () => editor?.setActiveField(cellTarget(row.key, col)) : undefined}
@@ -290,12 +432,34 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
                       );
                     })}
                   </div>
+                  {ownerEligible && (
+                    <div className="mt-3">
+                      <label
+                        htmlFor={`field-${field.fieldKey}-owner-${rowIndex}`}
+                        className="mb-1 block text-[13px] font-medium text-brand-slate-600"
+                      >
+                        Owner
+                      </label>
+                      <TeamMemberSelect
+                        id={`field-${field.fieldKey}-owner-${rowIndex}`}
+                        team={editorTeam}
+                        value={ownerUserId(row)}
+                        disabled={disabled}
+                        onChange={(uid) => updateOwner(row.key, uid)}
+                        warning={persistedId ? ownerWarnings[persistedId] : undefined}
+                        data-testid={`field-${field.fieldKey}-row-${rowIndex}-owner`}
+                      />
+                    </div>
+                  )}
                   {primaryColumn && persistedId ? (
                     <FieldAssistBar
                       fieldKey={field.fieldKey}
                       rowId={persistedId}
                       kinds={rowKinds}
-                      allowPull={blockSemantic === 'goals'}
+                      // Goals (the only semantic that ever offered "Pull from
+                      // student") now renders through `GoalsBlock` above and
+                      // never reaches this generic row-block branch.
+                      allowPull={false}
                       onApply={(text) => {
                         updateCell(row.key, primaryColumn.columnKey, text);
                         void autosave.flush();
@@ -323,23 +487,9 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
             data-testid={`field-${field.fieldKey}-add`}
           >
             <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-            Add {blockLabel(blockSemantic).toLowerCase()}
+            Add {rowBlockItemLabel(blockSemantic).toLowerCase()}
           </Button>
         </div>
-
-        {isGoalsTable && (
-          <RemoveGoalDialog
-            open={pendingGoalRemoval != null}
-            goalLabel={pendingGoalRemoval?.label ?? ''}
-            loading={goalRemovalSubmitting}
-            error={goalRemovalError}
-            onConfirm={(reason) => void confirmGoalRemoval(reason)}
-            onCancel={() => {
-              pendingGoalRemovalRef.current = null;
-              setPendingGoalRemoval(null);
-            }}
-          />
-        )}
       </div>
     );
   }
@@ -445,47 +595,20 @@ export function TableField({ field, value, disabled, onSave }: FieldRendererProp
   );
 }
 
-const cellInputClass =
+/** Shared input styling for a table cell — exported so the goals/services
+ *  focused editors (which render their own structured controls alongside
+ *  `TableCell`) match it exactly. */
+export const cellInputClass =
   'w-full px-2 py-1 bg-white rounded-input text-brand-slate-800 text-sm border border-brand-slate-200 focus:outline-none focus:border-brand-teal-500 focus:ring-[3px] focus:ring-brand-teal-50 transition-colors';
 
-/** Human label for one row of a semantic block ("Goal 2", "Service 1"). */
-function blockLabel(semantic: FieldSemantic | undefined): string {
-  switch (semantic) {
-    case 'goals':
-      return 'Goal';
-    case 'services':
-      return 'Service';
-    case 'accommodations':
-      return 'Accommodation';
-    case 'transition':
-      return 'Transition item';
-    case 'participants':
-      return 'Participant';
-    case 'evaluatorReports':
-      return 'Evaluator report';
-    default:
-      return 'Row';
-  }
-}
-
-/** Columns whose content is prose and deserves a full-width multiline input. */
-/** `_carriedFrom.date` is an ISO `yyyy-MM-dd`; show it the way the Evidence drawer does. */
-function formatCarriedDate(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString();
-}
-
-function isLongColumn(semantic: ColumnSemantic | undefined): boolean {
-  return semantic === 'goalText' || semantic === 'baseline' || semantic === 'targetCriteria' || semantic === 'findings' || semantic === 'transitionServices' || semantic === 'accommodation';
-}
-
-function TableCell({
+export function TableCell({
   column,
   rowIndex,
   fieldKey,
   value,
   disabled,
   multiline,
+  richText,
   inputId,
   onFocus,
   onChange,
@@ -498,6 +621,9 @@ function TableCell({
   disabled?: boolean;
   /** Block mode: render prose Text columns as a textarea. */
   multiline?: boolean;
+  /** Block mode: render this Text column as the larger auto-growing rich text
+   *  editor instead of a plain textarea (accommodation / transitionServices). */
+  richText?: boolean;
   /** Block mode: explicit id so the visible label associates with the control. */
   inputId?: string;
   onFocus?: () => void;
@@ -509,6 +635,22 @@ function TableCell({
   const ariaLabel = inputId ? undefined : `${column.label || 'Column'}, row ${rowIndex + 1}`;
   const testId = `field-${fieldKey}-cell-${rowIndex}-${column.columnKey}`;
   const strValue = typeof value === 'string' ? value : '';
+
+  if (richText && column.type === 'Text') {
+    return (
+      <RichTextEditor
+        id={inputId}
+        minRows={4}
+        value={strValue}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        onFocus={onFocus}
+        onChange={onChange}
+        onBlur={onBlur}
+        data-testid={testId}
+      />
+    );
+  }
 
   if (multiline && column.type === 'Text') {
     return (

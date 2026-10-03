@@ -19,8 +19,13 @@ interface FinalizeDocumentSectionProps {
   documentTypeId: number;
   documentTypeDisplayName: string;
   status: DocumentInstanceStatus;
-  // Flush every pending per-field autosave so the snapshot captures latest edits.
-  flushBeforeFinalize: () => Promise<void>;
+  // Flush every pending per-field autosave and close every open section so
+  // the snapshot captures latest edits. Resolves false (instead of closing
+  // anything) when the flush left an unresolved failure behind — a 409, a
+  // save still pending, or a SECTION that still shows "Couldn't save" for one
+  // of its fields — in which case the open section's own failure banner
+  // already shows the educator what to fix, and finalize must not proceed.
+  flushBeforeFinalize: () => Promise<boolean>;
   // Fresh save snapshot read AFTER the flush — gates finalize so we never
   // snapshot stale data when a field's last autosave silently failed.
   getSaveState?: () => { hasError: boolean; conflict: boolean; pending: boolean };
@@ -99,8 +104,10 @@ export function FinalizeDocumentSection({
     setError(null);
     setValidationErrors([]);
     try {
-      // Capture the latest edits before snapshotting.
-      await flushBeforeFinalize();
+      // Capture the latest edits before snapshotting; false means it refused
+      // to close sections because something is still unresolved (see the
+      // getSaveState() checks right below for which message applies).
+      const canProceed = await flushBeforeFinalize();
       // Gate on the post-flush save state: never finalize (snapshot) stale data
       // when the latest edit failed to persist or a concurrent change latched.
       const saveState = getSaveState?.();
@@ -110,7 +117,7 @@ export function FinalizeDocumentSection({
         );
         return;
       }
-      if (saveState?.hasError || saveState?.pending) {
+      if (!canProceed || saveState?.hasError || saveState?.pending) {
         setError('Your most recent edits could not be saved. Please retry them before finalizing.');
         return;
       }

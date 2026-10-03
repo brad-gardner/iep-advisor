@@ -43,7 +43,8 @@ export function SectionNavigator({ sections, activeId, onJump }: SectionNavigato
         ))}
       </ol>
       <p className="mt-2 hidden text-xs text-brand-slate-500 lg:block">
-        Press <kbd className="rounded border px-1">[</kbd> / <kbd className="rounded border px-1">]</kbd> to move between sections
+        Press <kbd className="rounded border px-1">[</kbd> / <kbd className="rounded border px-1">]</kbd> to move between
+        sections · <kbd className="rounded border px-1">E</kbd> to edit
       </p>
     </nav>
   );

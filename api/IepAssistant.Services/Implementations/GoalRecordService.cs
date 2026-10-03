@@ -68,6 +68,18 @@ public class GoalRecordService : IGoalRecordService
         string? Cell(JsonObject row, string colSemantic) =>
             goalsField.Columns.TryGetValue(colSemantic, out var colKey) ? DraftRowLabeler.CellText(row, colKey) : null;
 
+        // Belt-and-suspenders, not the primary gate (plan 2026-10-02-002 review pass 2):
+        // AuthoredDocumentVersionService.FinalizeAsync now strips a stale `_ownerUserId` from EVERY
+        // owner-eligible table — Goals included — on the snapshot BEFORE it is saved as `version.ValuesJson`,
+        // using this exact same active-membership query (OwnerEligibleRowSanitizer). So by the time this
+        // projection runs, a Goals row should never carry an owner who isn't an active team member. Re-check
+        // anyway, from the identical allow-list, so this projection can never disagree with the version/PDF
+        // even if that upstream sanitization is ever bypassed or reordered.
+        var activeTeamUserIds = await OwnerEligibleRowSanitizer.LoadActiveTeamUserIdsAsync(_context, version.SchoolStudentId, ct);
+
+        int? OwnerUserId(JsonObject row) =>
+            row[RowMetaKeys.OwnerUserId] is JsonValue v && v.TryGetValue<int>(out var id) && activeTeamUserIds.Contains(id) ? id : null;
+
         if (rows != null)
         {
             foreach (var row in rows.OfType<JsonObject>())
@@ -89,6 +101,7 @@ public class GoalRecordService : IGoalRecordService
                     TargetCriteria = Cell(row, ColumnSemantics.TargetCriteria),
                     MeasurementMethod = Cell(row, ColumnSemantics.MeasurementMethod),
                     Timeframe = Cell(row, ColumnSemantics.Timeframe),
+                    OwnerUserId = OwnerUserId(row),
                     Status = GoalRecordStatus.Active,
                     ProjectedAt = now,
                     CreatedById = version.FinalizedByUserId,
@@ -329,6 +342,7 @@ public class GoalRecordService : IGoalRecordService
             TargetCriteria = g.TargetCriteria,
             MeasurementMethod = g.MeasurementMethod,
             Timeframe = g.Timeframe,
+            OwnerUserId = g.OwnerUserId,
             Status = g.Status,
             StatusReason = g.StatusReason,
             ReviewedAt = g.ReviewedAt,

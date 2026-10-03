@@ -69,6 +69,34 @@ export const ROW_BLOCK_SEMANTICS: ReadonlySet<FieldSemantic> = new Set<FieldSema
   'evaluatorReports',
 ]);
 
+/**
+ * Semantics whose rows may carry a `_ownerUserId` (plan 2026-10-02-002, "read-first
+ * sections, goals/services, item owners") — mirrors api/IepAssistant.Services/Models/
+ * DocumentSemantics.cs `FieldSemantics.OwnerEligible`. Deliberately NOT participants/
+ * evaluatorReports: those rows already name a person.
+ */
+export const OWNER_ELIGIBLE_SEMANTICS: ReadonlySet<FieldSemantic> = new Set<FieldSemantic>([
+  'goals',
+  'services',
+  'accommodations',
+  'transition',
+]);
+
+/** Human, singular label for one row of a semantic block ("Goal 2", "Service 1",
+ *  used both in the row editor and in completeness advisory messages). */
+export const ROW_BLOCK_ITEM_LABELS: Partial<Record<FieldSemantic, string>> = {
+  goals: 'Goal',
+  services: 'Service',
+  accommodations: 'Accommodation',
+  transition: 'Transition item',
+  participants: 'Participant',
+  evaluatorReports: 'Evaluator report',
+};
+
+export function rowBlockItemLabel(semantic: FieldSemantic | undefined): string {
+  return (semantic && ROW_BLOCK_ITEM_LABELS[semantic]) || 'Row';
+}
+
 export const COLUMN_SEMANTICS = [
   'domain',
   'goalText',
@@ -135,3 +163,23 @@ export const ROW_ID_KEY = '_rowId';
 export const ROW_CARRIED_FROM_KEY = '_carriedFrom';
 /** Reserved row-object key: true once a carried row has been kept or edited. */
 export const ROW_CONFIRMED_KEY = '_confirmed';
+/**
+ * Reserved row-object key (plan 2026-10-02-002): the user id of the student-team
+ * member responsible for this row. Kept only on rows of an `OWNER_ELIGIBLE_SEMANTICS`
+ * table, and only while that user is an active team member — the server re-validates
+ * on every save and drops a stale/invalid value (with a field-level save warning).
+ * Mirrors `RowMetaKeys.OwnerUserId`.
+ */
+export const ROW_OWNER_USER_ID_KEY = '_ownerUserId';
+/**
+ * Output-only, role-display substitute for `ROW_OWNER_USER_ID_KEY` on family/student-
+ * facing value documents — never the person's name. The web client never reads or
+ * sends this key; it exists here only to document the reserved vocabulary. Mirrors
+ * `RowMetaKeys.OwnerRole`.
+ */
+export const ROW_OWNER_ROLE_KEY = '_ownerRole';
+/**
+ * Goal rows only (Phase 3): an ordered array of objective/benchmark objects, each
+ * `{ _rowId, description, criteria, targetDate }`. Mirrors `RowMetaKeys.Objectives`.
+ */
+export const ROW_OBJECTIVES_KEY = '_objectives';

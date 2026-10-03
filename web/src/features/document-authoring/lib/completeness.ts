@@ -1,5 +1,14 @@
 import { parseConfig } from '@/features/admin/templates/template-config';
-import { ROW_CARRIED_FROM_KEY, ROW_CONFIRMED_KEY, ROW_ID_KEY, type ColumnSemantic } from '@/features/admin/templates/document-semantics';
+import {
+  OWNER_ELIGIBLE_SEMANTICS,
+  ROW_CARRIED_FROM_KEY,
+  ROW_CONFIRMED_KEY,
+  ROW_ID_KEY,
+  ROW_OBJECTIVES_KEY,
+  ROW_OWNER_USER_ID_KEY,
+  rowBlockItemLabel,
+  type ColumnSemantic,
+} from '@/features/admin/templates/document-semantics';
 import type { TemplateFieldDto, TemplateVersionDetailDto } from '../types';
 import { readCarriedFrom } from './table-rows';
 
@@ -27,7 +36,10 @@ export interface CompletenessSummary {
 
 type Row = Record<string, unknown>;
 
-function isBlank(v: unknown): boolean {
+/** Shared blank-value rule: empty/whitespace strings, nullish, and empty arrays
+ *  are "no content yet". Exported so read-mode renderers can show the same
+ *  "Not set" / "Not started" treatment the completeness rules use. */
+export function isBlank(v: unknown): boolean {
   if (v == null) return true;
   if (typeof v === 'string') return v.replace(/<[^>]+>/g, '').trim() === '';
   if (typeof v === 'boolean') return false;
@@ -121,6 +133,45 @@ export function computeCompleteness(
           if (cellBlank(row, col('frequency'))) items.push({ key: `s-freq-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Service ${label} has no frequency`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
           if (cellBlank(row, col('duration'))) items.push({ key: `s-dur-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Service ${label} has no duration`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
           if (cellBlank(row, col('providerRole'))) items.push({ key: `s-prov-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Service ${label} has no provider role`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
+        });
+      }
+
+      // Owner (goals/services/accommodations/transition) + objectives (goals only)
+      // advisories — plan 2026-10-02-002. Mirrors
+      // DocumentCompletenessService.CountOwnerAndObjectiveAdvisories server-side;
+      // see its tests for the exact counting behavior this reproduces per-row.
+      if (semantic != null && OWNER_ELIGIBLE_SEMANTICS.has(semantic)) {
+        const primaryKey =
+          semantic === 'goals'
+            ? col('goalText')
+            : semantic === 'services'
+              ? col('serviceType')
+              : semantic === 'accommodations'
+                ? col('accommodation')
+                : col('transitionServices');
+        const itemLabel = rowBlockItemLabel(semantic);
+        tableRows.forEach((row, i) => {
+          const label = rowLabel(row, primaryKey, i);
+          if (isBlank(row[ROW_OWNER_USER_ID_KEY])) {
+            items.push({
+              key: `owner-${row[ROW_ID_KEY] ?? i}`,
+              severity: 'advisory',
+              message: `${itemLabel} ${label} has no owner`,
+              fieldKey: field.fieldKey,
+              fieldId: field.id,
+              sectionId: section.id,
+            });
+          }
+          if (semantic === 'goals' && isBlank(row[ROW_OBJECTIVES_KEY])) {
+            items.push({
+              key: `objectives-${row[ROW_ID_KEY] ?? i}`,
+              severity: 'advisory',
+              message: `Goal ${label} has no objectives`,
+              fieldKey: field.fieldKey,
+              fieldId: field.id,
+              sectionId: section.id,
+            });
+          }
         });
       }
     }

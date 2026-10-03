@@ -16,8 +16,9 @@ import type { TemplateVersionDetailDto } from '@/features/admin/templates/types'
 export type DocumentInstanceStatus = 'Draft' | 'Finalizing' | 'Finalized';
 
 /** A single Table row: cells keyed by the field's Table `columnKey` (guid), plus
- *  reserved `_rowId` / `_carriedFrom` / `_confirmed` metadata entries. */
-export type TableCellValue = string | boolean | Record<string, unknown>;
+ *  reserved `_rowId` / `_carriedFrom` / `_confirmed` / `_ownerUserId` / `_objectives`
+ *  metadata entries (`number` backs `_ownerUserId`, `unknown[]` backs `_objectives`). */
+export type TableCellValue = string | boolean | number | Record<string, unknown> | unknown[];
 export type TableRowValue = Record<string, TableCellValue>;
 
 /** A value-document entry. Scalars for Text/RichText/Date/Select/Checkbox; an
@@ -74,11 +75,28 @@ export interface SaveValuesRequest {
   rowVersion?: string;
 }
 
+/**
+ * One field/row-level save warning (plan 2026-10-02-002), e.g. an `_ownerUserId`
+ * that was not an active team member and was dropped. Safe to show directly next
+ * to the affected row's control. Mirrors `DocumentSaveWarningDto`.
+ */
+export interface DocumentSaveWarningDto {
+  /** The table field's FieldKey (guid) the affected row belongs to. */
+  fieldKey: string;
+  /** The affected row's `_rowId` (guid). */
+  rowId: string;
+  /** Stable machine-readable reason, e.g. `"ownerNotTeamMember"`. */
+  code: string;
+  message: string;
+}
+
 /** Lightweight save response: normalized values + rotated token (no template tree). */
 export interface DocumentValuesResponseDto {
   /** Keyed by `FieldKey` (guid); normalized server-side (e.g. sanitized RichText). */
   values: Record<string, unknown>;
   rowVersion: string | null;
+  /** Empty when there is nothing to warn about. */
+  warnings: DocumentSaveWarningDto[];
 }
 
 // ---------------------------------------------------------------------------

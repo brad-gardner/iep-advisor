@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -176,6 +177,105 @@ public sealed class GoalRecordServiceTests : IDisposable
         Assert.Equal(rowId, record.LineageId);
         Assert.Equal("Read at grade level", record.GoalText);
         Assert.Equal("42 wpm", record.Baseline);
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_CopiesRowOwnerUserId_OntoGoalRecord_WhenAnActiveTeamMember()
+    {
+        var s = Seed(nameof(FinalizeAsync_CopiesRowOwnerUserId_OntoGoalRecord_WhenAnActiveTeamMember));
+        using (var ctx = CreateContext())
+        {
+            ctx.StudentTeamMembers.Add(new StudentTeamMember { SchoolStudentId = s.StudentId, UserId = s.TeacherId, TeamRole = TeamRole.CaseManager, IsActive = true });
+            ctx.SaveChanges();
+        }
+        var rowId = Guid.NewGuid();
+        var valuesJson = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            [s.GoalsFieldKey.ToString()] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["_rowId"] = rowId.ToString(),
+                    [s.GoalCol.ToString()] = "Read at grade level",
+                    ["_ownerUserId"] = s.TeacherId
+                }
+            }
+        });
+
+        await SetValuesAndFinalizeAsync(s, valuesJson);
+
+        using var verify = CreateContext();
+        var record = await verify.GoalRecords.SingleAsync(g => g.SchoolStudentId == s.StudentId);
+        Assert.Equal(s.TeacherId, record.OwnerUserId);
+    }
+
+    /// <summary>
+    /// Review fix (plan 2026-10-02-002, P3): an owner is re-validated against ACTIVE StudentTeamMembers at
+    /// FINALIZE time, not just copied verbatim from whatever DocumentInstanceService accepted at save time
+    /// — covering both an amendment (which copies the frozen ValuesJson without going back through
+    /// CoerceTable) and a same-draft finalize that happens long after the save that set the owner.
+    /// </summary>
+    [Fact]
+    public async Task FinalizeAsync_DropsRowOwnerUserId_OntoGoalRecord_WhenNotAnActiveTeamMember()
+    {
+        var s = Seed(nameof(FinalizeAsync_DropsRowOwnerUserId_OntoGoalRecord_WhenNotAnActiveTeamMember));
+        // No StudentTeamMembers row for the teacher at all — the ValuesJson owner is stale/never-valid.
+        var rowId = Guid.NewGuid();
+        var valuesJson = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            [s.GoalsFieldKey.ToString()] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["_rowId"] = rowId.ToString(),
+                    [s.GoalCol.ToString()] = "Read at grade level",
+                    ["_ownerUserId"] = s.TeacherId
+                }
+            }
+        });
+
+        await SetValuesAndFinalizeAsync(s, valuesJson);
+
+        using var ctx = CreateContext();
+        var record = await ctx.GoalRecords.SingleAsync(g => g.SchoolStudentId == s.StudentId);
+        Assert.Null(record.OwnerUserId);
+    }
+
+    /// <summary>
+    /// Review pass 2 fix (plan 2026-10-02-002, P3): the frozen AuthoredDocumentVersion.ValuesJson must agree
+    /// with the projected GoalRecord — both load the stale owner's eligibility from the same active-
+    /// membership allow-list (OwnerEligibleRowSanitizer), so a departed owner can never be null on the
+    /// GoalRecord while still sitting in the version's snapshot (which is what the PDF renders from).
+    /// </summary>
+    [Fact]
+    public async Task FinalizeAsync_InactiveOwner_DroppedFromVersionSnapshot_AgreesWithGoalRecord()
+    {
+        var s = Seed(nameof(FinalizeAsync_InactiveOwner_DroppedFromVersionSnapshot_AgreesWithGoalRecord));
+        // No StudentTeamMembers row for the teacher at all — the ValuesJson owner is stale/never-valid.
+        var rowId = Guid.NewGuid();
+        var valuesJson = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            [s.GoalsFieldKey.ToString()] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["_rowId"] = rowId.ToString(),
+                    [s.GoalCol.ToString()] = "Read at grade level",
+                    ["_ownerUserId"] = s.TeacherId
+                }
+            }
+        });
+
+        await SetValuesAndFinalizeAsync(s, valuesJson);
+
+        using var ctx = CreateContext();
+        var record = await ctx.GoalRecords.SingleAsync(g => g.SchoolStudentId == s.StudentId);
+        Assert.Null(record.OwnerUserId);
+
+        var version = await ctx.AuthoredDocumentVersions.SingleAsync(v => v.Id == record.AuthoredDocumentVersionId);
+        var row = JsonNode.Parse(version.ValuesJson)!.AsObject()[s.GoalsFieldKey.ToString()]!.AsArray()
+            .OfType<JsonObject>().Single(r => r["_rowId"]!.ToString() == rowId.ToString());
+        Assert.Null(row[RowMetaKeys.OwnerUserId]); // version agrees with GoalRecord — neither carries the stale owner
     }
 
     [Fact]

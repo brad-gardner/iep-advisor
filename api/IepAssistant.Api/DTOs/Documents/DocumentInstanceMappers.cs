@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json;
 using IepAssistant.Api.DTOs.Templates;
 using IepAssistant.Services.Models;
@@ -30,7 +31,14 @@ internal static class DocumentInstanceMappers
     public static DocumentInstanceValuesDto MapValues(DocumentInstanceValuesModel m) => new()
     {
         Values = ParseValues(m.ValuesJson),
-        RowVersion = m.RowVersion is null ? null : Convert.ToBase64String(m.RowVersion)
+        RowVersion = m.RowVersion is null ? null : Convert.ToBase64String(m.RowVersion),
+        Warnings = m.Warnings.Select(w => new DocumentSaveWarningDto
+        {
+            FieldKey = w.FieldKey,
+            RowId = w.RowId,
+            Code = w.Code,
+            Message = w.Message
+        }).ToList()
     };
 
     public static DocumentInstanceSummaryDto MapSummary(DocumentInstanceSummaryModel m) => new()

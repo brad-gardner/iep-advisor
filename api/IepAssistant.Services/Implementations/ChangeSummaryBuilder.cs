@@ -83,11 +83,32 @@ public static class ChangeSummaryBuilder
         return result;
     }
 
-    /// <summary>Content-only equality: row metadata (`_rowId`, `_carriedFrom`, `_confirmed`) never counts as a change.</summary>
+    /// <summary>
+    /// Keys that are pure provenance/state metadata — never content — so they alone never register as a
+    /// row change: `_rowId` (row identity — DiffTable already matches rows by it before this ever runs),
+    /// `_carriedFrom`/`_confirmed` (carry-forward provenance/acknowledgement) and `_ownerRole` (an
+    /// output-only, family-facing substitute for `_ownerUserId` — never a real saved value, so it can
+    /// never legitimately differ between two SAVED value-documents).
+    ///
+    /// Deliberately narrower than <see cref="RowMetaKeys.All"/>: an owner reassignment
+    /// (`_ownerUserId`) and an objectives edit (`_objectives`) ARE content changes a re-share/converge/
+    /// meeting-brief diff must surface — see <see cref="RowContentEqual"/>. Neither this diff NOR its
+    /// output (<see cref="ChangeRowModel"/> carries only a row id + primary-column label, never a
+    /// per-field value) ever exposes WHO the new owner is to a family-facing reader — only that the row
+    /// changed.
+    /// </summary>
+    private static readonly IReadOnlySet<string> MetadataOnlyKeys = new HashSet<string>(StringComparer.Ordinal)
+        { RowMetaKeys.RowId, RowMetaKeys.CarriedFrom, RowMetaKeys.Confirmed, RowMetaKeys.OwnerRole };
+
+    /// <summary>Content-only equality: metadata (see <see cref="MetadataOnlyKeys"/>) never counts as a
+    /// change; every other key (including `_ownerUserId`) does. `_objectives` compares by CONTENT
+    /// (description/criteria/targetDate, in order) rather than raw JSON — each objective's own `_rowId`
+    /// is re-issued positionally on every save (plan 2026-10-02-002) and must not itself look like a
+    /// change.</summary>
     private static bool RowContentEqual(JsonObject a, JsonObject b)
     {
-        var aCells = a.Where(kv => !RowMetaKeys.All.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value?.ToJsonString());
-        var bCells = b.Where(kv => !RowMetaKeys.All.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value?.ToJsonString());
+        var aCells = a.Where(kv => !MetadataOnlyKeys.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => CellContentString(kv.Key, kv.Value));
+        var bCells = b.Where(kv => !MetadataOnlyKeys.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => CellContentString(kv.Key, kv.Value));
         if (aCells.Count != bCells.Count) return false;
         foreach (var (key, value) in aCells)
         {
@@ -95,6 +116,20 @@ public static class ChangeSummaryBuilder
                 return false;
         }
         return true;
+    }
+
+    private static string? CellContentString(string key, JsonNode? value)
+        => key == RowMetaKeys.Objectives ? ObjectivesContentString(value) : value?.ToJsonString();
+
+    /// <summary>`_objectives`'s comparable content: each objective's description/criteria/targetDate, in
+    /// order, joined — deliberately NEVER an objective's own `_rowId` (see <see cref="RowContentEqual"/>).</summary>
+    private static string ObjectivesContentString(JsonNode? value)
+    {
+        if (value is not JsonArray objectives) return string.Empty;
+        var parts = objectives.OfType<JsonObject>()
+            .Select(o => string.Join("|", new[] { "description", "criteria", "targetDate" }
+                .Select(k => o[k] is JsonValue v ? v.ToString() : string.Empty)));
+        return string.Join(";", parts);
     }
 
     private static void DiffScalar(TemplateFieldModel field, JsonObject previous, JsonObject next, List<ChangeFieldModel> changedFields)

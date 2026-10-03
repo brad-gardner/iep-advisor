@@ -50,6 +50,27 @@ public static class DraftRowLabeler
         return cell is JsonValue v ? v.ToString() : cell?.ToJsonString();
     }
 
+    /// <summary>
+    /// Plain-text summary of a goal row's <c>_objectives</c> ("description — criteria — targetDate; …"),
+    /// shared by every place a goal row is summarized for AI context (plan 2026-10-02-002) — NEVER
+    /// includes <c>_ownerUserId</c>, which has no text representation anywhere in this class. Null when
+    /// the row has no objectives with any content.
+    /// </summary>
+    public static string? ObjectivesSummaryText(JsonObject row)
+    {
+        if (row[RowMetaKeys.Objectives] is not JsonArray objectives || objectives.Count == 0)
+            return null;
+
+        var parts = objectives.OfType<JsonObject>()
+            .Select(o => string.Join(" — ", new[] { "description", "criteria", "targetDate" }
+                .Select(key => o[key] is JsonValue v ? v.ToString() : null)
+                .Where(s => !string.IsNullOrWhiteSpace(s))))
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .ToList();
+
+        return parts.Count == 0 ? null : string.Join("; ", parts);
+    }
+
     public static JsonObject? FindRow(JsonObject values, Guid fieldKey, string rowId)
     {
         if (values[fieldKey.ToString()] is not JsonArray rows) return null;

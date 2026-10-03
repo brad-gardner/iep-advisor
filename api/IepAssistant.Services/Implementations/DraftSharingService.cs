@@ -297,8 +297,13 @@ public class DraftSharingService : IDraftSharingService
         if (!tree.Success)
             return ServiceResult<SharedDraftRevisionDetailModel>.FailureResult(tree.Message ?? "The pinned template version could not be loaded.");
 
+        // Role-only owners, never names (design "Resolved Questions" #1): the frozen row's raw
+        // `_ownerUserId` must never reach a family-facing response.
+        var roleByUserId = await TeamRoleResolver.LoadRoleByUserIdAsync(_context, row.SchoolStudentId, ct);
+        var redactedValues = FamilyFacingValueRedactor.Redact(ValueDocumentJson.Parse(await LoadValuesJsonAsync(row.Id, ct)), tree.Data!.Sections, roleByUserId);
+
         var baseModel = await MapForParentAsync(row, parentUserId, ct);
-        var detail = ToDetail(baseModel, await LoadValuesJsonAsync(row.Id, ct), tree.Data!);
+        var detail = ToDetail(baseModel, redactedValues.ToJsonString(), tree.Data!);
 
         _audit.Record(AuditAction.View, parentUserId, "SharedDraftRevision", revisionId);
         return ServiceResult<SharedDraftRevisionDetailModel>.SuccessResult(detail);

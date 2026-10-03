@@ -14,4 +14,13 @@ public class DocumentCompletenessModel
     public int FilledCount { get; set; }
     public int TotalCount { get; set; }
     public int RequiredMissing { get; set; }
+
+    /// <summary>
+    /// Advisory-only count (plan 2026-10-02-002; never affects <see cref="Percent"/> or
+    /// <see cref="RequiredMissing"/>): one per row of a goals/services/accommodations/transition table
+    /// with no owner, PLUS one per goal row with no objectives. The web mirrors these as individual
+    /// "Show items" entries ("Goal &lt;label&gt; has no owner", "Goal &lt;label&gt; has no objectives",
+    /// …) — this count is the server's coarser (no per-row message) equivalent, for the home surface.
+    /// </summary>
+    public int AdvisoryMissing { get; set; }
 }
