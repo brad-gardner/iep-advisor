@@ -25,6 +25,7 @@ public class DocumentInstanceService : IDocumentInstanceService
     /// <summary>Max objectives/benchmarks kept per goal row (plan 2026-10-02-002); extras beyond this are dropped, preserving order.</summary>
     private const int MaxObjectives = 20;
     private const int MaxObjectiveDescriptionLength = 2000;
+    private const int MaxObjectiveCriteriaLength = 2000;
     private const int MaxObjectiveTargetDateLength = 50;
     private const string OwnerNotTeamMemberWarningCode = "ownerNotTeamMember";
 
@@ -540,9 +541,12 @@ public class DocumentInstanceService : IDocumentInstanceService
     /// objective's own <c>_rowId</c> follows the exact same server-assign/dedupe rule as a table row's (so
     /// a client that omits it, or sends a duplicate, still gets back a stable per-objective identity).
     /// Unknown keys are dropped; an objective with no description/criteria/targetDate left is dropped
-    /// (mirrors the row "reduced to nothing" rule above). A malformed (non-array) cell yields no
-    /// objectives rather than failing the whole save — reserved-key coercion is lenient, like
-    /// <see cref="CoerceCarriedFrom"/>.
+    /// (mirrors the row "reduced to nothing" rule above). A malformed (non-array) cell, OR an array that
+    /// reduces to zero surviving objectives (e.g. the client clears every objective, sending <c>[]</c> or
+    /// an array of now-empty entries), yields <c>null</c> — never an empty array — so
+    /// <see cref="CoerceTable"/>'s "row reduced to nothing" check correctly drops an otherwise-empty row
+    /// instead of keeping it alive on a vacuous <c>_objectives: []</c>. Reserved-key coercion is lenient,
+    /// like <see cref="CoerceCarriedFrom"/>.
     /// </summary>
     private static JsonNode? CoerceObjectives(JsonElement value)
     {
@@ -576,7 +580,7 @@ public class DocumentInstanceService : IDocumentInstanceService
                         break;
                     case "criteria":
                         if (prop.Value.ValueKind == JsonValueKind.String)
-                            criteria = prop.Value.GetString()?.Trim();
+                            criteria = Truncate(prop.Value.GetString(), MaxObjectiveCriteriaLength)?.Trim();
                         break;
                     case "targetDate":
                         if (prop.Value.ValueKind == JsonValueKind.String)
@@ -601,7 +605,7 @@ public class DocumentInstanceService : IDocumentInstanceService
             result.Add(objective);
         }
 
-        return result;
+        return result.Count == 0 ? null : result;
     }
 
     /// <summary>Accepts <c>{ versionId: int, rowId: guid, label?: string, date?: string }</c>; anything else is dropped.</summary>
@@ -660,21 +664,36 @@ public class DocumentInstanceService : IDocumentInstanceService
     }
 
     /// <summary>
-    /// True when the patch touches at least one Table field whose semantic is
-    /// <see cref="FieldSemantics.OwnerEligible"/> — the only case <see cref="CoerceTable"/> can keep a
-    /// <c>_ownerUserId</c>, so this gates the one team-membership query a save might need (most autosave
-    /// ticks touch a narrative field and skip it entirely).
+    /// True when the patch carries a NUMERIC <c>_ownerUserId</c> on at least one row of a Table field
+    /// whose semantic is <see cref="FieldSemantics.OwnerEligible"/> — the only shape <see cref="CoerceTable"/>
+    /// can actually keep as an owner, so this gates the one team-membership query a save might need. A
+    /// Table field's full row array is resent on every save of that field (not a per-row delta), so most
+    /// autosave ticks on an owner-eligible table still touch zero rows with a numeric owner value (the
+    /// table was edited for an unrelated reason) — this skips the query for those, not just for saves that
+    /// never touch the table at all. A non-numeric/absent <c>_ownerUserId</c> can never be kept regardless
+    /// of team membership (see <see cref="CoerceTable"/>'s own handling), so narrowing on "numeric value
+    /// present" never changes which owners are accepted or rejected — only whether the query runs.
     /// </summary>
     private static bool PatchTouchesOwnerEligibleTable(
         IReadOnlyDictionary<string, JsonElement> patch, IReadOnlyDictionary<Guid, TemplateField> fieldsByKey)
     {
-        foreach (var rawKey in patch.Keys)
+        foreach (var (rawKey, value) in patch)
         {
             if (!Guid.TryParse(rawKey, out var fieldKey) || !fieldsByKey.TryGetValue(fieldKey, out var field) || field.FieldType != FieldType.Table)
                 continue;
+            if (value.ValueKind != JsonValueKind.Array)
+                continue;
             var semantic = TemplateSemanticsReader.ReadField(field.FieldType, field.ConfigJson).Semantic;
-            if (semantic != null && FieldSemantics.OwnerEligible.Contains(semantic))
-                return true;
+            if (semantic == null || !FieldSemantics.OwnerEligible.Contains(semantic))
+                continue;
+
+            foreach (var rowElement in value.EnumerateArray())
+            {
+                if (rowElement.ValueKind == JsonValueKind.Object
+                    && rowElement.TryGetProperty(RowMetaKeys.OwnerUserId, out var ownerEl)
+                    && ownerEl.ValueKind == JsonValueKind.Number)
+                    return true;
+            }
         }
         return false;
     }

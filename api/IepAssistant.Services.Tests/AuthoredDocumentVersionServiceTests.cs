@@ -978,6 +978,97 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
         }
     }
 
+    private sealed record ServicesTemplateKeys(int VersionId, Guid ServicesFieldKey, Guid ServiceTypeCol);
+
+    /// <summary>A Services-semantic table (one Text column, ServiceType-tagged) so a test can exercise the
+    /// `_ownerUserId` family-facing redaction on <see cref="AuthoredDocumentVersionService.GetVersionAsync"/>
+    /// (review fix, plan 2026-10-02-002, P2-2).</summary>
+    private ServicesTemplateKeys SeedServicesTemplate(int docTypeId = IepTypeId)
+    {
+        var servicesFieldKey = Guid.NewGuid();
+        var serviceTypeCol = Guid.NewGuid();
+
+        using var ctx = CreateContext();
+        var version = new DocumentTemplateVersion { VersionNumber = 1, Status = TemplateVersionStatus.Published, PublishedAt = DateTime.UtcNow };
+        ctx.DocumentTemplates.Add(new DocumentTemplate { StateCode = null, DocumentTypeId = docTypeId, Name = "Services template", Versions = { version } });
+        ctx.SaveChanges();
+
+        ctx.TemplateSections.Add(new TemplateSection
+        {
+            DocumentTemplateVersionId = version.Id, SectionKey = Guid.NewGuid(), Title = "Services", DisplayOrder = 0,
+            Fields =
+            {
+                new TemplateField
+                {
+                    DocumentTemplateVersionId = version.Id, FieldKey = servicesFieldKey, FieldType = FieldType.Table, Label = "Services", DisplayOrder = 0,
+                    ConfigJson = TemplateGraphBuilder.TableConfig(FieldSemantics.Services, (serviceTypeCol, FieldType.Text, "Service", ColumnSemantics.ServiceType))
+                }
+            }
+        });
+        ctx.SaveChanges();
+
+        return new ServicesTemplateKeys(version.Id, servicesFieldKey, serviceTypeCol);
+    }
+
+    /// <summary>Inserts a finalized version with an explicit ValuesJson (bypassing finalize validation),
+    /// mirroring <see cref="SeedFinalizedVersion"/> but for a <see cref="ServicesTemplateKeys"/> template
+    /// whose ValuesJson a test builds directly.</summary>
+    private int SeedFinalizedServicesVersion(SchoolScenario s, ServicesTemplateKeys keys, int docTypeId, string valuesJson, int versionNumber = 1)
+    {
+        using var ctx = CreateContext();
+        var version = new AuthoredDocumentVersion
+        {
+            SchoolStudentId = s.StudentId,
+            DocumentTypeId = docTypeId,
+            DocumentTemplateVersionId = keys.VersionId,
+            VersionNumber = versionNumber,
+            ValuesJson = valuesJson,
+            FinalizedByUserId = s.CollaboratorUserId,
+            FinalizedAt = DateTime.UtcNow
+        };
+        ctx.AuthoredDocumentVersions.Add(version);
+        ctx.SaveChanges();
+        return version.Id;
+    }
+
+    [Fact]
+    public async Task ParentLinked_GetVersion_RedactsOwnerToRoleOnly_StaffSeesRawOwner()
+    {
+        var s = SeedSchoolWithStudent("parent-owner-redact");
+        var keys = SeedServicesTemplate();
+        using (var ctx = CreateContext())
+        {
+            ctx.StudentTeamMembers.Add(new StudentTeamMember
+            {
+                SchoolStudentId = s.StudentId, UserId = s.CollaboratorUserId, TeamRole = TeamRole.InterventionSpecialist, IsActive = true
+            });
+            ctx.SaveChanges();
+        }
+        var valuesJson = $$"""
+        { "{{keys.ServicesFieldKey}}": [ { "_rowId": "{{Guid.NewGuid()}}", "{{keys.ServiceTypeCol}}": "Speech therapy", "_ownerUserId": {{s.CollaboratorUserId}} } ] }
+        """;
+        var versionId = SeedFinalizedServicesVersion(s, keys, IepTypeId, valuesJson);
+        var parent = SeedLinkedParent("parent-owner-redact", s.StudentId);
+
+        // Staff still sees the raw owner id — nothing to redact for them.
+        using (var ctx = CreateContext())
+        {
+            var staffGet = await CreateService(ctx).GetVersionAsync(versionId, s.CollaboratorUserId);
+            Assert.True(staffGet.Success, staffGet.Message);
+            Assert.Contains(RowMetaKeys.OwnerUserId, staffGet.Data!.ValuesJson);
+            Assert.DoesNotContain(RowMetaKeys.OwnerRole, staffGet.Data.ValuesJson);
+        }
+
+        // The parent's read is redacted to role-only: never the raw id, never the person's name.
+        using (var ctx = CreateContext())
+        {
+            var parentGet = await CreateService(ctx).GetVersionAsync(versionId, parent.ParentUserId);
+            Assert.True(parentGet.Success, parentGet.Message);
+            Assert.DoesNotContain(RowMetaKeys.OwnerUserId, parentGet.Data!.ValuesJson);
+            Assert.Contains($"\"{RowMetaKeys.OwnerRole}\":\"Intervention Specialist\"", parentGet.Data.ValuesJson);
+        }
+    }
+
     // ---------------------------------------------------------------- PDF worker startup reconcile
 
     [Fact]

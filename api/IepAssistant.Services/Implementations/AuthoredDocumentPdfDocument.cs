@@ -322,6 +322,18 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
         ColumnSemantics.Accommodation, ColumnSemantics.TransitionServices
     };
 
+    /// <summary>
+    /// True only for a free-text (<see cref="FieldType.Text"/>) column tagged with a markdown-capable
+    /// semantic. Column semantic validation (<see cref="TemplateFieldConfigValidator"/>) checks only that
+    /// the tag is a recognized <see cref="ColumnSemantics"/> string — never that it matches the column's
+    /// actual <see cref="FieldType"/> — so nothing stops a district template from tagging a Select, Date
+    /// or Checkbox column with e.g. <see cref="ColumnSemantics.Accommodation"/>. Such a column must still
+    /// go through <see cref="FormatCell"/> (option-label lookup / date formatting), never raw
+    /// <see cref="AsString(JsonNode?)"/> parsed as markdown. Internal so it is unit-testable directly.
+    /// </summary>
+    internal static bool IsMarkdownCapableColumn(TableColumn column) =>
+        column.Type == FieldType.Text && column.Semantic != null && MarkdownCapableColumnSemantics.Contains(column.Semantic);
+
     /// <summary>Resolves a row's <c>_ownerUserId</c> to "Responsible: &lt;role&gt;" — role only, never the
     /// person's name (plan 2026-10-02-002). Null when the row has no owner or the owner doesn't resolve.</summary>
     private string? ResolveOwnerRole(JsonObject row) =>
@@ -563,8 +575,9 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                             row?.TryGetPropertyValue(column.ColumnKey.ToString(), out cell);
 
                             // A cell whose column is tagged as markdown-capable (goal text/baseline/target,
-                            // accommodation, transition services) renders structurally, not as raw syntax.
-                            if (column.Semantic != null && MarkdownCapableColumnSemantics.Contains(column.Semantic))
+                            // accommodation, transition services) renders structurally, not as raw syntax —
+                            // but only for a free-text column; see IsMarkdownCapableColumn.
+                            if (IsMarkdownCapableColumn(column))
                                 BodyCellMarkdown(table, AsString(cell));
                             else
                                 BodyCell(table, FormatCell(column, cell));

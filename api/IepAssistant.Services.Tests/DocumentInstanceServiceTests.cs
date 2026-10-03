@@ -849,6 +849,105 @@ public sealed class DocumentInstanceServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveValues_DropsOwner_WithWarning_WhenAnInactiveTeamMemberOfTheSameStudent()
+    {
+        var s = SeedSchoolWithStudent("owner-inactive");
+        var keys = SeedGoalsTemplate();
+        var instanceId = await CreateInstanceAsync(s);
+        var formerMemberId = SeedStranger("owner-inactive-former");
+        using (var ctx = CreateContext())
+        {
+            // On the SAME student's team, but no longer active — must be treated exactly like a stranger.
+            ctx.StudentTeamMembers.Add(new StudentTeamMember { SchoolStudentId = s.StudentId, UserId = formerMemberId, TeamRole = TeamRole.CaseManager, IsActive = false });
+            ctx.SaveChanges();
+        }
+
+        DocumentInstanceValuesModel saved;
+        using (var ctx = CreateContext())
+        {
+            var patch = Patch($$"""
+            { "{{keys.GoalsFieldKey}}": [ { "{{keys.GoalTextCol}}": "Read better", "_ownerUserId": {{formerMemberId}} } ] }
+            """);
+            var result = await CreateService(ctx).SaveValuesAsync(instanceId, patch, null, s.CollaboratorUserId);
+            Assert.True(result.Success, result.Message);
+            saved = result.Data!;
+        }
+
+        var warning = Assert.Single(saved.Warnings);
+        Assert.Equal("ownerNotTeamMember", warning.Code);
+
+        using var verify = CreateContext();
+        var row = ReadValues(verify, instanceId).GetProperty(keys.GoalsFieldKey.ToString())[0];
+        Assert.False(row.TryGetProperty(RowMetaKeys.OwnerUserId, out _));
+    }
+
+    [Fact]
+    public async Task SaveValues_DropsOwner_WithWarning_WhenAnActiveMemberOfAnotherStudentsTeam()
+    {
+        var s = SeedSchoolWithStudent("owner-other-student-a");
+        var other = SeedSchoolWithStudent("owner-other-student-b");
+        var keys = SeedGoalsTemplate();
+        var instanceId = await CreateInstanceAsync(s);
+        using (var ctx = CreateContext())
+        {
+            // Active, but on the OTHER student's team — must still be dropped for THIS student's document.
+            ctx.StudentTeamMembers.Add(new StudentTeamMember { SchoolStudentId = other.StudentId, UserId = other.CollaboratorUserId, TeamRole = TeamRole.CaseManager, IsActive = true });
+            ctx.SaveChanges();
+        }
+
+        DocumentInstanceValuesModel saved;
+        using (var ctx = CreateContext())
+        {
+            var patch = Patch($$"""
+            { "{{keys.GoalsFieldKey}}": [ { "{{keys.GoalTextCol}}": "Read better", "_ownerUserId": {{other.CollaboratorUserId}} } ] }
+            """);
+            var result = await CreateService(ctx).SaveValuesAsync(instanceId, patch, null, s.CollaboratorUserId);
+            Assert.True(result.Success, result.Message);
+            saved = result.Data!;
+        }
+
+        var warning = Assert.Single(saved.Warnings);
+        Assert.Equal("ownerNotTeamMember", warning.Code);
+
+        using var verify = CreateContext();
+        var row = ReadValues(verify, instanceId).GetProperty(keys.GoalsFieldKey.ToString())[0];
+        Assert.False(row.TryGetProperty(RowMetaKeys.OwnerUserId, out _));
+    }
+
+    [Fact]
+    public async Task SaveValues_DropsOwner_WithWarning_WhenOwnerUserIdIsNotANumber()
+    {
+        var s = SeedSchoolWithStudent("owner-non-number");
+        var keys = SeedGoalsTemplate();
+        var instanceId = await CreateInstanceAsync(s);
+        using (var ctx = CreateContext())
+        {
+            ctx.StudentTeamMembers.Add(new StudentTeamMember { SchoolStudentId = s.StudentId, UserId = s.CollaboratorUserId, TeamRole = TeamRole.CaseManager, IsActive = true });
+            ctx.SaveChanges();
+        }
+
+        DocumentInstanceValuesModel saved;
+        using (var ctx = CreateContext())
+        {
+            // A string (or any non-number, non-null) `_ownerUserId` on an owner-eligible table is rejected
+            // with the same warning as a non-member — never silently coerced, never kept.
+            var patch = Patch($$"""
+            { "{{keys.GoalsFieldKey}}": [ { "{{keys.GoalTextCol}}": "Read better", "_ownerUserId": "not-a-number" } ] }
+            """);
+            var result = await CreateService(ctx).SaveValuesAsync(instanceId, patch, null, s.CollaboratorUserId);
+            Assert.True(result.Success, result.Message);
+            saved = result.Data!;
+        }
+
+        var warning = Assert.Single(saved.Warnings);
+        Assert.Equal("ownerNotTeamMember", warning.Code);
+
+        using var verify = CreateContext();
+        var row = ReadValues(verify, instanceId).GetProperty(keys.GoalsFieldKey.ToString())[0];
+        Assert.False(row.TryGetProperty(RowMetaKeys.OwnerUserId, out _));
+    }
+
+    [Fact]
     public async Task SaveValues_DropsOwner_Silently_WhenTableSemanticIsNotOwnerEligible()
     {
         var s = SeedSchoolWithStudent("owner-wrong-semantic");
@@ -943,6 +1042,56 @@ public sealed class DocumentInstanceServiceTests : IDisposable
         using var verify = CreateContext();
         var row = ReadValues(verify, instanceId).GetProperty(keys.PlainTableFieldKey.ToString())[0];
         Assert.False(row.TryGetProperty(RowMetaKeys.Objectives, out _));
+    }
+
+    /// <summary>
+    /// Review fix (plan 2026-10-02-002, P3): clearing every objective on an otherwise-empty row (no goal
+    /// text, no owner) must drop the row entirely, the same as a row that never had objectives — not leave
+    /// behind a vacuous <c>{ _rowId, _objectives: [] }</c> that CoerceTable's "row reduced to nothing"
+    /// check previously treated as real content because <c>_objectives</c> was non-null.
+    /// </summary>
+    [Fact]
+    public async Task SaveValues_Objectives_EmptyArray_OnAnOtherwiseEmptyRow_DropsTheRowEntirely()
+    {
+        var s = SeedSchoolWithStudent("objectives-cleared");
+        var keys = SeedGoalsTemplate();
+        var instanceId = await CreateInstanceAsync(s);
+
+        using (var ctx = CreateContext())
+        {
+            var patch = Patch($$"""
+            { "{{keys.GoalsFieldKey}}": [ { "_objectives": [] } ] }
+            """);
+            var result = await CreateService(ctx).SaveValuesAsync(instanceId, patch, null, s.CollaboratorUserId);
+            Assert.True(result.Success, result.Message);
+        }
+
+        using var verify = CreateContext();
+        var rows = ReadValues(verify, instanceId).GetProperty(keys.GoalsFieldKey.ToString());
+        Assert.Equal(0, rows.GetArrayLength());
+    }
+
+    [Fact]
+    public async Task SaveValues_Objectives_TruncatesCriteria_LikeDescription()
+    {
+        var s = SeedSchoolWithStudent("objectives-criteria-truncate");
+        var keys = SeedGoalsTemplate();
+        var instanceId = await CreateInstanceAsync(s);
+        var longCriteria = new string('c', 2100);
+
+        using (var ctx = CreateContext())
+        {
+            var patch = Patch($$"""
+            { "{{keys.GoalsFieldKey}}": [ { "{{keys.GoalTextCol}}": "Read better", "_objectives": [ { "description": "x", "criteria": "{{longCriteria}}" } ] } ] }
+            """);
+            var result = await CreateService(ctx).SaveValuesAsync(instanceId, patch, null, s.CollaboratorUserId);
+            Assert.True(result.Success, result.Message);
+        }
+
+        using var verify = CreateContext();
+        var row = ReadValues(verify, instanceId).GetProperty(keys.GoalsFieldKey.ToString())[0];
+        var criteria = row.GetProperty(RowMetaKeys.Objectives)[0].GetProperty("criteria").GetString();
+        Assert.Equal(2000, criteria!.Length);
     }
 
     public void Dispose() => _connection.Dispose();

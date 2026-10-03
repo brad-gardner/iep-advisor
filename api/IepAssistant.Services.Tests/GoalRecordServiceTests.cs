@@ -179,9 +179,46 @@ public sealed class GoalRecordServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task FinalizeAsync_CopiesRowOwnerUserId_OntoGoalRecord()
+    public async Task FinalizeAsync_CopiesRowOwnerUserId_OntoGoalRecord_WhenAnActiveTeamMember()
     {
-        var s = Seed(nameof(FinalizeAsync_CopiesRowOwnerUserId_OntoGoalRecord));
+        var s = Seed(nameof(FinalizeAsync_CopiesRowOwnerUserId_OntoGoalRecord_WhenAnActiveTeamMember));
+        using (var ctx = CreateContext())
+        {
+            ctx.StudentTeamMembers.Add(new StudentTeamMember { SchoolStudentId = s.StudentId, UserId = s.TeacherId, TeamRole = TeamRole.CaseManager, IsActive = true });
+            ctx.SaveChanges();
+        }
+        var rowId = Guid.NewGuid();
+        var valuesJson = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            [s.GoalsFieldKey.ToString()] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["_rowId"] = rowId.ToString(),
+                    [s.GoalCol.ToString()] = "Read at grade level",
+                    ["_ownerUserId"] = s.TeacherId
+                }
+            }
+        });
+
+        await SetValuesAndFinalizeAsync(s, valuesJson);
+
+        using var verify = CreateContext();
+        var record = await verify.GoalRecords.SingleAsync(g => g.SchoolStudentId == s.StudentId);
+        Assert.Equal(s.TeacherId, record.OwnerUserId);
+    }
+
+    /// <summary>
+    /// Review fix (plan 2026-10-02-002, P3): an owner is re-validated against ACTIVE StudentTeamMembers at
+    /// FINALIZE time, not just copied verbatim from whatever DocumentInstanceService accepted at save time
+    /// — covering both an amendment (which copies the frozen ValuesJson without going back through
+    /// CoerceTable) and a same-draft finalize that happens long after the save that set the owner.
+    /// </summary>
+    [Fact]
+    public async Task FinalizeAsync_DropsRowOwnerUserId_OntoGoalRecord_WhenNotAnActiveTeamMember()
+    {
+        var s = Seed(nameof(FinalizeAsync_DropsRowOwnerUserId_OntoGoalRecord_WhenNotAnActiveTeamMember));
+        // No StudentTeamMembers row for the teacher at all — the ValuesJson owner is stale/never-valid.
         var rowId = Guid.NewGuid();
         var valuesJson = JsonSerializer.Serialize(new Dictionary<string, object>
         {
@@ -200,7 +237,7 @@ public sealed class GoalRecordServiceTests : IDisposable
 
         using var ctx = CreateContext();
         var record = await ctx.GoalRecords.SingleAsync(g => g.SchoolStudentId == s.StudentId);
-        Assert.Equal(s.TeacherId, record.OwnerUserId);
+        Assert.Null(record.OwnerUserId);
     }
 
     [Fact]

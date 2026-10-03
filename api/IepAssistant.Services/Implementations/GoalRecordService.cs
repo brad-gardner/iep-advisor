@@ -68,10 +68,21 @@ public class GoalRecordService : IGoalRecordService
         string? Cell(JsonObject row, string colSemantic) =>
             goalsField.Columns.TryGetValue(colSemantic, out var colKey) ? DraftRowLabeler.CellText(row, colKey) : null;
 
-        // Already validated as an active StudentTeamMember by DocumentInstanceService at save time —
-        // copied verbatim, not re-checked here (plan 2026-10-02-002).
-        static int? OwnerUserId(JsonObject row) =>
-            row[RowMetaKeys.OwnerUserId] is JsonValue v && v.TryGetValue<int>(out var id) ? id : null;
+        // Re-validated HERE, not just copied verbatim from a save-time check (plan 2026-10-02-002): an
+        // amendment (AuthoredDocumentVersionService.AmendAsync) copies the frozen ValuesJson straight into
+        // the new instance WITHOUT going back through DocumentInstanceService.CoerceTable, so an owner
+        // that was valid when originally saved is never re-checked before landing here; and even a
+        // same-draft finalize can happen long enough after the triggering save that the owner has since
+        // left the team. One query, reused for every goal row.
+        var activeTeamUserIds = (await _context.StudentTeamMembers
+                .AsNoTracking()
+                .Where(m => m.SchoolStudentId == version.SchoolStudentId && m.IsActive)
+                .Select(m => m.UserId)
+                .ToListAsync(ct))
+            .ToHashSet();
+
+        int? OwnerUserId(JsonObject row) =>
+            row[RowMetaKeys.OwnerUserId] is JsonValue v && v.TryGetValue<int>(out var id) && activeTeamUserIds.Contains(id) ? id : null;
 
         if (rows != null)
         {

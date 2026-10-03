@@ -307,7 +307,14 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         if (header == null)
             return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(VersionNotFoundMessage);
 
-        if (!await CanReadStudentAsync(actingUserId, header.SchoolStudentId, ct))
+        // Staff (org Viewer+) and a linked parent/student share this same read, but NOT the same
+        // ValuesJson: only staff may see a raw `_ownerUserId` on a goals/services/accommodations/
+        // transition row. A parent/student reader is redacted to role-only, never the person's name —
+        // same rule DraftSharingService.GetForParentAsync applies to a shared draft (plan 2026-10-02-002,
+        // design "Resolved Questions" #1). Tracked separately from CanReadStudentAsync (still used by the
+        // PDF status/download reads below, which never touch ValuesJson and so need no redaction branch).
+        var isStaffAccess = await _orgAccess.CanActOnStudentAsync(actingUserId, header.SchoolStudentId, AccessRole.Viewer, ct);
+        if (!isStaffAccess && !await ParentCanViewStudentAsync(actingUserId, header.SchoolStudentId, ct))
             return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(VersionPermissionMessage);
 
         var version = await _context.AuthoredDocumentVersions
@@ -346,6 +353,15 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(
                 tree.Message ?? "The pinned template version could not be loaded.");
 
+        var valuesJson = version.ValuesJson;
+        if (!isStaffAccess)
+        {
+            var roleByUserId = await TeamRoleResolver.LoadRoleByUserIdAsync(_context, version.SchoolStudentId, ct);
+            valuesJson = FamilyFacingValueRedactor
+                .Redact(ValueDocumentJson.Parse(version.ValuesJson), tree.Data!.Sections, roleByUserId)
+                .ToJsonString();
+        }
+
         var amendedByVersionIds = await _context.AuthoredDocumentVersions.AsNoTracking()
             .Where(v => v.AmendsVersionId == versionId)
             .Select(v => v.Id)
@@ -364,7 +380,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             VersionNumber = version.VersionNumber,
             FinalizedByUserId = version.FinalizedByUserId,
             FinalizedAt = version.FinalizedAt,
-            ValuesJson = version.ValuesJson,
+            ValuesJson = valuesJson,
             PdfRenderStatus = version.PdfRenderStatus,
             PdfBlobUri = version.PdfBlobUri,
             PdfRenderedAt = version.PdfRenderedAt,
@@ -400,7 +416,11 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             return ServiceResult<AmendResultModel>.FailureResult(PermissionMessage);
 
         // Prefilled VERBATIM — the frozen ValuesJson is copied as-is, so every `_rowId` (goal/service/
-        // accommodation lineage) is preserved exactly as it was at finalize time.
+        // accommodation lineage) is preserved exactly as it was at finalize time. This does NOT re-check
+        // a row's `_ownerUserId` against current active team membership (the copy never goes through
+        // DocumentInstanceService.CoerceTable) — a stale/departed owner rides along into the new draft
+        // until either an edit to that table re-validates it (a normal save does) or the next finalize
+        // re-validates it for the Goals table specifically (GoalRecordService.ProjectOnFinalizeAsync).
         var now = DateTime.UtcNow;
         var instance = new DocumentInstance
         {

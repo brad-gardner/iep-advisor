@@ -553,4 +553,70 @@ public sealed class AuthoredDocumentPdfDocumentTests
         Assert.NotEmpty(bytes);
         Assert.Contains("Table: Services", doc.Outline);
     }
+
+    // ---------------------------------------------------------------- Markdown-capable column gating (review fix)
+
+    [Fact]
+    public void IsMarkdownCapableColumn_TrueOnlyForTextColumnWithMarkdownSemantic()
+    {
+        var textAccommodation = new TableColumn { ColumnKey = Guid.NewGuid(), Type = FieldType.Text, Label = "Accommodation", Semantic = ColumnSemantics.Accommodation };
+        Assert.True(AuthoredDocumentPdfDocument.IsMarkdownCapableColumn(textAccommodation));
+
+        var textPlain = new TableColumn { ColumnKey = Guid.NewGuid(), Type = FieldType.Text, Label = "Note", Semantic = null };
+        Assert.False(AuthoredDocumentPdfDocument.IsMarkdownCapableColumn(textPlain));
+    }
+
+    /// <summary>
+    /// Column semantic validation never checks a semantic tag against the column's actual FieldType
+    /// (TemplateFieldConfigValidator), so a district template CAN tag a Select or Date column with a
+    /// markdown-capable semantic (e.g. accommodation). Such a column must still be treated as
+    /// FormatCell's territory (option-label lookup / date formatting) — never routed to the raw-markdown
+    /// cell path, which would print the stored option VALUE or raw date string unformatted.
+    /// </summary>
+    [Theory]
+    [InlineData(FieldType.Select)]
+    [InlineData(FieldType.Date)]
+    [InlineData(FieldType.Checkbox)]
+    public void IsMarkdownCapableColumn_FalseForNonTextColumn_EvenWithMarkdownSemantic(FieldType type)
+    {
+        var column = new TableColumn { ColumnKey = Guid.NewGuid(), Type = type, Label = "Accommodation", Semantic = ColumnSemantics.Accommodation };
+        Assert.False(AuthoredDocumentPdfDocument.IsMarkdownCapableColumn(column));
+    }
+
+    [Fact]
+    public void AccommodationsTable_SelectColumnMistaggedAsMarkdown_RendersWithoutThrowing()
+    {
+        var accommodationsKey = Guid.NewGuid();
+        var accommodationCol = Guid.NewGuid();
+        // A Select column mis-tagged with the markdown-capable Accommodation semantic (allowed by
+        // TemplateFieldConfigValidator, which checks only that the semantic string is recognized).
+        var accommodationsConfig = Cfg(new TableFieldConfig
+        {
+            Semantic = FieldSemantics.Accommodations,
+            Columns = new List<TableColumn>
+            {
+                new() { ColumnKey = accommodationCol, Type = FieldType.Select, Label = "Accommodation", Semantic = ColumnSemantics.Accommodation,
+                    ConfigJson = Cfg(new SelectFieldConfig { Options = new List<SelectOption> { new() { Value = "quiet-room", Label = "Quiet room" } } }) }
+            }
+        });
+        var tree = new TemplateVersionDetailModel
+        {
+            VersionNumber = 1,
+            Sections = new List<TemplateSectionModel>
+            {
+                new()
+                {
+                    Id = 1, Title = "Accommodations", DisplayOrder = 0,
+                    Fields = new List<TemplateFieldModel> { new() { Id = 1, FieldKey = accommodationsKey, FieldType = FieldType.Table, Label = "Accommodations", ConfigJson = accommodationsConfig, DisplayOrder = 0 } }
+                }
+            }
+        };
+        var values = $$"""{ "{{accommodationsKey}}": [ { "_rowId": "{{Guid.NewGuid()}}", "{{accommodationCol}}": "quiet-room" } ] }""";
+
+        var doc = new AuthoredDocumentPdfDocument("IEP", 1, new DateTime(2026, 1, 1), tree, values);
+        var bytes = doc.GeneratePdf();
+
+        Assert.NotEmpty(bytes);
+        Assert.Contains("Section: Accommodations", doc.Outline);
+    }
 }
