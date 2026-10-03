@@ -7,19 +7,24 @@ import { DocumentEditorContext, type DocumentEditorContextValue } from '../../ho
 import type { SaveResult } from '../../hooks/use-document-instance';
 import type { StudentTeamCache } from '../../hooks/use-student-team';
 
-const svcTypeCol = 'c1111111-1111-1111-1111-111111111111';
+// Services now render through `ServicesBlock` (schedule row + focused
+// editor) instead of this generic stacked-card block — see
+// `table-field-services.test.tsx` for the owner picker inside the service
+// editor. This file keeps covering the owner picker on the GENERIC row-block
+// branch, which accommodations and transition still share.
+const accCol = 'c1111111-1111-1111-1111-111111111111';
 const fieldKey = 'f1111111-1111-1111-1111-111111111111';
 
-const servicesField: TemplateFieldDto = {
+const accommodationsField: TemplateFieldDto = {
   id: 10,
   fieldKey,
   fieldType: 'Table',
-  label: 'Services',
+  label: 'Accommodations',
   required: false,
   displayOrder: 0,
   configJson: JSON.stringify({
-    semantic: 'services',
-    columns: [{ columnKey: svcTypeCol, type: 'Text', label: 'Service', required: false, semantic: 'serviceType' }],
+    semantic: 'accommodations',
+    columns: [{ columnKey: accCol, type: 'Text', label: 'Accommodation', required: false, semantic: 'accommodation' }],
   }),
 } as TemplateFieldDto;
 
@@ -60,7 +65,7 @@ function renderField(
   return render(
     <DocumentEditorContext.Provider value={editor}>
       <DocumentFlushContext.Provider value={registry}>
-        <TableField field={servicesField} value={value} onSave={onSave} />
+        <TableField field={accommodationsField} value={value} onSave={onSave} />
       </DocumentFlushContext.Provider>
     </DocumentEditorContext.Provider>
   );
@@ -68,7 +73,7 @@ function renderField(
 
 describe('TableField owner picker (plan 2026-10-02-002)', () => {
   it('loads the owner picker from the editor team cache, listing active members', () => {
-    renderField([{ _rowId: 'r1', [svcTypeCol]: 'OT' }], vi.fn());
+    renderField([{ _rowId: 'r1', [accCol]: 'OT' }], vi.fn());
     expect(screen.getByTestId(`field-${fieldKey}-row-0-owner`)).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Ana Ito — Occupational therapist' })).toBeInTheDocument();
     expect(screen.getByText('No owner yet')).toBeInTheDocument();
@@ -76,18 +81,18 @@ describe('TableField owner picker (plan 2026-10-02-002)', () => {
 
   it('sets an owner, flushing immediately through the same row autosave path (no debounce wait)', async () => {
     const onSave = vi.fn().mockResolvedValue({ ok: true, values: {} });
-    renderField([{ _rowId: 'r1', [svcTypeCol]: 'OT' }], onSave);
+    renderField([{ _rowId: 'r1', [accCol]: 'OT' }], onSave);
 
     fireEvent.change(screen.getByTestId(`field-${fieldKey}-row-0-owner`), { target: { value: '7' } });
 
     await waitFor(() =>
-      expect(onSave).toHaveBeenCalledWith({ [fieldKey]: [{ _rowId: 'r1', [svcTypeCol]: 'OT', _ownerUserId: 7 }] })
+      expect(onSave).toHaveBeenCalledWith({ [fieldKey]: [{ _rowId: 'r1', [accCol]: 'OT', _ownerUserId: 7 }] })
     );
   });
 
   it('clears an owner back to Unassigned, dropping the key entirely', async () => {
     const onSave = vi.fn().mockResolvedValue({ ok: true, values: {} });
-    renderField([{ _rowId: 'r1', [svcTypeCol]: 'OT', _ownerUserId: 7 }], onSave);
+    renderField([{ _rowId: 'r1', [accCol]: 'OT', _ownerUserId: 7 }], onSave);
 
     fireEvent.change(screen.getByTestId(`field-${fieldKey}-row-0-owner`), { target: { value: '' } });
 
@@ -102,7 +107,7 @@ describe('TableField owner picker (plan 2026-10-02-002)', () => {
       values: {},
       warnings: [{ fieldKey, rowId: 'r1', code: 'ownerNotTeamMember', message: 'Not an active team member.' }],
     });
-    renderField([{ _rowId: 'r1', [svcTypeCol]: 'OT' }], onSave);
+    renderField([{ _rowId: 'r1', [accCol]: 'OT' }], onSave);
 
     fireEvent.change(screen.getByTestId(`field-${fieldKey}-row-0-owner`), { target: { value: '7' } });
 
@@ -118,7 +123,7 @@ describe('TableField owner picker (plan 2026-10-02-002)', () => {
         warnings: [{ fieldKey, rowId: 'r1', code: 'ownerNotTeamMember', message: 'Not an active team member.' }],
       })
       .mockResolvedValueOnce({ ok: true, values: {}, warnings: [] });
-    renderField([{ _rowId: 'r1', [svcTypeCol]: 'OT' }], onSave);
+    renderField([{ _rowId: 'r1', [accCol]: 'OT' }], onSave);
 
     fireEvent.change(screen.getByTestId(`field-${fieldKey}-row-0-owner`), { target: { value: '7' } });
     expect(await screen.findByRole('alert')).toBeInTheDocument();

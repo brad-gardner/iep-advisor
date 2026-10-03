@@ -1,7 +1,7 @@
 ---
 title: "feat: IEP authoring — read-first sections, focused goal/service editors, item owners"
 type: feat
-status: active
+status: completed
 date: 2026-10-02
 design: docs/designs/2026-10-02-iep-authoring-read-edit-sections-design.md
 mockup: docs/designs/2026-10-02-iep-authoring-read-edit-sections-mockup.html
@@ -152,11 +152,23 @@ Decided in the design (see design doc):
 
 #### Phase 4: Services rework
 
-- [ ] `ServiceSchedule` read table + header total minutes/week
-- [ ] `ServiceEditor` inline structured editor: count + period, minutes, setting select, start/end, notes, owner; writes normalized text into the template's `frequency` / `duration` / `location` columns and parses existing values when it can (falls back to free text when unparseable)
-- [ ] Tests: parse/format round-trip, unparseable fallback, total minutes, editor states
+- [x] `ServiceSchedule` read table + header total minutes/week
+- [x] `ServiceEditor` inline structured editor: count + period, minutes, setting select, start/end, notes, owner; writes normalized text into the template's `frequency` / `duration` / `location` columns and parses existing values when it can (falls back to free text when unparseable)
+- [x] Tests: parse/format round-trip, unparseable fallback, total minutes, editor states
 
 **Checkpoint:** edit a service's frequency, minutes and setting; the read table and PDF show the normalized text; completeness still treats frequency/duration as filled.
+
+## Operational Validation (post-deploy)
+
+- **Migration first:** `AddGoalRecordOwner` was already applied to QA on 2026-10-02, before merge (additive, nullable). Verify with `dotnet ef migrations list --connection <QA>`.
+- **Logs (Elastic `app-logs-iepadvisor-api-production`):** watch for errors from `DocumentInstanceService` on `PUT /api/documents/*/values`, and for `ownerNotTeamMember` warnings (expected only when an owner leaves a team). No increase in 409 conflicts.
+- **Healthy signals:**
+  - on the Maple Ridge demo IEPs at 1920×1080, the completeness strip shows and the content column is ≥1000px;
+  - Edit / Done / Discard work;
+  - an owner set on a goal survives reload;
+  - a goal with objectives finalizes and the PDF shows the objectives plus "Responsible: <role>".
+- **Failure signals / mitigation:** save errors or 409 spikes on the authoring page; family draft or PDF showing a personal name. Revert the merge; the data in `ValuesJson` is backward compatible (the old UI ignores the reserved keys).
+- **Window / owner:** first QA authoring session after deploy (Brad).
 
 ## Alternative Approaches Considered
 

@@ -7,27 +7,28 @@ import { DocumentFlushContext } from '../../hooks/flush-registry-context';
 import { DocumentEditorContext, type ActiveFieldTarget, type DocumentEditorContextValue } from '../../hooks/document-editor-context';
 import type { SaveResult } from '../../hooks/use-document-instance';
 
-// Goals now render through `GoalsBlock` (card list + focused editor) instead
-// of this generic stacked-card block — see `table-field-goals.test.tsx` for
-// goal-specific coverage (including the goal-retirement dialog). `services`
-// exercises the SAME generic row-block mechanics (add/remove, min/max,
-// carried-forward, id adoption, evidence-insert targeting) that services,
-// accommodations and transition still share.
-const svcCol = 'c1111111-1111-1111-1111-111111111111';
+// Goals and services now render through their own focused-editor blocks
+// (`GoalsBlock` / `ServicesBlock`) instead of this generic stacked-card block
+// — see `table-field-goals.test.tsx` and `table-field-services.test.tsx` for
+// their semantic-specific coverage. `accommodations` exercises the SAME
+// generic row-block mechanics (add/remove, min/max, carried-forward, id
+// adoption, evidence-insert targeting) that accommodations and transition
+// still share.
+const accCol = 'c1111111-1111-1111-1111-111111111111';
 const noteCol = 'c2222222-2222-2222-2222-222222222222';
 const fieldKey = 'f1111111-1111-1111-1111-111111111111';
 
-const servicesField: TemplateFieldDto = {
+const accommodationsField: TemplateFieldDto = {
   id: 7,
   fieldKey,
   fieldType: 'Table',
-  label: 'Services',
+  label: 'Accommodations',
   required: false,
   displayOrder: 0,
   configJson: JSON.stringify({
-    semantic: 'services',
+    semantic: 'accommodations',
     columns: [
-      { columnKey: svcCol, type: 'Text', label: 'Service', required: true, semantic: 'serviceType' },
+      { columnKey: accCol, type: 'Text', label: 'Accommodation', required: true, semantic: 'accommodation' },
       { columnKey: noteCol, type: 'Text', label: 'Notes', required: false },
     ],
     maxRows: 2,
@@ -39,24 +40,24 @@ const registry = { register: () => () => {}, flushAll: async () => {} } as unkno
 function renderField(value: unknown, onSave: (p: Record<string, unknown>) => Promise<SaveResult>) {
   return render(
     <DocumentFlushContext.Provider value={registry}>
-      <TableField field={servicesField} value={value} onSave={onSave} />
+      <TableField field={accommodationsField} value={value} onSave={onSave} />
     </DocumentFlushContext.Provider>
   );
 }
 
 describe('TableField (semantic row block)', () => {
-  it('renders each service as a labelled card, with min/max controlling add and remove', () => {
+  it('renders each accommodation as a labelled card, with min/max controlling add and remove', () => {
     const onSave = vi.fn().mockResolvedValue({ ok: true, values: {} });
-    renderField([{ _rowId: 'ID-1', [svcCol]: 'Speech therapy', [noteCol]: 'pull-out' }], onSave);
+    renderField([{ _rowId: 'ID-1', [accCol]: 'Extended time', [noteCol]: 'pull-out' }], onSave);
 
-    expect(screen.getByText('Service 1')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: /^Service\s*\*?$/ })).toHaveValue('Speech therapy');
+    expect(screen.getByText('Accommodation 1')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /^Accommodation\s*\*?$/ })).toHaveValue('Extended time');
     expect(screen.getByRole('textbox', { name: 'Notes' })).toHaveValue('pull-out');
-    expect(screen.getByRole('button', { name: 'Add service' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Add accommodation' })).toBeEnabled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add service' }));
-    expect(screen.getByText('Service 2')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add service' })).toBeDisabled(); // maxRows = 2
+    fireEvent.click(screen.getByRole('button', { name: 'Add accommodation' }));
+    expect(screen.getByText('Accommodation 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add accommodation' })).toBeDisabled(); // maxRows = 2
   });
 
   it('keeps a new row mounted (same input, same key) while the first save adopts its server id', async () => {
@@ -66,23 +67,23 @@ describe('TableField (semantic row block)', () => {
     );
     renderField([], onSave);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add service' }));
-    const svcInput = screen.getByRole('textbox', { name: /^Service\s*\*?$/ });
-    svcInput.focus();
-    fireEvent.change(svcInput, { target: { value: 'Sp' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add accommodation' }));
+    const accInput = screen.getByRole('textbox', { name: /^Accommodation\s*\*?$/ });
+    accInput.focus();
+    fireEvent.change(accInput, { target: { value: 'Ex' } });
     expect(onSave).toHaveBeenCalledTimes(1); // add flushed immediately
 
     // AI help is only offered once the row has a persisted id (the hint shows until then).
     expect(screen.getByText(/AI help is available once this row has saved/)).toBeInTheDocument();
 
     await act(async () => {
-      resolveSave({ ok: true, values: { [fieldKey]: [{ _rowId: 'SERVER-ID', [svcCol]: '', [noteCol]: '' }] } });
+      resolveSave({ ok: true, values: { [fieldKey]: [{ _rowId: 'SERVER-ID', [accCol]: '', [noteCol]: '' }] } });
     });
 
     // The very same element is still mounted and focused — the key did not change.
-    expect(screen.getByRole('textbox', { name: /^Service\s*\*?$/ })).toBe(svcInput);
-    expect(document.activeElement).toBe(svcInput);
-    expect(svcInput).toHaveValue('Sp');
+    expect(screen.getByRole('textbox', { name: /^Accommodation\s*\*?$/ })).toBe(accInput);
+    expect(document.activeElement).toBe(accInput);
+    expect(accInput).toHaveValue('Ex');
     expect(screen.queryByText(/AI help is available once this row has saved/)).not.toBeInTheDocument(); // id adopted
   });
 
@@ -94,8 +95,8 @@ describe('TableField (semantic row block)', () => {
     });
     renderField(
       [
-        { _rowId: 'ID-1', _carriedFrom: { versionId: 3, rowId: 'ID-1', label: 'IEP v1', date: '2025-10-14' }, _confirmed: false, [svcCol]: 'Speech therapy', [noteCol]: '' },
-        { _rowId: 'ID-2', _carriedFrom: { versionId: 3, rowId: 'ID-2', label: 'IEP v1' }, _confirmed: false, [svcCol]: 'Occupational therapy', [noteCol]: '' },
+        { _rowId: 'ID-1', _carriedFrom: { versionId: 3, rowId: 'ID-1', label: 'IEP v1', date: '2025-10-14' }, _confirmed: false, [accCol]: 'Extended time', [noteCol]: '' },
+        { _rowId: 'ID-2', _carriedFrom: { versionId: 3, rowId: 'ID-2', label: 'IEP v1' }, _confirmed: false, [accCol]: 'Small group setting', [noteCol]: '' },
       ],
       onSave
     );
@@ -109,8 +110,8 @@ describe('TableField (semantic row block)', () => {
     const sent = calls.at(-1) as Array<Record<string, unknown>>;
     expect(sent[0]._confirmed).toBe(true);
 
-    const second = screen.getAllByRole('textbox', { name: /^Service\s*\*?$/ })[1];
-    fireEvent.change(second, { target: { value: 'OT services' } });
+    const second = screen.getAllByRole('textbox', { name: /^Accommodation\s*\*?$/ })[1];
+    fireEvent.change(second, { target: { value: 'Small group testing' } });
     expect(screen.getByTestId(`field-${fieldKey}-row-1-carried`)).toHaveTextContent('· reviewed');
   });
 
@@ -120,20 +121,20 @@ describe('TableField (semantic row block)', () => {
     const onSave = vi.fn().mockImplementation((patch: Record<string, unknown>) => {
       calls.push(patch[fieldKey]);
       n += 1;
-      return Promise.resolve({ ok: true, values: { [fieldKey]: [{ _rowId: 'ID-A', [svcCol]: 'x', [noteCol]: '' }] } });
+      return Promise.resolve({ ok: true, values: { [fieldKey]: [{ _rowId: 'ID-A', [accCol]: 'x', [noteCol]: '' }] } });
     });
     renderField([], onSave);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add service' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add accommodation' }));
     await act(async () => {}); // let the add-save resolve and adopt ID-A
-    fireEvent.change(screen.getByRole('textbox', { name: /^Service\s*\*?$/ }), { target: { value: 'typed' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Remove service 1' })); // immediate flush, no dialog for services
+    fireEvent.change(screen.getByRole('textbox', { name: /^Accommodation\s*\*?$/ }), { target: { value: 'typed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove accommodation 1' })); // immediate flush, no dialog for accommodations
     await act(async () => {});
 
     // Second+ saves carry the adopted id for the row (before it was removed).
     const withId = calls.slice(1).flat() as Array<Record<string, unknown>>;
     expect(n).toBeGreaterThanOrEqual(2);
-    expect(withId.some((r) => r._rowId === 'ID-A' && r[svcCol] === 'typed') || withId.length === 0).toBe(true);
+    expect(withId.some((r) => r._rowId === 'ID-A' && r[accCol] === 'typed') || withId.length === 0).toBe(true);
   });
 });
 
@@ -152,7 +153,7 @@ describe('TableField evidence-insert target', () => {
       <ToastProvider>
         <DocumentEditorContext.Provider value={editor}>
           <DocumentFlushContext.Provider value={registry}>
-            <TableField field={servicesField} value={value} onSave={onSave} />
+            <TableField field={accommodationsField} value={value} onSave={onSave} />
           </DocumentFlushContext.Provider>
         </DocumentEditorContext.Provider>
       </ToastProvider>
@@ -168,30 +169,30 @@ describe('TableField evidence-insert target', () => {
     });
     const { targets, cleared, unmount } = renderInEditor(
       [
-        { _rowId: 'ID-1', [svcCol]: 'Speech therapy', [noteCol]: '' },
-        { _rowId: 'ID-2', [svcCol]: 'Occupational therapy', [noteCol]: '' },
+        { _rowId: 'ID-1', [accCol]: 'Extended time', [noteCol]: '' },
+        { _rowId: 'ID-2', [accCol]: 'Small group setting', [noteCol]: '' },
       ],
       onSave
     );
 
-    const secondService = screen.getAllByRole('textbox', { name: /^Service\s*\*?$/ })[1];
-    fireEvent.focus(secondService);
+    const secondAccommodation = screen.getAllByRole('textbox', { name: /^Accommodation\s*\*?$/ })[1];
+    fireEvent.focus(secondAccommodation);
     const target = targets.at(-1)!;
-    expect(target.label()).toBe('Service 2 — Service');
+    expect(target.label()).toBe('Accommodation 2 — Accommodation');
 
     await act(async () => target.apply('Provider: Dr. Lee'));
-    expect(secondService).toHaveValue('Occupational therapy\n\nProvider: Dr. Lee');
+    expect(secondAccommodation).toHaveValue('Small group setting\n\nProvider: Dr. Lee');
     const sent = calls.at(-1) as Array<Record<string, unknown>>;
-    expect(sent[1][svcCol]).toBe('Occupational therapy\n\nProvider: Dr. Lee');
+    expect(sent[1][accCol]).toBe('Small group setting\n\nProvider: Dr. Lee');
 
     // Removing a DIFFERENT row (not the one holding the target) leaves it alone.
-    fireEvent.click(screen.getByRole('button', { name: 'Remove service 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove accommodation 1' }));
     await act(async () => {});
     expect(cleared.some((id) => target.id.startsWith(`${id}:`))).toBe(false);
-    expect(target.label()).toBe('Service 1 — Service'); // re-labeled after the shift
+    expect(target.label()).toBe('Accommodation 1 — Accommodation'); // re-labeled after the shift
 
     // Removing the row that owns the target clears it by prefix; unmount clears the field.
-    fireEvent.click(screen.getByRole('button', { name: 'Remove service 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove accommodation 1' }));
     await act(async () => {});
     expect(cleared.some((id) => target.id.startsWith(`${id}:`))).toBe(true);
     await act(async () => target.apply('ignored'));

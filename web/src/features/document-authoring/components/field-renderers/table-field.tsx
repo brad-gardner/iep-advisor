@@ -38,6 +38,7 @@ import {
 import { adoptRowObjectiveIds, toPlainObjectives, type KeyedObjective } from '../../lib/objective-rows';
 import { formatCarriedDate, isLongColumn, isRichTextColumn } from '../../lib/table-cell-format';
 import { GoalsBlock } from './table-field-goals';
+import { ServicesBlock } from './table-field-services';
 import { appendText, useDocumentEditorContext } from '../../hooks/document-editor-context';
 
 /**
@@ -284,7 +285,34 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
     );
   }
 
-  // Semantic row blocks (goals, services, accommodations, …) render as stacked
+  // Services get the same compact-row-plus-focused-editor treatment as goals
+  // (plan 2026-10-02-002, Phase 4): a schedule row per service, one of which
+  // may be swapped for the full structured `ServiceEditor` — frequency and
+  // duration are written back as normalized text into the template's
+  // existing columns, so the PDF, AI and completeness stay untouched.
+  if (blockSemantic === 'services') {
+    return (
+      <ServicesBlock
+        field={field}
+        columns={columns}
+        rows={rows}
+        disabled={disabled}
+        atMax={atMax}
+        atMin={atMin}
+        editorTeam={editorTeam}
+        ownerWarnings={ownerWarnings}
+        initialFocusRowKey={initialFocusRowKey}
+        saveStatus={autosave.status}
+        commit={commit}
+        onKeepRow={keepRow}
+        onRemoveRow={removeRow}
+        flush={autosave.flush}
+        cellTarget={cellTarget}
+      />
+    );
+  }
+
+  // Semantic row blocks (accommodations, transition, …) render as stacked
   // cards with labelled inputs — a goal has six fields and does not fit a
   // grid inside the editor column — with AI help and "pull from student" per
   // row. Untagged tables keep the compact grid.
@@ -575,7 +603,10 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
   );
 }
 
-const cellInputClass =
+/** Shared input styling for a table cell — exported so the goals/services
+ *  focused editors (which render their own structured controls alongside
+ *  `TableCell`) match it exactly. */
+export const cellInputClass =
   'w-full px-2 py-1 bg-white rounded-input text-brand-slate-800 text-sm border border-brand-slate-200 focus:outline-none focus:border-brand-teal-500 focus:ring-[3px] focus:ring-brand-teal-50 transition-colors';
 
 export function TableCell({

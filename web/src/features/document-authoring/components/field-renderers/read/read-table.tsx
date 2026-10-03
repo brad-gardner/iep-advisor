@@ -8,16 +8,16 @@ import type { TableCellValue } from '../../../types';
 import { fieldElementId } from '../types';
 import { ReadAccommodations } from './read-accommodations';
 import { ReadGoals } from './read-goals';
+import { ReadServices } from './read-services';
 import { ReadTransitionList } from './read-transition-list';
 import type { ReadFieldRendererProps } from './types';
 
 /**
- * Read view for a Table field. Accommodations, transition and goals rows each
- * get their own layout (`ReadAccommodations` / `ReadTransitionList` /
- * `ReadGoals`); everything else — services until its Phase 4 schedule view
- * lands — falls through to this generic one-row-per-entry table, which
- * appends an Owner column for any owner-eligible semantic (plan
- * 2026-10-02-002).
+ * Read view for a Table field. Accommodations, transition, goals and services
+ * rows each get their own layout (`ReadAccommodations` / `ReadTransitionList`
+ * / `ReadGoals` / `ReadServices`); everything else falls through to this
+ * generic one-row-per-entry table, which appends an Owner column for any
+ * owner-eligible semantic (plan 2026-10-02-002).
  */
 export function ReadTable(props: ReadFieldRendererProps) {
   const { field } = props;
@@ -27,6 +27,7 @@ export function ReadTable(props: ReadFieldRendererProps) {
   if (semantic === 'accommodations') return <ReadAccommodations {...props} />;
   if (semantic === 'transition') return <ReadTransitionList {...props} />;
   if (semantic === 'goals') return <ReadGoals {...props} />;
+  if (semantic === 'services') return <ReadServices {...props} />;
   return <ReadTableGeneric {...props} semantic={semantic} />;
 }
 
