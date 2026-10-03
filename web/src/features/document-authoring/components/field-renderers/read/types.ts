@@ -5,6 +5,12 @@ import type { TemplateFieldDto } from '@/features/admin/templates/types';
 export interface ReadFieldRendererProps {
   field: TemplateFieldDto;
   value: unknown;
+  /** Requests that the field switch to edit mode, focused on a specific row
+   *  (a goal card's "Edit goal") — `SectionCard` wires this to opening the
+   *  section and threading the row through as `initialFocusRowKey`. Undefined
+   *  outside an editable `SectionCard` (e.g. a frozen version's read view),
+   *  where every read renderer other than `ReadGoals` already ignores it. */
+  onEditRow?: (rowKey: string) => void;
 }
 
 /** Muted "nothing here yet" placeholder, shared across every read renderer so

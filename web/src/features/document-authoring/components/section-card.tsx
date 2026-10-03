@@ -91,6 +91,20 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [discardError, setDiscardError] = useState<string | null>(null);
   const fieldsBodyRef = useRef<HTMLDivElement>(null);
+  // Row to focus once a field mounts in edit mode — set when a read-mode row
+  // itself requests editing (a goal card's "Edit goal"), rather than the
+  // generic Edit button opening the whole section (plan 2026-10-02-002, Phase
+  // 3). Cleared on the generic Edit/Start-editing path so a later plain Edit
+  // doesn't land back on a stale row from an earlier visit.
+  const [pendingFocusRowKey, setPendingFocusRowKey] = useState<string | undefined>(undefined);
+  const openSection = () => {
+    setPendingFocusRowKey(undefined);
+    onOpen();
+  };
+  const editRow = (rowKey: string) => {
+    setPendingFocusRowKey(rowKey);
+    onOpen();
+  };
 
   useEffect(
     () => () => {
@@ -237,7 +251,7 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
             id={editButtonDomId(section.id)}
             className="ml-auto"
             disabled={disabled}
-            onClick={onOpen}
+            onClick={openSection}
             data-testid={`section-${section.id}-edit`}
           >
             Edit
@@ -299,6 +313,7 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
                   value={values[field.fieldKey]}
                   disabled={disabled}
                   onSave={wrappedSave}
+                  initialFocusRowKey={pendingFocusRowKey}
                 />
               ))}
             </DocumentFlushContext.Provider>
@@ -311,7 +326,7 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
             type="button"
             className="text-brand-teal-600 hover:underline"
             disabled={disabled}
-            onClick={onOpen}
+            onClick={openSection}
             data-testid={`section-${section.id}-start-editing`}
           >
             Start editing
@@ -322,7 +337,7 @@ export function SectionCard({ section, values, disabled, saveValues, isOpen, onO
       ) : (
         <div className="space-y-4">
           {fields.map((field) => (
-            <ReadField key={field.id} field={field} value={values[field.fieldKey]} />
+            <ReadField key={field.id} field={field} value={values[field.fieldKey]} onEditRow={editRow} />
           ))}
         </div>
       )}

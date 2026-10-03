@@ -221,4 +221,41 @@ export const CONTRAST_ALLOWLIST: ContrastAllowlistEntry[] = [
     count: 1,
     reason: "Diff indicator swatch for the '=' case renders an empty string (no visible text) — decorative badge color, not text.",
   },
+
+  // Objectives editor (plan 2026-10-02-002, Phase 3): reorder up/down and
+  // remove are icon-only buttons (aria-label carries the accessible name, no
+  // visible text).
+  {
+    file: 'src/features/document-authoring/components/field-renderers/objectives-editor.tsx',
+    text: 'className="rounded text-brand-slate-400 hover:text-brand-teal-600 disabled:opacity-30"',
+    count: 2,
+    reason: ICON_ONLY_TRIGGER,
+  },
+  {
+    file: 'src/features/document-authoring/components/field-renderers/objectives-editor.tsx',
+    text: 'className="shrink-0 text-brand-slate-400 hover:text-brand-danger-700 disabled:opacity-30"',
+    count: 1,
+    reason: ICON_ONLY_TRIGGER,
+  },
+
+  // Goal read cards (plan 2026-10-02-002, Phase 3): measurement/timeframe/
+  // objectives-count chip glyphs, aria-hidden, sitting beside their own text.
+  {
+    file: 'src/features/document-authoring/components/field-renderers/read/read-goals.tsx',
+    text: '<Ruler className="h-3.5 w-3.5 text-brand-slate-400" aria-hidden="true" />',
+    count: 1,
+    reason: STANDALONE_ICON,
+  },
+  {
+    file: 'src/features/document-authoring/components/field-renderers/read/read-goals.tsx',
+    text: '<CalendarClock className="h-3.5 w-3.5 text-brand-slate-400" aria-hidden="true" />',
+    count: 1,
+    reason: STANDALONE_ICON,
+  },
+  {
+    file: 'src/features/document-authoring/components/field-renderers/read/read-goals.tsx',
+    text: '<ListChecks className="h-3.5 w-3.5 text-brand-slate-400" aria-hidden="true" />',
+    count: 1,
+    reason: STANDALONE_ICON,
+  },
 ];

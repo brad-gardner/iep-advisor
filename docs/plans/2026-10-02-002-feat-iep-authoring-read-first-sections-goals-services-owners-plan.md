@@ -141,12 +141,12 @@ Decided in the design (see design doc):
 
 #### Phase 3: Goals rework
 
-- [ ] `GoalCardList` read view (clamped statement, chips, objectives count, owner, carried/keep badges)
-- [ ] `GoalEditor` focused editor (rich-text statement/baseline/target, measurement, reporting, timeframe, owner + evidence side panel, Remove with the existing reason dialog, Discard/Done scoped to the goal)
-- [ ] `_objectives` (C# normalization + TS types): add/remove/reorder with immutable React keys, ids adopted from the exact sent array (row-identity rules in `docs/solutions/ui-bugs/2026-09-15-autosaved-list-rows-*.md`)
-- [ ] Completeness advisory "goal has no objectives"; AI help per goal field unchanged; "Pull from student" unchanged
-- [ ] Objectives in the family draft and PDF goal block; `GoalRecord` snapshot includes objectives (JSON)
-- [ ] Tests: objectives identity (focus retained during autosave, reorder, delete), normalization ids, PDF objectives, completeness
+- [x] `GoalCardList` read view (clamped statement, chips, objectives count, owner, carried/keep badges)
+- [x] `GoalEditor` focused editor (rich-text statement/baseline/target, measurement, reporting, timeframe, owner + evidence side panel, Remove with the existing reason dialog, Discard/Done scoped to the goal)
+- [x] `_objectives` (C# normalization + TS types): add/remove/reorder with immutable React keys, ids adopted from the exact sent array (row-identity rules in `docs/solutions/ui-bugs/2026-09-15-autosaved-list-rows-*.md`)
+- [x] Completeness advisory "goal has no objectives"; AI help per goal field unchanged; "Pull from student" unchanged
+- [x] Objectives in the family draft and PDF goal block; `GoalRecord` snapshot includes objectives (JSON)
+- [x] Tests: objectives identity (focus retained during autosave, reorder, delete), normalization ids, PDF objectives, completeness
 
 **Checkpoint:** create a goal with 3 objectives, reorder them, reload, finalize, and see them on the PDF; the goal owner is on the `GoalRecord`.
 
