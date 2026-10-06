@@ -39,8 +39,13 @@ export function ChildForm({
     normalizeDisabilityCategory(initialValues?.disabilityCategory),
   );
   // Snapshotted at mount, like the selected values above, so a background
-  // refresh of the record can't drop a legacy option the state still holds.
-  // Modal unmounts the form while closed, so each edit open starts fresh.
+  // refresh of the record can't drop a legacy option the state still holds,
+  // or make "Not set" clear a value the user never saw. Modal unmounts the
+  // form while closed, so each edit open starts fresh.
+  const [initialGradeLevel] = useState(initialValues?.gradeLevel);
+  const [initialDisabilityCategory] = useState(
+    initialValues?.disabilityCategory,
+  );
   const [gradeLevelOptions] = useState(() =>
     buildGradeLevelOptions(initialValues?.gradeLevel),
   );
@@ -63,10 +68,10 @@ export function ChildForm({
       firstName: firstName.trim(),
       lastName: lastName.trim() || undefined,
       dateOfBirth: dateOfBirth || undefined,
-      gradeLevel: dropdownValue(gradeLevel, initialValues?.gradeLevel),
+      gradeLevel: dropdownValue(gradeLevel, initialGradeLevel),
       disabilityCategory: dropdownValue(
         disabilityCategory,
-        initialValues?.disabilityCategory,
+        initialDisabilityCategory,
       ),
       schoolDistrict: schoolDistrict.trim() || undefined,
     });

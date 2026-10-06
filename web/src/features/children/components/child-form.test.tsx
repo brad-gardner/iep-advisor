@@ -211,4 +211,31 @@ describe("ChildForm — Grade Level / Disability Category dropdowns", () => {
       }),
     );
   });
+
+  it("decides clear-vs-unchanged from the value the form opened with, not a later reload", async () => {
+    const user = userEvent.setup();
+    const onSubmit = makeOnSubmit();
+    const { rerender } = render(
+      <ChildForm
+        embedded
+        onSubmit={onSubmit}
+        submitLabel="Save Changes"
+        initialValues={{ firstName: "Ada", gradeLevel: "" }}
+      />,
+    );
+    rerender(
+      <ChildForm
+        embedded
+        onSubmit={onSubmit}
+        submitLabel="Save Changes"
+        initialValues={{ firstName: "Ada", gradeLevel: "5th" }}
+      />,
+    );
+
+    await user.click(screen.getByTestId("child-form-submit"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ gradeLevel: undefined }),
+    );
+  });
 });
