@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/use-auth';
 import { exportData, deleteAccount } from '../api/auth-api';
 import { Input } from '@/components/ui/input';
@@ -6,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 
 export function AccountDeletionSection() {
+  const { t } = useTranslation('auth');
   const { user, logout } = useAuth();
   const [showConfirm, setShowConfirm] = useState(false);
   const [password, setPassword] = useState('');
@@ -46,10 +48,10 @@ export function AccountDeletionSection() {
       if (response.success) {
         logout();
       } else {
-        setError(response.message || 'Failed to delete account');
+        setError(response.message || t('accountDeletion.failed'));
       }
     } catch {
-      setError('An error occurred. Please try again.');
+      setError(t('accountDeletion.error'));
     } finally {
       setIsDeleting(false);
     }
@@ -59,25 +61,24 @@ export function AccountDeletionSection() {
     <div className="space-y-4">
       <div>
         <Button variant="secondary" onClick={handleExport} loading={isExporting} data-testid="export-data">
-          Export My Data
+          {t('accountDeletion.exportButton')}
         </Button>
         <p className="text-xs text-brand-slate-500 mt-1">
-          Download all your data as a JSON file
+          {t('accountDeletion.exportHint')}
         </p>
       </div>
 
       {!showConfirm ? (
         <div>
           <Button variant="danger" onClick={() => setShowConfirm(true)} data-testid="delete-account">
-            Delete Account
+            {t('accountDeletion.deleteButton')}
           </Button>
         </div>
       ) : (
         <div className="border border-brand-danger-200 rounded-card p-4 bg-brand-danger-50">
-          <Notice variant="warning" title="This action has a 30-day grace period">
+          <Notice variant="warning" title={t('accountDeletion.gracePeriodTitle')}>
             <p className="mt-1">
-              Your account will be scheduled for deletion. You can cancel within 30 days by logging back in.
-              After that, all data will be permanently removed.
+              {t('accountDeletion.gracePeriodDetail')}
             </p>
           </Notice>
 
@@ -89,30 +90,30 @@ export function AccountDeletionSection() {
 
           <form onSubmit={handleDelete} className="mt-4 space-y-3">
             <Input
-              label="Confirm your password"
+              label={t('accountDeletion.confirmPasswordLabel')}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              placeholder="Enter your password"
+              placeholder={t('accountDeletion.passwordPlaceholder')}
               data-testid="delete-account-password"
             />
 
             {user?.mfaEnabled && (
               <Input
-                label="MFA Code"
+                label={t('accountDeletion.mfaCode')}
                 type="text"
                 inputMode="numeric"
                 value={mfaCode}
                 onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="000000"
+                placeholder={t('fields.codePlaceholder')}
                 maxLength={6}
               />
             )}
 
             <div className="flex gap-3">
               <Button variant="danger" type="submit" loading={isDeleting} data-testid="confirm-delete-account">
-                Confirm Deletion
+                {t('accountDeletion.confirmButton')}
               </Button>
               <Button
                 variant="ghost"
@@ -125,7 +126,7 @@ export function AccountDeletionSection() {
                   setError('');
                 }}
               >
-                Cancel
+                {t('accountDeletion.cancelButton')}
               </Button>
             </div>
           </form>

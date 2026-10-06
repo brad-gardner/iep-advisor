@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { resetPassword } from '../api/auth-api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,8 @@ import { Notice } from '@/components/ui/notice';
 import { usePageTitle } from '@/hooks/use-page-title';
 
 export function ResetPasswordPage() {
-  usePageTitle('Reset password');
+  const { t } = useTranslation('auth');
+  usePageTitle(t('resetPassword.pageTitle'));
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
@@ -21,12 +23,12 @@ export function ResetPasswordPage() {
     return (
       <div className="w-full">
         <h2 className="text-2xl font-serif font-semibold text-center mb-6 text-brand-slate-800">
-          Invalid Reset Link
+          {t('resetPassword.invalidLinkTitle')}
         </h2>
-        <Notice variant="error" title="This reset link is invalid or has expired" />
+        <Notice variant="error" title={t('resetPassword.invalidLink')} />
         <p className="mt-6 text-center text-sm text-brand-slate-500">
           <Link to="/forgot-password" className="text-brand-teal-500 hover:text-brand-teal-600">
-            Request a new reset link
+            {t('resetPassword.requestNewLink')}
           </Link>
         </p>
       </div>
@@ -38,12 +40,12 @@ export function ResetPasswordPage() {
     setError('');
 
     if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters');
+      setError(t('errors.passwordTooShort'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('errors.passwordsDoNotMatch'));
       return;
     }
 
@@ -52,13 +54,13 @@ export function ResetPasswordPage() {
       const response = await resetPassword(token, newPassword);
       if (response.success) {
         navigate('/login', {
-          state: { message: 'Password reset successful. Please sign in with your new password.' },
+          state: { message: t('resetPassword.successMessage') },
         });
       } else {
-        setError(response.message || 'Failed to reset password. The link may have expired.');
+        setError(response.message || t('resetPassword.failed'));
       }
     } catch {
-      setError('An error occurred. Please try again.');
+      setError(t('errors.genericTryAgain'));
     } finally {
       setIsLoading(false);
     }
@@ -67,7 +69,7 @@ export function ResetPasswordPage() {
   return (
     <div className="w-full">
       <h2 className="text-2xl font-serif font-semibold text-center mb-6 text-brand-slate-800">
-        Set New Password
+        {t('resetPassword.title')}
       </h2>
 
       {error && (
@@ -78,37 +80,37 @@ export function ResetPasswordPage() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
-          label="New Password"
+          label={t('resetPassword.newPassword')}
           type="password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           required
-          placeholder="********"
+          placeholder={t('fields.passwordPlaceholder')}
           minLength={8}
           maxLength={128}
           data-testid="reset-password"
         />
 
         <Input
-          label="Confirm Password"
+          label={t('fields.confirmPassword')}
           type="password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           required
-          placeholder="********"
+          placeholder={t('fields.passwordPlaceholder')}
           minLength={8}
           maxLength={128}
           data-testid="reset-confirm-password"
         />
 
         <Button type="submit" loading={isLoading} className="w-full" data-testid="reset-submit">
-          Reset Password
+          {t('resetPassword.submit')}
         </Button>
       </form>
 
       <p className="mt-6 text-center text-sm text-brand-slate-500">
         <Link to="/login" className="text-brand-teal-500 hover:text-brand-teal-600">
-          Back to login
+          {t('resetPassword.backToLogin')}
         </Link>
       </p>
     </div>

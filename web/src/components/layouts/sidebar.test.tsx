@@ -32,6 +32,7 @@ function makeUser(role: UserRole): User {
     fullName: 'Sam Staff',
     onboardingCompleted: true,
     subscriptionStatus: 'active',
+    preferredLanguage: null,
   };
 }
 

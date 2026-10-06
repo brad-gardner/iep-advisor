@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { forgotPassword } from '../api/auth-api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,8 @@ import { Notice } from '@/components/ui/notice';
 import { usePageTitle } from '@/hooks/use-page-title';
 
 export function ForgotPasswordPage() {
-  usePageTitle('Forgot password');
+  const { t } = useTranslation('auth');
+  usePageTitle(t('forgotPassword.pageTitle'));
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -30,18 +32,18 @@ export function ForgotPasswordPage() {
     return (
       <div className="w-full">
         <h2 className="text-2xl font-serif font-semibold text-center mb-6 text-brand-slate-800">
-          Check Your Email
+          {t('forgotPassword.checkEmailTitle')}
         </h2>
 
-        <Notice variant="success" title="If that email exists, we sent a reset link">
+        <Notice variant="success" title={t('forgotPassword.resetLinkSent')}>
           <p className="mt-1">
-            Please check your inbox and spam folder. The link will expire in 1 hour.
+            {t('forgotPassword.resetLinkSentDetail')}
           </p>
         </Notice>
 
         <p className="mt-6 text-center text-sm text-brand-slate-500">
           <Link to="/login" className="text-brand-teal-500 hover:text-brand-teal-600">
-            Back to login
+            {t('forgotPassword.backToLogin')}
           </Link>
         </p>
       </div>
@@ -51,34 +53,34 @@ export function ForgotPasswordPage() {
   return (
     <div className="w-full">
       <h2 className="text-2xl font-serif font-semibold text-center mb-6 text-brand-slate-800">
-        Reset Your Password
+        {t('forgotPassword.title')}
       </h2>
 
       <p className="text-sm text-brand-slate-500 text-center mb-6">
-        Enter your email address and we'll send you a link to reset your password.
+        {t('forgotPassword.instructions')}
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
-          label="Email"
+          label={t('fields.email')}
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          placeholder="you@example.com"
+          placeholder={t('fields.emailPlaceholder')}
           autoFocus
           maxLength={256}
           data-testid="forgot-email"
         />
 
         <Button type="submit" loading={isLoading} className="w-full" data-testid="forgot-submit">
-          Send Reset Link
+          {t('forgotPassword.submit')}
         </Button>
       </form>
 
       <p className="mt-6 text-center text-sm text-brand-slate-500">
         <Link to="/login" className="text-brand-teal-500 hover:text-brand-teal-600">
-          Back to login
+          {t('forgotPassword.backToLogin')}
         </Link>
       </p>
     </div>

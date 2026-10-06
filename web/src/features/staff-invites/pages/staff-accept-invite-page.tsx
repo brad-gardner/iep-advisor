@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
@@ -13,7 +14,8 @@ import type { StaffInvitePreview } from '../types';
 type Phase = 'loading' | 'ready' | 'error';
 
 export function StaffAcceptInvitePage() {
-  usePageTitle('Accept invite');
+  const { t } = useTranslation('auth');
+  usePageTitle(t('staffAcceptInvite.pageTitle'));
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const navigate = useNavigate();
@@ -21,7 +23,12 @@ export function StaffAcceptInvitePage() {
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [preview, setPreview] = useState<StaffInvitePreview | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // The reason (not a pre-localized string) is stored, and resolved to text at
+  // render time via `t()` — so a language switch while an error is showing
+  // updates the text immediately, without re-running the effect (and
+  // re-fetching the preview) just because `t`'s identity changed.
+  const [loadFailedReason, setLoadFailedReason] = useState<'server' | 'client' | null>(null);
+  const [serverMessage, setServerMessage] = useState<string | null>(null);
 
   // Missing token is derived at render time (no setState-in-effect needed).
   const isMissingToken = !token;
@@ -39,12 +46,13 @@ export function StaffAcceptInvitePage() {
           setPhase('ready');
         } else {
           setPhase('error');
-          setErrorMessage(response.message || 'This invite is invalid or has been claimed.');
+          setLoadFailedReason('server');
+          setServerMessage(response.message || null);
         }
       } catch {
         if (active) {
           setPhase('error');
-          setErrorMessage('An error occurred while loading this invite.');
+          setLoadFailedReason('client');
         }
       }
     })();
@@ -54,12 +62,15 @@ export function StaffAcceptInvitePage() {
     };
   }, [token]);
 
+  const loadErrorMessage =
+    serverMessage ?? (loadFailedReason === 'client' ? t('staffAcceptInvite.loadError') : t('staffAcceptInvite.loadFailed'));
+
   const handleAccept = async (data: {
     firstName: string;
     lastName: string;
     password: string;
   }) => {
-    if (!token) return { success: false, error: 'Missing invite token' };
+    if (!token) return { success: false, error: t('staffAcceptInvite.missingTokenError') };
     try {
       const response = await acceptStaffInvite({ token, ...data });
       if (response.success && response.data?.token && response.data.user) {
@@ -70,10 +81,10 @@ export function StaffAcceptInvitePage() {
       }
       return {
         success: false,
-        error: response.message || 'Could not accept this invite.',
+        error: response.message || t('staffAcceptInvite.acceptFailed'),
       };
     } catch {
-      return { success: false, error: 'An error occurred while accepting this invite.' };
+      return { success: false, error: t('staffAcceptInvite.acceptError') };
     }
   };
 
@@ -83,39 +94,33 @@ export function StaffAcceptInvitePage() {
     logout();
   };
 
-  const heading = 'Join your school team';
-
   return (
     <div className="w-full text-center">
-      <h2 className="text-2xl font-serif font-semibold mb-6 text-brand-slate-800">{heading}</h2>
+      <h2 className="text-2xl font-serif font-semibold mb-6 text-brand-slate-800">{t('staffAcceptInvite.heading')}</h2>
 
       {phase === 'loading' && !isMissingToken && (
         <div className="flex justify-center py-6">
-          <Spinner label="Loading invite…" />
+          <Spinner label={t('staffAcceptInvite.loadingInvite')} />
         </div>
       )}
 
       {(phase === 'error' || isMissingToken) && (
         <Notice
           variant="error"
-          title={
-            isMissingToken
-              ? 'This invite link is missing its token.'
-              : errorMessage || 'This invite is invalid or has been claimed.'
-          }
+          title={isMissingToken ? t('staffAcceptInvite.missingTokenTitle') : loadErrorMessage}
         />
       )}
 
       {phase === 'ready' && preview && preview.status === 'expired' && (
-        <Notice variant="warning" title="This invite has expired">
-          Ask your administrator to resend the invite.
+        <Notice variant="warning" title={t('staffAcceptInvite.expiredTitle')}>
+          {t('staffAcceptInvite.expiredDetail')}
         </Notice>
       )}
 
       {phase === 'ready' && preview && preview.status === 'invalid' && (
         <Notice
           variant="error"
-          title="This invite is invalid or has already been claimed."
+          title={t('staffAcceptInvite.invalidTitle')}
         />
       )}
 
@@ -123,21 +128,21 @@ export function StaffAcceptInvitePage() {
         <div className="space-y-5">
           <p className="text-sm text-brand-slate-600">
             <span className="font-medium text-brand-slate-800">{preview.districtName}</span>
-            {preview.schoolName ? ` · ${preview.schoolName}` : ''} invited you to join as{' '}
+            {preview.schoolName ? ` · ${preview.schoolName}` : ''} {t('staffAcceptInvite.invitedAs')}{' '}
             <span className="font-medium text-brand-slate-800">{orgRoleLabel(preview.roleName)}</span>.
           </p>
 
           {user ? (
             <div className="space-y-4" data-testid="staff-accept-signed-in">
-              <Notice variant="info" title={`This invite was sent to ${preview.email}.`}>
-                You are signed in as {user.email}. Sign out to continue.
+              <Notice variant="info" title={t('staffAcceptInvite.sentTo', { email: preview.email })}>
+                {t('staffAcceptInvite.signedInAs', { email: user.email })}
               </Notice>
               <Button
                 onClick={handleSignOut}
                 className="w-full"
                 data-testid="staff-accept-signout"
               >
-                Sign out
+                {t('staffAcceptInvite.signOut')}
               </Button>
             </div>
           ) : (

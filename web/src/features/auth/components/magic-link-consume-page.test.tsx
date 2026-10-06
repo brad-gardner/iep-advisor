@@ -35,6 +35,7 @@ const user: User = {
   fullName: 'Sam Staff',
   onboardingCompleted: true,
   subscriptionStatus: 'active',
+  preferredLanguage: null,
 };
 
 describe('MagicLinkConsumePage', () => {

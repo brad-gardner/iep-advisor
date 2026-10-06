@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "./button";
 import { Select } from "./input";
 
@@ -32,6 +33,7 @@ export function Pagination({
   label,
   "data-testid": testId,
 }: PaginationProps) {
+  const { t } = useTranslation("common");
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const last = Math.min(page * pageSize, total);
@@ -46,8 +48,8 @@ export function Pagination({
     >
       <p aria-live="polite" data-testid={testId ? `${testId}-summary` : undefined}>
         {total === 0
-          ? "No results"
-          : `Showing ${first}–${last} of ${total}`}
+          ? t("ui.noResults")
+          : t("ui.showingRange", { first, last, total })}
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -55,7 +57,7 @@ export function Pagination({
           <div className="flex items-center gap-2">
             <Select
               id={testId ? `${testId}-page-size` : "pagination-page-size"}
-              label="Rows per page"
+              label={t("ui.rowsPerPage")}
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
               className="w-auto"
@@ -79,10 +81,10 @@ export function Pagination({
             data-testid={testId ? `${testId}-prev` : undefined}
           >
             <ChevronLeft className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-            Previous
+            {t("ui.previous")}
           </Button>
           <span className="px-1 text-xs text-brand-slate-500">
-            Page {Math.min(page, pageCount)} of {pageCount}
+            {t("ui.pageOf", { page: Math.min(page, pageCount), pageCount })}
           </span>
           <Button
             variant="ghost"
@@ -91,7 +93,7 @@ export function Pagination({
             onClick={() => onPageChange(page + 1)}
             data-testid={testId ? `${testId}-next` : undefined}
           >
-            Next
+            {t("ui.next")}
             <ChevronRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
           </Button>
         </div>

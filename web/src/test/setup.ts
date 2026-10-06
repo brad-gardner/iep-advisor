@@ -2,6 +2,17 @@ import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 import { createElement, type ChangeEvent } from 'react';
 import type { RichTextEditorProps } from '@/components/ui/rich-text-editor';
+import i18n, { i18nReady } from '@/lib/i18n';
+
+// Initialize i18next synchronously (from this suite's point of view) with
+// English before any test file renders a component that calls `t()` — the
+// ~600 existing English text queries (getByRole name, getByText,
+// getByLabelText) keep working unchanged. Forced explicitly rather than
+// relying on jsdom's default `navigator.languages` so a test run is never
+// at the mercy of environment detection. Spanish-specific tests opt in via
+// `renderInSpanish` (`src/test/i18n-test-utils.tsx`).
+await i18nReady;
+await i18n.changeLanguage('en');
 
 // jsdom does not implement scrolling APIs used by overlay scroll-lock. Stub
 // them so tests exercising Modal/Drawer open/close don't emit "Not implemented"

@@ -18,12 +18,16 @@ export interface User {
   mfaEnabled?: boolean;
   onboardingCompleted: boolean;
   subscriptionStatus: string;
+  /** Saved account language. `null` until a session resolves and persists one (see AuthProvider). */
+  preferredLanguage: 'en' | 'es' | null;
 }
 
 export interface UpdateProfileRequest {
   firstName?: string;
   lastName?: string;
   state?: string;
+  /** Omitted leaves the saved preference unchanged. */
+  preferredLanguage?: 'en' | 'es';
 }
 
 export interface LoginRequest {

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 interface SparklineProps {
@@ -20,6 +21,7 @@ const PADDING = 4;
  * it, and a visually-hidden `<table>` gives the exact per-point values.
  */
 export function Sparkline({ title, values, pointLabels, className, 'data-testid': testId }: SparklineProps) {
+  const { t } = useTranslation('common');
   const max = Math.max(...values, 0);
   const min = Math.min(...values, 0);
   const range = max - min || 1;
@@ -48,8 +50,8 @@ export function Sparkline({ title, values, pointLabels, className, 'data-testid'
         <caption>{title}</caption>
         <thead>
           <tr>
-            <th scope="col">Point</th>
-            <th scope="col">Value</th>
+            <th scope="col">{t('charts.point')}</th>
+            <th scope="col">{t('charts.value')}</th>
           </tr>
         </thead>
         <tbody>

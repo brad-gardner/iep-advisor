@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 export interface StackedBarSegment {
@@ -55,6 +56,7 @@ function rowTotal(row: StackedBarRow): number {
  * with the full per-segment breakdown.
  */
 export function StackedBarChart({ title, rows, className, 'data-testid': testId }: StackedBarChartProps) {
+  const { t } = useTranslation('common');
   const maxTotal = Math.max(...rows.map(rowTotal), 1);
   const height = rows.length * ROW_HEIGHT + 8;
   const legendSegments = rows[0]?.segments ?? [];
@@ -110,7 +112,7 @@ export function StackedBarChart({ title, rows, className, 'data-testid': testId 
         <caption>{title}</caption>
         <thead>
           <tr>
-            <th scope="col">Label</th>
+            <th scope="col">{t('charts.label')}</th>
             {legendSegments.map((segment) => (
               <th scope="col" key={segment.key}>
                 {segment.label}

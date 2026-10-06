@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ParentRegisterForm } from './parent-register-form';
 import { DistrictRegisterForm } from './district-register-form';
 import { RegisterPathCard } from './register-path-card';
@@ -8,7 +9,8 @@ import { usePageTitle } from '@/hooks/use-page-title';
 type RegisterPath = 'parent' | 'district';
 
 export function RegisterPage() {
-  usePageTitle('Create your account');
+  const { t } = useTranslation('auth');
+  usePageTitle(t('register.pageTitle'));
   const [searchParams] = useSearchParams();
   const codeFromUrl = searchParams.get('code') ?? '';
   const typeFromUrl = searchParams.get('type');
@@ -29,22 +31,22 @@ export function RegisterPage() {
   return (
     <div className="w-full">
       <h2 className="text-2xl font-serif font-semibold text-center mb-6 text-brand-slate-800">
-        Create Your Account
+        {t('register.title')}
       </h2>
 
       <fieldset className="mb-6" data-testid="register-path-chooser">
-        <legend className="sr-only">Who are you signing up as?</legend>
-        <div role="radiogroup" aria-label="Account type" className="grid grid-cols-1 gap-3">
+        <legend className="sr-only">{t('register.chooserLegend')}</legend>
+        <div role="radiogroup" aria-label={t('register.accountType')} className="grid grid-cols-1 gap-3">
           <RegisterPathCard
-            title="I'm a parent"
-            description="Understand and advocate around your child's IEP. Requires a beta invite code."
+            title={t('register.parentPathTitle')}
+            description={t('register.parentPathDescription')}
             selected={path === 'parent'}
             onSelect={() => setPath('parent')}
             data-testid="register-path-parent"
           />
           <RegisterPathCard
-            title="I represent a school or district"
-            description="Set up your district to manage IEPs with your team."
+            title={t('register.districtPathTitle')}
+            description={t('register.districtPathDescription')}
             selected={path === 'district'}
             onSelect={() => setPath('district')}
             data-testid="register-path-district"
@@ -56,9 +58,9 @@ export function RegisterPage() {
       {path === 'district' && <DistrictRegisterForm />}
 
       <p className="mt-6 text-center text-sm text-brand-slate-500">
-        Already have an account?{' '}
+        {t('register.haveAccount')}{' '}
         <Link to="/login" className="text-brand-teal-500 hover:text-brand-teal-600">
-          Sign in
+          {t('register.signIn')}
         </Link>
       </p>
     </div>

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useEffect, useState } from 'react';
 import * as Sentry from '@sentry/react';
+import { useTranslation } from 'react-i18next';
 import type {
   User,
   LoginRequest,
@@ -16,6 +17,8 @@ import {
   completeOnboarding as completeOnboardingApi,
 } from '../api/auth-api';
 import { getToken, setToken, removeToken, setStoredUser, getStoredUser } from '@/lib/auth';
+import i18n from '@/lib/i18n';
+import { isSupportedLanguage, setPreLoginLanguage, DEFAULT_LANGUAGE, type SupportedLanguage } from '@/lib/i18n/detect';
 
 interface LoginResult {
   success: boolean;
@@ -38,14 +41,57 @@ interface AuthContextType {
   applySession: (token: string, user: User) => void;
   refreshUser: () => Promise<void>;
   logout: () => void;
+  /**
+   * Switches the active UI language immediately, then persists the choice:
+   * to the account (`PUT /api/auth/me`) when signed in, or to `localStorage`
+   * as the pre-login choice otherwise. Used by every `LanguageSwitcher` and
+   * by the Profile page's Language field.
+   */
+  setLanguage: (language: SupportedLanguage) => Promise<{ success: boolean; error?: string }>;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation('auth');
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [mfaPendingToken, setMfaPendingToken] = useState<string | null>(null);
+
+  // Applies the account's saved language once a user is known. When there is
+  // no saved preference yet (a first sign-in, or an account created before
+  // this field existed), this persists whatever language the session
+  // resolved to (the pre-login choice or browser detection) so future
+  // sign-ins, emails, and AI responses know it too. Fire-and-forget by
+  // design: it must never block or delay setting the signed-in user, since
+  // `ProtectedRoute`/`PublicRoute` key off that state synchronously.
+  const syncLanguagePreference = useCallback((userData: User) => {
+    if (isSupportedLanguage(userData.preferredLanguage)) {
+      if (i18n.language !== userData.preferredLanguage) {
+        void i18n.changeLanguage(userData.preferredLanguage);
+      }
+      return;
+    }
+
+    const resolved: SupportedLanguage = isSupportedLanguage(i18n.language)
+      ? i18n.language
+      : DEFAULT_LANGUAGE;
+
+    void updateProfileApi({ preferredLanguage: resolved })
+      .then((response) => {
+        if (!response.success || !response.data) return;
+        const savedLanguage = response.data.preferredLanguage;
+        setUser((prev) => {
+          if (!prev) return prev;
+          const merged = { ...prev, preferredLanguage: savedLanguage };
+          setStoredUser(JSON.stringify(merged));
+          return merged;
+        });
+      })
+      .catch(() => {
+        // Non-fatal — retried the next time a user loads (loadUser/refreshUser).
+      });
+  }, []);
 
   const loadUser = useCallback(async () => {
     const token = getToken();
@@ -66,6 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.success && response.data) {
         setUser(response.data);
         setStoredUser(JSON.stringify(response.data));
+        syncLanguagePreference(response.data);
       } else {
         removeToken();
         setUser(null);
@@ -76,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [syncLanguagePreference]);
 
   useEffect(() => {
     loadUser();
@@ -98,7 +145,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(token);
     setUser(userData);
     setStoredUser(JSON.stringify(userData));
-  }, []);
+    syncLanguagePreference(userData);
+  }, [syncLanguagePreference]);
 
   const login = async (data: LoginRequest): Promise<LoginResult> => {
     try {
@@ -120,9 +168,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { success: true };
         }
       }
-      return { success: false, error: response.message || 'Login failed' };
+      return { success: false, error: response.message || t('context.loginFailed') };
     } catch (error) {
-      return { success: false, error: 'An error occurred during login' };
+      return { success: false, error: t('context.loginError') };
     }
   };
 
@@ -146,9 +194,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         persistSession(response.data.token, response.data.user);
         return { success: true };
       }
-      return { success: false, error: response.message || 'Registration failed' };
+      return { success: false, error: response.message || t('context.registrationFailed') };
     } catch {
-      return { success: false, error: 'An error occurred during registration' };
+      return { success: false, error: t('context.registrationError') };
     }
   };
 
@@ -158,9 +206,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.success) {
         return { success: true };
       }
-      return { success: false, error: response.message || 'Registration failed' };
+      return { success: false, error: response.message || t('context.registrationFailed') };
     } catch (error) {
-      return { success: false, error: 'An error occurred during registration' };
+      return { success: false, error: t('context.registrationError') };
     }
   };
 
@@ -172,9 +220,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setStoredUser(JSON.stringify(response.data));
         return { success: true };
       }
-      return { success: false, error: response.message || 'Update failed' };
+      return { success: false, error: response.message || t('context.updateFailed') };
     } catch {
-      return { success: false, error: 'An error occurred updating profile' };
+      return { success: false, error: t('context.updateError') };
     }
   };
 
@@ -190,9 +238,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         return { success: true };
       }
-      return { success: false, error: response.message || 'Failed to complete onboarding' };
+      return { success: false, error: response.message || t('context.onboardingFailed') };
     } catch {
-      return { success: false, error: 'An error occurred completing onboarding' };
+      return { success: false, error: t('context.onboardingError') };
     }
   };
 
@@ -214,6 +262,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMfaPendingToken(null);
   };
 
+  const setLanguage = async (language: SupportedLanguage) => {
+    await i18n.changeLanguage(language);
+
+    if (!user) {
+      // No account to save it to yet — remembered for this browser until sign-in.
+      setPreLoginLanguage(language);
+      return { success: true };
+    }
+
+    try {
+      const response = await updateProfileApi({ preferredLanguage: language });
+      if (response.success && response.data) {
+        setUser(response.data);
+        setStoredUser(JSON.stringify(response.data));
+        return { success: true };
+      }
+      return { success: false, error: response.message || t('context.updateFailed') };
+    } catch {
+      return { success: false, error: t('context.languageUpdateError') };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -230,6 +300,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         applySession,
         refreshUser,
         logout,
+        setLanguage,
       }}
     >
       {children}

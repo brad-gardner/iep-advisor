@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { warmRichTextEditor } from '@/components/ui/rich-text-editor';
 import { MainLayout } from '@/components/layouts/main-layout';
@@ -137,6 +138,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 export function AppRouter() {
+  const { t } = useTranslation('common');
   return (
     <Routes>
       <Route
@@ -262,7 +264,7 @@ export function AppRouter() {
             <Suspense
               fallback={
                 <div className="flex justify-center py-12">
-                  <Spinner label="Loading the advocate…" />
+                  <Spinner label={t('routes.loadingAdvocate')} />
                 </div>
               }
             >

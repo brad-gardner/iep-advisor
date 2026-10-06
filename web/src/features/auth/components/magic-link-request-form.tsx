@@ -1,10 +1,9 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
 import { requestMagicLink } from '../api/auth-api';
-
-const CONFIRMATION_MESSAGE = 'If that address is eligible, a link is on its way.';
 
 /**
  * The small "email me a sign-in link" form (pilot-gates plan, phase 3):
@@ -17,6 +16,7 @@ const CONFIRMATION_MESSAGE = 'If that address is eligible, a link is on its way.
  * never reveals whether a given address exists or is eligible.
  */
 export function MagicLinkRequestForm() {
+  const { t } = useTranslation('auth');
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -38,7 +38,7 @@ export function MagicLinkRequestForm() {
     return (
       <div data-testid="magic-link-message">
         <div role="status">
-          <Notice variant="success" title={CONFIRMATION_MESSAGE} />
+          <Notice variant="success" title={t('magicLink.confirmation')} />
         </div>
       </div>
     );
@@ -47,17 +47,17 @@ export function MagicLinkRequestForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-3" data-testid="magic-link-form">
       <Input
-        label="Email"
+        label={t('fields.email')}
         type="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         required
-        placeholder="you@example.com"
+        placeholder={t('fields.emailPlaceholder')}
         maxLength={256}
         data-testid="magic-link-email"
       />
       <Button type="submit" loading={isSubmitting} className="w-full" data-testid="magic-link-submit">
-        Send sign-in link
+        {t('magicLink.submit')}
       </Button>
     </form>
   );

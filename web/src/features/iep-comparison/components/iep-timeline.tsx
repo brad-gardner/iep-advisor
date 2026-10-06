@@ -3,6 +3,7 @@ import { ArrowRightLeft } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
+import { getActiveLanguage } from '@/lib/i18n/format';
 import { useIepTimeline } from '../hooks/use-iep-timeline';
 import type { TimelineEntry } from '@/types/api';
 
@@ -22,7 +23,7 @@ function TimelineEntryCard({ entry }: { entry: TimelineEntry }) {
         <div>
           <p className="font-serif text-[17px] font-semibold text-brand-slate-800">
             {entry.iepDate
-              ? new Date(entry.iepDate).toLocaleDateString('en-US', {
+              ? new Date(entry.iepDate).toLocaleDateString(getActiveLanguage(), {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',

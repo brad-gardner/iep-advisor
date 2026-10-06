@@ -1,56 +1,56 @@
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, UserCircle, BookOpen, GraduationCap, LogOut, Menu, X, Shield, LifeBuoy, FileSearch, School, Home, ScrollText, FileText, Upload, Calendar, Bell, MailWarning, ClipboardCheck, Download, Mail, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Logo } from '@/components/ui/logo';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
 import { ORG_ROLE } from '@/features/educator/types';
 import { NotificationBell } from '@/features/notifications/components/notification-bell';
+import { LanguageSwitcher } from '@/lib/i18n/language-switcher';
 
 // Common items shown to every role, after any role-specific section above.
+// `labelKey` resolves against the `common` namespace (`nav.*`). `as const`
+// keeps each `labelKey` a specific literal (not widened to `string`) so
+// `t(labelKey)` below stays checked against the real resource keys.
 const commonNavItems = [
-  { to: '/notifications', label: 'Notifications', Icon: Bell },
-  { to: '/profile', label: 'Profile', Icon: UserCircle },
-  // { to: '/subscription', label: 'Subscription', Icon: CreditCard }, // Hidden during beta
-  { to: '/knowledge-base', label: 'Knowledge Base', Icon: BookOpen },
-  { to: '/iep-101', label: 'IEP 101', Icon: GraduationCap },
-];
+  { to: '/notifications', labelKey: 'nav.notifications', Icon: Bell },
+  { to: '/profile', labelKey: 'nav.profile', Icon: UserCircle },
+  // { to: '/subscription', labelKey: 'nav.subscription', Icon: CreditCard }, // Hidden during beta
+  { to: '/knowledge-base', labelKey: 'nav.knowledgeBase', Icon: BookOpen },
+  { to: '/iep-101', labelKey: 'nav.iep101', Icon: GraduationCap },
+] as const;
 
 const parentNavItems = [
-  { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
-  { to: '/children', label: 'My Children', Icon: Users },
-  { to: '/etrs', label: 'ETRs', Icon: FileSearch },
-];
+  { to: '/dashboard', labelKey: 'nav.dashboard', Icon: LayoutDashboard },
+  { to: '/children', labelKey: 'nav.myChildren', Icon: Users },
+  { to: '/etrs', labelKey: 'nav.etrs', Icon: FileSearch },
+] as const;
 
 const educatorNavItems = [
-  { to: '/educator', label: 'Home', Icon: Home },
-  { to: '/educator/students', label: 'Students', Icon: School },
-  { to: '/educator/calendar', label: 'Calendar', Icon: Calendar },
-];
+  { to: '/educator', labelKey: 'nav.home', Icon: Home },
+  { to: '/educator/students', labelKey: 'nav.students', Icon: School },
+  { to: '/educator/calendar', labelKey: 'nav.calendar', Icon: Calendar },
+] as const;
 
 const studentNavItems = [
-  { to: '/student', label: 'Home', Icon: Home },
-];
+  { to: '/student', labelKey: 'nav.home', Icon: Home },
+] as const;
 
 // "Administration" group. Schools is DistrictAdmin-only; Staff is visible to
 // both DistrictAdmin and SchoolAdmin. Each item declares whether SchoolAdmin
 // may see it so the group can mix scopes.
-const adminNavItems: {
-  to: string;
-  label: string;
-  Icon: typeof School;
-  schoolAdmin: boolean;
-}[] = [
-  { to: '/educator/admin/schools', label: 'Schools', Icon: School, schoolAdmin: false },
-  { to: '/educator/admin/staff', label: 'Staff', Icon: Users, schoolAdmin: true },
-  { to: '/educator/admin/compliance', label: 'Compliance', Icon: ClipboardCheck, schoolAdmin: true },
-  { to: '/educator/admin/imports', label: 'Import', Icon: Upload, schoolAdmin: true },
-  { to: '/educator/admin/activity', label: 'Activity log', Icon: ScrollText, schoolAdmin: true },
+const adminNavItems = [
+  { to: '/educator/admin/schools', labelKey: 'nav.schools', Icon: School, schoolAdmin: false },
+  { to: '/educator/admin/staff', labelKey: 'nav.staff', Icon: Users, schoolAdmin: true },
+  { to: '/educator/admin/compliance', labelKey: 'nav.compliance', Icon: ClipboardCheck, schoolAdmin: true },
+  { to: '/educator/admin/imports', labelKey: 'nav.import', Icon: Upload, schoolAdmin: true },
+  { to: '/educator/admin/activity', labelKey: 'nav.activityLog', Icon: ScrollText, schoolAdmin: true },
   // District-scoped export jobs span every school, so — like Schools — this is
   // DistrictAdmin-only, not offered to a SchoolAdmin.
-  { to: '/educator/admin/exports', label: 'Exports', Icon: Download, schoolAdmin: false },
-];
+  { to: '/educator/admin/exports', labelKey: 'nav.exports', Icon: Download, schoolAdmin: false },
+] as const;
 
 // Pilot-gates plan, phase 4, decision 8: linked in the sidebar footer.
 // `VITE_MARKETING_URL` — when the marketing site is deployed somewhere other
@@ -64,6 +64,7 @@ interface SidebarProps {
 export function Sidebar({ onLogout }: SidebarProps) {
   const location = useLocation();
   const { user } = useAuth();
+  const { t } = useTranslation('common');
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActive = (path: string) =>
@@ -116,7 +117,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
       </div>
 
       <nav className="flex-1 px-3 space-y-1">
-        {navItems.map(({ to, label, Icon }) => {
+        {navItems.map(({ to, labelKey, Icon }) => {
           const active = itemIsActive(to);
           const testId = `nav-${to.slice(1)}`;
           return (
@@ -132,7 +133,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
               }`}
             >
               <Icon size={18} strokeWidth={1.8} />
-              {label}
+              {t(labelKey)}
             </Link>
           );
         })}
@@ -142,10 +143,10 @@ export function Sidebar({ onLogout }: SidebarProps) {
           className="flex items-center gap-3 px-3 py-2.5 rounded-button text-sm text-brand-slate-400 hover:text-brand-slate-200 hover:bg-brand-slate-700 transition-colors"
         >
           <LifeBuoy size={18} strokeWidth={1.8} />
-          Support
+          {t('nav.support')}
         </a>
         <p className="px-3 text-[11px] text-brand-slate-500" data-testid="nav-support-note">
-          We reply within 1 business day
+          {t('nav.supportNote')}
         </p>
       </nav>
 
@@ -165,10 +166,10 @@ export function Sidebar({ onLogout }: SidebarProps) {
         <div className="px-3 mt-2" data-testid="district-admin-nav">
           <div className="border-t border-brand-slate-700 pt-3 mb-2">
             <span className="px-3 text-[10px] uppercase tracking-wider font-semibold text-brand-teal-400">
-              Administration
+              {t('nav.administration')}
             </span>
           </div>
-          {visibleAdminItems.map(({ to, label, Icon }) => (
+          {visibleAdminItems.map(({ to, labelKey, Icon }) => (
             <Link
               key={to}
               to={to}
@@ -181,7 +182,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
               }`}
             >
               <Icon size={18} strokeWidth={1.8} />
-              {label}
+              {t(labelKey)}
             </Link>
           ))}
         </div>
@@ -191,7 +192,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
         <div className="px-3 mt-2">
           <div className="border-t border-brand-slate-700 pt-3 mb-2">
             <span className="px-3 text-[10px] uppercase tracking-wider font-semibold text-brand-teal-400">
-              Admin
+              {t('nav.adminSection')}
             </span>
           </div>
           <Link
@@ -205,7 +206,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
             }`}
           >
             <LayoutDashboard size={18} strokeWidth={1.8} />
-            Dashboard
+            {t('nav.adminDashboard')}
           </Link>
           <Link
             to="/admin/users"
@@ -218,7 +219,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
             }`}
           >
             <Shield size={18} strokeWidth={1.8} />
-            Users
+            {t('nav.adminUsers')}
           </Link>
           <Link
             to="/admin/templates"
@@ -231,7 +232,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
             }`}
           >
             <FileText size={18} strokeWidth={1.8} />
-            Templates
+            {t('nav.adminTemplates')}
           </Link>
           <Link
             to="/admin/notifications"
@@ -244,7 +245,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
             }`}
           >
             <MailWarning size={18} strokeWidth={1.8} />
-            Email failures
+            {t('nav.adminNotifications')}
           </Link>
           <Link
             to="/admin/email"
@@ -257,7 +258,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
             }`}
           >
             <Mail size={18} strokeWidth={1.8} />
-            Outbound email
+            {t('nav.adminEmail')}
           </Link>
           <Link
             to="/admin/audit"
@@ -270,7 +271,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
             }`}
           >
             <ShieldCheck size={18} strokeWidth={1.8} />
-            Audit integrity
+            {t('nav.adminAudit')}
           </Link>
         </div>
       )}
@@ -297,7 +298,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
           className="flex items-center gap-2 text-sm text-brand-slate-400 hover:text-brand-slate-200 transition-colors"
         >
           <LogOut size={16} strokeWidth={1.8} />
-          Sign Out
+          {t('nav.signOut')}
         </button>
         <a
           href={TRUST_URL}
@@ -306,8 +307,11 @@ export function Sidebar({ onLogout }: SidebarProps) {
           data-testid="nav-trust"
           className="mt-3 block text-xs text-brand-slate-500 hover:text-brand-slate-300 transition-colors"
         >
-          Trust &amp; privacy
+          {t('nav.trustPrivacy')}
         </a>
+        <div className="mt-3">
+          <LanguageSwitcher tone="onDark" data-testid="sidebar-language-switcher" />
+        </div>
       </div>
     </>
   );
@@ -319,7 +323,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
         onClick={() => setMobileOpen(true)}
         className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-button bg-brand-slate-800 text-white"
         data-testid="mobile-menu-open"
-        aria-label="Open navigation"
+        aria-label={t('nav.openNavigation')}
       >
         <Menu size={20} strokeWidth={1.8} />
       </button>
@@ -342,7 +346,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
           onClick={() => setMobileOpen(false)}
           className="absolute top-4 right-4 text-brand-slate-400 hover:text-white"
           data-testid="mobile-menu-close"
-          aria-label="Close navigation"
+          aria-label={t('nav.closeNavigation')}
         >
           <X size={20} strokeWidth={1.8} />
         </button>

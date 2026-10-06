@@ -1,0 +1,108 @@
+{
+  "brand": {
+    "namePrefix": "IEP ",
+    "nameHighlight": "Advisor",
+    "tagline": "Navigate with confidence"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "myChildren": "My Children",
+    "etrs": "ETRs",
+    "home": "Home",
+    "students": "Students",
+    "calendar": "Calendar",
+    "notifications": "Notifications",
+    "profile": "Profile",
+    "knowledgeBase": "Knowledge Base",
+    "iep101": "IEP 101",
+    "schools": "Schools",
+    "staff": "Staff",
+    "compliance": "Compliance",
+    "import": "Import",
+    "activityLog": "Activity log",
+    "exports": "Exports",
+    "administration": "Administration",
+    "adminSection": "Admin",
+    "adminDashboard": "Dashboard",
+    "adminUsers": "Users",
+    "adminTemplates": "Templates",
+    "adminNotifications": "Email failures",
+    "adminEmail": "Outbound email",
+    "adminAudit": "Audit integrity",
+    "support": "Support",
+    "supportNote": "We reply within 1 business day",
+    "signOut": "Sign Out",
+    "trustPrivacy": "Trust & privacy",
+    "openNavigation": "Open navigation",
+    "closeNavigation": "Close navigation"
+  },
+  "ui": {
+    "cancel": "Cancel",
+    "closeDialog": "Close dialog",
+    "loading": "Loading…",
+    "previous": "Previous",
+    "next": "Next",
+    "pageOf": "Page {{page}} of {{pageCount}}",
+    "showingRange": "Showing {{first}}–{{last}} of {{total}}",
+    "noResults": "No results",
+    "rowsPerPage": "Rows per page",
+    "selectAllRows": "Select all rows on this page",
+    "selectRow": "Select {{label}}",
+    "actions": "Actions",
+    "rowActions": "Row actions",
+    "actionsFor": "Actions for {{label}}",
+    "nothingToShow": "Nothing to show yet.",
+    "breadcrumb": "Breadcrumb",
+    "required": "(required)"
+  },
+  "toast": {
+    "dismiss": "Dismiss notification"
+  },
+  "richText": {
+    "formatting": "Formatting",
+    "linkUrl": "Link URL",
+    "linkUrlPlaceholder": "https://…",
+    "link": "Link",
+    "bold": "Bold",
+    "italic": "Italic",
+    "strikethrough": "Strikethrough",
+    "heading2": "Heading 2",
+    "heading3": "Heading 3",
+    "bulletList": "Bullet list",
+    "numberedList": "Numbered list",
+    "quote": "Quote",
+    "undo": "Undo",
+    "redo": "Redo"
+  },
+  "pdfViewer": {
+    "documentParsed": "Document parsed",
+    "couldNotLoad": "Couldn't load the document.",
+    "couldNotLoadTitle": "Couldn't load the document",
+    "noDocument": "No document attached.",
+    "previewUnavailable": "Inline preview isn't available for this file.",
+    "documentPreview": "Document preview",
+    "openInNewTab": "Open in new tab",
+    "download": "Download",
+    "document": "Document"
+  },
+  "charts": {
+    "label": "Label",
+    "value": "Value",
+    "point": "Point"
+  },
+  "routes": {
+    "loadingAdvocate": "Loading the advocate…"
+  },
+  "relativeTime": {
+    "justNow": "just now",
+    "minutesAgo": "{{n}}m ago",
+    "hoursAgo": "{{n}}h ago",
+    "daysAgo": "{{n}}d ago"
+  },
+  "languageSwitcher": {
+    "label": "Idioma / Language",
+    "en": "English",
+    "es": "Español",
+    "updateFailed": "Couldn't save your language preference"
+  }
+}

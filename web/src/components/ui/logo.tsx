@@ -1,4 +1,5 @@
 import { CheckCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface LogoProps extends React.ComponentPropsWithoutRef<'div'> {
   variant?: 'light' | 'dark';
@@ -13,6 +14,7 @@ const sizes = {
 };
 
 export function Logo({ variant = 'light', size = 'md', showTagline = true, ...rest }: LogoProps) {
+  const { t } = useTranslation('common');
   const s = sizes[size];
   const textColor = variant === 'dark' ? 'text-white' : 'text-brand-slate-800';
 
@@ -23,12 +25,13 @@ export function Logo({ variant = 'light', size = 'md', showTagline = true, ...re
       </div>
       <div>
         <div className={`${s.text} font-serif leading-none`}>
-          <span className={textColor}>IEP </span>
-          <span className="text-brand-teal-500 font-semibold">Advisor</span>
+          {/* The brand name itself is never translated (glossary-es.md). */}
+          <span className={textColor}>{t('brand.namePrefix')}</span>
+          <span className="text-brand-teal-500 font-semibold">{t('brand.nameHighlight')}</span>
         </div>
         {showTagline && (
           <p className={`${s.tagline} font-semibold uppercase tracking-[0.12em] ${variant === 'dark' ? 'text-brand-slate-400' : 'text-brand-slate-500'} mt-0.5`}>
-            Navigate with confidence
+            {t('brand.tagline')}
           </p>
         )}
       </div>
