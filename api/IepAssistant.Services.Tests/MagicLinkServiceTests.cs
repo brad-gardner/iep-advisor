@@ -317,7 +317,7 @@ public sealed class MagicLinkServiceTests : IDisposable
     {
         public string? LastMagicLinkUrl { get; private set; }
 
-        public override Task SendMagicLinkEmailAsync(string toEmail, string firstName, string magicLinkUrl, CancellationToken ct = default)
+        public override Task SendMagicLinkEmailAsync(string toEmail, string firstName, string magicLinkUrl, string? language = null, CancellationToken ct = default)
         {
             LastMagicLinkUrl = magicLinkUrl;
             return Task.CompletedTask;

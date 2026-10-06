@@ -63,6 +63,7 @@ public sealed class JwtTokenFactory
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 State = user.State,
+                PreferredLanguage = user.PreferredLanguage,
                 Role = user.Role.ToString(),
                 IsActive = user.IsActive,
                 OnboardingCompleted = user.OnboardingCompletedAt.HasValue,

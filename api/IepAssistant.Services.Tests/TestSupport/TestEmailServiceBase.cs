@@ -12,7 +12,7 @@ namespace IepAssistant.Services.Tests.TestSupport;
 /// </summary>
 public class TestEmailServiceBase : IEmailService
 {
-    public virtual Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default) => Task.CompletedTask;
+    public virtual Task SendPasswordResetEmailAsync(string toEmail, string resetToken, string? language = null, CancellationToken ct = default) => Task.CompletedTask;
     public virtual Task SendShareInviteEmailAsync(string toEmail, string inviterName, string childName, string role, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
     public virtual Task SendSchoolLinkInviteEmailAsync(string toEmail, string educatorName, string schoolName, string studentName, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
     public virtual Task SendStudentInviteEmailAsync(string toEmail, string inviterName, string context, string inviteToken, CancellationToken ct = default) => Task.CompletedTask;
@@ -30,5 +30,5 @@ public class TestEmailServiceBase : IEmailService
     public virtual Task SendDigestAsync(string toEmail, DigestEmailModel model, CancellationToken ct = default) => Task.CompletedTask;
 
     // Pilot-gates plan, phase 3.
-    public virtual Task SendMagicLinkEmailAsync(string toEmail, string firstName, string magicLinkUrl, CancellationToken ct = default) => Task.CompletedTask;
+    public virtual Task SendMagicLinkEmailAsync(string toEmail, string firstName, string magicLinkUrl, string? language = null, CancellationToken ct = default) => Task.CompletedTask;
 }

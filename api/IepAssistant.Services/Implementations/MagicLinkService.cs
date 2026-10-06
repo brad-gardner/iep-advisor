@@ -86,7 +86,8 @@ public class MagicLinkService : IMagicLinkService
         await _context.SaveChangesAsync(ct);
 
         var magicLinkUrl = $"{_frontendUrl}/auth/magic?token={Uri.EscapeDataString(rawToken)}";
-        await _emailService.SendMagicLinkEmailAsync(user.Email, user.FirstName, magicLinkUrl, ct);
+        // Plan 2026-10-06 phase 1: render in the account's saved language.
+        await _emailService.SendMagicLinkEmailAsync(user.Email, user.FirstName, magicLinkUrl, user.PreferredLanguage, ct);
     }
 
     public async Task<MagicLinkConsumeResult> ConsumeAsync(string token, CancellationToken ct = default)

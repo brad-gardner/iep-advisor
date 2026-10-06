@@ -53,7 +53,7 @@ public sealed class AuthServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private AuthService CreateService(ApplicationDbContext ctx)
-        => new(_configuration, new UserRepository(ctx), ctx);
+        => new(_configuration, new UserRepository(ctx), ctx, TestSupport.TestLocalizers.Messages());
 
     private static RegisterDistrictModel Model(string email, string district, string? state = "OH") => new()
     {

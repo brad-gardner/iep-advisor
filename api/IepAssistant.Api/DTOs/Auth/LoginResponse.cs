@@ -14,6 +14,11 @@ public class UserDto
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string? State { get; set; }
+
+    /// <summary>"en" or "es", lowercase; null until resolved/saved. Serializes camelCase as
+    /// <c>preferredLanguage</c>.</summary>
+    public string? PreferredLanguage { get; set; }
+
     public string Role { get; set; } = string.Empty;
     public bool IsActive { get; set; }
     public bool OnboardingCompleted { get; set; }

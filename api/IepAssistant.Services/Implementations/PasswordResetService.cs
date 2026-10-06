@@ -56,8 +56,8 @@ public class PasswordResetService : IPasswordResetService
         _context.PasswordResetTokens.Add(resetToken);
         await _context.SaveChangesAsync(ct);
 
-        // Send email with the raw token
-        await _emailService.SendPasswordResetEmailAsync(email, rawToken, ct);
+        // Send email with the raw token, in the account's saved language (plan 2026-10-06 phase 1).
+        await _emailService.SendPasswordResetEmailAsync(email, rawToken, user.PreferredLanguage, ct);
     }
 
     public async Task<ServiceResult> ResetPasswordAsync(string token, string newPassword, CancellationToken ct = default)

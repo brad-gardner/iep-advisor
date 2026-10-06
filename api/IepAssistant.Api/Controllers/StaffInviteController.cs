@@ -81,6 +81,7 @@ public class StaffInviteController : ControllerBase
                 FirstName = auth.User.FirstName,
                 LastName = auth.User.LastName,
                 State = auth.User.State,
+                PreferredLanguage = auth.User.PreferredLanguage,
                 Role = auth.User.Role,
                 IsActive = auth.User.IsActive,
                 OnboardingCompleted = auth.User.OnboardingCompleted,

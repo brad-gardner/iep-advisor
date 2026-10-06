@@ -15,6 +15,11 @@ public class UserModel
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string? State { get; set; }
+
+    /// <summary>"en" or "es", lowercase; null until resolved/saved. See
+    /// <see cref="Localization.SupportedLanguages"/>.</summary>
+    public string? PreferredLanguage { get; set; }
+
     public string Role { get; set; } = string.Empty;
     public bool IsActive { get; set; }
     public bool OnboardingCompleted { get; set; }
@@ -69,6 +74,11 @@ public class UpdateProfileModel
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
     public string? State { get; set; }
+
+    /// <summary>Null/omitted leaves the stored preference unchanged; "en"/"es" (case-insensitive) sets it
+    /// (stored lowercase); anything else is a validation failure — see
+    /// <see cref="Implementations.AuthService.UpdateProfileAsync"/>.</summary>
+    public string? PreferredLanguage { get; set; }
 }
 
 public class MfaSetupResult

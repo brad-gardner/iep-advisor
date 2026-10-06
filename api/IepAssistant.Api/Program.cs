@@ -1,11 +1,14 @@
+using System.Globalization;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
+using IepAssistant.Api.Localization;
 using Scalar.AspNetCore;
 using Serilog;
 using Serilog.Events;
@@ -67,6 +70,29 @@ builder.Host.UseSerilog();
 // Add layers via extension methods
 builder.Services.AddDomain(builder.Configuration);
 builder.Services.AddServices();
+
+// Multilingual site plan (2026-10-06), phase 1: en (default) + es. ResourcesPath is relative to EACH
+// localized assembly (IepAssistant.Services/Resources/{Messages,Emails}.resx + .es.resx), not this one.
+builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    var supportedCultures = new[] { new CultureInfo("en"), new CultureInfo("es") };
+    options.DefaultRequestCulture = new RequestCulture("en");
+    options.SupportedCultures = supportedCultures;
+    options.SupportedUICultures = supportedCultures;
+    // Lets AcceptLanguageHeaderRequestCultureProvider match a region-qualified tag (e.g. "es-MX") to its
+    // neutral parent ("es") when the exact tag isn't itself in SupportedCultures/SupportedUICultures.
+    options.FallBackToParentCultures = true;
+    options.FallBackToParentUICultures = true;
+    options.RequestCultureProviders = new List<IRequestCultureProvider>
+    {
+        // Saved account preference first (requires UseAuthentication to have already run — see below),
+        // then the browser's Accept-Language header, then DefaultRequestCulture ("en").
+        new UserPreferredLanguageRequestCultureProvider(),
+        new AcceptLanguageHeaderRequestCultureProvider()
+    };
+});
 
 // Pilot-gates plan, phase 2: backs the signed account-deletion-cancellation link (AccountService /
 // POST /api/account/cancel-deletion). SetApplicationName pins the key ring's discriminator explicitly
@@ -510,6 +536,9 @@ app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
+// AFTER UseAuthentication: UserPreferredLanguageRequestCultureProvider reads HttpContext.User, which
+// authentication middleware populates from the JWT just above.
+app.UseRequestLocalization();
 app.UseAuthorization();
 app.UseRateLimiter();
 

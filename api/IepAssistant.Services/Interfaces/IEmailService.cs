@@ -4,7 +4,9 @@ namespace IepAssistant.Services.Interfaces;
 
 public interface IEmailService
 {
-    Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default);
+    /// <summary>Rendered in <paramref name="language"/> ("en"/"es", case-insensitive; null/unsupported
+    /// falls back to English) — plan 2026-10-06 phase 1.</summary>
+    Task SendPasswordResetEmailAsync(string toEmail, string resetToken, string? language = null, CancellationToken ct = default);
     Task SendShareInviteEmailAsync(string toEmail, string inviterName, string childName, string role, string inviteToken, CancellationToken ct = default);
     Task SendSchoolLinkInviteEmailAsync(string toEmail, string educatorName, string schoolName, string studentName, string inviteToken, CancellationToken ct = default);
     Task SendStudentInviteEmailAsync(string toEmail, string inviterName, string context, string inviteToken, CancellationToken ct = default);
@@ -39,6 +41,7 @@ public interface IEmailService
     Task SendDigestAsync(string toEmail, DigestEmailModel model, CancellationToken ct = default);
 
     /// <summary>Pilot-gates plan, phase 3 (C11 adoption slice): the 15-minute magic sign-in link for a
-    /// staff member eligible for magic-link sign-in.</summary>
-    Task SendMagicLinkEmailAsync(string toEmail, string firstName, string magicLinkUrl, CancellationToken ct = default);
+    /// staff member eligible for magic-link sign-in. Rendered in <paramref name="language"/> ("en"/"es",
+    /// case-insensitive; null/unsupported falls back to English) — plan 2026-10-06 phase 1.</summary>
+    Task SendMagicLinkEmailAsync(string toEmail, string firstName, string magicLinkUrl, string? language = null, CancellationToken ct = default);
 }

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="PasswordReset.Subject" xml:space="preserve">
+    <value>Restablezca su contraseña de IEP Advisor</value>
+  </data>
+  <data name="PasswordReset.Heading" xml:space="preserve">
+    <value>Restablecer su contraseña</value>
+  </data>
+  <data name="PasswordReset.Body" xml:space="preserve">
+    <value>Recibimos una solicitud para restablecer su contraseña. Haga clic en el botón de abajo para elegir una nueva. Este enlace vence en 15 minutos.</value>
+  </data>
+  <data name="PasswordReset.ButtonText" xml:space="preserve">
+    <value>Restablecer contraseña</value>
+  </data>
+  <data name="PasswordReset.Footer" xml:space="preserve">
+    <value>Si usted no solicitó esto, puede ignorar este correo electrónico de forma segura. Su contraseña no cambiará.</value>
+  </data>
+  <data name="PasswordReset.PlainTextBody" xml:space="preserve">
+    <value>Restablezca su contraseña de IEP Advisor visitando: {0}
+
+Este enlace vence en 15 minutos. Si usted no solicitó esto, ignore este correo electrónico.</value>
+  </data>
+  <data name="MagicLink.Subject" xml:space="preserve">
+    <value>Su enlace de inicio de sesión de IEP Advisor</value>
+  </data>
+  <data name="MagicLink.Heading" xml:space="preserve">
+    <value>Iniciar sesión en IEP Advisor</value>
+  </data>
+  <data name="MagicLink.Greeting" xml:space="preserve">
+    <value>Hola {0}, haga clic abajo para iniciar sesión. Este enlace vence en 15 minutos y solo se puede usar una vez.</value>
+  </data>
+  <data name="MagicLink.ButtonText" xml:space="preserve">
+    <value>Iniciar sesión</value>
+  </data>
+  <data name="MagicLink.Footer" xml:space="preserve">
+    <value>Si usted no solicitó este enlace, puede ignorar este correo electrónico de forma segura: nadie puede iniciar sesión sin él.</value>
+  </data>
+  <data name="MagicLink.PlainTextBody" xml:space="preserve">
+    <value>Hola {0}, use el siguiente enlace para iniciar sesión en IEP Advisor. Este enlace vence en 15 minutos y solo se puede usar una vez.
+
+Iniciar sesión: {1}
+
+Si usted no solicitó este enlace, puede ignorar este correo electrónico de forma segura.</value>
+  </data>
+</root>
