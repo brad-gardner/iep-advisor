@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn';
 import type { AutosaveStatus } from '@/hooks/use-autosave';
 import { useFlushRegistry } from '@/hooks/use-flush-registry';
 import { AutosaveIndicator } from '@/features/admin/templates/components/autosave-indicator';
-import type { DocumentValuePatch, TableRowValue, TemplateFieldDto, TemplateSectionDto } from '../types';
+import type { DocumentFieldValue, DocumentValuePatch, TableRowValue, TemplateFieldDto, TemplateSectionDto } from '../types';
 import type { CompletenessItem } from '../lib/completeness';
 import { isBlank } from '../lib/completeness';
 import { sectionDomId } from '../lib/section-dom';
@@ -127,7 +127,7 @@ export function SectionCard({
   // TextField/RichTextField), so the field's OWN autosave has nothing left
   // queued to retry on its own once that happens — this is the only place
   // that still has the value that failed.
-  const failedFieldsRef = useRef<Map<string, unknown>>(new Map());
+  const failedFieldsRef = useRef<Map<string, DocumentFieldValue>>(new Map());
   // Reactive mirror of `failedFieldsRef` for rendering the failure banner —
   // the ref stays the source of truth for synchronous reads.
   const [failedFields, setFailedFields] = useState<Array<{ key: string; label: string }>>([]);
@@ -257,11 +257,19 @@ export function SectionCard({
   // using the value THAT failed (not the stale `values` prop, which only
   // reflects the last successfully-saved state) — the field's own autosave
   // has nothing queued to retry on its own (see `failedFieldsRef` above).
+  // Flushes first: a field can carry a NEWER edit than the one that failed
+  // (its own debounce hasn't fired yet, or a blur flush it's mid-flight —
+  // mousedown on this very button blurs the field BEFORE the click handler
+  // runs), and `failedFieldsRef` only reflects the last SETTLED outcome.
+  // Rebuilding the patch only after that flush settles means a newer edit's
+  // own save always lands first on the serialized chain, and this never
+  // resends a now-stale value behind it.
   const handleRetryFailedSaves = async () => {
-    const patch = Object.fromEntries(failedFieldsRef.current) as DocumentValuePatch;
-    if (Object.keys(patch).length === 0) return;
     setRetrying(true);
     try {
+      await sectionFlushRegistry.flushAll();
+      const patch: DocumentValuePatch = Object.fromEntries(failedFieldsRef.current);
+      if (Object.keys(patch).length === 0) return;
       await wrappedSave(patch);
     } finally {
       setRetrying(false);
@@ -378,6 +386,12 @@ export function SectionCard({
 
   const confirmDiscard = async () => {
     if (!snapshot) {
+      // Nothing to restore — but a field could still have failed earlier
+      // (handleDiscardClick's own `changed` check reads `saveAttemptedRef`,
+      // not just the snapshot diff), so this exit must clear the record too,
+      // the same as the restored-successfully path below.
+      failedFieldsRef.current = new Map();
+      setFailedFields([]);
       confirmingDiscardRef.current = false;
       setConfirmingDiscard(false);
       onClose();
@@ -399,6 +413,16 @@ export function SectionCard({
         // the ref rather than assume "Keep editing" (disabled while
         // `restoring`) couldn't have raced it some other way.
         if (confirmingDiscardRef.current) {
+          // The restore just resent EVERY field's pre-edit value (via raw
+          // `saveValues`, not `wrappedSave`), including whichever one(s)
+          // previously failed — clear the failure record now, BEFORE
+          // closing, rather than leaving it for the next reopen. Otherwise
+          // the closed card would still show "Couldn't save" with a Retry
+          // that would resend the just-discarded value, and the registered
+          // getter would keep blocking Finalize for a section that is no
+          // longer even open.
+          failedFieldsRef.current = new Map();
+          setFailedFields([]);
           confirmingDiscardRef.current = false;
           setConfirmingDiscard(false);
           onClose();
@@ -511,8 +535,11 @@ export function SectionCard({
 
       {/* Suppressed during the discard confirmation so there is never more
           than one `role="alert"` region at once (see the comment above the
-          confirmation text) — Discard already supersedes any unsaved failure. */}
-      {!confirmingDiscard && failedFields.length > 0 && (
+          confirmation text) — Discard already supersedes any unsaved failure.
+          Gated on `isOpen` too: a CLOSED card must never show a stale failure
+          (or offer a Retry that would resend it) — the normal clearing path
+          is confirmDiscard above, but this is the backstop. */}
+      {isOpen && !confirmingDiscard && failedFields.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-3 text-sm text-brand-danger-700" role="alert">
           <span>
             Couldn&apos;t save {failedFields.map((f) => f.label).join(', ')} — check your connection and try again

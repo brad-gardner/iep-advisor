@@ -704,7 +704,11 @@ describe('AdvocatePage', () => {
   it('opens, renames and deletes conversations from the rail', async () => {
     renderPage();
     const rail = await screen.findByTestId('advocate-thread-list');
-    expect(within(rail).getByTestId('advocate-thread-1')).toHaveTextContent('PWN question');
+    // The rail container itself renders immediately (it also hosts the
+    // loading spinner); the thread rows only appear once `listAdvocateThreads`
+    // resolves and `useAdvocateThreads` commits them — await that too,
+    // rather than assuming it already landed by the time the container did.
+    expect(await within(rail).findByTestId('advocate-thread-1')).toHaveTextContent('PWN question');
 
     fireEvent.click(within(rail).getByTestId('advocate-thread-1-open'));
     await waitFor(() => expect(api.getAdvocateThread).toHaveBeenCalledWith(1));

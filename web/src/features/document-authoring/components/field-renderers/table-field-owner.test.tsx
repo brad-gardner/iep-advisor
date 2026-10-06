@@ -129,7 +129,13 @@ describe('TableField owner picker (plan 2026-10-02-002)', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
 
     fireEvent.change(screen.getByTestId(`field-${fieldKey}-row-0-owner`), { target: { value: '' } });
-    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    // `onSave` is called synchronously, but the warning is only cleared once
+    // its RESULT resolves (an extra microtask beyond the call itself) — wait
+    // for the state update, not just the call count, so this can't read the
+    // DOM a tick before that clears.
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
   });
 });
