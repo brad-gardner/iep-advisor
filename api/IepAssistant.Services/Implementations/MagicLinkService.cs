@@ -1,4 +1,3 @@
-using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -88,11 +87,9 @@ public class MagicLinkService : IMagicLinkService
         await _context.SaveChangesAsync(ct);
 
         var magicLinkUrl = $"{_frontendUrl}/auth/magic?token={Uri.EscapeDataString(rawToken)}";
-        // Plan 2026-10-06 phase 1: render in the account's saved language. No saved preference falls back
-        // to the current request's UI culture (the requester's browser Accept-Language — this flow is
-        // also unauthenticated) rather than hard-coding English.
-        var language = user.PreferredLanguage
-            ?? SupportedLanguages.Normalize(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
+        // Render in the account's saved language, falling back to the current request's UI culture when
+        // there is none (see SupportedLanguages.ForRecipient for why).
+        var language = SupportedLanguages.ForRecipient(user.PreferredLanguage);
         await _emailService.SendMagicLinkEmailAsync(user.Email, user.FirstName, magicLinkUrl, language, ct);
     }
 

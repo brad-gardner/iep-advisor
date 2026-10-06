@@ -68,6 +68,28 @@ public sealed class EmailServiceLanguageTests
     }
 
     [Fact]
+    public async Task SendPasswordResetEmail_TokenContainsPlusSlashEquals_EscapesAndRoundTripsThroughUrl()
+    {
+        // Regression: the raw base64 reset token can contain '+', '/', '=' — unescaped, a '+' decodes as
+        // a space (and '/'/'=' can confuse query parsing), corrupting the token before ResetPasswordAsync
+        // ever sees it. The magic-link URL already escapes (see MagicLinkService); this proves the
+        // password-reset URL does too, and that the escaped value decodes back to the exact original.
+        var queue = new CapturingQueue();
+        const string rawToken = "ab+c/DE==";
+
+        await CreateService(queue).SendPasswordResetEmailAsync("parent@example.com", rawToken, language: null);
+
+        var textBody = queue.LastDraft!.TextBody;
+        Assert.NotNull(textBody);
+        var match = System.Text.RegularExpressions.Regex.Match(textBody, @"token=(\S+)");
+        Assert.True(match.Success, "expected a token= query parameter in the plain-text body");
+
+        var encodedToken = match.Groups[1].Value;
+        Assert.DoesNotContain("+", encodedToken);
+        Assert.Equal(rawToken, Uri.UnescapeDataString(encodedToken));
+    }
+
+    [Fact]
     public async Task SendPasswordResetEmail_RestoresAmbientCultureAfterSending()
     {
         var original = CultureInfo.CurrentCulture;

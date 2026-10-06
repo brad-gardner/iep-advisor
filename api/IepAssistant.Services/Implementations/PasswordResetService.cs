@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
@@ -58,13 +57,9 @@ public class PasswordResetService : IPasswordResetService
         _context.PasswordResetTokens.Add(resetToken);
         await _context.SaveChangesAsync(ct);
 
-        // Send email with the raw token, in the account's saved language (plan 2026-10-06 phase 1). No
-        // saved preference (never signed in, or set before this feature existed) falls back to the
-        // CURRENT REQUEST's UI culture rather than hard-coding English — for this unauthenticated flow
-        // that's the requester's browser Accept-Language (see RequestLocalizationSetup), a better guess
-        // than the account owner's language, which this request can't yet know either way.
-        var language = user.PreferredLanguage
-            ?? SupportedLanguages.Normalize(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
+        // Send email with the raw token, in the account's saved language, falling back to the current
+        // request's UI culture when there is none (see SupportedLanguages.ForRecipient for why).
+        var language = SupportedLanguages.ForRecipient(user.PreferredLanguage);
         await _emailService.SendPasswordResetEmailAsync(email, rawToken, language, ct);
     }
 
