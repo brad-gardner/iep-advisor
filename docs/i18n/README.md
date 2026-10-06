@@ -37,30 +37,54 @@ special-education terminology), see [`glossary-es.md`](./glossary-es.md).
   module is imported somewhere, which `useTranslation` itself doesn't
   require, so a purely-lazy namespace's keys are checked by the parity test
   below rather than by `tsc`).
-- **Language resolution** (`web/src/lib/i18n/detect.ts`), in order:
+- **Language resolution** (`web/src/lib/i18n/detect.ts`), for what a page
+  *shows*, in order:
   1. the signed-in session's **cached** account language — the
      `preferredLanguage` on the last `/me` response `lib/auth` stored in
      `localStorage`, read synchronously so a page *reload* doesn't flash the
      pre-login/browser language first;
-  2. a choice made before signing in, or on a prior visit after signing out
-     (`localStorage`, or a `?lang=en|es` query param honored once by
-     `useLanguageQueryParam`);
-  3. the browser's `navigator.languages` (`es-*` → `es`);
-  4. `en`.
+  2. the visitor's **explicit** pre-login choice — the switcher, or a
+     `?lang=en|es` query param honored once by `useLanguageQueryParam`,
+     while signed out (`getPreLoginLanguage`);
+  3. the **sign-out display carry-over** — whatever language was active when
+     the previous session signed out (`getLastDisplayLanguage`), so the login
+     page doesn't flash back to the browser's language the instant someone
+     signs out;
+  4. the browser's `navigator.languages` (`es-*` → `es`);
+  5. `en`.
+
+  Signals 2 and 3 above are deliberately two different `localStorage` keys,
+  not one, and **only the explicit choice (2) may ever decide a null-
+  preference backfill** (the first sign-in for an account with no saved
+  language yet — see below). The carry-over (3) is display-only: on a
+  shared/kiosk device, the language the *previous* user left active says
+  nothing about what the *next* signed-in account should use, so
+  `AuthProvider.syncLanguagePreference`'s backfill resolves with
+  `getPreLoginLanguage() ?? detectBrowserLanguage()` — **never**
+  `i18n.language` and **never** `getLastDisplayLanguage()`. Conflating the
+  two was a real bug (a signed-out carry-over silently becoming a stranger's
+  permanent account preference); see the doc comments on `detect.ts` and
+  `AuthProvider.syncLanguagePreference` for the full reasoning.
 
   A signed-in user's language is *confirmed* separately, once `/me`
   resolves: `AuthProvider.loadUser`/`refreshUser` call `syncLanguagePreference`
   with the generation captured before that fetch started, so a stale response
   (one that resolves after a newer explicit switch) can never revert the
   language or persist a now-outdated choice — see the doc comments on
-  `AuthProvider.setLanguage`/`syncLanguagePreference` for the full race.
+  `AuthProvider.setLanguage`/`languageGenerationRef` for the full race. An
+  explicit `setLanguage` call also always awaits any backfill PUT already in
+  flight (`pendingBackfillRef`) before sending its own, so the visitor's own
+  choice is guaranteed to be the last write the server sees.
 - **Switching:** `web/src/lib/i18n/language-switcher.tsx` — the one
   `LanguageSwitcher` component, in the auth layout footer, the sidebar footer,
   and the Profile page's Language field (which also passes a `hint`).
   Switching updates `<html lang>` immediately and persists the choice
-  (account PUT when signed in, `localStorage` otherwise). Signing out keeps
-  the active language by writing it to the pre-login key, rather than
-  clearing it, so the login page doesn't fall back to the browser language.
+  (account PUT when signed in, the explicit pre-login key otherwise — never
+  the sign-out carry-over key). Signing out writes the active language to the
+  sign-out carry-over key (not the pre-login key), so the login page stays in
+  that language instead of falling back to the browser; signing in clears
+  that carry-over (its job is done) without touching the explicit pre-login
+  key.
 - **Formatting:** `web/src/lib/i18n/format.ts` (`getActiveLanguage`) plus
   `lib/format-date.ts` and `lib/relative-time.ts`, all keyed on the active
   i18next language rather than a hard-coded locale. A *computational* helper
@@ -71,6 +95,18 @@ special-education terminology), see [`glossary-es.md`](./glossary-es.md).
   converted in this phase may still show a mixed-language date (an
   unconverted page's own hard-coded `'en-US'`/`toLocaleDateString()` call);
   that's accepted until that page's phase converts it, not a Phase 1 bug.
+- **`orgRoleLabel` (`web/src/lib/org-role-label.ts`) is already translated**
+  via `common:orgRole.*`, independent of whether the *page* calling it has
+  converted yet. These callers haven't converted their own surrounding text:
+  `features/home/pages/staff-home-page.tsx`,
+  `features/district-admin/components/dashboard-invites-tile.tsx`,
+  `features/staff-invites/pages/district-staff-page.tsx`,
+  `features/educator/components/team/add-team-member-form.tsx`,
+  `features/educator/components/roster/assign-case-manager-modal.tsx`, and
+  `features/educator/components/team/team-member-row.tsx`. Expect a
+  mixed-language page (a translated role label inside otherwise-English
+  surrounding text) from these until their own phase converts them — not a
+  Phase 1 bug.
 
 ## Adding a key
 
@@ -143,8 +179,19 @@ prerequisite for marketing Spanish, not for shipping it.
 ## Tests
 
 - **Key parity:** `src/lib/i18n/locale-parity.test.ts` — every `en` key exists
-  in `es` and is non-empty (and vice versa, so nothing is orphaned).
+  in `es` and is non-empty (and vice versa, so nothing is orphaned), every
+  key's `{{placeholder}}` set matches between `en`/`es`, and every key's set
+  of `<tag>`/`</tag>` names (the components a `<Trans>` call substitutes)
+  matches too — a tag renamed on one side and not the other (e.g. the
+  reserved-word fix that turned `<context>` into `<inviter>`) fails this
+  immediately instead of silently breaking Spanish's styling.
 - **Resolution order:** `src/lib/i18n/detect.test.ts`.
+- **Key typing canary:** `src/lib/i18n/key-typing.test.ts` — `tsc`-only
+  (`npm run test:types`); a handful of `// @ts-expect-error` lines on known-
+  unknown keys (`i18n.t`, a namespaced `useTranslation().t`, `Trans`'s
+  `i18nKey`) so a future change that loosens the generated key typing to
+  `any` fails the build via "unused `@ts-expect-error`" instead of quietly
+  disabling typo-checking everywhere.
 - **Formatting:** `src/lib/format-date.test.ts` (and any other
   locale-sensitive formatter gets its own `en`/`es` cases as it's converted).
 - **Spanish render tests:** one per converted page/component, asserting the
@@ -167,9 +214,14 @@ prerequisite for marketing Spanish, not for shipping it.
   the ~600 existing English queries needed to change.
 - **No raw key leaking through, for every test, automatically:**
   `test/setup.ts` turns on `saveMissing` with a `missingKeyHandler` that
-  throws on any genuinely missing translation key (one resolved without an
-  explicit `defaultValue`, e.g. `orgRoleLabel`'s unrecognized-role fallback,
-  which is exempted). A Spanish render test no longer needs its own
+  throws on any genuinely missing translation key — one resolved without a
+  *meaningful* `defaultValue` (`opt.defaultValue !== key`). `orgRoleLabel`'s
+  unrecognized-role fallback (`{ defaultValue: name }`) is exempted this way;
+  a bare `<Trans i18nKey="some.key" />` with no children/`defaults`/
+  `tOptions.defaultValue` of its own is NOT — react-i18next quietly sets
+  `opt.defaultValue` to the key itself in that case, which is
+  indistinguishable from "no default" and must still throw on a typo. A
+  Spanish render test no longer needs its own
   `expect(document.body.textContent).not.toMatch(/ns:[a-zA-Z.]+/)` — a
   missing key fails the test the moment `t()` is called, for every
   namespace, not just the one a hand-written regex happened to name.

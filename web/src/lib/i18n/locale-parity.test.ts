@@ -33,6 +33,13 @@ function placeholdersOf(value: unknown): Set<string> {
   return new Set(names);
 }
 
+/** `<tag>`/`</tag>` names (e.g. `<district>`/`<role>`) used in a `<Trans>` string, by name — open and close tags collapse to the same entry. */
+function tagNamesOf(value: unknown): Set<string> {
+  if (typeof value !== 'string') return new Set();
+  const names = Array.from(value.matchAll(/<\/?([a-zA-Z][\w-]*)\s*\/?>/g)).map((m) => m[1]);
+  return new Set(names);
+}
+
 function setsEqual(a: Set<string>, b: Set<string>): boolean {
   if (a.size !== b.size) return false;
   for (const value of a) {
@@ -128,6 +135,22 @@ describe('locale key parity (en <-> es)', () => {
           const esPlaceholders = placeholdersOf(esFlat[key]);
           if (!setsEqual(enPlaceholders, esPlaceholders)) {
             mismatches.push(`${key}: en(reference)=${describeSet(enPlaceholders)} es=${describeSet(esPlaceholders)}`);
+          }
+        }
+
+        expect(mismatches).toEqual([]);
+      });
+
+      it('uses the same set of <tag>/</tag> names in es as in en for every key', () => {
+        const mismatches: string[] = [];
+
+        for (const [key, enValue] of Object.entries(enFlat)) {
+          const esValue = esFlat[key];
+          if (esValue === undefined) continue; // covered by the "every en key present in es" check above
+          const enTags = tagNamesOf(enValue);
+          const esTags = tagNamesOf(esValue);
+          if (!setsEqual(enTags, esTags)) {
+            mismatches.push(`${key}: en=${describeSet(enTags)} es=${describeSet(esTags)}`);
           }
         }
 

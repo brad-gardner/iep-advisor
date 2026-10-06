@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { removeToken, setStoredUser } from '@/lib/auth';
 import {
   detectBrowserLanguage,
   detectInitialLanguage,
@@ -64,8 +65,14 @@ describe('pre-login language storage', () => {
 });
 
 describe('detectInitialLanguage resolution order', () => {
-  beforeEach(() => clearPreLoginLanguage());
-  afterEach(() => clearPreLoginLanguage());
+  beforeEach(() => {
+    clearPreLoginLanguage();
+    removeToken(); // also clears the cached user `lib/auth` stores
+  });
+  afterEach(() => {
+    clearPreLoginLanguage();
+    removeToken();
+  });
 
   it('prefers a stored pre-login choice over the browser languages', () => {
     setPreLoginLanguage('es');
@@ -78,5 +85,28 @@ describe('detectInitialLanguage resolution order', () => {
 
   it('falls back to en when neither a stored choice nor a supported browser language exists', () => {
     expect(detectInitialLanguage(['fr-FR'])).toBe('en');
+  });
+
+  // This is the ONLY coverage of the cached-account-language priority: it's
+  // what `index.ts` relies on to show a reloaded, already-signed-in page in
+  // the right language before React (and `AuthProvider.loadUser`) ever
+  // mounts — `loadUser` deliberately does not re-apply it (see its doc
+  // comment), so there is no other startup-time test of this ordering.
+  it("prefers the signed-in session's cached account language over a pre-login choice or the browser", () => {
+    setStoredUser(JSON.stringify({ preferredLanguage: 'es' }));
+    setPreLoginLanguage('en');
+    expect(detectInitialLanguage(['en-US'])).toBe('es');
+  });
+
+  it('falls through to a pre-login choice when the cached account has no supported preference', () => {
+    setStoredUser(JSON.stringify({ preferredLanguage: null }));
+    setPreLoginLanguage('es');
+    expect(detectInitialLanguage(['en-US'])).toBe('es');
+  });
+
+  it('ignores an unparseable cached user record', () => {
+    localStorage.setItem('iep-assistant_user', '{not json');
+    setPreLoginLanguage('es');
+    expect(detectInitialLanguage(['en-US'])).toBe('es');
   });
 });

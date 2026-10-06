@@ -135,6 +135,12 @@ export function StaffAcceptInvitePage() {
                 schoolSuffix: preview.schoolName ? ` · ${preview.schoolName}` : '',
                 role: orgRoleLabel(preview.roleName),
               }}
+              // `district`/`schoolSuffix` come from the district's own
+              // naming — escape it during interpolation and unescape only
+              // for display, so a literal "<" in it can never be parsed as
+              // one of the tags below.
+              tOptions={{ interpolation: { escapeValue: true } }}
+              shouldUnescape
               components={{
                 district: <span className="font-medium text-brand-slate-800" />,
                 role: <span className="font-medium text-brand-slate-800" />,

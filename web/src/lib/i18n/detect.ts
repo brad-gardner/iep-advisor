@@ -10,10 +10,32 @@
  *      or pre-login language before `AuthProvider` gets a chance to confirm
  *      it. A fresh (not-yet-cached) sign-in still goes through
  *      `AuthProvider.loadUser`/`syncLanguagePreference` once `/me` resolves;
- *   2. a language chosen before signing in, or on a prior visit after
- *      signing out (`localStorage`);
- *   3. the browser's `navigator.languages` (`es-*` -> `es`);
- *   4. `en`.
+ *   2. the visitor's **explicit** pre-login choice — the switcher or a
+ *      `?lang=` visit while signed out (`getPreLoginLanguage`);
+ *   3. the **display-only** carry-over from the previous session's sign-out
+ *      (`getLastDisplayLanguage`) — so the login page doesn't flash back to
+ *      the browser's language the instant someone signs out;
+ *   4. the browser's `navigator.languages` (`es-*` -> `es`);
+ *   5. `en`.
+ *
+ * Two different signals can populate "the language to show while signed
+ * out," and they must never be confused with each other — a shared device
+ * is why:
+ *   - `getPreLoginLanguage`/`setPreLoginLanguage` — the **explicit** choice:
+ *     someone actually picked this language (the switcher, or a `?lang=`
+ *     visit) while no one was signed in. This is the ONLY signal that may
+ *     ever be used to *backfill* a null `preferredLanguage` on sign-in (see
+ *     `AuthProvider.syncLanguagePreference`) — it is, in fact, something a
+ *     real visitor chose.
+ *   - `getLastDisplayLanguage`/`setLastDisplayLanguage` — the **carry-over**:
+ *     whatever language happened to be active when the previous user signed
+ *     out. It's correct for *that* language to keep showing on the login
+ *     page (nobody wants the UI to jump back to the browser's language the
+ *     instant someone logs out), but it is NOT anyone's choice about what
+ *     the *next* signed-in account should use — on a shared/kiosk device,
+ *     the next person to sign in may have nothing to do with the language
+ *     the previous one left active. Never use this to decide a backfill, and
+ *     never treat it as equivalent to an explicit pre-login choice.
  *
  * Exposed as pure functions over injectable inputs so the order itself is
  * unit-testable without touching i18next or the DOM.
@@ -26,6 +48,7 @@ export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 export const DEFAULT_LANGUAGE: SupportedLanguage = 'en';
 
 const PRE_LOGIN_LANGUAGE_KEY = 'iep-assistant_lang_prelogin';
+const LAST_DISPLAY_LANGUAGE_KEY = 'iep-assistant_lang_last_display';
 
 export function isSupportedLanguage(value: string | null | undefined): value is SupportedLanguage {
   return !!value && (SUPPORTED_LANGUAGES as readonly string[]).includes(value);
@@ -38,7 +61,12 @@ function normalizeToSupported(tag: string | null | undefined): SupportedLanguage
   return isSupportedLanguage(base) ? base : null;
 }
 
-/** The language chosen before the visitor signed in, if any (`?lang=` or the switcher). */
+/**
+ * The language the visitor **explicitly** chose before signing in — the
+ * switcher, or a `?lang=` visit — while no one was signed in. The only
+ * pre-login signal that may ever back a null-preference backfill (see the
+ * module doc comment above and `AuthProvider.syncLanguagePreference`).
+ */
 export function getPreLoginLanguage(): SupportedLanguage | null {
   try {
     return normalizeToSupported(localStorage.getItem(PRE_LOGIN_LANGUAGE_KEY));
@@ -58,16 +86,48 @@ export function setPreLoginLanguage(language: SupportedLanguage): void {
   }
 }
 
-/**
- * Not called by app code — `AuthProvider.logout` now *sets* the pre-login
- * key to whatever language was active (so it survives sign-out) rather than
- * clearing it. Kept, and exported, purely as test cleanup: several specs
- * reset storage between cases without hardcoding this module's private
- * key.
- */
+/** Test cleanup for the explicit pre-login key — see the module doc comment. */
 export function clearPreLoginLanguage(): void {
   try {
     localStorage.removeItem(PRE_LOGIN_LANGUAGE_KEY);
+  } catch {
+    // Nothing to clean up if storage isn't available.
+  }
+}
+
+/**
+ * The language that was active when the previous session signed out —
+ * display-only (see the module doc comment above). Used by
+ * `detectInitialLanguage` ONLY to choose what the login page shows; never a
+ * basis for backfilling the next signed-in account's `preferredLanguage`.
+ */
+export function getLastDisplayLanguage(): SupportedLanguage | null {
+  try {
+    return normalizeToSupported(localStorage.getItem(LAST_DISPLAY_LANGUAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+/** Called by `AuthProvider.logout` to carry the active language onto the login page. */
+export function setLastDisplayLanguage(language: SupportedLanguage): void {
+  try {
+    localStorage.setItem(LAST_DISPLAY_LANGUAGE_KEY, language);
+  } catch {
+    // Best effort — the login page falls back to the explicit pre-login
+    // choice, then browser detection, if this isn't remembered.
+  }
+}
+
+/**
+ * Called by `AuthProvider` after a successful sign-in (the carry-over's job
+ * is done — the language is now the account's own concern) and by test
+ * cleanup, resetting storage between cases without hardcoding this module's
+ * private key.
+ */
+export function clearLastDisplayLanguage(): void {
+  try {
+    localStorage.removeItem(LAST_DISPLAY_LANGUAGE_KEY);
   } catch {
     // Nothing to clean up if storage isn't available.
   }
@@ -104,10 +164,18 @@ export function detectBrowserLanguage(
 
 /**
  * The language i18next initializes with, synchronously, before React
- * mounts: the cached account language, else a pre-login choice, else the
- * browser's languages, else `en`. `languages` is injectable for
- * deterministic tests.
+ * mounts: the cached account language, else an explicit pre-login choice,
+ * else the sign-out display carry-over, else the browser's languages, else
+ * `en`. `languages` is injectable for deterministic tests.
+ *
+ * Display-only resolution — never call this (or `getLastDisplayLanguage`)
+ * from a backfill decision; see the module doc comment above.
  */
 export function detectInitialLanguage(languages?: readonly string[]): SupportedLanguage {
-  return getStoredUserLanguage() ?? getPreLoginLanguage() ?? detectBrowserLanguage(languages);
+  return (
+    getStoredUserLanguage() ??
+    getPreLoginLanguage() ??
+    getLastDisplayLanguage() ??
+    detectBrowserLanguage(languages)
+  );
 }

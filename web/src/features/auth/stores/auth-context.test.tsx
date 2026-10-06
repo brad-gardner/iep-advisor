@@ -1,8 +1,15 @@
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { removeToken, setStoredUser, setToken } from '@/lib/auth';
-import { getPreLoginLanguage, clearPreLoginLanguage } from '@/lib/i18n/detect';
+import {
+  getPreLoginLanguage,
+  setPreLoginLanguage,
+  clearPreLoginLanguage,
+  setLastDisplayLanguage,
+  clearLastDisplayLanguage,
+} from '@/lib/i18n/detect';
 import i18n from '@/lib/i18n';
 import type { User } from '@/types/api';
 
@@ -36,14 +43,18 @@ function makeUser(overrides: Partial<User> = {}): User {
 }
 
 // A minimal consumer so the test can drive `setLanguage` directly without a
-// full page's unrelated UI.
+// full page's unrelated UI. `probe-result` surfaces the last call's return
+// value (not exposed by the real `LanguageSwitcher`, which only renders a
+// generic error message) for tests that need to assert on it directly.
 function LanguageProbe() {
   const { setLanguage, user } = useAuth();
+  const [lastResult, setLastResult] = useState<string | null>(null);
   return (
     <div>
       <span data-testid="probe-user">{user ? user.preferredLanguage ?? 'null' : 'signed-out'}</span>
-      <button onClick={() => void setLanguage('es')}>switch</button>
-      <button onClick={() => void setLanguage('en')}>switch-en</button>
+      <span data-testid="probe-result">{lastResult ?? 'none'}</span>
+      <button onClick={() => void setLanguage('es').then((r) => setLastResult(JSON.stringify(r)))}>switch</button>
+      <button onClick={() => void setLanguage('en').then((r) => setLastResult(JSON.stringify(r)))}>switch-en</button>
     </div>
   );
 }
@@ -65,6 +76,22 @@ function renderProbe() {
       <LanguageProbe />
     </AuthProvider>
   );
+}
+
+/**
+ * Shadows `navigator.languages` (an own, configurable property on the
+ * instance, overriding the prototype getter jsdom defines) for a single
+ * test's "browser language" — restore it afterward so later tests see
+ * jsdom's own default again.
+ */
+function stubBrowserLanguages(languages: string[]): () => void {
+  Object.defineProperty(window.navigator, 'languages', {
+    configurable: true,
+    get: () => languages,
+  });
+  return () => {
+    delete (window.navigator as unknown as { languages?: unknown }).languages;
+  };
 }
 
 describe('AuthProvider.setLanguage', () => {
@@ -90,6 +117,27 @@ describe('AuthProvider.setLanguage', () => {
     await waitFor(() => expect(getPreLoginLanguage()).toBe('es'));
     expect(authApi.updateProfile).not.toHaveBeenCalled();
     expect(i18n.language).toBe('es');
+  });
+
+  it('fails without persisting when the language load resolves but reverts (resolvedLanguage !== requested)', async () => {
+    const user = userEvent.setup();
+    renderProbe();
+    await screen.findByText('signed-out');
+
+    // Simulate `changeLanguage('es')` resolving (no throw) without actually
+    // switching — e.g. the lazy Spanish chunk failed and `index.ts`'s
+    // `failedLoading` handler reverted to English before this resolved.
+    // `i18n.resolvedLanguage` therefore still reads 'en', not the requested
+    // 'es'.
+    const changeLanguageSpy = vi.spyOn(i18n, 'changeLanguage').mockResolvedValue(i18n.t);
+
+    await user.click(screen.getByRole('button', { name: 'switch' }));
+
+    await waitFor(() => expect(screen.getByTestId('probe-result')).toHaveTextContent('"success":false'));
+
+    changeLanguageSpy.mockRestore();
+    expect(getPreLoginLanguage()).toBeNull(); // never persisted
+    expect(authApi.updateProfile).not.toHaveBeenCalled();
   });
 
   it('PUTs the choice to the account when signed in', async () => {
@@ -224,7 +272,7 @@ describe('language sync races', () => {
     expect(i18n.language).toBe('es');
   });
 
-  it('keeps an explicit switch when it races a background PUT for a null (first-sign-in) preference', async () => {
+  it('keeps an explicit switch when it races a background PUT for a null (first-sign-in) preference, sending it last', async () => {
     const newUser = makeUser({ preferredLanguage: null });
     setToken('a-jwt');
     setStoredUser(JSON.stringify(newUser));
@@ -245,17 +293,80 @@ describe('language sync races', () => {
     // user does anything.
     await waitFor(() => expect(authApi.updateProfile).toHaveBeenCalledTimes(1));
 
-    // The explicit switch's own PUT resolves normally and wins.
+    // `setLanguage` now deliberately awaits that in-flight backfill before
+    // sending its own PUT (see `AuthProvider.setLanguage`'s
+    // `pendingBackfillRef` await), so the explicit choice is guaranteed to
+    // be the LAST write the server sees rather than merely racing it.
+    // Resolve the backfill (with its stale, pre-switch resolved language)
+    // before clicking, so `setLanguage`'s await has something to resolve to.
+    resolveBackgroundPut({ success: true, data: { ...newUser, preferredLanguage: 'en' } });
+
     await user.click(screen.getByRole('button', { name: 'switch' }));
     await waitFor(() => expect(screen.getByTestId('probe-user')).toHaveTextContent('es'));
 
-    // Only now does the background PUT (for the stale, pre-switch resolved
-    // language) resolve. It must not clobber the explicit choice.
-    resolveBackgroundPut({ success: true, data: { ...newUser, preferredLanguage: 'en' } });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(screen.getByTestId('probe-user')).toHaveTextContent('es');
+    expect(authApi.updateProfile).toHaveBeenCalledTimes(2);
+    expect(authApi.updateProfile).toHaveBeenNthCalledWith(1, { preferredLanguage: 'en' });
+    expect(authApi.updateProfile).toHaveBeenNthCalledWith(2, { preferredLanguage: 'es' });
     expect(i18n.language).toBe('es');
     expect(getPreLoginLanguage()).toBeNull();
+  });
+});
+
+describe('shared-device language carry-over (logout -> sign-in)', () => {
+  let restoreBrowserLanguages: () => void;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    removeToken();
+    clearPreLoginLanguage();
+    clearLastDisplayLanguage();
+    restoreBrowserLanguages = stubBrowserLanguages(['en-US']); // the next signed-in user's "browser"
+  });
+
+  afterEach(async () => {
+    removeToken();
+    clearPreLoginLanguage();
+    clearLastDisplayLanguage();
+    restoreBrowserLanguages();
+    await i18n.changeLanguage('en');
+  });
+
+  it("does not backfill the next signed-in user's null preference with the previous user's sign-out carry-over", async () => {
+    // User A (Spanish) signs out: `AuthProvider.logout` records the
+    // carry-over for *display* only — never the explicit pre-login key.
+    await i18n.changeLanguage('es');
+    setLastDisplayLanguage('es');
+    expect(getPreLoginLanguage()).toBeNull();
+
+    // User B — no saved preference, English browser — signs in.
+    const userB = makeUser({ id: 2, email: 'bea@example.com', preferredLanguage: null });
+    setToken('b-jwt');
+    setStoredUser(JSON.stringify(userB));
+    authApi.getCurrentUser.mockResolvedValue({ success: true, data: userB });
+    authApi.updateProfile.mockResolvedValue({ success: true, data: { ...userB, preferredLanguage: 'en' } });
+
+    renderProbe();
+
+    await waitFor(() =>
+      expect(authApi.updateProfile).toHaveBeenCalledWith({ preferredLanguage: 'en' })
+    );
+  });
+
+  it("backfills with an explicit pre-login choice made before the next user signs in", async () => {
+    await i18n.changeLanguage('es');
+    setLastDisplayLanguage('es'); // the previous user's carry-over — still irrelevant to the backfill below
+    setPreLoginLanguage('es'); // someone explicitly switched to Spanish on this device before B signed in
+
+    const userB = makeUser({ id: 2, email: 'bea@example.com', preferredLanguage: null });
+    setToken('b-jwt');
+    setStoredUser(JSON.stringify(userB));
+    authApi.getCurrentUser.mockResolvedValue({ success: true, data: userB });
+    authApi.updateProfile.mockResolvedValue({ success: true, data: { ...userB, preferredLanguage: 'es' } });
+
+    renderProbe();
+
+    await waitFor(() =>
+      expect(authApi.updateProfile).toHaveBeenCalledWith({ preferredLanguage: 'es' })
+    );
   });
 });

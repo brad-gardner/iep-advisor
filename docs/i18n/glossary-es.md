@@ -43,6 +43,10 @@ Every Spanish string in the app, emails, PDFs and AI instructions uses these ter
 | student | estudiante |
 | school district | distrito escolar |
 | teacher | maestro / maestra (label: "Maestro") |
+| district administrator (org role) | administrador del distrito |
+| school administrator (org role) | administrador escolar |
+| related service provider (org role) | proveedor de servicios relacionados |
+| general educator (org role) | maestro de educación general |
 | draft | borrador |
 | finalize | finalizar |
 | share | compartir |

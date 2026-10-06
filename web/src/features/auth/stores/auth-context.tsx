@@ -18,7 +18,16 @@ import {
 } from '../api/auth-api';
 import { getToken, setToken, removeToken, setStoredUser, getStoredUser } from '@/lib/auth';
 import i18n from '@/lib/i18n';
-import { isSupportedLanguage, setPreLoginLanguage, DEFAULT_LANGUAGE, type SupportedLanguage } from '@/lib/i18n/detect';
+import {
+  isSupportedLanguage,
+  getPreLoginLanguage,
+  setPreLoginLanguage,
+  setLastDisplayLanguage,
+  clearLastDisplayLanguage,
+  detectBrowserLanguage,
+  DEFAULT_LANGUAGE,
+  type SupportedLanguage,
+} from '@/lib/i18n/detect';
 
 interface LoginResult {
   success: boolean;
@@ -61,36 +70,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Latest-wins guard for everything that can decide the active language —
   // an explicit `setLanguage` call, and the background sync below. Bumped by
   // `setLanguage` the instant it's invoked (before anything async), and
-  // captured by every async flow that might later apply a language so a
-  // slower, now-superseded operation can tell it lost the race and must
-  // neither persist its choice nor overwrite newer state (see the plan's
-  // phase-1 review: language sync races).
+  // captured by every async flow that might later apply a language
+  // (`syncLanguagePreference`'s callers below, each *before* starting the
+  // fetch that will eventually call it) so a slower, now-superseded
+  // operation can tell it lost the race: if `languageGenerationRef.current`
+  // no longer matches the generation it captured, a newer explicit switch
+  // happened while it was in flight, and it must neither persist its own
+  // (possibly stale) choice nor overwrite the newer one (see the plan's
+  // phase-1 review: language sync races). Call sites below carry only a
+  // one-line reminder of which check this is; this is the single place that
+  // explains why it exists.
   const languageGenerationRef = useRef(0);
+
+  // The in-flight backfill PUT started by `syncLanguagePreference` below, if
+  // any — so an explicit `setLanguage` call can await it (see there) and
+  // guarantee the user's own choice is always the *last* write the server
+  // sees, even if both requests happen to be in flight at once.
+  const pendingBackfillRef = useRef<Promise<void> | null>(null);
 
   // Applies the account's saved language once a user is known. When there is
   // no saved preference yet (a first sign-in, or an account created before
-  // this field existed), this persists whatever language the session
-  // resolved to (the pre-login choice or browser detection) so future
+  // this field existed), this persists a resolved language so future
   // sign-ins, emails, and AI responses know it too. Fire-and-forget by
   // design: it must never block or delay setting the signed-in user, since
   // `ProtectedRoute`/`PublicRoute` key off that state synchronously.
-  //
-  // `generation` is the value of `languageGenerationRef` captured by the
-  // caller *before* it started the fetch that produced `userData` — not at
-  // the top of this function. That's what lets this tell a stale response
-  // apart from a current one: if an explicit `setLanguage` call happened at
-  // any point during that fetch (bumping the ref), `userData` can no longer
-  // be trusted to decide the language, even though it's still the right
-  // value to store as the fetched user record.
   const syncLanguagePreference = useCallback((userData: User, generation: number) => {
-    if (languageGenerationRef.current !== generation) {
-      // An explicit switch raced ahead of this fetch. Applying `userData`'s
-      // (possibly stale) `preferredLanguage` now could revert a language the
-      // user already chose more recently — e.g. a `/me` refresh that was in
-      // flight when they switched to Spanish resolving afterward and saying
-      // "en". Never let it.
-      return;
-    }
+    if (languageGenerationRef.current !== generation) return; // superseded — see languageGenerationRef
 
     if (isSupportedLanguage(userData.preferredLanguage)) {
       if (i18n.language !== userData.preferredLanguage) {
@@ -99,18 +104,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const resolved: SupportedLanguage = isSupportedLanguage(i18n.language)
-      ? i18n.language
-      : DEFAULT_LANGUAGE;
+    // The backfill value is deliberately NOT `i18n.language`: on a shared
+    // device, the language currently active could be nothing more than the
+    // previous user's sign-out carry-over (`getLastDisplayLanguage`, applied
+    // for *display* only — see `lib/i18n/detect.ts`), which must never leak
+    // into this account's saved preference. Only an explicit pre-login
+    // choice counts as this visitor's own; otherwise fall back to the
+    // browser's own languages, then `en`.
+    const resolved: SupportedLanguage = getPreLoginLanguage() ?? detectBrowserLanguage();
 
-    void updateProfileApi({ preferredLanguage: resolved })
+    const backfillPromise = updateProfileApi({ preferredLanguage: resolved })
       .then((response) => {
         if (!response.success || !response.data) return;
-        if (languageGenerationRef.current !== generation) return; // superseded while this PUT was in flight
+        if (languageGenerationRef.current !== generation) return; // superseded — see languageGenerationRef
         const savedLanguage = response.data.preferredLanguage;
         setUser((prev) => {
           if (!prev) return prev;
-          if (prev.preferredLanguage) return prev; // an explicit switch already set it — never clobber
           const merged = { ...prev, preferredLanguage: savedLanguage };
           setStoredUser(JSON.stringify(merged));
           return merged;
@@ -118,7 +127,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {
         // Non-fatal — retried the next time a user loads (loadUser/refreshUser).
+      })
+      .finally(() => {
+        if (pendingBackfillRef.current === backfillPromise) pendingBackfillRef.current = null;
       });
+    pendingBackfillRef.current = backfillPromise;
   }, []);
 
   const loadUser = useCallback(async () => {
@@ -129,21 +142,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Try to get user from storage first, and apply its saved language
-      // immediately — don't wait on the network round-trip below just to
-      // show the account's own preference on a page the user has already
-      // visited once.
+      // Try to get user from storage first — don't wait on the network
+      // round-trip below just to show a page the user has already visited
+      // once. Its language was already applied, synchronously, by
+      // `detectInitialLanguage` at i18next init time (`lib/i18n/index.ts`
+      // reads the very same stored user); re-applying it here would be a
+      // redundant `changeLanguage` call for the already-active language.
       const storedUser = getStoredUser();
       if (storedUser) {
-        const parsed = JSON.parse(storedUser) as User;
-        setUser(parsed);
-        if (isSupportedLanguage(parsed.preferredLanguage) && i18n.language !== parsed.preferredLanguage) {
-          void i18n.changeLanguage(parsed.preferredLanguage);
-        }
+        setUser(JSON.parse(storedUser) as User);
       }
 
       // Verify with API. Captured before the request starts (see
-      // `syncLanguagePreference`'s doc comment) so a switch that happens
+      // `languageGenerationRef`'s doc comment) so a switch that happens
       // while this is in flight is never overwritten by its stale response.
       const generation = languageGenerationRef.current;
       const response = await getCurrentUser();
@@ -183,6 +194,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(token);
     setUser(userData);
     setStoredUser(JSON.stringify(userData));
+    // The sign-out carry-over's job (showing the login page in the right
+    // language) is done now that someone has actually signed in — clear it
+    // so it can't later be mistaken for this or a future visitor's own
+    // choice. The explicit pre-login choice, if any, is left alone (see
+    // `lib/i18n/detect.ts`).
+    clearLastDisplayLanguage();
     syncLanguagePreference(userData, languageGenerationRef.current);
   }, [syncLanguagePreference]);
 
@@ -303,9 +320,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     // Keep whatever language was active — it's still correct, it just has
     // nowhere to live once the account's saved preference is gone. Recorded
-    // as the pre-login choice so the login page (this session or a later
-    // one) stays in that language instead of falling back to the browser.
-    setPreLoginLanguage(isSupportedLanguage(i18n.language) ? i18n.language : DEFAULT_LANGUAGE);
+    // as the sign-out *display* carry-over (never the explicit pre-login
+    // key — see `lib/i18n/detect.ts`) so the login page stays in that
+    // language instead of falling back to the browser, without that choice
+    // ever being mistaken for the next signed-in account's own preference on
+    // a shared device.
+    setLastDisplayLanguage(isSupportedLanguage(i18n.language) ? i18n.language : DEFAULT_LANGUAGE);
     removeToken();
     setUser(null);
     setMfaPendingToken(null);
@@ -325,6 +345,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: true };
     }
 
+    if (i18n.resolvedLanguage !== language) {
+      // `changeLanguage` resolved, but not to the requested language — e.g.
+      // the lazy Spanish chunk failed to load and `lib/i18n/index.ts`'s
+      // `failedLoading` handler reverted to English. The active language is
+      // now, correctly, whatever actually loaded; never persist the one
+      // that didn't.
+      return { success: false, error: t('context.languageUpdateError') };
+    }
+
     if (!user) {
       // No account to save it to yet — remembered for this browser until sign-in.
       setPreLoginLanguage(language);
@@ -332,6 +361,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      // A backfill PUT from `syncLanguagePreference` may already be in
+      // flight (a first sign-in with no saved preference yet). Let it
+      // finish first — ignoring whatever it resolves to — so this explicit
+      // choice is always the last write the server sees, never clobbered by
+      // an older, already-superseded backfill landing after it.
+      if (pendingBackfillRef.current) {
+        await pendingBackfillRef.current.catch(() => undefined);
+      }
       const response = await updateProfileApi({ preferredLanguage: language });
       if (languageGenerationRef.current !== generation) {
         // Superseded while the PUT was in flight — ignore this response so

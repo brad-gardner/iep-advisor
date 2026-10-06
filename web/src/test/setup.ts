@@ -20,13 +20,18 @@ await i18n.changeLanguage('en');
 // i18next to invoke the handler at all; neither is set in the production
 // init (`lib/i18n/index.ts`) — this is test-only.
 //
-// A key resolved through an explicit `defaultValue` (e.g. `orgRoleLabel`'s
-// fallback for an unrecognized role name) is NOT a bug — it's withheld from
-// the throw via `opt.defaultValue`, which i18next populates from either
-// calling convention (`t(key, { defaultValue })` or `t(key, defaultValue)`).
+// A key resolved through an explicit, MEANINGFUL `defaultValue` (e.g.
+// `orgRoleLabel`'s fallback for an unrecognized role name, `{ defaultValue:
+// name }`) is NOT a bug, and is withheld from the throw. But `<Trans
+// i18nKey="some.key" />` with no `children`/`defaults`/`tOptions.defaultValue`
+// of its own ALSO ends up with a `defaultValue` in `opt` — react-i18next
+// falls back to the key itself (`opt.defaultValue === key`) when it has
+// nothing better, which is indistinguishable from "no default" and must
+// still throw on a genuinely missing key. Only a defaultValue that differs
+// from the key is a real, intentional fallback.
 i18n.options.saveMissing = true;
 i18n.options.missingKeyHandler = (lngs, ns, key, _fallbackValue, _updateMissing, opt) => {
-  if (opt && typeof opt === 'object' && 'defaultValue' in opt) return;
+  if (opt && typeof opt === 'object' && 'defaultValue' in opt && opt.defaultValue !== key) return;
   const languages = Array.isArray(lngs) ? lngs.join(', ') : lngs;
   throw new Error(`[i18n] missing translation for "${ns}:${key}" (${languages})`);
 };

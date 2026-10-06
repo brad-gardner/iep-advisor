@@ -106,7 +106,7 @@ export function StudentAcceptInvitePage() {
     ? t('studentAcceptInvite.noToken')
     : serverMessage ?? (errorReason ? reasonMessage(errorReason) : t('studentAcceptInvite.genericError'));
 
-  const inviterContext = preview
+  const inviter = preview
     ? preview.inviteSource === 'Educator'
       ? preview.schoolName ?? t('studentAcceptInvite.fromSchool')
       : t('studentAcceptInvite.fromParent')
@@ -127,9 +127,15 @@ export function StudentAcceptInvitePage() {
               <Trans
                 t={t}
                 i18nKey="studentAcceptInvite.invitedAsSentence"
-                values={{ context: inviterContext, name: preview.linkedToFirstName }}
+                values={{ inviter, name: preview.linkedToFirstName }}
+                // `inviter` and `name` can be user-entered text (a school or
+                // inviter's own name) — escape it during interpolation and
+                // unescape only for display, so a literal "<" in it can
+                // never be parsed as one of the tags below.
+                tOptions={{ interpolation: { escapeValue: true } }}
+                shouldUnescape
                 components={{
-                  context: <span className="font-medium text-brand-slate-800" />,
+                  inviter: <span className="font-medium text-brand-slate-800" />,
                   name: <span className="font-medium text-brand-slate-800" />,
                 }}
               />
