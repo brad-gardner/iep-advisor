@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { CreateChildProfileRequest } from "@/types/api";
-import { Input } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
+import {
+  buildDisabilityCategoryOptions,
+  buildGradeLevelOptions,
+  normalizeDisabilityCategory,
+  normalizeGradeLevel,
+} from "../lib/child-profile-options";
 
 interface ChildFormProps {
   initialValues?: Partial<CreateChildProfileRequest>;
@@ -26,13 +32,28 @@ export function ChildForm({
   const [dateOfBirth, setDateOfBirth] = useState(
     initialValues?.dateOfBirth ?? "",
   );
-  const [gradeLevel, setGradeLevel] = useState(initialValues?.gradeLevel ?? "");
+  const [gradeLevel, setGradeLevel] = useState(
+    normalizeGradeLevel(initialValues?.gradeLevel),
+  );
   const [disabilityCategory, setDisabilityCategory] = useState(
-    initialValues?.disabilityCategory ?? "",
+    normalizeDisabilityCategory(initialValues?.disabilityCategory),
+  );
+  // Computed once from the value this form mounted with — Modal unmounts the
+  // form while closed, so a fresh edit open recomputes against the latest
+  // record. Keeps a legacy/unmatched value selectable (and thus preserved on
+  // submit) without rebuilding the list on every keystroke.
+  const gradeLevelOptions = useMemo(
+    () => buildGradeLevelOptions(initialValues?.gradeLevel),
+    [initialValues?.gradeLevel],
+  );
+  const disabilityCategoryOptions = useMemo(
+    () => buildDisabilityCategoryOptions(initialValues?.disabilityCategory),
+    [initialValues?.disabilityCategory],
   );
   const [schoolDistrict, setSchoolDistrict] = useState(
     initialValues?.schoolDistrict ?? "",
   );
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,23 +111,31 @@ export function ChildForm({
         data-testid="child-date-of-birth"
       />
 
-      <Input
+      <Select
         label="Grade Level"
-        placeholder="e.g. 3rd, 7th, 10th"
         value={gradeLevel}
         onChange={(e) => setGradeLevel(e.target.value)}
-        maxLength={20}
         data-testid="child-grade-level"
-      />
+      >
+        {gradeLevelOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
 
-      <Input
+      <Select
         label="Disability Category"
-        placeholder="e.g. Autism, SLD, Speech/Language"
         value={disabilityCategory}
         onChange={(e) => setDisabilityCategory(e.target.value)}
-        maxLength={100}
         data-testid="child-disability-category"
-      />
+      >
+        {disabilityCategoryOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
 
       <Input
         label="School District"

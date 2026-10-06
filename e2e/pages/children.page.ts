@@ -30,8 +30,7 @@ export class ChildrenPage {
   }
 
   async updateGradeLevel(grade: string) {
-    await this.page.locator('[data-testid="child-grade-level"]').clear();
-    await this.page.locator('[data-testid="child-grade-level"]').fill(grade);
+    await this.page.locator('[data-testid="child-grade-level"]').selectOption(grade);
   }
 
   async fillChildForm(data: {
@@ -45,8 +44,10 @@ export class ChildrenPage {
     await this.page.locator('[data-testid="child-first-name"]').fill(data.firstName);
     if (data.lastName) await this.page.locator('[data-testid="child-last-name"]').fill(data.lastName);
     if (data.dateOfBirth) await this.page.locator('[data-testid="child-date-of-birth"]').fill(data.dateOfBirth);
-    if (data.gradeLevel) await this.page.locator('[data-testid="child-grade-level"]').fill(data.gradeLevel);
-    if (data.disabilityCategory) await this.page.locator('[data-testid="child-disability-category"]').fill(data.disabilityCategory);
+    if (data.gradeLevel) await this.page.locator('[data-testid="child-grade-level"]').selectOption(data.gradeLevel);
+    if (data.disabilityCategory) {
+      await this.page.locator('[data-testid="child-disability-category"]').selectOption(data.disabilityCategory);
+    }
     if (data.schoolDistrict) await this.page.locator('[data-testid="child-school-district"]').fill(data.schoolDistrict);
   }
 
