@@ -15,9 +15,6 @@ public static class SupportedLanguages
     /// <see cref="English"/> explicitly rather than assuming list order.</summary>
     public static readonly IReadOnlyList<string> All = new[] { English, Spanish };
 
-    /// <summary>True when <paramref name="language"/>, case-insensitively, is one of <see cref="All"/>.</summary>
-    public static bool IsSupported(string? language) => Normalize(language) != null;
-
     /// <summary>
     /// Trims and lowercases <paramref name="language"/> and returns it only if supported; otherwise null.
     /// Used both to validate a stored/requested exact code ("EN", " es ") and, defensively, a value read

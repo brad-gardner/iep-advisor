@@ -32,14 +32,4 @@ public class SupportedLanguagesTests
     {
         Assert.Null(SupportedLanguages.Normalize(input));
     }
-
-    [Theory]
-    [InlineData("en", true)]
-    [InlineData("ES", true)]
-    [InlineData("fr", false)]
-    [InlineData(null, false)]
-    public void IsSupported_MatchesNormalize(string? input, bool expected)
-    {
-        Assert.Equal(expected, SupportedLanguages.IsSupported(input));
-    }
 }

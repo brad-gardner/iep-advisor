@@ -6,20 +6,32 @@ namespace IepAssistant.Services.Tests;
 
 /// <summary>
 /// <see cref="CultureScope"/> is the disposable that out-of-request code (background workers, email
-/// composition) uses to set the ambient culture for the duration of a unit of work. Covers: it applies
-/// the requested supported language, it falls back to English for null/unsupported input rather than
-/// throwing (a stale or hand-edited PreferredLanguage must never crash a worker), and — most
-/// importantly — it restores whatever was ambient before, even when the scope's body throws.
+/// composition) uses to set the ambient UI culture for the duration of a unit of work. Covers: it applies
+/// the requested supported language to CurrentUICulture only, it falls back to English for
+/// null/unsupported input rather than throwing (a stale or hand-edited PreferredLanguage must never crash
+/// a worker), it never touches CurrentCulture (P2 fix, 2026-10-06 multilingual plan review — date/number
+/// formatting must not follow the UI language), and — most importantly — it restores whatever UI culture
+/// was ambient before, even when the scope's body throws.
 /// </summary>
 public class CultureScopeTests
 {
     [Fact]
-    public void For_Spanish_SetsCurrentCultureAndUiCulture()
+    public void For_Spanish_SetsUiCultureOnly_CurrentCultureUnaffected()
     {
-        using (CultureScope.For("es"))
+        var originalCulture = CultureInfo.CurrentCulture;
+        try
         {
-            Assert.Equal("es", CultureInfo.CurrentCulture.Name);
-            Assert.Equal("es", CultureInfo.CurrentUICulture.Name);
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en");
+
+            using (CultureScope.For("es"))
+            {
+                Assert.Equal("es", CultureInfo.CurrentUICulture.Name);
+                Assert.Equal("en", CultureInfo.CurrentCulture.Name);
+            }
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
         }
     }
 
@@ -28,48 +40,41 @@ public class CultureScopeTests
     [InlineData("")]
     [InlineData("fr")]
     [InlineData("ES-MX")] // region-qualified input is not what SupportedLanguages.Normalize handles — falls back to en.
-    public void For_UnsupportedOrMissingLanguage_FallsBackToEnglish(string? language)
+    public void For_UnsupportedOrMissingLanguage_FallsBackToEnglishUiCulture(string? language)
     {
         using (CultureScope.For(language))
         {
-            Assert.Equal("en", CultureInfo.CurrentCulture.Name);
             Assert.Equal("en", CultureInfo.CurrentUICulture.Name);
         }
     }
 
     [Fact]
-    public void Dispose_RestoresThePriorAmbientCulture()
+    public void Dispose_RestoresThePriorAmbientUiCulture()
     {
-        var original = CultureInfo.CurrentCulture;
         var originalUi = CultureInfo.CurrentUICulture;
         try
         {
-            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en");
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en");
 
             using (CultureScope.For("es"))
             {
-                Assert.Equal("es", CultureInfo.CurrentCulture.Name);
+                Assert.Equal("es", CultureInfo.CurrentUICulture.Name);
             }
 
-            Assert.Equal("en", CultureInfo.CurrentCulture.Name);
             Assert.Equal("en", CultureInfo.CurrentUICulture.Name);
         }
         finally
         {
-            CultureInfo.CurrentCulture = original;
             CultureInfo.CurrentUICulture = originalUi;
         }
     }
 
     [Fact]
-    public void Dispose_RestoresPriorCulture_EvenWhenBodyThrows()
+    public void Dispose_RestoresPriorUiCulture_EvenWhenBodyThrows()
     {
-        var original = CultureInfo.CurrentCulture;
         var originalUi = CultureInfo.CurrentUICulture;
         try
         {
-            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en");
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en");
 
             var threw = false;
@@ -86,13 +91,10 @@ public class CultureScopeTests
             }
 
             Assert.True(threw);
-
-            Assert.Equal("en", CultureInfo.CurrentCulture.Name);
             Assert.Equal("en", CultureInfo.CurrentUICulture.Name);
         }
         finally
         {
-            CultureInfo.CurrentCulture = original;
             CultureInfo.CurrentUICulture = originalUi;
         }
     }

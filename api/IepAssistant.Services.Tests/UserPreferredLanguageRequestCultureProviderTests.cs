@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -77,19 +76,17 @@ public sealed class UserPreferredLanguageRequestCultureProviderTests : IDisposab
         return httpContext;
     }
 
-    private static RequestLocalizationOptions BuildOptions() => new()
+    /// <summary>
+    /// Builds options via the SAME <see cref="RequestLocalizationSetup.Configure"/> Program.cs registers
+    /// with <c>builder.Services.Configure&lt;RequestLocalizationOptions&gt;</c>, rather than a
+    /// hand-duplicated copy that could silently drift from what actually ships.
+    /// </summary>
+    private static RequestLocalizationOptions BuildOptions()
     {
-        DefaultRequestCulture = new RequestCulture("en"),
-        SupportedCultures = new List<CultureInfo> { new("en"), new("es") },
-        SupportedUICultures = new List<CultureInfo> { new("en"), new("es") },
-        FallBackToParentCultures = true,
-        FallBackToParentUICultures = true,
-        RequestCultureProviders = new List<IRequestCultureProvider>
-        {
-            new UserPreferredLanguageRequestCultureProvider(),
-            new AcceptLanguageHeaderRequestCultureProvider()
-        }
-    };
+        var options = new RequestLocalizationOptions();
+        RequestLocalizationSetup.Configure(options);
+        return options;
+    }
 
     /// <summary>
     /// Runs the SAME <see cref="RequestLocalizationMiddleware"/> Program.cs wires up via
@@ -146,6 +143,36 @@ public sealed class UserPreferredLanguageRequestCultureProviderTests : IDisposab
         Assert.Null(result);
     }
 
+    // ----------------------------------------------------------------- HttpContext.Items fast path (set by
+    // JwtBearerEvents.OnTokenValidated in Program.cs, which already loaded the user row for the
+    // SecurityStamp check) — proven by seeding a DIFFERENT value in the database than in Items, so a
+    // result matching Items (not the DB) shows the lookup was skipped, not merely that it agreed.
+
+    [Fact]
+    public async Task Provider_PreferredLanguageInHttpContextItems_WinsOverDbValue()
+    {
+        var userId = await SeedUserAsync("en"); // DB says "en".
+        var httpContext = CreateHttpContext(userId);
+        httpContext.Items[UserPreferredLanguageRequestCultureProvider.PreferredLanguageItemsKey] = "es";
+
+        var result = await new UserPreferredLanguageRequestCultureProvider().DetermineProviderCultureResult(httpContext);
+
+        Assert.NotNull(result);
+        Assert.Equal("es", result!.Cultures[0].Value);
+    }
+
+    [Fact]
+    public async Task Provider_UnsupportedLanguageInHttpContextItems_ReturnsNull_WithoutFallingBackToDb()
+    {
+        var userId = await SeedUserAsync("es"); // DB says "es" — if this were consulted, the result would be "es", not null.
+        var httpContext = CreateHttpContext(userId);
+        httpContext.Items[UserPreferredLanguageRequestCultureProvider.PreferredLanguageItemsKey] = "fr";
+
+        var result = await new UserPreferredLanguageRequestCultureProvider().DetermineProviderCultureResult(httpContext);
+
+        Assert.Null(result);
+    }
+
     // ----------------------------------------------------------------- precedence, as registered in Program.cs
 
     [Fact]
@@ -177,6 +204,26 @@ public sealed class UserPreferredLanguageRequestCultureProviderTests : IDisposab
         var culture = await ResolveAsync(httpContext, BuildOptions());
 
         Assert.Equal("en", culture);
+    }
+
+    /// <summary>
+    /// P2 fix (2026-10-06 multilingual plan review): SupportedCultures is English-only, so the request's
+    /// UI culture (resource strings) can resolve to "es" while its culture (date/number formatting) never
+    /// does — only Program.cs's later, explicit per-recipient formatting (future phase) should format a
+    /// date for a Spanish viewer. Proven against the real RequestLocalizationMiddleware + the actual
+    /// RequestLocalizationSetup.Configure, not a re-implementation of the matching logic.
+    /// </summary>
+    [Fact]
+    public async Task Precedence_SavedSpanishPreference_SetsUiCultureSpanish_ButCultureStaysEnglish()
+    {
+        var userId = await SeedUserAsync("es");
+        var httpContext = CreateHttpContext(userId);
+
+        var uiCulture = await ResolveAsync(httpContext, BuildOptions());
+
+        Assert.Equal("es", uiCulture);
+        var feature = httpContext.Features.Get<IRequestCultureFeature>();
+        Assert.Equal("en", feature!.RequestCulture.Culture.Name);
     }
 
     public void Dispose()

@@ -1,9 +1,11 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using IepAssistant.Services.Security;
 
@@ -86,8 +88,12 @@ public class MagicLinkService : IMagicLinkService
         await _context.SaveChangesAsync(ct);
 
         var magicLinkUrl = $"{_frontendUrl}/auth/magic?token={Uri.EscapeDataString(rawToken)}";
-        // Plan 2026-10-06 phase 1: render in the account's saved language.
-        await _emailService.SendMagicLinkEmailAsync(user.Email, user.FirstName, magicLinkUrl, user.PreferredLanguage, ct);
+        // Plan 2026-10-06 phase 1: render in the account's saved language. No saved preference falls back
+        // to the current request's UI culture (the requester's browser Accept-Language — this flow is
+        // also unauthenticated) rather than hard-coding English.
+        var language = user.PreferredLanguage
+            ?? SupportedLanguages.Normalize(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
+        await _emailService.SendMagicLinkEmailAsync(user.Email, user.FirstName, magicLinkUrl, language, ct);
     }
 
     public async Task<MagicLinkConsumeResult> ConsumeAsync(string token, CancellationToken ct = default)

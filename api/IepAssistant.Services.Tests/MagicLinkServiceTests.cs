@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -310,16 +311,78 @@ public sealed class MagicLinkServiceTests : IDisposable
         Assert.False(result.Success);
     }
 
+    // ================================================================= RequestAsync: language (multilingual
+    // plan, 2026-10-06, phase 1, P3 fix) — PreferredLanguage passes through when set; a null preference
+    // falls back to the CURRENT request's resolved UI culture (this flow is unauthenticated, so the
+    // requester's own browser Accept-Language is the only language signal available) rather than
+    // hard-coding English.
+
+    [Fact]
+    public async Task RequestAsync_UserHasPreferredLanguage_PassesItThrough_RegardlessOfAmbientUiCulture()
+    {
+        var districtId = SeedDistrict();
+        SeedStaffUserWithLanguage(districtId, OrgRoleIds.GeneralEducator, "lang-es@example.com", "es");
+        var email = new CapturingEmailService();
+        var originalUi = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en"); // ambient request culture disagrees
+
+            using (var ctx = CreateContext())
+                await CreateService(ctx, email).RequestAsync("lang-es@example.com");
+
+            Assert.Equal("es", email.LastLanguage);
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = originalUi;
+        }
+    }
+
+    [Fact]
+    public async Task RequestAsync_UserHasNoPreferredLanguage_FallsBackToCurrentRequestUiCulture()
+    {
+        var districtId = SeedDistrict();
+        SeedStaffUser(districtId, OrgRoleIds.GeneralEducator, "lang-null@example.com");
+        var email = new CapturingEmailService();
+        var originalUi = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("es");
+
+            using (var ctx = CreateContext())
+                await CreateService(ctx, email).RequestAsync("lang-null@example.com");
+
+            Assert.Equal("es", email.LastLanguage);
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = originalUi;
+        }
+    }
+
+    private int SeedStaffUserWithLanguage(int districtId, int orgRoleId, string email, string? preferredLanguage)
+    {
+        var userId = SeedStaffUser(districtId, orgRoleId, email);
+        using var ctx = CreateContext();
+        var user = ctx.Users.Single(u => u.Id == userId);
+        user.PreferredLanguage = preferredLanguage;
+        ctx.SaveChanges();
+        return userId;
+    }
+
     public void Dispose() => _connection.Dispose();
 
-    /// <summary>Captures the magic-link URL passed to the email so tests can extract the raw token.</summary>
+    /// <summary>Captures the magic-link URL and language passed to the email so tests can inspect them.</summary>
     private sealed class CapturingEmailService : TestSupport.TestEmailServiceBase
     {
         public string? LastMagicLinkUrl { get; private set; }
+        public string? LastLanguage { get; private set; }
 
         public override Task SendMagicLinkEmailAsync(string toEmail, string firstName, string magicLinkUrl, string? language = null, CancellationToken ct = default)
         {
             LastMagicLinkUrl = magicLinkUrl;
+            LastLanguage = language;
             return Task.CompletedTask;
         }
     }

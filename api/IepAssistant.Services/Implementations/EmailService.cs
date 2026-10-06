@@ -35,6 +35,7 @@ public class EmailService : IEmailService
     public async Task SendPasswordResetEmailAsync(string toEmail, string resetToken, string? language = null, CancellationToken ct = default)
     {
         var resetUrl = $"{_frontendUrl}/reset-password?token={resetToken}";
+        var safeResetUrl = WebUtility.HtmlEncode(resetUrl);
 
         using var _ = CultureScope.For(language);
 
@@ -55,7 +56,7 @@ public class EmailService : IEmailService
                     {body}
                 </p>
                 <div style=""text-align: center; margin: 24px 0;"">
-                    <a href=""{resetUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                    <a href=""{safeResetUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
                         {buttonText}
                     </a>
                 </div>

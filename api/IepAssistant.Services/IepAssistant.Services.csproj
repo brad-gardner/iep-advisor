@@ -37,12 +37,11 @@
        computed manifest name (e.g. Resources/Messages.resx -> "IepAssistant.Services.Messages.resources",
        not "...Resources.Messages.resources"). AddLocalization's ResourcesPath = "Resources" (Api/Program.cs)
        expects the latter — IStringLocalizer<Messages>/<Emails> would otherwise report ResourceNotFound and
-       echo the raw key. LogicalName overrides the default for exactly these four files so build output
-       matches what ResourceManagerStringLocalizerFactory looks up; verified by TestLocalizers-backed tests. -->
+       echo the raw key. This wildcard LogicalName covers every current and future Resources\*.resx file
+       (including each language's satellite, e.g. Messages.es.resx -> Messages.es.resources) so build
+       output matches what ResourceManagerStringLocalizerFactory looks up, without a new line added per
+       phase/resource file; verified by TestLocalizers-backed tests (English and Spanish). -->
   <ItemGroup>
-    <EmbeddedResource Update="Resources\Messages.resx" LogicalName="IepAssistant.Services.Resources.Messages.resources" />
-    <EmbeddedResource Update="Resources\Messages.es.resx" LogicalName="IepAssistant.Services.Resources.Messages.es.resources" />
-    <EmbeddedResource Update="Resources\Emails.resx" LogicalName="IepAssistant.Services.Resources.Emails.resources" />
-    <EmbeddedResource Update="Resources\Emails.es.resx" LogicalName="IepAssistant.Services.Resources.Emails.es.resources" />
+    <EmbeddedResource Update="Resources\*.resx" LogicalName="$(RootNamespace).Resources.%(Filename).resources" />
   </ItemGroup>
 </Project>
