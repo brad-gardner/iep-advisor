@@ -293,11 +293,19 @@ describe('DocumentEditor', () => {
 
     await waitFor(() => expect(documentsApi.finalizeDocument).toHaveBeenCalled());
     // Both edits were flushed (not lost) ahead of the snapshot, and both
-    // sections closed once that flush was confirmed clean.
-    await waitFor(() => expect(screen.getByTestId('read-field-profile-field')).toHaveTextContent('Jordan!'));
-    expect(screen.getByTestId('read-field-present-field')).toHaveTextContent('Doing well.');
-    expect(screen.getByTestId('section-1-edit')).toBeInTheDocument();
-    expect(screen.getByTestId('section-2-edit')).toBeInTheDocument();
+    // sections closed once that flush was confirmed clean. Each section's
+    // field save lands via its own independent `setDetail` update — not
+    // necessarily in the same React commit as the other, or as `closeAll`'s
+    // own state update — so every one of these is asserted inside the SAME
+    // waitFor rather than read synchronously right after the call above:
+    // under load, a later re-render settling after that first check resolves
+    // (but before this line runs) can otherwise read a still-stale DOM.
+    await waitFor(() => {
+      expect(screen.getByTestId('read-field-profile-field')).toHaveTextContent('Jordan!');
+      expect(screen.getByTestId('read-field-present-field')).toHaveTextContent('Doing well.');
+      expect(screen.getByTestId('section-1-edit')).toBeInTheDocument();
+      expect(screen.getByTestId('section-2-edit')).toBeInTheDocument();
+    });
   });
 
   it('Finalize does not close sections, or call finalizeDocument, when the flushed save fails', async () => {
@@ -356,5 +364,37 @@ describe('DocumentEditor', () => {
     await waitFor(() => expect(within(dialog).getByRole('alert')).toHaveTextContent('could not be saved'));
     expect(documentsApi.finalizeDocument).not.toHaveBeenCalled();
     expect(screen.getByTestId('section-1-done')).toBeInTheDocument(); // section 1 still open with its failure
+  });
+
+  it('Finalize proceeds once a failed section is Discarded — the restore clears the per-field failure record instead of leaving it for Finalize to trip over', async () => {
+    documentsApi.finalizeDocument.mockClear();
+    documentsApi.finalizeDocument.mockResolvedValueOnce({ success: true, data: finalizedVersion() });
+    const user = userEvent.setup();
+    render(
+      <Harness
+        initialValues={{ [PROFILE_FIELD]: 'Jordan', [PRESENT_FIELD]: '' }}
+        // Fails only the EDITED value — Discard's restore re-sends the
+        // original ('Jordan'), which must succeed.
+        onSave={(patch) => (patch[PROFILE_FIELD] === 'Jordan!' ? { ok: false, message: 'Server unavailable.' } : { ok: true, values: patch })}
+      />
+    );
+
+    await user.click(screen.getByTestId('section-1-edit'));
+    await user.type(screen.getByTestId(`field-${PROFILE_FIELD}`), '!');
+    await user.click(screen.getByTestId('section-1-done'));
+    await waitFor(() => expect(screen.getByTestId('section-1-retry')).toBeInTheDocument());
+
+    // Discard the failed edit instead of retrying it.
+    await user.click(screen.getByTestId('section-1-discard'));
+    await user.click(await screen.findByTestId('section-1-discard-confirm'));
+    await waitFor(() => expect(screen.getByTestId('section-1-edit')).toBeInTheDocument());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    // Finalize must now proceed — the restore cleared section 1's failure
+    // record (instead of leaving it blocked until the next reopen).
+    await user.click(screen.getByTestId('finalize-button'));
+    await user.click(screen.getByTestId('finalize-confirm'));
+
+    await waitFor(() => expect(documentsApi.finalizeDocument).toHaveBeenCalled());
   });
 });

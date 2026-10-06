@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { TemplateSectionDto } from '../types';
 import type { CompletenessItem } from '../lib/completeness';
@@ -85,12 +85,14 @@ function Harness({
   items = [],
   disabled = false,
   startOpen = false,
+  registerFailureStatus,
 }: {
   initialValues: Record<string, unknown>;
   saveValues: (patch: Record<string, unknown>) => Promise<SaveResult>;
   items?: CompletenessItem[];
   disabled?: boolean;
   startOpen?: boolean;
+  registerFailureStatus?: (hasFailures: () => boolean) => () => void;
 }) {
   const [isOpen, setIsOpen] = useState(startOpen);
   return (
@@ -103,6 +105,7 @@ function Harness({
       onOpen={() => setIsOpen(true)}
       onClose={() => setIsOpen(false)}
       items={items}
+      registerFailureStatus={registerFailureStatus}
     />
   );
 }
@@ -483,6 +486,87 @@ describe('SectionCard — Done with a failed save', () => {
     await user.click(screen.getByTestId('section-10-done'));
     await waitFor(() => expect(saveValues).toHaveBeenCalledTimes(2));
     expect(screen.getByTestId('section-10-edit')).toBeInTheDocument();
+  });
+});
+
+describe('SectionCard — Discard after a failed save clears the failure record', () => {
+  it('a successful restore clears failedFieldsRef before closing: no banner/Retry once closed, and the registered failure getter reports false', async () => {
+    const user = userEvent.setup();
+    // Fails only the EDITED value — the restore re-sends the original
+    // ('Jordan'), which must succeed.
+    const saveValues = vi.fn().mockImplementation((patch: Record<string, unknown>) =>
+      Promise.resolve(patch[FIELD_A] === 'Changed' ? { ok: false, message: 'nope' } : okResult(patch))
+    );
+    let hasFailures: (() => boolean) | undefined;
+    render(
+      <Harness
+        initialValues={{ [FIELD_A]: 'Jordan', [FIELD_B]: '' }}
+        saveValues={saveValues}
+        startOpen
+        registerFailureStatus={(getter) => {
+          hasFailures = getter;
+          return () => {};
+        }}
+      />
+    );
+
+    await user.clear(screen.getByTestId(`field-${FIELD_A}`));
+    await user.type(screen.getByTestId(`field-${FIELD_A}`), 'Changed');
+    await user.tab(); // blur flushes immediately — fails
+    expect(await screen.findByTestId('section-10-retry')).toBeInTheDocument();
+    expect(hasFailures?.()).toBe(true);
+
+    await user.click(screen.getByTestId('section-10-discard'));
+    await user.click(await screen.findByTestId('section-10-discard-confirm'));
+
+    // Closed, with nothing left behind.
+    await waitFor(() => expect(screen.getByTestId('section-10-edit')).toBeInTheDocument());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('section-10-retry')).not.toBeInTheDocument();
+    // The registered getter — what Finalize actually consults — also agrees
+    // the section is clean, so Finalize is free to proceed.
+    expect(hasFailures?.()).toBe(false);
+  });
+});
+
+describe('SectionCard — Retry resends the latest value', () => {
+  it('flushes a newer, still-pending edit before rebuilding the retry patch, so the stale failed value is never resent behind it', async () => {
+    const user = userEvent.setup();
+    const aValues: string[] = [];
+    let failNextA = true;
+    const saveValues = vi.fn().mockImplementation((patch: Record<string, unknown>) => {
+      if (FIELD_A in patch) {
+        aValues.push(patch[FIELD_A] as string);
+        if (failNextA) {
+          failNextA = false;
+          return Promise.resolve({ ok: false, message: 'nope' });
+        }
+      }
+      return Promise.resolve(okResult(patch));
+    });
+    render(<Harness initialValues={{ [FIELD_A]: 'Jordan', [FIELD_B]: '' }} saveValues={saveValues} startOpen />);
+
+    await user.clear(screen.getByTestId(`field-${FIELD_A}`));
+    await user.type(screen.getByTestId(`field-${FIELD_A}`), 'V1');
+    await user.tab(); // blur flushes V1 immediately — fails
+    expect(await screen.findByTestId('section-10-retry')).toBeInTheDocument();
+
+    // A newer edit to the SAME field — still sitting in its own debounce,
+    // not yet flushed — when Retry is clicked.
+    await user.clear(screen.getByTestId(`field-${FIELD_A}`));
+    await user.type(screen.getByTestId(`field-${FIELD_A}`), 'V2');
+
+    // Blur (the field's own flush, same as a real mousedown-before-click on
+    // the Retry button) and the Retry click fired back to back with no
+    // await between them, so V2's save is still in flight — not yet
+    // settled — the instant Retry's own handler starts building its patch.
+    fireEvent.blur(screen.getByTestId(`field-${FIELD_A}`));
+    fireEvent.click(screen.getByTestId('section-10-retry'));
+
+    await waitFor(() => expect(screen.queryByTestId('section-10-retry')).not.toBeInTheDocument());
+    // V1 was sent exactly once (the original failed attempt); V2 is the
+    // last value sent for this field — never resent behind a stale V1.
+    expect(aValues).toEqual(['V1', 'V2']);
   });
 });
 
