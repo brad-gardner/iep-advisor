@@ -50,22 +50,17 @@ describe("ChildForm — Grade Level / Disability Category dropdowns", () => {
     expect(screen.getByTestId("child-disability-category")).toHaveValue("");
   });
 
-  it("submits undefined grade/disability when Not set is selected", async () => {
+  it("submits undefined grade/disability on create when Not set is selected", async () => {
     const user = userEvent.setup();
     const onSubmit = makeOnSubmit();
-    render(
-      <ChildForm
-        embedded
-        onSubmit={onSubmit}
-        submitLabel="Save"
-        initialValues={{
-          firstName: "Ada",
-          gradeLevel: "8th",
-          disabilityCategory: "Autism",
-        }}
-      />,
-    );
+    render(<ChildForm embedded onSubmit={onSubmit} submitLabel="Save" />);
 
+    await user.type(screen.getByTestId("child-first-name"), "Ada");
+    await user.selectOptions(screen.getByTestId("child-grade-level"), "8th");
+    await user.selectOptions(
+      screen.getByTestId("child-disability-category"),
+      "Autism",
+    );
     await user.selectOptions(screen.getByTestId("child-grade-level"), "Not set");
     await user.selectOptions(
       screen.getByTestId("child-disability-category"),
@@ -155,6 +150,65 @@ describe("ChildForm — Grade Level / Disability Category dropdowns", () => {
 
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ gradeLevel: "8th" }),
+    );
+  });
+
+  it("sends an empty string to clear a stored value when Not set is picked on edit", async () => {
+    const user = userEvent.setup();
+    const onSubmit = makeOnSubmit();
+    render(
+      <ChildForm
+        embedded
+        onSubmit={onSubmit}
+        submitLabel="Save Changes"
+        initialValues={{
+          firstName: "Ada",
+          gradeLevel: "4th",
+          disabilityCategory: "Autism",
+        }}
+      />,
+    );
+
+    await user.selectOptions(screen.getByTestId("child-grade-level"), "");
+    await user.selectOptions(
+      screen.getByTestId("child-disability-category"),
+      "",
+    );
+    await user.click(screen.getByTestId("child-form-submit"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ gradeLevel: "", disabilityCategory: "" }),
+    );
+  });
+
+  it("preselects the canonical option for a school-linked disability label", async () => {
+    const user = userEvent.setup();
+    const onSubmit = makeOnSubmit();
+    render(
+      <ChildForm
+        embedded
+        onSubmit={onSubmit}
+        submitLabel="Save Changes"
+        initialValues={{
+          firstName: "Ada",
+          disabilityCategory: "Visual Impairment",
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("child-disability-category")).toHaveValue(
+      "Visual impairment (including blindness)",
+    );
+    expect(optionLabels("child-disability-category")).not.toContain(
+      "Visual Impairment (current value)",
+    );
+
+    await user.click(screen.getByTestId("child-form-submit"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        disabilityCategory: "Visual impairment (including blindness)",
+      }),
     );
   });
 });

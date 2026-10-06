@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { DISABILITY_CATEGORY_LABELS } from "@/features/educator/types";
 import {
   GRADE_LEVEL_OPTIONS,
   DISABILITY_CATEGORY_OPTIONS,
@@ -6,6 +7,7 @@ import {
   normalizeDisabilityCategory,
   buildGradeLevelOptions,
   buildDisabilityCategoryOptions,
+  SERVER_DISPLAY_LABELS,
 } from "./child-profile-options";
 
 describe("GRADE_LEVEL_OPTIONS", () => {
@@ -118,6 +120,17 @@ describe("normalizeDisabilityCategory", () => {
       "Speech/Language (mild)",
     );
   });
+});
+
+describe("SERVER_DISPLAY_LABELS", () => {
+  it.each(Object.entries(SERVER_DISPLAY_LABELS))(
+    "%s's server display string %s resolves to its canonical option",
+    (category, display) => {
+      expect(normalizeDisabilityCategory(display)).toBe(
+        DISABILITY_CATEGORY_LABELS[category as keyof typeof DISABILITY_CATEGORY_LABELS],
+      );
+    },
+  );
 });
 
 describe("buildGradeLevelOptions", () => {

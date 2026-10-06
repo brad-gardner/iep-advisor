@@ -20,7 +20,8 @@
 //     into the full `<option>` list for a given current value, appending an
 //     extra "(current value)" entry when the current value didn't match any
 //     canonical option, so re-submitting without touching the field leaves
-//     the stored string unchanged.
+//     an unmatched stored string unchanged. A matched variant ("8", "SLD")
+//     is saved back as its canonical option — same meaning, tidier text.
 import {
   DISABILITY_CATEGORIES,
   DISABILITY_CATEGORY_LABELS,
@@ -121,6 +122,29 @@ export function buildGradeLevelOptions(
 export const DISABILITY_CATEGORY_OPTIONS: readonly string[] =
   DISABILITY_CATEGORIES.map((category) => DISABILITY_CATEGORY_LABELS[category]);
 
+// The API's `DisabilityCategory.ToDisplay()` strings — what ChildLinkService
+// writes into ChildProfile when a parent accepts a school link. Most differ
+// from our labels only by case; "Visual Impairment" differs in wording.
+export const SERVER_DISPLAY_LABELS: Readonly<
+  Record<(typeof DISABILITY_CATEGORIES)[number], string>
+> = {
+  Autism: "Autism",
+  DeafBlindness: "Deaf-Blindness",
+  Deafness: "Deafness",
+  DevelopmentalDelay: "Developmental Delay",
+  EmotionalDisturbance: "Emotional Disturbance",
+  HearingImpairment: "Hearing Impairment",
+  IntellectualDisability: "Intellectual Disability",
+  MultipleDisabilities: "Multiple Disabilities",
+  OrthopedicImpairment: "Orthopedic Impairment",
+  OtherHealthImpairment: "Other Health Impairment",
+  SpecificLearningDisability: "Specific Learning Disability",
+  SpeechOrLanguageImpairment: "Speech or Language Impairment",
+  TraumaticBrainInjury: "Traumatic Brain Injury",
+  VisualImpairment: "Visual Impairment",
+  Other: "Other",
+};
+
 function buildDisabilityAliases(): Map<string, string> {
   const aliases = new Map<string, string>();
   const add = (key: string, canonicalLabel: string) => {
@@ -131,6 +155,7 @@ function buildDisabilityAliases(): Map<string, string> {
     const label = DISABILITY_CATEGORY_LABELS[category];
     add(label, label); // readable label, any case
     add(category, label); // server enum code, e.g. "SpecificLearningDisability"
+    add(SERVER_DISPLAY_LABELS[category], label); // what a school link writes
   }
 
   // A short, deliberately conservative list of abbreviations: each maps to

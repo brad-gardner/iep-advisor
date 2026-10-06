@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { CreateChildProfileRequest } from "@/types/api";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -38,17 +38,14 @@ export function ChildForm({
   const [disabilityCategory, setDisabilityCategory] = useState(
     normalizeDisabilityCategory(initialValues?.disabilityCategory),
   );
-  // Computed once from the value this form mounted with — Modal unmounts the
-  // form while closed, so a fresh edit open recomputes against the latest
-  // record. Keeps a legacy/unmatched value selectable (and thus preserved on
-  // submit) without rebuilding the list on every keystroke.
-  const gradeLevelOptions = useMemo(
-    () => buildGradeLevelOptions(initialValues?.gradeLevel),
-    [initialValues?.gradeLevel],
+  // Snapshotted at mount, like the selected values above, so a background
+  // refresh of the record can't drop a legacy option the state still holds.
+  // Modal unmounts the form while closed, so each edit open starts fresh.
+  const [gradeLevelOptions] = useState(() =>
+    buildGradeLevelOptions(initialValues?.gradeLevel),
   );
-  const disabilityCategoryOptions = useMemo(
-    () => buildDisabilityCategoryOptions(initialValues?.disabilityCategory),
-    [initialValues?.disabilityCategory],
+  const [disabilityCategoryOptions] = useState(() =>
+    buildDisabilityCategoryOptions(initialValues?.disabilityCategory),
   );
   const [schoolDistrict, setSchoolDistrict] = useState(
     initialValues?.schoolDistrict ?? "",
@@ -66,8 +63,11 @@ export function ChildForm({
       firstName: firstName.trim(),
       lastName: lastName.trim() || undefined,
       dateOfBirth: dateOfBirth || undefined,
-      gradeLevel: gradeLevel.trim() || undefined,
-      disabilityCategory: disabilityCategory.trim() || undefined,
+      gradeLevel: dropdownValue(gradeLevel, initialValues?.gradeLevel),
+      disabilityCategory: dropdownValue(
+        disabilityCategory,
+        initialValues?.disabilityCategory,
+      ),
       schoolDistrict: schoolDistrict.trim() || undefined,
     });
 
@@ -158,4 +158,17 @@ export function ChildForm({
 
   if (embedded) return form;
   return <Card className="max-w-lg">{form}</Card>;
+}
+
+/**
+ * "Not set" sends nothing on create, but on edit it must clear a value the
+ * record already has — the API treats `""` as clear and omitted as unchanged.
+ */
+function dropdownValue(
+  value: string,
+  initialValue: string | undefined,
+): string | undefined {
+  const trimmed = value.trim();
+  if (trimmed) return trimmed;
+  return initialValue?.trim() ? "" : undefined;
 }

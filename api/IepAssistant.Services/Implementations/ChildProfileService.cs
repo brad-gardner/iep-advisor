@@ -83,11 +83,12 @@ public class ChildProfileService : IChildProfileService
         if (model.DateOfBirth.HasValue)
             entity.DateOfBirth = model.DateOfBirth;
 
+        // null = leave unchanged; empty/whitespace = clear (the form's "Not set").
         if (model.GradeLevel != null)
-            entity.GradeLevel = model.GradeLevel;
+            entity.GradeLevel = string.IsNullOrWhiteSpace(model.GradeLevel) ? null : model.GradeLevel;
 
         if (model.DisabilityCategory != null)
-            entity.DisabilityCategory = model.DisabilityCategory;
+            entity.DisabilityCategory = string.IsNullOrWhiteSpace(model.DisabilityCategory) ? null : model.DisabilityCategory;
 
         if (model.SchoolDistrict != null)
             entity.SchoolDistrict = model.SchoolDistrict;
