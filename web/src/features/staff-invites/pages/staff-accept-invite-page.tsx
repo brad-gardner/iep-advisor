@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
@@ -127,9 +127,19 @@ export function StaffAcceptInvitePage() {
       {phase === 'ready' && preview && preview.status === 'valid' && (
         <div className="space-y-5">
           <p className="text-sm text-brand-slate-600">
-            <span className="font-medium text-brand-slate-800">{preview.districtName}</span>
-            {preview.schoolName ? ` · ${preview.schoolName}` : ''} {t('staffAcceptInvite.invitedAs')}{' '}
-            <span className="font-medium text-brand-slate-800">{orgRoleLabel(preview.roleName)}</span>.
+            <Trans
+              t={t}
+              i18nKey="staffAcceptInvite.invitedAsSentence"
+              values={{
+                district: preview.districtName,
+                schoolSuffix: preview.schoolName ? ` · ${preview.schoolName}` : '',
+                role: orgRoleLabel(preview.roleName),
+              }}
+              components={{
+                district: <span className="font-medium text-brand-slate-800" />,
+                role: <span className="font-medium text-brand-slate-800" />,
+              }}
+            />
           </p>
 
           {user ? (

@@ -14,6 +14,23 @@ import i18n, { i18nReady } from '@/lib/i18n';
 await i18nReady;
 await i18n.changeLanguage('en');
 
+// Fail the test immediately on a genuinely missing translation key, instead
+// of relying on each Spanish-rendering test to separately regex-check the
+// DOM for a leaked raw `ns:key` string. `saveMissing` must be on for
+// i18next to invoke the handler at all; neither is set in the production
+// init (`lib/i18n/index.ts`) — this is test-only.
+//
+// A key resolved through an explicit `defaultValue` (e.g. `orgRoleLabel`'s
+// fallback for an unrecognized role name) is NOT a bug — it's withheld from
+// the throw via `opt.defaultValue`, which i18next populates from either
+// calling convention (`t(key, { defaultValue })` or `t(key, defaultValue)`).
+i18n.options.saveMissing = true;
+i18n.options.missingKeyHandler = (lngs, ns, key, _fallbackValue, _updateMissing, opt) => {
+  if (opt && typeof opt === 'object' && 'defaultValue' in opt) return;
+  const languages = Array.isArray(lngs) ? lngs.join(', ') : lngs;
+  throw new Error(`[i18n] missing translation for "${ns}:${key}" (${languages})`);
+};
+
 // jsdom does not implement scrolling APIs used by overlay scroll-lock. Stub
 // them so tests exercising Modal/Drawer open/close don't emit "Not implemented"
 // noise.

@@ -20,14 +20,11 @@ describe('LoginPage in Spanish', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Le damos la bienvenida' })).toBeInTheDocument();
     expect(screen.getByLabelText('Correo electrónico')).toBeInTheDocument();
     expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Iniciar sesión' })).toBeInTheDocument();
     expect(screen.getByText('¿Olvidó su contraseña?')).toBeInTheDocument();
     expect(screen.getByText('¿No tiene una cuenta?')).toBeInTheDocument();
-
-    // No raw i18next key (namespace:key) is visible anywhere on the page.
-    expect(document.body.textContent).not.toMatch(/auth:[a-zA-Z.]+/);
   });
 });

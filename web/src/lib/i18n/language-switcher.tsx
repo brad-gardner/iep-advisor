@@ -15,11 +15,23 @@ interface LanguageSwitcherProps {
    * palette to use. Defaults to the light-surface palette.
    */
   tone?: 'onDark' | 'onLight';
+  /**
+   * Optional helper text rendered under the control and associated with it
+   * via `aria-describedby` — e.g. the Profile page's explanation of what
+   * the choice affects. The auth layout and sidebar footers omit this; the
+   * visible bilingual label is enough there.
+   */
+  hint?: string;
 }
 
 const labelToneClass: Record<'onDark' | 'onLight', string> = {
   onDark: 'text-brand-slate-400',
   onLight: 'text-brand-slate-600',
+};
+
+const hintToneClass: Record<'onDark' | 'onLight', string> = {
+  onDark: 'text-brand-slate-400',
+  onLight: 'text-brand-slate-500',
 };
 
 /**
@@ -34,7 +46,12 @@ const labelToneClass: Record<'onDark' | 'onLight', string> = {
  * signed in, or to `localStorage` as the pre-login choice otherwise — see
  * `AuthProvider.setLanguage`.
  */
-export function LanguageSwitcher({ className, 'data-testid': testId, tone = 'onLight' }: LanguageSwitcherProps) {
+export function LanguageSwitcher({
+  className,
+  'data-testid': testId,
+  tone = 'onLight',
+  hint,
+}: LanguageSwitcherProps) {
   const { t, i18n } = useTranslation('common');
   const { setLanguage } = useAuth();
   const [error, setError] = useState(false);
@@ -42,6 +59,7 @@ export function LanguageSwitcher({ className, 'data-testid': testId, tone = 'onL
   // desktop rail both mount this), so a fixed id would collide — `useId`
   // keeps the label-control pairing valid in both instances.
   const selectId = useId();
+  const hintId = useId();
 
   const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const next = e.target.value;
@@ -54,7 +72,12 @@ export function LanguageSwitcher({ className, 'data-testid': testId, tone = 'onL
   return (
     <div className={className}>
       <label htmlFor={selectId} className={cn('mb-1 block text-xs font-medium', labelToneClass[tone])}>
-        {t('languageSwitcher.label')}
+        {/* Deliberately bilingual (design direction: "Language / Idioma") —
+            each word is marked with its own `lang` so a screen reader
+            pronounces it correctly regardless of the active UI language. */}
+        <span lang="es">{t('languageSwitcher.labelEs')}</span>
+        {' / '}
+        <span lang="en">{t('languageSwitcher.labelEn')}</span>
       </label>
       <Select
         id={selectId}
@@ -62,13 +85,19 @@ export function LanguageSwitcher({ className, 'data-testid': testId, tone = 'onL
         onChange={handleChange}
         className="w-auto"
         data-testid={testId}
+        aria-describedby={hint ? hintId : undefined}
       >
         {SUPPORTED_LANGUAGES.map((lng) => (
-          <option key={lng} value={lng}>
+          <option key={lng} value={lng} lang={lng}>
             {t(`languageSwitcher.${lng}`)}
           </option>
         ))}
       </Select>
+      {hint && (
+        <p id={hintId} className={cn('mt-1 text-xs', hintToneClass[tone])}>
+          {hint}
+        </p>
+      )}
       {error && (
         <p role="alert" className="mt-1 text-xs text-brand-danger-600">
           {t('languageSwitcher.updateFailed')}

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useEffect, useState } from 'react';
+import { createContext, useCallback, useEffect, useRef, useState } from 'react';
 import * as Sentry from '@sentry/react';
 import { useTranslation } from 'react-i18next';
 import type {
@@ -58,6 +58,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [mfaPendingToken, setMfaPendingToken] = useState<string | null>(null);
 
+  // Latest-wins guard for everything that can decide the active language —
+  // an explicit `setLanguage` call, and the background sync below. Bumped by
+  // `setLanguage` the instant it's invoked (before anything async), and
+  // captured by every async flow that might later apply a language so a
+  // slower, now-superseded operation can tell it lost the race and must
+  // neither persist its choice nor overwrite newer state (see the plan's
+  // phase-1 review: language sync races).
+  const languageGenerationRef = useRef(0);
+
   // Applies the account's saved language once a user is known. When there is
   // no saved preference yet (a first sign-in, or an account created before
   // this field existed), this persists whatever language the session
@@ -65,7 +74,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // sign-ins, emails, and AI responses know it too. Fire-and-forget by
   // design: it must never block or delay setting the signed-in user, since
   // `ProtectedRoute`/`PublicRoute` key off that state synchronously.
-  const syncLanguagePreference = useCallback((userData: User) => {
+  //
+  // `generation` is the value of `languageGenerationRef` captured by the
+  // caller *before* it started the fetch that produced `userData` — not at
+  // the top of this function. That's what lets this tell a stale response
+  // apart from a current one: if an explicit `setLanguage` call happened at
+  // any point during that fetch (bumping the ref), `userData` can no longer
+  // be trusted to decide the language, even though it's still the right
+  // value to store as the fetched user record.
+  const syncLanguagePreference = useCallback((userData: User, generation: number) => {
+    if (languageGenerationRef.current !== generation) {
+      // An explicit switch raced ahead of this fetch. Applying `userData`'s
+      // (possibly stale) `preferredLanguage` now could revert a language the
+      // user already chose more recently — e.g. a `/me` refresh that was in
+      // flight when they switched to Spanish resolving afterward and saying
+      // "en". Never let it.
+      return;
+    }
+
     if (isSupportedLanguage(userData.preferredLanguage)) {
       if (i18n.language !== userData.preferredLanguage) {
         void i18n.changeLanguage(userData.preferredLanguage);
@@ -80,9 +106,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void updateProfileApi({ preferredLanguage: resolved })
       .then((response) => {
         if (!response.success || !response.data) return;
+        if (languageGenerationRef.current !== generation) return; // superseded while this PUT was in flight
         const savedLanguage = response.data.preferredLanguage;
         setUser((prev) => {
           if (!prev) return prev;
+          if (prev.preferredLanguage) return prev; // an explicit switch already set it — never clobber
           const merged = { ...prev, preferredLanguage: savedLanguage };
           setStoredUser(JSON.stringify(merged));
           return merged;
@@ -101,18 +129,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Try to get user from storage first
+      // Try to get user from storage first, and apply its saved language
+      // immediately — don't wait on the network round-trip below just to
+      // show the account's own preference on a page the user has already
+      // visited once.
       const storedUser = getStoredUser();
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        const parsed = JSON.parse(storedUser) as User;
+        setUser(parsed);
+        if (isSupportedLanguage(parsed.preferredLanguage) && i18n.language !== parsed.preferredLanguage) {
+          void i18n.changeLanguage(parsed.preferredLanguage);
+        }
       }
 
-      // Verify with API
+      // Verify with API. Captured before the request starts (see
+      // `syncLanguagePreference`'s doc comment) so a switch that happens
+      // while this is in flight is never overwritten by its stale response.
+      const generation = languageGenerationRef.current;
       const response = await getCurrentUser();
       if (response.success && response.data) {
         setUser(response.data);
         setStoredUser(JSON.stringify(response.data));
-        syncLanguagePreference(response.data);
+        syncLanguagePreference(response.data, generation);
       } else {
         removeToken();
         setUser(null);
@@ -145,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(token);
     setUser(userData);
     setStoredUser(JSON.stringify(userData));
-    syncLanguagePreference(userData);
+    syncLanguagePreference(userData, languageGenerationRef.current);
   }, [syncLanguagePreference]);
 
   const login = async (data: LoginRequest): Promise<LoginResult> => {
@@ -245,11 +283,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshUser = async () => {
+    // Same latest-wins capture as `loadUser` — a refresh triggered mid-flow
+    // (e.g. after accepting an invite) must not let its response, once it's
+    // stale, re-decide the language out from under a switch the user made
+    // while it was in flight.
+    const generation = languageGenerationRef.current;
     try {
       const response = await getCurrentUser();
       if (response.success && response.data) {
         setUser(response.data);
         setStoredUser(JSON.stringify(response.data));
+        syncLanguagePreference(response.data, generation);
       }
     } catch {
       // Keep the existing user on a transient failure.
@@ -257,13 +301,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    // Keep whatever language was active — it's still correct, it just has
+    // nowhere to live once the account's saved preference is gone. Recorded
+    // as the pre-login choice so the login page (this session or a later
+    // one) stays in that language instead of falling back to the browser.
+    setPreLoginLanguage(isSupportedLanguage(i18n.language) ? i18n.language : DEFAULT_LANGUAGE);
     removeToken();
     setUser(null);
     setMfaPendingToken(null);
   };
 
   const setLanguage = async (language: SupportedLanguage) => {
+    const generation = ++languageGenerationRef.current;
     await i18n.changeLanguage(language);
+
+    if (languageGenerationRef.current !== generation) {
+      // A newer explicit switch started before this one's `changeLanguage`
+      // resolved (e.g. this call is for a lazily-loaded Spanish chunk that
+      // took longer than a quick follow-up switch back to English). i18next
+      // itself already keeps the *active* language correct in that case —
+      // this just stops the superseded call from also persisting its now-
+      // wrong choice to the account or `localStorage`.
+      return { success: true };
+    }
 
     if (!user) {
       // No account to save it to yet — remembered for this browser until sign-in.
@@ -273,6 +333,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const response = await updateProfileApi({ preferredLanguage: language });
+      if (languageGenerationRef.current !== generation) {
+        // Superseded while the PUT was in flight — ignore this response so
+        // it can't overwrite a newer switch's state.
+        return { success: true };
+      }
       if (response.success && response.data) {
         setUser(response.data);
         setStoredUser(JSON.stringify(response.data));

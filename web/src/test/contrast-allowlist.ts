@@ -259,12 +259,13 @@ export const CONTRAST_ALLOWLIST: ContrastAllowlistEntry[] = [
     reason: STANDALONE_ICON,
   },
 
-  // LanguageSwitcher's `onDark` tone: only ever passed from the sidebar
-  // footer and the auth layout footer, both on bg-brand-slate-800.
+  // LanguageSwitcher's `onDark` tone (the label, and the Profile-only hint):
+  // only ever passed from the sidebar footer and the auth layout footer,
+  // both on bg-brand-slate-800.
   {
     file: 'src/lib/i18n/language-switcher.tsx',
     text: "onDark: 'text-brand-slate-400',",
-    count: 1,
+    count: 2,
     reason: DARK_SIDEBAR,
   },
 ];

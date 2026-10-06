@@ -1,21 +1,25 @@
 /**
- * Language resolution for an anonymous (pre-login) visitor, plus the
- * supported-language vocabulary shared by the rest of `lib/i18n`.
+ * Language resolution for the synchronous i18next init in `index.ts` — run
+ * before React ever mounts, so it has no access to a signed-in `User`
+ * object, only whatever's reachable from `localStorage` right now.
  *
  * The full resolution order (design doc, Architecture → Web) is:
- *   1. the signed-in user's saved `preferredLanguage` (applied later, and
- *      separately, by `AuthProvider` via `i18n.changeLanguage` once `/me`
- *      resolves — it isn't knowable at synchronous init time);
- *   2. a language chosen before signing in (`localStorage`);
+ *   1. the signed-in session's cached account language — the
+ *      `preferredLanguage` on the last `/me` response `lib/auth` stored,
+ *      read synchronously here so a page *reload* doesn't flash the browser
+ *      or pre-login language before `AuthProvider` gets a chance to confirm
+ *      it. A fresh (not-yet-cached) sign-in still goes through
+ *      `AuthProvider.loadUser`/`syncLanguagePreference` once `/me` resolves;
+ *   2. a language chosen before signing in, or on a prior visit after
+ *      signing out (`localStorage`);
  *   3. the browser's `navigator.languages` (`es-*` -> `es`);
  *   4. `en`.
  *
- * Steps 2-4 are this module's job and are exposed as pure, dependency-free
- * functions so the order itself is unit-testable without touching i18next or
- * the DOM. `preLoginDetector` adapts them to the `i18next-browser-languagedetector`
- * plugin contract so the real detection still runs through that installed
- * library rather than a bespoke call in `index.ts`.
+ * Exposed as pure functions over injectable inputs so the order itself is
+ * unit-testable without touching i18next or the DOM.
  */
+
+import { getStoredUser } from '@/lib/auth';
 
 export const SUPPORTED_LANGUAGES = ['en', 'es'] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
@@ -54,11 +58,36 @@ export function setPreLoginLanguage(language: SupportedLanguage): void {
   }
 }
 
+/**
+ * Not called by app code — `AuthProvider.logout` now *sets* the pre-login
+ * key to whatever language was active (so it survives sign-out) rather than
+ * clearing it. Kept, and exported, purely as test cleanup: several specs
+ * reset storage between cases without hardcoding this module's private
+ * key.
+ */
 export function clearPreLoginLanguage(): void {
   try {
     localStorage.removeItem(PRE_LOGIN_LANGUAGE_KEY);
   } catch {
     // Nothing to clean up if storage isn't available.
+  }
+}
+
+/**
+ * The cached account language from the last `/me` response `lib/auth`
+ * stored (`localStorage`, not a fresh network call) — read synchronously so
+ * it's available before the request that would otherwise confirm it (see
+ * `AuthProvider.loadUser`). `null` if there's no stored session, it's
+ * unparseable, or it has no supported `preferredLanguage`.
+ */
+function getStoredUserLanguage(): SupportedLanguage | null {
+  try {
+    const raw = getStoredUser();
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { preferredLanguage?: string | null };
+    return isSupportedLanguage(parsed.preferredLanguage) ? parsed.preferredLanguage : null;
+  } catch {
+    return null;
   }
 }
 
@@ -74,22 +103,11 @@ export function detectBrowserLanguage(
 }
 
 /**
- * Resolution for an anonymous visitor: pre-login choice, else the browser's
- * languages, else `en`. `languages` is injectable for deterministic tests.
+ * The language i18next initializes with, synchronously, before React
+ * mounts: the cached account language, else a pre-login choice, else the
+ * browser's languages, else `en`. `languages` is injectable for
+ * deterministic tests.
  */
 export function detectInitialLanguage(languages?: readonly string[]): SupportedLanguage {
-  return getPreLoginLanguage() ?? detectBrowserLanguage(languages);
+  return getStoredUserLanguage() ?? getPreLoginLanguage() ?? detectBrowserLanguage(languages);
 }
-
-/**
- * `i18next-browser-languagedetector` custom detector wrapping the resolution
- * above, so the real app wires detection through the installed library
- * (`index.ts` registers it via `LanguageDetector.addDetector`) instead of
- * calling `detectInitialLanguage` directly.
- */
-export const preLoginDetector = {
-  name: 'iep-prelogin',
-  lookup(): string {
-    return detectInitialLanguage();
-  },
-};

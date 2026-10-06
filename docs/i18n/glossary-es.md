@@ -10,6 +10,7 @@ Every Spanish string in the app, emails, PDFs and AI instructions uses these ter
 - **Acronyms:** keep the English special-education acronyms that families see in school paperwork (**IEP, ETR, IDEA, FAPE, LRE**). Write them out the first time on explanatory pages:
   - "Programa de Educación Individualizado (IEP)"
   - "Informe del Equipo de Evaluación (ETR)"
+  - **MFA is not one of these.** It's a product/security term, not special-ed vocabulary families see on school paperwork — always write it out as "verificación en dos pasos" in running Spanish text (never "MFA" bare, e.g. not "Deshabilitar MFA").
 - **Inclusive phrasing:** prefer "su hijo o hija" in explanatory text and "su hijo" in short labels. Use "estudiante" for school-side contexts.
 - **Interpolation:** keep `{{name}}` placeholders exactly as they are. Don't translate brand names (IEP Advisor) or product feature names unless listed below.
 - **Punctuation:** use inverted marks (¿…?, ¡…!). Spanish uses « » rarely; use straight quotes as in English.
@@ -61,6 +62,7 @@ Every Spanish string in the app, emails, PDFs and AI instructions uses these ter
 | upload | subir |
 | download | descargar |
 | loading… | cargando… |
+| invite status: claimed/used | utilizada (not "reclamada") |
 | grade (level) | grado |
 | Pre-K / Kindergarten | prekínder / kínder |
 | 1st grade … 12th grade | 1.er grado … 12.º grado |

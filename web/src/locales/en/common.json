@@ -100,9 +100,17 @@
     "daysAgo": "{{n}}d ago"
   },
   "languageSwitcher": {
-    "label": "Idioma / Language",
+    "labelEs": "Idioma",
+    "labelEn": "Language",
     "en": "English",
     "es": "Español",
     "updateFailed": "Couldn't save your language preference"
+  },
+  "orgRole": {
+    "DistrictAdmin": "District administrator",
+    "SchoolAdmin": "School administrator",
+    "Teacher": "Teacher",
+    "RelatedServiceProvider": "Related service provider",
+    "GeneralEducator": "General educator"
   }
 }

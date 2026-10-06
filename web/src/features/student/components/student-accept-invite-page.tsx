@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Spinner } from '@/components/ui/spinner';
@@ -124,12 +124,15 @@ export function StudentAcceptInvitePage() {
         {(status === 'ready' || status === 'submitting') && preview && (
           <div className="space-y-5">
             <p className="text-sm text-brand-slate-600">
-              <span className="font-medium text-brand-slate-800">{inviterContext}</span>{' '}
-              {t('studentAcceptInvite.invitedAs')}{' '}
-              <span className="font-medium text-brand-slate-800">
-                {preview.linkedToFirstName}
-              </span>
-              .
+              <Trans
+                t={t}
+                i18nKey="studentAcceptInvite.invitedAsSentence"
+                values={{ context: inviterContext, name: preview.linkedToFirstName }}
+                components={{
+                  context: <span className="font-medium text-brand-slate-800" />,
+                  name: <span className="font-medium text-brand-slate-800" />,
+                }}
+              />
             </p>
 
             <label

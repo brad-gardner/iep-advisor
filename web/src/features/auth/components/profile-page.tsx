@@ -207,11 +207,14 @@ export function ProfilePage() {
       </Card>
 
       <Card className="max-w-lg" data-testid="profile-language-section">
-        <label className="block text-[13px] font-medium text-brand-slate-600 mb-1">
+        <h2 className="text-lg font-serif font-semibold text-brand-slate-800 mb-4">
           {t('profile.languageLabel')}
-        </label>
-        <LanguageSwitcher tone="onLight" data-testid="profile-language-switcher" />
-        <p className="text-[11px] text-brand-slate-500 mt-2">{t('profile.languageHint')}</p>
+        </h2>
+        <LanguageSwitcher
+          tone="onLight"
+          hint={t('profile.languageHint')}
+          data-testid="profile-language-switcher"
+        />
       </Card>
 
       <div className="max-w-lg space-y-3">

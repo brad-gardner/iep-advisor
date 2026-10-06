@@ -9,13 +9,3 @@ import { DEFAULT_LANGUAGE } from './detect';
 export function getActiveLanguage(): string {
   return i18n.language || DEFAULT_LANGUAGE;
 }
-
-/** `Intl.DateTimeFormat` bound to the active language. */
-export function formatDate(date: Date, options?: Intl.DateTimeFormatOptions): string {
-  return new Intl.DateTimeFormat(getActiveLanguage(), options).format(date);
-}
-
-/** `Intl.NumberFormat` bound to the active language. */
-export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {
-  return new Intl.NumberFormat(getActiveLanguage(), options).format(value);
-}

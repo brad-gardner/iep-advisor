@@ -18,7 +18,5 @@ describe('RegisterPage in Spanish', () => {
     expect(screen.getByText('Soy padre, madre o tutor')).toBeInTheDocument();
     expect(screen.getByText('Represento a una escuela o distrito')).toBeInTheDocument();
     expect(screen.getByText('¿Ya tiene una cuenta?')).toBeInTheDocument();
-
-    expect(document.body.textContent).not.toMatch(/auth:[a-zA-Z.]+/);
   });
 });

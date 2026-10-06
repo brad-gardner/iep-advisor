@@ -1,10 +1,10 @@
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import LanguageDetector from 'i18next-browser-languagedetector';
 import resourcesToBackend from 'i18next-resources-to-backend';
+import * as Sentry from '@sentry/react';
 import enCommon from '@/locales/en/common.json';
 import enAuth from '@/locales/en/auth.json';
-import { preLoginDetector, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from './detect';
+import { detectInitialLanguage, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from './detect';
 
 export const defaultNS = 'common';
 
@@ -23,16 +23,12 @@ const esLoaders = import.meta.glob('/src/locales/es/*.json') as Record<
   () => Promise<{ default: Record<string, unknown> }>
 >;
 
-const languageDetector = new LanguageDetector();
-languageDetector.addDetector(preLoginDetector);
-
 // Exported so callers that need to know initialization has settled (the
 // test setup, chiefly — see `test/setup.ts`) can await it instead of relying
 // on timing. Nothing else in app code should need this: `useTranslation`'s
 // own re-render-on-ready behavior (via `react: { useSuspense: false }`
 // below) handles the UI case.
 export const i18nReady = i18next
-  .use(languageDetector)
   .use(
     resourcesToBackend(async (language: string, namespace: string) => {
       const path = `/src/locales/${language}/${namespace}.json`;
@@ -50,15 +46,18 @@ export const i18nReady = i18next
     // English namespaces above are used directly; the backend is only
     // consulted for languages/namespaces not already bundled (i.e. es/*).
     partialBundledLanguages: true,
+    // Resolved once, synchronously, by `detectInitialLanguage` (cached
+    // account language, else a pre-login choice, else the browser, else
+    // `en` — see `detect.ts`). No detector plugin: `AuthProvider` is what
+    // applies a signed-in user's *confirmed* preference once `/me`
+    // resolves, and `useLanguageQueryParam` applies a `?lang=` visit: both
+    // call `i18n.changeLanguage` directly rather than through a detector.
+    lng: detectInitialLanguage(),
     fallbackLng: DEFAULT_LANGUAGE,
     supportedLngs: SUPPORTED_LANGUAGES,
     load: 'languageOnly',
     ns: ['common', 'auth'],
     defaultNS,
-    detection: {
-      order: ['iep-prelogin'],
-      caches: [],
-    },
     interpolation: { escapeValue: false },
     returnNull: false,
     // No Suspense boundary wraps most of the app (only the lazy Advocate
@@ -72,9 +71,22 @@ export const i18nReady = i18next
 
 // Keep the document's declared language in sync with i18next's resolved
 // language on every change (including the very first resolution).
-i18next.on('languageChanged', (lng) => {
+// `resolvedLanguage` (not the `lng` the event carries) is what actually
+// loaded — they can differ for an unsupported/regional tag.
+i18next.on('languageChanged', () => {
   if (typeof document !== 'undefined') {
-    document.documentElement.lang = lng;
+    document.documentElement.lang = i18next.resolvedLanguage ?? DEFAULT_LANGUAGE;
+  }
+});
+
+// A namespace fails to load (e.g. the network drops mid-way through
+// fetching the lazy Spanish chunk): never leave the UI showing raw
+// `ns:key` strings indefinitely. Log it and fall back to English, which is
+// always bundled and therefore always available.
+i18next.on('failedLoading', (lng, ns, msg) => {
+  Sentry.captureException(new Error(`[i18n] failed loading ${lng}/${ns}: ${msg}`));
+  if (lng !== DEFAULT_LANGUAGE) {
+    void i18next.changeLanguage(DEFAULT_LANGUAGE);
   }
 });
 

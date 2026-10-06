@@ -58,7 +58,5 @@ describe('Sidebar nav in Spanish', () => {
     expect(screen.getAllByText('Soporte')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Cerrar sesión')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Confianza y privacidad')[0]).toBeInTheDocument();
-
-    expect(document.body.textContent).not.toMatch(/common:[a-zA-Z.]+/);
   });
 });

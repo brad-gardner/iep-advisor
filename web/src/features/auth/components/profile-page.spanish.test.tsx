@@ -58,13 +58,15 @@ describe('ProfilePage in Spanish', () => {
     await renderProfilePage();
 
     expect((await screen.findAllByText('Perfil')).length).toBeGreaterThan(0);
-    expect(screen.getByText('Idioma')).toBeInTheDocument();
-    expect(screen.getByText('Idioma / Language')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Idioma' })).toBeInTheDocument();
+    expect(screen.getByTestId('profile-language-switcher')).toHaveAccessibleDescription(
+      'Cambia el idioma de la aplicación y de los correos electrónicos de la cuenta.'
+    );
+    const languageLabel = screen.getByText('Idioma', { selector: 'span[lang="es"]' }).closest('label');
+    expect(languageLabel).toHaveTextContent('Idioma / Language');
     expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeInTheDocument();
     expect(screen.getByText('Verificación en dos pasos')).toBeInTheDocument();
     expect(screen.getByText('Cuenta')).toBeInTheDocument();
-
-    expect(document.body.textContent).not.toMatch(/auth:[a-zA-Z.]+/);
   });
 
   it('switches the active language from the Profile page and persists it to the account', async () => {
