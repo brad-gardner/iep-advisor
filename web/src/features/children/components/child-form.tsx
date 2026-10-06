@@ -1,9 +1,15 @@
 import { useState } from "react";
 import type { CreateChildProfileRequest } from "@/types/api";
-import { Input } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
+import {
+  buildDisabilityCategoryOptions,
+  buildGradeLevelOptions,
+  normalizeDisabilityCategory,
+  normalizeGradeLevel,
+} from "../lib/child-profile-options";
 
 interface ChildFormProps {
   initialValues?: Partial<CreateChildProfileRequest>;
@@ -26,13 +32,30 @@ export function ChildForm({
   const [dateOfBirth, setDateOfBirth] = useState(
     initialValues?.dateOfBirth ?? "",
   );
-  const [gradeLevel, setGradeLevel] = useState(initialValues?.gradeLevel ?? "");
+  const [gradeLevel, setGradeLevel] = useState(
+    normalizeGradeLevel(initialValues?.gradeLevel),
+  );
   const [disabilityCategory, setDisabilityCategory] = useState(
-    initialValues?.disabilityCategory ?? "",
+    normalizeDisabilityCategory(initialValues?.disabilityCategory),
+  );
+  // Snapshotted at mount, like the selected values above, so a background
+  // refresh of the record can't drop a legacy option the state still holds,
+  // or make "Not set" clear a value the user never saw. Modal unmounts the
+  // form while closed, so each edit open starts fresh.
+  const [initialGradeLevel] = useState(initialValues?.gradeLevel);
+  const [initialDisabilityCategory] = useState(
+    initialValues?.disabilityCategory,
+  );
+  const [gradeLevelOptions] = useState(() =>
+    buildGradeLevelOptions(initialValues?.gradeLevel),
+  );
+  const [disabilityCategoryOptions] = useState(() =>
+    buildDisabilityCategoryOptions(initialValues?.disabilityCategory),
   );
   const [schoolDistrict, setSchoolDistrict] = useState(
     initialValues?.schoolDistrict ?? "",
   );
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,8 +68,11 @@ export function ChildForm({
       firstName: firstName.trim(),
       lastName: lastName.trim() || undefined,
       dateOfBirth: dateOfBirth || undefined,
-      gradeLevel: gradeLevel.trim() || undefined,
-      disabilityCategory: disabilityCategory.trim() || undefined,
+      gradeLevel: dropdownValue(gradeLevel, initialGradeLevel),
+      disabilityCategory: dropdownValue(
+        disabilityCategory,
+        initialDisabilityCategory,
+      ),
       schoolDistrict: schoolDistrict.trim() || undefined,
     });
 
@@ -90,23 +116,31 @@ export function ChildForm({
         data-testid="child-date-of-birth"
       />
 
-      <Input
+      <Select
         label="Grade Level"
-        placeholder="e.g. 3rd, 7th, 10th"
         value={gradeLevel}
         onChange={(e) => setGradeLevel(e.target.value)}
-        maxLength={20}
         data-testid="child-grade-level"
-      />
+      >
+        {gradeLevelOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
 
-      <Input
+      <Select
         label="Disability Category"
-        placeholder="e.g. Autism, SLD, Speech/Language"
         value={disabilityCategory}
         onChange={(e) => setDisabilityCategory(e.target.value)}
-        maxLength={100}
         data-testid="child-disability-category"
-      />
+      >
+        {disabilityCategoryOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
 
       <Input
         label="School District"
@@ -129,4 +163,17 @@ export function ChildForm({
 
   if (embedded) return form;
   return <Card className="max-w-lg">{form}</Card>;
+}
+
+/**
+ * "Not set" sends nothing on create, but on edit it must clear a value the
+ * record already has — the API treats `""` as clear and omitted as unchanged.
+ */
+function dropdownValue(
+  value: string,
+  initialValue: string | undefined,
+): string | undefined {
+  const trimmed = value.trim();
+  if (trimmed) return trimmed;
+  return initialValue?.trim() ? "" : undefined;
 }
