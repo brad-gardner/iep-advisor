@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 export interface BarChartDatum {
@@ -41,6 +42,7 @@ export function BarChart({
   className,
   'data-testid': testId,
 }: BarChartProps) {
+  const { t } = useTranslation('common');
   const maxValue = Math.max(max ?? 0, ...data.map((d) => d.value), 1);
   const height = data.length * ROW_HEIGHT + 8;
 
@@ -87,8 +89,8 @@ export function BarChart({
         <caption>{title}</caption>
         <thead>
           <tr>
-            <th scope="col">Label</th>
-            <th scope="col">Value</th>
+            <th scope="col">{t('charts.label')}</th>
+            <th scope="col">{t('charts.value')}</th>
           </tr>
         </thead>
         <tbody>

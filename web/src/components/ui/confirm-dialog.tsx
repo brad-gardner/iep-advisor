@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "./button";
 import { Modal } from "./modal";
 import { Notice } from "./notice";
@@ -36,7 +37,7 @@ export function ConfirmDialog({
   title,
   message,
   confirmLabel,
-  cancelLabel = "Cancel",
+  cancelLabel,
   confirmVariant = "danger",
   loading = false,
   error,
@@ -44,7 +45,9 @@ export function ConfirmDialog({
   onCancel,
   "data-testid": testId,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation("common");
   const messageId = useId();
+  const resolvedCancelLabel = cancelLabel ?? t("ui.cancel");
 
   return (
     <Modal
@@ -66,7 +69,7 @@ export function ConfirmDialog({
             autoFocus
             data-testid={testId ? `${testId}-cancel` : undefined}
           >
-            {cancelLabel}
+            {resolvedCancelLabel}
           </Button>
           <Button
             variant={confirmVariant}

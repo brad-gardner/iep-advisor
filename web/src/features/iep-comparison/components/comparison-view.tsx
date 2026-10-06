@@ -9,9 +9,10 @@ import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { PageLayout } from '@/components/ui/page-layout';
+import { getActiveLanguage } from '@/lib/i18n/format';
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  return new Date(dateStr).toLocaleDateString(getActiveLanguage(), {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

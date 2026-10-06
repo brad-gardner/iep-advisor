@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Logo } from '@/components/ui/logo';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { apiErrorMessage } from '@/lib/api-error';
 import { usePageTitle } from '@/hooks/use-page-title';
+import { useLanguageQueryParam } from '@/lib/i18n/use-language-query-param';
 import { cancelDeletionByToken } from '../api/auth-api';
 
 type Phase = 'loading' | 'success' | 'error';
-
-const DEFAULT_ERROR = 'This link is invalid or has expired.';
 
 /**
  * `/account/cancel-deletion?token=` — public, unauthenticated (pilot-gates
@@ -20,7 +20,11 @@ const DEFAULT_ERROR = 'This link is invalid or has expired.';
  * mount (`submittedRef`, guarding React StrictMode's double-invoked effect).
  */
 export function CancelDeletionPage() {
-  usePageTitle('Cancel account deletion');
+  const { t } = useTranslation('auth');
+  usePageTitle(t('cancelDeletion.pageTitle'));
+  // This page owns its own chrome (no AuthLayout), so it honors `?lang=`
+  // itself rather than inheriting the layout's handling.
+  useLanguageQueryParam();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const [phase, setPhase] = useState<Phase>(token ? 'loading' : 'error');
@@ -52,12 +56,12 @@ export function CancelDeletionPage() {
           setPhase('success');
         } else {
           setPhase('error');
-          setErrorMessage(response.message ?? DEFAULT_ERROR);
+          setErrorMessage(response.message ?? null);
         }
       } catch (err) {
         if (mountedRef.current) {
           setPhase('error');
-          setErrorMessage(apiErrorMessage(err, DEFAULT_ERROR));
+          setErrorMessage(apiErrorMessage(err, t('cancelDeletion.invalidLink')));
         }
       }
     })();
@@ -65,7 +69,7 @@ export function CancelDeletionPage() {
     return () => {
       mountedRef.current = false;
     };
-  }, []);
+  }, [t]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-brand-slate-50 px-4 py-12">
@@ -76,7 +80,7 @@ export function CancelDeletionPage() {
 
         {phase === 'loading' && (
           <div className="flex justify-center py-4" data-testid="cancel-deletion-loading">
-            <Spinner label="Cancelling your deletion request…" />
+            <Spinner label={t('cancelDeletion.cancelling')} />
           </div>
         )}
 
@@ -84,7 +88,7 @@ export function CancelDeletionPage() {
           <div role="status">
             <Notice
               variant="success"
-              title="Your deletion request was cancelled — you can sign in again"
+              title={t('cancelDeletion.success')}
               data-testid="cancel-deletion-success"
             />
           </div>
@@ -92,7 +96,11 @@ export function CancelDeletionPage() {
 
         {phase === 'error' && (
           <div role="alert">
-            <Notice variant="error" title={errorMessage ?? DEFAULT_ERROR} data-testid="cancel-deletion-error" />
+            <Notice
+              variant="error"
+              title={errorMessage ?? t('cancelDeletion.invalidLink')}
+              data-testid="cancel-deletion-error"
+            />
           </div>
         )}
 
@@ -103,7 +111,7 @@ export function CancelDeletionPage() {
               className="text-sm text-brand-teal-500 hover:text-brand-teal-600"
               data-testid="cancel-deletion-login-link"
             >
-              Go to sign in
+              {t('cancelDeletion.goToLogin')}
             </Link>
           </div>
         )}

@@ -6,6 +6,7 @@ using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Repositories;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -56,8 +57,10 @@ public class PasswordResetService : IPasswordResetService
         _context.PasswordResetTokens.Add(resetToken);
         await _context.SaveChangesAsync(ct);
 
-        // Send email with the raw token
-        await _emailService.SendPasswordResetEmailAsync(email, rawToken, ct);
+        // Send email with the raw token, in the account's saved language, falling back to the current
+        // request's UI culture when there is none (see SupportedLanguages.ForRecipient for why).
+        var language = SupportedLanguages.ForRecipient(user.PreferredLanguage);
+        await _emailService.SendPasswordResetEmailAsync(email, rawToken, language, ct);
     }
 
     public async Task<ServiceResult> ResetPasswordAsync(string token, string newPassword, CancellationToken ct = default)

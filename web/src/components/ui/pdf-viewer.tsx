@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, ExternalLink } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card } from "./card";
 import { Notice } from "./notice";
 
@@ -10,26 +11,27 @@ interface PdfViewerProps {
 }
 
 export function PdfViewer({ fileName, parsedNote, loadUrl }: PdfViewerProps) {
+  const { t } = useTranslation("common");
   const [url, setUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
-    setError(null);
+    setError(false);
     loadUrl()
       .then((u) => {
         if (cancelled) return;
         if (!u) {
-          setError("Couldn't load the document.");
+          setError(true);
         } else {
           setUrl(u);
         }
       })
       .catch(() => {
         if (cancelled) return;
-        setError("Couldn't load the document.");
+        setError(true);
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -42,7 +44,7 @@ export function PdfViewer({ fileName, parsedNote, loadUrl }: PdfViewerProps) {
   return (
     <div className="space-y-3">
       {parsedNote && (
-        <Notice variant="success" title="Document parsed">
+        <Notice variant="success" title={t("pdfViewer.documentParsed")}>
           {parsedNote}
         </Notice>
       )}
@@ -50,7 +52,7 @@ export function PdfViewer({ fileName, parsedNote, loadUrl }: PdfViewerProps) {
       <Card className="p-3">
         <div className="flex items-center justify-between mb-3">
           <div className="text-sm font-medium text-brand-slate-800 truncate">
-            {fileName || "Document"}
+            {fileName || t("pdfViewer.document")}
           </div>
           <div className="flex gap-2 shrink-0">
             {url && (
@@ -65,7 +67,7 @@ export function PdfViewer({ fileName, parsedNote, loadUrl }: PdfViewerProps) {
                   strokeWidth={1.8}
                   aria-hidden="true"
                 />
-                Open in new tab
+                {t("pdfViewer.openInNewTab")}
               </a>
             )}
             {url && (
@@ -79,7 +81,7 @@ export function PdfViewer({ fileName, parsedNote, loadUrl }: PdfViewerProps) {
                   strokeWidth={1.8}
                   aria-hidden="true"
                 />
-                Download
+                {t("pdfViewer.download")}
               </a>
             )}
           </div>
@@ -92,14 +94,14 @@ export function PdfViewer({ fileName, parsedNote, loadUrl }: PdfViewerProps) {
         )}
 
         {!isLoading && error && (
-          <Notice variant="error" title="Couldn't load the document">
-            {error}
+          <Notice variant="error" title={t("pdfViewer.couldNotLoadTitle")}>
+            {t("pdfViewer.couldNotLoad")}
           </Notice>
         )}
 
         {!isLoading && !error && !url && (
           <p className="text-sm text-brand-slate-500 py-8 text-center">
-            No document attached.
+            {t("pdfViewer.noDocument")}
           </p>
         )}
 
@@ -112,13 +114,14 @@ export function PdfViewer({ fileName, parsedNote, loadUrl }: PdfViewerProps) {
 }
 
 function PdfFrame({ url }: { url: string }) {
+  const { t } = useTranslation("common");
   const [frameError, setFrameError] = useState(false);
   return (
     <div className="w-full" style={{ height: "min(80vh, 900px)" }}>
       {frameError ? (
         <div className="text-center py-8">
           <p className="text-sm text-brand-slate-500 mb-3">
-            Inline preview isn't available for this file.
+            {t("pdfViewer.previewUnavailable")}
           </p>
           <a
             href={url}
@@ -126,13 +129,13 @@ function PdfFrame({ url }: { url: string }) {
             rel="noopener noreferrer"
             className="inline-flex items-center px-3 py-1.5 rounded-button text-[13px] font-medium bg-brand-slate-100 text-brand-slate-800 hover:bg-brand-slate-200 transition-colors"
           >
-            Open in new tab
+            {t("pdfViewer.openInNewTab")}
           </a>
         </div>
       ) : (
         <iframe
           src={url}
-          title="Document preview"
+          title={t("pdfViewer.documentPreview")}
           className="w-full h-full rounded-card border border-brand-slate-200"
           onError={() => setFrameError(true)}
         />

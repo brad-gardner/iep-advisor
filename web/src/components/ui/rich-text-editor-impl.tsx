@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Editor, EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extension-placeholder';
@@ -66,6 +67,7 @@ function ToolbarDivider() {
 }
 
 function LinkControl({ editor, disabled }: { editor: Editor; disabled?: boolean }) {
+  const { t } = useTranslation('common');
   const [showInput, setShowInput] = useState(false);
   const [url, setUrl] = useState('');
 
@@ -107,8 +109,8 @@ function LinkControl({ editor, disabled }: { editor: Editor; disabled?: boolean 
               cancel();
             }
           }}
-          placeholder="https://…"
-          aria-label="Link URL"
+          placeholder={t('richText.linkUrlPlaceholder')}
+          aria-label={t('richText.linkUrl')}
           autoFocus
           className="h-7 w-40 rounded border border-brand-slate-200 px-2 text-xs text-brand-slate-800 focus:border-brand-teal-500 focus:outline-none focus:ring-[3px] focus:ring-brand-teal-50"
         />
@@ -124,7 +126,7 @@ function LinkControl({ editor, disabled }: { editor: Editor; disabled?: boolean 
       }}
       isActive={editor.isActive('link')}
       disabled={disabled}
-      title="Link"
+      title={t('richText.link')}
     >
       <LinkIcon className="h-4 w-4" aria-hidden="true" />
     </ToolbarButton>
@@ -132,17 +134,18 @@ function LinkControl({ editor, disabled }: { editor: Editor; disabled?: boolean 
 }
 
 function Toolbar({ editor, disabled }: { editor: Editor; disabled?: boolean }) {
+  const { t } = useTranslation('common');
   return (
     <div
       role="toolbar"
-      aria-label="Formatting"
+      aria-label={t('richText.formatting')}
       className="flex flex-wrap items-center gap-0.5 border-b border-brand-slate-200 bg-brand-slate-50 px-2 py-1"
     >
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBold().run()}
         isActive={editor.isActive('bold')}
         disabled={disabled}
-        title="Bold"
+        title={t('richText.bold')}
       >
         <BoldIcon className="h-4 w-4" aria-hidden="true" />
       </ToolbarButton>
@@ -150,7 +153,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled?: boolean }) {
         onClick={() => editor.chain().focus().toggleItalic().run()}
         isActive={editor.isActive('italic')}
         disabled={disabled}
-        title="Italic"
+        title={t('richText.italic')}
       >
         <ItalicIcon className="h-4 w-4" aria-hidden="true" />
       </ToolbarButton>
@@ -158,7 +161,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled?: boolean }) {
         onClick={() => editor.chain().focus().toggleStrike().run()}
         isActive={editor.isActive('strike')}
         disabled={disabled}
-        title="Strikethrough"
+        title={t('richText.strikethrough')}
       >
         <StrikethroughIcon className="h-4 w-4" aria-hidden="true" />
       </ToolbarButton>
@@ -169,7 +172,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled?: boolean }) {
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
         isActive={editor.isActive('heading', { level: 2 })}
         disabled={disabled}
-        title="Heading 2"
+        title={t('richText.heading2')}
       >
         <Heading2Icon className="h-4 w-4" aria-hidden="true" />
       </ToolbarButton>
@@ -177,7 +180,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled?: boolean }) {
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
         isActive={editor.isActive('heading', { level: 3 })}
         disabled={disabled}
-        title="Heading 3"
+        title={t('richText.heading3')}
       >
         <Heading3Icon className="h-4 w-4" aria-hidden="true" />
       </ToolbarButton>
@@ -188,7 +191,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled?: boolean }) {
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         isActive={editor.isActive('bulletList')}
         disabled={disabled}
-        title="Bullet list"
+        title={t('richText.bulletList')}
       >
         <BulletListIcon className="h-4 w-4" aria-hidden="true" />
       </ToolbarButton>
@@ -196,7 +199,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled?: boolean }) {
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         isActive={editor.isActive('orderedList')}
         disabled={disabled}
-        title="Numbered list"
+        title={t('richText.numberedList')}
       >
         <OrderedListIcon className="h-4 w-4" aria-hidden="true" />
       </ToolbarButton>
@@ -207,7 +210,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled?: boolean }) {
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
         isActive={editor.isActive('blockquote')}
         disabled={disabled}
-        title="Quote"
+        title={t('richText.quote')}
       >
         <QuoteIcon className="h-4 w-4" aria-hidden="true" />
       </ToolbarButton>
@@ -218,10 +221,10 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled?: boolean }) {
 
       <ToolbarDivider />
 
-      <ToolbarButton onClick={() => editor.chain().focus().undo().run()} disabled={disabled} title="Undo">
+      <ToolbarButton onClick={() => editor.chain().focus().undo().run()} disabled={disabled} title={t('richText.undo')}>
         <UndoIcon className="h-4 w-4" aria-hidden="true" />
       </ToolbarButton>
-      <ToolbarButton onClick={() => editor.chain().focus().redo().run()} disabled={disabled} title="Redo">
+      <ToolbarButton onClick={() => editor.chain().focus().redo().run()} disabled={disabled} title={t('richText.redo')}>
         <RedoIcon className="h-4 w-4" aria-hidden="true" />
       </ToolbarButton>
     </div>
@@ -265,6 +268,7 @@ function RichTextEditorImpl({
   required,
   onReady,
 }: RichTextEditorProps) {
+  const { t } = useTranslation('common');
   // Refs keep the latest callbacks available to TipTap's event handlers
   // without forcing the editor to be recreated when the parent re-renders
   // with new (but behaviorally identical) callback references.
@@ -419,7 +423,7 @@ function RichTextEditorImpl({
               <span className="ml-1 text-brand-danger-700" aria-hidden="true">
                 *
               </span>
-              <span className="sr-only"> (required)</span>
+              <span className="sr-only"> {t('ui.required')}</span>
             </>
           )}
         </label>

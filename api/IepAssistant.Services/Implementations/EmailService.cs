@@ -1,7 +1,9 @@
 using System.Net;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -12,40 +14,55 @@ namespace IepAssistant.Services.Implementations;
 /// decision 2). <c>OutboundEmailWorker</c> + <c>IEmailTransport</c> are the only real sender; this class
 /// only renders. Enqueueing does not swallow: a queue write failure (e.g. the database is down)
 /// propagates to the caller, same as any other write.
+///
+/// Plan 2026-10-06 (multilingual) phase 1: the password-reset and magic-link emails render in the
+/// recipient's language via <see cref="Emails"/>/<see cref="CultureScope"/>. Every other Send* method
+/// here stays English-only until a later phase.
 /// </summary>
 public class EmailService : IEmailService
 {
     private readonly IOutboundEmailQueue _queue;
+    private readonly IStringLocalizer<Emails> _localizer;
     private readonly string _frontendUrl;
 
-    public EmailService(IConfiguration configuration, IOutboundEmailQueue queue)
+    public EmailService(IConfiguration configuration, IOutboundEmailQueue queue, IStringLocalizer<Emails> localizer)
     {
         _queue = queue;
+        _localizer = localizer;
         _frontendUrl = configuration["App:FrontendUrl"] ?? "http://localhost:5173";
     }
 
-    public async Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default)
+    public async Task SendPasswordResetEmailAsync(string toEmail, string resetToken, string? language = null, CancellationToken ct = default)
     {
-        var resetUrl = $"{_frontendUrl}/reset-password?token={resetToken}";
+        // Escape the base64 token (may contain +, /, =) so it survives the URL intact.
+        var resetUrl = $"{_frontendUrl}/reset-password?token={Uri.EscapeDataString(resetToken)}";
+        var safeResetUrl = WebUtility.HtmlEncode(resetUrl);
 
-        var subject = "Reset Your IEP Advisor Password";
+        using var _ = CultureScope.For(language);
+
+        var subject = _localizer["PasswordReset.Subject"].Value;
+        var heading = _localizer["PasswordReset.Heading"].Value;
+        var body = _localizer["PasswordReset.Body"].Value;
+        var buttonText = _localizer["PasswordReset.ButtonText"].Value;
+        var footer = _localizer["PasswordReset.Footer"].Value;
+
         var html = $@"
             <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
                 <div style=""text-align: center; margin-bottom: 24px;"">
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
                 </div>
-                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">Reset Your Password</h1>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">{heading}</h1>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    We received a request to reset your password. Click the button below to choose a new one. This link expires in 15 minutes.
+                    {body}
                 </p>
                 <div style=""text-align: center; margin: 24px 0;"">
-                    <a href=""{resetUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
-                        Reset Password
+                    <a href=""{safeResetUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                        {buttonText}
                     </a>
                 </div>
                 <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
-                    If you didn't request this, you can safely ignore this email. Your password won't change.
+                    {footer}
                 </p>
                 <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
                 <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
@@ -53,7 +70,7 @@ public class EmailService : IEmailService
                 </p>
             </div>";
 
-        var plainText = $"Reset your IEP Advisor password by visiting: {resetUrl}\n\nThis link expires in 15 minutes. If you didn't request this, ignore this email.";
+        var plainText = string.Format(_localizer["PasswordReset.PlainTextBody"].Value, resetUrl);
 
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "PasswordReset", null, ct);
     }
@@ -399,29 +416,36 @@ You're receiving this because you signed up for the beta.";
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "AccountDeletionCancelLink", null, ct);
     }
 
-    public async Task SendMagicLinkEmailAsync(string toEmail, string firstName, string magicLinkUrl, CancellationToken ct = default)
+    public async Task SendMagicLinkEmailAsync(string toEmail, string firstName, string magicLinkUrl, string? language = null, CancellationToken ct = default)
     {
         var safeFirstName = WebUtility.HtmlEncode(firstName);
         var safeMagicLinkUrl = WebUtility.HtmlEncode(magicLinkUrl);
 
-        var subject = "Your IEP Advisor sign-in link";
+        using var _ = CultureScope.For(language);
+
+        var subject = _localizer["MagicLink.Subject"].Value;
+        var heading = _localizer["MagicLink.Heading"].Value;
+        var greeting = string.Format(_localizer["MagicLink.Greeting"].Value, safeFirstName);
+        var buttonText = _localizer["MagicLink.ButtonText"].Value;
+        var footer = _localizer["MagicLink.Footer"].Value;
+
         var html = $@"
             <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
                 <div style=""text-align: center; margin-bottom: 24px;"">
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
                 </div>
-                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">Sign In to IEP Advisor</h1>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">{heading}</h1>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    Hi {safeFirstName}, click below to sign in. This link expires in 15 minutes and can only be used once.
+                    {greeting}
                 </p>
                 <div style=""text-align: center; margin: 24px 0;"">
                     <a href=""{safeMagicLinkUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
-                        Sign In
+                        {buttonText}
                     </a>
                 </div>
                 <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
-                    If you didn't request this link, you can safely ignore this email — no one can sign in without it.
+                    {footer}
                 </p>
                 <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
                 <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
@@ -429,7 +453,7 @@ You're receiving this because you signed up for the beta.";
                 </p>
             </div>";
 
-        var plainText = $"Hi {firstName}, use the link below to sign in to IEP Advisor. This link expires in 15 minutes and can only be used once.\n\nSign in: {magicLinkUrl}\n\nIf you didn't request this link, you can safely ignore this email.";
+        var plainText = string.Format(_localizer["MagicLink.PlainTextBody"].Value, firstName, magicLinkUrl);
 
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "MagicLink", null, ct);
     }

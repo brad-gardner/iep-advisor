@@ -4,8 +4,10 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
+using IepAssistant.Api.Localization;
 using Scalar.AspNetCore;
 using Serilog;
 using Serilog.Events;
@@ -67,6 +69,12 @@ builder.Host.UseSerilog();
 // Add layers via extension methods
 builder.Services.AddDomain(builder.Configuration);
 builder.Services.AddServices();
+
+// Multilingual site plan (2026-10-06), phase 1: en (default) + es. ResourcesPath is relative to EACH
+// localized assembly (IepAssistant.Services/Resources/{Messages,Emails}.resx + .es.resx), not this one.
+builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+
+builder.Services.Configure<RequestLocalizationOptions>(RequestLocalizationSetup.Configure);
 
 // Pilot-gates plan, phase 2: backs the signed account-deletion-cancellation link (AccountService /
 // POST /api/account/cancel-deletion). SetApplicationName pins the key ring's discriminator explicitly
@@ -239,6 +247,12 @@ builder.Services.AddAuthentication(options =>
                     context.Fail("Token has been revoked.");
                     return;
                 }
+
+                // Multilingual plan (2026-10-06) phase 1, P3 perf fix: this handler already loaded the
+                // user row above for the SecurityStamp check, so stash PreferredLanguage here for
+                // UserPreferredLanguageRequestCultureProvider to read — it skips its own (otherwise
+                // redundant) DB lookup for the same request when this key is present.
+                context.HttpContext.Items[UserPreferredLanguageRequestCultureProvider.PreferredLanguageItemsKey] = user.PreferredLanguage;
             }
         }
     };
@@ -510,6 +524,9 @@ app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
+// AFTER UseAuthentication: UserPreferredLanguageRequestCultureProvider reads HttpContext.User, which
+// authentication middleware populates from the JWT just above.
+app.UseRequestLocalization();
 app.UseAuthorization();
 app.UseRateLimiter();
 

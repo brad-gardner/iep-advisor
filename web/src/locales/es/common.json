@@ -1,0 +1,116 @@
+{
+  "brand": {
+    "namePrefix": "IEP ",
+    "nameHighlight": "Advisor",
+    "tagline": "Navegue con confianza"
+  },
+  "nav": {
+    "dashboard": "Inicio",
+    "myChildren": "Mis hijos",
+    "etrs": "ETR",
+    "home": "Inicio",
+    "students": "Estudiantes",
+    "calendar": "Calendario",
+    "notifications": "Notificaciones",
+    "profile": "Perfil",
+    "knowledgeBase": "Centro de recursos",
+    "iep101": "IEP 101",
+    "schools": "Escuelas",
+    "staff": "Personal",
+    "compliance": "Cumplimiento",
+    "import": "Importar",
+    "activityLog": "Registro de actividad",
+    "exports": "Exportaciones",
+    "administration": "Administración",
+    "adminSection": "Administrador",
+    "adminDashboard": "Panel",
+    "adminUsers": "Usuarios",
+    "adminTemplates": "Plantillas",
+    "adminNotifications": "Errores de correo",
+    "adminEmail": "Correo saliente",
+    "adminAudit": "Integridad de auditoría",
+    "support": "Soporte",
+    "supportNote": "Respondemos dentro de 1 día hábil",
+    "signOut": "Cerrar sesión",
+    "trustPrivacy": "Confianza y privacidad",
+    "openNavigation": "Abrir navegación",
+    "closeNavigation": "Cerrar navegación"
+  },
+  "ui": {
+    "cancel": "Cancelar",
+    "closeDialog": "Cerrar cuadro de diálogo",
+    "loading": "Cargando…",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "pageOf": "Página {{page}} de {{pageCount}}",
+    "showingRange": "Mostrando {{first}}–{{last}} de {{total}}",
+    "noResults": "Sin resultados",
+    "rowsPerPage": "Filas por página",
+    "selectAllRows": "Seleccionar todas las filas de esta página",
+    "selectRow": "Seleccionar {{label}}",
+    "actions": "Acciones",
+    "rowActions": "Acciones de fila",
+    "actionsFor": "Acciones para {{label}}",
+    "nothingToShow": "Nada para mostrar todavía.",
+    "breadcrumb": "Ruta de navegación",
+    "required": "(obligatorio)"
+  },
+  "toast": {
+    "dismiss": "Descartar notificación"
+  },
+  "richText": {
+    "formatting": "Formato",
+    "linkUrl": "URL del enlace",
+    "linkUrlPlaceholder": "https://…",
+    "link": "Enlace",
+    "bold": "Negrita",
+    "italic": "Cursiva",
+    "strikethrough": "Tachado",
+    "heading2": "Encabezado 2",
+    "heading3": "Encabezado 3",
+    "bulletList": "Lista con viñetas",
+    "numberedList": "Lista numerada",
+    "quote": "Cita",
+    "undo": "Deshacer",
+    "redo": "Rehacer"
+  },
+  "pdfViewer": {
+    "documentParsed": "Documento procesado",
+    "couldNotLoad": "No se pudo cargar el documento.",
+    "couldNotLoadTitle": "No se pudo cargar el documento",
+    "noDocument": "No hay ningún documento adjunto.",
+    "previewUnavailable": "La vista previa no está disponible para este archivo.",
+    "documentPreview": "Vista previa del documento",
+    "openInNewTab": "Abrir en una pestaña nueva",
+    "download": "Descargar",
+    "document": "Documento"
+  },
+  "charts": {
+    "label": "Etiqueta",
+    "value": "Valor",
+    "point": "Punto"
+  },
+  "routes": {
+    "loadingAdvocate": "Cargando el asesor virtual…"
+  },
+  "relativeTime": {
+    "justNow": "justo ahora",
+    "minutesAgo": "hace {{n}} min",
+    "hoursAgo": "hace {{n}} h",
+    "daysAgo": "hace {{n}} d"
+  },
+  "languageSwitcher": {
+    "labelEs": "Idioma",
+    "labelEn": "Language",
+    "en": "English",
+    "es": "Español",
+    "updateFailed": "No se pudo guardar su preferencia de idioma"
+  },
+  "orgRole": {
+    "DistrictAdmin": "Administrador del distrito",
+    "SchoolAdmin": "Administrador escolar",
+    "Teacher": "Maestro",
+    "RelatedServiceProvider": "Proveedor de servicios relacionados",
+    "GeneralEducator": "Maestro de educación general"
+  }
+}

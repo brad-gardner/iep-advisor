@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 type SpinnerSize = 'sm' | 'md' | 'lg';
@@ -34,10 +35,11 @@ const toneStyles: Record<SpinnerTone, string> = {
 export function Spinner({
   size = 'md',
   tone = 'brand',
-  label = 'Loading…',
+  label,
   className = '',
   ...rest
 }: SpinnerProps) {
+  const { t } = useTranslation('common');
   return (
     <div
       {...rest}
@@ -49,7 +51,7 @@ export function Spinner({
         className
       )}
     >
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">{label ?? t('ui.loading')}</span>
     </div>
   );
 }

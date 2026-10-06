@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/use-auth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ interface ParentRegisterFormProps {
 }
 
 export function ParentRegisterForm({ initialInviteCode = '' }: ParentRegisterFormProps) {
+  const { t } = useTranslation('auth');
   const navigate = useNavigate();
   const { register } = useAuth();
   const [formData, setFormData] = useState({
@@ -33,12 +35,12 @@ export function ParentRegisterForm({ initialInviteCode = '' }: ParentRegisterFor
     setError('');
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('errors.passwordsDoNotMatch'));
       return;
     }
 
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters');
+      setError(t('errors.passwordTooShort'));
       return;
     }
 
@@ -53,9 +55,9 @@ export function ParentRegisterForm({ initialInviteCode = '' }: ParentRegisterFor
     });
 
     if (result.success) {
-      navigate('/login', { state: { message: 'Registration successful! Please sign in.' } });
+      navigate('/login', { state: { message: t('parentRegisterForm.successMessage') } });
     } else {
-      setError(result.error || 'Registration failed');
+      setError(result.error || t('parentRegisterForm.failed'));
     }
 
     setIsLoading(false);
@@ -71,19 +73,19 @@ export function ParentRegisterForm({ initialInviteCode = '' }: ParentRegisterFor
 
       <form onSubmit={handleSubmit} className="space-y-4" data-testid="register-form">
         <Input
-          label="Invite Code"
+          label={t('parentRegisterForm.inviteCode')}
           name="inviteCode"
           value={formData.inviteCode}
           onChange={handleChange}
           required
-          placeholder="Enter your invite code"
+          placeholder={t('parentRegisterForm.inviteCodePlaceholder')}
           maxLength={20}
           data-testid="register-invite-code"
         />
 
         <div className="grid grid-cols-2 gap-4">
           <Input
-            label="First Name"
+            label={t('fields.firstName')}
             name="firstName"
             value={formData.firstName}
             onChange={handleChange}
@@ -92,7 +94,7 @@ export function ParentRegisterForm({ initialInviteCode = '' }: ParentRegisterFor
             data-testid="register-first-name"
           />
           <Input
-            label="Last Name"
+            label={t('fields.lastName')}
             name="lastName"
             value={formData.lastName}
             onChange={handleChange}
@@ -103,7 +105,7 @@ export function ParentRegisterForm({ initialInviteCode = '' }: ParentRegisterFor
         </div>
 
         <Input
-          label="Email"
+          label={t('fields.email')}
           name="email"
           type="email"
           value={formData.email}
@@ -114,7 +116,7 @@ export function ParentRegisterForm({ initialInviteCode = '' }: ParentRegisterFor
         />
 
         <Input
-          label="Password"
+          label={t('fields.password')}
           name="password"
           type="password"
           value={formData.password}
@@ -125,7 +127,7 @@ export function ParentRegisterForm({ initialInviteCode = '' }: ParentRegisterFor
         />
 
         <Input
-          label="Confirm Password"
+          label={t('fields.confirmPassword')}
           name="confirmPassword"
           type="password"
           value={formData.confirmPassword}
@@ -136,7 +138,7 @@ export function ParentRegisterForm({ initialInviteCode = '' }: ParentRegisterFor
         />
 
         <Button type="submit" loading={isLoading} className="w-full" data-testid="register-submit">
-          Create Account
+          {t('parentRegisterForm.submit')}
         </Button>
       </form>
     </>

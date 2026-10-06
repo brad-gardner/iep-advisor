@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/use-auth';
 import { MagicLinkRequestForm } from './magic-link-request-form';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,8 @@ import { Notice } from '@/components/ui/notice';
 import { usePageTitle } from '@/hooks/use-page-title';
 
 export function LoginPage() {
-  usePageTitle('Sign in');
+  const { t } = useTranslation('auth');
+  usePageTitle(t('login.pageTitle'));
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
@@ -52,7 +54,7 @@ export function LoginPage() {
         navigate('/mfa-verify', { state: { mfaPendingToken: result.mfaPendingToken } });
       } else if (!showMagicLinkRef.current) {
         // (a failure that lands after the user moved to the magic-link panel is dropped)
-        setError(result.error || 'Login failed');
+        setError(result.error || t('login.loginFailed'));
       }
     } finally {
       setIsLoading(false); // on every path — a stuck `loading` would disable Sign In until a reload
@@ -61,7 +63,7 @@ export function LoginPage() {
 
   return (
     <div className="w-full">
-      <h2 className="text-2xl font-serif font-semibold text-center mb-6 text-brand-slate-800">Welcome Back</h2>
+      <h2 className="text-2xl font-serif font-semibold text-center mb-6 text-brand-slate-800">{t('login.title')}</h2>
 
       {successMessage && <div className="mb-4" data-testid="login-success-message"><Notice variant="success" title={successMessage} /></div>}
       {error && <div className="mb-4" data-testid="login-error"><Notice variant="error" title={error} /></div>}
@@ -76,7 +78,7 @@ export function LoginPage() {
               className="text-xs text-brand-slate-500 hover:text-brand-slate-600"
               data-testid="magic-link-back"
             >
-              Back to password sign-in
+              {t('login.backToPassword')}
             </button>
           </div>
         </div>
@@ -84,24 +86,24 @@ export function LoginPage() {
         <div ref={passwordPanelRef} tabIndex={-1} className="rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500" data-testid="login-password-panel">
           <form onSubmit={handleSubmit} className="space-y-4" data-testid="login-form">
             <Input
-              label="Email"
+              label={t('fields.email')}
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="you@example.com"
+              placeholder={t('fields.emailPlaceholder')}
               maxLength={256}
               data-testid="login-email"
             />
 
             <div>
               <Input
-                label="Password"
+                label={t('fields.password')}
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                placeholder="********"
+                placeholder={t('fields.passwordPlaceholder')}
                 maxLength={128}
                 data-testid="login-password"
               />
@@ -111,13 +113,13 @@ export function LoginPage() {
                   className="text-xs text-brand-teal-500 hover:text-brand-teal-600"
                   data-testid="forgot-password-link"
                 >
-                  Forgot password?
+                  {t('login.forgotPassword')}
                 </Link>
               </div>
             </div>
 
             <Button type="submit" loading={isLoading} className="w-full" data-testid="login-submit">
-              Sign In
+              {t('login.submit')}
             </Button>
           </form>
 
@@ -128,16 +130,16 @@ export function LoginPage() {
               className="text-xs text-brand-teal-500 hover:text-brand-teal-600"
               data-testid="magic-link-toggle"
             >
-              Email me a sign-in link
+              {t('login.emailMeLink')}
             </button>
           </div>
         </div>
       )}
 
       <p className="mt-6 text-center text-sm text-brand-slate-500">
-        Don't have an account?{' '}
+        {t('login.noAccount')}{' '}
         <Link to="/register" className="text-brand-teal-500 hover:text-brand-teal-600" data-testid="register-link">
-          Sign up
+          {t('login.signUp')}
         </Link>
       </p>
     </div>

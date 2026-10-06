@@ -330,6 +330,7 @@ public class AdminController : ControllerBase
                 FirstName = u.FirstName,
                 LastName = u.LastName,
                 State = u.State,
+                PreferredLanguage = u.PreferredLanguage,
                 Role = u.Role.ToString(),
                 IsActive = u.IsActive,
                 OnboardingCompleted = u.OnboardingCompletedAt != null,

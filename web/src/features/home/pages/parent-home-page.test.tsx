@@ -35,6 +35,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     fullName: 'Priya Parent',
     onboardingCompleted: true,
     subscriptionStatus: 'active',
+    preferredLanguage: null,
     ...overrides,
   };
 }

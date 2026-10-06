@@ -122,6 +122,7 @@ const parent = (state: string | null): User => ({
   fullName: 'Pat Lee',
   onboardingCompleted: true,
   subscriptionStatus: 'active',
+  preferredLanguage: null,
 });
 
 function LocationProbe() {

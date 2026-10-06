@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Select } from '@/components/ui/input';
 
 const US_STATES = [
@@ -68,6 +69,7 @@ export function StateSelector({
   id = 'state',
   'data-testid': testId = 'profile-state',
 }: StateSelectorProps) {
+  const { t } = useTranslation('auth');
   return (
     <Select
       id={id}
@@ -75,7 +77,7 @@ export function StateSelector({
       onChange={(e) => onChange(e.target.value)}
       data-testid={testId}
     >
-      <option value="">Select a state...</option>
+      <option value="">{t('stateSelector.placeholder')}</option>
       {US_STATES.map((s) => (
         <option key={s.code} value={s.code}>
           {s.name}

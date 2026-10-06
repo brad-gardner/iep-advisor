@@ -2,6 +2,39 @@ import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 import { createElement, type ChangeEvent } from 'react';
 import type { RichTextEditorProps } from '@/components/ui/rich-text-editor';
+import i18n, { i18nReady } from '@/lib/i18n';
+
+// Initialize i18next synchronously (from this suite's point of view) with
+// English before any test file renders a component that calls `t()` — the
+// ~600 existing English text queries (getByRole name, getByText,
+// getByLabelText) keep working unchanged. Forced explicitly rather than
+// relying on jsdom's default `navigator.languages` so a test run is never
+// at the mercy of environment detection. Spanish-specific tests opt in via
+// `renderInSpanish` (`src/test/i18n-test-utils.tsx`).
+await i18nReady;
+await i18n.changeLanguage('en');
+
+// Fail the test immediately on a genuinely missing translation key, instead
+// of relying on each Spanish-rendering test to separately regex-check the
+// DOM for a leaked raw `ns:key` string. `saveMissing` must be on for
+// i18next to invoke the handler at all; neither is set in the production
+// init (`lib/i18n/index.ts`) — this is test-only.
+//
+// A key resolved through an explicit, MEANINGFUL `defaultValue` (e.g.
+// `orgRoleLabel`'s fallback for an unrecognized role name, `{ defaultValue:
+// name }`) is NOT a bug, and is withheld from the throw. But `<Trans
+// i18nKey="some.key" />` with no `children`/`defaults`/`tOptions.defaultValue`
+// of its own ALSO ends up with a `defaultValue` in `opt` — react-i18next
+// falls back to the key itself (`opt.defaultValue === key`) when it has
+// nothing better, which is indistinguishable from "no default" and must
+// still throw on a genuinely missing key. Only a defaultValue that differs
+// from the key is a real, intentional fallback.
+i18n.options.saveMissing = true;
+i18n.options.missingKeyHandler = (lngs, ns, key, _fallbackValue, _updateMissing, opt) => {
+  if (opt && typeof opt === 'object' && 'defaultValue' in opt && opt.defaultValue !== key) return;
+  const languages = Array.isArray(lngs) ? lngs.join(', ') : lngs;
+  throw new Error(`[i18n] missing translation for "${ns}:${key}" (${languages})`);
+};
 
 // jsdom does not implement scrolling APIs used by overlay scroll-lock. Stub
 // them so tests exercising Modal/Drawer open/close don't emit "Not implemented"

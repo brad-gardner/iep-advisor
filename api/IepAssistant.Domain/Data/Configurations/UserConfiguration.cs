@@ -16,6 +16,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.LastName).HasMaxLength(100).IsRequired();
         builder.Property(u => u.PasswordHash).HasMaxLength(256).IsRequired();
         builder.Property(u => u.State).HasMaxLength(2);
+        builder.Property(u => u.PreferredLanguage).HasMaxLength(10);
         // Tolerant string conversion: any legacy/un-migrated "User" row (or any other
         // unexpected stored value) reads back as Parent rather than throwing — so the app
         // fails safe (toward least privilege) during a rolling deploy before the data

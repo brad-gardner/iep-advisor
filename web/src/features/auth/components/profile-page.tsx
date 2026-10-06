@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/use-auth';
 import { disableMfa } from '../api/auth-api';
 import { StateSelector } from './state-selector';
@@ -12,9 +13,11 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
+import { LanguageSwitcher } from '@/lib/i18n/language-switcher';
 import { usePageTitle } from '@/hooks/use-page-title';
 
 function MfaSection() {
+  const { t } = useTranslation('auth');
   const { user } = useAuth();
   const [showDisable, setShowDisable] = useState(false);
   const [password, setPassword] = useState('');
@@ -33,10 +36,10 @@ function MfaSection() {
         setDisableSuccess(true);
         setShowDisable(false);
       } else {
-        setError(response.message || 'Failed to disable MFA');
+        setError(response.message || t('mfaSection.failed'));
       }
     } catch {
-      setError('An error occurred');
+      setError(t('mfaSection.error'));
     } finally {
       setIsLoading(false);
     }
@@ -47,18 +50,18 @@ function MfaSection() {
   return (
     <div className="space-y-3">
       {disableSuccess && (
-        <Notice variant="success" title="MFA has been disabled" />
+        <Notice variant="success" title={t('mfaSection.disabled')} />
       )}
 
       {isMfaEnabled ? (
         <>
           <div className="flex items-center gap-2">
-            <Badge variant="success">MFA Enabled</Badge>
+            <Badge variant="success">{t('mfaSection.enabledBadge')}</Badge>
           </div>
 
           {!showDisable ? (
             <Button variant="ghost" onClick={() => setShowDisable(true)}>
-              Disable MFA
+              {t('mfaSection.disableButton')}
             </Button>
           ) : (
             <div className="border border-brand-slate-100 rounded-card p-4">
@@ -69,26 +72,26 @@ function MfaSection() {
               )}
               <form onSubmit={handleDisable} className="space-y-3">
                 <Input
-                  label="Password"
+                  label={t('fields.password')}
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  placeholder="Enter your password"
+                  placeholder={t('mfaSection.passwordPlaceholder')}
                 />
                 <Input
-                  label="Authenticator Code"
+                  label={t('mfaSection.authenticatorCode')}
                   type="text"
                   inputMode="numeric"
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   required
-                  placeholder="000000"
+                  placeholder={t('fields.codePlaceholder')}
                   maxLength={6}
                 />
                 <div className="flex gap-3">
                   <Button type="submit" loading={isLoading}>
-                    Confirm Disable
+                    {t('mfaSection.confirmDisable')}
                   </Button>
                   <Button
                     variant="ghost"
@@ -100,7 +103,7 @@ function MfaSection() {
                       setError('');
                     }}
                   >
-                    Cancel
+                    {t('mfaSection.cancel')}
                   </Button>
                 </div>
               </form>
@@ -110,10 +113,10 @@ function MfaSection() {
       ) : (
         <div>
           <p className="text-sm text-brand-slate-500 mb-2">
-            Add an extra layer of security with two-factor authentication.
+            {t('mfaSection.enableDescription')}
           </p>
           <Link to="/mfa-setup">
-            <Button variant="secondary">Enable MFA</Button>
+            <Button variant="secondary">{t('mfaSection.enableButton')}</Button>
           </Link>
         </div>
       )}
@@ -122,7 +125,8 @@ function MfaSection() {
 }
 
 export function ProfilePage() {
-  usePageTitle('Profile');
+  const { t } = useTranslation('auth');
+  usePageTitle(t('profile.pageTitle'));
   const { user, updateProfile } = useAuth();
   const [firstName, setFirstName] = useState(user?.firstName ?? '');
   const [lastName, setLastName] = useState(user?.lastName ?? '');
@@ -142,16 +146,16 @@ export function ProfilePage() {
     });
 
     if (result.success) {
-      setMessage({ type: 'success', text: 'Profile updated successfully' });
+      setMessage({ type: 'success', text: t('profile.saveSuccess') });
     } else {
-      setMessage({ type: 'error', text: result.error ?? 'Update failed' });
+      setMessage({ type: 'error', text: result.error ?? t('profile.saveFailed') });
     }
 
     setIsSubmitting(false);
   };
 
   return (
-    <PageLayout title="Profile">
+    <PageLayout title={t('profile.pageTitle')}>
       <Card className="max-w-lg">
         <form onSubmit={handleSubmit} className="space-y-4">
           {message && (
@@ -162,7 +166,7 @@ export function ProfilePage() {
           )}
 
           <Input
-            label="Email"
+            label={t('fields.email')}
             type="text"
             value={user?.email ?? ''}
             disabled
@@ -171,7 +175,7 @@ export function ProfilePage() {
           />
 
           <Input
-            label="First Name"
+            label={t('fields.firstName')}
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             maxLength={100}
@@ -179,7 +183,7 @@ export function ProfilePage() {
           />
 
           <Input
-            label="Last Name"
+            label={t('fields.lastName')}
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
             maxLength={100}
@@ -188,18 +192,29 @@ export function ProfilePage() {
 
           <div>
             <label htmlFor="state" className="block text-[13px] font-medium text-brand-slate-600 mb-1">
-              State / Jurisdiction
+              {t('profile.stateLabel')}
             </label>
             <StateSelector value={state} onChange={setState} />
             <p className="text-[11px] text-brand-slate-500 mt-1">
-              Used to provide state-specific IEP guidance and regulations
+              {t('profile.stateHint')}
             </p>
           </div>
 
           <Button type="submit" loading={isSubmitting} disabled={!firstName.trim()} className="w-full" data-testid="profile-save">
-            Save Changes
+            {t('profile.submit')}
           </Button>
         </form>
+      </Card>
+
+      <Card className="max-w-lg" data-testid="profile-language-section">
+        <h2 className="text-lg font-serif font-semibold text-brand-slate-800 mb-4">
+          {t('profile.languageLabel')}
+        </h2>
+        <LanguageSwitcher
+          tone="onLight"
+          hint={t('profile.languageHint')}
+          data-testid="profile-language-switcher"
+        />
       </Card>
 
       <div className="max-w-lg space-y-3">
@@ -208,7 +223,7 @@ export function ProfilePage() {
           to="/redeem-invite"
           className="inline-block text-sm text-brand-teal-500 hover:text-brand-teal-600 underline"
         >
-          Redeem Invite Code
+          {t('profile.redeemInvite')}
         </Link>
       </div>
 
@@ -216,14 +231,14 @@ export function ProfilePage() {
 
       <Card className="max-w-lg" data-testid="mfa-section">
         <h2 className="text-lg font-serif font-semibold text-brand-slate-800 mb-4">
-          Two-Factor Authentication
+          {t('profile.mfaTitle')}
         </h2>
         <MfaSection />
       </Card>
 
       <Card className="max-w-lg" data-testid="account-section">
         <h2 className="text-lg font-serif font-semibold text-brand-slate-800 mb-4">
-          Account
+          {t('profile.accountTitle')}
         </h2>
         <AccountDeletionSection />
       </Card>

@@ -7,6 +7,7 @@
  * "this meeting was scheduled in X" uses `timeZoneLabel` for that tz's own
  * label. No date library — everything here rides `Intl.DateTimeFormat`.
  */
+import { getActiveLanguage } from '@/lib/i18n/format';
 
 export interface TimeZoneOption {
   id: string;
@@ -51,6 +52,12 @@ export function timeZoneLabel(timeZoneId: string): string {
 // Minutes to ADD to a wall-clock time in `timeZone` to get UTC, evaluated at
 // `instant` (an approximate UTC instant near the wall-clock time — offsets
 // vary across DST, so the caller re-derives from a first guess).
+//
+// Fixed to `en-US` rather than the active UI language: this reads back the
+// numeric year/month/day/hour/minute/second parts it just asked for (via
+// `Number(...)`), so it needs guaranteed ASCII-digit, Gregorian output — a
+// property of the locale, not something `hourCycle`/digit options alone
+// control — regardless of which language the viewer has selected.
 function utcOffsetMinutesAt(instant: Date, timeZone: string): number {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,
@@ -122,7 +129,9 @@ export function zonedDateTimeToUtcIso(date: string, time: string, timeZone: stri
 }
 
 /** Split a UTC ISO instant into wall-clock `{ date, time }` strings for
- * `timeZone` — used to pre-fill the schedule form when rescheduling. */
+ * `timeZone` — used to pre-fill the schedule form when rescheduling.
+ * Fixed to `en-US` for the same reason as `utcOffsetMinutesAt`: these parts
+ * feed a `YYYY-MM-DD`/`HH:mm` form field, not display text. */
 export function utcIsoToZonedParts(iso: string, timeZone: string): { date: string; time: string } {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,
@@ -147,11 +156,11 @@ export function formatMeetingWhen(startsAtUtc: string, durationMinutes: number):
   const start = new Date(startsAtUtc);
   if (Number.isNaN(start.getTime())) return '—';
   const end = new Date(start.getTime() + durationMinutes * 60000);
-  const dateFmt = new Intl.DateTimeFormat(undefined, {
+  const dateFmt = new Intl.DateTimeFormat(getActiveLanguage(), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
   });
-  const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+  const timeFmt = new Intl.DateTimeFormat(getActiveLanguage(), { hour: 'numeric', minute: '2-digit' });
   return `${dateFmt.format(start)}, ${timeFmt.format(start)} – ${timeFmt.format(end)}`;
 }

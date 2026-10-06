@@ -36,6 +36,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     fullName: "Ada Lovelace",
     onboardingCompleted: true,
     subscriptionStatus: "active",
+    preferredLanguage: null,
     ...overrides,
   };
 }

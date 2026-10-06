@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Spinner } from '@/components/ui/spinner';
@@ -11,19 +12,23 @@ import { acceptInvite, previewInvite } from '../api/student-invite-api';
 import type { StudentInvitePreviewDto } from '../types';
 
 type Status = 'loading' | 'ready' | 'submitting' | 'error';
-
-const CONSENT_LABEL =
-  'I understand and consent to activating my student account and participating in my IEP process.';
+type ErrorReason = 'loadFailed' | 'loadError' | 'acceptFailed' | 'acceptError';
 
 export function StudentAcceptInvitePage() {
-  usePageTitle('Activate your student account');
+  const { t } = useTranslation('auth');
+  usePageTitle(t('studentAcceptInvite.pageTitle'));
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
 
   const [status, setStatus] = useState<Status>('loading');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // The reason (not a pre-localized string) is stored, and resolved to text
+  // at render time via `t()` — so a language switch while an error is
+  // showing updates the text immediately, without re-running an effect (and
+  // re-fetching/re-submitting) just because `t`'s identity changed.
+  const [errorReason, setErrorReason] = useState<ErrorReason | null>(null);
+  const [serverMessage, setServerMessage] = useState<string | null>(null);
   const [preview, setPreview] = useState<StudentInvitePreviewDto | null>(null);
   const [consentAccepted, setConsentAccepted] = useState(false);
 
@@ -40,12 +45,13 @@ export function StudentAcceptInvitePage() {
           setStatus('ready');
         } else {
           setStatus('error');
-          setErrorMessage(response.message || 'This invite is invalid or has expired.');
+          setErrorReason('loadFailed');
+          setServerMessage(response.message || null);
         }
       } catch {
         if (active) {
           setStatus('error');
-          setErrorMessage('An error occurred while loading this invite.');
+          setErrorReason('loadError');
         }
       }
     }
@@ -62,7 +68,8 @@ export function StudentAcceptInvitePage() {
   const handleAccept = async () => {
     if (!token || !consentAccepted) return;
     setStatus('submitting');
-    setErrorMessage(null);
+    setErrorReason(null);
+    setServerMessage(null);
 
     try {
       const response = await acceptInvite(token, true);
@@ -73,38 +80,65 @@ export function StudentAcceptInvitePage() {
         navigate('/student', { replace: true });
       } else {
         setStatus('error');
-        setErrorMessage(response.message || 'Failed to accept this invite.');
+        setErrorReason('acceptFailed');
+        setServerMessage(response.message || null);
       }
     } catch {
       setStatus('error');
-      setErrorMessage('An error occurred while accepting this invite.');
+      setErrorReason('acceptError');
     }
   };
 
-  const inviterContext = preview
+  function reasonMessage(reason: ErrorReason): string {
+    switch (reason) {
+      case 'loadFailed':
+        return t('studentAcceptInvite.loadFailed');
+      case 'loadError':
+        return t('studentAcceptInvite.loadError');
+      case 'acceptFailed':
+        return t('studentAcceptInvite.acceptFailed');
+      case 'acceptError':
+        return t('studentAcceptInvite.acceptError');
+    }
+  }
+
+  const errorMessage = isMissingToken
+    ? t('studentAcceptInvite.noToken')
+    : serverMessage ?? (errorReason ? reasonMessage(errorReason) : t('studentAcceptInvite.genericError'));
+
+  const inviter = preview
     ? preview.inviteSource === 'Educator'
-      ? preview.schoolName ?? 'Your school'
-      : 'Your parent or guardian'
+      ? preview.schoolName ?? t('studentAcceptInvite.fromSchool')
+      : t('studentAcceptInvite.fromParent')
     : '';
 
   return (
-    <PageLayout data-testid="student-accept-invite" title="Activate Your Student Account">
+    <PageLayout data-testid="student-accept-invite" title={t('studentAcceptInvite.title')}>
       <Card className="max-w-md text-center">
         {status === 'loading' && !isMissingToken && (
           <div className="flex justify-center py-6">
-            <Spinner label="Loading invite…" />
+            <Spinner label={t('studentAcceptInvite.loadingInvite')} />
           </div>
         )}
 
         {(status === 'ready' || status === 'submitting') && preview && (
           <div className="space-y-5">
             <p className="text-sm text-brand-slate-600">
-              <span className="font-medium text-brand-slate-800">{inviterContext}</span>{' '}
-              invited you to join your IEP process as{' '}
-              <span className="font-medium text-brand-slate-800">
-                {preview.linkedToFirstName}
-              </span>
-              .
+              <Trans
+                t={t}
+                i18nKey="studentAcceptInvite.invitedAsSentence"
+                values={{ inviter, name: preview.linkedToFirstName }}
+                // `inviter` and `name` can be user-entered text (a school or
+                // inviter's own name) — escape it during interpolation and
+                // unescape only for display, so a literal "<" in it can
+                // never be parsed as one of the tags below.
+                tOptions={{ interpolation: { escapeValue: true } }}
+                shouldUnescape
+                components={{
+                  inviter: <span className="font-medium text-brand-slate-800" />,
+                  name: <span className="font-medium text-brand-slate-800" />,
+                }}
+              />
             </p>
 
             <label
@@ -119,7 +153,7 @@ export function StudentAcceptInvitePage() {
                 className="mt-0.5 h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-500"
                 data-testid="student-consent-checkbox"
               />
-              <span>{CONSENT_LABEL}</span>
+              <span>{t('studentAcceptInvite.consentLabel')}</span>
             </label>
 
             <Button
@@ -129,7 +163,7 @@ export function StudentAcceptInvitePage() {
               className="w-full"
               data-testid="student-accept-submit"
             >
-              Accept &amp; Activate
+              {t('studentAcceptInvite.submit')}
             </Button>
           </div>
         )}
@@ -138,14 +172,10 @@ export function StudentAcceptInvitePage() {
           <div className="space-y-4">
             <Notice
               variant="error"
-              title={
-                isMissingToken
-                  ? 'No invite token provided.'
-                  : errorMessage || 'Something went wrong'
-              }
+              title={errorMessage}
             />
             <Button variant="secondary" onClick={() => navigate('/dashboard')}>
-              Go to Dashboard
+              {t('studentAcceptInvite.goToDashboard')}
             </Button>
           </div>
         )}

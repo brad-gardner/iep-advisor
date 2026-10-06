@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
+import { useTranslation } from 'react-i18next';
 import { setupMfa, verifyMfaSetup } from '../api/auth-api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,8 @@ import { usePageTitle } from '@/hooks/use-page-title';
 type SetupStep = 'qr' | 'verify' | 'recovery';
 
 export function MfaSetupPage() {
-  usePageTitle('Set up two-factor authentication');
+  const { t } = useTranslation('auth');
+  usePageTitle(t('mfaSetup.pageTitle'));
   const navigate = useNavigate();
   const [step, setStep] = useState<SetupStep>('qr');
   const [otpauthUri, setOtpauthUri] = useState('');
@@ -32,10 +34,10 @@ export function MfaSetupPage() {
         setOtpauthUri(response.data.otpauthUri);
         setManualEntryKey(response.data.manualEntryKey);
       } else {
-        setError(response.message || 'Failed to start MFA setup');
+        setError(response.message || t('mfaSetup.setupFailed'));
       }
     } catch {
-      setError('An error occurred starting MFA setup');
+      setError(t('mfaSetup.setupError'));
     } finally {
       setIsLoading(false);
     }
@@ -51,10 +53,10 @@ export function MfaSetupPage() {
         setRecoveryCodes(response.data.recoveryCodes);
         setStep('recovery');
       } else {
-        setError(response.message || 'Invalid code. Please try again.');
+        setError(response.message || t('mfaSetup.invalidCode'));
       }
     } catch {
-      setError('An error occurred during verification');
+      setError(t('mfaSetup.verifyError'));
     } finally {
       setIsLoading(false);
     }
@@ -74,11 +76,10 @@ export function MfaSetupPage() {
   if (!otpauthUri && step === 'qr') {
     return (
       <div className="space-y-6">
-        <h1 className="font-serif">Enable Two-Factor Authentication</h1>
+        <h1 className="font-serif">{t('mfaSetup.enableTitle')}</h1>
         <Card className="max-w-lg">
           <p className="text-sm text-brand-slate-600 mb-4">
-            Add an extra layer of security to your account by requiring a verification code
-            from an authenticator app when you sign in.
+            {t('mfaSetup.enableDescription')}
           </p>
           {error && (
             <div className="mb-4">
@@ -87,10 +88,10 @@ export function MfaSetupPage() {
           )}
           <div className="flex gap-3">
             <Button onClick={handleSetup} loading={isLoading}>
-              Get Started
+              {t('mfaSetup.getStarted')}
             </Button>
             <Button variant="ghost" onClick={() => navigate('/profile')}>
-              Cancel
+              {t('mfaSetup.cancel')}
             </Button>
           </div>
         </Card>
@@ -102,10 +103,10 @@ export function MfaSetupPage() {
   if (step === 'qr') {
     return (
       <div className="space-y-6">
-        <h1 className="font-serif">Scan QR Code</h1>
+        <h1 className="font-serif">{t('mfaSetup.scanTitle')}</h1>
         <Card className="max-w-lg">
           <p className="text-sm text-brand-slate-600 mb-4">
-            Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
+            {t('mfaSetup.scanDescription')}
           </p>
 
           <div className="flex justify-center mb-4 p-4 bg-white rounded-card border border-brand-slate-100">
@@ -113,14 +114,14 @@ export function MfaSetupPage() {
           </div>
 
           <div className="mb-4">
-            <p className="text-xs text-brand-slate-500 mb-1">Can't scan? Enter this key manually:</p>
+            <p className="text-xs text-brand-slate-500 mb-1">{t('mfaSetup.manualEntryPrompt')}</p>
             <code className="block text-sm bg-brand-slate-50 border border-brand-slate-100 rounded-card px-3 py-2 font-mono text-brand-slate-700 break-all select-all">
               {manualEntryKey}
             </code>
           </div>
 
           <Button onClick={() => setStep('verify')} className="w-full">
-            Continue
+            {t('mfaSetup.continue')}
           </Button>
         </Card>
       </div>
@@ -131,10 +132,10 @@ export function MfaSetupPage() {
   if (step === 'verify') {
     return (
       <div className="space-y-6">
-        <h1 className="font-serif">Verify Setup</h1>
+        <h1 className="font-serif">{t('mfaSetup.verifyTitle')}</h1>
         <Card className="max-w-lg">
           <p className="text-sm text-brand-slate-600 mb-4">
-            Enter the 6-digit code from your authenticator app to confirm setup.
+            {t('mfaSetup.verifyDescription')}
           </p>
 
           {error && (
@@ -145,23 +146,23 @@ export function MfaSetupPage() {
 
           <form onSubmit={handleVerify} className="space-y-4">
             <Input
-              label="Verification Code"
+              label={t('fields.verificationCode')}
               type="text"
               inputMode="numeric"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               required
-              placeholder="000000"
+              placeholder={t('fields.codePlaceholder')}
               maxLength={6}
               autoFocus
             />
 
             <div className="flex gap-3">
               <Button type="submit" loading={isLoading} className="flex-1">
-                Verify & Enable
+                {t('mfaSetup.verifyAndEnable')}
               </Button>
               <Button variant="ghost" type="button" onClick={() => setStep('qr')}>
-                Back
+                {t('mfaSetup.back')}
               </Button>
             </div>
           </form>
@@ -173,12 +174,11 @@ export function MfaSetupPage() {
   // Step 3: Recovery codes
   return (
     <div className="space-y-6">
-      <h1 className="font-serif">Recovery Codes</h1>
+      <h1 className="font-serif">{t('mfaSetup.recoveryTitle')}</h1>
       <Card className="max-w-lg">
-        <Notice variant="warning" title="Save these codes — you won't see them again">
+        <Notice variant="warning" title={t('mfaSetup.recoveryWarningTitle')}>
           <p className="mt-1">
-            If you lose access to your authenticator app, you can use one of these codes to sign in.
-            Each code can only be used once.
+            {t('mfaSetup.recoveryWarningDetail')}
           </p>
         </Notice>
 
@@ -194,10 +194,10 @@ export function MfaSetupPage() {
 
         <div className="mt-4 flex gap-3">
           <Button variant="secondary" onClick={handleCopyAll}>
-            {copied ? 'Copied!' : 'Copy All'}
+            {copied ? t('mfaSetup.copied') : t('mfaSetup.copyAll')}
           </Button>
           <Button onClick={() => navigate('/profile')}>
-            Done
+            {t('mfaSetup.done')}
           </Button>
         </div>
       </Card>

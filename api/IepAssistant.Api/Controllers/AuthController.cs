@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Auth;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -18,19 +20,22 @@ public class AuthController : ControllerBase
     private readonly IPasswordResetService _passwordResetService;
     private readonly IAccountService _accountService;
     private readonly IMagicLinkService _magicLinkService;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public AuthController(
         IAuthService authService,
         IMfaService mfaService,
         IPasswordResetService passwordResetService,
         IAccountService accountService,
-        IMagicLinkService magicLinkService)
+        IMagicLinkService magicLinkService,
+        IStringLocalizer<Messages> localizer)
     {
         _authService = authService;
         _mfaService = mfaService;
         _passwordResetService = passwordResetService;
         _accountService = accountService;
         _magicLinkService = magicLinkService;
+        _localizer = localizer;
     }
 
     /// <summary>
@@ -43,12 +48,12 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _authService.LoginAsync(request.Email, request.Password, cancellationToken);
 
         if (result == null)
-            return Unauthorized(ApiResponse<object>.Error("Invalid email or password"));
+            return Unauthorized(ApiResponse<object>.Error(_localizer["AuthApi.InvalidEmailOrPassword"]));
 
         if (result.RequiresMfa)
         {
@@ -71,6 +76,7 @@ public class AuthController : ControllerBase
                 FirstName = authResult.User.FirstName,
                 LastName = authResult.User.LastName,
                 State = authResult.User.State,
+                PreferredLanguage = authResult.User.PreferredLanguage,
                 Role = authResult.User.Role,
                 IsActive = authResult.User.IsActive,
                 OnboardingCompleted = authResult.User.OnboardingCompleted,
@@ -90,7 +96,7 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var model = new RegisterModel
         {
@@ -104,9 +110,9 @@ public class AuthController : ControllerBase
         var result = await _authService.RegisterAsync(model, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Registration failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["AuthApi.RegistrationFailed"].Value));
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "User registered successfully"));
+        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["AuthApi.UserRegisteredSuccessfully"]));
     }
 
     /// <summary>
@@ -121,7 +127,7 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> RegisterDistrict([FromBody] RegisterDistrictRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var model = new RegisterDistrictModel
         {
@@ -136,7 +142,7 @@ public class AuthController : ControllerBase
         var result = await _authService.RegisterDistrictAsync(model, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Registration failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["AuthApi.RegistrationFailed"].Value));
 
         var authResult = result.AuthResult!;
         var response = new LoginResponse
@@ -150,6 +156,7 @@ public class AuthController : ControllerBase
                 FirstName = authResult.User.FirstName,
                 LastName = authResult.User.LastName,
                 State = authResult.User.State,
+                PreferredLanguage = authResult.User.PreferredLanguage,
                 Role = authResult.User.Role,
                 IsActive = authResult.User.IsActive,
                 OnboardingCompleted = authResult.User.OnboardingCompleted,
@@ -176,7 +183,7 @@ public class AuthController : ControllerBase
         var user = await _authService.GetUserByIdAsync(userId, cancellationToken);
 
         if (user == null)
-            return NotFound(ApiResponse<object>.Error("User not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["AuthApi.UserNotFound"]));
 
         var dto = new UserDto
         {
@@ -185,6 +192,7 @@ public class AuthController : ControllerBase
             FirstName = user.FirstName,
             LastName = user.LastName,
             State = user.State,
+            PreferredLanguage = user.PreferredLanguage,
             Role = user.Role,
             IsActive = user.IsActive,
             OnboardingCompleted = user.OnboardingCompleted,
@@ -211,13 +219,14 @@ public class AuthController : ControllerBase
         {
             FirstName = request.FirstName,
             LastName = request.LastName,
-            State = request.State
+            State = request.State,
+            PreferredLanguage = request.PreferredLanguage
         };
 
         var result = await _authService.UpdateProfileAsync(userId, model, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Update failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["AuthApi.UpdateFailed"].Value));
 
         var user = await _authService.GetUserByIdAsync(userId, cancellationToken);
         var dto = new UserDto
@@ -227,13 +236,14 @@ public class AuthController : ControllerBase
             FirstName = user.FirstName,
             LastName = user.LastName,
             State = user.State,
+            PreferredLanguage = user.PreferredLanguage,
             Role = user.Role,
             IsActive = user.IsActive,
             OnboardingCompleted = user.OnboardingCompleted,
             CreatedAt = user.CreatedAt
         };
 
-        return Ok(ApiResponse<UserDto>.SuccessResponse(dto, "Profile updated successfully"));
+        return Ok(ApiResponse<UserDto>.SuccessResponse(dto, _localizer["AuthApi.ProfileUpdatedSuccessfully"]));
     }
 
     /// <summary>
@@ -267,7 +277,7 @@ public class AuthController : ControllerBase
 
         var result = await _mfaService.VerifySetupAsync(userId, request.Code, cancellationToken);
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Verification failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["AuthApi.VerificationFailed"].Value));
 
         return Ok(ApiResponse<List<string>>.SuccessResponse(result.Data!, result.Message));
     }
@@ -284,15 +294,15 @@ public class AuthController : ControllerBase
     {
         var userId = _authService.ValidateMfaPendingToken(request.MfaPendingToken);
         if (userId == null)
-            return Unauthorized(ApiResponse<object>.Error("Invalid or expired MFA token"));
+            return Unauthorized(ApiResponse<object>.Error(_localizer["AuthApi.InvalidOrExpiredMfaToken"]));
 
         var valid = await _mfaService.ValidateCodeAsync(userId.Value, request.Code, cancellationToken);
         if (!valid)
-            return Unauthorized(ApiResponse<object>.Error("Invalid MFA code"));
+            return Unauthorized(ApiResponse<object>.Error(_localizer["AuthApi.InvalidMfaCode"]));
 
         var authResult = await _authService.CompleteMfaLoginAsync(userId.Value, cancellationToken);
         if (authResult == null)
-            return Unauthorized(ApiResponse<object>.Error("Login failed"));
+            return Unauthorized(ApiResponse<object>.Error(_localizer["AuthApi.LoginFailed"]));
 
         var response = new LoginResponse
         {
@@ -305,6 +315,7 @@ public class AuthController : ControllerBase
                 FirstName = authResult.User.FirstName,
                 LastName = authResult.User.LastName,
                 State = authResult.User.State,
+                PreferredLanguage = authResult.User.PreferredLanguage,
                 Role = authResult.User.Role,
                 IsActive = authResult.User.IsActive,
                 OnboardingCompleted = authResult.User.OnboardingCompleted,
@@ -327,15 +338,15 @@ public class AuthController : ControllerBase
     {
         var userId = _authService.ValidateMfaPendingToken(request.MfaPendingToken);
         if (userId == null)
-            return Unauthorized(ApiResponse<object>.Error("Invalid or expired MFA token"));
+            return Unauthorized(ApiResponse<object>.Error(_localizer["AuthApi.InvalidOrExpiredMfaToken"]));
 
         var valid = await _mfaService.ValidateRecoveryCodeAsync(userId.Value, request.RecoveryCode, cancellationToken);
         if (!valid)
-            return Unauthorized(ApiResponse<object>.Error("Invalid recovery code"));
+            return Unauthorized(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRecoveryCode"]));
 
         var authResult = await _authService.CompleteMfaLoginAsync(userId.Value, cancellationToken);
         if (authResult == null)
-            return Unauthorized(ApiResponse<object>.Error("Login failed"));
+            return Unauthorized(ApiResponse<object>.Error(_localizer["AuthApi.LoginFailed"]));
 
         var response = new LoginResponse
         {
@@ -348,6 +359,7 @@ public class AuthController : ControllerBase
                 FirstName = authResult.User.FirstName,
                 LastName = authResult.User.LastName,
                 State = authResult.User.State,
+                PreferredLanguage = authResult.User.PreferredLanguage,
                 Role = authResult.User.Role,
                 IsActive = authResult.User.IsActive,
                 OnboardingCompleted = authResult.User.OnboardingCompleted,
@@ -370,11 +382,11 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> RequestMagicLink([FromBody] MagicLinkRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         await _magicLinkService.RequestAsync(request.Email, cancellationToken);
 
-        return Accepted(ApiResponse<object>.SuccessResponse(null, "If that email is eligible for a sign-in link, one has been sent."));
+        return Accepted(ApiResponse<object>.SuccessResponse(null, _localizer["AuthApi.MagicLinkRequestAccepted"]));
     }
 
     /// <summary>
@@ -389,14 +401,14 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> ConsumeMagicLink([FromBody] MagicLinkConsumeRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _magicLinkService.ConsumeAsync(request.Token, cancellationToken);
 
         if (!result.Success)
             // 400, not 401: this is a business refusal of a public token (like reset-password / invite accept),
             // and the web client treats a 401 as "the session died" and logs the visitor out.
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Invalid or expired sign-in link."));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["AuthApi.InvalidOrExpiredSignInLink"].Value));
 
         if (result.RequiresMfa)
         {
@@ -413,7 +425,7 @@ public class AuthController : ControllerBase
             {
                 requiresMfa = true,
                 mfaSetupRequired = true
-            }, "This district requires multi-factor authentication. Please sign in with your password to finish setting it up."));
+            }, _localizer["AuthApi.DistrictRequiresMfa"]));
         }
 
         var authResult = result.AuthResult!;
@@ -428,6 +440,7 @@ public class AuthController : ControllerBase
                 FirstName = authResult.User.FirstName,
                 LastName = authResult.User.LastName,
                 State = authResult.User.State,
+                PreferredLanguage = authResult.User.PreferredLanguage,
                 Role = authResult.User.Role,
                 IsActive = authResult.User.IsActive,
                 OnboardingCompleted = authResult.User.OnboardingCompleted,
@@ -448,12 +461,12 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         await _passwordResetService.InitiateResetAsync(request.Email, cancellationToken);
 
         // Always return 202 regardless of whether the email exists
-        return Accepted(ApiResponse<object>.SuccessResponse(null, "If an account with that email exists, a reset link has been sent."));
+        return Accepted(ApiResponse<object>.SuccessResponse(null, _localizer["AuthApi.PasswordResetRequestAccepted"]));
     }
 
     /// <summary>
@@ -466,12 +479,12 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _passwordResetService.ResetPasswordAsync(request.Token, request.NewPassword, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Password reset failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["AuthApi.PasswordResetFailed"].Value));
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
@@ -491,7 +504,7 @@ public class AuthController : ControllerBase
 
         var result = await _mfaService.DisableAsync(userId, request.Password, request.Code, cancellationToken);
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Failed to disable MFA"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["AuthApi.FailedToDisableMfa"].Value));
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
@@ -528,12 +541,12 @@ public class AuthController : ControllerBase
             return Unauthorized();
 
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _accountService.ScheduleDeletionAsync(userId, request.Password, request.MfaCode, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Failed to schedule deletion"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["AuthApi.FailedToScheduleDeletion"].Value));
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
@@ -554,7 +567,7 @@ public class AuthController : ControllerBase
         var result = await _accountService.CancelDeletionAsync(userId, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Failed to cancel deletion"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["AuthApi.FailedToCancelDeletion"].Value));
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }

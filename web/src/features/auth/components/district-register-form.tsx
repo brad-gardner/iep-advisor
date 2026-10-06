@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/use-auth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 
 export function DistrictRegisterForm() {
+  const { t } = useTranslation('auth');
   const navigate = useNavigate();
   const { registerDistrict } = useAuth();
   const [formData, setFormData] = useState({
@@ -34,18 +36,18 @@ export function DistrictRegisterForm() {
     setError('');
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('errors.passwordsDoNotMatch'));
       return;
     }
 
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters');
+      setError(t('errors.passwordTooShort'));
       return;
     }
 
     const stateCode = formData.stateCode.trim();
     if (stateCode && stateCode.length !== 2) {
-      setError('State must be a 2-letter code');
+      setError(t('districtRegisterForm.stateLength'));
       return;
     }
 
@@ -69,7 +71,7 @@ export function DistrictRegisterForm() {
       sessionStorage.setItem('post-auth-redirect', '/educator/setup');
       navigate('/educator/setup', { replace: true });
     } else {
-      setError(result.error || 'Registration failed');
+      setError(result.error || t('districtRegisterForm.failed'));
       setIsLoading(false);
     }
   };
@@ -85,7 +87,7 @@ export function DistrictRegisterForm() {
       <form onSubmit={handleSubmit} className="space-y-4" data-testid="register-district-form">
         <div className="grid grid-cols-2 gap-4">
           <Input
-            label="First Name"
+            label={t('fields.firstName')}
             name="firstName"
             value={formData.firstName}
             onChange={handleChange}
@@ -94,7 +96,7 @@ export function DistrictRegisterForm() {
             data-testid="register-district-first-name"
           />
           <Input
-            label="Last Name"
+            label={t('fields.lastName')}
             name="lastName"
             value={formData.lastName}
             onChange={handleChange}
@@ -105,7 +107,7 @@ export function DistrictRegisterForm() {
         </div>
 
         <Input
-          label="Work Email"
+          label={t('districtRegisterForm.workEmail')}
           name="email"
           type="email"
           value={formData.email}
@@ -116,29 +118,29 @@ export function DistrictRegisterForm() {
         />
 
         <Input
-          label="District Name"
+          label={t('districtRegisterForm.districtName')}
           name="districtName"
           value={formData.districtName}
           onChange={handleChange}
           required
           maxLength={200}
-          placeholder="e.g. Springfield Unified School District"
+          placeholder={t('districtRegisterForm.districtNamePlaceholder')}
           data-testid="register-district-name"
         />
 
         <Input
-          label="State (optional)"
+          label={t('districtRegisterForm.stateOptional')}
           name="stateCode"
           value={formData.stateCode}
           onChange={handleStateCodeChange}
           maxLength={2}
-          placeholder="2-letter code, e.g. OH"
+          placeholder={t('districtRegisterForm.statePlaceholder')}
           autoCapitalize="characters"
           data-testid="register-district-state"
         />
 
         <Input
-          label="Password"
+          label={t('fields.password')}
           name="password"
           type="password"
           value={formData.password}
@@ -149,7 +151,7 @@ export function DistrictRegisterForm() {
         />
 
         <Input
-          label="Confirm Password"
+          label={t('fields.confirmPassword')}
           name="confirmPassword"
           type="password"
           value={formData.confirmPassword}
@@ -165,7 +167,7 @@ export function DistrictRegisterForm() {
           className="w-full"
           data-testid="register-district-submit"
         >
-          Create District Account
+          {t('districtRegisterForm.submit')}
         </Button>
       </form>
     </>

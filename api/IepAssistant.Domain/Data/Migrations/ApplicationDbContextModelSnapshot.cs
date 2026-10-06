@@ -4942,6 +4942,10 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<string>("PreferredLanguage")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(20)

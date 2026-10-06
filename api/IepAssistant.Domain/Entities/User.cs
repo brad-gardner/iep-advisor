@@ -7,6 +7,13 @@ public class User : BaseEntity, IAuditableEntity
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string? State { get; set; }
+
+    /// <summary>"en" or "es", lowercase; null until resolved and saved (first authenticated load, or an
+    /// explicit <c>PUT /api/auth/me</c> choice). See <c>IepAssistant.Services.Localization.SupportedLanguages</c>
+    /// for the supported list/normalization and <c>docs/designs/2026-10-06-multilingual-english-spanish-design.md</c>
+    /// for how it drives RequestLocalization, emails, and AI responses.</summary>
+    public string? PreferredLanguage { get; set; }
+
     public UserRole Role { get; set; } = UserRole.Parent;
     public bool IsActive { get; set; } = true;
     public bool MfaEnabled { get; set; } = false;

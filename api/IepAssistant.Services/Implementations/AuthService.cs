@@ -3,10 +3,12 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Localization;
 using Microsoft.IdentityModel.Tokens;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Repositories;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -17,15 +19,18 @@ public class AuthService : IAuthService
     private readonly IConfiguration _configuration;
     private readonly IUserRepository _userRepository;
     private readonly ApplicationDbContext _context;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public AuthService(
         IConfiguration configuration,
         IUserRepository userRepository,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        IStringLocalizer<Messages> localizer)
     {
         _configuration = configuration;
         _userRepository = userRepository;
         _context = context;
+        _localizer = localizer;
     }
 
     public async Task<LoginResult?> LoginAsync(string email, string password, CancellationToken cancellationToken = default)
@@ -94,10 +99,10 @@ public class AuthService : IAuthService
                 && (c.ExpiresAt == null || c.ExpiresAt > DateTime.UtcNow), cancellationToken);
 
         if (inviteCode == null)
-            return ServiceResult.FailureResult("Invalid or expired invite code.");
+            return ServiceResult.FailureResult(_localizer["Auth.InvalidOrExpiredInviteCode"]);
 
         if (await _userRepository.EmailExistsAsync(model.Email, cancellationToken))
-            return ServiceResult.FailureResult("Email is already registered.");
+            return ServiceResult.FailureResult(_localizer["Auth.EmailAlreadyRegistered"]);
 
         var user = new User
         {
@@ -121,7 +126,7 @@ public class AuthService : IAuthService
         inviteCode.RedeemedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult("User registered successfully.");
+        return ServiceResult.SuccessResult(_localizer["Auth.UserRegisteredSuccessfully"]);
     }
 
     public async Task<RegisterDistrictResult> RegisterDistrictAsync(RegisterDistrictModel model, CancellationToken cancellationToken = default)
@@ -130,7 +135,7 @@ public class AuthService : IAuthService
         // on Email is the real backstop — if a collision slips past this check the transaction below
         // rolls back, so no partial District/StaffProfile is ever persisted.
         if (await _userRepository.EmailExistsAsync(model.Email, cancellationToken))
-            return RegisterDistrictResult.Failure("Email is already registered.");
+            return RegisterDistrictResult.Failure(_localizer["Auth.EmailAlreadyRegistered"]);
 
         // One atomic transaction: User + (ALWAYS NEW) District + StaffProfile(DistrictAdmin). The District
         // is never find-or-create/matched by name — matching by name would let a stranger join an existing
@@ -211,7 +216,18 @@ public class AuthService : IAuthService
     {
         var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
         if (user == null)
-            return ServiceResult.FailureResult("User not found.");
+            return ServiceResult.FailureResult(_localizer["Auth.UserNotFound"]);
+
+        // null/omitted leaves the stored preference unchanged; anything non-null that isn't a supported
+        // code (case-insensitive) is a validation failure — checked before any field is mutated so a bad
+        // PreferredLanguage never leaves FirstName/LastName/State partially applied.
+        string? normalizedLanguage = null;
+        if (model.PreferredLanguage != null)
+        {
+            normalizedLanguage = SupportedLanguages.Normalize(model.PreferredLanguage);
+            if (normalizedLanguage == null)
+                return ServiceResult.FailureResult(_localizer["Auth.UnsupportedPreferredLanguage"]);
+        }
 
         if (model.FirstName != null)
             user.FirstName = model.FirstName;
@@ -222,12 +238,15 @@ public class AuthService : IAuthService
         if (model.State != null)
             user.State = model.State;
 
+        if (normalizedLanguage != null)
+            user.PreferredLanguage = normalizedLanguage;
+
         user.UpdatedAt = DateTime.UtcNow;
 
         _userRepository.Update(user);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult("Profile updated successfully.");
+        return ServiceResult.SuccessResult(_localizer["Auth.ProfileUpdatedSuccessfully"]);
     }
 
     public Task<AuthResult?> RefreshTokenAsync(string token, CancellationToken cancellationToken = default)
@@ -239,13 +258,13 @@ public class AuthService : IAuthService
     {
         var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
         if (user == null)
-            return ServiceResult.FailureResult("User not found.");
+            return ServiceResult.FailureResult(_localizer["Auth.UserNotFound"]);
 
         user.OnboardingCompletedAt = DateTime.UtcNow;
         _userRepository.Update(user);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult("Onboarding completed.");
+        return ServiceResult.SuccessResult(_localizer["Auth.OnboardingCompleted"]);
     }
 
     public int? ValidateMfaPendingToken(string token)
@@ -366,6 +385,7 @@ public class AuthService : IAuthService
         FirstName = user.FirstName,
         LastName = user.LastName,
         State = user.State,
+        PreferredLanguage = user.PreferredLanguage,
         Role = user.Role.ToString(),
         IsActive = user.IsActive,
         OnboardingCompleted = user.OnboardingCompletedAt.HasValue,

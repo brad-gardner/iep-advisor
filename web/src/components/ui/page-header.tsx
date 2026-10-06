@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 export interface Breadcrumb {
@@ -47,12 +48,13 @@ function Crumb({ crumb, isLast }: { crumb: Breadcrumb; isLast: boolean }) {
  * `MainLayout`); it does not provide the page container itself.
  */
 export function PageHeader({ title, subtitle, breadcrumb, actions }: PageHeaderProps) {
+  const { t } = useTranslation('common');
   const crumbs = breadcrumb && breadcrumb.length > 0 ? breadcrumb : null;
 
   return (
     <header className="space-y-2">
       {crumbs && (
-        <nav aria-label="Breadcrumb">
+        <nav aria-label={t('ui.breadcrumb')}>
           <ol className="flex items-center gap-1.5 text-xs">
             {crumbs.map((crumb, i) => (
               <Fragment key={i}>

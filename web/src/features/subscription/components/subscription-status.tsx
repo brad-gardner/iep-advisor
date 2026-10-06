@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { SubscribeButton } from './subscribe-button';
 import { createPortalSession } from '../api/subscription-api';
 import { useSubscription } from '../hooks/use-subscription';
+import { getActiveLanguage } from '@/lib/i18n/format';
 import type { SubscriptionStatus as SubscriptionStatusType, ChildUsage } from '@/types/api';
 
 function statusBadge(status: string) {
@@ -87,7 +88,7 @@ function StatusContent({ data }: { data: SubscriptionStatusType }) {
       {isActive && data.expiresAt && (
         <p className="text-sm text-brand-slate-500">
           Renews{' '}
-          {new Date(data.expiresAt).toLocaleDateString('en-US', {
+          {new Date(data.expiresAt).toLocaleDateString(getActiveLanguage(), {
             month: 'long',
             day: 'numeric',
             year: 'numeric',

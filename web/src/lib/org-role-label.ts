@@ -1,21 +1,18 @@
+import i18n from './i18n';
+
 // Human-facing labels for the seeded org-role names. The raw enum names
 // (`DistrictAdmin`/`SchoolAdmin`/`Teacher`/…) come straight from the API and
-// read as internal identifiers, so map them to sentence-style labels for
-// DISPLAY ONLY. Never use these for comparisons, routing, or testids — the raw
+// read as internal identifiers, so they're translated via
+// `common:orgRole.<name>` (see `locales/{en,es}/common.json`) for DISPLAY
+// ONLY. Never use these for comparisons, routing, or testids — the raw
 // `orgRoleName`/`ORG_ROLE` values remain the source of truth.
-const ORG_ROLE_LABELS: Record<string, string> = {
-  DistrictAdmin: 'District administrator',
-  SchoolAdmin: 'School administrator',
-  Teacher: 'Teacher',
-  RelatedServiceProvider: 'Related service provider',
-  GeneralEducator: 'General educator',
-};
 
 /**
- * Map a raw org-role name to its human label. Unknown or empty values pass
- * through unchanged so an unexpected role never renders as a blank.
+ * Map a raw org-role name to its human, translated label. Unknown or empty
+ * values pass through unchanged so an unexpected role never renders as a
+ * blank (or, now that this is translated, as a raw key).
  */
 export function orgRoleLabel(name: string | null | undefined): string {
   if (!name) return '';
-  return ORG_ROLE_LABELS[name] ?? name;
+  return i18n.t(`common:orgRole.${name}`, { defaultValue: name });
 }

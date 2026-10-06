@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle, Info, XCircle, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { DEFAULT_TOAST_DURATION_MS } from './toast-provider';
 import type { ToastItem, ToastVariant } from './toast-types';
@@ -12,6 +13,7 @@ const variantStyles: Record<ToastVariant, { bg: string; border: string; text: st
 };
 
 function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: number) => void }) {
+  const { t } = useTranslation('common');
   const { bg, border, text, Icon } = variantStyles[toast.variant];
   // Pause auto-dismiss while hovered so a reader isn't rushed. Toggling this in
   // the pointer handlers restarts the effect's timer below.
@@ -42,7 +44,7 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: num
       <button
         type="button"
         onClick={() => onDismiss(toast.id)}
-        aria-label="Dismiss notification"
+        aria-label={t('toast.dismiss')}
         className={cn('-m-1 shrink-0 rounded p-1 transition-colors hover:bg-black/5', text)}
       >
         <X className="h-4 w-4" strokeWidth={2} aria-hidden="true" />

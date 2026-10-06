@@ -1,5 +1,6 @@
 import { useId } from "react";
 import { X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import { useDialogElement } from "./use-dialog-element";
 
@@ -64,6 +65,7 @@ export function Modal({
   children,
   "data-testid": testId,
 }: ModalProps) {
+  const { t } = useTranslation("common");
   const requestClose = preventClose ? () => {} : onClose;
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogElement(
     open,
@@ -101,7 +103,7 @@ export function Modal({
                 type="button"
                 onClick={requestClose}
                 disabled={preventClose}
-                aria-label="Close dialog"
+                aria-label={t("ui.closeDialog")}
                 data-testid={testId ? `${testId}-close` : undefined}
                 className="-mr-1.5 -mt-0.5 rounded-button p-1 text-brand-slate-400 transition-colors hover:bg-brand-slate-50 hover:text-brand-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
               >

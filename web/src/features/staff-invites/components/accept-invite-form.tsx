@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
@@ -14,6 +15,7 @@ interface AcceptInviteFormProps {
 }
 
 export function AcceptInviteForm({ email, onSubmit }: AcceptInviteFormProps) {
+  const { t } = useTranslation('auth');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
@@ -26,15 +28,15 @@ export function AcceptInviteForm({ email, onSubmit }: AcceptInviteFormProps) {
     setError(null);
 
     if (!firstName.trim() || !lastName.trim()) {
-      setError('First and last name are required');
+      setError(t('acceptInviteForm.namesRequired'));
       return;
     }
     if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+      setError(t('acceptInviteForm.passwordTooShort'));
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('acceptInviteForm.passwordsDoNotMatch'));
       return;
     }
 
@@ -45,7 +47,7 @@ export function AcceptInviteForm({ email, onSubmit }: AcceptInviteFormProps) {
       password,
     });
     if (!result.success) {
-      setError(result.error ?? 'Could not accept this invite');
+      setError(result.error ?? t('acceptInviteForm.failed'));
       setIsSubmitting(false);
     }
   };
@@ -58,11 +60,11 @@ export function AcceptInviteForm({ email, onSubmit }: AcceptInviteFormProps) {
         </div>
       )}
 
-      <Input label="Email" type="email" value={email} readOnly disabled data-testid="staff-accept-email" />
+      <Input label={t('fields.email')} type="email" value={email} readOnly disabled data-testid="staff-accept-email" />
 
       <div className="grid grid-cols-2 gap-4">
         <Input
-          label="First name"
+          label={t('acceptInviteForm.firstName')}
           value={firstName}
           onChange={(e) => setFirstName(e.target.value)}
           required
@@ -70,7 +72,7 @@ export function AcceptInviteForm({ email, onSubmit }: AcceptInviteFormProps) {
           data-testid="staff-accept-first-name"
         />
         <Input
-          label="Last name"
+          label={t('acceptInviteForm.lastName')}
           value={lastName}
           onChange={(e) => setLastName(e.target.value)}
           required
@@ -80,7 +82,7 @@ export function AcceptInviteForm({ email, onSubmit }: AcceptInviteFormProps) {
       </div>
 
       <Input
-        label="Password"
+        label={t('acceptInviteForm.password')}
         type="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
@@ -90,7 +92,7 @@ export function AcceptInviteForm({ email, onSubmit }: AcceptInviteFormProps) {
         data-testid="staff-accept-password"
       />
       <Input
-        label="Confirm password"
+        label={t('acceptInviteForm.confirmPassword')}
         type="password"
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
@@ -101,7 +103,7 @@ export function AcceptInviteForm({ email, onSubmit }: AcceptInviteFormProps) {
       />
 
       <Button type="submit" disabled={isSubmitting} className="w-full" data-testid="staff-accept-submit">
-        {isSubmitting ? 'Creating account...' : 'Accept invite & create account'}
+        {isSubmitting ? t('acceptInviteForm.submitting') : t('acceptInviteForm.submit')}
       </Button>
     </form>
   );

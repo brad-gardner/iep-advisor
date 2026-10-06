@@ -1,6 +1,7 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import * as Sentry from '@sentry/react';
 import { getToken, removeToken } from './auth';
+import i18n from './i18n';
 
 export const apiClient = axios.create({
   baseURL: '',
@@ -16,6 +17,11 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Lets RequestLocalization pick the active UI language for this request
+    // (e.g. a localized validation message) even before the account's saved
+    // preference is persisted — the server still prefers a signed-in user's
+    // saved preference over this header (design doc, Architecture → API).
+    config.headers['Accept-Language'] = i18n.language || 'en';
     return config;
   },
   (error) => Promise.reject(error)

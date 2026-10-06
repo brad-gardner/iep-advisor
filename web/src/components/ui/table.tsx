@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import { Menu, type MenuItem } from "./menu";
 import { Skeleton } from "./skeleton";
@@ -105,6 +106,7 @@ export function Table<T>({
   selection,
   "data-testid": testId,
 }: TableProps<T>) {
+  const { t } = useTranslation("common");
   const [sort, setSort] = useState<
     { key: string; direction: SortDirection } | undefined
   >(defaultSort);
@@ -169,7 +171,7 @@ export function Table<T>({
                 <input
                   type="checkbox"
                   className={checkboxStyles}
-                  aria-label="Select all rows on this page"
+                  aria-label={t("ui.selectAllRows")}
                   checked={allSelected}
                   ref={(el) => {
                     if (el) el.indeterminate = someSelected && !allSelected;
@@ -245,7 +247,7 @@ export function Table<T>({
             })}
             {hasActions && (
               <th scope="col" className="w-12 px-2 py-2.5">
-                <span className="sr-only">Actions</span>
+                <span className="sr-only">{t("ui.actions")}</span>
               </th>
             )}
           </tr>
@@ -272,7 +274,7 @@ export function Table<T>({
               <td colSpan={totalCols} className="px-4 py-10">
                 {empty ?? (
                   <p className="text-center text-sm text-brand-slate-500">
-                    Nothing to show yet.
+                    {t("ui.nothingToShow")}
                   </p>
                 )}
               </td>
@@ -296,7 +298,7 @@ export function Table<T>({
                       <input
                         type="checkbox"
                         className={checkboxStyles}
-                        aria-label={`Select ${selection.rowLabel(row)}`}
+                        aria-label={t("ui.selectRow", { label: selection.rowLabel(row) })}
                         checked={selection.selectedKeys.has(rowKey(row))}
                         onChange={() => selection.onToggle(row)}
                         data-testid={
@@ -337,8 +339,8 @@ export function Table<T>({
                         <Menu
                           label={
                             rowActionLabel
-                              ? `Actions for ${rowActionLabel(row)}`
-                              : "Row actions"
+                              ? t("ui.actionsFor", { label: rowActionLabel(row) })
+                              : t("ui.rowActions")
                           }
                           items={actions}
                         />

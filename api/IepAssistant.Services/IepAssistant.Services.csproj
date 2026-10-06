@@ -22,6 +22,7 @@
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.Abstractions" Version="9.0.17" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Localization.Abstractions" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.1" />
     <PackageReference Include="QuestPDF" Version="2024.12.3" />
     <PackageReference Include="Stripe.net" Version="50.4.1" />
@@ -30,5 +31,17 @@
 
   <ItemGroup>
     <ProjectReference Include="..\IepAssistant.Domain\IepAssistant.Domain.csproj" />
+  </ItemGroup>
+
+  <!-- The .NET SDK's default EmbeddedResource naming drops a folder literally named "Resources" from the
+       computed manifest name (e.g. Resources/Messages.resx -> "IepAssistant.Services.Messages.resources",
+       not "...Resources.Messages.resources"). AddLocalization's ResourcesPath = "Resources" (Api/Program.cs)
+       expects the latter — IStringLocalizer<Messages>/<Emails> would otherwise report ResourceNotFound and
+       echo the raw key. This wildcard LogicalName covers every current and future Resources\*.resx file
+       (including each language's satellite, e.g. Messages.es.resx -> Messages.es.resources) so build
+       output matches what ResourceManagerStringLocalizerFactory looks up, without a new line added per
+       phase/resource file; verified by TestLocalizers-backed tests (English and Spanish). -->
+  <ItemGroup>
+    <EmbeddedResource Update="Resources\*.resx" LogicalName="$(RootNamespace).Resources.%(Filename).resources" />
   </ItemGroup>
 </Project>

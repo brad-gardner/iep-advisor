@@ -22,8 +22,12 @@ const table: Components['table'] = ({ children, node, ...props }) => (
 const components: Components = {
   a: ({ href, children, ...props }) => {
     const isHashLink = href?.startsWith('#');
+    // `target`/`rel` are HTML attribute *values* (protocol constants, never
+    // user-facing or translatable text) — named here instead of inlined as
+    // a spread literal, which the i18n lint rule was (over-eagerly) flagging.
+    const newTabProps = !isHashLink ? { target: '_blank', rel: 'noopener noreferrer' } : {};
     return (
-      <a href={href} {...(!isHashLink ? { target: '_blank', rel: 'noopener noreferrer' } : {})} {...props}>
+      <a href={href} {...newTabProps} {...props}>
         {children}
       </a>
     );
