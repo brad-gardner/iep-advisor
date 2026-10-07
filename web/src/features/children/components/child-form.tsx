@@ -28,7 +28,7 @@ export function ChildForm({
   submitLabel,
   embedded = false,
 }: ChildFormProps) {
-  const { t } = useTranslation("children");
+  const { t } = useTranslation(["children", "common"]);
   const [firstName, setFirstName] = useState(initialValues?.firstName ?? "");
   const [lastName, setLastName] = useState(initialValues?.lastName ?? "");
   const [dateOfBirth, setDateOfBirth] = useState(
@@ -79,7 +79,7 @@ export function ChildForm({
     });
 
     if (!result.success) {
-      setError(result.error ?? t("form.genericError"));
+      setError(result.error ?? t("common:ui.genericError"));
     }
 
     setIsSubmitting(false);

@@ -11,6 +11,13 @@ interface UseHomeResult {
   retry: () => void;
 }
 
+// A server-provided message is already resolved text (localized server-side,
+// per the plan's `.resx` work) and is shown as-is; the generic fallback is
+// translated at RENDER time instead of load time (see `useHome` below) so a
+// language switch after a failed load shows the new language immediately,
+// without needing to refetch.
+type HomeLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
+
 /**
  * Loads the single role-scoped `GET /api/home` aggregate. A failure never
  * degrades to an empty state — callers render the error with a retry action.
@@ -22,7 +29,7 @@ interface UseHomeResult {
 export function useHome(): UseHomeResult {
   const { t } = useTranslation('home');
   const [home, setHome] = useState<HomeDto | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<HomeLoadError | null>(null);
   // Bumped by the "Try again" button to re-run the load effect below.
   const [retryToken, setRetryToken] = useState(0);
 
@@ -34,23 +41,33 @@ export function useHome(): UseHomeResult {
         if (!active) return;
         if (response.success && response.data) {
           setHome(response.data);
-          setError(null);
+          setLoadError(null);
         } else {
-          setError(response.message ?? t('errors.loadFailed'));
+          setLoadError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, t('errors.loadFailed')));
+        if (!active) return;
+        // `apiErrorMessage` with no fallback (`''`) tells us ONLY whether the
+        // server itself supplied a message — the generic text is filled in
+        // below, at render, in whichever language is active then.
+        const serverMessage = apiErrorMessage(err, '');
+        setLoadError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
       }
     })();
     return () => {
       active = false;
     };
-  }, [retryToken, t]);
+    // `t` deliberately excluded: re-running the fetch on a language switch
+    // would be wasteful and racy (phase 2 review). The generic error text is
+    // translated below, at render, from `loadError`'s stored KIND rather than
+    // a snapshot string, so it already follows the active language with no
+    // refetch needed.
+  }, [retryToken]);
 
   return {
     home,
-    isLoading: home === null && error === null,
-    error,
-    retry: () => setRetryToken((t) => t + 1),
+    isLoading: home === null && loadError === null,
+    error: loadError ? (loadError.kind === 'server' ? loadError.message : t('errors.loadFailed')) : null,
+    retry: () => setRetryToken((n) => n + 1),
   };
 }

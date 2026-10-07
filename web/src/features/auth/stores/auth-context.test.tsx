@@ -437,6 +437,58 @@ describe('todos/247: explicit pre-login choice is a one-time, one-visitor signal
     );
   });
 
+  it('clears a lingering pre-login value on logout, defensively, so it never backfills the next visitor on a shared device', async () => {
+    const signedInUser = makeUser({ preferredLanguage: 'en' });
+    setToken('a-jwt');
+    setStoredUser(JSON.stringify(signedInUser));
+    authApi.getCurrentUser.mockResolvedValue({ success: true, data: signedInUser });
+
+    const user = userEvent.setup();
+    renderProbe();
+    await screen.findByText('en'); // loadUser resolved
+
+    // Simulate a leftover pre-login value some other path might have left
+    // behind — logout must clear it regardless of how it got there.
+    setPreLoginLanguage('es');
+
+    await user.click(screen.getByRole('button', { name: 'logout' }));
+    await screen.findByText('signed-out');
+
+    expect(getPreLoginLanguage()).toBeNull();
+  });
+
+  it('leaves the user null, with nothing written to the stored user, when logout runs while the initial /me is still in flight', async () => {
+    const signedInUser = makeUser({ preferredLanguage: 'en' });
+    setToken('a-jwt');
+    setStoredUser(JSON.stringify(signedInUser));
+
+    let resolveMe!: (value: { success: true; data: User }) => void;
+    authApi.getCurrentUser.mockImplementation(
+      () => new Promise((resolve) => { resolveMe = resolve; })
+    );
+
+    const user = userEvent.setup();
+    renderProbe();
+
+    // `loadUser`'s mount-triggered `/me` is in flight; the stored user is
+    // shown optimistically while it waits.
+    await screen.findByText('en');
+
+    // Sign out before that `/me` resolves.
+    await user.click(screen.getByRole('button', { name: 'logout' }));
+    await screen.findByText('signed-out');
+    expect(getStoredUser()).toBeNull(); // logout's removeToken() already cleared it
+
+    // Now let the slow `/me` resolve, with a signed-in-looking payload.
+    resolveMe({ success: true, data: signedInUser });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Must still be signed out — the stale response must not resurrect a
+    // user with no token, nor write one back to storage.
+    expect(screen.getByTestId('probe-user')).toHaveTextContent('signed-out');
+    expect(getStoredUser()).toBeNull();
+  });
+
   it('leaves the user signed out, with nothing written to the stored user, when logout runs while a language PUT is still in flight', async () => {
     const signedInUser = makeUser({ preferredLanguage: 'en' });
     setToken('a-jwt');

@@ -3,7 +3,6 @@
     "welcome": "Welcome, {{name}}",
     "home": "Home",
     "loadingAriaLabel": "Loading your home",
-    "loading": "Loading…",
     "noUpcomingMeetings": "No upcoming meetings scheduled."
   },
   "staffPage": {
@@ -11,8 +10,7 @@
     "noProfileTitle": "No staff profile found",
     "noProfileBody": "Your account is not linked to a school or district. Please contact support to finish setting up your access.",
     "viewStudents": "View students",
-    "loadingAriaLabel": "Loading your home",
-    "loading": "Loading…"
+    "loadingAriaLabel": "Loading your home"
   },
   "accountSetupNotices": {
     "completeSetupTitle": "Complete your setup to get the most out of IEP Advisor",

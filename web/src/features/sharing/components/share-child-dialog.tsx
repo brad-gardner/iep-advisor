@@ -14,7 +14,7 @@ interface ShareChildDialogProps {
 }
 
 export function ShareChildDialog({ childId, onInvited, onCancel }: ShareChildDialogProps) {
-  const { t } = useTranslation('sharing');
+  const { t } = useTranslation(['sharing', 'common']);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('viewer');
   const [isSubmitting, setIsSubmitting] = useState(false);

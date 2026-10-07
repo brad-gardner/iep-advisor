@@ -56,7 +56,8 @@
     "required": "(required)",
     "notSet": "Not set",
     "currentValueSuffix": "{{value}} (current value)",
-    "tryAgain": "Try again"
+    "tryAgain": "Try again",
+    "genericError": "Something went wrong. Please try again."
   },
   "toast": {
     "dismiss": "Dismiss notification"
@@ -149,5 +150,18 @@
     "TraumaticBrainInjury": "Traumatic brain injury",
     "VisualImpairment": "Visual impairment (including blindness)",
     "Other": "Other"
+  },
+  "inviteStatus": {
+    "action": {
+      "accept": "Accept",
+      "tentative": "Tentative",
+      "decline": "Decline"
+    },
+    "status": {
+      "Pending": "Pending",
+      "Accepted": "Accepted",
+      "Declined": "Declined",
+      "Tentative": "Tentative"
+    }
   }
 }

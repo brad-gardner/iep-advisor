@@ -4,6 +4,7 @@ import {
   DISABILITY_CATEGORY_LABELS,
   type DisabilityCategory,
 } from '@/features/educator/types';
+import { normalizeDisabilityCategory } from '@/features/children/lib/child-profile-options';
 
 // Human-facing labels for the canonical `DISABILITY_CATEGORY_OPTIONS` values
 // (`features/children/lib/child-profile-options.ts`) — the readable English
@@ -20,13 +21,20 @@ const LABEL_TO_CODE = new Map<string, DisabilityCategory>(
 
 /**
  * Map a canonical (or legacy/unmatched) disability-category label to its
- * human, translated label. A value with no matching IDEA category — an
- * unmatched legacy string a parent typed before the dropdown existed —
- * passes through unchanged rather than rendering blank or a raw key.
+ * human, translated label. A legacy/raw stored value — any case, the IDEA
+ * code itself (`"SLD"`), or the server's own display string
+ * (`"Specific Learning Disability"`, title case) — is normalized to the
+ * exact canonical label first (`normalizeDisabilityCategory`, the same
+ * mapping the child profile form uses to pick the matching `<option>`)
+ * before looking up its code. Only a value that STILL doesn't match
+ * anything — an unmatched legacy string a parent typed before the dropdown
+ * existed — passes through unchanged, rather than rendering blank or a raw
+ * key.
  */
 export function disabilityCategoryLabel(value: string | null | undefined): string {
   if (!value) return '';
-  const code = LABEL_TO_CODE.get(value);
+  const normalized = normalizeDisabilityCategory(value);
+  const code = LABEL_TO_CODE.get(normalized);
   if (!code) return value;
   return i18n.t(`common:disabilityCategory.${code}`, { defaultValue: value });
 }

@@ -125,7 +125,7 @@ function StatusContent({ data }: { data: SubscriptionStatusType }) {
 }
 
 export function SubscriptionStatusCard() {
-  const { t } = useTranslation('subscription');
+  const { t } = useTranslation(['subscription', 'common']);
   const { status, isLoading, reload } = useSubscription();
 
   if (isLoading) {

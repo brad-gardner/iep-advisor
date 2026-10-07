@@ -56,7 +56,8 @@
     "required": "(obligatorio)",
     "notSet": "Sin establecer",
     "currentValueSuffix": "{{value}} (valor actual)",
-    "tryAgain": "Intentar de nuevo"
+    "tryAgain": "Intentar de nuevo",
+    "genericError": "Algo salió mal. Inténtelo de nuevo."
   },
   "toast": {
     "dismiss": "Descartar notificación"
@@ -149,5 +150,18 @@
     "TraumaticBrainInjury": "Lesión cerebral traumática",
     "VisualImpairment": "Discapacidad visual (incluida la ceguera)",
     "Other": "Otra"
+  },
+  "inviteStatus": {
+    "action": {
+      "accept": "Aceptar",
+      "tentative": "Tal vez",
+      "decline": "Rechazar"
+    },
+    "status": {
+      "Pending": "Pendiente",
+      "Accepted": "Aceptada",
+      "Declined": "Rechazada",
+      "Tentative": "Tentativa"
+    }
   }
 }

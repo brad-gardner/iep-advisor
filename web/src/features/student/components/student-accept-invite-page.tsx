@@ -15,7 +15,7 @@ type Status = 'loading' | 'ready' | 'submitting' | 'error';
 type ErrorReason = 'loadFailed' | 'loadError' | 'acceptFailed' | 'acceptError';
 
 export function StudentAcceptInvitePage() {
-  const { t } = useTranslation('auth');
+  const { t } = useTranslation(['auth', 'common']);
   usePageTitle(t('studentAcceptInvite.pageTitle'));
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
@@ -104,7 +104,7 @@ export function StudentAcceptInvitePage() {
 
   const errorMessage = isMissingToken
     ? t('studentAcceptInvite.noToken')
-    : serverMessage ?? (errorReason ? reasonMessage(errorReason) : t('studentAcceptInvite.genericError'));
+    : serverMessage ?? (errorReason ? reasonMessage(errorReason) : t('common:ui.genericError'));
 
   const inviter = preview
     ? preview.inviteSource === 'Educator'

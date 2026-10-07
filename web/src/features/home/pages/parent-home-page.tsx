@@ -25,7 +25,7 @@ import type { HomeMeetingDto, ParentNextMeetingDto } from '../types';
  * dashboard body unchanged (see `LegacyParentHome`).
  */
 export function ParentHomePage() {
-  const { t } = useTranslation('home');
+  const { t } = useTranslation(['home', 'common']);
   const { user } = useAuth();
   const { home, isLoading, error, retry } = useHome();
   // Reflects a successful RSVP into the rendered next-meeting card without a
@@ -41,7 +41,7 @@ export function ParentHomePage() {
         <div className="space-y-6" role="status" aria-label={t('parentPage.loadingAriaLabel')}>
           <Skeleton className="h-40 w-full" />
           <Skeleton className="h-40 w-full" />
-          <span className="sr-only">{t('parentPage.loading')}</span>
+          <span className="sr-only">{t('common:ui.loading')}</span>
         </div>
       </PageLayout>
     );

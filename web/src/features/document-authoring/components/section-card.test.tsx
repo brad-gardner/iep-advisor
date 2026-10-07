@@ -192,6 +192,26 @@ describe('SectionCard — Edit / Done', () => {
     await waitFor(() => expect(document.activeElement).toBe(firstInput));
   });
 
+  it('does not steal focus back to the first field if the user already focused a different field before the auto-focus frame runs', async () => {
+    const user = userEvent.setup();
+    render(<Harness initialValues={{ [FIELD_A]: 'Jordan', [FIELD_B]: '' }} saveValues={vi.fn()} />);
+
+    await user.click(screen.getByTestId('section-10-edit'));
+    // The auto-focus-first-field effect above has scheduled its
+    // `requestAnimationFrame` by now, but a real rAF has not fired yet
+    // (only microtasks have flushed) — simulate the user getting there
+    // first, e.g. a fast click straight into a specific field.
+    const secondInput = screen.getByTestId(`field-${FIELD_B}`);
+    secondInput.focus();
+    expect(document.activeElement).toBe(secondInput);
+
+    // Give the real rAF a chance to run; it must see the field already
+    // focused and leave it alone rather than moving focus to field A.
+    await waitFor(() => expect(document.activeElement).toBe(secondInput));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(document.activeElement).toBe(secondInput);
+  });
+
   it('Done flushes the pending edit (before its own debounce fires) and closes, returning focus to Edit', async () => {
     const user = userEvent.setup();
     const saveValues = vi.fn().mockImplementation((patch: Record<string, unknown>) => Promise.resolve(okResult(patch)));

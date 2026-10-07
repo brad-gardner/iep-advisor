@@ -43,6 +43,10 @@ export default defineConfig([
       'src/features/child-links/**/*.{ts,tsx}',
       'src/features/sharing/**/*.{ts,tsx}',
       'src/features/knowledge-base/**/*.{ts,tsx}',
+      // Not a phase-2 feature (meetings converts in phase 3) — only this one
+      // component is in scope, because the parent-home "next meeting"/
+      // "upcoming meeting" cards (phase 2) render it (phase 2 review).
+      'src/features/meetings/components/rsvp-button-group.tsx',
     ],
     ignores: [
       '**/*.test.{ts,tsx}',

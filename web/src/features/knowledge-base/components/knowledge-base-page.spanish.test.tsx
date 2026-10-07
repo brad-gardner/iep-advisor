@@ -53,6 +53,10 @@ describe('KnowledgeBasePage in Spanish', () => {
     const cards = await screen.findAllByTestId('kb-entry');
     expect(cards[0]).toHaveTextContent('Prior written notice'); // article content stays English
     expect(screen.getByTestId('kb-entry-english-note')).toHaveTextContent('Disponible en inglés');
+    // Marked `lang="en"` since the surrounding UI is Spanish — tells
+    // assistive tech this text is a different language than the page.
+    expect(screen.getByRole('heading', { name: 'Prior written notice' })).toHaveAttribute('lang', 'en');
+    expect(screen.getByText('About Prior written notice.')).toHaveAttribute('lang', 'en');
 
     expect(
       screen.getByText('Esta información se ofrece con fines educativos. No constituye asesoría legal.')

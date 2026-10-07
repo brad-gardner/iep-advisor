@@ -34,7 +34,7 @@
     "body": "Esto es lo que puede hacer con IEP Advisor. Comience por donde le resulte más cómodo.",
     "uploadTitle": "Suba un IEP",
     "uploadDescription": "Obtenga un análisis con inteligencia artificial del IEP de su hijo",
-    "goalsTitle": "Defina metas de defensa",
+    "goalsTitle": "Defina metas para el IEP",
     "goalsDescription": "Defina sus prioridades y verifique si el IEP las aborda",
     "prepTitle": "Prepárese para las reuniones",
     "prepDescription": "Obtenga listas de verificación prácticas para llegar preparado",
@@ -53,10 +53,10 @@
     "whoGetsHeading": "¿Quién recibe un IEP?",
     "whoGetsBody": "Niños de 3 a 21 años que tienen una discapacidad que afecta su aprendizaje. Existen 13 categorías bajo la IDEA (la Ley de Educación para Personas con Discapacidades), que incluyen autismo, discapacidades específicas del aprendizaje, trastornos del habla o del lenguaje, entre otras. Su hijo debe ser evaluado y declarado elegible antes de que se pueda crear un IEP.",
     "whatsInHeading": "¿Qué contiene un IEP?",
-    "presentLevelsLabel": "Niveles actuales:",
+    "presentLevelsLabel": "Niveles actuales de desempeño:",
     "presentLevelsText": "Cómo le está yendo a su hijo actualmente a nivel académico y funcional",
     "annualGoalsLabel": "Metas anuales:",
-    "annualGoalsText": "Objetivos medibles para el año (deben ser específicos, medibles, alcanzables, relevantes y con plazos definidos)",
+    "annualGoalsText": "Metas medibles para el año (deben ser específicas, medibles, alcanzables, relevantes y con plazos definidos)",
     "servicesLabel": "Servicios:",
     "servicesText": "El apoyo que recibirá su hijo (terapia del habla, terapia ocupacional, tutoría, etc.)",
     "accommodationsLabel": "Adaptaciones:",
@@ -68,9 +68,9 @@
     "right2": "Usted debe dar su consentimiento antes de que comiencen las evaluaciones y los servicios",
     "right3": "Usted tiene el derecho de ver todos los registros relacionados con su hijo",
     "right4": "La escuela debe darle un aviso previo por escrito antes de hacer cambios",
-    "right5": "Usted puede estar en desacuerdo, y existen procesos formales para resolver disputas (mediación, proceso legal debido)",
+    "right5": "Usted puede estar en desacuerdo, y existen procesos formales para resolver disputas (mediación, debido proceso)",
     "meetingHeading": "Qué esperar en una reunión del IEP",
-    "meetingBody": "La reunión generalmente dura de 1 a 2 horas. El equipo revisa el progreso de su hijo, analiza las metas para el próximo año y decide los servicios y la ubicación. Usted puede traer a quien quiera para que lo apoye: un asesor, un familiar o un amigo.",
+    "meetingBody": "La reunión generalmente dura de 1 a 2 horas. El equipo revisa el progreso de su hijo, analiza las metas para el próximo año y decide los servicios y la ubicación. Usted puede traer a quien quiera para que lo apoye: un defensor, un familiar o un amigo.",
     "termsHeading": "Términos comunes",
     "termFape": "FAPE",
     "termFapeDef": "Educación Pública Gratuita y Apropiada",
@@ -84,7 +84,7 @@
     "termTransitionDef": "Planificación para la vida después de la escuela secundaria (comienza a los 16 años)",
     "termPwn": "Aviso previo por escrito (PWN)",
     "termPwnDef": "Notificación por escrito que la escuela debe proporcionar antes de cambiar el programa de su hijo",
-    "termDueProcess": "Proceso legal debido",
-    "termDueProcessDef": "Una audiencia formal para resolver desacuerdos"
+    "termDueProcess": "Debido proceso",
+    "termDueProcessDef": "Una audiencia de debido proceso formal para resolver desacuerdos"
   }
 }

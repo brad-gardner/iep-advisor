@@ -3,7 +3,6 @@
     "welcome": "Le damos la bienvenida, {{name}}",
     "home": "Inicio",
     "loadingAriaLabel": "Cargando su inicio",
-    "loading": "Cargando…",
     "noUpcomingMeetings": "No hay reuniones próximas programadas."
   },
   "staffPage": {
@@ -11,8 +10,7 @@
     "noProfileTitle": "No se encontró un perfil de personal",
     "noProfileBody": "Su cuenta no está vinculada a una escuela o distrito. Comuníquese con soporte para terminar de configurar su acceso.",
     "viewStudents": "Ver estudiantes",
-    "loadingAriaLabel": "Cargando su inicio",
-    "loading": "Cargando…"
+    "loadingAriaLabel": "Cargando su inicio"
   },
   "accountSetupNotices": {
     "completeSetupTitle": "Complete su configuración para aprovechar al máximo IEP Advisor",

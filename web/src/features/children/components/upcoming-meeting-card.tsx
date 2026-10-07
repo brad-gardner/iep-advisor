@@ -9,8 +9,8 @@ import { apiErrorMessage } from '@/lib/api-error';
 import { listChildMeetings, rsvpToMeeting } from '@/features/meetings/api/meetings-api';
 import { formatMeetingWhen } from '@/features/meetings/lib/meeting-time';
 import { RsvpButtonGroup } from '@/features/meetings/components/rsvp-button-group';
-import { INVITE_STATUS_LABELS } from '@/features/meetings/types';
 import type { InviteStatus, MeetingDto } from '@/features/meetings/types';
+import { inviteStatusLabel } from '@/lib/invite-status-label';
 
 function nextUpcoming(meetings: MeetingDto[]): MeetingDto | null {
   const now = Date.now();
@@ -30,13 +30,19 @@ const inviteBadgeVariant: Record<InviteStatus, 'success' | 'error' | 'warning' |
   Pending: 'neutral',
 };
 
+// A server-provided message is already resolved text and shown as-is; the
+// generic fallback is translated at RENDER time (see `error` below) rather
+// than load time, so a language switch after a failed load shows the new
+// language immediately, with no refetch (phase 2 review).
+type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
+
 /** Parent child-overview card: the child's next scheduled meeting with
  * Accept/Decline/Tentative RSVP buttons. Renders nothing if there is none. */
 export function UpcomingMeetingCard({ childId }: { childId: number }) {
-  const { t } = useTranslation('children');
+  const { t } = useTranslation(['children', 'common']);
   // `undefined` = loading, `null` = loaded with nothing upcoming.
   const [meeting, setMeeting] = useState<MeetingDto | null | undefined>(undefined);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
   // A failed RSVP is shown inline under the buttons; the card (and the meeting)
   // stays visible so the family can simply try the response again.
   const [rsvpError, setRsvpError] = useState<string | null>(null);
@@ -60,18 +66,23 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
         if (!active) return;
         if (response.success && response.data) {
           setMeeting(nextUpcoming(response.data));
-          setError(null);
+          setLoadError(null);
         } else {
-          setError(response.message ?? t('upcomingMeeting.loadError'));
+          setLoadError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, t('upcomingMeeting.loadError')));
+        if (!active) return;
+        const serverMessage = apiErrorMessage(err, '');
+        setLoadError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
       }
     })();
     return () => {
       active = false;
     };
-  }, [childId, retryToken, t]);
+    // `t` deliberately excluded — see the `LoadError` comment above.
+  }, [childId, retryToken]);
+
+  const error = loadError ? (loadError.kind === 'server' ? loadError.message : t('upcomingMeeting.loadError')) : null;
 
   const handleRsvp = async (status: InviteStatus) => {
     if (!meeting) return;
@@ -117,7 +128,7 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
       {meeting.myInviteStatus && (
         <div className="mt-3">
           <Badge variant={inviteBadgeVariant[meeting.myInviteStatus]}>
-            {INVITE_STATUS_LABELS[meeting.myInviteStatus]}
+            {inviteStatusLabel(meeting.myInviteStatus)}
           </Badge>
         </div>
       )}

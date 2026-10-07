@@ -21,7 +21,7 @@ import type { NotificationDto } from '../types';
  * item shape).
  */
 export function NotificationBell() {
-  const { t } = useTranslation('notifications');
+  const { t } = useTranslation(['notifications', 'common']);
   const { unreadCount, refresh } = useNotificationsContext();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationDto[] | null>(null);

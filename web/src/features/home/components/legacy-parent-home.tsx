@@ -18,7 +18,7 @@ interface LegacyParentHomeProps {
  * children, account, and quick actions.
  */
 export function LegacyParentHome({ user }: LegacyParentHomeProps) {
-  const { t } = useTranslation('home');
+  const { t } = useTranslation(['home', 'common']);
   return (
     <div className="space-y-6" data-testid="parent-home-legacy">
       <AccountSetupNotices user={user} />

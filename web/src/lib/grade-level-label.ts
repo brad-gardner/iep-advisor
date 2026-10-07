@@ -1,4 +1,5 @@
 import i18n from './i18n';
+import { normalizeGradeLevel } from '@/features/children/lib/child-profile-options';
 
 // Human-facing labels for the canonical `GRADE_LEVEL_OPTIONS` values
 // (`features/children/lib/child-profile-options.ts`) — translated via
@@ -10,11 +11,16 @@ import i18n from './i18n';
 
 /**
  * Map a canonical (or legacy/unmatched) grade-level string to its human,
- * translated label. A value with no translation entry — an unmatched legacy
- * string a parent typed before the dropdown existed — passes through
- * unchanged rather than rendering blank or a raw key.
+ * translated label. `common:gradeLevel.*` is keyed by the CANONICAL form
+ * (`"5th"`, `"Kindergarten"`, `"Pre-K"`, …), so a legacy/raw stored value —
+ * `"5"`, `"K"`, `"PK"`, any case — is normalized to that canonical form
+ * first (`normalizeGradeLevel`), the same mapping the child profile form
+ * already uses to pick the matching `<option>`. Only a value that STILL
+ * doesn't match anything after normalizing passes through unchanged, rather
+ * than rendering blank or a raw key.
  */
 export function gradeLevelLabel(value: string | null | undefined): string {
   if (!value) return '';
-  return i18n.t(`common:gradeLevel.${value}`, { defaultValue: value });
+  const normalized = normalizeGradeLevel(value);
+  return i18n.t(`common:gradeLevel.${normalized}`, { defaultValue: value });
 }

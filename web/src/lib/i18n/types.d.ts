@@ -1,39 +1,51 @@
 import 'i18next';
-import type { resources } from './index';
 
-// Derives STRICT typed keys from the English resources *exported by
-// `index.ts`* (the single place the two SHELL namespaces are registered —
-// see its `resources` object): an unknown or misspelled `t('common:…')`/
-// `t('auth:…')` key becomes a `tsc` error, and adding a bundled namespace
-// there (one import + one entry) is all it takes to type it here too.
+// Type-only companions to `index.ts`'s runtime `import.meta.glob(..., {
+// eager: true })` discovery of every `en/*.json` file. A dynamic glob gives
+// Vite's types a generic `Record<string, Module>` shape — every match typed
+// the same way, with no literal per-file-path key and no per-file literal
+// JSON shape (see `node_modules/vite/types/importGlob.d.ts`'s
+// `ImportGlobFunction`) — so the glob's VALUE can't, by itself, produce the
+// STRICT, per-namespace key typing below; these `import type` lines are the
+// (erased-at-runtime) substitute. `EnResources` must name exactly the same
+// namespaces as `index.ts`'s `resources.en` (equivalently, its
+// `featureNamespaces` export) — `index.test.ts` and `locale-parity.test.ts`
+// cover the files on disk; this is the one place that still needs a line
+// added per new namespace. Forgetting one isn't silent: the first
+// `useTranslation('<that namespace>')` call for it fails to compile (the
+// namespace is simply unknown to `CustomTypeOptions`, not loosely typed).
 //
-// Every other, feature-level namespace (`children`, `home`, …) loads
-// lazily in BOTH languages (see `index.ts`'s `localeLoaders`) and is
-// deliberately NOT part of `resources` above, so it can't be derived the
-// same way. It still needs an entry here — react-i18next's generated
-// `useTranslation`/`t` overloads only accept a namespace name that
-// `CustomTypeOptions.resources` knows about at all, strictly-typed or
-// not — so each one is listed in `LazyNamespaces` below with a loose
-// `Record<string, string>` shape: `useTranslation('children')` and
-// `t('children:anyKey')` compile, but an individual KEY typo in a lazy
-// namespace is caught at runtime by the key-parity test
-// (`locale-parity.test.ts`), not by `tsc`. Add one line per new
-// feature-level namespace as a phase converts it.
-interface LazyNamespaces {
-  children: Record<string, string>;
-  home: Record<string, string>;
-  onboarding: Record<string, string>;
-  notifications: Record<string, string>;
-  subscription: Record<string, string>;
-  'child-links': Record<string, string>;
-  sharing: Record<string, string>;
-  'knowledge-base': Record<string, string>;
+// Because every namespace is listed here now (not just the two shell ones),
+// an unknown or misspelled key is a `tsc` error for EVERY namespace, not
+// only `common`/`auth` — see `key-typing.test.tsx`'s canary.
+import type EnAuth from '@/locales/en/auth.json';
+import type EnChildLinks from '@/locales/en/child-links.json';
+import type EnChildren from '@/locales/en/children.json';
+import type EnCommon from '@/locales/en/common.json';
+import type EnHome from '@/locales/en/home.json';
+import type EnKnowledgeBase from '@/locales/en/knowledge-base.json';
+import type EnNotifications from '@/locales/en/notifications.json';
+import type EnOnboarding from '@/locales/en/onboarding.json';
+import type EnSharing from '@/locales/en/sharing.json';
+import type EnSubscription from '@/locales/en/subscription.json';
+
+export interface EnResources {
+  auth: typeof EnAuth;
+  'child-links': typeof EnChildLinks;
+  children: typeof EnChildren;
+  common: typeof EnCommon;
+  home: typeof EnHome;
+  'knowledge-base': typeof EnKnowledgeBase;
+  notifications: typeof EnNotifications;
+  onboarding: typeof EnOnboarding;
+  sharing: typeof EnSharing;
+  subscription: typeof EnSubscription;
 }
 
 declare module 'i18next' {
   interface CustomTypeOptions {
     defaultNS: 'common';
     returnNull: false;
-    resources: (typeof resources)['en'] & LazyNamespaces;
+    resources: EnResources;
   }
 }

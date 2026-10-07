@@ -17,7 +17,7 @@ import { StaffHomeBody } from '../components/staff-home-body';
  * guards (unchanged from the previous `EducatorHomePage`) plus the page chrome.
  */
 export function StaffHomePage() {
-  const { t } = useTranslation('home');
+  const { t } = useTranslation(['home', 'common']);
   const { profile, isLoading } = useEducatorProfile();
   // Title upgrades from a generic "Home" to the org name once the profile
   // resolves — called unconditionally so every guard state below gets a title.
@@ -31,7 +31,7 @@ export function StaffHomePage() {
           <Skeleton className="h-4 w-40" />
         </div>
         <Skeleton className="h-44 w-full max-w-lg" />
-        <span className="sr-only">{t('staffPage.loading')}</span>
+        <span className="sr-only">{t('common:ui.loading')}</span>
       </div>
     );
   }

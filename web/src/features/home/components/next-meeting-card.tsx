@@ -10,8 +10,8 @@ import { apiErrorMessage } from '@/lib/api-error';
 import { rsvpToMeeting } from '@/features/meetings/api/meetings-api';
 import { RsvpButtonGroup } from '@/features/meetings/components/rsvp-button-group';
 import { formatMeetingWhen } from '@/features/meetings/lib/meeting-time';
-import { INVITE_STATUS_LABELS } from '@/features/meetings/types';
 import type { InviteStatus } from '@/features/meetings/types';
+import { inviteStatusLabel } from '@/lib/invite-status-label';
 import type { HomeMeetingDto } from '../types';
 
 function countdownLabel(daysUntil: number, t: TFunction<'home'>): string {
@@ -110,7 +110,7 @@ export function NextMeetingCard({
                     : 'neutral'
             }
           >
-            {INVITE_STATUS_LABELS[meeting.myInviteStatus]}
+            {inviteStatusLabel(meeting.myInviteStatus)}
           </Badge>
         </div>
       )}

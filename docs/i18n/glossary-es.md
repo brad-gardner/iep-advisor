@@ -47,6 +47,9 @@ Every Spanish string in the app, emails, PDFs and AI instructions uses these ter
 | school administrator (org role) | administrador escolar |
 | related service provider (org role) | proveedor de servicios relacionados |
 | general educator (org role) | maestro de educación general |
+| owner (access role) | propietario |
+| collaborator (access role) | colaborador |
+| viewer (access role) | observador |
 | draft | borrador |
 | finalize | finalizar |
 | share | compartir |
@@ -67,6 +70,9 @@ Every Spanish string in the app, emails, PDFs and AI instructions uses these ter
 | download | descargar |
 | loading… | cargando… |
 | invite status: claimed/used | utilizada (not "reclamada") |
+| due process (hearing) | debido proceso (audiencia de debido proceso) |
+| advocacy goals (parent priorities) | metas para el IEP |
+| advocate (a person) | defensor / defensora |
 | grade (level) | grado |
 | Pre-K / Kindergarten | prekínder / kínder |
 | 1st grade … 12th grade | 1.er grado … 12.º grado |

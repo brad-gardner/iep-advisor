@@ -15,8 +15,7 @@
     "goToDashboard": "Ir al panel",
     "noToken": "No se proporcionó un token de enlace.",
     "acceptFailed": "No se pudo aceptar este enlace.",
-    "acceptError": "Ocurrió un error al aceptar este enlace.",
-    "genericError": "Algo salió mal"
+    "acceptError": "Ocurrió un error al aceptar este enlace."
   },
   "choice": {
     "legend": "¿Cómo debemos vincular a este estudiante?",

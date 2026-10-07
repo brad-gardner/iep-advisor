@@ -11,7 +11,7 @@ import { CaseloadHome } from './caseload-home';
  * variant body. A load failure always renders an error notice with retry —
  * never an empty state. */
 export function StaffHomeBody() {
-  const { t } = useTranslation('home');
+  const { t } = useTranslation(['home', 'common']);
   const { home, isLoading, error, retry } = useHome();
 
   if (isLoading) {

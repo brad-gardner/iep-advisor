@@ -13,62 +13,60 @@ special-education terminology), see [`glossary-es.md`](./glossary-es.md).
   passes it as `lng` at `init()`; a signed-in user's confirmed preference and
   a `?lang=` visit are applied afterward via `i18n.changeLanguage` directly
   (`AuthProvider`, `useLanguageQueryParam`).
-- **Resources:** `web/src/locales/{en,es}/<namespace>.json`. English is bundled
-  (static imports in `web/src/lib/i18n/index.ts`) **only for the two shell
-  namespaces** (`common`, `auth`). Every other, feature-level namespace loads
-  lazily **in both languages** via the same `resourcesToBackend`
-  plugin/`import.meta.glob` (`index.ts`'s `localeLoaders`, now globbing
-  `locales/en/*.json` and `locales/es/*.json`) — `partialBundledLanguages:
-  true` means the backend is only ever actually consulted for a
-  (language, namespace) pair not already in the bundle, so `en/common` and
-  `en/auth` are served from the bundle while, say, `en/children` and
-  `es/children` both go through the backend. Phase 1 only needed Spanish
-  lazy-loaded because every namespace that existed then (`common`, `auth`)
-  was already bundled in English; from the first feature-level namespace
-  (phase 2's `children`) onward, English needs the same lazy path Spanish
-  always had.
+- **Resources (phase 2 review — all English is bundled, not just the shell):**
+  `web/src/locales/{en,es}/<namespace>.json`. Every `en/*.json` file is
+  bundled EAGERLY — `index.ts`'s `resources.en` is built from
+  `import.meta.glob('/src/locales/en/*.json', { eager: true })`, so a new
+  namespace's English is picked up automatically with no import to add. Only
+  Spanish stays lazy, per namespace, via the same `resourcesToBackend` plugin
+  (`index.ts`'s `esLoaders`, globbing `locales/es/*.json` only — English never
+  touches this backend). This replaced phase 1's design, where only the two
+  shell namespaces (`common`, `auth`) were bundled and every other namespace
+  was lazy in BOTH languages: that showed a raw `ns:key` flash on a feature
+  page's first paint in English too, and — worse — got permanently STUCK
+  showing raw keys if the lazy English chunk failed to load (the
+  `failedLoading` handler's English fallback is useless once English is
+  itself the thing that failed to load). See the plan's "Decisions added
+  during implementation."
 - **Namespaces:** one per feature folder, plus `common` for shared chrome
   (layouts, `components/ui/*`, enum-label helpers, generic errors). A page
   reads from its own feature namespace and `common`. **`index.ts`'s `ns`
-  option only ever lists the shell namespaces (`common`, `auth`)** — those
-  two load eagerly because the shell (layouts, the switcher, auth pages)
-  needs them before any route-level code splitting kicks in. Every other,
-  feature-level namespace is **not** added there; it loads on demand the
-  first time a component calls `useTranslation('<that namespace>')`
-  (react-i18next's `useTranslation` triggers the load itself and re-renders
-  once it resolves — see `react: { useSuspense: false }` in `index.ts`).
-  Adding a namespace to `ns` would make every page pay for loading it, even
-  pages that never render a component from that feature. Because this applies
-  in English too now, a component's very first render (in either language)
-  can momentarily see an unloaded namespace — harmless in practice (the
-  re-render lands before anyone notices, and `test/setup.ts` /
-  `renderInSpanish` preload every known feature namespace for tests — see
-  below), but it is why `missingKeyHandler` specifically exempts
-  "not loaded yet" from "missing" (see Tests).
-- **Typed keys:** `web/src/lib/i18n/types.d.ts` derives `CustomTypeOptions`
-  from the `resources` object `index.ts` exports, so `t('common:unknownKey')`/
-  `t('auth:unknownKey')` is a `tsc` error, not a runtime surprise, and
-  registering a new *bundled* namespace is one import + one entry in that
-  single `resources` object. A lazy, feature-level namespace (`children`,
-  `home`, `onboarding`, `notifications`, `subscription`, `child-links`,
-  `sharing`, `knowledge-base`, …) isn't part of `resources` and can't be
-  derived the same way — react-i18next's generated `useTranslation`/`t`
-  overloads still need SOME entry for it in `CustomTypeOptions.resources`,
-  strictly-typed or not, or `useTranslation('<namespace>')` itself fails to
-  compile. Each one gets a line in `types.d.ts`'s `LazyNamespaces` with a
-  loose `Record<string, string>` shape: `useTranslation('children')` and
-  `t('children:anyKey')` compile, but an individual KEY typo in a lazy
-  namespace is caught at runtime by the parity test below, not by `tsc`. Add
-  one `LazyNamespaces` line per new feature-level namespace.
-  **Gotcha:** don't build a lazy namespace's key dynamically (a template
-  literal or a variable) in the SAME call that also passes `options` (e.g.
-  `{ defaultValue }`) — `i18n.t(\`sharing:role.${role}\`, { defaultValue })`
-  fails to type-check against a loose `Record<string, string>` namespace (a
-  `keyof Record<string, string>` quirk feeding a nonsensical `string`-method
-  union into the error). A `switch` over literal keys (see
-  `features/sharing/lib/role-label.ts`, `features/knowledge-base/components/
-  category-tabs.tsx`), or a dynamic key with NO extra options, both compile
-  fine.
+  option still only ever lists the shell namespaces (`common`, `auth`)** —
+  those two are the only ones that must be ready, synchronously, before the
+  shell (layouts, the switcher, auth pages) renders at all. Every other
+  namespace is **not** added there, even though its ENGLISH data now sits in
+  `resources` right alongside the shell namespaces': `useTranslation('<that
+  namespace>')` sees it as already loaded (no network call) the instant a
+  component first asks for it, in English, regardless of whether it's in
+  `ns`. Only its SPANISH data is genuinely lazy, fetched on that same first
+  call. Adding a namespace to `ns` would force Spanish to eagerly fetch every
+  namespace's chunk up front, defeating the point of lazy-loading Spanish at
+  all.
+- **Typed keys (phase 2 review — every namespace is strict now, not just
+  `common`/`auth`):** `web/src/lib/i18n/types.d.ts` declares `EnResources`
+  from one `import type` per `en/*.json` namespace file — type-only, so it
+  costs nothing at runtime — and sets `CustomTypeOptions.resources` to it
+  directly. A dynamic `import.meta.glob` can't itself produce this: Vite
+  types every glob match with the same generic shape, with no literal
+  per-file key or per-file JSON shape (see
+  `node_modules/vite/types/importGlob.d.ts`), so there's no way to derive a
+  strict, per-namespace key union from `index.ts`'s runtime `resources.en`
+  alone. `EnResources` is the parallel, hand-maintained stand-in: it must
+  name the same namespaces `resources.en` does (`index.test.ts`/
+  `locale-parity.test.ts` cover the files on disk), and registering a new
+  namespace needs exactly one `import type` line there. Forgetting it isn't
+  silent — the first `useTranslation('<that namespace>')` call for it fails
+  to compile, since the namespace is simply unknown to `CustomTypeOptions`,
+  not loosely typed. This means `t('common:unknownKey')`,
+  `t('children:unknownKey')`, etc. are ALL now `tsc` errors, for every
+  namespace — phase 1 only caught this for `common`/`auth`.
+  **Gotcha — reaching another namespace from a single-namespace hook:**
+  `useTranslation('home')`'s `t` only type-checks keys from `home` itself (or
+  `ns:key` for a namespace in the SAME array) — `t('common:ui.tryAgain')`
+  from a single-namespace `home` hook is a `tsc` error now that `home` is
+  strictly typed (phase 1 this compiled, loosely, because every feature
+  namespace was `Record<string, string>`). Pass an array instead:
+  `useTranslation(['home', 'common'])`.
 - **Language resolution** (`web/src/lib/i18n/detect.ts`), for what a page
   *shows*, in order:
   1. the signed-in session's **cached** account language — the
@@ -77,7 +75,13 @@ special-education terminology), see [`glossary-es.md`](./glossary-es.md).
      pre-login/browser language first;
   2. the visitor's **explicit** pre-login choice — the switcher, or a
      `?lang=en|es` query param honored once by `useLanguageQueryParam`,
-     while signed out (`getPreLoginLanguage`);
+     while signed out (`getPreLoginLanguage`). A signed-in visitor following
+     a `?lang=` link (e.g. an invite opened while signed in as someone else)
+     still sees that language for display, but it is NEVER written to this
+     key (phase 2 review) — writing it would let a signed-in account's
+     incidental link click decide a *different*, later visitor's backfill on
+     a shared device, which is exactly what this key must never do (see the
+     module doc comment on `detect.ts`);
   3. the **sign-out display carry-over** — whatever language was active when
      the previous session signed out (`getLastDisplayLanguage`), so the login
      page doesn't flash back to the browser's language the instant someone
@@ -106,7 +110,15 @@ special-education terminology), see [`glossary-es.md`](./glossary-es.md).
   `AuthProvider.setLanguage`/`languageGenerationRef` for the full race. An
   explicit `setLanguage` call also always awaits any backfill PUT already in
   flight (`pendingBackfillRef`) before sending its own, so the visitor's own
-  choice is guaranteed to be the last write the server sees.
+  choice is guaranteed to be the last write the server sees. Both
+  `AuthProvider.loadUser`/`refreshUser`/`setLanguage` additionally capture
+  the signed-in token *before* their own fetch/PUT starts and compare it
+  against the current one once the response lands: if `logout()` ran in
+  between, the token is gone, and the response is discarded rather than
+  resurrecting a signed-in-looking user with no token (phase 2 review;
+  todos/247). `logout()` also clears the explicit pre-login key
+  defensively, so this departing session can never leave a value there for
+  the next, possibly anonymous, visitor to be backfilled with.
 - **Switching:** `web/src/lib/i18n/language-switcher.tsx` — the one
   `LanguageSwitcher` component, in the auth layout footer, the sidebar footer,
   and the Profile page's Language field (which also passes a `hint`).
@@ -148,11 +160,19 @@ special-education terminology), see [`glossary-es.md`](./glossary-es.md).
   `web/src/lib/disability-category-label.ts` (`common:disabilityCategory.*`,
   keyed by the IDEA category CODE rather than the stored label text) cover
   `features/children/lib/child-profile-options.ts`'s dropdown values and
-  everywhere `ChildProfile.gradeLevel`/`disabilityCategory` are displayed.
-  `features/sharing/lib/role-label.ts` (`sharing:role.*`) covers the
-  child-access share role (`owner`/`viewer`/`collaborator`) — written as a
-  `switch` over literal keys rather than a dynamic one (see the
-  `LazyNamespaces` gotcha above, since `sharing` is a lazy namespace).
+  everywhere `ChildProfile.gradeLevel`/`disabilityCategory` are displayed —
+  each NORMALIZES the raw stored value first (`normalizeGradeLevel`/
+  `normalizeDisabilityCategory`, the same mapping the child profile form uses
+  to pick a matching `<option>`) before looking up its translation, so a
+  legacy/raw value (`"5"`, `"K"`, `"PK"`, an IDEA code like `"SLD"`, any case)
+  resolves to the same translation its canonical form would, rather than
+  falling through to the untranslated pass-through (phase 2 review).
+  `web/src/lib/invite-status-label.ts` (`common:inviteStatus.status.*`)
+  covers a meeting invite's RSVP status (Pending/Accepted/Declined/
+  Tentative) the same way. `features/sharing/lib/role-label.ts`
+  (`sharing:role.*`) covers the child-access share role (`owner`/`viewer`/
+  `collaborator`) — written as a `switch` over literal keys rather than a
+  dynamic one.
 - **DB-authored content stays English, with a note**: `features/knowledge-base`
   converts page chrome (search, category tabs, the disclaimer) but not an
   article's own `title`/`content`/`tags`/`state` (district/DB content, like
@@ -160,19 +180,53 @@ special-education terminology), see [`glossary-es.md`](./glossary-es.md).
   knowledge-base-articles follow-up, not this phase). Each entry card shows a
   small `knowledge-base:entryCard.availableInEnglish` note when
   `i18n.resolvedLanguage === 'es'`, so a Spanish reader is told plainly
-  rather than left to assume the article itself was translated.
+  rather than left to assume the article itself was translated, and marks
+  the title/content themselves `lang="en"` whenever the UI isn't English
+  (phase 2 review) — same reasoning as `<html lang>` for the page as a
+  whole, so assistive tech knows this one piece of text is a different
+  language than its surroundings.
+- **Generic "loading…"/"something went wrong" text is `common:ui.loading`/
+  `common:ui.genericError`, not a new per-feature key** (phase 2 review):
+  several namespaces had independently drafted their own near-duplicate of
+  each (`home:parentPage.loading`, `children:form.genericError`, …) — now
+  consolidated onto the one pair in `common`. A message that's actually
+  MORE specific than "something went wrong" (e.g. `onboarding:child.
+  genericError`, "An error occurred creating the profile") still gets its
+  own key; only the genuinely generic, feature-agnostic ones are
+  consolidated.
+- **An effect that fetches on mount never has `t` in its dependency array**
+  (phase 2 review: it did in several places — `use-home.ts`, `use-children.ts`,
+  `AcceptLinkPage`, `UpcomingMeetingCard`, `NotificationsPage`,
+  `AdminNotificationFailuresPage` — before this). `t`'s identity changes on
+  every language switch, so including it re-runs the whole fetch just
+  because the user changed languages — wasteful, and racy with whatever
+  else that effect does. Store an error FLAG or CODE in state instead of a
+  pre-translated string (e.g. `{ kind: 'server'; message: string } | { kind:
+  'generic' }` — a server-provided message is already resolved text and
+  shown as-is; the generic case is translated), and translate it at RENDER
+  time, where the current `t` is always the current language. See
+  `src/features/student/components/student-accept-invite-page.tsx` (phase
+  1) for the original of this pattern, or any of the files above for its
+  phase 2 fix. An effect using this pattern typically also wants an `active`
+  (or a ref-backed equivalent) guard so a superseded/unmounted call's
+  response is never applied after the fact.
 
 ## Adding a key
 
 1. Add the English string to `web/src/locales/en/<namespace>.json` (create the
-   namespace file if the feature doesn't have one yet). **Only add it to the
-   `ns` array and `resources` object in `web/src/lib/i18n/index.ts` if
-   `<namespace>` is `common` or `auth`** — the two shell namespaces that must
-   be ready before the app chrome renders. Any other, feature-level
-   namespace stays out of `ns`/`resources`: it's picked up automatically the
-   first time a component calls `useTranslation('<namespace>')`, and listing
-   it in `ns` would make it load eagerly for every page instead of only the
-   pages that use it.
+   namespace file if the feature doesn't have one yet). Never add anything to
+   `web/src/lib/i18n/index.ts`'s `resources` for this — `index.ts` discovers
+   every `en/*.json` file itself (`import.meta.glob(..., { eager: true })`),
+   so a brand-new namespace's English is bundled automatically. **Only add
+   `<namespace>` to `index.ts`'s `ns` array if it's `common` or `auth`** — the
+   two shell namespaces that must be ready, synchronously, before the app
+   chrome renders; every other namespace loads on demand the first time a
+   component calls `useTranslation('<namespace>')` (instantly in English,
+   already bundled; lazily in Spanish).
+   **Do** add one `import type` line for the new namespace to
+   `web/src/lib/i18n/types.d.ts`'s `EnResources` — this is the one place that
+   still needs hand-maintaining per namespace, so its keys get strict `tsc`
+   checking instead of only being caught by the parity test below.
 2. Add the Spanish translation at the same key path in
    `web/src/locales/es/<namespace>.json`, following
    [`glossary-es.md`](./glossary-es.md) (neutral Latin American Spanish,
@@ -180,7 +234,10 @@ special-education terminology), see [`glossary-es.md`](./glossary-es.md).
    `{{placeholders}}` exactly — en and es must use the same placeholder
    names for a key).
 3. Use it with `useTranslation('<namespace>')` and `t('key')` (or
-   `t('otherNamespace:key')` to reach another namespace, e.g. `common:ui.cancel`).
+   `t('otherNamespace:key')` to reach another namespace, e.g. `common:ui.cancel`
+   — pass an array to `useTranslation`, e.g. `useTranslation(['<namespace>',
+   'common'])`, or every OTHER namespace's keys are a `tsc` error from this
+   hook's `t`; see the "Typed keys" gotcha above).
    A mixed-language sentence (English glue text around a translated value,
    or vice versa) is a bug even if every individual piece is translated —
    build it as one interpolated key, with `<Trans>` for any bold/styled
@@ -217,6 +274,9 @@ flat while the remaining phases convert the rest of `src`. Converted so far:
 - `src/features/child-links/**`
 - `src/features/sharing/**`
 - `src/features/knowledge-base/**`
+- `src/features/meetings/components/rsvp-button-group.tsx` (not the rest of
+  `features/meetings` — that's phase 3 — but this one component renders
+  inside the phase-2 "next meeting"/"upcoming meeting" cards)
 
 `src/features/children/components/child-ieps-tab.tsx` and
 `child-etrs-tab.tsx` are explicitly excluded from the `children` ratchet —
@@ -263,18 +323,14 @@ prerequisite for marketing Spanish, not for shipping it.
 - **Resolution order:** `src/lib/i18n/detect.test.ts`.
 - **Key typing canary:** `src/lib/i18n/key-typing.test.tsx` — `tsc`-only
   (`npm run test:types`); a handful of `// @ts-expect-error` lines on known-
-  unknown keys (`i18n.t`, a namespaced `useTranslation().t`, `Trans`'s
-  `i18nKey`) so a future change that loosens the generated key typing to
-  `any` fails the build via "unused `@ts-expect-error`" instead of quietly
-  disabling typo-checking everywhere. `.tsx`, not `.ts` (phase 2): the
-  `Trans` canary needs REAL JSX — `React.createElement(Trans, {...})` lost
-  its per-element generic inference once a lazy, loosely-typed namespace
-  existed (see the `LazyNamespaces` gotcha above), so the bare-`createElement`
-  version of this check went vacuously green. The file also has a
-  non-`@ts-expect-error` line asserting a lazy namespace's arbitrary key
-  (`useTranslation('children')` + `t('anything')`) DOES compile — a future
-  tightening of `LazyNamespaces` that breaks this is caught as an ordinary
-  `tsc` error, not silently.
+  unknown keys (`i18n.t`, a namespaced `useTranslation().t` — including
+  `children`, a feature namespace, since phase 2 review made every namespace
+  strict — and `Trans`'s `i18nKey`) so a future change that loosens the
+  generated key typing to `any` fails the build via "unused
+  `@ts-expect-error`" instead of quietly disabling typo-checking everywhere.
+  `.tsx`, not `.ts`: the `Trans` canary needs REAL JSX —
+  `React.createElement(Trans, {...})` doesn't get the same per-element
+  generic inference JSX syntax does.
 - **Formatting:** `src/lib/format-date.test.ts` (and any other
   locale-sensitive formatter gets its own `en`/`es` cases as it's converted).
 - **Spanish render tests:** one per converted page/component, asserting the
@@ -296,23 +352,27 @@ prerequisite for marketing Spanish, not for shipping it.
   global test setup initializes i18next with English synchronously so none of
   the ~600 existing English queries needed to change. **Pass `ns` to
   `renderInSpanish`** only if a namespace exists outside `locales/es/*.json`
-  (it never does in practice, but the option stays) — it preloads every known
-  feature namespace (`featureNamespaces`, from `lib/i18n/index.ts`) in
-  Spanish before `render`, same reasoning as `test/setup.ts` below.
+  (it never does in practice, but the option stays) — it preloads every
+  namespace (`featureNamespaces`, from `lib/i18n/index.ts` — every namespace
+  now, not just feature-level ones, since Spanish is lazy for `common`/`auth`
+  too) in Spanish before `render`, same reasoning as `test/setup.ts` below.
 - **No raw key leaking through, for every test, automatically:**
   `test/setup.ts` turns on `saveMissing` with a `missingKeyHandler` that
   throws on any genuinely missing translation key — one resolved without a
   *meaningful* `defaultValue` (`opt.defaultValue !== key`) **and** whose
   namespace has actually finished loading for that language
-  (`i18n.hasLoadedNamespace`). That second check matters as of phase 2:
-  every feature-level namespace loads lazily in BOTH languages now (see
-  "Resources" above), so the very first render of a component calling
-  `useTranslation('<namespace>')` in a worker that hasn't loaded it yet would
-  otherwise look exactly like a missing key. `test/setup.ts` sidesteps this
-  for English by preloading every namespace in `featureNamespaces` up front,
-  before any test runs; `renderInSpanish` does the same for Spanish. The
+  (`i18n.hasLoadedNamespace`). English is always already loaded (every
+  `en/*.json` file is bundled eagerly — see "Resources" above), so that
+  second check only ever matters for Spanish: a namespace's Spanish data
+  loads lazily, so the very first render of a component calling
+  `useTranslation('<namespace>')` in a worker that hasn't loaded it yet in
+  Spanish would otherwise look exactly like a missing key. `test/setup.ts`
+  preloads every namespace in `featureNamespaces` in English up front (now
+  effectively a confirmation, not a real load, since English needs no
+  fetch); `renderInSpanish` does the equivalent, real, load for Spanish. The
   `hasLoadedNamespace` guard in `missingKeyHandler` is the backstop for
-  anything that still races it. `orgRoleLabel`'s unrecognized-role fallback
+  anything that still races the Spanish load. `orgRoleLabel`'s
+  unrecognized-role fallback
   (`{ defaultValue: name }`) is exempted the same way as a real "has a
   default" case; a bare `<Trans i18nKey="some.key" />` with no children/
   `defaults`/`tOptions.defaultValue` of its own is NOT — react-i18next

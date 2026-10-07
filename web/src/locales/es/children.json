@@ -8,15 +8,14 @@
     "schoolDistrict": "Distrito escolar"
   },
   "form": {
-    "saving": "Guardando...",
-    "genericError": "Algo salió mal"
+    "saving": "Guardando..."
   },
   "list": {
     "pageTitle": "Sus hijos",
     "addChild": "Agregar hijo",
     "emptyTitle": "Aún no hay perfiles de hijos.",
     "addFirstChild": "Agregue a su primer hijo",
-    "gradePrefix": "Grado: {{grade}}",
+    "gradePrefix": "{{grade}}",
     "addChildDrawerTitle": "Agregar hijo",
     "createProfile": "Crear perfil",
     "toastCreated": "Perfil del hijo agregado",
@@ -51,7 +50,7 @@
     "profileHeading": "Perfil",
     "sharingHeading": "Acceso compartido",
     "inviteSomeone": "Invitar a alguien",
-    "shareDescription": "Comparta la información del IEP de {{name}} con otro padre o madre, un asesor o un abogado. Esa persona tendrá su propio inicio de sesión y podrá ver o colaborar según el rol que usted le asigne.",
+    "shareDescription": "Comparta la información del IEP de {{name}} con otro padre o madre, un defensor o un abogado. Esa persona tendrá su propio inicio de sesión y podrá ver o colaborar según el rol que usted le asigne.",
     "shareModalTitle": "Invitar a alguien al perfil de {{name}}",
     "studentAccountHeading": "Cuenta del estudiante",
     "inviteStudentDescription": "Invite a {{name}} a activar su propia cuenta y participar en su proceso de IEP.",
@@ -59,7 +58,7 @@
     "inviteStudentError": "Ocurrió un error al enviar la invitación"
   },
   "goals": {
-    "heading": "Sus metas de defensa"
+    "heading": "Sus metas para el IEP"
   },
   "dashboard": {
     "heading": "Mis hijos",
@@ -68,7 +67,7 @@
     "emptyTitle": "Aún no hay perfiles de hijos",
     "addFirstChild": "Agregue el perfil de su primer hijo",
     "add": "Agregar",
-    "gradePrefix": "Grado: {{grade}}",
+    "gradePrefix": "{{grade}}",
     "viewAll": "Ver todos ({{count}})"
   },
   "upcomingMeeting": {

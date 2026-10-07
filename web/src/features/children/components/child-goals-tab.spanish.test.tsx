@@ -29,6 +29,6 @@ describe("ChildGoalsTab in Spanish", () => {
       { ns: "children" }
     );
 
-    expect(screen.getByRole("heading", { name: "Sus metas de defensa" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sus metas para el IEP" })).toBeInTheDocument();
   });
 });

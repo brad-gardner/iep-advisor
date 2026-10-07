@@ -22,7 +22,7 @@ function sortChildren(children: ChildProfile[]): ChildProfile[] {
 }
 
 export function DashboardChildrenSection() {
-  const { t } = useTranslation("children");
+  const { t } = useTranslation(["children", "common"]);
   const { children, isLoading, error, reload } = useChildren();
 
   if (isLoading) {

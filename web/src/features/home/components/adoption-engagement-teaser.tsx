@@ -16,7 +16,7 @@ const BOARD_LINK = '/educator/admin/compliance';
  * never blocks the rest of the home.
  */
 export function AdoptionEngagementTeaser() {
-  const { t } = useTranslation('home');
+  const { t } = useTranslation(['home', 'common']);
   const { adoption, engagement, adoptionError, engagementError, isLoading, error, retry } =
     useAdoptionEngagement(null);
 

@@ -6,9 +6,17 @@ import { StatTile } from './stat-tile';
 import { rosterAttentionHref } from '../lib/roster-links';
 import type { RosterAttentionDto } from '../types';
 
+type RosterAttentionLabelKey =
+  | 'rosterAttention.overdueAnnual'
+  | 'rosterAttention.overdueReeval'
+  | 'rosterAttention.due30'
+  | 'rosterAttention.unknownDates'
+  | 'rosterAttention.noLead'
+  | 'rosterAttention.noFamily';
+
 const TILES: {
   key: keyof RosterAttentionDto;
-  labelKey: string;
+  labelKey: RosterAttentionLabelKey;
   attention: AttentionFilter;
   tone?: 'warning' | 'danger';
 }[] = [

@@ -17,8 +17,14 @@ import { listNotifications, markAllNotificationsRead, markNotificationRead } fro
 import { useNotificationsContext } from '../hooks/use-notifications-context';
 import type { NotificationDto } from '../types';
 
+// A server-provided message is already resolved text and shown as-is; the
+// generic fallback is translated at RENDER time (see `error` below) rather
+// than load time, so a language switch after a failed load shows the new
+// language immediately, with no refetch (phase 2 review).
+type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
+
 export function NotificationsPage() {
-  const { t } = useTranslation('notifications');
+  const { t } = useTranslation(['notifications', 'common']);
   usePageTitle(t('notificationsPage.pageTitle'));
   const { show: showToast } = useToast();
   // The sidebar bell shares this same count (see `NotificationsProvider`) —
@@ -27,7 +33,7 @@ export function NotificationsPage() {
   // 60s poll tick.
   const { refresh: refreshUnreadCount } = useNotificationsContext();
   const [items, setItems] = useState<NotificationDto[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
   // Bumped by the "Try again" button to re-run the load effect below.
   const [retryToken, setRetryToken] = useState(0);
@@ -40,18 +46,27 @@ export function NotificationsPage() {
         if (!active) return;
         if (response.success && response.data) {
           setItems(response.data.items);
-          setError(null);
+          setLoadError(null);
         } else {
-          setError(response.message ?? t('notificationsPage.loadFailed'));
+          setLoadError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, t('notificationsPage.loadFailed')));
+        if (!active) return;
+        const serverMessage = apiErrorMessage(err, '');
+        setLoadError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
       }
     })();
     return () => {
       active = false;
     };
-  }, [retryToken, t]);
+    // `t` deliberately excluded — see the `LoadError` comment above.
+  }, [retryToken]);
+
+  const error = loadError
+    ? loadError.kind === 'server'
+      ? loadError.message
+      : t('notificationsPage.loadFailed')
+    : null;
 
   const handleMarkRead = async (notification: NotificationDto) => {
     if (notification.readAt) return;

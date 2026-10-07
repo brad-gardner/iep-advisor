@@ -145,8 +145,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loadUser = useCallback(async () => {
-    const token = getToken();
-    if (!token) {
+    // Captured before the `/me` request starts: if `logout()` runs while it
+    // is in flight, the token is gone by the time the response lands, and
+    // this stale response must never resurrect a signed-in-looking user with
+    // no token (todos/247) by writing `setUser`/`setStoredUser` after the
+    // fact. Checked again below, after the `await`, alongside the existing
+    // `languageGenerationRef` check (which guards the LANGUAGE side of the
+    // same race; this guards the USER/session side).
+    const tokenAtStart = getToken();
+    if (!tokenAtStart) {
       setIsLoading(false);
       return;
     }
@@ -168,6 +175,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // while this is in flight is never overwritten by its stale response.
       const generation = languageGenerationRef.current;
       const response = await getCurrentUser();
+      if (getToken() !== tokenAtStart) {
+        // Signed out (or a different session started) while this request
+        // was in flight — `logout()` already cleared the user and token;
+        // applying this response now would undo that.
+        return;
+      }
       if (response.success && response.data) {
         setUser(response.data);
         setStoredUser(JSON.stringify(response.data));
@@ -177,6 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
       }
     } catch {
+      if (getToken() !== tokenAtStart) return;
       removeToken();
       setUser(null);
     } finally {
@@ -321,8 +335,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // stale, re-decide the language out from under a switch the user made
     // while it was in flight.
     const generation = languageGenerationRef.current;
+    // Same session-side guard as `loadUser`: if `logout()` runs before this
+    // resolves, the token is gone and this response must not resurrect a
+    // signed-in-looking user with no token (todos/247).
+    const tokenAtStart = getToken();
     try {
       const response = await getCurrentUser();
+      if (getToken() !== tokenAtStart) return;
       if (response.success && response.data) {
         setUser(response.data);
         setStoredUser(JSON.stringify(response.data));
@@ -348,6 +367,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // ever being mistaken for the next signed-in account's own preference on
     // a shared device.
     setLastDisplayLanguage(isSupportedLanguage(i18n.language) ? i18n.language : DEFAULT_LANGUAGE);
+    // Defensive hygiene, not a normal write path (signing in already clears
+    // this — see `persistSession` — and `useLanguageQueryParam` no longer
+    // writes it while signed in): makes sure this account's departing
+    // session never leaves a pre-login value behind for the NEXT, possibly
+    // anonymous, visitor on a shared device to be backfilled with.
+    clearPreLoginLanguage();
     removeToken();
     setUser(null);
     setMfaPendingToken(null);
@@ -355,6 +380,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const setLanguage = async (language: SupportedLanguage) => {
     const generation = ++languageGenerationRef.current;
+    // Captured before anything async below, same reasoning as `loadUser`/
+    // `refreshUser`: if `logout()` runs while the PUT further down is in
+    // flight, the token is gone by the time its response lands, and that
+    // response must never resurrect a signed-in-looking user with no token
+    // (todos/247).
+    const tokenAtStart = getToken();
     await i18n.changeLanguage(language);
 
     if (languageGenerationRef.current !== generation) {
@@ -397,28 +428,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // it can't overwrite a newer switch's state.
         return { success: true };
       }
+      if (getToken() !== tokenAtStart) {
+        // Superseded by sign-out instead: `logout()` doesn't bump
+        // `generation`, so the check above alone wouldn't catch this — a
+        // slow response arriving after sign-out must never resurrect a
+        // signed-in-looking user with no token (todos/247).
+        return { success: true };
+      }
       if (response.success && response.data) {
-        // Narrowed into its own `const` so the closure below keeps the
-        // non-undefined type — TS doesn't carry a property-access narrowing
-        // (`response.data`) through a nested function the way it does a
-        // plain variable.
-        const data = response.data;
-        // Functional form, not a bare `setUser(data)`: if `logout()` ran
-        // while this PUT was in flight, `user` is already `null` and must
-        // stay that way — a slow response arriving after sign-out must never
-        // resurrect a signed-in-looking user with no token (todos/247). The
-        // generation check above already covers "superseded by a newer
-        // language switch"; this covers "superseded by sign-out" too, since
-        // logout doesn't change what `generation` captured at the top of this
-        // function. The updater runs synchronously, so `wasSignedIn` is
-        // correct by the time `setUser` returns — gating the `setStoredUser`
-        // write below on the *current* state, not the stale `user` closure.
-        let wasSignedIn = false;
-        setUser((prev) => {
-          if (prev) wasSignedIn = true;
-          return prev ? data : prev;
-        });
-        if (wasSignedIn) setStoredUser(JSON.stringify(data));
+        setUser(response.data);
+        setStoredUser(JSON.stringify(response.data));
         return { success: true };
       }
       return { success: false, error: response.message || t('context.updateFailed') };

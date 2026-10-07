@@ -319,6 +319,19 @@ export function SectionCard({
       const raf = requestAnimationFrame(() => {
         const body = fieldsBodyRef.current;
         if (!body) return;
+        // The gap between scheduling this and the next frame is enough for a
+        // fast user (or another effect) to have already focused one of this
+        // section's own editable fields — don't yank focus away from it back
+        // to "the first field" just because that's what this effect was
+        // originally going to do.
+        const activeElement = document.activeElement;
+        if (
+          activeElement instanceof HTMLElement &&
+          body.contains(activeElement) &&
+          activeElement.matches('input,textarea,select,[contenteditable="true"]')
+        ) {
+          return;
+        }
         // Two-step, not one combined selector: a RichText field's toolbar
         // renders its (focusable) formatting buttons BEFORE the contenteditable
         // in DOM order, so a single comma-separated query that includes

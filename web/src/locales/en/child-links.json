@@ -15,8 +15,7 @@
     "goToDashboard": "Go to Dashboard",
     "noToken": "No link token provided.",
     "acceptFailed": "Failed to accept this link.",
-    "acceptError": "An error occurred while accepting this link.",
-    "genericError": "Something went wrong"
+    "acceptError": "An error occurred while accepting this link."
   },
   "choice": {
     "legend": "How should we link this student?",

@@ -100,6 +100,11 @@ This follows the approved design (`docs/designs/2026-10-06-multilingual-english-
 - Each generated AI artifact gets a `Language` column (`AnalysisRun`, meeting-prep, meeting summary/brief, advocate thread, draft explanation/questions, progress-report analysis) via migration.
 - PDF services take a `CultureInfo`, and blob and cache keys include the language.
 
+### Decisions added during implementation
+
+- **English is fully bundled (Phase 2 review).** Lazy English namespaces showed raw keys before load and got stuck on them when a chunk failed. All `en/*.json` files are now eager, and only Spanish is lazy. Watch the main-chunk gzip each phase against the 15% budget (≤418 kB). If it gets close, split English by route and preload, rather than going back to render-time loading.
+- **`ServiceErrorKind` is a prerequisite for translating server messages (Phase 2 review).** About 30 controllers chose 403/404/409/503 by matching English words in `ServiceResult.Message`, and translating the messages silently turned those into 400. Before any phase translates a service, that service must set `ErrorKind` on every failure its controller maps to a status, and the controller must use the shared mapper. Never match on translated text.
+
 ### Implementation Phases
 
 Each phase converts its pages and is done when:

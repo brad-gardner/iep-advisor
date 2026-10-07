@@ -12,14 +12,25 @@ import { usePageTitle } from '@/hooks/use-page-title';
 
 type Status = 'loading' | 'ready' | 'submitting' | 'success' | 'error';
 
+// A server-provided message is already resolved text and shown as-is;
+// `invalidLink`/`loadError` name a namespace key, translated at RENDER time
+// (see `errorMessage` below) rather than load time, so a language switch
+// after a failed load shows the new language immediately with no refetch
+// (phase 2 review).
+type LoadError = { kind: 'server'; message: string } | { kind: 'invalidLink' } | { kind: 'loadError' };
+
 export function AcceptLinkPage() {
-  const { t } = useTranslation('child-links');
+  const { t } = useTranslation(['child-links', 'common']);
   usePageTitle(t('acceptLink.pageTitle'));
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
 
   const [status, setStatus] = useState<Status>('loading');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
+  // Set by `handleAccept`, an event handler (not an effect) — translated
+  // immediately with whatever `t` is current at submit time, so it's never
+  // subject to the same staleness concern as the load effect's error below.
+  const [acceptErrorMessage, setAcceptErrorMessage] = useState<string | null>(null);
   const [preview, setPreview] = useState<ChildLinkInvitePreview | null>(null);
   const [accepted, setAccepted] = useState<AcceptedChildLink | null>(null);
   const [choice, setChoice] = useState<string>(CREATE_NEW);
@@ -37,12 +48,12 @@ export function AcceptLinkPage() {
           setStatus('ready');
         } else {
           setStatus('error');
-          setErrorMessage(response.message || t('acceptLink.invalidLink'));
+          setLoadError(response.message ? { kind: 'server', message: response.message } : { kind: 'invalidLink' });
         }
       } catch {
         if (active) {
           setStatus('error');
-          setErrorMessage(t('acceptLink.loadError'));
+          setLoadError({ kind: 'loadError' });
         }
       }
     }
@@ -51,7 +62,14 @@ export function AcceptLinkPage() {
     return () => {
       active = false;
     };
-  }, [token, t]);
+    // `t` deliberately excluded — see the `LoadError` comment above.
+  }, [token]);
+
+  const errorMessage = loadError
+    ? loadError.kind === 'server'
+      ? loadError.message
+      : t(`acceptLink.${loadError.kind}`)
+    : acceptErrorMessage;
 
   // Missing token is derived at render time (no setState-in-effect needed).
   const isMissingToken = !token;
@@ -59,7 +77,7 @@ export function AcceptLinkPage() {
   const handleAccept = async () => {
     if (!token) return;
     setStatus('submitting');
-    setErrorMessage(null);
+    setAcceptErrorMessage(null);
 
     const linkToChildProfileId = choice === CREATE_NEW ? undefined : Number(choice);
 
@@ -70,11 +88,11 @@ export function AcceptLinkPage() {
         setStatus('success');
       } else {
         setStatus('error');
-        setErrorMessage(response.message || t('acceptLink.acceptFailed'));
+        setAcceptErrorMessage(response.message || t('acceptLink.acceptFailed'));
       }
     } catch {
       setStatus('error');
-      setErrorMessage(t('acceptLink.acceptError'));
+      setAcceptErrorMessage(t('acceptLink.acceptError'));
     }
   };
 
@@ -165,7 +183,7 @@ export function AcceptLinkPage() {
               title={
                 isMissingToken
                   ? t('acceptLink.noToken')
-                  : errorMessage || t('acceptLink.genericError')
+                  : errorMessage || t('common:ui.genericError')
               }
             />
             <Link to="/dashboard">

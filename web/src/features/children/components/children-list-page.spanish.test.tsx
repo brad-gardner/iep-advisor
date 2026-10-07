@@ -54,7 +54,7 @@ describe("ChildrenListPage in Spanish", () => {
     });
     await renderPage();
 
-    expect(screen.getByText("Grado: 3.er grado")).toBeInTheDocument();
+    expect(screen.getByText("3.er grado")).toBeInTheDocument();
     expect(screen.getByText("Autismo")).toBeInTheDocument();
   });
 });
