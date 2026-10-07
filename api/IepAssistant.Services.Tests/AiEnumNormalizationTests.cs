@@ -128,18 +128,34 @@ public class AiEnumNormalizationTests
     [Theory]
     [InlineData("met", "met")]
     [InlineData("cumplido", "met")]
+    [InlineData("alcanzado", "met")]
+    [InlineData("alcanzada", "met")]
+    [InlineData("logrado", "met")]
     [InlineData("on_track", "on_track")]
     [InlineData("encaminado", "on_track")]
+    [InlineData("progresando", "on_track")]
+    [InlineData("en_curso", "on_track")]
+    [InlineData("en_progreso", "on_track")]
+    [InlineData("concerning", "concerning")]
+    [InlineData("no_cumplido", "concerning")]
+    [InlineData("no_cumplida", "concerning")]
+    [InlineData("estancado", "concerning")]
+    [InlineData("estancada", "concerning")]
     [InlineData("regressing", "regressing")]
     [InlineData("retrocediendo", "regressing")]
+    [InlineData("retroceso", "regressing")]
     [InlineData("insufficient_data", "insufficient_data")]
     [InlineData("datos_insuficientes", "insufficient_data")]
+    [InlineData("insuficiente", "insufficient_data")]
     public void NormalizeProgressRating_KnownValues_MapToCanonicalEnglish(string input, string expected) =>
         Assert.Equal(expected, AiEnumNormalization.NormalizeProgressRating(input));
 
-    [Fact]
-    public void NormalizeProgressRating_Unknown_FallsBackToRegressing() =>
-        Assert.Equal("regressing", AiEnumNormalization.NormalizeProgressRating("estancado"));
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("desconocido")]
+    public void NormalizeProgressRating_UnknownOrMissing_FallsBackToConcerning(string? input) =>
+        Assert.Equal("concerning", AiEnumNormalization.NormalizeProgressRating(input));
 
     // --- evidence quality ---
 
@@ -165,6 +181,9 @@ public class AiEnumNormalizationTests
     [InlineData("texto_generico", "boilerplate")]
     [InlineData("other", "other")]
     [InlineData("otro", "other")]
+    [InlineData("otros", "other")]
+    [InlineData("otras", "other")]
+    [InlineData("datos_insuficientes", "missing_data")]
     public void NormalizeRedFlagCategory_KnownValues_MapToCanonicalEnglish(string input, string expected) =>
         Assert.Equal(expected, AiEnumNormalization.NormalizeRedFlagCategory(input));
 
@@ -283,5 +302,112 @@ public class AiEnumNormalizationTests
         Assert.Equal("high", response.RedFlags[0].Severity);
         Assert.Equal("compliance", response.RedFlags[0].Category);
         Assert.Equal("not_addressed", response.AdvocacyGapAnalysis!.GoalAlignments[0].AlignmentStatus);
+    }
+
+    // --- null robustness: an explicit JSON `null` for an object field or inside an array must not throw ---
+
+    [Fact]
+    public void AnalysisRunService_SourceAnalysisResponse_NullSmartAnalysisAndNullArrayElements_DoesNotThrow()
+    {
+        const string json = """
+        {
+          "overallSummary": "Summary.",
+          "sections": [
+            {
+              "sectionKind": "present_levels",
+              "plainLanguageSummary": "Explanation.",
+              "keyPoints": [],
+              "redFlags": [
+                null,
+                { "severity": "red", "title": "Concern", "description": "Detail." }
+              ],
+              "legalReferences": []
+            }
+          ],
+          "goalAnalyses": [
+            {
+              "goalId": 1,
+              "goalText": "Goal text",
+              "smartAnalysis": null,
+              "overallRating": "green",
+              "plainLanguageSummary": "..."
+            }
+          ],
+          "overallRedFlags": [
+            null,
+            { "severity": "yellow", "title": "General", "description": "Detail." }
+          ],
+          "advocacyGapAnalysis": {
+            "summary": "...",
+            "goalAlignments": [
+              null,
+              { "parentGoalText": "Goal", "alignmentStatus": "addressed", "explanation": "..." }
+            ]
+          }
+        }
+        """;
+
+        var response = JsonSerializer.Deserialize<SourceAnalysisResponse>(json, CaseInsensitive);
+        Assert.NotNull(response);
+
+        var ex = Record.Exception(() => AnalysisRunService.NormalizeNulls(response!));
+        Assert.Null(ex);
+
+        Assert.Single(response!.Sections[0].RedFlags);
+        Assert.Equal("red", response.Sections[0].RedFlags[0].Severity);
+
+        Assert.Single(response.OverallRedFlags);
+        Assert.Equal("yellow", response.OverallRedFlags[0].Severity);
+
+        var goal = response.GoalAnalyses[0];
+        Assert.NotNull(goal.SmartAnalysis);
+        Assert.NotNull(goal.SmartAnalysis.Specific);
+        Assert.NotNull(goal.SmartAnalysis.Measurable);
+        Assert.NotNull(goal.SmartAnalysis.Achievable);
+        Assert.NotNull(goal.SmartAnalysis.Relevant);
+        Assert.NotNull(goal.SmartAnalysis.TimeBound);
+
+        Assert.Single(response.AdvocacyGapAnalysis!.GoalAlignments);
+        Assert.Equal("addressed", response.AdvocacyGapAnalysis.GoalAlignments[0].AlignmentStatus);
+    }
+
+    [Fact]
+    public void ProgressReportAnalysisService_Response_NullArrayElements_DoesNotThrow()
+    {
+        const string json = """
+        {
+          "summary": "Summary.",
+          "goalProgressFindings": [
+            null,
+            { "iepGoalText": "Goal", "reportedProgress": "...", "progressRating": "met", "evidenceQuality": "strong" }
+          ],
+          "redFlags": [
+            null,
+            { "severity": "high", "category": "compliance", "finding": "...", "whyItMatters": "..." }
+          ],
+          "advocacyGapAnalysis": {
+            "summary": "...",
+            "goalAlignments": [
+              null,
+              { "parentGoalText": "Goal", "alignmentStatus": "not_addressed", "explanation": "..." }
+            ]
+          }
+        }
+        """;
+
+        var response = JsonSerializer.Deserialize<ProgressReportAnalysisResponse>(json, CaseInsensitive);
+        Assert.NotNull(response);
+
+        var ex = Record.Exception(() => ProgressReportAnalysisService.NormalizeEnums(response!));
+        Assert.Null(ex);
+
+        Assert.Single(response!.GoalProgressFindings);
+        Assert.Equal("met", response.GoalProgressFindings[0].ProgressRating);
+
+        Assert.Single(response.RedFlags);
+        Assert.Equal("high", response.RedFlags[0].Severity);
+
+        Assert.Single(response.AdvocacyGapAnalysis!.GoalAlignments);
+        Assert.Equal("not_addressed", response.AdvocacyGapAnalysis.GoalAlignments[0].AlignmentStatus);
     }
 }

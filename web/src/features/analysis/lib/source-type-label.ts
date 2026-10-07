@@ -1,8 +1,9 @@
 import i18n from '@/lib/i18n';
 
 /**
- * Translated label for a bare analysis source type (`"IEP"`, `"ETR"`,
- * `"Progress report"`) — via `analysis:sourceLabel.sourceType.*`. Used as
+ * Translated label for a bare analysis source type (`IepDocument`,
+ * `EtrDocument`, `ProgressReport` → "IEP", "ETR", "Progress report") — via
+ * `analysis:sourceLabel.sourceType.*`. Used as
  * the `"<type> #<id>"` fallback by `RunSourceSections` (this feature) and
  * by `otherSourceLabel` in `iep-documents`'/`etr-documents`' own analysis
  * tabs, for a source whose own record the server couldn't resolve (so

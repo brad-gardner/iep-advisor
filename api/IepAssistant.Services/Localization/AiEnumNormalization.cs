@@ -121,19 +121,29 @@ public static class AiEnumNormalization
     public static string NormalizeHighMediumLowSeverity(string? value) => Resolve(value, HighMediumLowSeverityMap, "high");
 
     // --- met/on_track/concerning/regressing/insufficient_data progress rating (GoalProgressFinding.
-    // ProgressRating — ProgressReportAnalysisService) — more severe: regressing ---
+    // ProgressRating — ProgressReportAnalysisService) — fallback: concerning. NOT the general
+    // "more severe wins" rule: "regressing" is a specific, stronger claim (performance has actively
+    // declined) than an unrecognized token warrants, and asserting a child is getting worse on no good
+    // basis is its own harm. "concerning" flags the finding for the parent's attention without making
+    // that unsupported claim. ---
     private static readonly Dictionary<string, string> ProgressRatingMap = new()
     {
         ["met"] = "met", ["cumplido"] = "met", ["cumplida"] = "met", ["logrado"] = "met", ["lograda"] = "met",
+        ["alcanzado"] = "met", ["alcanzada"] = "met",
         ["on_track"] = "on_track", ["en_progreso"] = "on_track", ["en_camino"] = "on_track",
         ["encaminado"] = "on_track", ["encaminada"] = "on_track",
+        ["progresando"] = "on_track", ["en_curso"] = "on_track",
         ["concerning"] = "concerning", ["preocupante"] = "concerning",
+        ["no_cumplido"] = "concerning", ["no_cumplida"] = "concerning",
+        ["estancado"] = "concerning", ["estancada"] = "concerning",
         ["regressing"] = "regressing", ["retrocediendo"] = "regressing", ["en_retroceso"] = "regressing",
+        ["retroceso"] = "regressing",
         ["insufficient_data"] = "insufficient_data",
         ["datos_insuficientes"] = "insufficient_data", ["informacion_insuficiente"] = "insufficient_data",
+        ["insuficiente"] = "insufficient_data",
     };
 
-    public static string NormalizeProgressRating(string? value) => Resolve(value, ProgressRatingMap, "regressing");
+    public static string NormalizeProgressRating(string? value) => Resolve(value, ProgressRatingMap, "concerning");
 
     // --- strong/adequate/weak evidence quality (GoalProgressFinding.EvidenceQuality —
     // ProgressReportAnalysisService) — more severe: weak ---
@@ -153,12 +163,23 @@ public static class AiEnumNormalization
     private static readonly Dictionary<string, string> RedFlagCategoryMap = new()
     {
         ["missing_data"] = "missing_data", ["datos_faltantes"] = "missing_data", ["falta_de_datos"] = "missing_data",
+        ["datos_insuficientes"] = "missing_data",
         ["boilerplate"] = "boilerplate", ["texto_generico"] = "boilerplate", ["lenguaje_generico"] = "boilerplate",
         ["regression"] = "regression", ["retroceso"] = "regression", ["regresion"] = "regression",
         ["insufficient_evidence"] = "insufficient_evidence", ["evidencia_insuficiente"] = "insufficient_evidence",
         ["compliance"] = "compliance", ["cumplimiento"] = "compliance", ["procedimental"] = "compliance",
-        ["other"] = "other", ["otro"] = "other", ["otra"] = "other",
+        ["other"] = "other", ["otro"] = "other", ["otra"] = "other", ["otros"] = "other", ["otras"] = "other",
     };
 
     public static string NormalizeRedFlagCategory(string? value) => Resolve(value, RedFlagCategoryMap, "compliance");
+
+    /// <summary>Drops explicit JSON <c>null</c> elements from a model-returned array before the caller's
+    /// normalization pass iterates it unconditionally. A Claude response can include <c>null</c> entries
+    /// in an array whose element type is otherwise non-nullable (e.g. <c>"redFlags": [null, {...}]</c>):
+    /// JSON deserialization honors exactly what was sent and does not filter those out, so an
+    /// unconditional foreach immediately after parsing would throw. Called by every
+    /// <c>NormalizeNulls</c>/<c>NormalizeEnums</c> pass (<c>AnalysisRunService</c>,
+    /// <c>ProgressReportAnalysisService</c>) before it touches a model-returned list's contents.</summary>
+    public static List<T> RemoveNullElements<T>(List<T>? list) where T : class =>
+        list == null ? [] : list.Where(item => item != null).ToList();
 }

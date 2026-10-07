@@ -1457,7 +1457,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
         foreach (var goal in response.GoalAnalyses)
             NormalizeNulls(goal);
 
-        response.OverallRedFlags ??= [];
+        response.OverallRedFlags = AiEnumNormalization.RemoveNullElements(response.OverallRedFlags);
         foreach (var flag in response.OverallRedFlags)
             NormalizeSeverity(flag);
 
@@ -1473,7 +1473,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
 
     internal static void NormalizeNulls(AnalysisRunSynthesisResponse response)
     {
-        response.OverallRedFlags ??= [];
+        response.OverallRedFlags = AiEnumNormalization.RemoveNullElements(response.OverallRedFlags);
         foreach (var flag in response.OverallRedFlags)
             NormalizeSeverity(flag);
 
@@ -1490,7 +1490,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
     private static void NormalizeNulls(AnalysisRunSectionResult section)
     {
         section.KeyPoints ??= [];
-        section.RedFlags ??= [];
+        section.RedFlags = AiEnumNormalization.RemoveNullElements(section.RedFlags);
         foreach (var flag in section.RedFlags)
             NormalizeSeverity(flag);
         section.LegalReferences ??= [];
@@ -1509,6 +1509,17 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
         goal.SuggestedImprovements ??= [];
 
         goal.OverallRating = AiEnumNormalization.NormalizeGreenYellowRedRating(goal.OverallRating);
+
+        // An explicit "smartAnalysis": null (or a null sub-criterion within it) overwrites the
+        // property's own `= new()` default — JSON deserialization sets exactly what the model sent, it
+        // does not fall back to a type's default initializer for an explicit null.
+        goal.SmartAnalysis ??= new();
+        goal.SmartAnalysis.Specific ??= new();
+        goal.SmartAnalysis.Measurable ??= new();
+        goal.SmartAnalysis.Achievable ??= new();
+        goal.SmartAnalysis.Relevant ??= new();
+        goal.SmartAnalysis.TimeBound ??= new();
+
         NormalizeRating(goal.SmartAnalysis.Specific);
         NormalizeRating(goal.SmartAnalysis.Measurable);
         NormalizeRating(goal.SmartAnalysis.Achievable);
@@ -1541,7 +1552,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
 
     private static void NormalizeNulls(AdvocacyGapAnalysisResponse gap)
     {
-        gap.GoalAlignments ??= [];
+        gap.GoalAlignments = AiEnumNormalization.RemoveNullElements(gap.GoalAlignments);
         foreach (var alignment in gap.GoalAlignments)
         {
             alignment.AlignedIepGoals ??= [];

@@ -304,14 +304,17 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
     // see AiEnumNormalization's doc comment for the "unknown -> more severe/conservative" fallback rule.
     internal static void NormalizeEnums(ProgressReportAnalysisResponse response)
     {
-        response.GoalProgressFindings ??= [];
+        // RemoveNullElements drops any explicit JSON `null` array entries before the loops below
+        // dereference every element unconditionally — see its doc comment for why deserialization can
+        // produce those despite each element type being non-nullable.
+        response.GoalProgressFindings = AiEnumNormalization.RemoveNullElements(response.GoalProgressFindings);
         foreach (var finding in response.GoalProgressFindings)
         {
             finding.ProgressRating = AiEnumNormalization.NormalizeProgressRating(finding.ProgressRating);
             finding.EvidenceQuality = AiEnumNormalization.NormalizeEvidenceQuality(finding.EvidenceQuality);
         }
 
-        response.RedFlags ??= [];
+        response.RedFlags = AiEnumNormalization.RemoveNullElements(response.RedFlags);
         foreach (var flag in response.RedFlags)
         {
             flag.Severity = AiEnumNormalization.NormalizeHighMediumLowSeverity(flag.Severity);
@@ -320,7 +323,8 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
 
         if (response.AdvocacyGapAnalysis != null)
         {
-            response.AdvocacyGapAnalysis.GoalAlignments ??= [];
+            response.AdvocacyGapAnalysis.GoalAlignments =
+                AiEnumNormalization.RemoveNullElements(response.AdvocacyGapAnalysis.GoalAlignments);
             foreach (var alignment in response.AdvocacyGapAnalysis.GoalAlignments)
                 alignment.AlignmentStatus = AiEnumNormalization.NormalizeAlignmentStatus(alignment.AlignmentStatus);
         }

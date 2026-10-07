@@ -69,7 +69,11 @@ public class MeetingSummaryService : IMeetingSummaryService
         var resolvedResponses = await LoadResolvedResponsesAsync(meeting.SchoolStudentId, ct);
 
         var userText = new StringBuilder();
-        userText.AppendLine($"Meeting: {meeting.Title} ({meeting.Type}), held {meeting.StartsAtUtc:MMMM d, yyyy}, for {meeting.StudentFirstName}.");
+        // ISO date, not a culture-formatted month name: this text becomes part of the Claude prompt, and
+        // CultureScope below deliberately leaves CurrentCulture alone (see its doc comment) — an
+        // "MMMM d, yyyy"-style format here would always render in whatever culture is ambient on this
+        // thread (English), which a Spanish-drafted summary could then echo back verbatim.
+        userText.AppendLine($"Meeting: {meeting.Title} ({meeting.Type}), held {meeting.StartsAtUtc:yyyy-MM-dd}, for {meeting.StudentFirstName}.");
         userText.AppendLine();
         if (source != null)
         {
