@@ -18,7 +18,7 @@ public sealed class DigestServiceTests : IDisposable
     private static readonly IConfiguration EmptyConfig = new ConfigurationBuilder().Build();
 
     private DigestService CreateService(ApplicationDbContext ctx, IEmailService email)
-        => new(ctx, new ObligationService(ctx, new OrgAccessService(ctx)), email, EmptyConfig, NullLogger<DigestService>.Instance);
+        => new(ctx, new ObligationService(ctx, new OrgAccessService(ctx)), email, EmptyConfig, NullLogger<DigestService>.Instance, TestSupport.TestLocalizers.Notifications());
 
     [Fact]
     public async Task RunForDateAsync_IncludesDueSoonOverdueAndMeetingsInNext7Days()
@@ -62,6 +62,8 @@ public sealed class DigestServiceTests : IDisposable
         var notification = await assertCtx.Set<Notification>().SingleAsync(n => n.UserId == leadUserId && n.Kind == NotificationKind.ObligationDigest);
         Assert.NotNull(notification.EmailSentAt);
         Assert.Null(notification.EmailError);
+        // Phase 4 review fix: real plural forms (2 deadlines, 1 meeting) instead of the "(s)" shortcut.
+        Assert.Equal("2 deadlines due soon or overdue, 1 meeting in the next 7 days.", notification.Body);
     }
 
     [Fact]
@@ -201,6 +203,74 @@ public sealed class DigestServiceTests : IDisposable
         Assert.DoesNotContain(adminDigest.Obligations, o => o.StudentName == "Other School");
     }
 
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 4: the bell notification (the digest email itself is covered by EmailService tests) follows each staff
+    // member's own PreferredLanguage, resolved from the same already-batched user-info query.
+
+    [Fact]
+    public async Task RunForDateAsync_PerRecipientLanguage_NotificationBellTextFollowsEachStaffMembersLanguage()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var enStudentId = _db.Student(schoolId, "English", "Student");
+        var esStudentId = _db.Student(schoolId, "Spanish", "Student");
+        var (enUserId, _) = _db.Staff("digest-en@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var (esUserId, _) = _db.Staff("digest-es@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.TeamMember(enStudentId, enUserId, TeamRole.CaseManager, isLead: true);
+        _db.TeamMember(esStudentId, esUserId, TeamRole.CaseManager, isLead: true);
+
+        using (var ctx = _db.Context())
+        {
+            ctx.SchoolStudents.Single(s => s.Id == enStudentId).AnnualReviewDueDate = DateTime.UtcNow.Date.AddDays(-1);
+            ctx.SchoolStudents.Single(s => s.Id == esStudentId).AnnualReviewDueDate = DateTime.UtcNow.Date.AddDays(-1);
+            ctx.Users.Single(u => u.Id == esUserId).PreferredLanguage = "es";
+            ctx.SaveChanges();
+        }
+
+        var email = new CapturingDigestEmailService();
+        using var ctx2 = _db.Context();
+        await CreateService(ctx2, email).RunForDateAsync(DateOnly.FromDateTime(DateTime.UtcNow));
+
+        using var assertCtx = _db.Context();
+        var enNotification = await assertCtx.Set<Notification>().SingleAsync(n => n.UserId == enUserId && n.Kind == NotificationKind.ObligationDigest);
+        var esNotification = await assertCtx.Set<Notification>().SingleAsync(n => n.UserId == esUserId && n.Kind == NotificationKind.ObligationDigest);
+
+        Assert.Equal("Your daily IEP Advisor digest", enNotification.Title);
+        Assert.Equal("Su resumen diario de IEP Advisor", esNotification.Title);
+        // Phase 4 review fix: real singular forms, not the "(s)"/"(es)" shortcut that showed the
+        // parenthetical literally regardless of count.
+        Assert.StartsWith("1 deadline due soon or overdue", enNotification.Body);
+        Assert.StartsWith("1 plazo vencido o próximo a vencer", esNotification.Body);
+    }
+
+    [Fact]
+    public async Task RunForDateAsync_SpanishRecipientWithTwoOverdueObligations_UsesSpanishPluralForm()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var studentAId = _db.Student(schoolId, "Uno", "Student");
+        var studentBId = _db.Student(schoolId, "Dos", "Student");
+        var (esUserId, _) = _db.Staff("digest-es-plural@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.TeamMember(studentAId, esUserId, TeamRole.CaseManager, isLead: true);
+        _db.TeamMember(studentBId, esUserId, TeamRole.CaseManager, isLead: true);
+
+        using (var ctx = _db.Context())
+        {
+            ctx.SchoolStudents.Single(s => s.Id == studentAId).AnnualReviewDueDate = DateTime.UtcNow.Date.AddDays(-1);
+            ctx.SchoolStudents.Single(s => s.Id == studentBId).AnnualReviewDueDate = DateTime.UtcNow.Date.AddDays(-2);
+            ctx.Users.Single(u => u.Id == esUserId).PreferredLanguage = "es";
+            ctx.SaveChanges();
+        }
+
+        var email = new CapturingDigestEmailService();
+        using var ctx2 = _db.Context();
+        await CreateService(ctx2, email).RunForDateAsync(DateOnly.FromDateTime(DateTime.UtcNow));
+
+        using var assertCtx = _db.Context();
+        var notification = await assertCtx.Set<Notification>().SingleAsync(n => n.UserId == esUserId && n.Kind == NotificationKind.ObligationDigest);
+        Assert.Equal("2 plazos vencidos o próximos a vencer, 0 reuniones en los próximos 7 días.", notification.Body);
+    }
+
     private sealed class CapturingDigestEmailService : TestSupport.TestEmailServiceBase
     {
         public DigestEmailModel? LastModel { get; private set; }
@@ -208,7 +278,7 @@ public sealed class DigestServiceTests : IDisposable
         public int SendCount { get; private set; }
         public bool ThrowOnSend { get; set; }
 
-        public override Task SendDigestAsync(string toEmail, DigestEmailModel model, CancellationToken ct = default)
+        public override Task SendDigestAsync(string toEmail, DigestEmailModel model, string? recipientLanguage = null, CancellationToken ct = default)
         {
             if (ThrowOnSend)
                 throw new InvalidOperationException("simulated ACS failure");

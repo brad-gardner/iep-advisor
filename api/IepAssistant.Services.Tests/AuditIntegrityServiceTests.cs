@@ -31,7 +31,7 @@ public sealed class AuditIntegrityServiceTests : IDisposable
     {
         public List<(IEnumerable<int> UserIds, NotificationKind Kind)> Calls { get; } = new();
 
-        public Task NotifyAsync(IEnumerable<int> userIds, NotificationKind kind, string title, string body, string? linkPath, string dedupKey, bool emailImmediately, CancellationToken ct = default)
+        public Task NotifyAsync(IEnumerable<int> userIds, NotificationKind kind, Func<string, (string Title, string Body)> buildText, string? linkPath, string dedupKey, bool emailImmediately, CancellationToken ct = default)
         {
             Calls.Add((userIds, kind));
             return Task.CompletedTask;
@@ -78,7 +78,7 @@ public sealed class AuditIntegrityServiceTests : IDisposable
         var rows = SeedValidChain();
         var notifications = new CapturingNotificationService();
         using var ctx = CreateContext();
-        var service = new AuditIntegrityService(ctx, notifications, NullLogger<AuditIntegrityService>.Instance);
+        var service = new AuditIntegrityService(ctx, notifications, NullLogger<AuditIntegrityService>.Instance, TestSupport.TestLocalizers.Notifications());
 
         var result = await service.RunCheckAsync();
 
@@ -108,7 +108,7 @@ public sealed class AuditIntegrityServiceTests : IDisposable
 
         var notifications = new CapturingNotificationService();
         using var ctx = CreateContext();
-        var service = new AuditIntegrityService(ctx, notifications, NullLogger<AuditIntegrityService>.Instance);
+        var service = new AuditIntegrityService(ctx, notifications, NullLogger<AuditIntegrityService>.Instance, TestSupport.TestLocalizers.Notifications());
 
         var result = await service.RunCheckAsync();
 
@@ -131,7 +131,7 @@ public sealed class AuditIntegrityServiceTests : IDisposable
 
         var notifications = new CapturingNotificationService();
         using var ctx = CreateContext();
-        var service = new AuditIntegrityService(ctx, notifications, NullLogger<AuditIntegrityService>.Instance);
+        var service = new AuditIntegrityService(ctx, notifications, NullLogger<AuditIntegrityService>.Instance, TestSupport.TestLocalizers.Notifications());
 
         var result = await service.RunCheckAsync();
 
@@ -144,7 +144,7 @@ public sealed class AuditIntegrityServiceTests : IDisposable
     {
         var notifications = new CapturingNotificationService();
         using var ctx = CreateContext();
-        var service = new AuditIntegrityService(ctx, notifications, NullLogger<AuditIntegrityService>.Instance);
+        var service = new AuditIntegrityService(ctx, notifications, NullLogger<AuditIntegrityService>.Instance, TestSupport.TestLocalizers.Notifications());
 
         await service.RunCheckAsync();
         await service.RunCheckAsync();

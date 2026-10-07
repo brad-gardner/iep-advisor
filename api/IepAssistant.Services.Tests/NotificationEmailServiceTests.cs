@@ -18,7 +18,7 @@ public sealed class NotificationEmailServiceTests : IDisposable
     private static readonly IConfiguration EmptyConfig = new ConfigurationBuilder().Build();
 
     private NotificationEmailService CreateService(ApplicationDbContext ctx, IEmailService email)
-        => new(ctx, email, new IcsBuilder(), EmptyConfig, NullLogger<NotificationEmailService>.Instance);
+        => new(ctx, email, new IcsBuilder(), EmptyConfig, NullLogger<NotificationEmailService>.Instance, TestSupport.TestLocalizers.Emails());
 
     private int SeedQueuedNotification(int userId, NotificationKind kind = NotificationKind.Generic, string? linkPath = null)
     {
@@ -234,6 +234,67 @@ public sealed class NotificationEmailServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessNotificationAsync_MeetingScheduled_SpanishRecipient_EmailedIcsVideoLabelResolvesInRecipientLanguage()
+    {
+        // Multilingual plan phase 4 review fix: the emailed .ics's DESCRIPTION "Video:" label is resolved
+        // from THIS recipient's own PreferredLanguage (same lookup pattern as EmailService), not left as
+        // IcsMeetingInputMapper's English-only default. "Video" happens to be the same word in Spanish
+        // (see IcsBuilderTests), so this proves the language plumbing actually runs, not a text change.
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (userId, _) = _db.Staff("u5c@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var meetingId = _db.Meeting(studentId, userId, DateTime.UtcNow.AddDays(3));
+        _db.MeetingParticipant(meetingId, userId);
+        var notificationId = SeedQueuedNotification(userId, NotificationKind.MeetingScheduled, $"/meetings/{meetingId}");
+
+        using (var ctx = _db.Context())
+        {
+            ctx.Set<Meeting>().Single(m => m.Id == meetingId).VideoUrl = "https://meet.example.com/abc";
+            ctx.Set<User>().Single(u => u.Id == userId).PreferredLanguage = "es";
+            ctx.SaveChanges();
+        }
+
+        var email = new CapturingEmailService();
+        using var ctx2 = _db.Context();
+        await CreateService(ctx2, email).ProcessNotificationAsync(notificationId);
+
+        Assert.NotNull(email.LastIcsBytes);
+        var ics = System.Text.Encoding.UTF8.GetString(email.LastIcsBytes!);
+        Assert.Contains("Video: https://meet.example.com/abc", ics);
+    }
+
+    [Fact]
+    public async Task ProcessNotificationAsync_MeetingScheduled_SpanishRecipient_RsvpUrlsCarryLangParamAndEmailUsesSameResolvedLanguage()
+    {
+        // Phase 4 review fix: the RSVP accept/decline links must carry &lang= for this recipient's
+        // language (so the public RSVP landing page opens already in Spanish), and the email itself must
+        // be told the same already-resolved language rather than re-querying for it.
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (userId, _) = _db.Staff("u5d@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var meetingId = _db.Meeting(studentId, userId, DateTime.UtcNow.AddDays(3));
+        _db.MeetingParticipant(meetingId, userId);
+        var notificationId = SeedQueuedNotification(userId, NotificationKind.MeetingScheduled, $"/meetings/{meetingId}");
+
+        using (var ctx = _db.Context())
+        {
+            ctx.Set<User>().Single(u => u.Id == userId).PreferredLanguage = "es";
+            ctx.SaveChanges();
+        }
+
+        var email = new CapturingEmailService();
+        using var ctx2 = _db.Context();
+        await CreateService(ctx2, email).ProcessNotificationAsync(notificationId);
+
+        Assert.NotNull(email.LastModel);
+        Assert.Contains("&lang=es", email.LastModel!.RsvpAcceptUrl);
+        Assert.Contains("&lang=es", email.LastModel.RsvpDeclineUrl);
+        Assert.Equal("es", email.LastRecipientLanguage);
+    }
+
+    [Fact]
     public async Task ProcessNotificationAsync_MeetingCancelled_EmailedIcsCarriesRealBumpedSequence()
     {
         // MeetingService.CancelAsync bumps Sequence on every cancel; the emailed .ics must reflect that
@@ -313,29 +374,36 @@ public sealed class NotificationEmailServiceTests : IDisposable
         public byte[]? LastIcsBytes { get; private set; }
         public string? ThrowMessage { get; set; }
 
-        public override Task SendNotificationAsync(string toEmail, string title, string body, string linkUrl, CancellationToken ct = default)
+        public string? LastRecipientLanguage { get; private set; }
+        public MeetingEmailModel? LastModel { get; private set; }
+
+        public override Task SendNotificationAsync(string toEmail, string title, string body, string linkUrl, string? recipientLanguage = null, CancellationToken ct = default)
         {
             if (ThrowMessage != null)
                 throw new InvalidOperationException(ThrowMessage);
             GenericSendCount++;
+            LastRecipientLanguage = recipientLanguage;
             return Task.CompletedTask;
         }
 
-        public override Task SendMeetingInvitationAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
+        public override Task SendMeetingInvitationAsync(string toEmail, MeetingEmailModel model, byte[] ics, string? recipientLanguage = null, CancellationToken ct = default)
         {
             if (ThrowMessage != null)
                 throw new InvalidOperationException(ThrowMessage);
             InvitationSendCount++;
             LastIcsBytes = ics;
+            LastRecipientLanguage = recipientLanguage;
+            LastModel = model;
             return Task.CompletedTask;
         }
 
-        public override Task SendMeetingCancelledAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
+        public override Task SendMeetingCancelledAsync(string toEmail, MeetingEmailModel model, byte[] ics, string? recipientLanguage = null, CancellationToken ct = default)
         {
             if (ThrowMessage != null)
                 throw new InvalidOperationException(ThrowMessage);
             CancelSendCount++;
             LastIcsBytes = ics;
+            LastRecipientLanguage = recipientLanguage;
             return Task.CompletedTask;
         }
     }

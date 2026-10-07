@@ -309,10 +309,15 @@ public class AiEnumNormalizationTests
     [Fact]
     public void AnalysisRunService_SourceAnalysisResponse_NullSmartAnalysisAndNullArrayElements_DoesNotThrow()
     {
+        // todos/249: in addition to a null element NESTED inside redFlags/overallRedFlags/goalAlignments
+        // (already covered below), this also puts a null element directly in the TOP-LEVEL sections,
+        // goalAnalyses and etrCompleteness.evaluatedDomains arrays — the gap a bare `??= []` doesn't
+        // close, since it only substitutes [] for a null LIST, never strips a null ELEMENT within one.
         const string json = """
         {
           "overallSummary": "Summary.",
           "sections": [
+            null,
             {
               "sectionKind": "present_levels",
               "plainLanguageSummary": "Explanation.",
@@ -325,6 +330,7 @@ public class AiEnumNormalizationTests
             }
           ],
           "goalAnalyses": [
+            null,
             {
               "goalId": 1,
               "goalText": "Goal text",
@@ -337,6 +343,14 @@ public class AiEnumNormalizationTests
             null,
             { "severity": "yellow", "title": "General", "description": "Detail." }
           ],
+          "etrCompleteness": {
+            "evaluatedDomains": [
+              null,
+              { "domain": "Psychological", "toolsUsed": [], "adequacyRating": "thin" }
+            ],
+            "missingDomains": [],
+            "overallCompletenessRating": "concerning"
+          },
           "advocacyGapAnalysis": {
             "summary": "...",
             "goalAlignments": [
@@ -353,12 +367,14 @@ public class AiEnumNormalizationTests
         var ex = Record.Exception(() => AnalysisRunService.NormalizeNulls(response!));
         Assert.Null(ex);
 
-        Assert.Single(response!.Sections[0].RedFlags);
+        Assert.Single(response!.Sections);
+        Assert.Single(response.Sections[0].RedFlags);
         Assert.Equal("red", response.Sections[0].RedFlags[0].Severity);
 
         Assert.Single(response.OverallRedFlags);
         Assert.Equal("yellow", response.OverallRedFlags[0].Severity);
 
+        Assert.Single(response.GoalAnalyses);
         var goal = response.GoalAnalyses[0];
         Assert.NotNull(goal.SmartAnalysis);
         Assert.NotNull(goal.SmartAnalysis.Specific);
@@ -366,6 +382,9 @@ public class AiEnumNormalizationTests
         Assert.NotNull(goal.SmartAnalysis.Achievable);
         Assert.NotNull(goal.SmartAnalysis.Relevant);
         Assert.NotNull(goal.SmartAnalysis.TimeBound);
+
+        Assert.Single(response.EtrCompleteness!.EvaluatedDomains);
+        Assert.Equal("thin", response.EtrCompleteness.EvaluatedDomains[0].AdequacyRating);
 
         Assert.Single(response.AdvocacyGapAnalysis!.GoalAlignments);
         Assert.Equal("addressed", response.AdvocacyGapAnalysis.GoalAlignments[0].AlignmentStatus);

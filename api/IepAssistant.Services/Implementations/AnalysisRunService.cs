@@ -1449,11 +1449,15 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
 
     internal static void NormalizeNulls(SourceAnalysisResponse response)
     {
-        response.Sections ??= [];
+        // todos/249: a bare `??= []` only defends against the whole LIST being an explicit JSON null —
+        // an element WITHIN a non-null list (e.g. "sections": [null, {...}]) survives it and throws a
+        // NullReferenceException the first time the loop below dereferences it. RemoveNullElements
+        // strips those (and still substitutes [] for a null list), exactly like OverallRedFlags below.
+        response.Sections = AiEnumNormalization.RemoveNullElements(response.Sections);
         foreach (var section in response.Sections)
             NormalizeNulls(section);
 
-        response.GoalAnalyses ??= [];
+        response.GoalAnalyses = AiEnumNormalization.RemoveNullElements(response.GoalAnalyses);
         foreach (var goal in response.GoalAnalyses)
             NormalizeNulls(goal);
 
@@ -1532,7 +1536,8 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
 
     private static void NormalizeNulls(EtrCompletenessSectionPayload payload)
     {
-        payload.EvaluatedDomains ??= [];
+        // todos/249: same null-element gap as Sections/GoalAnalyses above.
+        payload.EvaluatedDomains = AiEnumNormalization.RemoveNullElements(payload.EvaluatedDomains);
         foreach (var domain in payload.EvaluatedDomains)
         {
             domain.ToolsUsed ??= [];

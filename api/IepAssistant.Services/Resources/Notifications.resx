@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Notifications.DraftShared.Title" xml:space="preserve">
+    <value>A draft was shared with you</value>
+  </data>
+  <data name="Notifications.DraftShared.Withdrawn.Title" xml:space="preserve">
+    <value>Draft withdrawn</value>
+  </data>
+  <data name="Notifications.DraftShared.Body" xml:space="preserve">
+    <value>A new draft (revision {0}) is ready for you to review.</value>
+  </data>
+  <data name="Notifications.DraftShared.BodyWithNote" xml:space="preserve">
+    <value>A new draft (revision {0}) is ready for you to review. Note from the team: {1}</value>
+  </data>
+  <data name="Notifications.DraftShared.WithdrawnBody" xml:space="preserve">
+    <value>Revision {0} was withdrawn by the school team.</value>
+  </data>
+  <data name="Notifications.MeetingScheduled.Title" xml:space="preserve">
+    <value>Meeting scheduled: {0}</value>
+  </data>
+  <data name="Notifications.MeetingScheduled.Body" xml:space="preserve">
+    <value>{0} for {1} on {2} ({3}) was scheduled.</value>
+  </data>
+  <data name="Notifications.MeetingUpdated.Title" xml:space="preserve">
+    <value>Meeting updated: {0}</value>
+  </data>
+  <data name="Notifications.MeetingUpdated.Body" xml:space="preserve">
+    <value>{0} for {1} on {2} ({3}) was updated.</value>
+  </data>
+  <data name="Notifications.MeetingCancelled.Title" xml:space="preserve">
+    <value>Meeting cancelled: {0}</value>
+  </data>
+  <data name="Notifications.MeetingCancelled.Body" xml:space="preserve">
+    <value>{0} for {1} on {2} ({3}) was cancelled.</value>
+  </data>
+  <data name="Notifications.ResponseReceived.Title" xml:space="preserve">
+    <value>New family response</value>
+  </data>
+  <data name="Notifications.ResponseReceived.Body" xml:space="preserve">
+    <value>A family member responded ({0}) to the shared draft for {1}.</value>
+  </data>
+  <data name="Notifications.ResponseReceived.UnknownStudent" xml:space="preserve">
+    <value>the student</value>
+  </data>
+  <data name="Notifications.DraftResponseResolved.Title" xml:space="preserve">
+    <value>Your response was resolved</value>
+  </data>
+  <data name="Notifications.DraftResponseResolved.BodyWithReply" xml:space="preserve">
+    <value>The school team replied: {0}</value>
+  </data>
+  <data name="Notifications.DraftResponseResolved.BodyNoReply" xml:space="preserve">
+    <value>The school team addressed this in the draft.</value>
+  </data>
+  <data name="Notifications.MeetingSummarySent.Title" xml:space="preserve">
+    <value>Your family meeting summary is ready</value>
+  </data>
+  <data name="Notifications.MeetingSummarySent.Body" xml:space="preserve">
+    <value>A plain-language summary of the {0} meeting for {1} is ready to review.</value>
+  </data>
+  <data name="Notifications.EvaluatorOverdue.Title" xml:space="preserve">
+    <value>Evaluator assignment overdue: {0}</value>
+  </data>
+  <data name="Notifications.EvaluatorOverdue.Body" xml:space="preserve">
+    <value>{0} evaluation for {1} was due {2} and has not been submitted.</value>
+  </data>
+  <data name="Notifications.AuditIntegrityBroken.Title" xml:space="preserve">
+    <value>Audit log integrity check failed</value>
+  </data>
+  <data name="Notifications.AuditIntegrityBroken.Body" xml:space="preserve">
+    <value>The audit hash chain is broken starting at AccessAuditLog #{0}. This may indicate the audit trail was altered outside the application.</value>
+  </data>
+  <data name="Notifications.MeetingReminder.Title" xml:space="preserve">
+    <value>Reminder: {0}</value>
+  </data>
+  <data name="Notifications.MeetingReminder.Body" xml:space="preserve">
+    <value>{0} for {1} is coming up.</value>
+  </data>
+  <data name="Notifications.ExportReady.Title" xml:space="preserve">
+    <value>Your export is ready</value>
+  </data>
+  <data name="Notifications.ExportReady.Body" xml:space="preserve">
+    <value>The export you requested has finished and is ready to download.</value>
+  </data>
+  <data name="Notifications.ExportFailed.Title" xml:space="preserve">
+    <value>Your export failed</value>
+  </data>
+  <data name="Notifications.ExportFailed.Body" xml:space="preserve">
+    <value>The export you requested could not be completed. Please try again.</value>
+  </data>
+  <data name="Notifications.Digest.Title" xml:space="preserve">
+    <value>Your daily IEP Advisor digest</value>
+  </data>
+  <data name="Notifications.Digest.Body" xml:space="preserve">
+    <value>{0}, {1}.</value>
+  </data>
+  <data name="Notifications.Digest.DeadlineCountOne" xml:space="preserve">
+    <value>{0} deadline due soon or overdue</value>
+  </data>
+  <data name="Notifications.Digest.DeadlineCountOther" xml:space="preserve">
+    <value>{0} deadlines due soon or overdue</value>
+  </data>
+  <data name="Notifications.Digest.MeetingCountOne" xml:space="preserve">
+    <value>{0} meeting in the next {1} days</value>
+  </data>
+  <data name="Notifications.Digest.MeetingCountOther" xml:space="preserve">
+    <value>{0} meetings in the next {1} days</value>
+  </data>
+  <data name="Notifications.DraftResponseKind.Agree" xml:space="preserve">
+    <value>Agree</value>
+  </data>
+  <data name="Notifications.DraftResponseKind.Question" xml:space="preserve">
+    <value>Question</value>
+  </data>
+  <data name="Notifications.DraftResponseKind.ChangeRequest" xml:space="preserve">
+    <value>Request a change</value>
+  </data>
+  <data name="Notifications.DraftResponseKind.Comment" xml:space="preserve">
+    <value>Comment</value>
+  </data>
+</root>

@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -25,14 +27,16 @@ public class DigestService : IDigestService
     private readonly IEmailService _emailService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<DigestService> _logger;
+    private readonly IStringLocalizer<Notifications> _notificationsLocalizer;
 
-    public DigestService(ApplicationDbContext context, IObligationService obligationService, IEmailService emailService, IConfiguration configuration, ILogger<DigestService> logger)
+    public DigestService(ApplicationDbContext context, IObligationService obligationService, IEmailService emailService, IConfiguration configuration, ILogger<DigestService> logger, IStringLocalizer<Notifications> notificationsLocalizer)
     {
         _context = context;
         _obligationService = obligationService;
         _emailService = emailService;
         _configuration = configuration;
         _logger = logger;
+        _notificationsLocalizer = notificationsLocalizer;
     }
 
     public async Task RunForDateAsync(DateOnly localDate, CancellationToken ct = default)
@@ -86,7 +90,7 @@ public class DigestService : IDigestService
 
         var userInfoById = await _context.Users.AsNoTracking()
             .Where(u => usersWithContent.Contains(u.Id))
-            .Select(u => new { u.Id, u.FirstName, u.Email })
+            .Select(u => new { u.Id, u.FirstName, u.Email, u.PreferredLanguage })
             .ToDictionaryAsync(u => u.Id, ct);
 
         var notificationsByUser = new Dictionary<int, Notification>();
@@ -98,12 +102,32 @@ public class DigestService : IDigestService
             var dueOrOverdue = obligationsByUser.TryGetValue(userId, out var obl) ? obl : new List<ObligationModel>();
             var upcomingMeetings = meetingsByUser.TryGetValue(userId, out var mtg) ? mtg : new();
 
+            // Multilingual plan (2026-10-06) phase 4: the bell title/body follow this recipient's own
+            // language — one user at a time is already a single batched user-info query above, so no
+            // extra per-recipient query is introduced here.
+            //
+            // Phase 4 review fix: the deadline/meeting clauses use real count==1 vs other plural resx keys
+            // instead of the English-only "(s)"/Spanish "(es)" shortcut, which showed the parenthetical
+            // literally (e.g. "1 deadline(s)") regardless of count.
+            string title, body;
+            using (CultureScope.For(info.PreferredLanguage))
+            {
+                title = _notificationsLocalizer["Notifications.Digest.Title"];
+                string deadlineClause = dueOrOverdue.Count == 1
+                    ? _notificationsLocalizer["Notifications.Digest.DeadlineCountOne", dueOrOverdue.Count]
+                    : _notificationsLocalizer["Notifications.Digest.DeadlineCountOther", dueOrOverdue.Count];
+                string meetingClause = upcomingMeetings.Count == 1
+                    ? _notificationsLocalizer["Notifications.Digest.MeetingCountOne", upcomingMeetings.Count, MeetingLookaheadDays]
+                    : _notificationsLocalizer["Notifications.Digest.MeetingCountOther", upcomingMeetings.Count, MeetingLookaheadDays];
+                body = _notificationsLocalizer["Notifications.Digest.Body", deadlineClause, meetingClause];
+            }
+
             var notification = new Notification
             {
                 UserId = userId,
                 Kind = NotificationKind.ObligationDigest,
-                Title = "Your daily IEP Advisor digest",
-                Body = $"{dueOrOverdue.Count} deadline(s) due soon or overdue, {upcomingMeetings.Count} meeting(s) in the next {MeetingLookaheadDays} days.",
+                Title = title,
+                Body = body,
                 LinkPath = "/notifications",
                 DedupKey = dedupKey,
                 CreatedAt = DateTime.UtcNow
@@ -145,7 +169,10 @@ public class DigestService : IDigestService
 
             try
             {
-                await _emailService.SendDigestAsync(info.Email, model, ct);
+                // Pass this recipient's already-loaded language straight through so the digest EMAIL
+                // renders in the same language as the bell title/body built above, without EmailService
+                // re-querying the same user row to resolve it again.
+                await _emailService.SendDigestAsync(info.Email, model, info.PreferredLanguage, ct);
                 notification.EmailSentAt = DateTime.UtcNow;
             }
             catch (Exception ex)

@@ -93,7 +93,7 @@ public class StudentInviteService : IStudentInviteService
             .Where(c => c.Id == childProfileId)
             .Select(c => c.FirstName)
             .FirstOrDefaultAsync(ct);
-        var context = $"to contribute to {childFirstName}'s IEP";
+        var context = new StudentInviteContext { Kind = StudentInviteContextKind.ParentChild, ChildFirstName = childFirstName };
 
         await _emailService.SendStudentInviteEmailAsync(studentEmail, inviterName, context, rawToken, ct);
 
@@ -150,7 +150,7 @@ public class StudentInviteService : IStudentInviteService
             .Select(s => s.Name)
             .FirstOrDefaultAsync(ct);
         var inviterName = inviter != null ? inviter.FullName.Trim() : "An educator";
-        var context = $"at {schoolName ?? "your school"}";
+        var context = new StudentInviteContext { Kind = StudentInviteContextKind.EducatorSchool, SchoolName = schoolName };
 
         await _emailService.SendStudentInviteEmailAsync(studentEmail, inviterName, context, rawToken, ct);
 

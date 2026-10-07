@@ -105,7 +105,7 @@ public class IcsBuilder : IIcsBuilder
 
         var descriptionParts = new List<string>();
         if (!string.IsNullOrWhiteSpace(meeting.VideoUrl))
-            descriptionParts.Add($"Video: {meeting.VideoUrl}");
+            descriptionParts.Add($"{meeting.VideoLabel}: {meeting.VideoUrl}");
         if (!string.IsNullOrWhiteSpace(meeting.Notes))
             descriptionParts.Add(meeting.Notes!);
 
@@ -124,7 +124,12 @@ public class IcsBuilder : IIcsBuilder
         if (!string.IsNullOrWhiteSpace(meeting.Location))
             lines.Add($"LOCATION:{EscapeText(meeting.Location)}");
         if (descriptionParts.Count > 0)
-            lines.Add($"DESCRIPTION:{EscapeText(string.Join("\\n", descriptionParts))}");
+            // A real newline here (not the 2-character literal "\n") so EscapeText's own
+            // "\n" -> "\\n" replacement below turns it into RFC 5545's actual line-break escape —
+            // joining with the 2-character literal instead produced a literal "\n" in the rendered
+            // DESCRIPTION (EscapeText's backslash-doubling step turned the one real backslash into two),
+            // which calendar apps show as the text "\n" rather than a line break.
+            lines.Add($"DESCRIPTION:{EscapeText(string.Join("\n", descriptionParts))}");
 
         lines.Add($"ORGANIZER;CN={QuoteParam(meeting.OrganizerName)}:mailto:{SanitizeAddress(meeting.OrganizerEmail)}");
 

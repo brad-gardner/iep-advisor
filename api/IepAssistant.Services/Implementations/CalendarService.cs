@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
@@ -17,19 +18,22 @@ public class CalendarService : ICalendarService
     private readonly IObligationService _obligationService;
     private readonly IOrgAccessService _orgAccess;
     private readonly IIcsBuilder _icsBuilder;
+    private readonly IStringLocalizer<Emails> _localizer;
 
     public CalendarService(
         ApplicationDbContext context,
         IMeetingService meetingService,
         IObligationService obligationService,
         IOrgAccessService orgAccess,
-        IIcsBuilder icsBuilder)
+        IIcsBuilder icsBuilder,
+        IStringLocalizer<Emails> localizer)
     {
         _context = context;
         _meetingService = meetingService;
         _obligationService = obligationService;
         _orgAccess = orgAccess;
         _icsBuilder = icsBuilder;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<List<CalendarItemModel>>> GetMineAsync(int userId, DateTime? from, DateTime? to, CancellationToken ct = default)
@@ -143,7 +147,8 @@ public class CalendarService : ICalendarService
         if (!await AuthorizeMeetingReadAsync(userId, meeting, ct))
             return ServiceResult<byte[]>.FailureResult("You do not have permission to view this meeting.");
 
-        var input = IcsMeetingInputMapper.Map(meeting);
+        var input = IcsMeetingInputMapper.Map(meeting, _localizer);
+        input.VideoLabel = _localizer["Meeting.VideoLabel"].Value;
         var ics = _icsBuilder.BuildMeetingEvent(input, meeting.Status == MeetingStatus.Cancelled ? "CANCEL" : "REQUEST");
         return ServiceResult<byte[]>.SuccessResult(ics);
     }

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -19,12 +20,14 @@ public class MeetingReminderService : IMeetingReminderService
     private readonly ApplicationDbContext _context;
     private readonly INotificationService _notifications;
     private readonly ILogger<MeetingReminderService> _logger;
+    private readonly IStringLocalizer<Notifications> _notificationsLocalizer;
 
-    public MeetingReminderService(ApplicationDbContext context, INotificationService notifications, ILogger<MeetingReminderService> logger)
+    public MeetingReminderService(ApplicationDbContext context, INotificationService notifications, ILogger<MeetingReminderService> logger, IStringLocalizer<Notifications> notificationsLocalizer)
     {
         _context = context;
         _notifications = notifications;
         _logger = logger;
+        _notificationsLocalizer = notificationsLocalizer;
     }
 
     public async Task RunOnceAsync(DateTime utcNow, CancellationToken ct = default)
@@ -92,11 +95,13 @@ public class MeetingReminderService : IMeetingReminderService
             return;
         }
 
-        var title = $"Reminder: {meetingTitle}";
-        var body = $"{meetingTitle} for {studentName} is coming up.";
+        (string Title, string Body) BuildText(string lang) => (
+            _notificationsLocalizer["Notifications.MeetingReminder.Title", meetingTitle],
+            _notificationsLocalizer["Notifications.MeetingReminder.Body", meetingTitle, studentName]);
+
         try
         {
-            await _notifications.NotifyAsync(new[] { userId }, NotificationKind.MeetingReminder, title, body,
+            await _notifications.NotifyAsync(new[] { userId }, NotificationKind.MeetingReminder, BuildText,
                 $"/meetings/{meetingId}", $"meeting-{meetingId}-reminder-{offset}", emailImmediately: true, ct);
         }
         catch (Exception ex)

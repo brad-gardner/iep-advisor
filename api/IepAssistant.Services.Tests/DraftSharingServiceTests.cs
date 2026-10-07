@@ -45,8 +45,9 @@ public sealed class DraftSharingServiceTests : IDisposable
     {
         public List<(List<int> UserIds, NotificationKind Kind, string Title, string Body, string? LinkPath, string DedupKey)> Calls { get; } = new();
 
-        public Task NotifyAsync(IEnumerable<int> userIds, NotificationKind kind, string title, string body, string? linkPath, string dedupKey, bool emailImmediately, CancellationToken ct = default)
+        public Task NotifyAsync(IEnumerable<int> userIds, NotificationKind kind, Func<string, (string Title, string Body)> buildText, string? linkPath, string dedupKey, bool emailImmediately, CancellationToken ct = default)
         {
+            var (title, body) = buildText(SupportedLanguages.English);
             Calls.Add((userIds.ToList(), kind, title, body, linkPath, dedupKey));
             return Task.CompletedTask;
         }
@@ -63,8 +64,8 @@ public sealed class DraftSharingServiceTests : IDisposable
         var access = new AccessService(ctx);
         var authoring = new TemplateAuthoringService(ctx, _audit, NullLogger<TemplateAuthoringService>.Instance);
         var notifications = new FakeNotifications();
-        var responses = new DraftResponseService(ctx, access, org, notifications, NullLogger<DraftResponseService>.Instance, TestSupport.TestLocalizers.Messages());
-        var sharing = new DraftSharingService(ctx, org, access, authoring, notifications, responses, _audit, NullLogger<DraftSharingService>.Instance, TestSupport.TestLocalizers.Messages());
+        var responses = new DraftResponseService(ctx, access, org, notifications, NullLogger<DraftResponseService>.Instance, TestSupport.TestLocalizers.Messages(), TestSupport.TestLocalizers.Notifications());
+        var sharing = new DraftSharingService(ctx, org, access, authoring, notifications, responses, _audit, NullLogger<DraftSharingService>.Instance, TestSupport.TestLocalizers.Messages(), TestSupport.TestLocalizers.Notifications());
         return (sharing, responses, notifications);
     }
 

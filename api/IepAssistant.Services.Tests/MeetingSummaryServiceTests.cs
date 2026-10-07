@@ -46,7 +46,7 @@ public sealed class MeetingSummaryServiceTests : IDisposable
     internal sealed class FakeNotifications : INotificationService
     {
         public List<(List<int> UserIds, NotificationKind Kind)> Calls { get; } = new();
-        public Task NotifyAsync(IEnumerable<int> userIds, NotificationKind kind, string title, string body, string? linkPath, string dedupKey, bool emailImmediately, CancellationToken ct = default)
+        public Task NotifyAsync(IEnumerable<int> userIds, NotificationKind kind, Func<string, (string Title, string Body)> buildText, string? linkPath, string dedupKey, bool emailImmediately, CancellationToken ct = default)
         {
             Calls.Add((userIds.ToList(), kind));
             return Task.CompletedTask;
@@ -62,7 +62,7 @@ public sealed class MeetingSummaryServiceTests : IDisposable
     private (MeetingSummaryService Service, FakeNotifications Notifications) CreateService(ApplicationDbContext ctx)
     {
         var notifications = new FakeNotifications();
-        return (new MeetingSummaryService(ctx, new OrgAccessService(ctx), _claude, notifications, _audit, TestSupport.TestLocalizers.Ai(), NullLogger<MeetingSummaryService>.Instance), notifications);
+        return (new MeetingSummaryService(ctx, new OrgAccessService(ctx), _claude, notifications, _audit, TestSupport.TestLocalizers.Ai(), TestSupport.TestLocalizers.Notifications(), NullLogger<MeetingSummaryService>.Instance), notifications);
     }
 
     private sealed record Scenario(int MeetingId, int DistrictId, int ChildId, int TeacherId, int ParentId, int StudentId);

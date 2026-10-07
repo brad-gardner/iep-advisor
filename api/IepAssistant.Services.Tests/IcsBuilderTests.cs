@@ -226,6 +226,99 @@ public class IcsBuilderTests
         Assert.DoesNotContain("\r", summaryLine);
     }
 
+    // ----------------------------------------------------------------- Multilingual plan phase 4
+    //
+    // IcsBuilder stays dependency-free (no IStringLocalizer of its own): its one app-generated DESCRIPTION
+    // literal ("Video: ", built by BuildEventLines) now comes from IcsMeetingInput.VideoLabel instead of
+    // a hardcoded string, so a CALLER that knows the recipient's language (NotificationEmailService) can
+    // supply the localized label while every other caller (the default "Video", which happens to be the
+    // same word in Spanish too) is unaffected. Title/Location/Notes passed in are meeting CONTENT, not UI
+    // chrome, supplied by NotificationEmailService/CalendarService via IcsMeetingInputMapper. This component's job is correctly carrying
+    // Spanish (accented, multi-byte UTF-8) text through SUMMARY/DESCRIPTION/LOCATION without corruption —
+    // including across RFC 5545's 75-octet line folding, which must never split a multi-byte UTF-8 sequence.
+
+    [Fact]
+    public void BuildMeetingEvent_VideoLabelDefaultsToVideo_MatchingPriorHardcodedLiteral()
+    {
+        var input = Meeting();
+        input.VideoUrl = "https://meet.example.com/xyz";
+        var ics = Unfold(Text(_builder.BuildMeetingEvent(input, "REQUEST")));
+
+        Assert.Contains("DESCRIPTION:Video: https://meet.example.com/xyz", ics);
+    }
+
+    [Fact]
+    public void BuildMeetingEvent_VideoAndNotes_DescriptionJoinsWithARealLineBreak_NotTheLiteralBackslashN()
+    {
+        // Pre-existing bug: the parts used to be joined with the 2-character literal "\n" (backslash +
+        // 'n'), which EscapeText's backslash-doubling step turned into a literal "\n" in the rendered
+        // DESCRIPTION — calendar apps showed the text "\n" between the two parts instead of a line break.
+        var input = Meeting();
+        input.VideoUrl = "https://meet.example.com/xyz";
+        input.Notes = "Bring the latest progress report.";
+
+        var ics = Unfold(Text(_builder.BuildMeetingEvent(input, "REQUEST")));
+        var descriptionLine = ics.Split("\r\n").Single(l => l.StartsWith("DESCRIPTION:"));
+
+        // RFC 5545's escaped line break is exactly one backslash followed by 'n' (never two backslashes).
+        Assert.Contains("Video: https://meet.example.com/xyz\\nBring the latest progress report.", descriptionLine);
+        Assert.DoesNotContain("\\\\n", descriptionLine);
+    }
+
+    [Fact]
+    public void BuildMeetingEvent_CustomVideoLabel_IsUsedInDescription()
+    {
+        var input = Meeting();
+        input.VideoUrl = "https://meet.example.com/xyz";
+        input.VideoLabel = "Video"; // Spanish value is identical to English — see IcsBuilderTests class comment above.
+        var ics = Unfold(Text(_builder.BuildMeetingEvent(input, "REQUEST")));
+
+        Assert.Contains("DESCRIPTION:Video: https://meet.example.com/xyz", ics);
+    }
+
+    [Fact]
+    public void BuildMeetingEvent_SpanishAccentedTitleLocationAndNotes_RoundTripUncorrupted()
+    {
+        const string spanishTitle = "Reunión de revisión anual del IEP";
+        const string spanishLocation = "Oficina del administración — Edificio Núñez";
+        const string spanishNotes = "Favor de traer el informe de progreso más reciente y cualquier pregunta.";
+
+        var input = Meeting(title: spanishTitle);
+        input.Location = spanishLocation;
+        input.Notes = spanishNotes;
+
+        var ics = Unfold(Text(_builder.BuildMeetingEvent(input, "REQUEST")));
+
+        Assert.Contains($"SUMMARY:{spanishTitle}", ics);
+        Assert.Contains($"LOCATION:{spanishLocation}", ics);
+        Assert.Contains(spanishNotes, ics);
+        // No replacement character (U+FFFD) anywhere — a corrupted multi-byte split would introduce one.
+        Assert.DoesNotContain('�', ics);
+    }
+
+    [Fact]
+    public void BuildMeetingEvent_LongSpanishTitle_FoldsWithoutSplittingMultiByteCharacters()
+    {
+        // é/ó/í/ñ encode as 2 UTF-8 bytes each — long enough to force SUMMARY past the 75-octet fold
+        // boundary mid-character, which is exactly what FoldLine's UTF-8-boundary check must prevent.
+        var longSpanishTitle = string.Concat(Enumerable.Repeat("Educación Individualizada para Samuel Núñez — ", 4));
+        var input = Meeting(title: longSpanishTitle);
+
+        var bytes = _builder.BuildMeetingEvent(input, "REQUEST");
+        var foldedText = Encoding.UTF8.GetString(bytes);
+
+        foreach (var physicalLine in foldedText.Split("\r\n"))
+        {
+            if (physicalLine.Length == 0)
+                continue;
+            Assert.True(Encoding.UTF8.GetByteCount(physicalLine) <= 75, $"Line exceeded 75 octets: {physicalLine}");
+        }
+
+        var unfolded = Unfold(foldedText);
+        Assert.Contains($"SUMMARY:{longSpanishTitle}", unfolded);
+        Assert.DoesNotContain('�', unfolded);
+    }
+
     [Fact]
     public void BuildFeed_ContainsAllDayObligationAndTimedMeetingEvents()
     {

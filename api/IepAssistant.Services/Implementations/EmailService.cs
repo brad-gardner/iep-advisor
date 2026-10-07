@@ -1,7 +1,10 @@
 using System.Net;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
+using IepAssistant.Domain.Data;
+using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
@@ -16,19 +19,30 @@ namespace IepAssistant.Services.Implementations;
 /// propagates to the caller, same as any other write.
 ///
 /// Plan 2026-10-06 (multilingual) phase 1: the password-reset and magic-link emails render in the
-/// recipient's language via <see cref="Emails"/>/<see cref="CultureScope"/>. Every other Send* method
-/// here stays English-only until a later phase.
+/// recipient's language via <see cref="Emails"/>/<see cref="CultureScope"/>.
+///
+/// Phase 4: every remaining Send* method follows suit. Each resolves the RECIPIENT's language —
+/// <see cref="ResolveRecipientAsync"/> looks up <c>toEmail</c> in <c>Users</c> and uses the account's own
+/// saved <c>PreferredLanguage</c> (defaulting to English when unset — the recipient's own language always
+/// wins, it is never the sender's). Only a pre-account recipient (no User row for that address) falls back
+/// to <see cref="SupportedLanguages.ForRecipient"/> — effectively the sender's current request UI culture,
+/// English outside a request — because there is no other signal for someone who has never set a
+/// preference and isn't the person driving this request (design decision 5). Pre-account invite/landing
+/// links get <c>?lang=</c> appended (<see cref="AppendLangParam"/>) so the public landing page opens in
+/// that language before anyone has signed in.
 /// </summary>
 public class EmailService : IEmailService
 {
     private readonly IOutboundEmailQueue _queue;
     private readonly IStringLocalizer<Emails> _localizer;
+    private readonly ApplicationDbContext _context;
     private readonly string _frontendUrl;
 
-    public EmailService(IConfiguration configuration, IOutboundEmailQueue queue, IStringLocalizer<Emails> localizer)
+    public EmailService(IConfiguration configuration, IOutboundEmailQueue queue, IStringLocalizer<Emails> localizer, ApplicationDbContext context)
     {
         _queue = queue;
         _localizer = localizer;
+        _context = context;
         _frontendUrl = configuration["App:FrontendUrl"] ?? "http://localhost:5173";
     }
 
@@ -77,30 +91,46 @@ public class EmailService : IEmailService
 
     public async Task SendShareInviteEmailAsync(string toEmail, string inviterName, string childName, string role, string inviteToken, CancellationToken ct = default)
     {
-        var inviteUrl = $"{_frontendUrl}/accept-invite?token={inviteToken}";
-        var roleDisplay = role == "Collaborator" ? "collaborate on" : "view";
+        var (language, hasAccount) = await ResolveRecipientAsync(toEmail, ct);
+        using var _ = CultureScope.For(language);
 
-        var subject = $"{inviterName} invited you to IEP Advisor";
+        var inviteUrl = $"{_frontendUrl}/accept-invite?token={Uri.EscapeDataString(inviteToken)}";
+        if (!hasAccount)
+            inviteUrl = AppendLangParam(inviteUrl, language);
+        var safeInviteUrl = WebUtility.HtmlEncode(inviteUrl);
+
+        var safeInviterName = WebUtility.HtmlEncode(inviterName);
+        var safeChildName = WebUtility.HtmlEncode(childName);
+        var isCollaborator = role == "Collaborator";
+
+        var subject = string.Format(_localizer["ShareInvite.Subject"].Value, inviterName);
+        var heading = _localizer["ShareInvite.Heading"].Value;
+        var body1Key = isCollaborator ? "ShareInvite.Body1Collaborate" : "ShareInvite.Body1View";
+        var body1 = string.Format(_localizer[body1Key].Value, $"<strong>{safeInviterName}</strong>", safeChildName);
+        var body2 = _localizer["ShareInvite.Body2"].Value;
+        var buttonText = _localizer["ShareInvite.ButtonText"].Value;
+        var footer = _localizer["ShareInvite.Footer"].Value;
+
         var html = $@"
             <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
                 <div style=""text-align: center; margin-bottom: 24px;"">
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
                 </div>
-                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">You've Been Invited</h1>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">{heading}</h1>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    <strong>{inviterName}</strong> has invited you to {roleDisplay} {childName}'s IEP information on IEP Advisor.
+                    {body1}
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    IEP Advisor helps parents understand and advocate for their child's Individualized Education Program.
+                    {body2}
                 </p>
                 <div style=""text-align: center; margin: 24px 0;"">
-                    <a href=""{inviteUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
-                        Accept Invitation
+                    <a href=""{safeInviteUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                        {buttonText}
                     </a>
                 </div>
                 <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
-                    This invitation expires in 7 days. If you don't have an IEP Advisor account, you'll be asked to create one.
+                    {footer}
                 </p>
                 <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
                 <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
@@ -108,37 +138,54 @@ public class EmailService : IEmailService
                 </p>
             </div>";
 
-        var plainText = $"{inviterName} has invited you to {roleDisplay} {childName}'s IEP information on IEP Advisor.\n\nAccept the invitation: {inviteUrl}\n\nThis invitation expires in 7 days.";
+        var plainTextKey = isCollaborator ? "ShareInvite.PlainTextCollaborate" : "ShareInvite.PlainTextView";
+        var plainText = string.Format(_localizer[plainTextKey].Value, inviterName, childName, inviteUrl);
 
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "ShareInvite", null, ct);
     }
 
     public async Task SendSchoolLinkInviteEmailAsync(string toEmail, string educatorName, string schoolName, string studentName, string inviteToken, CancellationToken ct = default)
     {
+        var (language, hasAccount) = await ResolveRecipientAsync(toEmail, ct);
+        using var _ = CultureScope.For(language);
+
         // Escape the base64 token (may contain +, /, =) so it survives the URL intact.
         var inviteUrl = $"{_frontendUrl}/accept-link?token={Uri.EscapeDataString(inviteToken)}";
+        if (!hasAccount)
+            inviteUrl = AppendLangParam(inviteUrl, language);
+        var safeInviteUrl = WebUtility.HtmlEncode(inviteUrl);
 
-        var subject = $"{educatorName} invited you to connect on IEP Advisor";
+        var safeEducatorName = WebUtility.HtmlEncode(educatorName);
+        var safeSchoolName = WebUtility.HtmlEncode(schoolName);
+        var safeStudentName = WebUtility.HtmlEncode(studentName);
+
+        var subject = string.Format(_localizer["SchoolLinkInvite.Subject"].Value, educatorName);
+        var heading = _localizer["SchoolLinkInvite.Heading"].Value;
+        var body1 = string.Format(_localizer["SchoolLinkInvite.Body1"].Value, $"<strong>{safeEducatorName}</strong>", $"<strong>{safeSchoolName}</strong>", $"<strong>{safeStudentName}</strong>");
+        var body2 = _localizer["SchoolLinkInvite.Body2"].Value;
+        var buttonText = _localizer["SchoolLinkInvite.ButtonText"].Value;
+        var footer = _localizer["SchoolLinkInvite.Footer"].Value;
+
         var html = $@"
             <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
                 <div style=""text-align: center; margin-bottom: 24px;"">
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
                 </div>
-                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">You've Been Invited to Connect</h1>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">{heading}</h1>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    <strong>{educatorName}</strong> at <strong>{schoolName}</strong> has invited you to connect with <strong>{studentName}</strong>'s record on IEP Advisor.
+                    {body1}
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    Linking lets you receive and understand your child's IEP information directly from the school.
+                    {body2}
                 </p>
                 <div style=""text-align: center; margin: 24px 0;"">
-                    <a href=""{inviteUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
-                        Accept Invitation
+                    <a href=""{safeInviteUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                        {buttonText}
                     </a>
                 </div>
                 <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
-                    This invitation expires in 14 days. If you don't have an IEP Advisor account, you'll be asked to create one.
+                    {footer}
                 </p>
                 <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
                 <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
@@ -146,38 +193,56 @@ public class EmailService : IEmailService
                 </p>
             </div>";
 
-        var plainText = $"{educatorName} at {schoolName} has invited you to connect with {studentName}'s record on IEP Advisor.\n\nAccept the invitation: {inviteUrl}\n\nThis invitation expires in 14 days.";
+        var plainText = string.Format(_localizer["SchoolLinkInvite.PlainTextBody"].Value, educatorName, schoolName, studentName, inviteUrl);
 
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "SchoolLinkInvite", null, ct);
     }
 
-    public async Task SendStudentInviteEmailAsync(string toEmail, string inviterName, string context, string inviteToken, CancellationToken ct = default)
+    public async Task SendStudentInviteEmailAsync(string toEmail, string inviterName, StudentInviteContext context, string inviteToken, CancellationToken ct = default)
     {
+        var (language, hasAccount) = await ResolveRecipientAsync(toEmail, ct);
+        using var _ = CultureScope.For(language);
+
         // Escape the base64 token (may contain +, /, =) so it survives the URL intact.
         var inviteUrl = $"{_frontendUrl}/student/accept-invite?token={Uri.EscapeDataString(inviteToken)}";
+        if (!hasAccount)
+            inviteUrl = AppendLangParam(inviteUrl, language);
+        var safeInviteUrl = WebUtility.HtmlEncode(inviteUrl);
 
-        var subject = $"{inviterName} invited you to your IEP Advisor student account";
+        var safeInviterName = WebUtility.HtmlEncode(inviterName);
+        // `context` is structured data (plan 2026-10-06 phase 4 review fix) — the one clause that differs
+        // by invite source is rendered here, in the recipient's own language, from Emails.resx (the
+        // caller previously built this as a pre-formatted ENGLISH sentence fragment).
+        var contextClause = BuildStudentInviteContextClause(context);
+        var safeContext = WebUtility.HtmlEncode(contextClause);
+
+        var subject = string.Format(_localizer["StudentInvite.Subject"].Value, inviterName);
+        var heading = _localizer["StudentInvite.Heading"].Value;
+        var body1 = string.Format(_localizer["StudentInvite.Body1"].Value, $"<strong>{safeInviterName}</strong>", safeContext);
+        var body2 = _localizer["StudentInvite.Body2"].Value;
+        var buttonText = _localizer["StudentInvite.ButtonText"].Value;
+        var footer = _localizer["StudentInvite.Footer"].Value;
+
         var html = $@"
             <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
                 <div style=""text-align: center; margin-bottom: 24px;"">
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
                 </div>
-                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">You've Been Invited</h1>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">{heading}</h1>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    <strong>{inviterName}</strong> has invited you to set up your own student account on IEP Advisor {context}.
+                    {body1}
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    Your student workspace lets you share your strengths, interests, and goals so your voice is part of your IEP.
-                    You'll be asked to review and accept a short consent before your account is activated.
+                    {body2}
                 </p>
                 <div style=""text-align: center; margin: 24px 0;"">
-                    <a href=""{inviteUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
-                        Set Up My Account
+                    <a href=""{safeInviteUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                        {buttonText}
                     </a>
                 </div>
                 <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
-                    This invitation expires in 14 days.
+                    {footer}
                 </p>
                 <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
                 <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
@@ -185,45 +250,76 @@ public class EmailService : IEmailService
                 </p>
             </div>";
 
-        var plainText = $"{inviterName} has invited you to set up your own student account on IEP Advisor {context}.\n\nYou'll be asked to accept a short consent before your account is activated.\n\nAccept the invitation: {inviteUrl}\n\nThis invitation expires in 14 days.";
+        var plainText = string.Format(_localizer["StudentInvite.PlainTextBody"].Value, inviterName, contextClause, inviteUrl);
 
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "StudentInvite", null, ct);
     }
 
+    /// <summary>Renders <see cref="StudentInviteContext"/>'s one varying clause from Emails.resx under
+    /// the ambient culture (the caller already opened <see cref="CultureScope"/>). A null/blank school
+    /// name (educator invite with no school on file) falls back to a localized generic clause rather than
+    /// a hardcoded English "your school".</summary>
+    private string BuildStudentInviteContextClause(StudentInviteContext context) => context.Kind switch
+    {
+        StudentInviteContextKind.ParentChild =>
+            string.Format(_localizer["StudentInvite.ContextParent"].Value, context.ChildFirstName ?? string.Empty),
+        StudentInviteContextKind.EducatorSchool => string.Format(
+            _localizer["StudentInvite.ContextEducator"].Value,
+            string.IsNullOrWhiteSpace(context.SchoolName) ? _localizer["StudentInvite.UnknownSchool"].Value : context.SchoolName),
+        _ => string.Empty
+    };
+
     public async Task SendStaffInviteEmailAsync(string toEmail, string districtName, string? schoolName, string roleName, string inviteToken, CancellationToken ct = default)
     {
+        var (language, hasAccount) = await ResolveRecipientAsync(toEmail, ct);
+        using var _ = CultureScope.For(language);
+
         // Escape the base64 token (may contain +, /, =) so it survives the URL intact.
         var inviteUrl = $"{_frontendUrl}/staff/accept-invite?token={Uri.EscapeDataString(inviteToken)}";
+        if (!hasAccount)
+            inviteUrl = AppendLangParam(inviteUrl, language);
+        var safeInviteUrl = WebUtility.HtmlEncode(inviteUrl);
 
-        var orgLine = string.IsNullOrWhiteSpace(schoolName)
-            ? $"<strong>{districtName}</strong>"
-            : $"<strong>{schoolName}</strong> ({districtName})";
+        var safeDistrictName = WebUtility.HtmlEncode(districtName);
+        var safeSchoolName = string.IsNullOrWhiteSpace(schoolName) ? null : WebUtility.HtmlEncode(schoolName);
+        // roleName is district-authored org-role content (OrgRole.Name) — stays as written, like
+        // district/school names, never translated (design: "Not translated (by design)").
+        var safeRoleName = WebUtility.HtmlEncode(roleName);
+
+        var orgLine = safeSchoolName == null
+            ? $"<strong>{safeDistrictName}</strong>"
+            : $"<strong>{safeSchoolName}</strong> ({safeDistrictName})";
         var orgLinePlain = string.IsNullOrWhiteSpace(schoolName)
             ? districtName
             : $"{schoolName} ({districtName})";
 
-        var subject = $"You've been invited to join {districtName} on IEP Advisor";
+        var subject = string.Format(_localizer["StaffInvite.Subject"].Value, districtName);
+        var heading = _localizer["StaffInvite.Heading"].Value;
+        var body1 = string.Format(_localizer["StaffInvite.Body1"].Value, orgLine, $"<strong>{safeRoleName}</strong>");
+        var body2 = _localizer["StaffInvite.Body2"].Value;
+        var buttonText = _localizer["StaffInvite.ButtonText"].Value;
+        var footer = _localizer["StaffInvite.Footer"].Value;
+
         var html = $@"
             <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
                 <div style=""text-align: center; margin-bottom: 24px;"">
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
                 </div>
-                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">You've Been Invited to Join</h1>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">{heading}</h1>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    You've been invited to join {orgLine} on IEP Advisor as a <strong>{roleName}</strong>.
+                    {body1}
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    IEP Advisor helps school teams author, manage, and collaborate on IEPs. Accept the invitation
-                    below to create your account and get started.
+                    {body2}
                 </p>
                 <div style=""text-align: center; margin: 24px 0;"">
-                    <a href=""{inviteUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
-                        Accept Invitation
+                    <a href=""{safeInviteUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
+                        {buttonText}
                     </a>
                 </div>
                 <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
-                    This invitation expires in 14 days and is tied to this email address.
+                    {footer}
                 </p>
                 <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
                 <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
@@ -231,47 +327,60 @@ public class EmailService : IEmailService
                 </p>
             </div>";
 
-        var plainText = $"You've been invited to join {orgLinePlain} on IEP Advisor as a {roleName}.\n\nAccept the invitation: {inviteUrl}\n\nThis invitation expires in 14 days and is tied to this email address.";
+        var plainText = string.Format(_localizer["StaffInvite.PlainTextBody"].Value, orgLinePlain, roleName, inviteUrl);
 
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "StaffInvite", null, ct);
     }
 
     public async Task SendStaffInviteExpiringEmailAsync(string toEmail, string inviteeEmail, string districtName, string? schoolName, DateTime expiresAt, CancellationToken ct = default)
     {
+        // The recipient here is the admin who sent the invite (an existing account), not the invitee —
+        // not a pre-account landing link, so no ?lang= and no AppendLangParam.
+        var (language, _) = await ResolveRecipientAsync(toEmail, ct);
+        using var _scope = CultureScope.For(language);
+
         // Deep-links the admin straight to the staff management page so they can resend in one click.
         var staffUrl = $"{_frontendUrl}/educator/admin/staff";
-        var expiresDisplay = expiresAt.ToString("MMMM d, yyyy");
+        var expiresDisplay = LocalizedDateFormat.LongDate(expiresAt, language);
 
-        var orgLine = string.IsNullOrWhiteSpace(schoolName)
-            ? $"<strong>{districtName}</strong>"
-            : $"<strong>{schoolName}</strong> ({districtName})";
+        var safeInviteeEmail = WebUtility.HtmlEncode(inviteeEmail);
+        var safeDistrictName = WebUtility.HtmlEncode(districtName);
+        var safeSchoolName = string.IsNullOrWhiteSpace(schoolName) ? null : WebUtility.HtmlEncode(schoolName);
+
+        var orgLine = safeSchoolName == null
+            ? $"<strong>{safeDistrictName}</strong>"
+            : $"<strong>{safeSchoolName}</strong> ({safeDistrictName})";
         var orgLinePlain = string.IsNullOrWhiteSpace(schoolName)
             ? districtName
             : $"{schoolName} ({districtName})";
 
-        var subject = $"A staff invite for {inviteeEmail} is about to expire";
+        var subject = string.Format(_localizer["StaffInviteExpiring.Subject"].Value, inviteeEmail);
+        var heading = _localizer["StaffInviteExpiring.Heading"].Value;
+        var body1 = string.Format(_localizer["StaffInviteExpiring.Body1"].Value, $"<strong>{safeInviteeEmail}</strong>", orgLine, $"<strong>{expiresDisplay}</strong>");
+        var body2 = _localizer["StaffInviteExpiring.Body2"].Value;
+        var buttonText = _localizer["StaffInviteExpiring.ButtonText"].Value;
+        var footer = _localizer["StaffInviteExpiring.Footer"].Value;
+
         var html = $@"
             <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
                 <div style=""text-align: center; margin-bottom: 24px;"">
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
                 </div>
-                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">A Staff Invite Is About to Expire</h1>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">{heading}</h1>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    The staff invite you sent to <strong>{inviteeEmail}</strong> to join {orgLine} on IEP Advisor
-                    expires on <strong>{expiresDisplay}</strong> and hasn't been accepted yet.
+                    {body1}
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    If they still need access, you can resend the invite to reset the clock. If not, no action is needed —
-                    the invite will simply expire.
+                    {body2}
                 </p>
                 <div style=""text-align: center; margin: 24px 0;"">
                     <a href=""{staffUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
-                        Manage Staff Invites
+                        {buttonText}
                     </a>
                 </div>
                 <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
-                    You're receiving this because you sent this invite. Only you are notified.
+                    {footer}
                 </p>
                 <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
                 <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
@@ -279,16 +388,41 @@ public class EmailService : IEmailService
                 </p>
             </div>";
 
-        var plainText = $"The staff invite you sent to {inviteeEmail} to join {orgLinePlain} on IEP Advisor expires on {expiresDisplay} and hasn't been accepted yet.\n\nIf they still need access, resend the invite to reset the clock: {staffUrl}\n\nIf not, no action is needed — the invite will simply expire. Only you are notified.";
+        var plainText = string.Format(_localizer["StaffInviteExpiring.PlainTextBody"].Value, inviteeEmail, orgLinePlain, expiresDisplay, staffUrl);
 
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "StaffInviteExpiring", null, ct);
     }
 
     public async Task SendBetaInviteEmailAsync(string toEmail, string inviteCode, CancellationToken ct = default)
     {
-        var signupUrl = $"{_frontendUrl}/register?code={Uri.EscapeDataString(inviteCode)}";
+        var (language, hasAccount) = await ResolveRecipientAsync(toEmail, ct);
+        using var _ = CultureScope.For(language);
 
-        var subject = "Welcome to the IEP Advisor Beta";
+        var signupUrl = $"{_frontendUrl}/register?code={Uri.EscapeDataString(inviteCode)}";
+        if (!hasAccount)
+            signupUrl = AppendLangParam(signupUrl, language);
+        var safeSignupUrl = WebUtility.HtmlEncode(signupUrl);
+        var safeInviteCode = WebUtility.HtmlEncode(inviteCode);
+
+        var subject = _localizer["BetaInvite.Subject"].Value;
+        var greeting = _localizer["BetaInvite.Greeting"].Value;
+        var intro1 = _localizer["BetaInvite.Intro1"].Value;
+        var intro2 = _localizer["BetaInvite.Intro2"].Value;
+        var helpHeading = _localizer["BetaInvite.HelpHeading"].Value;
+        var helpBulletsHtml = _localizer["BetaInvite.HelpBulletsHtml"].Value;
+        var helpBulletsPlain = _localizer["BetaInvite.HelpBulletsPlain"].Value;
+        var emailLine = _localizer["BetaInvite.EmailLine"].Value;
+        var betaHeading = _localizer["BetaInvite.BetaHeading"].Value;
+        var betaBulletsHtml = _localizer["BetaInvite.BetaBulletsHtml"].Value;
+        var betaBulletsPlain = _localizer["BetaInvite.BetaBulletsPlain"].Value;
+        var buttonText = _localizer["BetaInvite.ButtonText"].Value;
+        var codeLabelHtml = string.Format(_localizer["BetaInvite.CodeLabel"].Value, safeInviteCode);
+        var codeLabelPlain = string.Format(_localizer["BetaInvite.CodeLabel"].Value, inviteCode);
+        var codeManualNote = _localizer["BetaInvite.CodeManualNote"].Value;
+        var signature = _localizer["BetaInvite.Signature"].Value;
+        var footerNote = _localizer["BetaInvite.FooterNote"].Value;
+        var plainCtaLabel = _localizer["BetaInvite.PlainCtaLabel"].Value;
+
         var html = $@"
             <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
                 <div style=""text-align: center; margin-bottom: 24px;"">
@@ -296,114 +430,115 @@ public class EmailService : IEmailService
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
                 </div>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.7;"">
-                    Hi there,
+                    {greeting}
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.7;"">
-                    Welcome to the IEP Advisor beta. I'm Brad, the founder — and I wanted to reach out personally to say thank you for being here.
+                    {intro1}
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.7;"">
-                    IEP Advisor exists because parents deserve the same clarity and confidence at the IEP table that the school district's team already has. You're one of the first people to actually use it, which means your experience over the next few weeks will directly shape what this product becomes.
+                    {intro2}
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.7; font-weight: 500; color: #1E2A2A;"">
-                    Here's what I'd love your help with:
+                    {helpHeading}
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.9; padding-left: 8px;"">
-                    → Try uploading a real IEP document and tell me if the plain-language explanations actually make sense<br />
-                    → Let me know if anything is confusing, missing, or feels off<br />
-                    → If you hit a bug or something breaks, please don't just close the tab — let me know directly or use the support link on the site!
+                    {helpBulletsHtml}
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.7;"">
-                    You can email me directly at <a href=""mailto:bradgardner@sevenhillstechnology.com"" style=""color: #1A9478; text-decoration: none;"">bradgardner@sevenhillstechnology.com</a>
+                    {emailLine} <a href=""mailto:bradgardner@sevenhillstechnology.com"" style=""color: #1A9478; text-decoration: none;"">bradgardner@sevenhillstechnology.com</a>
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.7; font-weight: 500; color: #1E2A2A;"">
-                    A few things to know about the beta:
+                    {betaHeading}
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.9; padding-left: 8px;"">
-                    • Some features are still in progress — you may see rough edges<br />
-                    • Your data is private and handled with care — not exposed or sold under any circumstance<br />
-                    • This is the best time to influence what gets built next — I'd love to hear what other features you would find useful
+                    {betaBulletsHtml}
                 </p>
                 <div style=""text-align: center; margin: 28px 0;"">
-                    <a href=""{signupUrl}"" style=""display: inline-block; padding: 14px 28px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 500;"">
-                        Get Started
+                    <a href=""{safeSignupUrl}"" style=""display: inline-block; padding: 14px 28px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 500;"">
+                        {buttonText}
                     </a>
                 </div>
                 <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
-                    Your invite code: <strong>{inviteCode}</strong><br />
-                    You can also enter this code manually at the sign-up page.
+                    {codeLabelHtml}<br />
+                    {codeManualNote}
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.7; margin-top: 24px;"">
-                    Brad Gardner
+                    {signature}
                 </p>
                 <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
                 <p style=""font-size: 11px; color: #A8B5B5; text-align: center; line-height: 1.6;"">
                     IEP Advisor · iep-advisor.com<br />
-                    You're receiving this because you signed up for the beta.
+                    {footerNote}
                 </p>
             </div>";
 
-        var plainText = $@"Hi there,
+        var plainText = $@"{greeting}
 
-Welcome to the IEP Advisor beta. I'm Brad, the founder — and I wanted to reach out personally to say thank you for being here.
+{intro1}
 
-IEP Advisor exists because parents deserve the same clarity and confidence at the IEP table that the school district's team already has. You're one of the first people to actually use it, which means your experience over the next few weeks will directly shape what this product becomes.
+{intro2}
 
-Here's what I'd love your help with:
+{helpHeading}
 
-→ Try uploading a real IEP document and tell me if the plain-language explanations actually make sense
-→ Let me know if anything is confusing, missing, or feels off
-→ If you hit a bug or something breaks, please don't just close the tab — let me know directly or use the support link on the site!
+{helpBulletsPlain}
 
-You can email me directly at bradgardner@sevenhillstechnology.com
+{emailLine} bradgardner@sevenhillstechnology.com
 
-A few things to know about the beta:
-• Some features are still in progress — you may see rough edges
-• Your data is private and handled with care — not exposed or sold under any circumstance
-• This is the best time to influence what gets built next — I'd love to hear what other features you would find useful
+{betaHeading}
+{betaBulletsPlain}
 
-To get started: {signupUrl}
+{plainCtaLabel}: {signupUrl}
 
-Your invite code: {inviteCode}
-You can also enter this code manually at the sign-up page.
+{codeLabelPlain}
+{codeManualNote}
 
-Brad Gardner
+{signature}
 
 —
 IEP Advisor · iep-advisor.com
-You're receiving this because you signed up for the beta.";
+{footerNote}";
 
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "BetaInvite", null, ct);
     }
 
     public async Task SendAccountDeletionCancelLinkEmailAsync(string toEmail, string firstName, string cancelUrl, DateTime purgeDate, CancellationToken ct = default)
     {
+        // The recipient is the account owner (deactivated but still a User row) — not a pre-account
+        // invite, and cancelUrl is a signed token URL built by the caller: never mutate its query string.
+        var (language, _) = await ResolveRecipientAsync(toEmail, ct);
+        using var _scope = CultureScope.For(language);
+
         var safeFirstName = WebUtility.HtmlEncode(firstName);
         var safeCancelUrl = WebUtility.HtmlEncode(cancelUrl);
-        var purgeDateDisplay = purgeDate.ToString("MMMM d, yyyy");
+        var purgeDateDisplay = LocalizedDateFormat.LongDate(purgeDate, language);
 
-        var subject = "Your IEP Advisor account is scheduled for deletion";
+        var subject = _localizer["AccountDeletionCancelLink.Subject"].Value;
+        var heading = _localizer["AccountDeletionCancelLink.Heading"].Value;
+        var body1 = string.Format(_localizer["AccountDeletionCancelLink.Body1"].Value, safeFirstName, purgeDateDisplay);
+        var body2 = _localizer["AccountDeletionCancelLink.Body2"].Value;
+        var buttonText = _localizer["AccountDeletionCancelLink.ButtonText"].Value;
+        var footer = _localizer["AccountDeletionCancelLink.Footer"].Value;
+
         var html = $@"
             <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
                 <div style=""text-align: center; margin-bottom: 24px;"">
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
                 </div>
-                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">Your Account Is Scheduled for Deletion</h1>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">{heading}</h1>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    Hi {safeFirstName}, we received a request to delete your IEP Advisor account. It will be
-                    permanently deleted on <strong>{purgeDateDisplay}</strong> unless you cancel before then.
+                    {body1}
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    If this was you and you want your account deleted, no action is needed. If you didn't
-                    request this — or changed your mind — click below to cancel.
+                    {body2}
                 </p>
                 <div style=""text-align: center; margin: 24px 0;"">
                     <a href=""{safeCancelUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
-                        Cancel Deletion
+                        {buttonText}
                     </a>
                 </div>
                 <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
-                    Your account has been deactivated in the meantime, so this link is the only way to cancel — signing in will not work until you use it.
+                    {footer}
                 </p>
                 <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
                 <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
@@ -411,7 +546,7 @@ You're receiving this because you signed up for the beta.";
                 </p>
             </div>";
 
-        var plainText = $"Hi {firstName}, we received a request to delete your IEP Advisor account. It will be permanently deleted on {purgeDateDisplay} unless you cancel before then.\n\nCancel deletion: {cancelUrl}\n\nYour account has been deactivated in the meantime, so this link is the only way to cancel.";
+        var plainText = string.Format(_localizer["AccountDeletionCancelLink.PlainTextBody"].Value, firstName, purgeDateDisplay, cancelUrl);
 
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "AccountDeletionCancelLink", null, ct);
     }
@@ -460,26 +595,48 @@ You're receiving this because you signed up for the beta.";
 
     // ----------------------------------------------------------------- Plan 4 additions (throw on failure)
 
-    public Task SendMeetingInvitationAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
-        => SendMeetingEmailAsync(toEmail, "Meeting scheduled", "A meeting has been scheduled", "MeetingInvitation", model, ics, ct);
+    public Task SendMeetingInvitationAsync(string toEmail, MeetingEmailModel model, byte[] ics, string? recipientLanguage = null, CancellationToken ct = default)
+        => SendMeetingEmailAsync(toEmail, "Meeting.Invitation.SubjectPrefix", "Meeting.Invitation.Intro", "MeetingInvitation", model, ics, recipientLanguage, ct);
 
-    public Task SendMeetingUpdatedAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
-        => SendMeetingEmailAsync(toEmail, "Meeting updated", "A meeting has been updated", "MeetingUpdated", model, ics, ct);
+    public Task SendMeetingUpdatedAsync(string toEmail, MeetingEmailModel model, byte[] ics, string? recipientLanguage = null, CancellationToken ct = default)
+        => SendMeetingEmailAsync(toEmail, "Meeting.Updated.SubjectPrefix", "Meeting.Updated.Intro", "MeetingUpdated", model, ics, recipientLanguage, ct);
 
-    public Task SendMeetingCancelledAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
-        => SendMeetingEmailAsync(toEmail, "Meeting cancelled", "A meeting has been cancelled", "MeetingCancelled", model, ics, ct);
+    public Task SendMeetingCancelledAsync(string toEmail, MeetingEmailModel model, byte[] ics, string? recipientLanguage = null, CancellationToken ct = default)
+        => SendMeetingEmailAsync(toEmail, "Meeting.Cancelled.SubjectPrefix", "Meeting.Cancelled.Intro", "MeetingCancelled", model, ics, recipientLanguage, ct);
 
-    private async Task SendMeetingEmailAsync(string toEmail, string subjectPrefix, string introText, string kind, MeetingEmailModel model, byte[] ics, CancellationToken ct)
+    /// <summary>The .ics attachment bytes are built by the caller before reaching here (see
+    /// <see cref="Implementations.NotificationEmailService"/> and <see cref="IcsMeetingInputMapper"/> for
+    /// how its own text is localized) — this method only localizes its own subject/HTML/plain-text
+    /// wrapper around that attachment. <paramref name="recipientLanguage"/>, when given, is the caller's
+    /// already-resolved language for this recipient (see <see cref="ResolveRecipientAsync"/>); passing it
+    /// keeps the email body and the .ics attachment the caller built alongside it in agreement about which
+    /// language this recipient gets, without a second database lookup here.</summary>
+    private async Task SendMeetingEmailAsync(string toEmail, string subjectPrefixKey, string introTextKey, string kind, MeetingEmailModel model, byte[] ics, string? recipientLanguage, CancellationToken ct)
     {
-        var subject = $"{subjectPrefix}: {model.Title} for {model.StudentFirstName}";
-        var whenLine = $"{model.StartsAtUtc:MMMM d, yyyy} at {model.StartsAtUtc:h:mm tt} ({model.TimeZoneId})";
+        var (language, _) = await ResolveRecipientAsync(toEmail, ct, recipientLanguage);
+        using var _scope = CultureScope.For(language);
+
+        var subjectPrefix = _localizer[subjectPrefixKey].Value;
+        var introText = _localizer[introTextKey].Value;
+        var forConnector = _localizer["Meeting.SubjectForConnector"].Value;
+        var subject = $"{subjectPrefix}: {model.Title} {forConnector} {model.StudentFirstName}";
+
+        var whenLine = $"{LocalizedDateFormat.MeetingDateTime(model.StartsAtUtc, language)} ({model.TimeZoneId})";
+        var durationLabel = string.Format(_localizer["Meeting.DurationMinutes"].Value, model.DurationMinutes);
+        var organizedByLine = string.Format(_localizer["Meeting.OrganizedBy"].Value, model.Title, model.StudentFirstName, model.OrganizerName);
+        var detailsLabel = _localizer["Meeting.DetailsLabel"].Value;
+        var icsAttachedText = _localizer["Meeting.IcsAttached"].Value;
 
         var rsvpPlain = string.Empty;
         if (!string.IsNullOrWhiteSpace(model.RsvpAcceptUrl) && !string.IsNullOrWhiteSpace(model.RsvpDeclineUrl))
-            rsvpPlain = $"\nAccept: {model.RsvpAcceptUrl}\nDecline: {model.RsvpDeclineUrl}\n";
+        {
+            var acceptLabel = _localizer["Meeting.RsvpAccept"].Value;
+            var declineLabel = _localizer["Meeting.RsvpDecline"].Value;
+            rsvpPlain = $"\n{acceptLabel}: {model.RsvpAcceptUrl}\n{declineLabel}: {model.RsvpDeclineUrl}\n";
+        }
 
-        var html = RenderMeetingHtml(introText, model);
-        var plainText = $"{introText}\n\n{model.Title} for {model.StudentFirstName}, organized by {model.OrganizerName}.\n{whenLine} - {model.DurationMinutes} minutes{(string.IsNullOrWhiteSpace(model.Location) ? "" : $" - {model.Location}")}\n{rsvpPlain}\nDetails: {model.DetailUrl}\nA calendar invite (.ics) is attached.";
+        var html = RenderMeetingHtml(introText, model, language, _localizer);
+        var plainText = $"{introText}\n\n{organizedByLine}\n{whenLine} - {durationLabel}{(string.IsNullOrWhiteSpace(model.Location) ? "" : $" - {model.Location}")}\n{rsvpPlain}\n{detailsLabel}: {model.DetailUrl}\n{icsAttachedText}";
 
         var attachment = new OutboundEmailAttachmentDraft("meeting.ics", "text/calendar", ics);
         await EnqueueEmailAsync(toEmail, subject, html, plainText, kind, new[] { attachment }, ct);
@@ -488,27 +645,41 @@ You're receiving this because you signed up for the beta.";
     /// <summary>Renders <see cref="SendMeetingEmailAsync"/>'s HTML body. Every interpolated value that
     /// originates from staff/attacker-controllable input (title, location, organizer/student names, and
     /// the app-constructed URLs) is HTML-encoded — a meeting Title containing markup must not execute in
-    /// the recipient's mail client (todos/049). Internal + static so it is unit-testable without a live
-    /// ACS connection.</summary>
-    internal static string RenderMeetingHtml(string introText, MeetingEmailModel model)
+    /// the recipient's mail client (todos/049). <paramref name="language"/> drives explicit date/time
+    /// formatting (Spanish month names) — see <see cref="LocalizedDateFormat.MeetingDateTime"/>;
+    /// <paramref name="localizer"/> resolves the surrounding chrome text. Internal + static so it is
+    /// unit-testable without a live ACS connection.</summary>
+    internal static string RenderMeetingHtml(string introText, MeetingEmailModel model, string language, IStringLocalizer<Emails> localizer)
     {
+        // Self-contained: `localizer["key"]` resolves against the AMBIENT CurrentUICulture, not the
+        // `language` parameter directly, so this opens its own scope rather than trusting the caller to
+        // have one active already (CultureScope.For nests safely — it just saves/restores).
+        using var _ = CultureScope.For(language);
+
         var title = WebUtility.HtmlEncode(model.Title);
         var studentFirstName = WebUtility.HtmlEncode(model.StudentFirstName);
         var organizerName = WebUtility.HtmlEncode(model.OrganizerName);
         var timeZoneId = WebUtility.HtmlEncode(model.TimeZoneId);
         var location = string.IsNullOrWhiteSpace(model.Location) ? null : WebUtility.HtmlEncode(model.Location);
         var detailUrl = WebUtility.HtmlEncode(model.DetailUrl);
-        var whenLine = $"{model.StartsAtUtc:MMMM d, yyyy} at {model.StartsAtUtc:h:mm tt} ({timeZoneId})";
+
+        var whenLine = $"{LocalizedDateFormat.MeetingDateTime(model.StartsAtUtc, language)} ({timeZoneId})";
+        var durationLabel = string.Format(localizer["Meeting.DurationMinutes"].Value, model.DurationMinutes);
+        var organizedByLine = string.Format(localizer["Meeting.OrganizedBy"].Value, $"<strong>{title}</strong>", studentFirstName, organizerName);
+        var icsAttachedText = localizer["Meeting.IcsAttached"].Value;
+        var viewDetailsText = localizer["Meeting.ViewDetails"].Value;
 
         var rsvpHtml = string.Empty;
         if (!string.IsNullOrWhiteSpace(model.RsvpAcceptUrl) && !string.IsNullOrWhiteSpace(model.RsvpDeclineUrl))
         {
             var acceptUrl = WebUtility.HtmlEncode(model.RsvpAcceptUrl);
             var declineUrl = WebUtility.HtmlEncode(model.RsvpDeclineUrl);
+            var acceptText = localizer["Meeting.RsvpAccept"].Value;
+            var declineText = localizer["Meeting.RsvpDecline"].Value;
             rsvpHtml = $@"
                 <div style=""text-align: center; margin: 24px 0;"">
-                    <a href=""{acceptUrl}"" style=""display: inline-block; margin: 0 8px; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">Accept</a>
-                    <a href=""{declineUrl}"" style=""display: inline-block; margin: 0 8px; padding: 12px 24px; background-color: #E8ECEC; color: #1E2A2A; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">Decline</a>
+                    <a href=""{acceptUrl}"" style=""display: inline-block; margin: 0 8px; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">{acceptText}</a>
+                    <a href=""{declineUrl}"" style=""display: inline-block; margin: 0 8px; padding: 12px 24px; background-color: #E8ECEC; color: #1E2A2A; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">{declineText}</a>
                 </div>";
         }
 
@@ -520,14 +691,14 @@ You're receiving this because you signed up for the beta.";
                 </div>
                 <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">{WebUtility.HtmlEncode(introText)}</h1>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    <strong>{title}</strong> for {studentFirstName}, organized by {organizerName}.
+                    {organizedByLine}
                 </p>
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">
-                    {whenLine} &middot; {model.DurationMinutes} minutes{(location == null ? "" : $" &middot; {location}")}
+                    {whenLine} &middot; {durationLabel}{(location == null ? "" : $" &middot; {location}")}
                 </p>
                 {rsvpHtml}
                 <p style=""font-size: 12px; color: #A8B5B5; line-height: 1.5;"">
-                    A calendar invite (.ics) is attached. <a href=""{detailUrl}"" style=""color: #1A9478;"">View meeting details</a>.
+                    {icsAttachedText} <a href=""{detailUrl}"" style=""color: #1A9478;"">{viewDetailsText}</a>.
                 </p>
                 <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
                 <p style=""font-size: 11px; color: #A8B5B5; text-align: center;"">
@@ -536,22 +707,32 @@ You're receiving this because you signed up for the beta.";
             </div>";
     }
 
-    public async Task SendNotificationAsync(string toEmail, string title, string body, string linkUrl, CancellationToken ct = default)
+    public async Task SendNotificationAsync(string toEmail, string title, string body, string linkUrl, string? recipientLanguage = null, CancellationToken ct = default)
     {
-        var html = RenderNotificationHtml(title, body, linkUrl);
-        var plainText = $"{title}\n\n{body}\n\nView in IEP Advisor: {linkUrl}";
+        // title/body come from the stored Notification row, already localized at creation time
+        // (NotificationService.NotifyAsync builds them per recipient language). This method only
+        // localizes its own wrapper chrome — the button text.
+        var (language, _) = await ResolveRecipientAsync(toEmail, ct, recipientLanguage);
+        using var _ = CultureScope.For(language);
+
+        var html = RenderNotificationHtml(title, body, linkUrl, _localizer);
+        var buttonText = _localizer["Notification.ButtonText"].Value;
+        var plainText = $"{title}\n\n{body}\n\n{buttonText}: {linkUrl}";
 
         await EnqueueEmailAsync(toEmail, title, html, plainText, "Notification", null, ct);
     }
 
     /// <summary>Renders <see cref="SendNotificationAsync"/>'s HTML body. <paramref name="title"/>/
     /// <paramref name="body"/> ultimately derive from a staff-supplied meeting Title (MeetingService builds
-    /// them as e.g. "Meeting updated: {meeting.Title}") and must be HTML-encoded (todos/049).</summary>
-    internal static string RenderNotificationHtml(string title, string body, string linkUrl)
+    /// them as e.g. "Meeting updated: {meeting.Title}") and must be HTML-encoded (todos/049). Only the
+    /// wrapper's button text is localized via <paramref name="localizer"/> — title/body are rendered
+    /// exactly as given (already localized by the notification's creator, or pass-through English).</summary>
+    internal static string RenderNotificationHtml(string title, string body, string linkUrl, IStringLocalizer<Emails> localizer)
     {
         var safeTitle = WebUtility.HtmlEncode(title);
         var safeBody = WebUtility.HtmlEncode(body);
         var safeLink = WebUtility.HtmlEncode(linkUrl);
+        var buttonText = localizer["Notification.ButtonText"].Value;
 
         return $@"
             <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
@@ -563,7 +744,7 @@ You're receiving this because you signed up for the beta.";
                 <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6;"">{safeBody}</p>
                 <div style=""text-align: center; margin: 24px 0;"">
                     <a href=""{safeLink}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
-                        View in IEP Advisor
+                        {buttonText}
                     </a>
                 </div>
                 <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
@@ -573,36 +754,75 @@ You're receiving this because you signed up for the beta.";
             </div>";
     }
 
-    public async Task SendDigestAsync(string toEmail, DigestEmailModel model, CancellationToken ct = default)
+    public async Task SendDigestAsync(string toEmail, DigestEmailModel model, string? recipientLanguage = null, CancellationToken ct = default)
     {
-        var subject = "Your daily IEP Advisor digest";
-        var html = RenderDigestHtml(model);
+        var (language, _) = await ResolveRecipientAsync(toEmail, ct, recipientLanguage);
+        using var _ = CultureScope.For(language);
 
-        var plainText = $"Good morning, {model.RecipientFirstName}\n\nDeadlines:\n" +
-            (model.Obligations.Count == 0 ? "No overdue or upcoming deadlines.\n" : string.Concat(model.Obligations.Select(o => $"- {o.Status}: {o.Kind} for {o.StudentName}{(o.DueDate.HasValue ? $" (due {o.DueDate.Value:MMM d, yyyy})" : "")}\n"))) +
-            "\nMeetings in the next 7 days:\n" +
-            (model.UpcomingMeetings.Count == 0 ? "No meetings in the next 7 days.\n" : string.Concat(model.UpcomingMeetings.Select(m => $"- {m.Title} for {m.StudentName} - {m.StartsAtUtc:MMM d, h:mm tt} ({m.TimeZoneId})\n"))) +
-            $"\nOpen IEP Advisor: {model.DetailUrl}";
+        var subject = _localizer["Digest.Subject"].Value;
+        var html = RenderDigestHtml(model, language, _localizer);
+
+        var greeting = string.Format(_localizer["Digest.Greeting"].Value, model.RecipientFirstName);
+        var deadlinesHeadingPlain = _localizer["Digest.DeadlinesHeadingPlain"].Value;
+        var noDeadlines = _localizer["Digest.NoDeadlines"].Value;
+        var meetingsHeadingPlain = _localizer["Digest.MeetingsHeadingPlain"].Value;
+        var noMeetings = _localizer["Digest.NoMeetings"].Value;
+        var dueDateSuffixFormat = _localizer["Digest.DueDateSuffix"].Value;
+        var buttonText = _localizer["Digest.ButtonText"].Value;
+        var forConnector = _localizer["Digest.ForConnector"].Value;
+
+        var plainText = $"{greeting}\n\n{deadlinesHeadingPlain}\n" +
+            (model.Obligations.Count == 0
+                ? $"{noDeadlines}\n"
+                : string.Concat(model.Obligations.Select(o =>
+                    $"- {ObligationStatusLabel(o.Status, _localizer)}: {ObligationKindLabel(o.Kind, _localizer)} {forConnector} {o.StudentName}{(o.DueDate.HasValue ? string.Format(dueDateSuffixFormat, LocalizedDateFormat.ShortDate(o.DueDate.Value, language)) : "")}\n"))) +
+            $"\n{meetingsHeadingPlain}\n" +
+            (model.UpcomingMeetings.Count == 0
+                ? $"{noMeetings}\n"
+                : string.Concat(model.UpcomingMeetings.Select(m =>
+                    $"- {m.Title} {forConnector} {m.StudentName} - {LocalizedDateFormat.ShortDateTime(m.StartsAtUtc, language)} ({m.TimeZoneId})\n"))) +
+            $"\n{buttonText}: {model.DetailUrl}";
 
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "Digest", null, ct);
     }
 
     /// <summary>Renders <see cref="SendDigestAsync"/>'s HTML body. Obligation/meeting StudentName and
-    /// meeting Title are staff-supplied and must be HTML-encoded (todos/049); Kind/Status are enums and
-    /// need no encoding, but are included via <see cref="object.ToString"/> either way.</summary>
-    internal static string RenderDigestHtml(DigestEmailModel model)
+    /// meeting Title are staff-supplied and must be HTML-encoded (todos/049). Kind/Status are closed enums
+    /// (not user content), so phase 4's review fix localizes them via <see cref="ObligationKindLabel"/>/
+    /// <see cref="ObligationStatusLabel"/> instead of their raw <see cref="object.ToString"/> name (e.g.
+    /// "AnnualReview") — unlike <c>EvaluatorAssignment.Domain</c> and <c>StaffInvite</c>'s org-role name,
+    /// which stay as written because they are free text/district content, not an enum. Dates are formatted
+    /// explicitly for <paramref name="language"/> (see <see cref="LocalizedDateFormat.ShortDate"/>/
+    /// <see cref="LocalizedDateFormat.ShortDateTime"/>); <paramref name="localizer"/> resolves the
+    /// surrounding chrome text, including the "for" connector between a meeting/obligation and its
+    /// student name.</summary>
+    internal static string RenderDigestHtml(DigestEmailModel model, string language, IStringLocalizer<Emails> localizer)
     {
+        // Self-contained: see RenderMeetingHtml's note on why this opens its own CultureScope.
+        using var _ = CultureScope.For(language);
+
         var recipientFirstName = WebUtility.HtmlEncode(model.RecipientFirstName);
         var detailUrl = WebUtility.HtmlEncode(model.DetailUrl);
 
+        var noDeadlinesText = $"{localizer["Digest.NoDeadlines"].Value} {localizer["Digest.NiceWork"].Value}";
+        var dueDateSuffixFormat = localizer["Digest.DueDateSuffix"].Value;
+        var forConnector = localizer["Digest.ForConnector"].Value;
+
         var obligationRows = model.Obligations.Count == 0
-            ? "<p style=\"font-size: 13px; color: #A8B5B5;\">No overdue or upcoming deadlines. Nice work.</p>"
+            ? $"<p style=\"font-size: 13px; color: #A8B5B5;\">{noDeadlinesText}</p>"
             : string.Concat(model.Obligations.Select(o =>
-                $"<li style=\"font-size: 13px; color: #5A6F6F; margin-bottom: 4px;\"><strong>{o.Status}</strong> — {o.Kind} for {WebUtility.HtmlEncode(o.StudentName)}{(o.DueDate.HasValue ? $" (due {o.DueDate.Value:MMM d, yyyy})" : "")}</li>"));
+                $"<li style=\"font-size: 13px; color: #5A6F6F; margin-bottom: 4px;\"><strong>{ObligationStatusLabel(o.Status, localizer)}</strong> — {ObligationKindLabel(o.Kind, localizer)} {forConnector} {WebUtility.HtmlEncode(o.StudentName)}{(o.DueDate.HasValue ? string.Format(dueDateSuffixFormat, LocalizedDateFormat.ShortDate(o.DueDate.Value, language)) : "")}</li>"));
+
+        var noMeetingsText = localizer["Digest.NoMeetings"].Value;
         var meetingRows = model.UpcomingMeetings.Count == 0
-            ? "<p style=\"font-size: 13px; color: #A8B5B5;\">No meetings in the next 7 days.</p>"
+            ? $"<p style=\"font-size: 13px; color: #A8B5B5;\">{noMeetingsText}</p>"
             : string.Concat(model.UpcomingMeetings.Select(m =>
-                $"<li style=\"font-size: 13px; color: #5A6F6F; margin-bottom: 4px;\">{WebUtility.HtmlEncode(m.Title)} for {WebUtility.HtmlEncode(m.StudentName)} — {m.StartsAtUtc:MMM d, h:mm tt} ({WebUtility.HtmlEncode(m.TimeZoneId)})</li>"));
+                $"<li style=\"font-size: 13px; color: #5A6F6F; margin-bottom: 4px;\">{WebUtility.HtmlEncode(m.Title)} {forConnector} {WebUtility.HtmlEncode(m.StudentName)} — {LocalizedDateFormat.ShortDateTime(m.StartsAtUtc, language)} ({WebUtility.HtmlEncode(m.TimeZoneId)})</li>"));
+
+        var greetingHtml = string.Format(localizer["Digest.Greeting"].Value, recipientFirstName);
+        var deadlinesHeading = localizer["Digest.DeadlinesHeadingHtml"].Value;
+        var meetingsHeading = localizer["Digest.MeetingsHeadingHtml"].Value;
+        var buttonText = localizer["Digest.ButtonText"].Value;
 
         return $@"
             <div style=""font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;"">
@@ -610,14 +830,14 @@ You're receiving this because you signed up for the beta.";
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1E2A2A;"">IEP </span>
                     <span style=""font-family: 'Lora', Georgia, serif; font-size: 24px; color: #1A9478; font-weight: 600;"">Advisor</span>
                 </div>
-                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">Good morning, {recipientFirstName}</h1>
-                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6; font-weight: 500;"">Deadlines</p>
+                <h1 style=""font-family: 'Lora', Georgia, serif; font-size: 22px; color: #1E2A2A; margin-bottom: 16px;"">{greetingHtml}</h1>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6; font-weight: 500;"">{deadlinesHeading}</p>
                 <ul style=""padding-left: 18px; margin: 0 0 16px;"">{obligationRows}</ul>
-                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6; font-weight: 500;"">Meetings in the next 7 days</p>
+                <p style=""font-size: 14px; color: #5A6F6F; line-height: 1.6; font-weight: 500;"">{meetingsHeading}</p>
                 <ul style=""padding-left: 18px; margin: 0 0 16px;"">{meetingRows}</ul>
                 <div style=""text-align: center; margin: 24px 0;"">
                     <a href=""{detailUrl}"" style=""display: inline-block; padding: 12px 24px; background-color: #1A9478; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;"">
-                        Open IEP Advisor
+                        {buttonText}
                     </a>
                 </div>
                 <hr style=""border: none; border-top: 1px solid #E8ECEC; margin: 24px 0;"" />
@@ -625,6 +845,65 @@ You're receiving this because you signed up for the beta.";
                     IEP Advisor — Navigate with confidence
                 </p>
             </div>";
+    }
+
+    /// <summary>Localized display label for a closed <see cref="ObligationKind"/> value (digest email
+    /// content, phase 4 review fix) — resolved via <c>ObligationKind.&lt;value&gt;</c> in Emails.resx
+    /// under the ambient culture.</summary>
+    private static string ObligationKindLabel(ObligationKind kind, IStringLocalizer<Emails> localizer) => localizer[$"ObligationKind.{kind}"].Value;
+
+    /// <summary>Localized display label for a closed <see cref="ObligationStatus"/> value (digest email
+    /// content, phase 4 review fix) — resolved via <c>ObligationStatus.&lt;value&gt;</c> in Emails.resx
+    /// under the ambient culture.</summary>
+    private static string ObligationStatusLabel(ObligationStatus status, IStringLocalizer<Emails> localizer) => localizer[$"ObligationStatus.{status}"].Value;
+
+    // ----------------------------------------------------------------- Recipient language resolution
+
+    /// <summary>
+    /// Resolves the language to render <paramref name="toEmail"/>'s email in, and whether that address
+    /// belongs to an existing account (plan 2026-10-06, phase 4, decision 5: culture per RECIPIENT, not
+    /// sender — "the person reading it is who matters"). An existing account's own saved
+    /// <see cref="Domain.Entities.User.PreferredLanguage"/> always wins (defaulting to English when unset,
+    /// same as everywhere else in this codebase treats a null preference) — it is never overridden by
+    /// whichever UI culture the current request/thread happens to be in, because that reflects the
+    /// SENDER, a different person. Only a pre-account recipient (no <c>User</c> row for this address)
+    /// falls back to <see cref="SupportedLanguages.ForRecipient"/> (effectively the sender's current
+    /// request UI culture; English outside a request), because there is no other language signal for
+    /// someone who has never set a preference and isn't the person driving this request.
+    /// </summary>
+    /// <param name="knownLanguage">When the caller already loaded this exact recipient's
+    /// <see cref="Domain.Entities.User.PreferredLanguage"/> itself (e.g. <c>NotificationEmailService</c>
+    /// and <c>DigestService</c>, which batch-load every recipient's language up front for the bell
+    /// notification/.ics and want the email body to agree with it), it passes that value here and this
+    /// method returns it directly — skipping the lookup below entirely, rather than re-querying the same
+    /// row a second time and risking a different answer if the row changed in between.</param>
+    private async Task<(string Language, bool HasAccount)> ResolveRecipientAsync(string toEmail, CancellationToken ct, string? knownLanguage = null)
+    {
+        var known = SupportedLanguages.Normalize(knownLanguage);
+        if (known != null)
+            return (known, true);
+
+        var normalizedEmail = toEmail.Trim().ToLowerInvariant();
+        var user = await _context.Users
+            .AsNoTracking()
+            .Where(u => u.Email.ToLower() == normalizedEmail)
+            .Select(u => new { u.PreferredLanguage })
+            .FirstOrDefaultAsync(ct);
+
+        if (user == null)
+            return (SupportedLanguages.ForRecipient(null) ?? SupportedLanguages.English, false);
+
+        return (SupportedLanguages.Normalize(user.PreferredLanguage) ?? SupportedLanguages.English, true);
+    }
+
+    /// <summary>Appends <c>?lang=</c>/<c>&amp;lang=</c> (respecting an existing query string) to a
+    /// pre-account invite/landing link, so the web app's public pages — which already honor
+    /// <c>?lang=</c> — open in the sender's language before anyone has signed in to save a preference of
+    /// their own (plan 4, decision 2).</summary>
+    private static string AppendLangParam(string url, string language)
+    {
+        var separator = url.Contains('?') ? "&" : "?";
+        return $"{url}{separator}lang={Uri.EscapeDataString(language)}";
     }
 
     /// <summary>Composes an <see cref="OutboundEmailDraft"/> and enqueues it. This is the ONLY place any

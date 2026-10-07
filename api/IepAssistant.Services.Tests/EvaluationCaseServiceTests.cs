@@ -91,7 +91,8 @@ public sealed class EvaluationCaseServiceTests : IDisposable
         new NoopBlobStorageFake(),
         new NotificationService(ctx, TestSupport.TestLocalizers.Messages()),
         CreateDocumentInstanceService(ctx),
-        NullLogger<EvaluationCaseService>.Instance);
+        NullLogger<EvaluationCaseService>.Instance,
+        TestSupport.TestLocalizers.Notifications());
 
     private sealed record Scenario(int StudentId, int LeadUserId, int EvaluatorUserId);
 
@@ -276,6 +277,11 @@ public sealed class EvaluationCaseServiceTests : IDisposable
         using var readCtx = CreateContext();
         var count = await readCtx.Notifications.CountAsync(n => n.Kind == NotificationKind.EvaluatorOverdue && n.UserId == s.EvaluatorUserId);
         Assert.Equal(1, count); // the second pass on the same day is a no-op (NotifyAsync's rolling 24h dedup)
+
+        // English body keeps main's short date ("MMM d, yyyy").
+        var body = await readCtx.Notifications.Where(n => n.Kind == NotificationKind.EvaluatorOverdue && n.UserId == s.EvaluatorUserId).Select(n => n.Body).SingleAsync();
+        var expectedDate = DateTime.UtcNow.Date.AddDays(-5).ToString("MMM d, yyyy", System.Globalization.CultureInfo.GetCultureInfo("en"));
+        Assert.Contains($"was due {expectedDate}", body);
     }
 
     // ---------------------------------------------------------------- ETR handoff

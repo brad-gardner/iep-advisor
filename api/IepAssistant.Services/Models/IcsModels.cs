@@ -22,6 +22,15 @@ public class IcsMeetingInput
     public string? Location { get; set; }
     public string? VideoUrl { get; set; }
     public string? Notes { get; set; }
+
+    /// <summary>Label prefixing <see cref="VideoUrl"/> in the rendered DESCRIPTION (e.g. "Video: {url}") —
+    /// multilingual plan (2026-10-06) phase 4 review fix: the caller resolves this in the recipient's own
+    /// language (see <c>NotificationEmailService</c>) so <see cref="Implementations.IcsBuilder"/> stays
+    /// dependency-free (no <c>IStringLocalizer</c>) while still rendering localized chrome text. Defaults
+    /// to the English literal this replaced, so every other caller (the authoritative single-meeting .ics
+    /// download in <c>CalendarService</c>, which runs inside a request already culture-aware for its own
+    /// purposes but is out of scope for this phase) is unaffected.</summary>
+    public string VideoLabel { get; set; } = "Video";
     public int Sequence { get; set; }
     public bool IsCancelled { get; set; }
     public string OrganizerName { get; set; } = string.Empty;

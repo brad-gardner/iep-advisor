@@ -100,4 +100,368 @@ Iniciar sesión: {1}
 
 Si usted no solicitó este enlace, puede ignorar este correo electrónico de forma segura.</value>
   </data>
+
+  <!-- Multilingual plan (2026-10-06) phase 4: every remaining email kind renders in the recipient's
+       language (EmailService.ResolveRecipientAsync). Drafted by Claude 2026-10-06; needs native review
+       before Spanish is marketed (docs/i18n/glossary-es.md). -->
+
+  <data name="ShareInvite.Subject" xml:space="preserve">
+    <value>{0} le invitó a IEP Advisor</value>
+  </data>
+  <data name="ShareInvite.Heading" xml:space="preserve">
+    <value>Ha recibido una invitación</value>
+  </data>
+  <data name="ShareInvite.Body1Collaborate" xml:space="preserve">
+    <value>{0} le ha invitado a colaborar en la información del IEP de {1} en IEP Advisor.</value>
+  </data>
+  <data name="ShareInvite.Body1View" xml:space="preserve">
+    <value>{0} le ha invitado a ver la información del IEP de {1} en IEP Advisor.</value>
+  </data>
+  <data name="ShareInvite.Body2" xml:space="preserve">
+    <value>IEP Advisor ayuda a los padres a entender y defender el Programa de Educación Individualizado (IEP) de su hijo.</value>
+  </data>
+  <data name="ShareInvite.ButtonText" xml:space="preserve">
+    <value>Aceptar invitación</value>
+  </data>
+  <data name="ShareInvite.Footer" xml:space="preserve">
+    <value>Esta invitación vence en 7 días. Si no tiene una cuenta de IEP Advisor, se le pedirá que cree una.</value>
+  </data>
+  <data name="ShareInvite.PlainTextCollaborate" xml:space="preserve">
+    <value>{0} le ha invitado a colaborar en la información del IEP de {1} en IEP Advisor.
+
+Acepte la invitación: {2}
+
+Esta invitación vence en 7 días.</value>
+  </data>
+  <data name="ShareInvite.PlainTextView" xml:space="preserve">
+    <value>{0} le ha invitado a ver la información del IEP de {1} en IEP Advisor.
+
+Acepte la invitación: {2}
+
+Esta invitación vence en 7 días.</value>
+  </data>
+
+  <data name="SchoolLinkInvite.Subject" xml:space="preserve">
+    <value>{0} le invitó a conectarse en IEP Advisor</value>
+  </data>
+  <data name="SchoolLinkInvite.Heading" xml:space="preserve">
+    <value>Ha recibido una invitación para conectarse</value>
+  </data>
+  <data name="SchoolLinkInvite.Body1" xml:space="preserve">
+    <value>{0} de {1} le ha invitado a conectarse con el registro de {2} en IEP Advisor.</value>
+  </data>
+  <data name="SchoolLinkInvite.Body2" xml:space="preserve">
+    <value>Conectarse le permite recibir y entender la información del IEP de su hijo directamente de la escuela.</value>
+  </data>
+  <data name="SchoolLinkInvite.ButtonText" xml:space="preserve">
+    <value>Aceptar invitación</value>
+  </data>
+  <data name="SchoolLinkInvite.Footer" xml:space="preserve">
+    <value>Esta invitación vence en 14 días. Si no tiene una cuenta de IEP Advisor, se le pedirá que cree una.</value>
+  </data>
+  <data name="SchoolLinkInvite.PlainTextBody" xml:space="preserve">
+    <value>{0} de {1} le ha invitado a conectarse con el registro de {2} en IEP Advisor.
+
+Acepte la invitación: {3}
+
+Esta invitación vence en 14 días.</value>
+  </data>
+
+  <data name="StudentInvite.Subject" xml:space="preserve">
+    <value>{0} le invitó a su cuenta de estudiante de IEP Advisor</value>
+  </data>
+  <data name="StudentInvite.Heading" xml:space="preserve">
+    <value>Ha recibido una invitación</value>
+  </data>
+  <data name="StudentInvite.Body1" xml:space="preserve">
+    <value>{0} le ha invitado a crear su propia cuenta de estudiante en IEP Advisor {1}.</value>
+  </data>
+  <data name="StudentInvite.Body2" xml:space="preserve">
+    <value>Su espacio de estudiante le permite compartir sus fortalezas, intereses y metas para que su voz forme parte de su IEP. Se le pedirá que revise y acepte un breve consentimiento antes de activar su cuenta.</value>
+  </data>
+  <data name="StudentInvite.ButtonText" xml:space="preserve">
+    <value>Configurar mi cuenta</value>
+  </data>
+  <data name="StudentInvite.Footer" xml:space="preserve">
+    <value>Esta invitación vence en 14 días.</value>
+  </data>
+  <data name="StudentInvite.PlainTextBody" xml:space="preserve">
+    <value>{0} le ha invitado a crear su propia cuenta de estudiante en IEP Advisor {1}.
+
+Se le pedirá que acepte un breve consentimiento antes de activar su cuenta.
+
+Acepte la invitación: {2}
+
+Esta invitación vence en 14 días.</value>
+  </data>
+  <data name="StudentInvite.ContextParent" xml:space="preserve">
+    <value>para contribuir al IEP de {0}</value>
+  </data>
+  <data name="StudentInvite.ContextEducator" xml:space="preserve">
+    <value>en {0}</value>
+  </data>
+  <data name="StudentInvite.UnknownSchool" xml:space="preserve">
+    <value>su escuela</value>
+  </data>
+
+  <data name="StaffInvite.Subject" xml:space="preserve">
+    <value>Le han invitado a unirse a {0} en IEP Advisor</value>
+  </data>
+  <data name="StaffInvite.Heading" xml:space="preserve">
+    <value>Ha recibido una invitación para unirse</value>
+  </data>
+  <data name="StaffInvite.Body1" xml:space="preserve">
+    <value>Se le ha invitado a unirse a {0} en IEP Advisor como {1}.</value>
+  </data>
+  <data name="StaffInvite.Body2" xml:space="preserve">
+    <value>IEP Advisor ayuda a los equipos escolares a redactar, gestionar y colaborar en los IEP. Acepte la invitación a continuación para crear su cuenta y comenzar.</value>
+  </data>
+  <data name="StaffInvite.ButtonText" xml:space="preserve">
+    <value>Aceptar invitación</value>
+  </data>
+  <data name="StaffInvite.Footer" xml:space="preserve">
+    <value>Esta invitación vence en 14 días y está vinculada a este correo electrónico.</value>
+  </data>
+  <data name="StaffInvite.PlainTextBody" xml:space="preserve">
+    <value>Se le ha invitado a unirse a {0} en IEP Advisor como {1}.
+
+Acepte la invitación: {2}
+
+Esta invitación vence en 14 días y está vinculada a este correo electrónico.</value>
+  </data>
+
+  <data name="StaffInviteExpiring.Subject" xml:space="preserve">
+    <value>Una invitación de personal para {0} está por vencer</value>
+  </data>
+  <data name="StaffInviteExpiring.Heading" xml:space="preserve">
+    <value>Una invitación de personal está por vencer</value>
+  </data>
+  <data name="StaffInviteExpiring.Body1" xml:space="preserve">
+    <value>La invitación de personal que envió a {0} para unirse a {1} en IEP Advisor vence el {2} y todavía no ha sido aceptada.</value>
+  </data>
+  <data name="StaffInviteExpiring.Body2" xml:space="preserve">
+    <value>Si todavía necesitan acceso, puede reenviar la invitación para reiniciar el plazo. Si no, no es necesario hacer nada: la invitación simplemente vencerá.</value>
+  </data>
+  <data name="StaffInviteExpiring.ButtonText" xml:space="preserve">
+    <value>Gestionar invitaciones de personal</value>
+  </data>
+  <data name="StaffInviteExpiring.Footer" xml:space="preserve">
+    <value>Recibe este mensaje porque usted envió esta invitación. Solo usted recibe esta notificación.</value>
+  </data>
+  <data name="StaffInviteExpiring.PlainTextBody" xml:space="preserve">
+    <value>La invitación de personal que envió a {0} para unirse a {1} en IEP Advisor vence el {2} y todavía no ha sido aceptada.
+
+Si todavía necesitan acceso, reenvíe la invitación para reiniciar el plazo: {3}
+
+Si no, no es necesario hacer nada: la invitación simplemente vencerá. Solo usted recibe esta notificación.</value>
+  </data>
+
+  <data name="BetaInvite.Subject" xml:space="preserve">
+    <value>Bienvenido a la versión beta de IEP Advisor</value>
+  </data>
+  <data name="BetaInvite.Greeting" xml:space="preserve">
+    <value>Hola,</value>
+  </data>
+  <data name="BetaInvite.Intro1" xml:space="preserve">
+    <value>Bienvenido a la versión beta de IEP Advisor. Soy Brad, el fundador, y quería escribirle personalmente para agradecerle por estar aquí.</value>
+  </data>
+  <data name="BetaInvite.Intro2" xml:space="preserve">
+    <value>IEP Advisor existe porque los padres merecen la misma claridad y confianza en la mesa del IEP que ya tiene el equipo del distrito escolar. Usted es una de las primeras personas en usarlo, lo que significa que su experiencia en las próximas semanas dará forma directamente a lo que este producto llegará a ser.</value>
+  </data>
+  <data name="BetaInvite.HelpHeading" xml:space="preserve">
+    <value>Esto es en lo que me encantaría que me ayudara:</value>
+  </data>
+  <data name="BetaInvite.HelpBulletsHtml" xml:space="preserve">
+    <value>→ Intente subir un IEP real y dígame si las explicaciones en lenguaje sencillo realmente tienen sentido&lt;br /&gt;
+→ Avíseme si algo resulta confuso, falta o no se siente bien&lt;br /&gt;
+→ Si encuentra un error o algo deja de funcionar, no cierre la pestaña sin más: avíseme directamente o use el enlace de soporte en el sitio</value>
+  </data>
+  <data name="BetaInvite.HelpBulletsPlain" xml:space="preserve">
+    <value>→ Intente subir un IEP real y dígame si las explicaciones en lenguaje sencillo realmente tienen sentido
+→ Avíseme si algo resulta confuso, falta o no se siente bien
+→ Si encuentra un error o algo deja de funcionar, no cierre la pestaña sin más: avíseme directamente o use el enlace de soporte en el sitio</value>
+  </data>
+  <data name="BetaInvite.EmailLine" xml:space="preserve">
+    <value>Puede escribirme directamente a</value>
+  </data>
+  <data name="BetaInvite.BetaHeading" xml:space="preserve">
+    <value>Algunas cosas que debe saber sobre la beta:</value>
+  </data>
+  <data name="BetaInvite.BetaBulletsHtml" xml:space="preserve">
+    <value>• Algunas funciones todavía están en desarrollo — puede ver algunos detalles sin pulir&lt;br /&gt;
+• Sus datos son privados y se manejan con cuidado — no se exponen ni se venden bajo ninguna circunstancia&lt;br /&gt;
+• Este es el mejor momento para influir en lo que se construirá después — me encantaría saber qué otras funciones le resultarían útiles</value>
+  </data>
+  <data name="BetaInvite.BetaBulletsPlain" xml:space="preserve">
+    <value>• Algunas funciones todavía están en desarrollo — puede ver algunos detalles sin pulir
+• Sus datos son privados y se manejan con cuidado — no se exponen ni se venden bajo ninguna circunstancia
+• Este es el mejor momento para influir en lo que se construirá después — me encantaría saber qué otras funciones le resultarían útiles</value>
+  </data>
+  <data name="BetaInvite.ButtonText" xml:space="preserve">
+    <value>Comenzar</value>
+  </data>
+  <data name="BetaInvite.CodeLabel" xml:space="preserve">
+    <value>Su código de invitación: {0}</value>
+  </data>
+  <data name="BetaInvite.CodeManualNote" xml:space="preserve">
+    <value>También puede ingresar este código manualmente en la página de registro.</value>
+  </data>
+  <data name="BetaInvite.Signature" xml:space="preserve">
+    <value>Brad Gardner</value>
+  </data>
+  <data name="BetaInvite.FooterNote" xml:space="preserve">
+    <value>Está recibiendo esto porque se registró para la beta.</value>
+  </data>
+  <data name="BetaInvite.PlainCtaLabel" xml:space="preserve">
+    <value>Para comenzar</value>
+  </data>
+
+  <data name="AccountDeletionCancelLink.Subject" xml:space="preserve">
+    <value>Su cuenta de IEP Advisor está programada para eliminación</value>
+  </data>
+  <data name="AccountDeletionCancelLink.Heading" xml:space="preserve">
+    <value>Su cuenta está programada para eliminación</value>
+  </data>
+  <data name="AccountDeletionCancelLink.Body1" xml:space="preserve">
+    <value>Hola {0}, recibimos una solicitud para eliminar su cuenta de IEP Advisor. Se eliminará permanentemente el &lt;strong&gt;{1}&lt;/strong&gt; a menos que la cancele antes de esa fecha.</value>
+  </data>
+  <data name="AccountDeletionCancelLink.Body2" xml:space="preserve">
+    <value>Si usted hizo esta solicitud y quiere que se elimine su cuenta, no es necesario hacer nada. Si usted no la solicitó, o cambió de opinión, haga clic abajo para cancelarla.</value>
+  </data>
+  <data name="AccountDeletionCancelLink.ButtonText" xml:space="preserve">
+    <value>Cancelar eliminación</value>
+  </data>
+  <data name="AccountDeletionCancelLink.Footer" xml:space="preserve">
+    <value>Su cuenta ha sido desactivada mientras tanto, así que este enlace es la única forma de cancelar: iniciar sesión no funcionará hasta que lo use.</value>
+  </data>
+  <data name="AccountDeletionCancelLink.PlainTextBody" xml:space="preserve">
+    <value>Hola {0}, recibimos una solicitud para eliminar su cuenta de IEP Advisor. Se eliminará permanentemente el {1} a menos que la cancele antes de esa fecha.
+
+Cancelar eliminación: {2}
+
+Su cuenta ha sido desactivada mientras tanto, así que este enlace es la única forma de cancelar.</value>
+  </data>
+
+  <data name="Meeting.Invitation.SubjectPrefix" xml:space="preserve">
+    <value>Reunión programada</value>
+  </data>
+  <data name="Meeting.Invitation.Intro" xml:space="preserve">
+    <value>Se ha programado una reunión</value>
+  </data>
+  <data name="Meeting.Updated.SubjectPrefix" xml:space="preserve">
+    <value>Reunión actualizada</value>
+  </data>
+  <data name="Meeting.Updated.Intro" xml:space="preserve">
+    <value>Se ha actualizado una reunión</value>
+  </data>
+  <data name="Meeting.Cancelled.SubjectPrefix" xml:space="preserve">
+    <value>Reunión cancelada</value>
+  </data>
+  <data name="Meeting.Cancelled.Intro" xml:space="preserve">
+    <value>Se ha cancelado una reunión</value>
+  </data>
+  <data name="Meeting.SubjectForConnector" xml:space="preserve">
+    <value>para</value>
+  </data>
+  <data name="Meeting.OrganizedBy" xml:space="preserve">
+    <value>{0} para {1}, organizada por {2}.</value>
+  </data>
+  <data name="Meeting.OrganizerFallback" xml:space="preserve">
+    <value>Organizador</value>
+  </data>
+  <data name="Meeting.OrganizerTeamFallback" xml:space="preserve">
+    <value>El equipo de su escuela</value>
+  </data>
+  <data name="Meeting.DurationMinutes" xml:space="preserve">
+    <value>{0} minutos</value>
+  </data>
+  <data name="Meeting.RsvpAccept" xml:space="preserve">
+    <value>Aceptar</value>
+  </data>
+  <data name="Meeting.RsvpDecline" xml:space="preserve">
+    <value>Rechazar</value>
+  </data>
+  <data name="Meeting.IcsAttached" xml:space="preserve">
+    <value>Se adjunta una invitación de calendario (.ics).</value>
+  </data>
+  <data name="Meeting.ViewDetails" xml:space="preserve">
+    <value>Ver detalles de la reunión</value>
+  </data>
+  <data name="Meeting.DetailsLabel" xml:space="preserve">
+    <value>Detalles</value>
+  </data>
+  <data name="Meeting.VideoLabel" xml:space="preserve">
+    <value>Video</value>
+  </data>
+
+  <data name="Notification.ButtonText" xml:space="preserve">
+    <value>Ver en IEP Advisor</value>
+  </data>
+
+  <data name="Digest.Subject" xml:space="preserve">
+    <value>Su resumen diario de IEP Advisor</value>
+  </data>
+  <data name="Digest.Greeting" xml:space="preserve">
+    <value>Buenos días, {0}</value>
+  </data>
+  <data name="Digest.DeadlinesHeadingHtml" xml:space="preserve">
+    <value>Plazos</value>
+  </data>
+  <data name="Digest.DeadlinesHeadingPlain" xml:space="preserve">
+    <value>Plazos:</value>
+  </data>
+  <data name="Digest.NoDeadlines" xml:space="preserve">
+    <value>No hay plazos vencidos ni próximos.</value>
+  </data>
+  <data name="Digest.NiceWork" xml:space="preserve">
+    <value>Buen trabajo.</value>
+  </data>
+  <data name="Digest.MeetingsHeadingHtml" xml:space="preserve">
+    <value>Reuniones en los próximos 7 días</value>
+  </data>
+  <data name="Digest.MeetingsHeadingPlain" xml:space="preserve">
+    <value>Reuniones en los próximos 7 días:</value>
+  </data>
+  <data name="Digest.NoMeetings" xml:space="preserve">
+    <value>No hay reuniones en los próximos 7 días.</value>
+  </data>
+  <data name="Digest.ButtonText" xml:space="preserve">
+    <value>Abrir IEP Advisor</value>
+  </data>
+  <data name="Digest.DueDateSuffix" xml:space="preserve">
+    <value> (vence el {0})</value>
+  </data>
+  <data name="Digest.ForConnector" xml:space="preserve">
+    <value>para</value>
+  </data>
+  <data name="ObligationKind.AnnualReview" xml:space="preserve">
+    <value>Revisión anual</value>
+  </data>
+  <data name="ObligationKind.Reevaluation" xml:space="preserve">
+    <value>Reevaluación</value>
+  </data>
+  <data name="ObligationKind.EtrDue" xml:space="preserve">
+    <value>ETR</value>
+  </data>
+  <data name="ObligationKind.GoalObservationStale" xml:space="preserve">
+    <value>Progreso de la meta vencido</value>
+  </data>
+  <data name="ObligationKind.EvaluationDetermination" xml:space="preserve">
+    <value>Determinación de la evaluación</value>
+  </data>
+  <data name="ObligationKind.EvaluatorSubmission" xml:space="preserve">
+    <value>Entrega del evaluador</value>
+  </data>
+  <data name="ObligationStatus.Upcoming" xml:space="preserve">
+    <value>Próxima</value>
+  </data>
+  <data name="ObligationStatus.DueSoon" xml:space="preserve">
+    <value>Próxima a vencer</value>
+  </data>
+  <data name="ObligationStatus.Overdue" xml:space="preserve">
+    <value>Vencida</value>
+  </data>
+  <data name="ObligationStatus.Unknown" xml:space="preserve">
+    <value>Desconocida</value>
+  </data>
 </root>

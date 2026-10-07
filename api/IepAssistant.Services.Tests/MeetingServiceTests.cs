@@ -28,7 +28,8 @@ public sealed class MeetingServiceTests : IDisposable
         new NotificationService(ctx, TestSupport.TestLocalizers.Messages()),
         new CapturingAuditLogger(),
         NullLogger<MeetingService>.Instance,
-        TestSupport.TestLocalizers.Messages());
+        TestSupport.TestLocalizers.Messages(),
+        TestSupport.TestLocalizers.Notifications());
 
     private static CreateMeetingModel BasicMeeting(DateTime startsAtUtc, List<ParticipantInputModel>? participants = null) => new()
     {

@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -24,6 +26,7 @@ public class EvaluationCaseService : IEvaluationCaseService
     private readonly INotificationService _notifications;
     private readonly IDocumentInstanceService _documentInstanceService;
     private readonly ILogger<EvaluationCaseService> _logger;
+    private readonly IStringLocalizer<Notifications> _notificationsLocalizer;
 
     public EvaluationCaseService(
         ApplicationDbContext context,
@@ -31,7 +34,8 @@ public class EvaluationCaseService : IEvaluationCaseService
         IBlobStorageService blob,
         INotificationService notifications,
         IDocumentInstanceService documentInstanceService,
-        ILogger<EvaluationCaseService> logger)
+        ILogger<EvaluationCaseService> logger,
+        IStringLocalizer<Notifications> notificationsLocalizer)
     {
         _context = context;
         _orgAccess = orgAccess;
@@ -39,6 +43,7 @@ public class EvaluationCaseService : IEvaluationCaseService
         _notifications = notifications;
         _documentInstanceService = documentInstanceService;
         _logger = logger;
+        _notificationsLocalizer = notificationsLocalizer;
     }
 
     // ---------------------------------------------------------------- Reads
@@ -327,11 +332,24 @@ public class EvaluationCaseService : IEvaluationCaseService
         {
             var recipients = new HashSet<int> { a.UserId, a.LeadUserId ?? a.CreatedByUserId };
             var dedupKey = $"evaluator-overdue-{a.Id}-{today:yyyyMMdd}";
-            var title = $"Evaluator assignment overdue: {a.Domain}";
-            var body = $"{a.Domain} evaluation for {a.StudentName} was due {a.DueDate:MMM d, yyyy} and has not been submitted.";
+            // Multilingual plan phase 4 review: re-checked whether this should localize like
+            // DraftResponseKind now does. EvaluatorAssignment.Domain is free text a staff member types
+            // when creating the assignment (AddAssignmentAsync only validates non-empty; see
+            // add-assignment-form.tsx's plain text input and demo seed values like "Cognitive ability and
+            // observation") — not a closed C# enum, so there is no fixed value set to add resx keys for.
+            // It stays in English for every recipient, same as other staff-authored free text in this
+            // codebase (StaffInvite's org-role name, DraftResponse.StaffReply, Meeting.Title).
+            var domain = a.Domain;
+            var studentName = a.StudentName;
+            var dueDate = a.DueDate!.Value;
+
+            (string Title, string Body) BuildText(string lang) => (
+                _notificationsLocalizer["Notifications.EvaluatorOverdue.Title", domain],
+                _notificationsLocalizer["Notifications.EvaluatorOverdue.Body", domain, studentName, LocalizedDateFormat.ShortDate(dueDate, lang)]);
+
             try
             {
-                await _notifications.NotifyAsync(recipients, NotificationKind.EvaluatorOverdue, title, body,
+                await _notifications.NotifyAsync(recipients, NotificationKind.EvaluatorOverdue, BuildText,
                     $"/educator/students/{a.StudentId}", dedupKey, emailImmediately: true, ct);
             }
             catch (Exception ex)

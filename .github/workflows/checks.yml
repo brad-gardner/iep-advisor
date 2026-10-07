@@ -70,6 +70,9 @@ jobs:
       - name: Build
         run: npm run build
         working-directory: web
+      - name: Bundle size (main chunk gzip budget)
+        run: npm run check:bundle
+        working-directory: web
       - name: UX guard
         run: npm run guard:ux
         working-directory: web

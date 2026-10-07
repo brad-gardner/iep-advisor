@@ -79,6 +79,13 @@ Every Spanish string in the app, emails, PDFs and AI instructions uses these ter
 | Pre-K / Kindergarten | prekínder / kínder |
 | 1st grade … 12th grade | 1.er grado … 12.º grado |
 | ungraded | sin grado |
+| deadline | plazo (the due-date sense — "¿cuándo vence?" — never the installment/loan-term sense of "plazo") |
+| digest (daily email) | resumen diario |
+| export | exportación |
+| staff (school staff) | personal (the school-staff sense — "personal escolar" when it needs disambiguating from the adjective "personal") |
+| obligation status: upcoming | Próxima |
+| obligation status: due soon | Próxima a vencer |
+| obligation status: overdue | Vencida |
 
 ## IDEA disability categories
 

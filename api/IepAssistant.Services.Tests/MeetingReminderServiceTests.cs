@@ -12,7 +12,7 @@ public sealed class MeetingReminderServiceTests : IDisposable
     private readonly RosterTestDb _db = new();
 
     private MeetingReminderService CreateService(Domain.Data.ApplicationDbContext ctx)
-        => new(ctx, new NotificationService(ctx, TestSupport.TestLocalizers.Messages()), NullLogger<MeetingReminderService>.Instance);
+        => new(ctx, new NotificationService(ctx, TestSupport.TestLocalizers.Messages()), NullLogger<MeetingReminderService>.Instance, TestSupport.TestLocalizers.Notifications());
 
     private (int districtId, int schoolId, int studentId, int userId) SeedMeetingParticipant()
     {
@@ -168,6 +168,36 @@ public sealed class MeetingReminderServiceTests : IDisposable
         // Candidates + participants + already-sent reminders = 3 SELECTs total, independent of meeting
         // count, and zero further work since every (meeting, offset) pair is already complete.
         Assert.True(counter.Queries <= 4, $"Queries = {counter.Queries}");
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06) phase 4
+
+    [Fact]
+    public async Task RunOnceAsync_SpanishPreferringParticipant_ReminderNotificationIsInSpanish()
+    {
+        var (districtId, schoolId, studentId, enUserId) = SeedMeetingParticipant();
+        var (esUserId, _) = _db.Staff("participant-es@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var meetingId = _db.Meeting(studentId, enUserId, DateTime.UtcNow.AddMinutes(30));
+        _db.MeetingParticipant(meetingId, enUserId);
+        _db.MeetingParticipant(meetingId, esUserId);
+
+        using (var ctx = _db.Context())
+        {
+            ctx.Users.Single(u => u.Id == esUserId).PreferredLanguage = "es";
+            ctx.SaveChanges();
+        }
+
+        using var ctx2 = _db.Context();
+        await CreateService(ctx2).RunOnceAsync(DateTime.UtcNow);
+
+        using var assertCtx = _db.Context();
+        var enNotification = await assertCtx.Set<Notification>().FirstAsync(n => n.UserId == enUserId && n.Kind == NotificationKind.MeetingReminder);
+        var esNotification = await assertCtx.Set<Notification>().FirstAsync(n => n.UserId == esUserId && n.Kind == NotificationKind.MeetingReminder);
+
+        Assert.StartsWith("Reminder:", enNotification.Title);
+        Assert.StartsWith("Recordatorio:", esNotification.Title);
+        Assert.Contains("is coming up.", enNotification.Body);
+        Assert.Contains("se acerca.", esNotification.Body);
     }
 
     // ----------------------------------------------------------------- DbUpdateException classification (todos/053)
