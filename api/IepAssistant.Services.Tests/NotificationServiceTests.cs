@@ -1,8 +1,11 @@
 using System.Linq;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Localization;
+using IepAssistant.Services.Models;
 using Xunit;
 
 namespace IepAssistant.Services.Tests;
@@ -167,8 +170,9 @@ public sealed class NotificationServiceTests : IDisposable
 
     // ----------------------------------------------------------------- multilingual plan (2026-10-06)
     // phase 2: Notifications.NotFound renders in the UI culture — English under "en", Spanish under
-    // "es" (and the Spanish text deliberately still contains "no encontrad", relied on by
-    // NotificationsController.MapFailure's 404 routing — see that controller).
+    // "es". Review fix P2-A: NotificationsController's 404 routing now switches on
+    // ServiceResult.ErrorKind (asserted below), never on message-text substrings — see
+    // IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure.
 
     [Fact]
     public async Task MarkReadAsync_UnknownNotification_UnderEnglishCulture_MessageIsEnglish()
@@ -182,6 +186,7 @@ public sealed class NotificationServiceTests : IDisposable
 
         Assert.False(result.Success);
         Assert.Equal("Notification not found.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
     }
 
     [Fact]
@@ -196,6 +201,16 @@ public sealed class NotificationServiceTests : IDisposable
 
         Assert.False(result.Success);
         Assert.Equal("Notificación no encontrada.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    /// <summary>Minimal concrete <see cref="ControllerBase"/> for exercising the
+    /// <see cref="ServiceFailureMapperExtensions.MapServiceFailure"/> extension outside a real controller.</summary>
+    private sealed class TestController : ControllerBase
+    {
     }
 
     public void Dispose() => _db.Dispose();

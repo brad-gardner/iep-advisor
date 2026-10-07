@@ -133,7 +133,7 @@ public sealed class PasswordResetServiceTests : IDisposable
         var result = await CreateService().ResetPasswordAsync("not-a-real-token", "NewPassword1!");
 
         Assert.False(result.Success);
-        Assert.Equal("El token para restablecer la contraseña no es válido o ha vencido.", result.Message);
+        Assert.Equal("El enlace para restablecer la contraseña no es válido o ha vencido.", result.Message);
     }
 
     public void Dispose()

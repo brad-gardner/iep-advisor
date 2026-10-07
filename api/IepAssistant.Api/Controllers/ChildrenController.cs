@@ -81,7 +81,7 @@ public class ChildrenController : ControllerBase
             return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["ChildrenApi.CreationFailed"].Value));
 
         var dto = MapToDto(result.Data!);
-        return CreatedAtAction(nameof(GetById), new { id = dto.Id }, ApiResponse<ChildProfileDto>.SuccessResponse(dto, _localizer["ChildrenApi.CreatedSuccessfully"]));
+        return CreatedAtAction(nameof(GetById), new { id = dto.Id }, ApiResponse<ChildProfileDto>.SuccessResponse(dto, result.Message));
     }
 
     [HttpPut("{id}")]
@@ -105,7 +105,7 @@ public class ChildrenController : ControllerBase
         if (!result.Success)
             return NotFound(ApiResponse<object>.Error(result.Message ?? _localizer["ChildrenApi.UpdateFailed"].Value));
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["ChildrenApi.UpdatedSuccessfully"]));
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 
     [HttpDelete("{id}")]
@@ -119,7 +119,7 @@ public class ChildrenController : ControllerBase
         if (!result.Success)
             return NotFound(ApiResponse<object>.Error(result.Message ?? _localizer["ChildrenApi.DeleteFailed"].Value));
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["ChildrenApi.DeletedSuccessfully"]));
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 
     [HttpPut("{childId}/current-iep/{iepId}")]
@@ -133,7 +133,7 @@ public class ChildrenController : ControllerBase
         if (!result.Success)
             return NotFound(ApiResponse<object>.Error(result.Message ?? _localizer["ChildrenApi.SetCurrentIepFailed"].Value));
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message ?? _localizer["ChildrenApi.CurrentIepUpdated"].Value));
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 
     private static ChildProfileDto MapToDto(ChildProfileModel model, string? role = null) => new()

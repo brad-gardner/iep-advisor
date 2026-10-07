@@ -49,13 +49,13 @@ public class ChildLinkService : IChildLinkService
     public async Task<ServiceResult<ChildLinkModel>> InviteParentAsync(int educatorUserId, int studentId, string parentEmail, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(parentEmail))
-            return ServiceResult<ChildLinkModel>.FailureResult(_localizer["ChildLinks.ParentEmailRequired"]);
+            return ServiceResult<ChildLinkModel>.FailureResult(ServiceErrorKind.Validation, _localizer["ChildLinks.ParentEmailRequired"]);
 
         parentEmail = parentEmail.Trim();
 
         var access = await GetEducatorStudentAccessAsync(educatorUserId, studentId, ct);
         if (access.student == null)
-            return ServiceResult<ChildLinkModel>.FailureResult(_localizer["ChildLinks.NoPermissionToInvite"]);
+            return ServiceResult<ChildLinkModel>.Forbidden(_localizer["ChildLinks.NoPermissionToInvite"]);
 
         var student = access.student;
         var now = DateTime.UtcNow;
@@ -68,7 +68,7 @@ public class ChildLinkService : IChildLinkService
                         && l.AcceptedAt == null
                         && l.InviteExpiresAt > now, ct);
         if (existingPending)
-            return ServiceResult<ChildLinkModel>.FailureResult(_localizer["ChildLinks.PendingInviteExists"]);
+            return ServiceResult<ChildLinkModel>.FailureResult(ServiceErrorKind.Validation, _localizer["ChildLinks.PendingInviteExists"]);
 
         // Idempotency: the student is already actively linked to a ChildProfile owned by this email.
         var alreadyLinked = await _context.ChildLinks
@@ -84,7 +84,7 @@ public class ChildLinkService : IChildLinkService
                  && ca.User != null
                  && ca.User.Email.ToLower() == parentEmail.ToLower()), ct);
         if (alreadyLinked)
-            return ServiceResult<ChildLinkModel>.FailureResult(_localizer["ChildLinks.AlreadyLinkedToParent"]);
+            return ServiceResult<ChildLinkModel>.FailureResult(ServiceErrorKind.Validation, _localizer["ChildLinks.AlreadyLinkedToParent"]);
 
         var rawToken = InviteTokenHelper.Generate();
         var tokenHash = InviteTokenHelper.Hash(rawToken);
@@ -137,17 +137,17 @@ public class ChildLinkService : IChildLinkService
     {
         var invite = await FindActiveInviteAsync(token, ct);
         if (invite == null)
-            return ServiceResult<ChildLinkInvitePreviewModel>.FailureResult(_localizer["Invites.InvalidOrExpired"]);
+            return ServiceResult<ChildLinkInvitePreviewModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Invites.InvalidOrExpired"]);
 
         var emailCheck = await VerifyEmailMatchAsync(parentUserId, invite, ct);
         if (!emailCheck.Success)
-            return ServiceResult<ChildLinkInvitePreviewModel>.FailureResult(emailCheck.Message!);
+            return ServiceResult<ChildLinkInvitePreviewModel>.FailureResult(emailCheck.ErrorKind, emailCheck.Message!);
 
         var student = await _context.SchoolStudents
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.Id == invite.SchoolStudentId, ct);
         if (student == null)
-            return ServiceResult<ChildLinkInvitePreviewModel>.FailureResult(_localizer["ChildLinks.StudentNotFound"]);
+            return ServiceResult<ChildLinkInvitePreviewModel>.NotFound(_localizer["ChildLinks.StudentNotFound"]);
 
         var schoolName = await _context.Schools
             .Where(s => s.Id == student.SchoolId)
@@ -172,11 +172,11 @@ public class ChildLinkService : IChildLinkService
     {
         var invite = await FindActiveInviteAsync(token, ct);
         if (invite == null)
-            return ServiceResult<ChildLinkModel>.FailureResult(_localizer["Invites.InvalidOrExpired"]);
+            return ServiceResult<ChildLinkModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Invites.InvalidOrExpired"]);
 
         var emailCheck = await VerifyEmailMatchAsync(parentUserId, invite, ct);
         if (!emailCheck.Success)
-            return ServiceResult<ChildLinkModel>.FailureResult(emailCheck.Message!);
+            return ServiceResult<ChildLinkModel>.FailureResult(emailCheck.ErrorKind, emailCheck.Message!);
 
         // Idempotency: this student already has an active, accepted link to a ChildProfile this parent owns.
         // Return success WITHOUT creating anything (exactly one link).
@@ -203,11 +203,11 @@ public class ChildLinkService : IChildLinkService
         {
             var isOwner = await _accessService.HasMinimumRoleAsync(linkToChildProfileId.Value, parentUserId, AccessRole.Owner, ct);
             if (!isOwner)
-                return ServiceResult<ChildLinkModel>.FailureResult(_localizer["ChildLinks.NoPermissionToLinkChild"]);
+                return ServiceResult<ChildLinkModel>.Forbidden(_localizer["ChildLinks.NoPermissionToLinkChild"]);
         }
         else if (!await _context.SchoolStudents.AnyAsync(s => s.Id == invite.SchoolStudentId, ct))
         {
-            return ServiceResult<ChildLinkModel>.FailureResult(_localizer["ChildLinks.StudentNotFound"]);
+            return ServiceResult<ChildLinkModel>.NotFound(_localizer["ChildLinks.StudentNotFound"]);
         }
 
         // Atomically claim the invite, so two concurrent accepts of the same token can't both pass
@@ -238,7 +238,7 @@ public class ChildLinkService : IChildLinkService
                 .FirstOrDefaultAsync(ct);
             return winner != null
                 ? ServiceResult<ChildLinkModel>.SuccessResult(MapToModel(winner), _localizer["ChildLinks.AlreadyLinked"])
-                : ServiceResult<ChildLinkModel>.FailureResult(_localizer["Invites.InvalidOrExpired"]);
+                : ServiceResult<ChildLinkModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Invites.InvalidOrExpired"]);
         }
 
         // Keep the tracked entity consistent with the claim we just committed out-of-band.
@@ -257,7 +257,7 @@ public class ChildLinkService : IChildLinkService
             var student = await _context.SchoolStudents
                 .FirstOrDefaultAsync(s => s.Id == invite.SchoolStudentId, ct);
             if (student == null)
-                return ServiceResult<ChildLinkModel>.FailureResult(_localizer["ChildLinks.StudentNotFound"]);
+                return ServiceResult<ChildLinkModel>.NotFound(_localizer["ChildLinks.StudentNotFound"]);
 
             var child = new ChildProfile
             {
@@ -310,11 +310,11 @@ public class ChildLinkService : IChildLinkService
         var link = await _context.ChildLinks
             .FirstOrDefaultAsync(l => l.Id == linkId && l.SchoolStudentId == studentId, ct);
         if (link == null)
-            return ServiceResult.FailureResult(_localizer["ChildLinks.LinkNotFound"]);
+            return ServiceResult.NotFound(_localizer["ChildLinks.LinkNotFound"]);
 
         var access = await GetEducatorStudentAccessAsync(educatorUserId, link.SchoolStudentId, ct);
         if (access.student == null)
-            return ServiceResult.FailureResult(_localizer["ChildLinks.NoPermissionToRevoke"]);
+            return ServiceResult.Forbidden(_localizer["ChildLinks.NoPermissionToRevoke"]);
 
         // Forward-only: deactivating the link stops FUTURE version sharing but does NOT retroactively
         // remove anything the parent already received. IepVersion sharing arrives in P5; nothing is shared
@@ -334,7 +334,7 @@ public class ChildLinkService : IChildLinkService
     {
         var access = await GetEducatorStudentAccessAsync(educatorUserId, studentId, ct);
         if (access.student == null)
-            return ServiceResult<List<ChildLinkModel>>.FailureResult(_localizer["ChildLinks.NoPermissionToViewStudentLinks"]);
+            return ServiceResult<List<ChildLinkModel>>.Forbidden(_localizer["ChildLinks.NoPermissionToViewStudentLinks"]);
 
         var links = await _context.ChildLinks
             .AsNoTracking()
@@ -352,7 +352,7 @@ public class ChildLinkService : IChildLinkService
         // Parent must have access to the child (any role).
         var role = await _accessService.GetRoleAsync(childProfileId, parentUserId, ct);
         if (role == null)
-            return ServiceResult<List<ChildSchoolLinkModel>>.FailureResult(_localizer["ChildLinks.NoPermissionToViewChild"]);
+            return ServiceResult<List<ChildSchoolLinkModel>>.Forbidden(_localizer["ChildLinks.NoPermissionToViewChild"]);
 
         var links = await _context.ChildLinks
             .AsNoTracking()
@@ -409,11 +409,11 @@ public class ChildLinkService : IChildLinkService
     {
         var user = await _context.Users.FindAsync(new object[] { parentUserId }, ct);
         if (user == null)
-            return ServiceResult.FailureResult(_localizer["Auth.UserNotFound"]);
+            return ServiceResult.NotFound(_localizer["Auth.UserNotFound"]);
 
         if (!string.IsNullOrEmpty(invite.InviteEmail) &&
             !string.Equals(user.Email, invite.InviteEmail, StringComparison.OrdinalIgnoreCase))
-            return ServiceResult.FailureResult(_localizer["Invites.SentToDifferentEmail"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Invites.SentToDifferentEmail"]);
 
         return ServiceResult.SuccessResult();
     }

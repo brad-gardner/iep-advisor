@@ -167,26 +167,14 @@
   <data name="ChildrenApi.CreationFailed" xml:space="preserve">
     <value>Creation failed</value>
   </data>
-  <data name="ChildrenApi.CreatedSuccessfully" xml:space="preserve">
-    <value>Child profile created successfully</value>
-  </data>
   <data name="ChildrenApi.UpdateFailed" xml:space="preserve">
     <value>Update failed</value>
-  </data>
-  <data name="ChildrenApi.UpdatedSuccessfully" xml:space="preserve">
-    <value>Child profile updated successfully</value>
   </data>
   <data name="ChildrenApi.DeleteFailed" xml:space="preserve">
     <value>Delete failed</value>
   </data>
-  <data name="ChildrenApi.DeletedSuccessfully" xml:space="preserve">
-    <value>Child profile deleted successfully</value>
-  </data>
   <data name="ChildrenApi.SetCurrentIepFailed" xml:space="preserve">
     <value>Set current IEP failed</value>
-  </data>
-  <data name="ChildrenApi.CurrentIepUpdated" xml:space="preserve">
-    <value>Current IEP updated</value>
   </data>
 
   <data name="ChildLinks.ParentEmailRequired" xml:space="preserve">
@@ -321,6 +309,13 @@
 
   <data name="Notifications.NotFound" xml:space="preserve">
     <value>Notification not found.</value>
+  </data>
+
+  <data name="Home.NoChildrenLinked" xml:space="preserve">
+    <value>No children linked to your account yet.</value>
+  </data>
+  <data name="Home.ChildHasNoSchoolLink" xml:space="preserve">
+    <value>{0} has no school link yet.</value>
   </data>
 
   <data name="KnowledgeBaseApi.NotFound" xml:space="preserve">

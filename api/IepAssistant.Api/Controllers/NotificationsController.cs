@@ -31,7 +31,7 @@ public class NotificationsController : ControllerBase
     {
         var result = await _notificationService.GetForUserAsync(User.GetUserId(), unread, limit, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var data = result.Data!;
         return Ok(ApiResponse<NotificationListDto>.SuccessResponse(new NotificationListDto
@@ -48,7 +48,7 @@ public class NotificationsController : ControllerBase
     {
         var result = await _notificationService.MarkReadAsync(User.GetUserId(), id, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<object>.SuccessResponse(null));
     }
@@ -73,21 +73,4 @@ public class NotificationsController : ControllerBase
         EmailSentAt = n.EmailSentAt,
         EmailError = n.EmailError
     };
-
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= _localizer["Api.RequestFailed"].Value;
-
-        // See the matching comment in ChildLinkController.MapFailure: the Spanish translation of
-        // Notifications.NotFound deliberately contains "no encontrad" (stem of "no encontrada") for
-        // exactly this routing check to keep working under Spanish culture.
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("permiso", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("no encontrad", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

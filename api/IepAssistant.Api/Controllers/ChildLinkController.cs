@@ -35,7 +35,7 @@ public class ChildLinkController : ControllerBase
         var result = await _childLinkService.PreviewInviteAsync(User.GetUserId(), token, ct);
 
         if (!result.Success)
-            return MapFailure<ChildLinkInvitePreviewDto>(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var d = result.Data!;
         return Ok(ApiResponse<ChildLinkInvitePreviewDto>.SuccessResponse(new ChildLinkInvitePreviewDto
@@ -66,7 +66,7 @@ public class ChildLinkController : ControllerBase
             User.GetUserId(), request.Token, request.LinkToChildProfileId, ct);
 
         if (!result.Success)
-            return MapFailure<AcceptedChildLinkDto>(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var d = result.Data!;
         return Ok(ApiResponse<AcceptedChildLinkDto>.SuccessResponse(new AcceptedChildLinkDto
@@ -85,7 +85,7 @@ public class ChildLinkController : ControllerBase
     {
         var result = await _childLinkService.GetChildSchoolLinksAsync(User.GetUserId(), childId, ct);
         if (!result.Success)
-            return MapFailure<List<ChildSchoolLinkDto>>(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var dtos = result.Data!.Select(l => new ChildSchoolLinkDto
         {
@@ -97,25 +97,5 @@ public class ChildLinkController : ControllerBase
             LinkedAt = l.LinkedAt
         }).ToList();
         return Ok(ApiResponse<List<ChildSchoolLinkDto>>.SuccessResponse(dtos));
-    }
-
-    private IActionResult MapFailure<T>(string? message)
-    {
-        message ??= _localizer["Api.RequestFailed"].Value;
-
-        // Status routing is keyed off substrings of the (now-localized) message text. The Spanish
-        // translations of every "no permission"/"not found" message in this controller's services
-        // deliberately include "permiso"/"no encontrad" (stem covers both "encontrado"/"encontrada"
-        // grammatical gender) for exactly this reason — see Messages.es.resx (ChildLinks.* area).
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("permiso", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("no encontrad", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        // "Invalid or expired", "different email address", etc. -> 400.
-        return BadRequest(ApiResponse<object>.Error(message));
     }
 }

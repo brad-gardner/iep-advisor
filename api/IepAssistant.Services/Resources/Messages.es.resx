@@ -167,26 +167,14 @@
   <data name="ChildrenApi.CreationFailed" xml:space="preserve">
     <value>No se pudo crear</value>
   </data>
-  <data name="ChildrenApi.CreatedSuccessfully" xml:space="preserve">
-    <value>Perfil del hijo creado correctamente</value>
-  </data>
   <data name="ChildrenApi.UpdateFailed" xml:space="preserve">
     <value>No se pudo actualizar</value>
-  </data>
-  <data name="ChildrenApi.UpdatedSuccessfully" xml:space="preserve">
-    <value>Perfil del hijo actualizado correctamente</value>
   </data>
   <data name="ChildrenApi.DeleteFailed" xml:space="preserve">
     <value>No se pudo eliminar</value>
   </data>
-  <data name="ChildrenApi.DeletedSuccessfully" xml:space="preserve">
-    <value>Perfil del hijo eliminado correctamente</value>
-  </data>
   <data name="ChildrenApi.SetCurrentIepFailed" xml:space="preserve">
     <value>No se pudo establecer el IEP actual</value>
-  </data>
-  <data name="ChildrenApi.CurrentIepUpdated" xml:space="preserve">
-    <value>IEP actual actualizado</value>
   </data>
 
   <data name="ChildLinks.ParentEmailRequired" xml:space="preserve">
@@ -205,7 +193,7 @@
     <value>Invitación enviada correctamente.</value>
   </data>
   <data name="Invites.InvalidOrExpired" xml:space="preserve">
-    <value>El token de invitación no es válido o ha vencido.</value>
+    <value>El enlace de invitación no es válido o ha vencido.</value>
   </data>
   <data name="ChildLinks.StudentNotFound" xml:space="preserve">
     <value>Estudiante no encontrado.</value>
@@ -236,7 +224,7 @@
   </data>
 
   <data name="ChildLinksApi.TokenRequired" xml:space="preserve">
-    <value>El token es obligatorio.</value>
+    <value>El enlace es obligatorio.</value>
   </data>
 
   <data name="Invites.SentToDifferentEmail" xml:space="preserve">
@@ -268,7 +256,7 @@
     <value>No se encontró el registro de acceso.</value>
   </data>
   <data name="Sharing.CannotRevokeLastOwner" xml:space="preserve">
-    <value>No se puede revocar al último propietario.</value>
+    <value>No se puede quitar el acceso del último propietario.</value>
   </data>
   <data name="Sharing.AccessRevokedSuccessfully" xml:space="preserve">
     <value>Acceso revocado correctamente.</value>
@@ -323,6 +311,13 @@
     <value>Notificación no encontrada.</value>
   </data>
 
+  <data name="Home.NoChildrenLinked" xml:space="preserve">
+    <value>Aún no hay hijos vinculados a su cuenta.</value>
+  </data>
+  <data name="Home.ChildHasNoSchoolLink" xml:space="preserve">
+    <value>{0} aún no tiene un enlace escolar.</value>
+  </data>
+
   <data name="KnowledgeBaseApi.NotFound" xml:space="preserve">
     <value>No se encontró la entrada del centro de recursos</value>
   </data>
@@ -332,7 +327,7 @@
   </data>
 
   <data name="PasswordReset.InvalidOrExpiredToken" xml:space="preserve">
-    <value>El token para restablecer la contraseña no es válido o ha vencido.</value>
+    <value>El enlace para restablecer la contraseña no es válido o ha vencido.</value>
   </data>
   <data name="PasswordReset.ResetSuccessfully" xml:space="preserve">
     <value>La contraseña se restableció correctamente.</value>

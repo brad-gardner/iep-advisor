@@ -26,7 +26,7 @@ public sealed class HomeServiceTests : IDisposable
         // IOrgAccessService is Scoped) so its per-request staff-context memo is actually shared across
         // HomeService/ObligationService/DistrictService, as it would be for a real request.
         var districtService = new DistrictService(ctx, orgAccess, NullLogger<DistrictService>.Instance);
-        return new HomeService(ctx, orgAccess, obligationService, completeness, districtService);
+        return new HomeService(ctx, orgAccess, obligationService, completeness, districtService, TestSupport.TestLocalizers.Messages());
     }
 
     /// <summary>Seeds a one-required-field Published template version and returns its id.</summary>

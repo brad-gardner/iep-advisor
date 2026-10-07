@@ -81,7 +81,7 @@ public class NotificationService : INotificationService
     {
         var notification = await _context.Notifications.FirstOrDefaultAsync(n => n.Id == notificationId && n.UserId == userId, ct);
         if (notification == null)
-            return ServiceResult.FailureResult(_localizer["Notifications.NotFound"]);
+            return ServiceResult.NotFound(_localizer["Notifications.NotFound"]);
 
         if (notification.ReadAt == null)
         {
