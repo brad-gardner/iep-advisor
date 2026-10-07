@@ -14,7 +14,8 @@
     "guard:ux": "node scripts/ux-consistency-guard.mjs",
     "type-check": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "check:bundle": "node scripts/check-bundle-size.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.43.0",
