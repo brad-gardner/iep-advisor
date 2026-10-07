@@ -205,7 +205,16 @@ public class AuthoredDocumentPdfService : IAuthoredDocumentPdfService
 
         if (!string.IsNullOrEmpty(englishPdf.HeaderSnapshotJson))
         {
-            var cached = JsonSerializer.Deserialize<AuthoredDocumentPdfHeaderContext>(englishPdf.HeaderSnapshotJson);
+            AuthoredDocumentPdfHeaderContext? cached = null;
+            try
+            {
+                cached = JsonSerializer.Deserialize<AuthoredDocumentPdfHeaderContext>(englishPdf.HeaderSnapshotJson);
+            }
+            catch (Exception ex) when (ex is JsonException or NotSupportedException)
+            {
+                // A snapshot written by an older header shape must not wedge every retry in Error.
+                _logger.LogWarning(ex, "PDF header freeze: HeaderSnapshotJson on version {VersionId} is unreadable", versionId);
+            }
             if (cached != null) return cached;
 
             _logger.LogWarning("PDF header freeze: HeaderSnapshotJson on version {VersionId} failed to deserialize; rebuilding live (not re-stored)", versionId);

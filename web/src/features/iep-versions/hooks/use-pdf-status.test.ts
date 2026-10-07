@@ -88,7 +88,7 @@ describe('usePdfStatus', () => {
     // is active.
     const { result } = renderHook(() => usePdfStatus(1, 'Rendered'));
 
-    expect(result.current.status).not.toBe('Rendered');
+    expect(result.current.status).toBeNull();
     expect(result.current.url).toBeNull();
 
     await waitFor(() => expect(result.current.status).toBe('Pending'));
@@ -106,5 +106,44 @@ describe('usePdfStatus', () => {
     expect(result.current.status).toBe('Rendered');
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
+  });
+
+  it('drops an English request that resolves after the switch to Spanish', async () => {
+    iepVersionsApi.getPdfStatus.mockResolvedValue({
+      success: true,
+      data: status({ renderStatus: 'Error', url: null, errorMessage: 'boom' }),
+    });
+    const { result } = renderHook(() => usePdfStatus(1));
+    await waitFor(() => expect(result.current.status).toBe('Error'));
+
+    // Retry sent while English is active, still in flight across the switch.
+    let resolveEnglishRetry!: (value: { success: true; data: IepVersionPdfStatusDto }) => void;
+    iepVersionsApi.retryPdf.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveEnglishRetry = resolve;
+        })
+    );
+    let retryDone!: Promise<void>;
+    act(() => {
+      retryDone = result.current.retry();
+    });
+
+    iepVersionsApi.getPdfStatus.mockResolvedValue({
+      success: true,
+      data: status({ renderStatus: 'Pending', url: null }),
+    });
+    await act(async () => {
+      await i18n.changeLanguage('es');
+    });
+    await waitFor(() => expect(result.current.status).toBe('Pending'));
+
+    // The English answer lands last; it must not overwrite the Spanish state.
+    await act(async () => {
+      resolveEnglishRetry({ success: true, data: status({ renderStatus: 'Rendered' }) });
+      await retryDone;
+    });
+    expect(result.current.status).toBe('Pending');
+    expect(result.current.url).toBeNull();
   });
 });

@@ -81,7 +81,7 @@ describe('useAuthoredPdfStatus', () => {
     // data; it must not be trusted while Spanish is active.
     const { result } = renderHook(() => useAuthoredPdfStatus(1, 'Rendered'));
 
-    expect(result.current.status).not.toBe('Rendered');
+    expect(result.current.status).toBeNull();
 
     await waitFor(() => expect(result.current.status).toBe('Pending'));
   });

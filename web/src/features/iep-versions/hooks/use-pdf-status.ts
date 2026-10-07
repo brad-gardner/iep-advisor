@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+// The singleton api-client reads for Accept-Language.
+import appI18n from '@/lib/i18n';
 import { usePolling } from '@/hooks/use-polling';
 import { getPdfStatus, retryPdf } from '../api/iep-versions-api';
 import type { IepVersionPdfStatusDto, PdfRenderStatus } from '../types';
@@ -61,7 +63,12 @@ export function usePdfStatus(
 
   const fetchStatus = useCallback(async () => {
     try {
+      // Requests carry the language active when sent (api-client's Accept-Language);
+      // drop the answer if the language switched while it was in flight, so a
+      // previous language's row never overwrites the reset state.
+      const sentWith = appI18n.language;
       const res = await getPdfStatus(versionId);
+      if (appI18n.language !== sentWith) return;
       if (res.success && res.data) {
         setPdf(res.data);
       }
@@ -115,7 +122,9 @@ export function usePdfStatus(
     setTimedOut(false);
     startedAtRef.current = Date.now();
     try {
+      const sentWith = appI18n.language;
       const res = await retryPdf(versionId);
+      if (appI18n.language !== sentWith) return;
       if (res.success && res.data) {
         setPdf(res.data);
       } else {

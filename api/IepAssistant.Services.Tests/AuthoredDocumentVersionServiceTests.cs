@@ -1221,6 +1221,30 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RenderAsync_UnreadableHeaderSnapshot_FallsBackToLiveHeader_InsteadOfFailing()
+    {
+        var s = SeedSchoolWithStudent("pdf-header-corrupt");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Pending);
+
+        using (var ctx = CreateContext())
+        {
+            var english = ctx.AuthoredDocumentPdfs.Single(p => p.AuthoredDocumentVersionId == versionId);
+            english.HeaderSnapshotJson = "{\"StudentFirstName\": 42";
+            ctx.SaveChanges();
+        }
+
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, new SuccessBlobStorageFake()).RenderAsync(versionId);
+
+        using (var ctx = CreateContext())
+        {
+            var english = ctx.AuthoredDocumentPdfs.Single(p => p.AuthoredDocumentVersionId == versionId);
+            Assert.Equal(PdfRenderStatus.Rendered, english.RenderStatus);
+        }
+    }
+
+    [Fact]
     public async Task GetPdfStatus_FirstSpanishPoll_CreatesPendingRow_FlagsNeedsRender_LeavesEnglishRowUntouched()
     {
         var s = SeedSchoolWithStudent("pdf-status-es");
