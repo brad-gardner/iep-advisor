@@ -33,6 +33,7 @@ public class DraftResponseService : IDraftResponseService
     private readonly INotificationService _notifications;
     private readonly ILogger<DraftResponseService> _logger;
     private readonly IStringLocalizer<Messages> _localizer;
+    private readonly IStringLocalizer<Notifications> _notificationsLocalizer;
 
     public DraftResponseService(
         ApplicationDbContext context,
@@ -40,7 +41,8 @@ public class DraftResponseService : IDraftResponseService
         IOrgAccessService orgAccess,
         INotificationService notifications,
         ILogger<DraftResponseService> logger,
-        IStringLocalizer<Messages> localizer)
+        IStringLocalizer<Messages> localizer,
+        IStringLocalizer<Notifications> notificationsLocalizer)
     {
         _context = context;
         _accessService = accessService;
@@ -48,6 +50,7 @@ public class DraftResponseService : IDraftResponseService
         _notifications = notifications;
         _logger = logger;
         _localizer = localizer;
+        _notificationsLocalizer = notificationsLocalizer;
     }
 
     public async Task<ServiceResult<DraftResponseModel>> CreateAsync(int parentUserId, int revisionId, CreateDraftResponseModel model, CancellationToken ct = default)
@@ -178,16 +181,24 @@ public class DraftResponseService : IDraftResponseService
             if (recipientIds.Count == 0)
                 return;
 
-            var studentName = await _context.SchoolStudents.AsNoTracking()
+            var studentName = (await _context.SchoolStudents.AsNoTracking()
                 .Where(s => s.Id == header.SchoolStudentId)
                 .Select(s => s.FirstName + " " + s.LastName)
-                .FirstOrDefaultAsync(ct) ?? "the student";
+                .FirstOrDefaultAsync(ct))?.Trim();
+            if (string.IsNullOrWhiteSpace(studentName))
+                studentName = null;
 
-            const string title = "New family response";
-            var body = $"A family member responded ({response.Kind}) to the shared draft for {studentName.Trim()}.";
+            // response.Kind is an enum-like value, kept in English for every recipient — consistent with
+            // every other status/severity/kind value in this codebase (multilingual plan, phase 3 review).
+            var kindLabel = response.Kind.ToString();
             var linkPath = $"/educator/documents/{header.DocumentInstanceId}?tab=converge";
             var dedupKey = $"draft-response-{response.Id}";
-            await _notifications.NotifyAsync(recipientIds, NotificationKind.ResponseReceived, title, body, linkPath, dedupKey, emailImmediately: true, ct);
+
+            (string Title, string Body) BuildText(string lang) => (
+                _notificationsLocalizer["Notifications.ResponseReceived.Title"],
+                _notificationsLocalizer["Notifications.ResponseReceived.Body", kindLabel, studentName ?? _notificationsLocalizer["Notifications.ResponseReceived.UnknownStudent"]]);
+
+            await _notifications.NotifyAsync(recipientIds, NotificationKind.ResponseReceived, BuildText, linkPath, dedupKey, emailImmediately: true, ct);
         }
         catch (Exception ex)
         {
@@ -200,17 +211,22 @@ public class DraftResponseService : IDraftResponseService
     {
         try
         {
-            const string title = "Your response was resolved";
-            var body = response.StaffReply != null
-                ? $"The school team replied: {response.StaffReply}"
-                : "The school team addressed this in the draft.";
+            // response.StaffReply is staff-authored free text — never translated, only the sentence
+            // wrapping it (multilingual plan 2026-10-06 phase 4).
+            var staffReply = response.StaffReply;
+            (string Title, string Body) BuildText(string lang) => (
+                _notificationsLocalizer["Notifications.DraftResponseResolved.Title"],
+                staffReply != null
+                    ? _notificationsLocalizer["Notifications.DraftResponseResolved.BodyWithReply", staffReply]
+                    : _notificationsLocalizer["Notifications.DraftResponseResolved.BodyNoReply"]);
+
             // The parent route is child-scoped; a student account (no child profile) gets the bare route.
             var childId = await ParentAccessResolver.ResolveChildIdAsync(_context, _accessService, response.ParentUserId, schoolStudentId, AccessRole.Viewer, ct);
             var linkPath = childId != null
                 ? $"/children/{childId}/shared-drafts/{response.SharedDraftRevisionId}"
                 : $"/shared-drafts/{response.SharedDraftRevisionId}";
             var dedupKey = $"draft-response-resolved-{response.Id}";
-            await _notifications.NotifyAsync(new[] { response.ParentUserId }, NotificationKind.DraftResponseResolved, title, body, linkPath, dedupKey, emailImmediately: true, ct);
+            await _notifications.NotifyAsync(new[] { response.ParentUserId }, NotificationKind.DraftResponseResolved, BuildText, linkPath, dedupKey, emailImmediately: true, ct);
         }
         catch (Exception ex)
         {

@@ -25,8 +25,8 @@ public sealed class NotificationServiceTests : IDisposable
         var (userId, _) = _db.Staff("staff@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
         var service = CreateService();
 
-        await service.NotifyAsync(new[] { userId }, NotificationKind.MeetingScheduled, "Title", "Body", "/meetings/1", "meeting-1-0-MeetingScheduled", emailImmediately: true);
-        await service.NotifyAsync(new[] { userId }, NotificationKind.MeetingScheduled, "Title", "Body", "/meetings/1", "meeting-1-0-MeetingScheduled", emailImmediately: true);
+        await service.NotifyAsync(new[] { userId }, NotificationKind.MeetingScheduled, _ => ("Title", "Body"), "/meetings/1", "meeting-1-0-MeetingScheduled", emailImmediately: true);
+        await service.NotifyAsync(new[] { userId }, NotificationKind.MeetingScheduled, _ => ("Title", "Body"), "/meetings/1", "meeting-1-0-MeetingScheduled", emailImmediately: true);
 
         using var ctx = _db.Context();
         var count = ctx.Set<Notification>().Count(n => n.UserId == userId && n.Kind == NotificationKind.MeetingScheduled);
@@ -41,8 +41,8 @@ public sealed class NotificationServiceTests : IDisposable
         var (userId, _) = _db.Staff("staff2@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
         var service = CreateService();
 
-        await service.NotifyAsync(new[] { userId }, NotificationKind.MeetingUpdated, "Title", "Body", "/meetings/1", "meeting-1-0-MeetingUpdated", emailImmediately: true);
-        await service.NotifyAsync(new[] { userId }, NotificationKind.MeetingUpdated, "Title", "Body", "/meetings/1", "meeting-1-1-MeetingUpdated", emailImmediately: true);
+        await service.NotifyAsync(new[] { userId }, NotificationKind.MeetingUpdated, _ => ("Title", "Body"), "/meetings/1", "meeting-1-0-MeetingUpdated", emailImmediately: true);
+        await service.NotifyAsync(new[] { userId }, NotificationKind.MeetingUpdated, _ => ("Title", "Body"), "/meetings/1", "meeting-1-1-MeetingUpdated", emailImmediately: true);
 
         using var ctx = _db.Context();
         var count = ctx.Set<Notification>().Count(n => n.UserId == userId && n.Kind == NotificationKind.MeetingUpdated);
@@ -57,7 +57,7 @@ public sealed class NotificationServiceTests : IDisposable
         var (userId, _) = _db.Staff("staff3@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
         var service = CreateService();
 
-        await service.NotifyAsync(new[] { userId }, NotificationKind.Generic, "Title", "Body", null, "same-key", emailImmediately: false);
+        await service.NotifyAsync(new[] { userId }, NotificationKind.Generic, _ => ("Title", "Body"), null, "same-key", emailImmediately: false);
 
         // Back-date the existing row past the 24h dedup window, then notify again with the same key.
         using (var ctx = _db.Context())
@@ -67,7 +67,7 @@ public sealed class NotificationServiceTests : IDisposable
             await ctx.SaveChangesAsync();
         }
 
-        await service.NotifyAsync(new[] { userId }, NotificationKind.Generic, "Title", "Body", null, "same-key", emailImmediately: false);
+        await service.NotifyAsync(new[] { userId }, NotificationKind.Generic, _ => ("Title", "Body"), null, "same-key", emailImmediately: false);
 
         using var assertCtx = _db.Context();
         var count = assertCtx.Set<Notification>().Count(n => n.UserId == userId && n.DedupKey == "same-key");
@@ -82,7 +82,7 @@ public sealed class NotificationServiceTests : IDisposable
         var (userId, _) = _db.Staff("staff4@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
         var service = CreateService();
 
-        await service.NotifyAsync(new[] { userId }, NotificationKind.MeetingCancelled, "Title", "Body", "/meetings/9", "k1", emailImmediately: true);
+        await service.NotifyAsync(new[] { userId }, NotificationKind.MeetingCancelled, _ => ("Title", "Body"), "/meetings/9", "k1", emailImmediately: true);
 
         using var ctx = _db.Context();
         var row = await ctx.Set<Notification>().SingleAsync(n => n.UserId == userId);
@@ -97,7 +97,7 @@ public sealed class NotificationServiceTests : IDisposable
         var (userId, _) = _db.Staff("staff5@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
         var service = CreateService();
 
-        await service.NotifyAsync(new[] { userId }, NotificationKind.Generic, "Title", "Body", null, "k2", emailImmediately: false);
+        await service.NotifyAsync(new[] { userId }, NotificationKind.Generic, _ => ("Title", "Body"), null, "k2", emailImmediately: false);
 
         using var ctx = _db.Context();
         var row = await ctx.Set<Notification>().SingleAsync(n => n.UserId == userId);
@@ -112,8 +112,8 @@ public sealed class NotificationServiceTests : IDisposable
         var (userId, _) = _db.Staff("staff6@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
         var service = CreateService();
 
-        await service.NotifyAsync(new[] { userId }, NotificationKind.Generic, "A", "Body", null, "k3", emailImmediately: false);
-        await service.NotifyAsync(new[] { userId }, NotificationKind.Generic, "B", "Body", null, "k4", emailImmediately: false);
+        await service.NotifyAsync(new[] { userId }, NotificationKind.Generic, _ => ("A", "Body"), null, "k3", emailImmediately: false);
+        await service.NotifyAsync(new[] { userId }, NotificationKind.Generic, _ => ("B", "Body"), null, "k4", emailImmediately: false);
 
         var all = await service.GetForUserAsync(userId, unreadOnly: false, limit: 50);
         var toRead = all.Data!.Items.First();
@@ -134,9 +134,9 @@ public sealed class NotificationServiceTests : IDisposable
         var (otherUserId, _) = _db.Staff("staff8@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
         var service = CreateService();
 
-        await service.NotifyAsync(new[] { userId }, NotificationKind.Generic, "A", "Body", null, "k5", emailImmediately: false);
-        await service.NotifyAsync(new[] { userId }, NotificationKind.Generic, "B", "Body", null, "k6", emailImmediately: false);
-        await service.NotifyAsync(new[] { otherUserId }, NotificationKind.Generic, "C", "Body", null, "k7", emailImmediately: false);
+        await service.NotifyAsync(new[] { userId }, NotificationKind.Generic, _ => ("A", "Body"), null, "k5", emailImmediately: false);
+        await service.NotifyAsync(new[] { userId }, NotificationKind.Generic, _ => ("B", "Body"), null, "k6", emailImmediately: false);
+        await service.NotifyAsync(new[] { otherUserId }, NotificationKind.Generic, _ => ("C", "Body"), null, "k7", emailImmediately: false);
 
         var result = await service.MarkAllReadAsync(userId);
 
@@ -153,8 +153,8 @@ public sealed class NotificationServiceTests : IDisposable
         var (userId, _) = _db.Staff("staff9@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
         var service = CreateService();
 
-        await service.NotifyAsync(new[] { userId }, NotificationKind.MeetingReminder, "A", "Body", "/meetings/1", "k8", emailImmediately: true);
-        await service.NotifyAsync(new[] { userId }, NotificationKind.MeetingReminder, "B", "Body", "/meetings/2", "k9", emailImmediately: true);
+        await service.NotifyAsync(new[] { userId }, NotificationKind.MeetingReminder, _ => ("A", "Body"), "/meetings/1", "k8", emailImmediately: true);
+        await service.NotifyAsync(new[] { userId }, NotificationKind.MeetingReminder, _ => ("B", "Body"), "/meetings/2", "k9", emailImmediately: true);
 
         using (var ctx = _db.Context())
         {
@@ -166,6 +166,42 @@ public sealed class NotificationServiceTests : IDisposable
         var failures = await service.GetFailuresAsync(200);
         Assert.Single(failures.Data!);
         Assert.Equal("boom", failures.Data![0].EmailError);
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 4: one NotifyAsync fan-out, batch-resolved recipient languages, each recipient's own language.
+
+    [Fact]
+    public async Task NotifyAsync_FanOutToOneEnglishAndOneSpanishRecipient_EachNotificationIsInThatRecipientsOwnLanguage()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var (enUserId, _) = _db.Staff("staff-fanout-en@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var (esUserId, _) = _db.Staff("staff-fanout-es@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+
+        using (var ctx = _db.Context())
+        {
+            var esUser = await ctx.Set<User>().SingleAsync(u => u.Id == esUserId);
+            esUser.PreferredLanguage = "es";
+            await ctx.SaveChangesAsync();
+        }
+
+        var notificationsLocalizer = TestSupport.TestLocalizers.Notifications();
+        (string Title, string Body) BuildText(string lang) =>
+            (notificationsLocalizer["Notifications.ExportReady.Title"], notificationsLocalizer["Notifications.ExportReady.Body"]);
+
+        // One fan-out call, both recipients, exactly like a real caller's single NotifyAsync invocation —
+        // proving buildText resolves per-recipient language from one batched call, not two separate ones.
+        await CreateService().NotifyAsync(new[] { enUserId, esUserId }, NotificationKind.ExportReady, BuildText, null, "fanout-key", emailImmediately: false);
+
+        using var assertCtx = _db.Context();
+        var enRow = await assertCtx.Set<Notification>().SingleAsync(n => n.UserId == enUserId);
+        var esRow = await assertCtx.Set<Notification>().SingleAsync(n => n.UserId == esUserId);
+
+        Assert.Equal("Your export is ready", enRow.Title);
+        Assert.Equal("The export you requested has finished and is ready to download.", enRow.Body);
+        Assert.Equal("Su exportación está lista", esRow.Title);
+        Assert.Equal("La exportación que solicitó ha finalizado y está lista para descargar.", esRow.Body);
     }
 
     // ----------------------------------------------------------------- multilingual plan (2026-10-06)

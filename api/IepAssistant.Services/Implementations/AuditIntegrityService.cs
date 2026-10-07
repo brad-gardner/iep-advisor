@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -19,12 +20,14 @@ public class AuditIntegrityService : IAuditIntegrityService
     private readonly ApplicationDbContext _context;
     private readonly INotificationService _notificationService;
     private readonly ILogger<AuditIntegrityService> _logger;
+    private readonly IStringLocalizer<Notifications> _notificationsLocalizer;
 
-    public AuditIntegrityService(ApplicationDbContext context, INotificationService notificationService, ILogger<AuditIntegrityService> logger)
+    public AuditIntegrityService(ApplicationDbContext context, INotificationService notificationService, ILogger<AuditIntegrityService> logger, IStringLocalizer<Notifications> notificationsLocalizer)
     {
         _context = context;
         _notificationService = notificationService;
         _logger = logger;
+        _notificationsLocalizer = notificationsLocalizer;
     }
 
     public async Task<AuditIntegrityRunModel> RunCheckAsync(CancellationToken ct = default)
@@ -118,11 +121,14 @@ public class AuditIntegrityService : IAuditIntegrityService
         if (adminIds.Count == 0)
             return;
 
+        (string Title, string Body) BuildText(string lang) => (
+            _notificationsLocalizer["Notifications.AuditIntegrityBroken.Title"],
+            _notificationsLocalizer["Notifications.AuditIntegrityBroken.Body", firstBrokenId]);
+
         await _notificationService.NotifyAsync(
             adminIds,
             NotificationKind.AuditIntegrityBroken,
-            "Audit log integrity check failed",
-            $"The audit hash chain is broken starting at AccessAuditLog #{firstBrokenId}. This may indicate the audit trail was altered outside the application.",
+            BuildText,
             "/admin/audit",
             $"audit-integrity-broken-{firstBrokenId}",
             emailImmediately: true,

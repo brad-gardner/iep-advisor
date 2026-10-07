@@ -91,7 +91,8 @@ public sealed class EvaluationCaseServiceTests : IDisposable
         new NoopBlobStorageFake(),
         new NotificationService(ctx, TestSupport.TestLocalizers.Messages()),
         CreateDocumentInstanceService(ctx),
-        NullLogger<EvaluationCaseService>.Instance);
+        NullLogger<EvaluationCaseService>.Instance,
+        TestSupport.TestLocalizers.Notifications());
 
     private sealed record Scenario(int StudentId, int LeadUserId, int EvaluatorUserId);
 

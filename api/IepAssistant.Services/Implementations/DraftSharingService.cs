@@ -30,6 +30,7 @@ public class DraftSharingService : IDraftSharingService
     private readonly IAuditLogger _audit;
     private readonly ILogger<DraftSharingService> _logger;
     private readonly IStringLocalizer<Messages> _localizer;
+    private readonly IStringLocalizer<Notifications> _notificationsLocalizer;
 
     public DraftSharingService(
         ApplicationDbContext context,
@@ -40,7 +41,8 @@ public class DraftSharingService : IDraftSharingService
         IDraftResponseService responses,
         IAuditLogger audit,
         ILogger<DraftSharingService> logger,
-        IStringLocalizer<Messages> localizer)
+        IStringLocalizer<Messages> localizer,
+        IStringLocalizer<Notifications> notificationsLocalizer)
     {
         _context = context;
         _orgAccess = orgAccess;
@@ -51,6 +53,7 @@ public class DraftSharingService : IDraftSharingService
         _audit = audit;
         _logger = logger;
         _localizer = localizer;
+        _notificationsLocalizer = notificationsLocalizer;
     }
 
     private LocalizedString PermissionMessage => _localizer["Documents.Permission"];
@@ -429,28 +432,37 @@ public class DraftSharingService : IDraftSharingService
 
     private async Task NotifyRecipientsAsync(int instanceId, IReadOnlyList<RecipientInfo> recipients, int revisionId, int revisionNumber, bool withdrawn, string? message, CancellationToken ct)
     {
-        var title = withdrawn ? "Draft withdrawn" : "A draft was shared with you";
         var dedupKey = withdrawn ? $"shared-draft-{instanceId}-{revisionNumber}-withdrawn" : $"shared-draft-{instanceId}-{revisionNumber}";
+
+        // Multilingual plan (2026-10-06) phase 4: built inside NotifyAsync's per-language CultureScope,
+        // once per distinct recipient language — never once per recipient. `message` (the team's optional
+        // free-text note) is never translated, only the sentence wrapping it. Students never get the
+        // note, matching the pre-existing behavior this replaces.
+        (string Title, string Body) BuildText(bool includeNote)
+        {
+            if (withdrawn)
+                return (_notificationsLocalizer["Notifications.DraftShared.Withdrawn.Title"], _notificationsLocalizer["Notifications.DraftShared.WithdrawnBody", revisionNumber]);
+
+            var title = _notificationsLocalizer["Notifications.DraftShared.Title"];
+            var body = includeNote && !string.IsNullOrWhiteSpace(message)
+                ? _notificationsLocalizer["Notifications.DraftShared.BodyWithNote", revisionNumber, message!]
+                : _notificationsLocalizer["Notifications.DraftShared.Body", revisionNumber];
+            return (title, body);
+        }
 
         try
         {
             foreach (var group in recipients.Where(r => r.Relationship == "Parent").GroupBy(r => r.ChildId!.Value))
             {
-                var body = withdrawn
-                    ? $"Revision {revisionNumber} was withdrawn by the school team."
-                    : $"A new draft (revision {revisionNumber}) is ready for you to review." + (message != null ? $" Note from the team: {message}" : string.Empty);
                 // Routes key on the revision id (not the per-instance revision number).
                 var linkPath = $"/children/{group.Key}/shared-drafts/{revisionId}";
-                await _notifications.NotifyAsync(group.Select(g => g.UserId), NotificationKind.DraftShared, title, body, linkPath, dedupKey, emailImmediately: true, ct);
+                await _notifications.NotifyAsync(group.Select(g => g.UserId), NotificationKind.DraftShared, _ => BuildText(includeNote: true), linkPath, dedupKey, emailImmediately: true, ct);
             }
 
             var studentIds = recipients.Where(r => r.Relationship == "Student").Select(r => r.UserId).ToList();
             if (studentIds.Count > 0)
             {
-                var body = withdrawn
-                    ? $"Revision {revisionNumber} was withdrawn by the school team."
-                    : $"A new draft (revision {revisionNumber}) is ready for you to review.";
-                await _notifications.NotifyAsync(studentIds, NotificationKind.DraftShared, title, body, $"/shared-drafts/{revisionId}", dedupKey, emailImmediately: true, ct);
+                await _notifications.NotifyAsync(studentIds, NotificationKind.DraftShared, _ => BuildText(includeNote: false), $"/shared-drafts/{revisionId}", dedupKey, emailImmediately: true, ct);
             }
         }
         catch (Exception ex)

@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -25,14 +27,16 @@ public class DigestService : IDigestService
     private readonly IEmailService _emailService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<DigestService> _logger;
+    private readonly IStringLocalizer<Notifications> _notificationsLocalizer;
 
-    public DigestService(ApplicationDbContext context, IObligationService obligationService, IEmailService emailService, IConfiguration configuration, ILogger<DigestService> logger)
+    public DigestService(ApplicationDbContext context, IObligationService obligationService, IEmailService emailService, IConfiguration configuration, ILogger<DigestService> logger, IStringLocalizer<Notifications> notificationsLocalizer)
     {
         _context = context;
         _obligationService = obligationService;
         _emailService = emailService;
         _configuration = configuration;
         _logger = logger;
+        _notificationsLocalizer = notificationsLocalizer;
     }
 
     public async Task RunForDateAsync(DateOnly localDate, CancellationToken ct = default)
@@ -86,7 +90,7 @@ public class DigestService : IDigestService
 
         var userInfoById = await _context.Users.AsNoTracking()
             .Where(u => usersWithContent.Contains(u.Id))
-            .Select(u => new { u.Id, u.FirstName, u.Email })
+            .Select(u => new { u.Id, u.FirstName, u.Email, u.PreferredLanguage })
             .ToDictionaryAsync(u => u.Id, ct);
 
         var notificationsByUser = new Dictionary<int, Notification>();
@@ -98,12 +102,22 @@ public class DigestService : IDigestService
             var dueOrOverdue = obligationsByUser.TryGetValue(userId, out var obl) ? obl : new List<ObligationModel>();
             var upcomingMeetings = meetingsByUser.TryGetValue(userId, out var mtg) ? mtg : new();
 
+            // Multilingual plan (2026-10-06) phase 4: the bell title/body follow this recipient's own
+            // language — one user at a time is already a single batched user-info query above, so no
+            // extra per-recipient query is introduced here.
+            string title, body;
+            using (CultureScope.For(info.PreferredLanguage))
+            {
+                title = _notificationsLocalizer["Notifications.Digest.Title"];
+                body = _notificationsLocalizer["Notifications.Digest.Body", dueOrOverdue.Count, upcomingMeetings.Count, MeetingLookaheadDays];
+            }
+
             var notification = new Notification
             {
                 UserId = userId,
                 Kind = NotificationKind.ObligationDigest,
-                Title = "Your daily IEP Advisor digest",
-                Body = $"{dueOrOverdue.Count} deadline(s) due soon or overdue, {upcomingMeetings.Count} meeting(s) in the next {MeetingLookaheadDays} days.",
+                Title = title,
+                Body = body,
                 LinkPath = "/notifications",
                 DedupKey = dedupKey,
                 CreatedAt = DateTime.UtcNow
@@ -145,6 +159,11 @@ public class DigestService : IDigestService
 
             try
             {
+                // Multilingual plan (2026-10-06) phase 4: the digest EMAIL's own localization is
+                // EmailService's responsibility (owned elsewhere this phase) — this only ensures the
+                // ambient UI culture matches THIS recipient while it renders, mirroring how NotifyAsync
+                // wraps buildText in CultureScope for the bell notification above.
+                using var _ = CultureScope.For(info.PreferredLanguage);
                 await _emailService.SendDigestAsync(info.Email, model, ct);
                 notification.EmailSentAt = DateTime.UtcNow;
             }

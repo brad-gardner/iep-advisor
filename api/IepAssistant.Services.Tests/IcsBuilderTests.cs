@@ -226,6 +226,59 @@ public class IcsBuilderTests
         Assert.DoesNotContain("\r", summaryLine);
     }
 
+    // ----------------------------------------------------------------- Multilingual plan phase 4
+    //
+    // IcsBuilder has no translatable chrome strings of its own to localize for Spanish — its only
+    // app-generated literal ("Video: " in the DESCRIPTION, built by BuildEventLines) is the same word in
+    // Spanish. Title/Location/Notes passed in are meeting CONTENT, not UI chrome, and the service that
+    // supplies them (NotificationEmailService, via IcsMeetingInputMapper) is outside this worker's
+    // ownership for this phase. What IS this component's job is correctly carrying Spanish (accented,
+    // multi-byte UTF-8) text through SUMMARY/DESCRIPTION/LOCATION without corruption — including across
+    // RFC 5545's 75-octet line folding, which must never split a multi-byte UTF-8 sequence.
+
+    [Fact]
+    public void BuildMeetingEvent_SpanishAccentedTitleLocationAndNotes_RoundTripUncorrupted()
+    {
+        const string spanishTitle = "Reunión de revisión anual del IEP";
+        const string spanishLocation = "Oficina del administración — Edificio Núñez";
+        const string spanishNotes = "Favor de traer el informe de progreso más reciente y cualquier pregunta.";
+
+        var input = Meeting(title: spanishTitle);
+        input.Location = spanishLocation;
+        input.Notes = spanishNotes;
+
+        var ics = Unfold(Text(_builder.BuildMeetingEvent(input, "REQUEST")));
+
+        Assert.Contains($"SUMMARY:{spanishTitle}", ics);
+        Assert.Contains($"LOCATION:{spanishLocation}", ics);
+        Assert.Contains(spanishNotes, ics);
+        // No replacement character (U+FFFD) anywhere — a corrupted multi-byte split would introduce one.
+        Assert.DoesNotContain('�', ics);
+    }
+
+    [Fact]
+    public void BuildMeetingEvent_LongSpanishTitle_FoldsWithoutSplittingMultiByteCharacters()
+    {
+        // é/ó/í/ñ encode as 2 UTF-8 bytes each — long enough to force SUMMARY past the 75-octet fold
+        // boundary mid-character, which is exactly what FoldLine's UTF-8-boundary check must prevent.
+        var longSpanishTitle = string.Concat(Enumerable.Repeat("Educación Individualizada para Samuel Núñez — ", 4));
+        var input = Meeting(title: longSpanishTitle);
+
+        var bytes = _builder.BuildMeetingEvent(input, "REQUEST");
+        var foldedText = Encoding.UTF8.GetString(bytes);
+
+        foreach (var physicalLine in foldedText.Split("\r\n"))
+        {
+            if (physicalLine.Length == 0)
+                continue;
+            Assert.True(Encoding.UTF8.GetByteCount(physicalLine) <= 75, $"Line exceeded 75 octets: {physicalLine}");
+        }
+
+        var unfolded = Unfold(foldedText);
+        Assert.Contains($"SUMMARY:{longSpanishTitle}", unfolded);
+        Assert.DoesNotContain('�', unfolded);
+    }
+
     [Fact]
     public void BuildFeed_ContainsAllDayObligationAndTimedMeetingEvents()
     {

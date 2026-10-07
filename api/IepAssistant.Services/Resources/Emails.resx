@@ -100,4 +100,319 @@ Sign in: {1}
 
 If you didn't request this link, you can safely ignore this email.</value>
   </data>
+
+  <!-- Multilingual plan (2026-10-06) phase 4: every remaining email kind renders in the recipient's
+       language (EmailService.ResolveRecipientAsync). -->
+
+  <data name="ShareInvite.Subject" xml:space="preserve">
+    <value>{0} invited you to IEP Advisor</value>
+  </data>
+  <data name="ShareInvite.Heading" xml:space="preserve">
+    <value>You've Been Invited</value>
+  </data>
+  <data name="ShareInvite.Body1Collaborate" xml:space="preserve">
+    <value>{0} has invited you to collaborate on {1}'s IEP information on IEP Advisor.</value>
+  </data>
+  <data name="ShareInvite.Body1View" xml:space="preserve">
+    <value>{0} has invited you to view {1}'s IEP information on IEP Advisor.</value>
+  </data>
+  <data name="ShareInvite.Body2" xml:space="preserve">
+    <value>IEP Advisor helps parents understand and advocate for their child's Individualized Education Program.</value>
+  </data>
+  <data name="ShareInvite.ButtonText" xml:space="preserve">
+    <value>Accept Invitation</value>
+  </data>
+  <data name="ShareInvite.Footer" xml:space="preserve">
+    <value>This invitation expires in 7 days. If you don't have an IEP Advisor account, you'll be asked to create one.</value>
+  </data>
+  <data name="ShareInvite.PlainTextCollaborate" xml:space="preserve">
+    <value>{0} has invited you to collaborate on {1}'s IEP information on IEP Advisor.
+
+Accept the invitation: {2}
+
+This invitation expires in 7 days.</value>
+  </data>
+  <data name="ShareInvite.PlainTextView" xml:space="preserve">
+    <value>{0} has invited you to view {1}'s IEP information on IEP Advisor.
+
+Accept the invitation: {2}
+
+This invitation expires in 7 days.</value>
+  </data>
+
+  <data name="SchoolLinkInvite.Subject" xml:space="preserve">
+    <value>{0} invited you to connect on IEP Advisor</value>
+  </data>
+  <data name="SchoolLinkInvite.Heading" xml:space="preserve">
+    <value>You've Been Invited to Connect</value>
+  </data>
+  <data name="SchoolLinkInvite.Body1" xml:space="preserve">
+    <value>{0} at {1} has invited you to connect with {2}'s record on IEP Advisor.</value>
+  </data>
+  <data name="SchoolLinkInvite.Body2" xml:space="preserve">
+    <value>Linking lets you receive and understand your child's IEP information directly from the school.</value>
+  </data>
+  <data name="SchoolLinkInvite.ButtonText" xml:space="preserve">
+    <value>Accept Invitation</value>
+  </data>
+  <data name="SchoolLinkInvite.Footer" xml:space="preserve">
+    <value>This invitation expires in 14 days. If you don't have an IEP Advisor account, you'll be asked to create one.</value>
+  </data>
+  <data name="SchoolLinkInvite.PlainTextBody" xml:space="preserve">
+    <value>{0} at {1} has invited you to connect with {2}'s record on IEP Advisor.
+
+Accept the invitation: {3}
+
+This invitation expires in 14 days.</value>
+  </data>
+
+  <data name="StudentInvite.Subject" xml:space="preserve">
+    <value>{0} invited you to your IEP Advisor student account</value>
+  </data>
+  <data name="StudentInvite.Heading" xml:space="preserve">
+    <value>You've Been Invited</value>
+  </data>
+  <data name="StudentInvite.Body1" xml:space="preserve">
+    <value>{0} has invited you to set up your own student account on IEP Advisor {1}.</value>
+  </data>
+  <data name="StudentInvite.Body2" xml:space="preserve">
+    <value>Your student workspace lets you share your strengths, interests, and goals so your voice is part of your IEP. You'll be asked to review and accept a short consent before your account is activated.</value>
+  </data>
+  <data name="StudentInvite.ButtonText" xml:space="preserve">
+    <value>Set Up My Account</value>
+  </data>
+  <data name="StudentInvite.Footer" xml:space="preserve">
+    <value>This invitation expires in 14 days.</value>
+  </data>
+  <data name="StudentInvite.PlainTextBody" xml:space="preserve">
+    <value>{0} has invited you to set up your own student account on IEP Advisor {1}.
+
+You'll be asked to accept a short consent before your account is activated.
+
+Accept the invitation: {2}
+
+This invitation expires in 14 days.</value>
+  </data>
+
+  <data name="StaffInvite.Subject" xml:space="preserve">
+    <value>You've been invited to join {0} on IEP Advisor</value>
+  </data>
+  <data name="StaffInvite.Heading" xml:space="preserve">
+    <value>You've Been Invited to Join</value>
+  </data>
+  <data name="StaffInvite.Body1" xml:space="preserve">
+    <value>You've been invited to join {0} on IEP Advisor as a {1}.</value>
+  </data>
+  <data name="StaffInvite.Body2" xml:space="preserve">
+    <value>IEP Advisor helps school teams author, manage, and collaborate on IEPs. Accept the invitation below to create your account and get started.</value>
+  </data>
+  <data name="StaffInvite.ButtonText" xml:space="preserve">
+    <value>Accept Invitation</value>
+  </data>
+  <data name="StaffInvite.Footer" xml:space="preserve">
+    <value>This invitation expires in 14 days and is tied to this email address.</value>
+  </data>
+  <data name="StaffInvite.PlainTextBody" xml:space="preserve">
+    <value>You've been invited to join {0} on IEP Advisor as a {1}.
+
+Accept the invitation: {2}
+
+This invitation expires in 14 days and is tied to this email address.</value>
+  </data>
+
+  <data name="StaffInviteExpiring.Subject" xml:space="preserve">
+    <value>A staff invite for {0} is about to expire</value>
+  </data>
+  <data name="StaffInviteExpiring.Heading" xml:space="preserve">
+    <value>A Staff Invite Is About to Expire</value>
+  </data>
+  <data name="StaffInviteExpiring.Body1" xml:space="preserve">
+    <value>The staff invite you sent to {0} to join {1} on IEP Advisor expires on {2} and hasn't been accepted yet.</value>
+  </data>
+  <data name="StaffInviteExpiring.Body2" xml:space="preserve">
+    <value>If they still need access, you can resend the invite to reset the clock. If not, no action is needed — the invite will simply expire.</value>
+  </data>
+  <data name="StaffInviteExpiring.ButtonText" xml:space="preserve">
+    <value>Manage Staff Invites</value>
+  </data>
+  <data name="StaffInviteExpiring.Footer" xml:space="preserve">
+    <value>You're receiving this because you sent this invite. Only you are notified.</value>
+  </data>
+  <data name="StaffInviteExpiring.PlainTextBody" xml:space="preserve">
+    <value>The staff invite you sent to {0} to join {1} on IEP Advisor expires on {2} and hasn't been accepted yet.
+
+If they still need access, resend the invite to reset the clock: {3}
+
+If not, no action is needed — the invite will simply expire. Only you are notified.</value>
+  </data>
+
+  <data name="BetaInvite.Subject" xml:space="preserve">
+    <value>Welcome to the IEP Advisor Beta</value>
+  </data>
+  <data name="BetaInvite.Greeting" xml:space="preserve">
+    <value>Hi there,</value>
+  </data>
+  <data name="BetaInvite.Intro1" xml:space="preserve">
+    <value>Welcome to the IEP Advisor beta. I'm Brad, the founder — and I wanted to reach out personally to say thank you for being here.</value>
+  </data>
+  <data name="BetaInvite.Intro2" xml:space="preserve">
+    <value>IEP Advisor exists because parents deserve the same clarity and confidence at the IEP table that the school district's team already has. You're one of the first people to actually use it, which means your experience over the next few weeks will directly shape what this product becomes.</value>
+  </data>
+  <data name="BetaInvite.HelpHeading" xml:space="preserve">
+    <value>Here's what I'd love your help with:</value>
+  </data>
+  <data name="BetaInvite.HelpBulletsHtml" xml:space="preserve">
+    <value>→ Try uploading a real IEP document and tell me if the plain-language explanations actually make sense&lt;br /&gt;
+→ Let me know if anything is confusing, missing, or feels off&lt;br /&gt;
+→ If you hit a bug or something breaks, please don't just close the tab — let me know directly or use the support link on the site!</value>
+  </data>
+  <data name="BetaInvite.HelpBulletsPlain" xml:space="preserve">
+    <value>→ Try uploading a real IEP document and tell me if the plain-language explanations actually make sense
+→ Let me know if anything is confusing, missing, or feels off
+→ If you hit a bug or something breaks, please don't just close the tab — let me know directly or use the support link on the site!</value>
+  </data>
+  <data name="BetaInvite.EmailLine" xml:space="preserve">
+    <value>You can email me directly at</value>
+  </data>
+  <data name="BetaInvite.BetaHeading" xml:space="preserve">
+    <value>A few things to know about the beta:</value>
+  </data>
+  <data name="BetaInvite.BetaBulletsHtml" xml:space="preserve">
+    <value>• Some features are still in progress — you may see rough edges&lt;br /&gt;
+• Your data is private and handled with care — not exposed or sold under any circumstance&lt;br /&gt;
+• This is the best time to influence what gets built next — I'd love to hear what other features you would find useful</value>
+  </data>
+  <data name="BetaInvite.BetaBulletsPlain" xml:space="preserve">
+    <value>• Some features are still in progress — you may see rough edges
+• Your data is private and handled with care — not exposed or sold under any circumstance
+• This is the best time to influence what gets built next — I'd love to hear what other features you would find useful</value>
+  </data>
+  <data name="BetaInvite.ButtonText" xml:space="preserve">
+    <value>Get Started</value>
+  </data>
+  <data name="BetaInvite.CodeLabel" xml:space="preserve">
+    <value>Your invite code: {0}</value>
+  </data>
+  <data name="BetaInvite.CodeManualNote" xml:space="preserve">
+    <value>You can also enter this code manually at the sign-up page.</value>
+  </data>
+  <data name="BetaInvite.Signature" xml:space="preserve">
+    <value>Brad Gardner</value>
+  </data>
+  <data name="BetaInvite.FooterNote" xml:space="preserve">
+    <value>You're receiving this because you signed up for the beta.</value>
+  </data>
+  <data name="BetaInvite.PlainCtaLabel" xml:space="preserve">
+    <value>To get started</value>
+  </data>
+
+  <data name="AccountDeletionCancelLink.Subject" xml:space="preserve">
+    <value>Your IEP Advisor account is scheduled for deletion</value>
+  </data>
+  <data name="AccountDeletionCancelLink.Heading" xml:space="preserve">
+    <value>Your Account Is Scheduled for Deletion</value>
+  </data>
+  <data name="AccountDeletionCancelLink.Body1" xml:space="preserve">
+    <value>Hi {0}, we received a request to delete your IEP Advisor account. It will be permanently deleted on &lt;strong&gt;{1}&lt;/strong&gt; unless you cancel before then.</value>
+  </data>
+  <data name="AccountDeletionCancelLink.Body2" xml:space="preserve">
+    <value>If this was you and you want your account deleted, no action is needed. If you didn't request this — or changed your mind — click below to cancel.</value>
+  </data>
+  <data name="AccountDeletionCancelLink.ButtonText" xml:space="preserve">
+    <value>Cancel Deletion</value>
+  </data>
+  <data name="AccountDeletionCancelLink.Footer" xml:space="preserve">
+    <value>Your account has been deactivated in the meantime, so this link is the only way to cancel — signing in will not work until you use it.</value>
+  </data>
+  <data name="AccountDeletionCancelLink.PlainTextBody" xml:space="preserve">
+    <value>Hi {0}, we received a request to delete your IEP Advisor account. It will be permanently deleted on {1} unless you cancel before then.
+
+Cancel deletion: {2}
+
+Your account has been deactivated in the meantime, so this link is the only way to cancel.</value>
+  </data>
+
+  <data name="Meeting.Invitation.SubjectPrefix" xml:space="preserve">
+    <value>Meeting scheduled</value>
+  </data>
+  <data name="Meeting.Invitation.Intro" xml:space="preserve">
+    <value>A meeting has been scheduled</value>
+  </data>
+  <data name="Meeting.Updated.SubjectPrefix" xml:space="preserve">
+    <value>Meeting updated</value>
+  </data>
+  <data name="Meeting.Updated.Intro" xml:space="preserve">
+    <value>A meeting has been updated</value>
+  </data>
+  <data name="Meeting.Cancelled.SubjectPrefix" xml:space="preserve">
+    <value>Meeting cancelled</value>
+  </data>
+  <data name="Meeting.Cancelled.Intro" xml:space="preserve">
+    <value>A meeting has been cancelled</value>
+  </data>
+  <data name="Meeting.SubjectForConnector" xml:space="preserve">
+    <value>for</value>
+  </data>
+  <data name="Meeting.At" xml:space="preserve">
+    <value>at</value>
+  </data>
+  <data name="Meeting.OrganizedBy" xml:space="preserve">
+    <value>{0} for {1}, organized by {2}.</value>
+  </data>
+  <data name="Meeting.DurationMinutes" xml:space="preserve">
+    <value>{0} minutes</value>
+  </data>
+  <data name="Meeting.RsvpAccept" xml:space="preserve">
+    <value>Accept</value>
+  </data>
+  <data name="Meeting.RsvpDecline" xml:space="preserve">
+    <value>Decline</value>
+  </data>
+  <data name="Meeting.IcsAttached" xml:space="preserve">
+    <value>A calendar invite (.ics) is attached.</value>
+  </data>
+  <data name="Meeting.ViewDetails" xml:space="preserve">
+    <value>View meeting details</value>
+  </data>
+  <data name="Meeting.DetailsLabel" xml:space="preserve">
+    <value>Details</value>
+  </data>
+
+  <data name="Notification.ButtonText" xml:space="preserve">
+    <value>View in IEP Advisor</value>
+  </data>
+
+  <data name="Digest.Subject" xml:space="preserve">
+    <value>Your daily IEP Advisor digest</value>
+  </data>
+  <data name="Digest.Greeting" xml:space="preserve">
+    <value>Good morning, {0}</value>
+  </data>
+  <data name="Digest.DeadlinesHeadingHtml" xml:space="preserve">
+    <value>Deadlines</value>
+  </data>
+  <data name="Digest.DeadlinesHeadingPlain" xml:space="preserve">
+    <value>Deadlines:</value>
+  </data>
+  <data name="Digest.NoDeadlines" xml:space="preserve">
+    <value>No overdue or upcoming deadlines.</value>
+  </data>
+  <data name="Digest.NiceWork" xml:space="preserve">
+    <value>Nice work.</value>
+  </data>
+  <data name="Digest.MeetingsHeadingHtml" xml:space="preserve">
+    <value>Meetings in the next 7 days</value>
+  </data>
+  <data name="Digest.MeetingsHeadingPlain" xml:space="preserve">
+    <value>Meetings in the next 7 days:</value>
+  </data>
+  <data name="Digest.NoMeetings" xml:space="preserve">
+    <value>No meetings in the next 7 days.</value>
+  </data>
+  <data name="Digest.ButtonText" xml:space="preserve">
+    <value>Open IEP Advisor</value>
+  </data>
+  <data name="Digest.DueDateSuffix" xml:space="preserve">
+    <value> (due {0})</value>
+  </data>
 </root>

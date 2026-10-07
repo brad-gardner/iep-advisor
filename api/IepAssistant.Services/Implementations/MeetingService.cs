@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -36,6 +37,7 @@ public class MeetingService : IMeetingService
     private readonly IAuditLogger _audit;
     private readonly ILogger<MeetingService> _logger;
     private readonly IStringLocalizer<Messages> _localizer;
+    private readonly IStringLocalizer<Notifications> _notificationsLocalizer;
 
     public MeetingService(
         ApplicationDbContext context,
@@ -44,7 +46,8 @@ public class MeetingService : IMeetingService
         INotificationService notifications,
         IAuditLogger audit,
         ILogger<MeetingService> logger,
-        IStringLocalizer<Messages> localizer)
+        IStringLocalizer<Messages> localizer,
+        IStringLocalizer<Notifications> notificationsLocalizer)
     {
         _context = context;
         _orgAccess = orgAccess;
@@ -53,6 +56,7 @@ public class MeetingService : IMeetingService
         _audit = audit;
         _logger = logger;
         _localizer = localizer;
+        _notificationsLocalizer = notificationsLocalizer;
     }
 
     // ----------------------------------------------------------------- Create
@@ -120,7 +124,7 @@ public class MeetingService : IMeetingService
         await _context.SaveChangesAsync(ct);
 
         _audit.Record(AuditAction.Edit, userId, "Meeting", meeting.Id);
-        await NotifyParticipantsAsync(meeting.Id, NotificationKind.MeetingScheduled, "scheduled", ct);
+        await NotifyParticipantsAsync(meeting.Id, NotificationKind.MeetingScheduled, ct);
 
         return ServiceResult<MeetingModel>.SuccessResult(await LoadMeetingModelAsync(meeting.Id, userId, ct));
     }
@@ -307,7 +311,7 @@ public class MeetingService : IMeetingService
 
         _audit.Record(AuditAction.Edit, userId, "Meeting", meeting.Id);
         if (scheduleChanged)
-            await NotifyParticipantsAsync(meeting.Id, NotificationKind.MeetingUpdated, "updated", ct);
+            await NotifyParticipantsAsync(meeting.Id, NotificationKind.MeetingUpdated, ct);
 
         return ServiceResult<MeetingModel>.SuccessResult(await LoadMeetingModelAsync(meeting.Id, userId, ct));
     }
@@ -329,7 +333,7 @@ public class MeetingService : IMeetingService
             await _context.SaveChangesAsync(ct);
 
             _audit.Record(AuditAction.Edit, userId, "Meeting", meeting.Id);
-            await NotifyParticipantsAsync(meeting.Id, NotificationKind.MeetingCancelled, "cancelled", ct);
+            await NotifyParticipantsAsync(meeting.Id, NotificationKind.MeetingCancelled, ct);
         }
 
         return ServiceResult<MeetingModel>.SuccessResult(await LoadMeetingModelAsync(meeting.Id, userId, ct));
@@ -647,7 +651,7 @@ public class MeetingService : IMeetingService
 
     // ----------------------------------------------------------------- Notifications
 
-    private async Task NotifyParticipantsAsync(int meetingId, NotificationKind kind, string changeWord, CancellationToken ct)
+    private async Task NotifyParticipantsAsync(int meetingId, NotificationKind kind, CancellationToken ct)
     {
         var meeting = await _context.Meetings.AsNoTracking()
             .Include(m => m.Participants)
@@ -661,16 +665,34 @@ public class MeetingService : IMeetingService
             return;
 
         var studentName = $"{meeting.SchoolStudent.FirstName} {meeting.SchoolStudent.LastName}".Trim();
-        var title = $"Meeting {changeWord}: {meeting.Title}";
-        var body = $"{meeting.Title} for {studentName} on {meeting.StartsAtUtc:MMMM d, yyyy 'at' h:mm tt} ({meeting.TimeZoneId}) was {changeWord}.";
         var linkPath = $"/meetings/{meeting.Id}";
         // Include the sequence so a later reschedule (which bumps sequence) is a fresh dedup key even
         // within 24h of a previous notification for the same meeting.
         var dedupKey = $"meeting-{meeting.Id}-{meeting.Sequence}-{kind}";
 
+        // Multilingual plan (2026-10-06) phase 4: one resx key pair per kind (never a word substituted
+        // into one template) because "scheduled"/"updated"/"cancelled" require different Spanish past
+        // participles (feminine agreement with "reunión"), not a literal translation of the English word.
+        var (titleKey, bodyKey) = kind switch
+        {
+            NotificationKind.MeetingScheduled => ("Notifications.MeetingScheduled.Title", "Notifications.MeetingScheduled.Body"),
+            NotificationKind.MeetingCancelled => ("Notifications.MeetingCancelled.Title", "Notifications.MeetingCancelled.Body"),
+            _ => ("Notifications.MeetingUpdated.Title", "Notifications.MeetingUpdated.Body")
+        };
+
+        (string Title, string Body) BuildText(string lang)
+        {
+            // Explicit per-recipient-language date, never the ambient CurrentCulture (CultureScope
+            // deliberately leaves it alone) — see NotificationDateFormat's doc comment.
+            var formattedDate = NotificationDateFormat.FormatMeetingDateTime(meeting.StartsAtUtc, lang);
+            var title = _notificationsLocalizer[titleKey, meeting.Title];
+            var body = _notificationsLocalizer[bodyKey, meeting.Title, studentName, formattedDate, meeting.TimeZoneId];
+            return (title, body);
+        }
+
         try
         {
-            await _notifications.NotifyAsync(userIds, kind, title, body, linkPath, dedupKey, emailImmediately: true, ct);
+            await _notifications.NotifyAsync(userIds, kind, BuildText, linkPath, dedupKey, emailImmediately: true, ct);
         }
         catch (Exception ex)
         {

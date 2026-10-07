@@ -3,6 +3,7 @@ using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -23,7 +24,7 @@ public class NotificationService : INotificationService
         _localizer = localizer;
     }
 
-    public async Task NotifyAsync(IEnumerable<int> userIds, NotificationKind kind, string title, string body,
+    public async Task NotifyAsync(IEnumerable<int> userIds, NotificationKind kind, Func<string, (string Title, string Body)> buildText,
         string? linkPath, string dedupKey, bool emailImmediately, CancellationToken ct = default)
     {
         var distinctUserIds = userIds.Distinct().ToList();
@@ -37,12 +38,30 @@ public class NotificationService : INotificationService
             .ToListAsync(ct);
         var recentSet = recentlyNotified.ToHashSet();
 
+        var pendingUserIds = distinctUserIds.Where(id => !recentSet.Contains(id)).ToList();
+        if (pendingUserIds.Count == 0)
+            return;
+
+        // Batch-load every pending recipient's language in ONE query — never per recipient — so a large
+        // fan-out (every platform admin, every district staff member, ...) stays a fixed number of
+        // queries regardless of recipient count (multilingual plan 2026-10-06 phase 4, decision 1).
+        var languageByUserId = await _context.Users.AsNoTracking()
+            .Where(u => pendingUserIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.PreferredLanguage })
+            .ToDictionaryAsync(u => u.Id, u => u.PreferredLanguage, ct);
+
         var now = DateTime.UtcNow;
-        var rows = distinctUserIds
-            .Where(id => !recentSet.Contains(id))
-            .Select(id => new Notification
+        var rows = new List<Notification>();
+        // Grouping collapses to at most SupportedLanguages.All.Count groups (today: en/es), so
+        // buildText — which may call an IStringLocalizer — runs once per LANGUAGE, not once per
+        // recipient, and each group's resource lookups resolve under that language's CultureScope.
+        foreach (var group in pendingUserIds.GroupBy(id => SupportedLanguages.Normalize(languageByUserId.GetValueOrDefault(id)) ?? SupportedLanguages.English))
+        {
+            using var _ = CultureScope.For(group.Key);
+            var (title, body) = buildText(group.Key);
+            rows.AddRange(group.Select(userId => new Notification
             {
-                UserId = id,
+                UserId = userId,
                 Kind = kind,
                 Title = title,
                 Body = body,
@@ -50,11 +69,8 @@ public class NotificationService : INotificationService
                 DedupKey = dedupKey,
                 CreatedAt = now,
                 EmailQueuedAt = emailImmediately ? now : null
-            })
-            .ToList();
-
-        if (rows.Count == 0)
-            return;
+            }));
+        }
 
         await _context.Notifications.AddRangeAsync(rows, ct);
         await _context.SaveChangesAsync(ct);

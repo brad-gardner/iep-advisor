@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Notifications.DraftShared.Title" xml:space="preserve">
+    <value>Se compartió un borrador con usted</value>
+  </data>
+  <data name="Notifications.DraftShared.Withdrawn.Title" xml:space="preserve">
+    <value>Borrador retirado</value>
+  </data>
+  <data name="Notifications.DraftShared.Body" xml:space="preserve">
+    <value>Hay un nuevo borrador (revisión {0}) listo para que lo revise.</value>
+  </data>
+  <data name="Notifications.DraftShared.BodyWithNote" xml:space="preserve">
+    <value>Hay un nuevo borrador (revisión {0}) listo para que lo revise. Nota del equipo: {1}</value>
+  </data>
+  <data name="Notifications.DraftShared.WithdrawnBody" xml:space="preserve">
+    <value>La revisión {0} fue retirada por el equipo escolar.</value>
+  </data>
+  <data name="Notifications.MeetingScheduled.Title" xml:space="preserve">
+    <value>Reunión programada: {0}</value>
+  </data>
+  <data name="Notifications.MeetingScheduled.Body" xml:space="preserve">
+    <value>{0} para {1} el {2} ({3}) fue programada.</value>
+  </data>
+  <data name="Notifications.MeetingUpdated.Title" xml:space="preserve">
+    <value>Reunión actualizada: {0}</value>
+  </data>
+  <data name="Notifications.MeetingUpdated.Body" xml:space="preserve">
+    <value>{0} para {1} el {2} ({3}) fue actualizada.</value>
+  </data>
+  <data name="Notifications.MeetingCancelled.Title" xml:space="preserve">
+    <value>Reunión cancelada: {0}</value>
+  </data>
+  <data name="Notifications.MeetingCancelled.Body" xml:space="preserve">
+    <value>{0} para {1} el {2} ({3}) fue cancelada.</value>
+  </data>
+  <data name="Notifications.ResponseReceived.Title" xml:space="preserve">
+    <value>Nueva respuesta de la familia</value>
+  </data>
+  <data name="Notifications.ResponseReceived.Body" xml:space="preserve">
+    <value>Un familiar respondió ({0}) al borrador compartido para {1}.</value>
+  </data>
+  <data name="Notifications.ResponseReceived.UnknownStudent" xml:space="preserve">
+    <value>el estudiante</value>
+  </data>
+  <data name="Notifications.DraftResponseResolved.Title" xml:space="preserve">
+    <value>Se resolvió su respuesta</value>
+  </data>
+  <data name="Notifications.DraftResponseResolved.BodyWithReply" xml:space="preserve">
+    <value>El equipo escolar respondió: {0}</value>
+  </data>
+  <data name="Notifications.DraftResponseResolved.BodyNoReply" xml:space="preserve">
+    <value>El equipo escolar atendió esto en el borrador.</value>
+  </data>
+  <data name="Notifications.MeetingSummarySent.Title" xml:space="preserve">
+    <value>Su resumen de la reunión familiar está listo</value>
+  </data>
+  <data name="Notifications.MeetingSummarySent.Body" xml:space="preserve">
+    <value>Un resumen en lenguaje sencillo de la reunión {0} para {1} está listo para revisar.</value>
+  </data>
+  <data name="Notifications.EvaluatorOverdue.Title" xml:space="preserve">
+    <value>Asignación de evaluador vencida: {0}</value>
+  </data>
+  <data name="Notifications.EvaluatorOverdue.Body" xml:space="preserve">
+    <value>La evaluación de {0} para {1} venció el {2} y no se ha presentado.</value>
+  </data>
+  <data name="Notifications.AuditIntegrityBroken.Title" xml:space="preserve">
+    <value>Falló la verificación de integridad del registro de auditoría</value>
+  </data>
+  <data name="Notifications.AuditIntegrityBroken.Body" xml:space="preserve">
+    <value>La cadena de hash de auditoría está rota a partir de AccessAuditLog #{0}. Esto podría indicar que el registro de auditoría fue alterado fuera de la aplicación.</value>
+  </data>
+  <data name="Notifications.MeetingReminder.Title" xml:space="preserve">
+    <value>Recordatorio: {0}</value>
+  </data>
+  <data name="Notifications.MeetingReminder.Body" xml:space="preserve">
+    <value>{0} para {1} se acerca.</value>
+  </data>
+  <data name="Notifications.ExportReady.Title" xml:space="preserve">
+    <value>Su exportación está lista</value>
+  </data>
+  <data name="Notifications.ExportReady.Body" xml:space="preserve">
+    <value>La exportación que solicitó ha finalizado y está lista para descargar.</value>
+  </data>
+  <data name="Notifications.ExportFailed.Title" xml:space="preserve">
+    <value>Su exportación falló</value>
+  </data>
+  <data name="Notifications.ExportFailed.Body" xml:space="preserve">
+    <value>La exportación que solicitó no se pudo completar. Inténtelo de nuevo.</value>
+  </data>
+  <data name="Notifications.Digest.Title" xml:space="preserve">
+    <value>Su resumen diario de IEP Advisor</value>
+  </data>
+  <data name="Notifications.Digest.Body" xml:space="preserve">
+    <value>{0} plazo(s) vencido(s) o próximo(s) a vencer, {1} reunión(es) en los próximos {2} días.</value>
+  </data>
+</root>

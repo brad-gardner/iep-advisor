@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -45,19 +46,22 @@ public class ExportService : IExportService
     private readonly IBlobStorageService _blob;
     private readonly INotificationService _notifications;
     private readonly ILogger<ExportService> _logger;
+    private readonly IStringLocalizer<Notifications> _notificationsLocalizer;
 
     public ExportService(
         ApplicationDbContext context,
         IOrgAccessService orgAccess,
         IBlobStorageService blob,
         INotificationService notifications,
-        ILogger<ExportService> logger)
+        ILogger<ExportService> logger,
+        IStringLocalizer<Notifications> notificationsLocalizer)
     {
         _context = context;
         _orgAccess = orgAccess;
         _blob = blob;
         _notifications = notifications;
         _logger = logger;
+        _notificationsLocalizer = notificationsLocalizer;
     }
 
     // ---------------------------------------------------------------- Enqueue + read
@@ -482,12 +486,13 @@ public class ExportService : IExportService
     {
         try
         {
-            var title = job.Status == ExportJobStatus.Completed ? "Your export is ready" : "Your export failed";
-            var body = job.Status == ExportJobStatus.Completed
-                ? "The export you requested has finished and is ready to download."
-                : "The export you requested could not be completed. Please try again.";
+            var completed = job.Status == ExportJobStatus.Completed;
+            (string Title, string Body) BuildText(string lang) => completed
+                ? (_notificationsLocalizer["Notifications.ExportReady.Title"], _notificationsLocalizer["Notifications.ExportReady.Body"])
+                : (_notificationsLocalizer["Notifications.ExportFailed.Title"], _notificationsLocalizer["Notifications.ExportFailed.Body"]);
+
             await _notifications.NotifyAsync(
-                new[] { job.RequestedByUserId }, NotificationKind.ExportReady, title, body,
+                new[] { job.RequestedByUserId }, NotificationKind.ExportReady, BuildText,
                 "/educator/admin/exports", $"export-{job.Id}", emailImmediately: false, ct);
         }
         catch (Exception ex)

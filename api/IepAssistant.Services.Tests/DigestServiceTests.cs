@@ -18,7 +18,7 @@ public sealed class DigestServiceTests : IDisposable
     private static readonly IConfiguration EmptyConfig = new ConfigurationBuilder().Build();
 
     private DigestService CreateService(ApplicationDbContext ctx, IEmailService email)
-        => new(ctx, new ObligationService(ctx, new OrgAccessService(ctx)), email, EmptyConfig, NullLogger<DigestService>.Instance);
+        => new(ctx, new ObligationService(ctx, new OrgAccessService(ctx)), email, EmptyConfig, NullLogger<DigestService>.Instance, TestSupport.TestLocalizers.Notifications());
 
     [Fact]
     public async Task RunForDateAsync_IncludesDueSoonOverdueAndMeetingsInNext7Days()
@@ -199,6 +199,44 @@ public sealed class DigestServiceTests : IDisposable
         var adminDigest = email.ByRecipient["admin@example.com"];
         Assert.Contains(adminDigest.Obligations, o => o.StudentName == "Led ByTeacher");
         Assert.DoesNotContain(adminDigest.Obligations, o => o.StudentName == "Other School");
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 4: the bell notification (not the rich digest EMAIL, owned elsewhere) follows each staff
+    // member's own PreferredLanguage, resolved from the same already-batched user-info query.
+
+    [Fact]
+    public async Task RunForDateAsync_PerRecipientLanguage_NotificationBellTextFollowsEachStaffMembersLanguage()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var enStudentId = _db.Student(schoolId, "English", "Student");
+        var esStudentId = _db.Student(schoolId, "Spanish", "Student");
+        var (enUserId, _) = _db.Staff("digest-en@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        var (esUserId, _) = _db.Staff("digest-es@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.TeamMember(enStudentId, enUserId, TeamRole.CaseManager, isLead: true);
+        _db.TeamMember(esStudentId, esUserId, TeamRole.CaseManager, isLead: true);
+
+        using (var ctx = _db.Context())
+        {
+            ctx.SchoolStudents.Single(s => s.Id == enStudentId).AnnualReviewDueDate = DateTime.UtcNow.Date.AddDays(-1);
+            ctx.SchoolStudents.Single(s => s.Id == esStudentId).AnnualReviewDueDate = DateTime.UtcNow.Date.AddDays(-1);
+            ctx.Users.Single(u => u.Id == esUserId).PreferredLanguage = "es";
+            ctx.SaveChanges();
+        }
+
+        var email = new CapturingDigestEmailService();
+        using var ctx2 = _db.Context();
+        await CreateService(ctx2, email).RunForDateAsync(DateOnly.FromDateTime(DateTime.UtcNow));
+
+        using var assertCtx = _db.Context();
+        var enNotification = await assertCtx.Set<Notification>().SingleAsync(n => n.UserId == enUserId && n.Kind == NotificationKind.ObligationDigest);
+        var esNotification = await assertCtx.Set<Notification>().SingleAsync(n => n.UserId == esUserId && n.Kind == NotificationKind.ObligationDigest);
+
+        Assert.Equal("Your daily IEP Advisor digest", enNotification.Title);
+        Assert.Equal("Su resumen diario de IEP Advisor", esNotification.Title);
+        Assert.StartsWith("1 deadline(s)", enNotification.Body);
+        Assert.StartsWith("1 plazo(s)", esNotification.Body);
     }
 
     private sealed class CapturingDigestEmailService : TestSupport.TestEmailServiceBase

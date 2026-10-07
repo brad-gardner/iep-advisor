@@ -16,7 +16,7 @@ public sealed class CalendarServiceTests : IDisposable
     {
         var orgAccess = new OrgAccessService(ctx);
         var notifications = new NotificationService(ctx, TestSupport.TestLocalizers.Messages());
-        var meetingService = new MeetingService(ctx, orgAccess, new AccessService(ctx), notifications, new CapturingAuditLogger(), Microsoft.Extensions.Logging.Abstractions.NullLogger<MeetingService>.Instance, TestSupport.TestLocalizers.Messages());
+        var meetingService = new MeetingService(ctx, orgAccess, new AccessService(ctx), notifications, new CapturingAuditLogger(), Microsoft.Extensions.Logging.Abstractions.NullLogger<MeetingService>.Instance, TestSupport.TestLocalizers.Messages(), TestSupport.TestLocalizers.Notifications());
         var obligationService = new ObligationService(ctx, orgAccess);
         return new CalendarService(ctx, meetingService, obligationService, orgAccess, new IcsBuilder());
     }
@@ -120,7 +120,7 @@ public sealed class CalendarServiceTests : IDisposable
         int meetingId;
         using (var ctx = _db.Context())
         {
-            var meetingService = new MeetingService(ctx, new OrgAccessService(ctx), new AccessService(ctx), new NotificationService(ctx, TestSupport.TestLocalizers.Messages()), new CapturingAuditLogger(), Microsoft.Extensions.Logging.Abstractions.NullLogger<MeetingService>.Instance, TestSupport.TestLocalizers.Messages());
+            var meetingService = new MeetingService(ctx, new OrgAccessService(ctx), new AccessService(ctx), new NotificationService(ctx, TestSupport.TestLocalizers.Messages()), new CapturingAuditLogger(), Microsoft.Extensions.Logging.Abstractions.NullLogger<MeetingService>.Instance, TestSupport.TestLocalizers.Messages(), TestSupport.TestLocalizers.Notifications());
             var created = await meetingService.CreateAsync(creatorUserId, studentId, new Models.CreateMeetingModel { Type = MeetingType.AnnualReview, Title = "AR", StartsAtUtc = DateTime.UtcNow.AddDays(3), DurationMinutes = 60 });
             meetingId = created.Data!.Id;
         }
@@ -144,7 +144,7 @@ public sealed class CalendarServiceTests : IDisposable
         int meetingId;
         using (var ctx = _db.Context())
         {
-            var meetingService = new MeetingService(ctx, new OrgAccessService(ctx), new AccessService(ctx), new NotificationService(ctx, TestSupport.TestLocalizers.Messages()), new CapturingAuditLogger(), Microsoft.Extensions.Logging.Abstractions.NullLogger<MeetingService>.Instance, TestSupport.TestLocalizers.Messages());
+            var meetingService = new MeetingService(ctx, new OrgAccessService(ctx), new AccessService(ctx), new NotificationService(ctx, TestSupport.TestLocalizers.Messages()), new CapturingAuditLogger(), Microsoft.Extensions.Logging.Abstractions.NullLogger<MeetingService>.Instance, TestSupport.TestLocalizers.Messages(), TestSupport.TestLocalizers.Notifications());
             var created = await meetingService.CreateAsync(creatorUserId, studentId, new Models.CreateMeetingModel { Type = MeetingType.AnnualReview, Title = "AR", StartsAtUtc = DateTime.UtcNow.AddDays(3), DurationMinutes = 60 });
             meetingId = created.Data!.Id;
         }

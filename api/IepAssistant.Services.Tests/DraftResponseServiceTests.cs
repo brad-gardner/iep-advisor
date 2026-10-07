@@ -41,7 +41,7 @@ public sealed class DraftResponseServiceTests : IDisposable
     {
         public List<(List<int> UserIds, NotificationKind Kind, string? LinkPath)> Calls { get; } = new();
 
-        public Task NotifyAsync(IEnumerable<int> userIds, NotificationKind kind, string title, string body, string? linkPath, string dedupKey, bool emailImmediately, CancellationToken ct = default)
+        public Task NotifyAsync(IEnumerable<int> userIds, NotificationKind kind, Func<string, (string Title, string Body)> buildText, string? linkPath, string dedupKey, bool emailImmediately, CancellationToken ct = default)
         {
             Calls.Add((userIds.ToList(), kind, linkPath));
             return Task.CompletedTask;
@@ -56,7 +56,7 @@ public sealed class DraftResponseServiceTests : IDisposable
     private (DraftResponseService Service, FakeNotifications Notifications) CreateService(ApplicationDbContext ctx)
     {
         var notifications = new FakeNotifications();
-        return (new DraftResponseService(ctx, new AccessService(ctx), new OrgAccessService(ctx), notifications, NullLogger<DraftResponseService>.Instance, TestSupport.TestLocalizers.Messages()), notifications);
+        return (new DraftResponseService(ctx, new AccessService(ctx), new OrgAccessService(ctx), notifications, NullLogger<DraftResponseService>.Instance, TestSupport.TestLocalizers.Messages(), TestSupport.TestLocalizers.Notifications()), notifications);
     }
 
     private sealed record Scenario(int InstanceId, int StudentId, int TeacherId, int ParentId);

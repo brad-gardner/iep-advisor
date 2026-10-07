@@ -1,5 +1,8 @@
 using System.Globalization;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using IepAssistant.Domain.Data;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
@@ -13,10 +16,27 @@ namespace IepAssistant.Services.Tests;
 /// <c>Emails.es.resx</c> resources (not a stub) — covers the English default, the Spanish subject/body,
 /// and that composing one language's email leaves the ambient culture exactly as it found it (so a later
 /// English send in the same worker/request isn't accidentally rendered in Spanish — see
-/// <see cref="CultureScopeTests"/> for the underlying guarantee).
+/// <see cref="CultureScopeTests"/> for the underlying guarantee). These two methods take an explicit
+/// <c>language</c> parameter and never query <c>Users</c>, so the DbContext below is wired up (phase 4
+/// added it to <see cref="EmailService"/>'s constructor for the recipient-lookup methods) but never hits
+/// the database in this file — see <c>EmailServicePhase4LanguageTests</c> for the lookup-driven methods.
 /// </summary>
-public sealed class EmailServiceLanguageTests
+public sealed class EmailServiceLanguageTests : IDisposable
 {
+    private readonly SqliteConnection _connection;
+    private readonly DbContextOptions<ApplicationDbContext> _options;
+
+    public EmailServiceLanguageTests()
+    {
+        _connection = new SqliteConnection("DataSource=:memory:");
+        _connection.Open();
+        _options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(_connection).Options;
+        using var ctx = new ApplicationDbContext(_options);
+        ctx.Database.EnsureCreated();
+    }
+
+    public void Dispose() => _connection.Dispose();
+
     private sealed class CapturingQueue : IOutboundEmailQueue
     {
         public OutboundEmailDraft? LastDraft { get; private set; }
@@ -28,12 +48,12 @@ public sealed class EmailServiceLanguageTests
         }
     }
 
-    private static EmailService CreateService(CapturingQueue queue)
+    private EmailService CreateService(CapturingQueue queue)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["App:FrontendUrl"] = "https://app.example.com" })
             .Build();
-        return new EmailService(configuration, queue, TestSupport.TestLocalizers.Emails());
+        return new EmailService(configuration, queue, TestSupport.TestLocalizers.Emails(), new ApplicationDbContext(_options));
     }
 
     [Fact]

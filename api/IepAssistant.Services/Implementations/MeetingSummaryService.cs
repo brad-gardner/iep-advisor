@@ -31,6 +31,7 @@ public class MeetingSummaryService : IMeetingSummaryService
     private readonly INotificationService _notifications;
     private readonly IAuditLogger _audit;
     private readonly IStringLocalizer<Ai> _localizer;
+    private readonly IStringLocalizer<Notifications> _notificationsLocalizer;
     private readonly ILogger<MeetingSummaryService> _logger;
 
     public MeetingSummaryService(
@@ -40,6 +41,7 @@ public class MeetingSummaryService : IMeetingSummaryService
         INotificationService notifications,
         IAuditLogger audit,
         IStringLocalizer<Ai> localizer,
+        IStringLocalizer<Notifications> notificationsLocalizer,
         ILogger<MeetingSummaryService> logger)
     {
         _context = context;
@@ -48,6 +50,7 @@ public class MeetingSummaryService : IMeetingSummaryService
         _notifications = notifications;
         _audit = audit;
         _localizer = localizer;
+        _notificationsLocalizer = notificationsLocalizer;
         _logger = logger;
     }
 
@@ -338,15 +341,21 @@ public class MeetingSummaryService : IMeetingSummaryService
             if (recipients.Count == 0)
                 return;
 
-            const string title = "Your family meeting summary is ready";
-            var body = $"A plain-language summary of the {meeting.Title} meeting for {meeting.StudentFirstName} is ready to review.";
             var dedupKey = $"meeting-summary-{meetingId}";
+            var meetingTitle = meeting.Title;
+            var studentFirstName = meeting.StudentFirstName;
+
+            // Multilingual plan (2026-10-06) phase 4 / todos/249: this notification was still
+            // hard-coded English — built per recipient's own language, like every other notification.
+            (string Title, string Body) BuildText(string lang) => (
+                _notificationsLocalizer["Notifications.MeetingSummarySent.Title"],
+                _notificationsLocalizer["Notifications.MeetingSummarySent.Body", meetingTitle, studentFirstName]);
 
             foreach (var r in recipients)
             {
                 var childId = r.IsStudent ? null : await ResolveChildIdForUserAsync(r.UserId, meeting.SchoolStudentId, ct);
                 var linkPath = childId != null ? $"/children/{childId}/meetings/{meetingId}/summary" : $"/meetings/{meetingId}/summary";
-                await _notifications.NotifyAsync(new[] { r.UserId }, NotificationKind.MeetingSummarySent, title, body, linkPath, dedupKey, emailImmediately: true, ct);
+                await _notifications.NotifyAsync(new[] { r.UserId }, NotificationKind.MeetingSummarySent, BuildText, linkPath, dedupKey, emailImmediately: true, ct);
             }
         }
         catch (Exception ex)
