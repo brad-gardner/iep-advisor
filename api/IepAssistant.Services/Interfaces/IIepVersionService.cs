@@ -29,8 +29,12 @@ public interface IIepVersionService
     Task<ServiceResult<int>> RequestPdfRetryAsync(int userId, int versionId, CancellationToken ct = default);
 
     /// <summary>
-    /// PDF status + (when Rendered) a short-lived download URL. Educator-with-access OR
-    /// linked-parent-with-access (same authorization as <see cref="GetVersionAsync"/>).
+    /// PDF status + (when Rendered) a short-lived download URL, for the CALLER's current UI language
+    /// (multilingual plan phase 7 — see <c>SupportedLanguages.CurrentUiLanguage</c>). Educator-with-access
+    /// OR linked-parent-with-access (same authorization as <see cref="GetVersionAsync"/>). No longer
+    /// side-effect-free on a first poll for a non-English language: it creates that language's Pending
+    /// tracking row and sets <see cref="Models.IepVersionPdfStatusModel.NeedsRender"/> so the controller
+    /// enqueues the render.
     /// </summary>
     Task<ServiceResult<IepVersionPdfStatusModel>> GetPdfStatusAsync(int userId, int versionId, CancellationToken ct = default);
 }

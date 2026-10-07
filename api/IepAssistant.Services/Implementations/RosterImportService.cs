@@ -28,9 +28,12 @@ namespace IepAssistant.Services.Implementations;
 /// messages (stored in <c>ImportRow.Message</c>, shown in the preview table) are localized too, but carry
 /// no <see cref="ServiceErrorKind"/> — they never affect HTTP status. CSV column header tokens
 /// (<c>StudentId</c>, <c>FirstName</c>, etc. — see <see cref="Columns"/>) stay English in both languages,
-/// matching the literal header text in the workbook the user is editing;
-/// <see cref="ImportWorkbook"/>'s shared file-level validation messages (used by
-/// <c>StaffImportService</c> too) are intentionally left English-only this phase.
+/// matching the literal header text in the workbook the user is editing.
+///
+/// <para>Phase 7: the per-field "Changes" preview lines (<c>eval.Changes</c> — "School: Old → New", etc.)
+/// and <see cref="ImportWorkbook"/>'s shared file/sheet-level validation messages (used by
+/// <c>StaffImportService</c> too) are now localized as well — only the LABEL before each "→" is
+/// translated; the values either side (names, dates, enum display strings) are data, not translated.</para>
 ///
 /// <para><c>ImportRow.Message</c> is written in whichever language is active for the request that wrote
 /// it — the uploader's at preview, the committer's at commit (which re-evaluates and overwrites every
@@ -136,11 +139,11 @@ public class RosterImportService : IRosterImportService
             return ServiceResult<ImportPreviewModel>.FailureResult(deniedKind, denied);
         var ctx = ctxOrNull!;
 
-        var rejection = ImportWorkbook.ValidateUpload(upload);
+        var rejection = ImportWorkbook.ValidateUpload(upload, _localizer);
         if (rejection != null)
             return ServiceResult<ImportPreviewModel>.FailureResult(ServiceErrorKind.Validation, rejection);
 
-        var (parsedRows, readError) = ImportWorkbook.ReadSheet(upload.Content, SheetName, Columns, RequiredColumns);
+        var (parsedRows, readError) = ImportWorkbook.ReadSheet(upload.Content, SheetName, Columns, RequiredColumns, _localizer);
         if (readError != null)
             return ServiceResult<ImportPreviewModel>.FailureResult(ServiceErrorKind.Validation, readError);
         var sheetRows = parsedRows!;
@@ -164,7 +167,7 @@ public class RosterImportService : IRosterImportService
                 PayloadJson = ImportWorkbook.SerializePayload(sheetRow.Cells)
             });
         }
-        ImportWorkbook.FlagDuplicateKeys(rows, "StudentId");
+        ImportWorkbook.FlagDuplicateKeys(rows, "StudentId", _localizer);
 
         var batch = new ImportBatch
         {
@@ -672,38 +675,40 @@ public class RosterImportService : IRosterImportService
 
         // ---- Diff against the stored record (blank = keep, so only SET values can differ)
         var s = existing!;
+        // Multilingual plan phase 7: the LABEL before each "→" is localized; names/dates/enum display
+        // strings either side of it are data, not translated.
         if (eval.School != null && eval.School.Id != s.SchoolId)
         {
-            eval.Changes.Add($"School: {refs.Schools.FirstOrDefault(x => x.Id == s.SchoolId)?.Name ?? s.SchoolId.ToString()} → {eval.School.Name}");
+            eval.Changes.Add($"{_localizer["RosterImport.FieldSchool"]}: {refs.Schools.FirstOrDefault(x => x.Id == s.SchoolId)?.Name ?? s.SchoolId.ToString()} → {eval.School.Name}");
             var newSchoolId = eval.School.Id;
             var portable = refs.PortableUserIds(newSchoolId);
             var leaving = existingStudents.ActiveTeamUserIds(s.Id).Count(u => !portable.Contains(u));
             if (leaving > 0)
-                eval.Changes.Add($"Team: {leaving} member(s) will be deactivated");
+                eval.Changes.Add(string.Format(_localizer["RosterImport.TeamMembersWillBeDeactivated"].Value, leaving));
         }
         if (eval.FirstName != null && eval.FirstName != s.FirstName)
-            eval.Changes.Add($"First name: {s.FirstName} → {eval.FirstName}");
+            eval.Changes.Add($"{_localizer["RosterImport.FieldFirstName"]}: {s.FirstName} → {eval.FirstName}");
         if (eval.LastName != null && eval.LastName != (s.LastName ?? string.Empty))
-            eval.Changes.Add($"Last name: {s.LastName} → {eval.LastName}");
+            eval.Changes.Add($"{_localizer["RosterImport.FieldLastName"]}: {s.LastName} → {eval.LastName}");
         if (eval.DateOfBirth != null && eval.DateOfBirth != s.DateOfBirth?.Date)
-            eval.Changes.Add($"Date of birth: {ImportWorkbook.FormatDate(s.DateOfBirth)} → {ImportWorkbook.FormatDate(eval.DateOfBirth)}");
+            eval.Changes.Add($"{_localizer["RosterImport.FieldDateOfBirth"]}: {ImportWorkbook.FormatDate(s.DateOfBirth)} → {ImportWorkbook.FormatDate(eval.DateOfBirth)}");
         if (eval.Grade != null && eval.Grade != s.GradeLevel)
-            eval.Changes.Add($"Grade: {s.GradeLevel?.ToDisplay()} → {eval.Grade.Value.ToDisplay()}");
+            eval.Changes.Add($"{_localizer["RosterImport.FieldGrade"]}: {s.GradeLevel?.ToDisplay()} → {eval.Grade.Value.ToDisplay()}");
         if (eval.Disability.Set && eval.Disability.Value != s.DisabilityCategory)
-            eval.Changes.Add($"Disability: {s.DisabilityCategory?.ToDisplay()} → {eval.Disability.Value?.ToDisplay()}");
+            eval.Changes.Add($"{_localizer["RosterImport.FieldDisability"]}: {s.DisabilityCategory?.ToDisplay()} → {eval.Disability.Value?.ToDisplay()}");
         if (eval.HomeLanguage.Set && !string.Equals(eval.HomeLanguage.Value, s.HomeLanguage, StringComparison.Ordinal))
-            eval.Changes.Add($"Home language: {s.HomeLanguage} → {eval.HomeLanguage.Value}");
+            eval.Changes.Add($"{_localizer["RosterImport.FieldHomeLanguage"]}: {s.HomeLanguage} → {eval.HomeLanguage.Value}");
         if (eval.CaseManager.Set && eval.CaseManager.Value?.UserId != s.CaseManagerUserId)
         {
             var current = refs.Staff.FirstOrDefault(x => x.UserId == s.CaseManagerUserId)?.Email ?? (s.CaseManagerUserId == null ? "" : "(other)");
-            eval.Changes.Add($"Case manager: {current} → {eval.CaseManager.Value?.Email}");
+            eval.Changes.Add($"{_localizer["RosterImport.FieldCaseManager"]}: {current} → {eval.CaseManager.Value?.Email}");
         }
-        DiffDate(eval, "IEP date", s.IepDate, eval.IepDate);
-        DiffDate(eval, "Annual review due", s.AnnualReviewDueDate, eval.AnnualReviewDue);
-        DiffDate(eval, "ETR date", s.EtrDate, eval.EtrDate);
-        DiffDate(eval, "Reevaluation due", s.ReevaluationDueDate, eval.ReevaluationDue);
+        DiffDate(eval, _localizer["RosterImport.FieldIepDate"], s.IepDate, eval.IepDate);
+        DiffDate(eval, _localizer["RosterImport.FieldAnnualReviewDue"], s.AnnualReviewDueDate, eval.AnnualReviewDue);
+        DiffDate(eval, _localizer["RosterImport.FieldEtrDate"], s.EtrDate, eval.EtrDate);
+        DiffDate(eval, _localizer["RosterImport.FieldReevaluationDue"], s.ReevaluationDueDate, eval.ReevaluationDue);
         if (eval.Status != null && eval.Status != s.Status)
-            eval.Changes.Add($"Status: {s.Status} → {eval.Status}");
+            eval.Changes.Add($"{_localizer["RosterImport.FieldStatus"]}: {s.Status} → {eval.Status}");
 
         eval.Outcome = eval.Changes.Count > 0 ? ImportRowOutcome.Updated : ImportRowOutcome.Unchanged;
         return eval;

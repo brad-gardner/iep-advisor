@@ -218,7 +218,7 @@ public sealed class UserRoleAndCoParentTests : IDisposable
 
         using (var ctx = CreateContext())
         {
-            var service = new UserService(new UserRepository(ctx), ctx);
+            var service = new UserService(new UserRepository(ctx), ctx, TestLocalizers.Messages());
             var result = await service.UpdateUserAsync(
                 userId,
                 new Services.Models.UpdateUserModel { Role = "Hacker" });

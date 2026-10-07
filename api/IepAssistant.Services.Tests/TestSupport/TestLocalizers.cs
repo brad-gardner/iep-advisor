@@ -25,4 +25,6 @@ public static class TestLocalizers
     public static IStringLocalizer<Ai> Ai() => Provider.GetRequiredService<IStringLocalizer<Ai>>();
 
     public static IStringLocalizer<Notifications> Notifications() => Provider.GetRequiredService<IStringLocalizer<Notifications>>();
+
+    public static IStringLocalizer<Pdf> Pdf() => Provider.GetRequiredService<IStringLocalizer<Pdf>>();
 }

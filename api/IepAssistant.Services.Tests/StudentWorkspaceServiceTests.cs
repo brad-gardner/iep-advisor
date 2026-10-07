@@ -391,7 +391,7 @@ public sealed class StudentWorkspaceServiceTests : IDisposable
         int draftId, sectionId;
         using (var ctx = CreateContext())
         {
-            var draftSvc = new IepDraftService(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<IepDraftService>.Instance);
+            var draftSvc = new IepDraftService(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<IepDraftService>.Instance, TestSupport.TestLocalizers.Messages());
             draftId = (await draftSvc.CreateDraftAsync(school.EducatorUserId, school.SchoolStudentId, "Annual")).Data!.Id;
             var section = await draftSvc.AddSectionAsync(school.EducatorUserId, draftId, new UpsertIepDraftSectionModel
             {

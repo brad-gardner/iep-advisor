@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -14,21 +15,23 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 public class IepDraftService : IIepDraftService
 {
-    private const string PermissionMessage = "You do not have permission to access this IEP draft.";
-    private const string DraftNotFoundMessage = "IEP draft not found.";
-
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
     private readonly IAuditLogger _audit;
     private readonly ILogger<IepDraftService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public IepDraftService(ApplicationDbContext context, IOrgAccessService orgAccess, IAuditLogger audit, ILogger<IepDraftService> logger)
+    public IepDraftService(ApplicationDbContext context, IOrgAccessService orgAccess, IAuditLogger audit, ILogger<IepDraftService> logger, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
         _audit = audit;
         _logger = logger;
+        _localizer = localizer;
     }
+
+    private LocalizedString PermissionMessage => _localizer["IepDrafts.Permission"];
+    private LocalizedString DraftNotFoundMessage => _localizer["IepDrafts.DraftNotFound"];
 
     // ---------------------------------------------------------------- Drafts
 
@@ -36,7 +39,7 @@ public class IepDraftService : IIepDraftService
     {
         var access = await CheckStudentAccessAsync(userId, studentId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult<IepDraftModel>.FailureResult(access.Message!);
+            return ServiceResult<IepDraftModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var now = DateTime.UtcNow;
         var draft = new IepDraft
@@ -59,7 +62,7 @@ public class IepDraftService : IIepDraftService
     {
         var access = await CheckStudentAccessAsync(userId, studentId, AccessRole.Viewer, ct);
         if (!access.Success)
-            return ServiceResult<List<IepDraftModel>>.FailureResult(access.Message!);
+            return ServiceResult<List<IepDraftModel>>.FailureResult(access.ErrorKind, access.Message!);
 
         var drafts = await _context.IepDrafts
             .AsNoTracking()
@@ -75,7 +78,7 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Viewer, ct);
         if (!access.Success)
-            return ServiceResult<IepDraftModel>.FailureResult(access.Message!);
+            return ServiceResult<IepDraftModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var draft = await _context.IepDrafts
             .AsNoTracking()
@@ -88,7 +91,7 @@ public class IepDraftService : IIepDraftService
             .FirstOrDefaultAsync(d => d.Id == draftId, ct);
 
         if (draft == null)
-            return ServiceResult<IepDraftModel>.FailureResult(DraftNotFoundMessage);
+            return ServiceResult<IepDraftModel>.FailureResult(ServiceErrorKind.NotFound, DraftNotFoundMessage);
 
         _audit.Record(AuditAction.View, userId, "IepDraft", draftId);
         return ServiceResult<IepDraftModel>.SuccessResult(MapDraftFull(draft));
@@ -100,7 +103,7 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult<IepDraftSectionModel>.FailureResult(access.Message!);
+            return ServiceResult<IepDraftSectionModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var now = DateTime.UtcNow;
         var order = await NextOrderAsync(_context.IepDraftSections.Where(s => s.IepDraftId == draftId).Select(s => s.DisplayOrder), ct);
@@ -127,11 +130,11 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult<IepDraftSectionModel>.FailureResult(access.Message!);
+            return ServiceResult<IepDraftSectionModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var entity = await _context.IepDraftSections.FirstOrDefaultAsync(s => s.Id == id && s.IepDraftId == draftId, ct);
         if (entity == null)
-            return ServiceResult<IepDraftSectionModel>.FailureResult("Section not found.");
+            return ServiceResult<IepDraftSectionModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["IepDrafts.SectionNotFound"]);
 
         var now = DateTime.UtcNow;
         entity.SectionKind = model.SectionKind;
@@ -149,11 +152,11 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult.FailureResult(access.Message!);
+            return ServiceResult.FailureResult(access.ErrorKind, access.Message!);
 
         var entity = await _context.IepDraftSections.FirstOrDefaultAsync(s => s.Id == id && s.IepDraftId == draftId, ct);
         if (entity == null)
-            return ServiceResult.FailureResult("Section not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["IepDrafts.SectionNotFound"]);
 
         _context.IepDraftSections.Remove(entity);
         await StampDraftAsync(draftId, userId, DateTime.UtcNow, ct);
@@ -168,7 +171,7 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult<IepDraftGoalModel>.FailureResult(access.Message!);
+            return ServiceResult<IepDraftGoalModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var now = DateTime.UtcNow;
         var order = await NextOrderAsync(_context.IepDraftGoals.Where(g => g.IepDraftId == draftId).Select(g => g.DisplayOrder), ct);
@@ -199,11 +202,11 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult<IepDraftGoalModel>.FailureResult(access.Message!);
+            return ServiceResult<IepDraftGoalModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var entity = await _context.IepDraftGoals.FirstOrDefaultAsync(g => g.Id == id && g.IepDraftId == draftId, ct);
         if (entity == null)
-            return ServiceResult<IepDraftGoalModel>.FailureResult("Goal not found.");
+            return ServiceResult<IepDraftGoalModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["IepDrafts.GoalNotFound"]);
 
         var now = DateTime.UtcNow;
         entity.Domain = model.Domain;
@@ -225,11 +228,11 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult.FailureResult(access.Message!);
+            return ServiceResult.FailureResult(access.ErrorKind, access.Message!);
 
         var entity = await _context.IepDraftGoals.FirstOrDefaultAsync(g => g.Id == id && g.IepDraftId == draftId, ct);
         if (entity == null)
-            return ServiceResult.FailureResult("Goal not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["IepDrafts.GoalNotFound"]);
 
         _context.IepDraftGoals.Remove(entity);
         await StampDraftAsync(draftId, userId, DateTime.UtcNow, ct);
@@ -244,7 +247,7 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult<IepDraftServiceLineModel>.FailureResult(access.Message!);
+            return ServiceResult<IepDraftServiceLineModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var now = DateTime.UtcNow;
         var order = await NextOrderAsync(_context.IepDraftServiceLines.Where(s => s.IepDraftId == draftId).Select(s => s.DisplayOrder), ct);
@@ -276,11 +279,11 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult<IepDraftServiceLineModel>.FailureResult(access.Message!);
+            return ServiceResult<IepDraftServiceLineModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var entity = await _context.IepDraftServiceLines.FirstOrDefaultAsync(s => s.Id == id && s.IepDraftId == draftId, ct);
         if (entity == null)
-            return ServiceResult<IepDraftServiceLineModel>.FailureResult("Service line not found.");
+            return ServiceResult<IepDraftServiceLineModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["IepDrafts.ServiceLineNotFound"]);
 
         var now = DateTime.UtcNow;
         entity.ServiceType = model.ServiceType;
@@ -303,11 +306,11 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult.FailureResult(access.Message!);
+            return ServiceResult.FailureResult(access.ErrorKind, access.Message!);
 
         var entity = await _context.IepDraftServiceLines.FirstOrDefaultAsync(s => s.Id == id && s.IepDraftId == draftId, ct);
         if (entity == null)
-            return ServiceResult.FailureResult("Service line not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["IepDrafts.ServiceLineNotFound"]);
 
         _context.IepDraftServiceLines.Remove(entity);
         await StampDraftAsync(draftId, userId, DateTime.UtcNow, ct);
@@ -322,7 +325,7 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult<IepDraftAccommodationModel>.FailureResult(access.Message!);
+            return ServiceResult<IepDraftAccommodationModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var now = DateTime.UtcNow;
         var order = await NextOrderAsync(_context.IepDraftAccommodations.Where(a => a.IepDraftId == draftId).Select(a => a.DisplayOrder), ct);
@@ -349,11 +352,11 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult<IepDraftAccommodationModel>.FailureResult(access.Message!);
+            return ServiceResult<IepDraftAccommodationModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var entity = await _context.IepDraftAccommodations.FirstOrDefaultAsync(a => a.Id == id && a.IepDraftId == draftId, ct);
         if (entity == null)
-            return ServiceResult<IepDraftAccommodationModel>.FailureResult("Accommodation not found.");
+            return ServiceResult<IepDraftAccommodationModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["IepDrafts.AccommodationNotFound"]);
 
         var now = DateTime.UtcNow;
         entity.Category = model.Category;
@@ -371,11 +374,11 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult.FailureResult(access.Message!);
+            return ServiceResult.FailureResult(access.ErrorKind, access.Message!);
 
         var entity = await _context.IepDraftAccommodations.FirstOrDefaultAsync(a => a.Id == id && a.IepDraftId == draftId, ct);
         if (entity == null)
-            return ServiceResult.FailureResult("Accommodation not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["IepDrafts.AccommodationNotFound"]);
 
         _context.IepDraftAccommodations.Remove(entity);
         await StampDraftAsync(draftId, userId, DateTime.UtcNow, ct);
@@ -390,7 +393,7 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult<IepDraftTransitionItemModel>.FailureResult(access.Message!);
+            return ServiceResult<IepDraftTransitionItemModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var now = DateTime.UtcNow;
         var order = await NextOrderAsync(_context.IepDraftTransitionItems.Where(t => t.IepDraftId == draftId).Select(t => t.DisplayOrder), ct);
@@ -417,11 +420,11 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult<IepDraftTransitionItemModel>.FailureResult(access.Message!);
+            return ServiceResult<IepDraftTransitionItemModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var entity = await _context.IepDraftTransitionItems.FirstOrDefaultAsync(t => t.Id == id && t.IepDraftId == draftId, ct);
         if (entity == null)
-            return ServiceResult<IepDraftTransitionItemModel>.FailureResult("Transition item not found.");
+            return ServiceResult<IepDraftTransitionItemModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["IepDrafts.TransitionItemNotFound"]);
 
         var now = DateTime.UtcNow;
         entity.PostsecondaryGoalArea = model.PostsecondaryGoalArea;
@@ -439,11 +442,11 @@ public class IepDraftService : IIepDraftService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult.FailureResult(access.Message!);
+            return ServiceResult.FailureResult(access.ErrorKind, access.Message!);
 
         var entity = await _context.IepDraftTransitionItems.FirstOrDefaultAsync(t => t.Id == id && t.IepDraftId == draftId, ct);
         if (entity == null)
-            return ServiceResult.FailureResult("Transition item not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["IepDrafts.TransitionItemNotFound"]);
 
         _context.IepDraftTransitionItems.Remove(entity);
         await StampDraftAsync(draftId, userId, DateTime.UtcNow, ct);
@@ -463,7 +466,7 @@ public class IepDraftService : IIepDraftService
     {
         return await _orgAccess.CanActOnStudentAsync(userId, studentId, minimumRole, ct)
             ? ServiceResult.SuccessResult()
-            : ServiceResult.FailureResult(PermissionMessage);
+            : ServiceResult.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
     }
 
     /// <summary>
@@ -482,14 +485,14 @@ public class IepDraftService : IIepDraftService
             .FirstOrDefaultAsync(ct);
 
         if (draftInfo == null)
-            return ServiceResult.FailureResult(DraftNotFoundMessage);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, DraftNotFoundMessage);
 
         var access = await CheckStudentAccessAsync(userId, draftInfo.SchoolStudentId, minimumRole, ct);
         if (!access.Success)
             return access;
 
         if (minimumRole >= AccessRole.Collaborator && draftInfo.Status == IepDraftStatus.Finalizing)
-            return ServiceResult.FailureResult("The draft is being finalized; try again in a moment.");
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["IepDrafts.DraftBeingFinalized"]);
 
         return access;
     }

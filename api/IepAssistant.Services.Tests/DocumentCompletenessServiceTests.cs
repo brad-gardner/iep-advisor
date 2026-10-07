@@ -34,7 +34,7 @@ public sealed class DocumentCompletenessServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private DocumentCompletenessService CreateService(ApplicationDbContext ctx)
-        => new(ctx, new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()));
+        => new(ctx, new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()), TestSupport.TestLocalizers.Messages());
 
     // ----------------------------------------------------------------- Fixtures
 

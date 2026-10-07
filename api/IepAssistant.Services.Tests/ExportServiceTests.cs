@@ -87,7 +87,7 @@ public sealed class ExportServiceTests : IDisposable
             {
                 SchoolStudentId = studentId, DocumentTypeId = 1, DocumentTemplateVersionId = templateVersionId,
                 VersionNumber = 1, ValuesJson = "{\"k\":\"v\"}", FinalizedByUserId = userId, FinalizedAt = DateTime.UtcNow.AddDays(-20),
-                Pdf = new AuthoredDocumentPdf { RenderStatus = PdfRenderStatus.Rendered, RenderedAt = DateTime.UtcNow.AddDays(-20) }
+                Pdfs = new List<AuthoredDocumentPdf> { new() { RenderStatus = PdfRenderStatus.Rendered, RenderedAt = DateTime.UtcNow.AddDays(-20) } }
             };
             ctx.AuthoredDocumentVersions.Add(version);
             ctx.SaveChanges();

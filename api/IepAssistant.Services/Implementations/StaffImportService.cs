@@ -103,11 +103,11 @@ public class StaffImportService : IStaffImportService
             return ServiceResult<ImportPreviewModel>.FailureResult(deniedKind, denied);
         var ctx = ctxOrNull!;
 
-        var rejection = ImportWorkbook.ValidateUpload(upload);
+        var rejection = ImportWorkbook.ValidateUpload(upload, _localizer);
         if (rejection != null)
             return ServiceResult<ImportPreviewModel>.FailureResult(ServiceErrorKind.Validation, rejection);
 
-        var (parsedRows, readError) = ImportWorkbook.ReadSheet(upload.Content, SheetName, Columns, RequiredColumns);
+        var (parsedRows, readError) = ImportWorkbook.ReadSheet(upload.Content, SheetName, Columns, RequiredColumns, _localizer);
         if (readError != null)
             return ServiceResult<ImportPreviewModel>.FailureResult(ServiceErrorKind.Validation, readError);
         var sheetRows = parsedRows!;
@@ -128,7 +128,7 @@ public class StaffImportService : IStaffImportService
                 PayloadJson = ImportWorkbook.SerializePayload(sheetRow.Cells)
             });
         }
-        ImportWorkbook.FlagDuplicateKeys(rows, "Email");
+        ImportWorkbook.FlagDuplicateKeys(rows, "Email", _localizer);
 
         var batch = new ImportBatch
         {
@@ -364,16 +364,19 @@ public class StaffImportService : IStaffImportService
             return eval;
         }
 
+        // Multilingual plan phase 7: only the LABEL before "→" is localized. OrgRoleIds.NameOf returns the
+        // same literal role token the Role column accepts (DistrictAdmin/SchoolAdmin/Teacher/…) — a typed
+        // input token, never translated, same as the column headers themselves.
         if (existing.OrgRoleId != roleId)
         {
             if (existing.OrgRoleId == OrgRoleIds.DistrictAdmin && existing.IsActive && refs.ActiveDistrictAdminCount <= 1)
                 return eval.Fail(_localizer["StaffImport.CannotChangeRoleOfLastAdmin"]);
-            eval.Changes.Add($"Role: {OrgRoleIds.NameOf(existing.OrgRoleId)} → {OrgRoleIds.NameOf(roleId.Value)}");
+            eval.Changes.Add($"{_localizer["StaffImport.FieldRole"]}: {OrgRoleIds.NameOf(existing.OrgRoleId)} → {OrgRoleIds.NameOf(roleId.Value)}");
         }
         if ((eval.School?.Id) != existing.SchoolId)
-            eval.Changes.Add($"School: {refs.Schools.FirstOrDefault(s => s.Id == existing.SchoolId)?.Name ?? ""} → {eval.School?.Name ?? ""}");
+            eval.Changes.Add($"{_localizer["StaffImport.FieldSchool"]}: {refs.Schools.FirstOrDefault(s => s.Id == existing.SchoolId)?.Name ?? ""} → {eval.School?.Name ?? ""}");
         if (eval.Title.Set && !string.Equals(eval.Title.Value, existing.Title, StringComparison.Ordinal))
-            eval.Changes.Add($"Title: {existing.Title} → {eval.Title.Value}");
+            eval.Changes.Add($"{_localizer["StaffImport.FieldTitle"]}: {existing.Title} → {eval.Title.Value}");
 
         eval.Outcome = eval.Changes.Count > 0 ? ImportRowOutcome.Updated : ImportRowOutcome.Unchanged;
         return eval;

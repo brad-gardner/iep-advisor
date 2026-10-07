@@ -59,8 +59,13 @@ public class AuthoredDocumentVersion : BaseEntity, IAuditableEntity
     public DocumentTemplateVersion DocumentTemplateVersion { get; set; } = null!;
     public AuthoredDocumentVersion? AmendsVersion { get; set; }
 
-    /// <summary>The rendered-PDF tracking row (one-to-one). The ONE mutable child — the render worker updates it.</summary>
-    public AuthoredDocumentPdf? Pdf { get; set; }
+    /// <summary>
+    /// One row per rendered language (multilingual plan phase 7) — was a singular one-to-one nav before
+    /// this phase. The ONE mutable child collection — the render worker updates a row after rendering.
+    /// Callers that want "the" (English) PDF status for backward-compatible summaries select the row
+    /// whose <see cref="AuthoredDocumentPdf.Language"/> is <c>null</c> or <c>"en"</c>.
+    /// </summary>
+    public ICollection<AuthoredDocumentPdf> Pdfs { get; set; } = new List<AuthoredDocumentPdf>();
 
     public ICollection<SignedArtifact> SignedArtifacts { get; set; } = new List<SignedArtifact>();
 }

@@ -49,4 +49,16 @@ public static class SupportedLanguages
     /// </summary>
     public static string? ForRecipient(string? saved)
         => Normalize(saved) ?? Normalize(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
+
+    /// <summary>
+    /// Multilingual plan phase 7: the language to render/serve a PDF in. ASP.NET Core's
+    /// <c>RequestLocalization</c> middleware has already set <see cref="CultureInfo.CurrentUICulture"/>
+    /// from the signed-in user's saved preference or <c>Accept-Language</c> by the time a PDF
+    /// status/retry/download controller action or service method runs (same ambient value the
+    /// <see cref="ResponseLanguage"/> AI-prompt caller reads) — so a controller and the service it calls
+    /// resolve the SAME language independently, with no parameter needed to keep them in agreement.
+    /// Always normalized: never null, defaults to <see cref="English"/>.
+    /// </summary>
+    public static string CurrentUiLanguage()
+        => Normalize(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName) ?? English;
 }

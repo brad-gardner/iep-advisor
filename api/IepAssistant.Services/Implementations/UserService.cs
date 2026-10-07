@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Repositories;
 using IepAssistant.Services.Interfaces;
@@ -9,11 +10,13 @@ public class UserService : IUserService
 {
     private readonly IUserRepository _userRepository;
     private readonly ApplicationDbContext _context;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public UserService(IUserRepository userRepository, ApplicationDbContext context)
+    public UserService(IUserRepository userRepository, ApplicationDbContext context, IStringLocalizer<Messages> localizer)
     {
         _userRepository = userRepository;
         _context = context;
+        _localizer = localizer;
     }
 
     public async Task<IEnumerable<UserModel>> GetAllUsersAsync(CancellationToken cancellationToken = default)
@@ -32,7 +35,7 @@ public class UserService : IUserService
     {
         var user = await _userRepository.GetByIdAsync(id, cancellationToken);
         if (user == null)
-            return ServiceResult.FailureResult("User not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Users.NotFound"]);
 
         if (model.FirstName != null)
             user.FirstName = model.FirstName;
@@ -50,7 +53,7 @@ public class UserService : IUserService
             if (Enum.TryParse<Domain.Entities.UserRole>(requestedRole, ignoreCase: true, out var parsedRole))
                 user.Role = parsedRole;
             else
-                return ServiceResult.FailureResult($"Invalid role '{model.Role}'.");
+                return ServiceResult.FailureResult(ServiceErrorKind.Validation, string.Format(_localizer["Users.InvalidRole"].Value, model.Role));
         }
 
         if (model.IsActive.HasValue)
@@ -65,14 +68,14 @@ public class UserService : IUserService
         _userRepository.Update(user);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult("User updated successfully.");
+        return ServiceResult.SuccessResult(_localizer["Users.UpdatedSuccessfully"]);
     }
 
     public async Task<ServiceResult> DeleteUserAsync(int id, CancellationToken cancellationToken = default)
     {
         var user = await _userRepository.GetByIdAsync(id, cancellationToken);
         if (user == null)
-            return ServiceResult.FailureResult("User not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Users.NotFound"]);
 
         user.IsActive = false;
         user.SecurityStamp++; // Invalidate existing tokens immediately
@@ -81,7 +84,7 @@ public class UserService : IUserService
         _userRepository.Update(user);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult("User deleted successfully.");
+        return ServiceResult.SuccessResult(_localizer["Users.DeletedSuccessfully"]);
     }
 
     private static UserModel MapToUserModel(Domain.Entities.User user) => new()

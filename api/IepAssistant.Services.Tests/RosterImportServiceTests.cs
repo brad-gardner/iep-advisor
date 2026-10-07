@@ -162,6 +162,22 @@ public sealed class RosterImportServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Preview_RejectsByContentType_UnderSpanishCulture_MessageIsSpanish()
+    {
+        // Multilingual plan phase 7: ImportWorkbook.ValidateUpload (reached here since the service, not
+        // just DistrictImportsController, is exercised directly) is now localized.
+        var o = Org();
+        var content = StudentsWorkbook(StudentRow("1", "Maple Elementary"));
+
+        using var ctx = _db.Context();
+        using var _lang = IepAssistant.Services.Localization.CultureScope.For("es");
+        var byContentType = await Roster(ctx).PreviewAsync(o.Admin, Upload(content, "roster.xlsx", "application/vnd.ms-excel.sheet.macroEnabled.12"));
+
+        Assert.False(byContentType.Success);
+        Assert.Equal("Solo se aceptan libros .xlsx.", byContentType.Message);
+    }
+
+    [Fact]
     public async Task Preview_RejectsOversizeFile_AndTooManyRows()
     {
         var o = Org();
@@ -257,6 +273,26 @@ public sealed class RosterImportServiceTests : IDisposable
         Assert.Equal(cm, stored.CaseManagerUserId);
         Assert.Equal(DisabilityCategory.SpecificLearningDisability, stored.DisabilityCategory);
         Assert.Equal(new DateTime(2026, 1, 15), stored.IepDate);
+    }
+
+    [Fact]
+    public async Task Preview_ChangedGrade_UnderSpanishCulture_ChangesLineLabelIsTranslated()
+    {
+        // Multilingual plan phase 7: only the LABEL before "→" is translated ("Grade" -> "Grado"); the
+        // grade VALUES either side are data (enum display strings), unaffected by language here.
+        var o = Org();
+        var content = StudentsWorkbook(StudentRow("000123", "Maple Elementary", "Ann", "Zed", new DateTime(2015, 4, 2), "5"));
+
+        using var ctx = _db.Context();
+        var first = await Roster(ctx).PreviewAsync(o.Admin, Upload(content));
+        await Roster(ctx).CommitAsync(o.Admin, first.Data!.BatchId, commitValid: false);
+
+        using var _lang = IepAssistant.Services.Localization.CultureScope.For("es");
+        var changed = await Roster(ctx).PreviewAsync(o.Admin, Upload(StudentsWorkbook(
+            StudentRow("000123", "Maple Elementary", "Ann", "Zed", new DateTime(2015, 4, 2), "6"))));
+
+        var row = Assert.Single(changed.Data!.Rows);
+        Assert.Equal(new[] { "Grado: 5 → 6" }, row.Changes);
     }
 
     [Fact]
@@ -688,6 +724,27 @@ public sealed class RosterImportServiceTests : IDisposable
         var invite = Assert.Single(check.StaffInvites);
         Assert.Equal(("new@x.com", OrgRoleIds.GeneralEducator, o.SchoolA), (invite.Email, invite.OrgRoleId, invite.SchoolId));
         Assert.Equal("new@x.com", Assert.Single(_email.StaffInvitesSentTo));
+    }
+
+    [Fact]
+    public async Task StaffImport_RoleSchoolTitleChanges_UnderSpanishCulture_LabelsTranslated_RoleTokenStaysLiteral()
+    {
+        // Multilingual plan phase 7: "Role"/"School"/"Title" labels translate; the Role COLUMN's own
+        // values (DistrictAdmin/SchoolAdmin/Teacher/RelatedServiceProvider/GeneralEducator) are typed
+        // input tokens the Role column accepts verbatim and stay English in both languages.
+        var o = Org();
+        _db.Staff("existing2@x.com", o.District, o.SchoolA, OrgRoleIds.Teacher, title: "Old title");
+        var content = StaffWorkbook(
+            new Dictionary<string, object> { ["Email"] = "existing2@x.com", ["FirstName"] = "Ex", ["LastName"] = "Isting", ["Role"] = "RelatedServiceProvider", ["SchoolName"] = "Oak Middle", ["Title"] = "SLP" });
+
+        using var ctx = _db.Context();
+        using var _lang = IepAssistant.Services.Localization.CultureScope.For("es");
+        var preview = await StaffImports(ctx).PreviewAsync(o.Admin, Upload(content, "staff.xlsx"));
+
+        Assert.Equal(ImportRowOutcome.Updated, preview.Data!.Rows[0].Outcome);
+        Assert.Equal(
+            new[] { "Rol: Teacher → RelatedServiceProvider", "Escuela: Maple Elementary → Oak Middle", "Título: Old title → SLP" },
+            preview.Data.Rows[0].Changes);
     }
 
     [Fact]

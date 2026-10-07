@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Data.Configurations;
 using IepAssistant.Domain.Entities;
@@ -20,25 +21,27 @@ public class ParentPrepQuestionService : IParentPrepQuestionService
     public const int MaxTextLength = ParentPrepQuestionConfiguration.TextMaxLength;
     public static readonly IReadOnlyList<string> AllowedSources = new[] { ParentPrepQuestion.SourceParent, ParentPrepQuestion.SourceAdvocate };
 
-    private const string ChildNotFound = "Child profile not found.";
-    private const string QuestionNotFound = "Prep question not found.";
-    private const string TextRequired = "Question text is required.";
-
     private static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
 
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _access;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public ParentPrepQuestionService(ApplicationDbContext context, IAccessService access)
+    public ParentPrepQuestionService(ApplicationDbContext context, IAccessService access, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _access = access;
+        _localizer = localizer;
     }
+
+    private LocalizedString ChildNotFound => _localizer["ParentPrepQuestions.ChildNotFound"];
+    private LocalizedString QuestionNotFound => _localizer["ParentPrepQuestions.QuestionNotFound"];
+    private LocalizedString TextRequired => _localizer["ParentPrepQuestions.TextRequired"];
 
     public async Task<ServiceResult<List<ParentPrepQuestionModel>>> GetForChildAsync(int childId, int userId, CancellationToken ct = default)
     {
         if (!await _access.HasMinimumRoleAsync(childId, userId, AccessRole.Viewer, ct))
-            return ServiceResult<List<ParentPrepQuestionModel>>.FailureResult(ChildNotFound);
+            return ServiceResult<List<ParentPrepQuestionModel>>.FailureResult(ServiceErrorKind.NotFound, ChildNotFound);
 
         var items = await OrderedForChild(_context.ParentPrepQuestions.AsNoTracking(), childId).ToListAsync(ct);
         return ServiceResult<List<ParentPrepQuestionModel>>.SuccessResult(items.Select(Map).ToList());
@@ -47,14 +50,14 @@ public class ParentPrepQuestionService : IParentPrepQuestionService
     public async Task<ServiceResult<ParentPrepQuestionAddResult>> AddAsync(int childId, int userId, string? text, string? source, CancellationToken ct = default)
     {
         if (!await _access.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult<ParentPrepQuestionAddResult>.FailureResult(ChildNotFound);
+            return ServiceResult<ParentPrepQuestionAddResult>.FailureResult(ServiceErrorKind.NotFound, ChildNotFound);
 
         var (clean, error) = NormalizeText(text);
-        if (error != null) return ServiceResult<ParentPrepQuestionAddResult>.FailureResult(error);
+        if (error != null) return ServiceResult<ParentPrepQuestionAddResult>.FailureResult(ServiceErrorKind.Validation, error);
 
         var normalizedSource = (source ?? ParentPrepQuestion.SourceParent).Trim().ToLowerInvariant();
         if (!AllowedSources.Contains(normalizedSource, StringComparer.Ordinal))
-            return ServiceResult<ParentPrepQuestionAddResult>.FailureResult("Source must be 'parent' or 'advocate'.");
+            return ServiceResult<ParentPrepQuestionAddResult>.FailureResult(ServiceErrorKind.Validation, _localizer["ParentPrepQuestions.InvalidSource"]);
 
         // The whole list is small (a parent's own questions) and is needed both for the duplicate check —
         // case-insensitive regardless of the database collation — and for the next display order.
@@ -82,15 +85,15 @@ public class ParentPrepQuestionService : IParentPrepQuestionService
     {
         var entity = await _context.ParentPrepQuestions.FirstOrDefaultAsync(q => q.Id == id, ct);
         if (entity == null || !await _access.HasMinimumRoleAsync(entity.ChildProfileId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult<ParentPrepQuestionModel>.FailureResult(QuestionNotFound);
+            return ServiceResult<ParentPrepQuestionModel>.FailureResult(ServiceErrorKind.NotFound, QuestionNotFound);
 
         if (text == null && isChecked == null)
-            return ServiceResult<ParentPrepQuestionModel>.FailureResult("Provide text or isChecked.");
+            return ServiceResult<ParentPrepQuestionModel>.FailureResult(ServiceErrorKind.Validation, _localizer["ParentPrepQuestions.ProvideTextOrChecked"]);
 
         if (text != null)
         {
             var (clean, error) = NormalizeText(text);
-            if (error != null) return ServiceResult<ParentPrepQuestionModel>.FailureResult(error);
+            if (error != null) return ServiceResult<ParentPrepQuestionModel>.FailureResult(ServiceErrorKind.Validation, error);
             entity.Text = clean!;
         }
         if (isChecked != null) entity.IsChecked = isChecked.Value;
@@ -104,19 +107,20 @@ public class ParentPrepQuestionService : IParentPrepQuestionService
     public async Task<ServiceResult<List<ParentPrepQuestionModel>>> ReorderAsync(int childId, int userId, IReadOnlyList<int> orderedIds, CancellationToken ct = default)
     {
         if (!await _access.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult<List<ParentPrepQuestionModel>>.FailureResult(ChildNotFound);
+            return ServiceResult<List<ParentPrepQuestionModel>>.FailureResult(ServiceErrorKind.NotFound, ChildNotFound);
 
         if (orderedIds.Count == 0)
-            return ServiceResult<List<ParentPrepQuestionModel>>.FailureResult("ids is required.");
+            return ServiceResult<List<ParentPrepQuestionModel>>.FailureResult(ServiceErrorKind.Validation, _localizer["ParentPrepQuestions.IdsRequired"]);
         if (orderedIds.Distinct().Count() != orderedIds.Count)
-            return ServiceResult<List<ParentPrepQuestionModel>>.FailureResult("ids must not repeat.");
+            return ServiceResult<List<ParentPrepQuestionModel>>.FailureResult(ServiceErrorKind.Validation, _localizer["ParentPrepQuestions.IdsMustNotRepeat"]);
 
         var questions = await OrderedForChild(_context.ParentPrepQuestions, childId).ToListAsync(ct);
         var byId = questions.ToDictionary(q => q.Id);
         // An id from another child is reported exactly like a nonexistent one (a 400, worded without
-        // "not found" so the controller does not map it to 404).
+        // "not found" so the controller does not map it to 404) — ErrorKind is explicitly Validation
+        // (never NotFound) to preserve that on purpose, independent of what the localized text says.
         if (orderedIds.Any(id => !byId.ContainsKey(id)))
-            return ServiceResult<List<ParentPrepQuestionModel>>.FailureResult("Every id must be one of this child's prep questions.");
+            return ServiceResult<List<ParentPrepQuestionModel>>.FailureResult(ServiceErrorKind.Validation, _localizer["ParentPrepQuestions.IdsMustBelongToChild"]);
 
         var listed = new HashSet<int>(orderedIds);
         var sequence = orderedIds.Select(id => byId[id]).Concat(questions.Where(q => !listed.Contains(q.Id))).ToList();
@@ -136,7 +140,7 @@ public class ParentPrepQuestionService : IParentPrepQuestionService
     {
         var entity = await _context.ParentPrepQuestions.FirstOrDefaultAsync(q => q.Id == id, ct);
         if (entity == null || !await _access.HasMinimumRoleAsync(entity.ChildProfileId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult.FailureResult(QuestionNotFound);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, QuestionNotFound);
         _context.ParentPrepQuestions.Remove(entity);
         await _context.SaveChangesAsync(ct);
         return ServiceResult.SuccessResult();
@@ -144,15 +148,16 @@ public class ParentPrepQuestionService : IParentPrepQuestionService
 
     /// <summary>
     /// Sanitize (dangerous blocks go with their content), strip every remaining tag, collapse whitespace onto
-    /// one line, THEN measure. Returns the text to persist, or an error.
+    /// one line, THEN measure. Returns the text to persist, or an error. Instance (not static, unlike
+    /// before localization) so it can read <see cref="_localizer"/>.
     /// </summary>
-    internal static (string? Text, string? Error) NormalizeText(string? text)
+    internal (string? Text, string? Error) NormalizeText(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return (null, TextRequired);
         var plain = PromptText.StripHtml(RichTextSanitizer.Sanitize(text));
         plain = Whitespace.Replace(plain, " ").Trim();
         if (plain.Length == 0) return (null, TextRequired);
-        if (plain.Length > MaxTextLength) return (null, $"Question must be {MaxTextLength} characters or fewer.");
+        if (plain.Length > MaxTextLength) return (null, string.Format(_localizer["ParentPrepQuestions.TextTooLong"].Value, MaxTextLength));
         return (plain, null);
     }
 

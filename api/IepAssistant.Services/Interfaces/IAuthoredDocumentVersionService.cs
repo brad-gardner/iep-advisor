@@ -33,8 +33,12 @@ public interface IAuthoredDocumentVersionService
     Task<ServiceResult<AuthoredDocumentVersionDetailModel>> GetVersionAsync(int versionId, int actingUserId, CancellationToken ct = default);
 
     /// <summary>
-    /// PDF render status only (no URL). Same authorization as <see cref="GetVersionAsync"/>. Safe to poll:
-    /// side-effect-free (no SAS minted, no audit written). Use <see cref="GetPdfDownloadUrlAsync"/> for the URL.
+    /// PDF render status only (no URL), for the CALLER's current UI language (multilingual plan phase 7 —
+    /// see <c>SupportedLanguages.CurrentUiLanguage</c>). Same authorization as <see cref="GetVersionAsync"/>.
+    /// No SAS is minted and no audit is written (use <see cref="GetPdfDownloadUrlAsync"/> for the URL) —
+    /// but it is no longer fully side-effect-free: a first poll for a non-English language creates that
+    /// language's Pending tracking row and sets <see cref="Models.AuthoredDocumentPdfStatusModel.NeedsRender"/>
+    /// so the controller enqueues the render.
     /// </summary>
     Task<ServiceResult<AuthoredDocumentPdfStatusModel>> GetPdfStatusAsync(int versionId, int actingUserId, CancellationToken ct = default);
 

@@ -6,6 +6,7 @@ using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -157,11 +158,17 @@ public class IepVersionService : IIepVersionService
                     DisplayOrder = t.DisplayOrder,
                     LineageId = t.LineageId
                 }).ToList(),
-                // P5b render worker flips this Pending -> Rendered/Error.
-                Pdf = new IepVersionPdf
+                // P5b render worker flips this Pending -> Rendered/Error. Explicitly English (multilingual
+                // plan phase 7): finalize always renders the default/English PDF first; any other
+                // language's row is created on demand by GetPdfStatusAsync the first time it's requested.
+                Pdfs = new List<IepVersionPdf>
                 {
-                    RenderStatus = PdfRenderStatus.Pending,
-                    CreatedById = userId
+                    new()
+                    {
+                        Language = SupportedLanguages.English,
+                        RenderStatus = PdfRenderStatus.Pending,
+                        CreatedById = userId
+                    }
                 }
             };
 
@@ -261,7 +268,7 @@ public class IepVersionService : IIepVersionService
             .Include(v => v.ServiceLines)
             .Include(v => v.Accommodations)
             .Include(v => v.TransitionItems)
-            .Include(v => v.Pdf)
+            .Include(v => v.Pdfs)
             .FirstOrDefaultAsync(v => v.Id == versionId, ct);
 
         if (version == null)
@@ -289,7 +296,13 @@ public class IepVersionService : IIepVersionService
         if (!access.Success)
             return ServiceResult<int>.FailureResult(access.ErrorKind, access.Message!);
 
-        var pdf = await _context.IepVersionPdfs.FirstOrDefaultAsync(p => p.IepVersionId == versionId, ct);
+        // Multilingual plan phase 7: retries the row for the CALLER's current language (the controller
+        // resolves the same ambient CurrentUICulture independently — see SupportedLanguages.CurrentUiLanguage
+        // — to enqueue the matching render), never "the" row, since a version can have one per language.
+        var language = SupportedLanguages.CurrentUiLanguage();
+        var pdf = await _context.IepVersionPdfs.FirstOrDefaultAsync(
+            p => p.IepVersionId == versionId && (p.Language == language
+                || (language == SupportedLanguages.English && p.Language == null)), ct);
         if (pdf == null)
             return ServiceResult<int>.FailureResult(ServiceErrorKind.Validation, _localizer["Pdf.NoRecordToRetry"]);
 
@@ -321,22 +334,46 @@ public class IepVersionService : IIepVersionService
         if (!educatorAccess.Success && !await ParentCanViewStudentAsync(userId, version.SchoolStudentId, ct))
             return ServiceResult<IepVersionPdfStatusModel>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
-        var pdf = await _context.IepVersionPdfs
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.IepVersionId == versionId, ct);
+        // Multilingual plan phase 7: the requesting user's UI language (download endpoints run in-request,
+        // so CurrentUICulture already reflects their saved preference/Accept-Language — see
+        // RequestLocalizationSetup). English keeps the pre-phase-7 single-row behavior; any other
+        // language's row is created HERE, Pending, the first time it's polled — NeedsRender tells the
+        // controller to enqueue the render (after this commit, same after-commit/isolated convention as
+        // Finalize/Retry), so a render is kicked off exactly once per (version, language).
+        var language = SupportedLanguages.CurrentUiLanguage();
+        var pdf = await _context.IepVersionPdfs.FirstOrDefaultAsync(
+            p => p.IepVersionId == versionId && (p.Language == language
+                || (language == SupportedLanguages.English && p.Language == null)), ct);
+
+        var needsRender = false;
+        if (pdf == null)
+        {
+            pdf = new IepVersionPdf
+            {
+                IepVersionId = versionId,
+                Language = language,
+                RenderStatus = PdfRenderStatus.Pending,
+                CreatedById = userId
+            };
+            await _context.IepVersionPdfs.AddAsync(pdf, ct);
+            await _context.SaveChangesAsync(ct);
+            needsRender = true;
+        }
 
         var model = new IepVersionPdfStatusModel
         {
             VersionId = versionId,
-            RenderStatus = pdf?.RenderStatus ?? PdfRenderStatus.Pending,
-            RenderedAt = pdf?.RenderedAt,
-            ErrorMessage = pdf?.ErrorMessage
+            Language = language,
+            NeedsRender = needsRender,
+            RenderStatus = pdf.RenderStatus,
+            RenderedAt = pdf.RenderedAt,
+            ErrorMessage = pdf.ErrorMessage
         };
 
-        if (pdf?.RenderStatus == PdfRenderStatus.Rendered)
+        if (pdf.RenderStatus == PdfRenderStatus.Rendered)
         {
             // Build a short-lived download URL from the deterministic blob path (SAS when supported).
-            var blobPath = IIepVersionPdfService.BlobPathFor(versionId, version.VersionNumber);
+            var blobPath = IIepVersionPdfService.BlobPathFor(versionId, version.VersionNumber, language);
             model.Url = await _blob.GetDownloadUrlAsync(blobPath);
 
             // FERPA audit: a Rendered download URL is actually being handed out — log the export.
@@ -401,7 +438,10 @@ public class IepVersionService : IIepVersionService
 
     // ---------------------------------------------------------------- Mappers
 
-    // EF-translatable projection expression (PdfRenderStatus joins via the optional 1:1 Pdf nav).
+    // EF-translatable projection expression. PdfRenderStatus reflects the ENGLISH row specifically
+    // (multilingual plan phase 7: Pdf became Pdfs, one row per language) — a correlated subquery rather
+    // than a join, since a version can now have more than one Pdf row. Backward-compatible: this is the
+    // same "the PDF's status" summaries showed before this phase, when English was the only row.
     private static readonly System.Linq.Expressions.Expression<Func<IepVersion, IepVersionSummaryModel>> SummaryProjection =
         v => new IepVersionSummaryModel
         {
@@ -414,11 +454,18 @@ public class IepVersionService : IIepVersionService
             EffectiveDate = v.EffectiveDate,
             FinalizedByUserId = v.FinalizedByUserId,
             FinalizedAt = v.FinalizedAt,
-            PdfRenderStatus = v.Pdf != null ? v.Pdf.RenderStatus : (PdfRenderStatus?)null
+            PdfRenderStatus = v.Pdfs
+                .Where(p => p.Language == null || p.Language == SupportedLanguages.English)
+                .Select(p => (PdfRenderStatus?)p.RenderStatus)
+                .FirstOrDefault()
         };
 
     private static IepVersionModel MapVersionFull(IepVersion v)
     {
+        // Multilingual plan phase 7: reflects the ENGLISH row specifically (Pdf became Pdfs) — the same
+        // "the PDF's status" this DTO carried before this phase, when English was the only row.
+        var englishPdf = v.Pdfs.FirstOrDefault(p => p.Language == null || p.Language == SupportedLanguages.English);
+
         var model = new IepVersionModel
         {
             Id = v.Id,
@@ -430,9 +477,9 @@ public class IepVersionService : IIepVersionService
             EffectiveDate = v.EffectiveDate,
             FinalizedByUserId = v.FinalizedByUserId,
             FinalizedAt = v.FinalizedAt,
-            PdfRenderStatus = v.Pdf?.RenderStatus,
-            PdfBlobUri = v.Pdf?.BlobUri,
-            PdfRenderedAt = v.Pdf?.RenderedAt
+            PdfRenderStatus = englishPdf?.RenderStatus,
+            PdfBlobUri = englishPdf?.BlobUri,
+            PdfRenderedAt = englishPdf?.RenderedAt
         };
 
         model.Sections = v.Sections.OrderBy(s => s.DisplayOrder).ThenBy(s => s.Id).Select(s => new IepVersionSectionModel

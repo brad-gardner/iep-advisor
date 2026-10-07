@@ -7,6 +7,7 @@ using IepAssistant.Api.DTOs.Documents;
 using IepAssistant.Api.Extensions;
 using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 
 namespace IepAssistant.Api.Controllers;
 
@@ -120,6 +121,11 @@ public class AuthoredDocumentVersionController : ControllerBase
         var result = await _service.GetPdfStatusAsync(versionId, User.GetUserId(), ct);
         if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
+        // Multilingual plan phase 7: the service created a Pending row for this language and asks us to
+        // kick off its render (after-commit, isolated — same convention as Finalize/Retry).
+        if (result.Data!.NeedsRender)
+            await _pdfQueue.EnqueueAsync(versionId, result.Data.Language, CancellationToken.None);
+
         return Ok(ApiResponse<AuthoredDocumentPdfStatusDto>.SuccessResponse(
             AuthoredDocumentVersionMappers.MapPdfStatus(result.Data!)));
     }
@@ -150,7 +156,10 @@ public class AuthoredDocumentVersionController : ControllerBase
         if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         // The service committed the Pending flip; now enqueue the re-render (after-commit, isolated).
-        await _pdfQueue.EnqueueAsync(result.Data, CancellationToken.None);
+        // Multilingual plan phase 7: the service retried the row for the caller's CURRENT UI language —
+        // resolving the same ambient value here (rather than threading it through Data) keeps the two in
+        // agreement without changing this endpoint's response shape.
+        await _pdfQueue.EnqueueAsync(result.Data, SupportedLanguages.CurrentUiLanguage(), CancellationToken.None);
 
         return Ok(ApiResponse<object>.SuccessResponse(new { versionId, status = "Pending" }));
     }

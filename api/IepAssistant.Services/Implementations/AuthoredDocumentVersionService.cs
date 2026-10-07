@@ -10,6 +10,7 @@ using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -185,12 +186,18 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
                 EffectiveDate = instance.EffectiveDate,
                 CreatedById = actingUserId,
                 UpdatedById = actingUserId,
-                // The render worker flips this Pending -> Rendered/Error.
-                Pdf = new AuthoredDocumentPdf
+                // The render worker flips this Pending -> Rendered/Error. Explicitly English (multilingual
+                // plan phase 7): finalize always renders the default/English PDF first; any other
+                // language's row is created on demand by GetPdfStatusAsync the first time it's requested.
+                Pdfs = new List<AuthoredDocumentPdf>
                 {
-                    RenderStatus = PdfRenderStatus.Pending,
-                    CreatedById = actingUserId,
-                    UpdatedById = actingUserId
+                    new()
+                    {
+                        Language = SupportedLanguages.English,
+                        RenderStatus = PdfRenderStatus.Pending,
+                        CreatedById = actingUserId,
+                        UpdatedById = actingUserId
+                    }
                 }
             };
 
@@ -354,9 +361,14 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
                 v.FinalizedByUserId,
                 v.FinalizedAt,
                 v.ValuesJson,
-                PdfRenderStatus = v.Pdf != null ? (PdfRenderStatus?)v.Pdf.RenderStatus : null,
-                PdfBlobUri = v.Pdf != null ? v.Pdf.BlobUri : null,
-                PdfRenderedAt = v.Pdf != null ? v.Pdf.RenderedAt : null,
+                // Multilingual plan phase 7: reflects the ENGLISH row specifically (Pdf became Pdfs, one
+                // row per language) — the same "the PDF's status" this DTO carried before this phase.
+                PdfRenderStatus = v.Pdfs.Where(p => p.Language == null || p.Language == SupportedLanguages.English)
+                    .Select(p => (PdfRenderStatus?)p.RenderStatus).FirstOrDefault(),
+                PdfBlobUri = v.Pdfs.Where(p => p.Language == null || p.Language == SupportedLanguages.English)
+                    .Select(p => p.BlobUri).FirstOrDefault(),
+                PdfRenderedAt = v.Pdfs.Where(p => p.Language == null || p.Language == SupportedLanguages.English)
+                    .Select(p => p.RenderedAt).FirstOrDefault(),
                 v.SignatureStatus,
                 SignedArtifactCount = v.SignedArtifacts.Count,
                 v.AmendsVersionId,
@@ -485,21 +497,44 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         if (!await CanReadStudentAsync(actingUserId, header.SchoolStudentId, ct))
             return ServiceResult<AuthoredDocumentPdfStatusModel>.FailureResult(ServiceErrorKind.Forbidden, VersionPermissionMessage);
 
-        var pdf = await _context.AuthoredDocumentPdfs
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.AuthoredDocumentVersionId == versionId, ct);
+        // Multilingual plan phase 7: the requesting user's UI language (download endpoints run in-request,
+        // so CurrentUICulture already reflects their saved preference/Accept-Language). English keeps the
+        // pre-phase-7 single-row behavior; any other language's row is created HERE, Pending, the first
+        // time it's polled — NeedsRender tells the controller to enqueue the render (after this commit,
+        // same after-commit/isolated convention as Finalize/Retry), so a render is kicked off exactly once
+        // per (version, language). This is the one place this method is no longer side-effect-free on a
+        // first poll for a non-English language — still no SAS/audit (those stay in GetPdfDownloadUrlAsync).
+        var language = SupportedLanguages.CurrentUiLanguage();
+        var pdf = await _context.AuthoredDocumentPdfs.FirstOrDefaultAsync(
+            p => p.AuthoredDocumentVersionId == versionId && (p.Language == language
+                || (language == SupportedLanguages.English && p.Language == null)), ct);
+
+        var needsRender = false;
+        if (pdf == null)
+        {
+            pdf = new AuthoredDocumentPdf
+            {
+                AuthoredDocumentVersionId = versionId,
+                Language = language,
+                RenderStatus = PdfRenderStatus.Pending,
+                CreatedById = actingUserId,
+                UpdatedById = actingUserId
+            };
+            await _context.AuthoredDocumentPdfs.AddAsync(pdf, ct);
+            await _context.SaveChangesAsync(ct);
+            needsRender = true;
+        }
 
         var model = new AuthoredDocumentPdfStatusModel
         {
             VersionId = versionId,
-            RenderStatus = pdf?.RenderStatus ?? PdfRenderStatus.Pending,
-            RenderedAt = pdf?.RenderedAt,
-            ErrorMessage = pdf?.ErrorMessage
+            Language = language,
+            NeedsRender = needsRender,
+            RenderStatus = pdf.RenderStatus,
+            RenderedAt = pdf.RenderedAt,
+            ErrorMessage = pdf.ErrorMessage
         };
 
-        // Side-effect-free: the client polls this endpoint, so it neither mints a download URL nor
-        // writes an audit entry. The SAS + FERPA Export audit live in GetPdfDownloadUrlAsync, invoked
-        // only when the user actually downloads.
         return ServiceResult<AuthoredDocumentPdfStatusModel>.SuccessResult(model);
     }
 
@@ -513,9 +548,13 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         if (!await CanReadStudentAsync(actingUserId, header.SchoolStudentId, ct))
             return ServiceResult<string>.FailureResult(ServiceErrorKind.Forbidden, VersionPermissionMessage);
 
+        // Multilingual plan phase 7: the same resolved language GetPdfStatusAsync used to poll/create the
+        // row — the download only succeeds once THAT language's row is Rendered.
+        var language = SupportedLanguages.CurrentUiLanguage();
         var renderStatus = await _context.AuthoredDocumentPdfs
             .AsNoTracking()
-            .Where(p => p.AuthoredDocumentVersionId == versionId)
+            .Where(p => p.AuthoredDocumentVersionId == versionId && (p.Language == language
+                || (language == SupportedLanguages.English && p.Language == null)))
             .Select(p => (PdfRenderStatus?)p.RenderStatus)
             .FirstOrDefaultAsync(ct);
 
@@ -523,7 +562,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             return ServiceResult<string>.FailureResult(ServiceErrorKind.Validation, _localizer["AuthoredDocuments.PdfNotAvailableYet"]);
 
         // Mint a short-lived download URL from the deterministic blob path (SAS when supported).
-        var blobPath = IAuthoredDocumentPdfService.BlobPathFor(versionId, header.VersionNumber);
+        var blobPath = IAuthoredDocumentPdfService.BlobPathFor(versionId, header.VersionNumber, language);
         var url = await _blob.GetDownloadUrlAsync(blobPath);
 
         // FERPA audit: this is an actual export of the finalized document (unlike a status poll).
@@ -543,7 +582,13 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         if (!await _orgAccess.CanActOnStudentAsync(actingUserId, header.SchoolStudentId, AccessRole.Collaborator, ct))
             return ServiceResult<int>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
-        var pdf = await _context.AuthoredDocumentPdfs.FirstOrDefaultAsync(p => p.AuthoredDocumentVersionId == versionId, ct);
+        // Multilingual plan phase 7: retries the row for the CALLER's current language (the controller
+        // resolves the same ambient CurrentUICulture independently to enqueue the matching render), never
+        // "the" row, since a version can have one per language.
+        var language = SupportedLanguages.CurrentUiLanguage();
+        var pdf = await _context.AuthoredDocumentPdfs.FirstOrDefaultAsync(
+            p => p.AuthoredDocumentVersionId == versionId && (p.Language == language
+                || (language == SupportedLanguages.English && p.Language == null)), ct);
         if (pdf == null)
             return ServiceResult<int>.FailureResult(ServiceErrorKind.Validation, _localizer["Pdf.NoRecordToRetry"]);
 
@@ -809,7 +854,10 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             VersionNumber = v.VersionNumber,
             FinalizedByUserId = v.FinalizedByUserId,
             FinalizedAt = v.FinalizedAt,
-            PdfRenderStatus = v.Pdf != null ? v.Pdf.RenderStatus : (PdfRenderStatus?)null,
+            // Multilingual plan phase 7: reflects the ENGLISH row specifically (Pdf became Pdfs, one row
+            // per language) — the same "the PDF's status" this summary showed before this phase.
+            PdfRenderStatus = v.Pdfs.Where(p => p.Language == null || p.Language == SupportedLanguages.English)
+                .Select(p => (PdfRenderStatus?)p.RenderStatus).FirstOrDefault(),
             SignatureStatus = v.SignatureStatus,
             SignedArtifactCount = v.SignedArtifacts.Count,
             AmendsVersionId = v.AmendsVersionId,

@@ -3,23 +3,29 @@ using Microsoft.EntityFrameworkCore;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 
 namespace IepAssistant.Api.BackgroundServices;
 
 /// <summary>
-/// Queue of AuthoredDocumentVersion ids whose PDF needs rendering (State Document Template Engine,
-/// Phase 4). The controller enqueues after FinalizeAsync commits (and on retry); the single-consumer
-/// worker drains it. A DISTINCT queue type from <see cref="IepVersionPdfQueue"/> (never reused) so the
-/// two pipelines stay independent.
+/// Queue of (AuthoredDocumentVersion id, language) pairs whose PDF needs rendering (State Document
+/// Template Engine, Phase 4; language added multilingual plan phase 7). The controller enqueues after
+/// FinalizeAsync commits (and on retry, and on a first request for a not-yet-rendered language); the
+/// single-consumer worker drains it. A DISTINCT queue type from <see cref="IepVersionPdfQueue"/> (never
+/// reused) so the two pipelines stay independent.
 /// </summary>
 public class AuthoredDocumentPdfQueue
 {
-    private readonly Channel<int> _channel = Channel.CreateUnbounded<int>();
+    private readonly Channel<(int VersionId, string Language)> _channel = Channel.CreateUnbounded<(int, string)>();
 
-    public async ValueTask EnqueueAsync(int versionId, CancellationToken cancellationToken = default)
-        => await _channel.Writer.WriteAsync(versionId, cancellationToken);
+    /// <summary>English, matching every pre-phase-7 call site that enqueued a bare version id.</summary>
+    public ValueTask EnqueueAsync(int versionId, CancellationToken cancellationToken = default)
+        => EnqueueAsync(versionId, SupportedLanguages.English, cancellationToken);
 
-    public IAsyncEnumerable<int> DequeueAllAsync(CancellationToken cancellationToken)
+    public async ValueTask EnqueueAsync(int versionId, string language, CancellationToken cancellationToken = default)
+        => await _channel.Writer.WriteAsync((versionId, SupportedLanguages.Normalize(language) ?? SupportedLanguages.English), cancellationToken);
+
+    public IAsyncEnumerable<(int VersionId, string Language)> DequeueAllAsync(CancellationToken cancellationToken)
         => _channel.Reader.ReadAllAsync(cancellationToken);
 }
 
@@ -52,21 +58,21 @@ public class AuthoredDocumentPdfWorker : BackgroundService
 
         await ReconcilePendingRendersAsync(stoppingToken);
 
-        await foreach (var versionId in _queue.DequeueAllAsync(stoppingToken))
+        await foreach (var (versionId, language) in _queue.DequeueAllAsync(stoppingToken))
         {
             try
             {
-                _logger.LogInformation("Rendering PDF for AuthoredDocumentVersion {VersionId}", versionId);
+                _logger.LogInformation("Rendering PDF for AuthoredDocumentVersion {VersionId} language {Language}", versionId, language);
 
                 using var scope = _scopeFactory.CreateScope();
                 var service = scope.ServiceProvider.GetRequiredService<IAuthoredDocumentPdfService>();
-                await service.RenderAsync(versionId, stoppingToken);
+                await service.RenderAsync(versionId, language, stoppingToken);
             }
             catch (Exception ex)
             {
                 // RenderAsync already isolates render failures; this guards against scope/resolution
                 // failures so the loop never dies on a single bad item.
-                _logger.LogError(ex, "Unhandled error rendering PDF for AuthoredDocumentVersion {VersionId}", versionId);
+                _logger.LogError(ex, "Unhandled error rendering PDF for AuthoredDocumentVersion {VersionId} language {Language}", versionId, language);
             }
         }
     }
@@ -82,18 +88,18 @@ public class AuthoredDocumentPdfWorker : BackgroundService
             using var scope = _scopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-            var pendingVersionIds = await context.AuthoredDocumentPdfs
+            var pending = await context.AuthoredDocumentPdfs
                 .Where(p => p.RenderStatus == PdfRenderStatus.Pending)
-                .Select(p => p.AuthoredDocumentVersionId)
+                .Select(p => new { p.AuthoredDocumentVersionId, p.Language })
                 .ToListAsync(stoppingToken);
 
-            if (pendingVersionIds.Count == 0)
+            if (pending.Count == 0)
                 return;
 
-            foreach (var versionId in pendingVersionIds)
-                await _queue.EnqueueAsync(versionId, stoppingToken);
+            foreach (var p in pending)
+                await _queue.EnqueueAsync(p.AuthoredDocumentVersionId, p.Language ?? SupportedLanguages.English, stoppingToken);
 
-            _logger.LogWarning("Re-enqueued {Count} pending AuthoredDocument PDF render(s) from a previous process", pendingVersionIds.Count);
+            _logger.LogWarning("Re-enqueued {Count} pending AuthoredDocument PDF render(s) from a previous process", pending.Count);
         }
         catch (Exception ex)
         {

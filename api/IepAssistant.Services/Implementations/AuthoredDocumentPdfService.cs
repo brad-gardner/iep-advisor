@@ -1,10 +1,12 @@
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using QuestPDF.Fluent;
 
 namespace IepAssistant.Services.Implementations;
@@ -20,6 +22,12 @@ namespace IepAssistant.Services.Implementations;
 /// composer) sets RenderStatus=Error + ErrorMessage and is swallowed (not rethrown) so the worker
 /// continues. The frozen version content is never touched, so the legal record stays valid and the render
 /// can be retried.</para>
+///
+/// <para><b>Multilingual (phase 7):</b> renders inside <see cref="CultureScope.For"/> for the requested
+/// language so <see cref="PdfLabels.From"/> resolves the right resx, and writes the (version, language)
+/// row matching <paramref name="language"/> — never "the" row, since a version can now have one per
+/// language. District-authored template section/field labels are never translated. See
+/// <see cref="IAuthoredDocumentPdfService.BlobPathFor(int, int, string?)"/> for the blob path.</para>
 /// </summary>
 public class AuthoredDocumentPdfService : IAuthoredDocumentPdfService
 {
@@ -29,21 +37,26 @@ public class AuthoredDocumentPdfService : IAuthoredDocumentPdfService
     private readonly ITemplateAuthoringService _authoring;
     private readonly IBlobStorageService _blob;
     private readonly ILogger<AuthoredDocumentPdfService> _logger;
+    private readonly IStringLocalizer<Pdf> _localizer;
 
     public AuthoredDocumentPdfService(
         ApplicationDbContext context,
         ITemplateAuthoringService authoring,
         IBlobStorageService blob,
-        ILogger<AuthoredDocumentPdfService> logger)
+        ILogger<AuthoredDocumentPdfService> logger,
+        IStringLocalizer<Pdf> localizer)
     {
         _context = context;
         _authoring = authoring;
         _blob = blob;
         _logger = logger;
+        _localizer = localizer;
     }
 
-    public async Task RenderAsync(int versionId, CancellationToken ct = default)
+    public async Task RenderAsync(int versionId, string? language = null, CancellationToken ct = default)
     {
+        var normalizedLanguage = SupportedLanguages.Normalize(language) ?? SupportedLanguages.English;
+
         // Load the immutable version read-only as a flat scalar projection (the pinned section/field tree
         // is loaded separately below via the authoring tree builder).
         var version = await _context.AuthoredDocumentVersions
@@ -72,11 +85,15 @@ public class AuthoredDocumentPdfService : IAuthoredDocumentPdfService
             return;
         }
 
-        // The PDF tracking row is tracked (we update it). It is created Pending by FinalizeAsync.
-        var pdf = await _context.AuthoredDocumentPdfs.FirstOrDefaultAsync(p => p.AuthoredDocumentVersionId == versionId, ct);
+        // The PDF tracking row is tracked (we update it) — one per (version, language). Created Pending
+        // by FinalizeAsync for English, or by AuthoredDocumentVersionService.GetPdfStatusAsync on first
+        // request for any other language.
+        var pdf = await _context.AuthoredDocumentPdfs.FirstOrDefaultAsync(
+            p => p.AuthoredDocumentVersionId == versionId && (p.Language == normalizedLanguage
+                || (normalizedLanguage == SupportedLanguages.English && p.Language == null)), ct);
         if (pdf == null)
         {
-            _logger.LogWarning("PDF render skipped: AuthoredDocumentPdf row for version {VersionId} not found", versionId);
+            _logger.LogWarning("PDF render skipped: AuthoredDocumentPdf row for version {VersionId} language {Language} not found", versionId, normalizedLanguage);
             return;
         }
 
@@ -98,13 +115,18 @@ public class AuthoredDocumentPdfService : IAuthoredDocumentPdfService
 
             var header = await BuildHeaderContextAsync(version.SchoolStudentId, version.DocumentTypeKey, version.StateCode, version.AmendsVersionNumber, version.EffectiveDate, ct);
 
-            var document = new AuthoredDocumentPdfDocument(
-                version.DocumentTypeDisplayName, version.VersionNumber, version.FinalizedAt, tree.Data!, version.ValuesJson, header);
-            var bytes = document.GeneratePdf();
+            byte[] bytes;
+            using (CultureScope.For(normalizedLanguage))
+            {
+                var labels = PdfLabels.From(_localizer);
+                var document = new AuthoredDocumentPdfDocument(
+                    version.DocumentTypeDisplayName, version.VersionNumber, version.FinalizedAt, tree.Data!, version.ValuesJson, header, labels);
+                bytes = document.GeneratePdf();
+            }
 
             var checksum = Convert.ToBase64String(SHA256.HashData(bytes));
 
-            var blobPath = IAuthoredDocumentPdfService.BlobPathFor(versionId, version.VersionNumber);
+            var blobPath = IAuthoredDocumentPdfService.BlobPathFor(versionId, version.VersionNumber, normalizedLanguage);
             using var stream = new MemoryStream(bytes);
             var storedUri = await _blob.UploadAsync(blobPath, stream, "application/pdf", ct);
 
@@ -116,7 +138,7 @@ public class AuthoredDocumentPdfService : IAuthoredDocumentPdfService
             pdf.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Rendered PDF for AuthoredDocumentVersion {VersionId} ({Bytes} bytes)", versionId, bytes.Length);
+            _logger.LogInformation("Rendered PDF for AuthoredDocumentVersion {VersionId} language {Language} ({Bytes} bytes)", versionId, normalizedLanguage, bytes.Length);
         }
         catch (Exception ex)
         {

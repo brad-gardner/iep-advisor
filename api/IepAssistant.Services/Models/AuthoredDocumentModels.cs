@@ -78,13 +78,26 @@ public class AmendResultModel
 }
 
 /// <summary>
-/// PDF render status for a finalized version. Side-effect-free (polled frequently), so it carries NO
-/// download URL — the SAS is minted only by <c>GetPdfDownloadUrlAsync</c>, which is where the FERPA
-/// Export audit is recorded (a poll is not an export).
+/// PDF render status for a finalized version. Carries no download URL — the SAS is minted only by
+/// <c>GetPdfDownloadUrlAsync</c>, which is where the FERPA Export audit is recorded (a poll is not an
+/// export). Multilingual plan phase 7: no longer side-effect-free on a FIRST poll for a non-English
+/// language — see <see cref="NeedsRender"/>.
 /// </summary>
 public class AuthoredDocumentPdfStatusModel
 {
     public int VersionId { get; set; }
+
+    /// <summary>Multilingual plan phase 7: the language this status reflects (the caller's resolved
+    /// current UI language — see <c>SupportedLanguages.CurrentUiLanguage</c>), internal-only (not carried
+    /// onto <c>AuthoredDocumentPdfStatusDto</c>) — used by the controller to enqueue a render for the SAME
+    /// language <see cref="NeedsRender"/> flagged, without re-resolving it.</summary>
+    public string Language { get; set; } = Localization.SupportedLanguages.English;
+
+    /// <summary>Multilingual plan phase 7: true only when this call just created the tracking row for
+    /// <see cref="Language"/> (first request for that language) — the controller enqueues a render
+    /// exactly then, never on a later poll of an already-queued row. Internal-only, not carried onto the DTO.</summary>
+    public bool NeedsRender { get; set; }
+
     public PdfRenderStatus RenderStatus { get; set; }
     public DateTime? RenderedAt { get; set; }
     public string? ErrorMessage { get; set; }

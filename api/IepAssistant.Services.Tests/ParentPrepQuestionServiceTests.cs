@@ -30,7 +30,7 @@ public sealed class ParentPrepQuestionServiceTests : IDisposable
 
     private ApplicationDbContext CreateContext() => new(_options);
 
-    private static ParentPrepQuestionService CreateService(ApplicationDbContext ctx) => new(ctx, new AccessService(ctx));
+    private static ParentPrepQuestionService CreateService(ApplicationDbContext ctx) => new(ctx, new AccessService(ctx), TestSupport.TestLocalizers.Messages());
 
     private sealed record Family(int OwnerId, int CoParentId, int ViewerId, int StrangerId, int ChildId, int OtherChildId);
 
@@ -298,6 +298,9 @@ public sealed class ParentPrepQuestionServiceTests : IDisposable
         Assert.False(foreign.Success);
         Assert.Equal("Every id must be one of this child's prep questions.", foreign.Message);
         Assert.DoesNotContain("not found", foreign.Message, StringComparison.OrdinalIgnoreCase);
+        // Multilingual plan phase 7: ErrorKind (not message text) is what the controller maps status
+        // from — must stay Validation (400), deliberately never NotFound, regardless of language.
+        Assert.Equal(ServiceErrorKind.Validation, foreign.ErrorKind);
 
         var unknown = await service.ReorderAsync(f.ChildId, f.OwnerId, new[] { 999_999 });
         Assert.Equal(foreign.Message, unknown.Message); // no existence hint
@@ -335,6 +338,22 @@ public sealed class ParentPrepQuestionServiceTests : IDisposable
         var again = await CreateService(ctx).DeleteAsync(drop.Id, f.OwnerId);
         Assert.False(again.Success);
         Assert.Equal("Prep question not found.", again.Message);
+    }
+
+    // ------------------------------------------------------------------ multilingual plan phase 7
+
+    [Fact]
+    public async Task AddAsync_InvalidSource_UnderSpanishCulture_MessageIsSpanish_KindStaysValidation()
+    {
+        var f = SeedFamily("i18n-es");
+
+        using var ctx = CreateContext();
+        using var _lang = IepAssistant.Services.Localization.CultureScope.For("es");
+        var result = await CreateService(ctx).AddAsync(f.ChildId, f.OwnerId, "Some question", "not-a-real-source");
+
+        Assert.False(result.Success);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+        Assert.Equal("El origen debe ser 'parent' o 'advocate'.", result.Message);
     }
 
     public void Dispose() => _connection.Dispose();
