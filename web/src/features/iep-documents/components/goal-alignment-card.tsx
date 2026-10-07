@@ -1,19 +1,20 @@
 import { Lightbulb } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { GoalAlignment } from '@/types/api';
 import { CATEGORY_COLORS } from '@/features/advocacy-goals/constants';
 import { Badge } from '@/components/ui/badge';
-
-const STATUS_VARIANTS: Record<string, { variant: 'success' | 'warning' | 'error'; label: string }> = {
-  addressed: { variant: 'success', label: 'Addressed' },
-  partially_addressed: { variant: 'warning', label: 'Partially Addressed' },
-  not_addressed: { variant: 'error', label: 'Not Addressed' },
-};
 
 interface GoalAlignmentCardProps {
   alignment: GoalAlignment;
 }
 
 export function GoalAlignmentCard({ alignment }: GoalAlignmentCardProps) {
+  const { t } = useTranslation('iep-documents');
+  const STATUS_VARIANTS: Record<string, { variant: 'success' | 'warning' | 'error'; label: string }> = {
+    addressed: { variant: 'success', label: t('goalAlignmentCard.statusAddressed') },
+    partially_addressed: { variant: 'warning', label: t('goalAlignmentCard.statusPartiallyAddressed') },
+    not_addressed: { variant: 'error', label: t('goalAlignmentCard.statusNotAddressed') },
+  };
   const status = STATUS_VARIANTS[alignment.alignmentStatus] || STATUS_VARIANTS.not_addressed;
 
   return (
@@ -41,7 +42,7 @@ export function GoalAlignmentCard({ alignment }: GoalAlignmentCardProps) {
       {alignment.alignedIepGoals.length > 0 && (
         <div>
           <p className="text-[10px] font-semibold text-brand-teal-500 uppercase tracking-wide mb-1">
-            Aligned IEP Goals
+            {t('goalAlignmentCard.alignedIepGoals')}
           </p>
           <ul className="space-y-1">
             {alignment.alignedIepGoals.map((goal, i) => (
@@ -57,7 +58,7 @@ export function GoalAlignmentCard({ alignment }: GoalAlignmentCardProps) {
         <div className="border-l-2 border-l-brand-teal-500 bg-brand-teal-50 rounded-r-card p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <Lightbulb className="w-3.5 h-3.5 text-brand-teal-500" strokeWidth={1.8} aria-hidden="true" />
-            <p className="text-[11px] font-medium text-brand-teal-600">Recommended Action</p>
+            <p className="text-[11px] font-medium text-brand-teal-600">{t('goalAlignmentCard.recommendedAction')}</p>
           </div>
           <p className="text-sm text-brand-slate-600">{alignment.recommendation}</p>
         </div>

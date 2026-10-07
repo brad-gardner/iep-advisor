@@ -1,9 +1,11 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { AdvocacyGapAnalysisSection } from "@/features/iep-documents/components/advocacy-gap-analysis";
+import { GeneratedLanguageNotice } from "@/lib/i18n/generated-language-notice";
 import { useProgressReportAnalysis } from "../hooks/use-progress-report-analysis";
 import { GoalProgressCard } from "./goal-progress-card";
 
@@ -14,20 +16,21 @@ interface ProgressReportAnalysisTabProps {
 export function ProgressReportAnalysisTab({
   progressReportId,
 }: ProgressReportAnalysisTabProps) {
+  const { t } = useTranslation("progress-reports");
   const { analysis, status, loading, isTriggering, error, start } =
     useProgressReportAnalysis(progressReportId);
 
   if (loading && !analysis) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading analysis…" />
+        <Spinner label={t("analysisTab.loading")} />
       </div>
     );
   }
 
   if (error && !analysis) {
     return (
-      <Notice variant="error" title="Couldn't load analysis">
+      <Notice variant="error" title={t("analysisTab.loadErrorTitle")}>
         {error}
       </Notice>
     );
@@ -37,15 +40,13 @@ export function ProgressReportAnalysisTab({
     return (
       <Card className="text-center py-12">
         <h3 className="font-serif text-[20px] font-semibold text-brand-slate-800 mb-2">
-          Analyze this progress report
+          {t("analysisTab.startHeading")}
         </h3>
         <p className="text-sm text-brand-slate-500 mb-4 max-w-md mx-auto">
-          We'll review the report against this IEP's goals and any advocacy
-          goals you've set. You'll get per-goal progress findings, red flags,
-          and concrete questions to bring to the next meeting.
+          {t("analysisTab.startBody")}
         </p>
         <Button onClick={start} loading={isTriggering}>
-          Run Analysis
+          {t("analysisTab.runAnalysis")}
         </Button>
       </Card>
     );
@@ -54,9 +55,9 @@ export function ProgressReportAnalysisTab({
   if (status === "pending" || status === "analyzing") {
     return (
       <Card className="text-center py-12">
-        <Spinner className="mx-auto mb-4" label="Analyzing progress report…" />
+        <Spinner className="mx-auto mb-4" label={t("analysisTab.analyzingLabel")} />
         <p className="text-sm text-brand-slate-500">
-          Analyzing the progress report. This usually takes 1–3 minutes.
+          {t("analysisTab.analyzingBody")}
         </p>
       </Card>
     );
@@ -65,13 +66,12 @@ export function ProgressReportAnalysisTab({
   if (status === "error") {
     return (
       <Card className="text-center py-12">
-        <Notice variant="error" title="Analysis failed">
-          {analysis?.errorMessage ||
-            "An error occurred while analyzing this report."}
+        <Notice variant="error" title={t("analysisTab.failedTitle")}>
+          {analysis?.errorMessage || t("analysisTab.failedGeneric")}
         </Notice>
         <div className="mt-4">
           <Button onClick={start} loading={isTriggering}>
-            Retry Analysis
+            {t("analysisTab.retryAnalysis")}
           </Button>
         </div>
       </Card>
@@ -82,10 +82,12 @@ export function ProgressReportAnalysisTab({
 
   return (
     <div className="space-y-6" data-testid="progress-report-analysis">
+      <GeneratedLanguageNotice generatedLanguage={analysis.generatedLanguage} />
+
       {analysis.summary && (
         <Card>
           <h2 className="font-serif text-[22px] font-semibold text-brand-slate-800 mb-2">
-            Summary
+            {t("analysisTab.summary")}
           </h2>
           <p className="text-sm text-brand-slate-600 whitespace-pre-wrap">
             {analysis.summary}
@@ -96,7 +98,7 @@ export function ProgressReportAnalysisTab({
       {analysis.goalProgressFindings.length > 0 && (
         <section>
           <h2 className="font-serif text-[22px] font-semibold text-brand-slate-800 mb-3">
-            Goal Progress ({analysis.goalProgressFindings.length})
+            {t("analysisTab.goalProgress", { count: analysis.goalProgressFindings.length })}
           </h2>
           <div className="space-y-3">
             {analysis.goalProgressFindings.map((f, i) => (
@@ -109,7 +111,7 @@ export function ProgressReportAnalysisTab({
       {analysis.redFlags.length > 0 && (
         <Card>
           <h2 className="font-serif text-[22px] font-semibold text-brand-slate-800 mb-3">
-            Red Flags ({analysis.redFlags.length})
+            {t("analysisTab.redFlags", { count: analysis.redFlags.length })}
           </h2>
           <div className="space-y-3">
             {analysis.redFlags.map((rf, i) => (
@@ -127,9 +129,15 @@ export function ProgressReportAnalysisTab({
                           : "neutral"
                     }
                   >
-                    {rf.severity}
+                    {rf.severity === "high"
+                      ? t("analysisTab.severityHigh")
+                      : rf.severity === "medium"
+                        ? t("analysisTab.severityMedium")
+                        : rf.severity === "low"
+                          ? t("analysisTab.severityLow")
+                          : rf.severity}
                   </Badge>
-                  <Badge variant="neutral">{rf.category}</Badge>
+                  <Badge variant="neutral">{t(`analysisTab.category.${rf.category}`, { defaultValue: rf.category })}</Badge>
                 </div>
                 <p className="text-sm font-medium text-brand-slate-800">
                   {rf.finding}

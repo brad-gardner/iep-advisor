@@ -28,7 +28,7 @@ type HomeLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
  * fetch behind the existing error until it resolves.
  */
 export function useHome(): UseHomeResult {
-  const { t } = useTranslation('home');
+  const { t, i18n } = useTranslation('home');
   const { user } = useAuth();
   const [home, setHome] = useState<HomeDto | null>(null);
   const [loadError, setLoadError] = useState<HomeLoadError | null>(null);
@@ -64,14 +64,21 @@ export function useHome(): UseHomeResult {
     // text is translated below, at render, from `loadError`'s stored KIND
     // rather than a snapshot string, so it already follows the active
     // language with no refetch needed.
-    // `user?.preferredLanguage` deliberately included: some of `/api/home`'s
-    // notices are localized server-side (the plan's `.resx` work), so once
-    // the ACCOUNT's saved preference changes — e.g. right after
-    // `setLanguage`'s PUT lands — a refetch is needed to pick up those
-    // notices in the new language. This only changes when the PUT actually
-    // resolves, so it doesn't reintroduce the refetch-per-switch problem `t`
-    // was excluded for above.
-  }, [retryToken, user?.preferredLanguage]);
+    // `i18n.resolvedLanguage` AND `user?.preferredLanguage` are both
+    // included, because the server picks between them itself: a signed-in
+    // request is localized from the account's SAVED preference, not
+    // `Accept-Language`, while a signed-out one has no saved preference to
+    // read and falls back to `Accept-Language` (i.e. the language actually
+    // in use). So this effect must refetch on whichever of the two actually
+    // drives the response for the current viewer — `resolvedLanguage` for
+    // the signed-out case (a lazy Spanish chunk finishing, or a switch that
+    // reverted) and `user?.preferredLanguage` for the signed-in case (the
+    // backfill/PUT in `AuthProvider` landing after this effect's first run).
+    // `resolvedLanguage` changes only once a language switch has actually
+    // taken effect (never mid-switch, and never on a switch that reverted),
+    // so this still doesn't reintroduce the refetch-per-switch-attempt
+    // problem `t` was excluded for above.
+  }, [retryToken, i18n.resolvedLanguage, user?.preferredLanguage]);
 
   return {
     home,

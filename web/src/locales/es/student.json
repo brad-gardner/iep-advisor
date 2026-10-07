@@ -1,0 +1,81 @@
+{
+  "entryKinds": {
+    "Strength": {
+      "label": "Fortaleza",
+      "sectionTitle": "Mis fortalezas",
+      "hint": "Cosas que hace bien o que le enorgullecen.",
+      "placeholder": "Se me da bien…"
+    },
+    "Interest": {
+      "label": "Interés",
+      "sectionTitle": "Mis intereses",
+      "hint": "Cosas que disfruta o sobre las que quiere aprender más.",
+      "placeholder": "Me interesa…"
+    },
+    "AccommodationRequest": {
+      "label": "Solicitud de adaptación",
+      "sectionTitle": "Adaptaciones que quiero",
+      "hint": "Apoyos que le ayudan a aprender mejor.",
+      "placeholder": "Me ayuda cuando…"
+    },
+    "MeetingStatement": {
+      "label": "Declaración para la reunión",
+      "sectionTitle": "Lo que quiero decir en mi reunión",
+      "hint": "Cosas que quiere que su equipo escuche.",
+      "placeholder": "En mi reunión, quiero decir…"
+    },
+    "AiInterviewAnswer": {
+      "label": "Respuesta de la entrevista con IA"
+    }
+  },
+  "homePage": {
+    "welcomeTitle": "Le damos la bienvenida, {{name}}",
+    "defaultTitle": "Su espacio",
+    "subtitle": "Agregue sus fortalezas, intereses y lo que quiere decir; luego elija qué compartir con su equipo.",
+    "loadingWorkspace": "Cargando su espacio…",
+    "workspaceLoadErrorTitle": "No pudimos cargar su espacio",
+    "addedToast": "Agregado a su espacio",
+    "savedToast": "Cambios guardados",
+    "deletedToast": "Entrada eliminada",
+    "deleteDialogTitle": "Eliminar entrada",
+    "deleteDialogMessage": "¿Eliminar esto? Esto no se puede deshacer."
+  },
+  "workspaceSection": {
+    "empty": "Aún no hay nada aquí.",
+    "add": "Agregar"
+  },
+  "entryEditor": {
+    "shareLabel": "Compartir esto con mi equipo",
+    "contentAriaLabel": "Contenido de la entrada",
+    "saveLabel": "Guardar"
+  },
+  "entryCard": {
+    "edit": "Editar",
+    "delete": "Eliminar"
+  },
+  "shareToggle": {
+    "shared": "Compartido con su equipo",
+    "private": "Solo usted puede ver esto"
+  },
+  "aiInterview": {
+    "heading": "Entrevista con IA",
+    "description": "Dígale al asistente qué necesita ayuda para expresar. Redactará algo que podrá guardar o cambiar.",
+    "promptPlaceholder": "Quiero decirle a mi equipo que…",
+    "promptAriaLabel": "¿Qué quiere decir y necesita ayuda para expresarlo?",
+    "askButton": "Preguntarle al asistente",
+    "errorTitle": "El asistente no pudo ayudar en este momento",
+    "errorBody": "Intente de nuevo en un momento.",
+    "saveAsStatement": "Guardar como declaración para la reunión",
+    "saveAsAnswer": "Guardar como respuesta de la entrevista",
+    "dismiss": "Descartar",
+    "privacyNote": "Las entradas guardadas son privadas hasta que elija compartirlas."
+  },
+  "inviteForm": {
+    "emailLabel": "Correo electrónico del estudiante *",
+    "submit": "Enviar invitación",
+    "successDefault": "Invitación enviada. El estudiante tiene una invitación pendiente.",
+    "failureDefault": "No se pudo enviar la invitación",
+    "cardHeading": "Invitar al estudiante",
+    "cardDescriptionDefault": "Invite al estudiante a activar su propia cuenta y participar en su proceso de IEP."
+  }
+}

@@ -3,6 +3,7 @@ import { getIepDocuments } from '@/features/iep-documents/api/iep-documents-api'
 import { listByChild as listEtrsByChild } from '@/features/etr-documents/api/etr-documents-api';
 import { listChildMeetings } from '@/features/meetings/api/meetings-api';
 import { formatDate } from '@/lib/format-date';
+import i18n from '@/lib/i18n';
 
 export interface JournalLinkOption {
   id: number;
@@ -40,7 +41,7 @@ export function useJournalLinkOptions(childId: number): { options: JournalLinkOp
           ieps: (ieps ?? []).map((d) => ({ id: d.id, label: `IEP · ${formatDate(d.iepDate, d.fileName)}` })),
           etrs: (etrs ?? []).map((d) => ({
             id: d.id,
-            label: `${d.evaluationType || 'ETR'} · ${formatDate(d.evaluationDate, d.fileName ?? 'undated')}`,
+            label: `${d.evaluationType || 'ETR'} · ${formatDate(d.evaluationDate, d.fileName ?? i18n.t('journal:drawer.undated'))}`,
           })),
           meetings: (meetings ?? []).map((m) => ({ id: m.id, label: `${m.title} · ${formatDate(m.startsAtUtc)}` })),
         });

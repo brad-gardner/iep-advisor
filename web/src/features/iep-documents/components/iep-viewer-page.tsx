@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   ChevronDown,
@@ -33,18 +34,13 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { ProgressReportsTab } from "@/features/progress-reports/components/progress-reports-tab";
 import { AskAdvocateButton } from "@/features/advocate/components/ask-advocate-button";
 import { formatDate } from "@/lib/format-date";
-
-const MEETING_TYPE_LABELS: Record<string, string> = {
-  initial: "Initial IEP",
-  annual_review: "Annual Review",
-  amendment: "Amendment",
-  reevaluation: "Reevaluation",
-};
+import { documentMeetingTypeLabel } from "@/lib/meeting-labels";
 
 /** `#goal-340` (an advocate citation) opens the analysis tab on the goal list and scrolls to that goal. */
 const GOAL_HASH = /^#goal-\d+$/;
 
 export function IepViewerPage() {
+  const { t } = useTranslation(["iep-documents", "common"]);
   usePageTitle("IEP");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -209,20 +205,20 @@ export function IepViewerPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading document…" />
+        <Spinner label={t("loadingDocument")} />
       </div>
     );
   }
 
   if (!document) {
-    return <EmptyState icon={FileX} title="Document not found." />;
+    return <EmptyState icon={FileX} title={t("documentNotFound")} />;
   }
 
   const documentTitle =
     document.fileName ||
     (document.meetingType
-      ? MEETING_TYPE_LABELS[document.meetingType] || document.meetingType
-      : `IEP #${document.id}`);
+      ? documentMeetingTypeLabel(document.meetingType)
+      : t("viewer.documentIdFallback", { id: document.id }));
 
   return (
     // Document viewer: cap at a comfortable reading width rather than filling
@@ -233,7 +229,7 @@ export function IepViewerPage() {
         className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />
-        Back to child
+        {t("backToChild")}
       </Link>
 
       <PageHeader
@@ -243,7 +239,7 @@ export function IepViewerPage() {
             <AskAdvocateButton
               childId={document.childProfileId}
               about={{ kind: "iep", id: document.id }}
-              label={document.iepDate ? `IEP from ${formatDate(document.iepDate)}` : undefined}
+              label={document.iepDate ? t("askAbout.iep", { date: formatDate(document.iepDate) }) : undefined}
               canAsk={childRole !== null && childRole !== "viewer"}
               data-testid="iep-ask-advocate"
             />
@@ -259,12 +255,12 @@ export function IepViewerPage() {
                     strokeWidth={1.8}
                     aria-hidden="true"
                   />
-                  Compare
+                  {t("viewer.compare")}
                 </Button>
                 {compareOpen && (
                   <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-card border border-brand-slate-200 shadow-lg z-20 py-1">
                     <p className="px-3 py-1.5 text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold">
-                      Compare with...
+                      {t("viewer.compareWith")}
                     </p>
                     {otherIeps.map((other) => (
                       <button
@@ -279,13 +275,12 @@ export function IepViewerPage() {
                       >
                         <span className="font-medium">
                           {other.iepDate
-                            ? new Date(other.iepDate).toLocaleDateString()
-                            : `IEP #${other.id}`}
+                            ? formatDate(other.iepDate)
+                            : t("viewer.documentIdFallback", { id: other.id })}
                         </span>
                         {other.meetingType && (
                           <span className="text-brand-slate-500 ml-2 text-[12px]">
-                            {MEETING_TYPE_LABELS[other.meetingType] ||
-                              other.meetingType}
+                            {documentMeetingTypeLabel(other.meetingType)}
                           </span>
                         )}
                       </button>
@@ -300,7 +295,7 @@ export function IepViewerPage() {
                 strokeWidth={1.8}
                 aria-hidden="true"
               />
-              Download PDF
+              {t("viewer.downloadPdf")}
             </Button>
             {(document.status === "error" || document.status === "uploaded") && (
               <Button onClick={handleReprocess}>
@@ -309,7 +304,7 @@ export function IepViewerPage() {
                   strokeWidth={1.8}
                   aria-hidden="true"
                 />
-                Process
+                {t("viewer.process")}
               </Button>
             )}
           </>
@@ -319,12 +314,12 @@ export function IepViewerPage() {
       <div className="flex items-center gap-3 flex-wrap">
         {document.meetingType && (
           <Badge variant="neutral">
-            {MEETING_TYPE_LABELS[document.meetingType] || document.meetingType}
+            {documentMeetingTypeLabel(document.meetingType)}
           </Badge>
         )}
         {childCurrentIepId === document.id && (
           <Badge variant="success" data-testid="current-iep-badge">
-            Current IEP
+            {t("viewer.currentIep")}
           </Badge>
         )}
         {childCurrentIepId !== document.id && childRole && childRole !== "viewer" && (
@@ -335,17 +330,17 @@ export function IepViewerPage() {
             loading={settingCurrent}
             data-testid="make-current-iep-button"
           >
-            Make current
+            {t("viewer.makeCurrent")}
           </Button>
         )}
         {document.iepDate && (
           <span className="text-[13px] text-brand-slate-500">
-            {new Date(document.iepDate).toLocaleDateString()}
+            {formatDate(document.iepDate)}
           </span>
         )}
         {document.attendees && (
           <span className="text-[13px] text-brand-slate-500">
-            Attendees: {document.attendees}
+            {t("viewer.attendees", { attendees: document.attendees })}
           </span>
         )}
       </div>
@@ -362,7 +357,7 @@ export function IepViewerPage() {
             ) : (
               <ChevronDown className="w-3.5 h-3.5 mr-1" strokeWidth={1.8} aria-hidden="true" />
             )}
-            Notes
+            {t("viewer.notes")}
           </Button>
           {notesExpanded && (
             <div className="mt-1 bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200">
@@ -373,21 +368,20 @@ export function IepViewerPage() {
       )}
 
       {document.status === "processing" && (
-        <Notice variant="warning" title="Processing">
-          Document is being processed. This may take a minute...
+        <Notice variant="warning" title={t("viewer.processingTitle")}>
+          {t("viewer.processingBody")}
         </Notice>
       )}
 
       {document.status === "error" && (
-        <Notice variant="error" title="Processing failed">
-          Try re-uploading or click Process to retry.
+        <Notice variant="error" title={t("viewer.processingFailedTitle")}>
+          {t("viewer.processingFailedBody")}
         </Notice>
       )}
 
       {document.status === "uploaded" && (
-        <Notice variant="info" title="Not yet processed">
-          Document uploaded but not yet processed. Click Process to extract and
-          analyze.
+        <Notice variant="info" title={t("viewer.notProcessedTitle")}>
+          {t("viewer.notProcessedBody")}
         </Notice>
       )}
 
@@ -404,7 +398,7 @@ export function IepViewerPage() {
                   : "text-brand-slate-500 hover:text-brand-slate-800"
               }`}
             >
-              Document
+              {t("viewer.tabDocument")}
             </button>
             <button
               onClick={() => setActiveTab("analysis")}
@@ -415,7 +409,7 @@ export function IepViewerPage() {
                   : "text-brand-slate-500 hover:text-brand-slate-800"
               }`}
             >
-              Analysis
+              {t("viewer.tabAnalysis")}
               {analysisSource?.status === "Completed" && (
                 <span className="ml-2 inline-block w-2 h-2 rounded-full bg-brand-teal-500" />
               )}
@@ -429,7 +423,7 @@ export function IepViewerPage() {
                   : "text-brand-slate-500 hover:text-brand-slate-800"
               }`}
             >
-              Progress Reports
+              {t("viewer.tabProgressReports")}
             </button>
           </div>
 
@@ -439,7 +433,7 @@ export function IepViewerPage() {
               fileName={document.fileName}
               parsedNote={
                 sections.length > 0
-                  ? `We've already parsed this IEP. Head to the Analysis tab for findings, goal review, and advocacy alignment.`
+                  ? t("viewer.parsedNote")
                   : undefined
               }
               loadUrl={async () => {

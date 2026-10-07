@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { apiErrorMessage } from '@/lib/api-error';
 import type { CreateEtrRequest, EtrDocument } from '../types';
 import {
   create as createEtrApi,
@@ -7,10 +8,13 @@ import {
   remove as removeEtrApi,
 } from '../api/etr-documents-api';
 
+/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
+export type UseEtrDocumentsError = { kind: 'server'; message: string } | { kind: 'generic' };
+
 export function useEtrDocuments(childId: number) {
   const [etrs, setEtrs] = useState<EtrDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UseEtrDocumentsError | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -20,10 +24,11 @@ export function useEtrDocuments(childId: number) {
       if (response.success && response.data) {
         setEtrs(response.data);
       } else {
-        setError(response.message || 'Failed to load ETRs');
+        setError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
       }
-    } catch {
-      setError('Failed to load ETRs');
+    } catch (err) {
+      const message = apiErrorMessage(err, '');
+      setError(message ? { kind: 'server', message } : { kind: 'generic' });
     } finally {
       setIsLoading(false);
     }
@@ -61,7 +66,7 @@ export function useEtrDocuments(childId: number) {
 export function useEtrDocument(id: number) {
   const [etr, setEtr] = useState<EtrDocument | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UseEtrDocumentsError | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -71,10 +76,11 @@ export function useEtrDocument(id: number) {
       if (response.success && response.data) {
         setEtr(response.data);
       } else {
-        setError(response.message || 'ETR not found');
+        setError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
       }
-    } catch {
-      setError('Failed to load ETR');
+    } catch (err) {
+      const message = apiErrorMessage(err, '');
+      setError(message ? { kind: 'server', message } : { kind: 'generic' });
     } finally {
       setIsLoading(false);
     }

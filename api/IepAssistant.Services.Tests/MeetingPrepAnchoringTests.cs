@@ -24,7 +24,7 @@ public class MeetingPrepAnchoringTests
 
     // GenerateFromGoalsAsync touches only access and the context; the other collaborators are unused.
     private static MeetingPrepService Service(Domain.Data.ApplicationDbContext context) =>
-        new(null!, null!, null!, new AllowAll(), null!, context, null!, NullLogger<MeetingPrepService>.Instance);
+        new(null!, null!, null!, new AllowAll(), null!, context, null!, TestSupport.TestLocalizers.Ai(), NullLogger<MeetingPrepService>.Instance);
 
     private static int SeedIep(AnalysisRunTestFixture fixture, DateTime? iepDate, string status = "parsed", bool isActive = true)
     {

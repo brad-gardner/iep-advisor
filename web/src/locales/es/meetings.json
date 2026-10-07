@@ -1,0 +1,13 @@
+{
+  "rsvpPage": {
+    "pageTitle": "Confirmación de reunión",
+    "heading": "Invitación a la reunión",
+    "missingToken": "A este enlace le falta su token de invitación.",
+    "invalidLink": "Este enlace de invitación ya no es válido.",
+    "loadingInvitation": "Cargando invitación…",
+    "respondedTitle": "Gracias; su respuesta fue registrada",
+    "respondedBody": "Usted respondió: {{status}}.",
+    "changeResponse": "Cambiar respuesta",
+    "submitFailed": "No se pudo registrar su respuesta."
+  }
+}

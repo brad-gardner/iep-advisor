@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -9,11 +10,11 @@ import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-e
 import { apiErrorMessage } from '@/lib/api-error';
 import { createJournalEntry, deleteJournalEntry, updateJournalEntry } from '../api/journal-api';
 import { useJournalLinkOptions, type JournalLinkOption } from '../hooks/use-journal-link-options';
+import { journalTagLabel } from '../lib/tag-label';
 import { todayInputValue } from '../lib/today';
 import {
   JOURNAL_CONTENT_MAX_LENGTH,
   JOURNAL_TAGS,
-  JOURNAL_TAG_LABELS,
   type JournalEntryDto,
   type JournalTag,
   type SaveJournalEntryRequest,
@@ -52,6 +53,7 @@ export function JournalEntryDrawer({
   onDeleted,
   'data-testid': testId = 'journal-entry-drawer',
 }: JournalEntryDrawerProps) {
+  const { t } = useTranslation('journal');
   const [busy, setBusy] = useState(false);
   const editing = Boolean(entry);
 
@@ -60,7 +62,7 @@ export function JournalEntryDrawer({
       open={open}
       onClose={onClose}
       preventClose={busy}
-      title={editing ? 'Edit update' : 'Add an update'}
+      title={editing ? t('drawer.editTitle') : t('drawer.addTitle')}
       data-testid={testId}
     >
       <JournalEntryForm
@@ -102,6 +104,7 @@ function JournalEntryForm({
   onSaved,
   onDeleted,
 }: JournalEntryFormProps) {
+  const { t } = useTranslation(['journal', 'common']);
   const today = todayInputValue();
   const [occurredOn, setOccurredOn] = useState(entry?.occurredOn ?? initial?.occurredOn ?? today);
   const [tag, setTag] = useState<JournalTag>(entry?.tag ?? initial?.tag ?? 'Other');
@@ -139,10 +142,10 @@ function JournalEntryForm({
       if (res.success && res.data) {
         onSaved(res.data, entry ? 'updated' : 'created');
       } else {
-        setError(res.message ?? 'Could not save this update.');
+        setError(res.message ?? t('drawer.saveFailed'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not save this update.'));
+      setError(apiErrorMessage(err, t('drawer.saveFailed')));
     } finally {
       setSaving(false);
       onBusyChange(false);
@@ -162,10 +165,10 @@ function JournalEntryForm({
         setConfirmingDelete(false);
         onDeleted?.(entry.id);
       } else {
-        setDeleteError(res.message ?? 'Could not delete this update.');
+        setDeleteError(res.message ?? t('drawer.deleteFailed'));
       }
     } catch (err) {
-      setDeleteError(apiErrorMessage(err, 'Could not delete this update.'));
+      setDeleteError(apiErrorMessage(err, t('drawer.deleteFailed')));
     } finally {
       setDeleting(false);
       onBusyChange(false);
@@ -178,7 +181,7 @@ function JournalEntryForm({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input
             id="journal-occurred-on"
-            label="Date"
+            label={t('drawer.dateLabel')}
             type="date"
             value={occurredOn}
             max={today}
@@ -188,14 +191,14 @@ function JournalEntryForm({
           />
           <Select
             id="journal-tag"
-            label="Kind of update"
+            label={t('drawer.kindLabel')}
             value={tag}
             onChange={(e) => setTag(e.target.value as JournalTag)}
             data-testid={`${testId}-tag`}
           >
-            {JOURNAL_TAGS.map((t) => (
-              <option key={t} value={t}>
-                {JOURNAL_TAG_LABELS[t]}
+            {JOURNAL_TAGS.map((tagOption) => (
+              <option key={tagOption} value={tagOption}>
+                {journalTagLabel(tagOption)}
               </option>
             ))}
           </Select>
@@ -203,8 +206,8 @@ function JournalEntryForm({
 
         <RichTextEditor
           id="journal-content"
-          label="What happened"
-          placeholder="Sent home early after a meltdown at recess. Called Ms. Rivera — she said…"
+          label={t('drawer.contentLabel')}
+          placeholder={t('drawer.contentPlaceholder')}
           minRows={6}
           value={content}
           onChange={setContent}
@@ -215,11 +218,11 @@ function JournalEntryForm({
 
         {!optionsLoading && (options.ieps.length > 0 || options.etrs.length > 0 || options.meetings.length > 0) && (
           <fieldset className="space-y-3">
-            <legend className="text-[13px] font-medium text-brand-slate-600">Link to (optional)</legend>
+            <legend className="text-[13px] font-medium text-brand-slate-600">{t('drawer.linkLegend')}</legend>
             {options.ieps.length > 0 && (
               <LinkSelect
                 id="journal-link-iep"
-                label="IEP"
+                label={t('drawer.linkIep')}
                 value={linkedIepDocumentId}
                 options={options.ieps}
                 onChange={setLinkedIepDocumentId}
@@ -229,7 +232,7 @@ function JournalEntryForm({
             {options.etrs.length > 0 && (
               <LinkSelect
                 id="journal-link-etr"
-                label="ETR"
+                label={t('drawer.linkEtr')}
                 value={linkedEtrDocumentId}
                 options={options.etrs}
                 onChange={setLinkedEtrDocumentId}
@@ -239,7 +242,7 @@ function JournalEntryForm({
             {options.meetings.length > 0 && (
               <LinkSelect
                 id="journal-link-meeting"
-                label="Meeting"
+                label={t('drawer.linkMeeting')}
                 value={linkedMeetingId}
                 options={options.meetings}
                 onChange={setLinkedMeetingId}
@@ -251,7 +254,7 @@ function JournalEntryForm({
 
         {!dateValid && occurredOn !== '' && (
           <p className="text-xs text-brand-danger-700" role="alert" data-testid={`${testId}-date-error`}>
-            The date can't be in the future.
+            {t('drawer.dateFutureError')}
           </p>
         )}
 
@@ -276,14 +279,14 @@ function JournalEntryForm({
               data-testid={`${testId}-delete`}
             >
               <Trash2 className="mr-1 h-4 w-4" aria-hidden="true" />
-              Delete
+              {t('drawer.delete')}
             </Button>
           )}
           <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={saving || deleting}>
-            Cancel
+            {t('common:ui.cancel')}
           </Button>
           <Button type="submit" size="sm" loading={saving} disabled={!canSubmit} data-testid={`${testId}-save`}>
-            {entry ? 'Save changes' : 'Save update'}
+            {entry ? t('drawer.saveChanges') : t('drawer.saveNew')}
           </Button>
         </div>
       </form>
@@ -291,9 +294,9 @@ function JournalEntryForm({
       {/* Outside the <form>: the dialog's own buttons are untyped and would otherwise submit it. */}
       <ConfirmDialog
         open={confirmingDelete}
-        title="Delete update"
-        message="Delete this journal update? This cannot be undone."
-        confirmLabel="Delete"
+        title={t('drawer.deleteDialogTitle')}
+        message={t('drawer.deleteDialogMessage')}
+        confirmLabel={t('drawer.deleteConfirm')}
         loading={deleting}
         error={deleteError}
         onConfirm={() => void remove()}
@@ -318,6 +321,7 @@ interface LinkSelectProps {
 }
 
 function LinkSelect({ id, label, value, options, onChange, testId }: LinkSelectProps) {
+  const { t } = useTranslation('journal');
   // Keep a link the options no longer list (a document since removed) rather
   // than silently dropping it the next time this entry is saved.
   const orphan = value != null && !options.some((o) => o.id === value);
@@ -329,8 +333,8 @@ function LinkSelect({ id, label, value, options, onChange, testId }: LinkSelectP
       onChange={(e) => onChange(fromSelectValue(e.target.value))}
       data-testid={testId}
     >
-      <option value="">Not linked</option>
-      {orphan && <option value={String(value)}>Linked item #{value}</option>}
+      <option value="">{t('drawer.notLinked')}</option>
+      {orphan && <option value={String(value)}>{t('drawer.linkedItem', { id: value })}</option>}
       {options.map((o) => (
         <option key={o.id} value={String(o.id)}>
           {o.label}

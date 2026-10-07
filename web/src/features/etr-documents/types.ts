@@ -36,18 +36,6 @@ export interface UpdateEtrMetadataRequest {
   notes?: string;
 }
 
-export const EVALUATION_TYPE_LABELS: Record<string, string> = {
-  initial: 'Initial Evaluation',
-  reevaluation: 'Reevaluation',
-  transfer: 'Transfer',
-  other: 'Other',
-};
-
-export const DOCUMENT_STATE_LABELS: Record<string, string> = {
-  draft: 'Draft',
-  final: 'Final',
-};
-
 export type EtrSectionType =
   | 'referral_reason'
   | 'background_information'

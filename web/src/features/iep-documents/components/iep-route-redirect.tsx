@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { getIepDocument } from "../api/iep-documents-api";
 import { Spinner } from "@/components/ui/spinner";
 
 export function IepRouteRedirect() {
+  const { t } = useTranslation("iep-documents");
   const { id } = useParams<{ id: string }>();
   const [childId, setChildId] = useState<number | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -27,7 +29,7 @@ export function IepRouteRedirect() {
   if (childId == null) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading document…" />
+        <Spinner label={t("loadingDocument")} />
       </div>
     );
   }

@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Lightbulb } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
+import { GeneratedLanguageNotice } from '@/lib/i18n/generated-language-notice';
 import { useDraftReviewContext } from '../hooks/draft-review-context';
 
 type ExplainTarget =
@@ -21,6 +23,7 @@ interface ExplainPanelProps {
  * own loading/error state once it has asked.
  */
 export function ExplainPanel({ target, 'data-testid': testId }: ExplainPanelProps) {
+  const { t } = useTranslation('shared-drafts');
   const ctx = useDraftReviewContext();
   const [revealed, setRevealed] = useState(false);
   if (!ctx) return null;
@@ -29,7 +32,7 @@ export function ExplainPanel({ target, 'data-testid': testId }: ExplainPanelProp
     target.kind === 'item'
       ? explanations.getItemExplanation(target.fieldKey, target.rowId)
       : explanations.getSectionExplanation(target.sectionId, target.title);
-  const label = target.kind === 'section' ? 'Explain this section' : 'Explain';
+  const label = target.kind === 'section' ? t('explainPanel.explainSection') : t('explainPanel.explain');
 
   const handleToggle = () => {
     if (!revealed) explanations.ensureLoaded();
@@ -46,7 +49,7 @@ export function ExplainPanel({ target, 'data-testid': testId }: ExplainPanelProp
         data-testid={testId}
       >
         <Lightbulb className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-        {revealed ? 'Hide explanation' : label}
+        {revealed ? t('explainPanel.hideExplanation') : label}
       </Button>
       {/* Live region: the explanation arrives asynchronously after the click, so
           assistive tech hears it land (same idiom as the editor's AssistPopover). */}
@@ -58,6 +61,7 @@ export function ExplainPanel({ target, 'data-testid': testId }: ExplainPanelProp
         >
           {explanation ? (
             <>
+              <GeneratedLanguageNotice generatedLanguage={explanations.generatedLanguage} className="mb-2" />
               <p className="whitespace-pre-wrap text-brand-slate-700">{explanation}</p>
               {explanations.disclaimer && (
                 <p className="mt-2 text-xs text-brand-slate-500">{explanations.disclaimer}</p>
@@ -65,15 +69,18 @@ export function ExplainPanel({ target, 'data-testid': testId }: ExplainPanelProp
             </>
           ) : explanations.isLoading ? (
             <span className="flex items-center gap-2 text-brand-slate-500">
-              <Spinner size="sm" /> Explaining…
+              <Spinner size="sm" /> {t('explainPanel.explaining')}
             </span>
           ) : explanations.error ? (
             <div role="alert">
-              <Notice variant="error" title={explanations.error} />
+              <Notice
+                variant="error"
+                title={explanations.error.kind === 'server' ? explanations.error.message : t('explainPanel.loadError')}
+              />
             </div>
           ) : (
             <p className="text-brand-slate-500">
-              {target.kind === 'section' ? 'No explanation available for this section.' : 'No explanation available for this item.'}
+              {target.kind === 'section' ? t('explainPanel.noExplanationSection') : t('explainPanel.noExplanationItem')}
             </p>
           )}
         </div>

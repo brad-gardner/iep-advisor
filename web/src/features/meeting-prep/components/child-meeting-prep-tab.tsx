@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/toast";
 import type { ChildOutletContext } from "@/features/children/components/child-detail-page";
 import { useMeetingPrep } from "../hooks/use-meeting-prep";
@@ -12,10 +13,6 @@ import { StudentSharedEntries } from "./student-shared-entries";
 /** `?addQuestion=<text>` — an advocate suggestion handed to the parent's own question list. */
 export const ADD_QUESTION_PARAM = "addQuestion";
 
-export const QUESTION_ADDED_TOAST = "Added to your questions";
-export const QUESTION_EXISTS_TOAST = "Already in your questions";
-export const QUESTION_FAILED_TOAST = "Could not add that question";
-
 /**
  * Child-level (standalone) Meeting Prep tab, gated behind the
  * MeetingPrepStandalone feature flag. Reuses the child-scoped useMeetingPrep
@@ -23,6 +20,7 @@ export const QUESTION_FAILED_TOAST = "Could not add that question";
  * meeting-date control above it and the parent's own question list.
  */
 export function ChildMeetingPrepTab() {
+  const { t } = useTranslation("meeting-prep");
   const { child, childId } = useOutletContext<ChildOutletContext>();
   const { show } = useToast();
   const canEdit = child.role === "owner" || child.role === "collaborator";
@@ -53,9 +51,9 @@ export function ChildMeetingPrepTab() {
     consumedRef.current = incoming;
     if (canEditQuestions) {
       void addQuestion(incoming, "advocate").then((result) => {
-        if (result === "added") show({ message: QUESTION_ADDED_TOAST, variant: "success" });
-        else if (result === "duplicate") show({ message: QUESTION_EXISTS_TOAST, variant: "info" });
-        else if (result === "failed") show({ message: QUESTION_FAILED_TOAST, variant: "error" });
+        if (result === "added") show({ message: t("toast.questionAdded"), variant: "success" });
+        else if (result === "duplicate") show({ message: t("toast.questionExists"), variant: "info" });
+        else if (result === "failed") show({ message: t("toast.questionFailed"), variant: "error" });
       });
     }
     setSearchParams(
@@ -66,11 +64,11 @@ export function ChildMeetingPrepTab() {
       },
       { replace: true },
     );
-  }, [incoming, questionsLoading, canEditQuestions, addQuestion, setSearchParams, show]);
+  }, [incoming, questionsLoading, canEditQuestions, addQuestion, setSearchParams, show, t]);
 
   const addTyped = async (text: string) => {
     const result = await addQuestion(text, "parent");
-    if (result === "added") show({ message: QUESTION_ADDED_TOAST, variant: "success" });
+    if (result === "added") show({ message: t("toast.questionAdded"), variant: "success" });
     return result;
   };
 

@@ -4,10 +4,12 @@ import {
   ClipboardList,
   RefreshCw,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { MeetingPrepChecklist, CheckItemRequest } from "@/types/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatDate } from "@/lib/format-date";
+import { GeneratedLanguageNotice } from "@/lib/i18n/generated-language-notice";
 import { Notice } from "@/components/ui/notice";
 import { Spinner } from "@/components/ui/spinner";
 import { ChecklistSection } from "./checklist-section";
@@ -29,21 +31,17 @@ interface MeetingPrepTabProps {
 }
 
 const SECTIONS = [
-  { key: "questionsToAsk", title: "Questions to Ask", icon: HelpCircle },
-  { key: "redFlagsToRaise", title: "Red Flags to Raise", icon: AlertTriangle },
-  {
-    key: "preparationNotes",
-    title: "Preparation Notes",
-    icon: ClipboardList,
-  },
+  { key: "questionsToAsk", icon: HelpCircle },
+  { key: "redFlagsToRaise", icon: AlertTriangle },
+  { key: "preparationNotes", icon: ClipboardList },
 ] as const;
 
 // Legacy sections from older checklists — rendered if they have data
 const LEGACY_SECTIONS = [
-  { key: "documentsToBring", title: "Documents to Bring" },
-  { key: "rightsToReference", title: "Rights to Reference" },
-  { key: "goalGaps", title: "Goal Gaps" },
-  { key: "generalTips", title: "General Tips" },
+  { key: "documentsToBring" },
+  { key: "rightsToReference" },
+  { key: "goalGaps" },
+  { key: "generalTips" },
 ] as const;
 
 type SectionKey = keyof Pick<
@@ -74,6 +72,7 @@ function getAllItems(checklist: MeetingPrepChecklist) {
 }
 
 export function MeetingPrepTab(props: MeetingPrepTabProps) {
+  const { t } = useTranslation(['meeting-prep', 'common']);
   const {
     checklist,
     isLoading,
@@ -98,7 +97,7 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading meeting prep…" />
+        <Spinner label={t('tab.loading')} />
       </div>
     );
   }
@@ -123,13 +122,12 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
   ) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">
-        <Spinner size="lg" className="mb-4" label="Generating your checklist…" />
+        <Spinner size="lg" className="mb-4" label={t('tab.generatingSpinner')} />
         <h3 className="font-serif text-[22px] font-semibold text-brand-slate-800 mb-2">
-          Generating Your Checklist
+          {t('tab.generatingTitle')}
         </h3>
         <p className="text-brand-slate-500 text-sm text-center max-w-md mb-6">
-          Building a personalized meeting prep checklist. This typically takes
-          30-60 seconds.
+          {t('tab.generatingBody')}
         </p>
       </div>
     );
@@ -139,13 +137,12 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">
         <Card className="max-w-md text-center">
-          <Notice variant="error" title="Generation Failed">
-            {displayChecklist.errorMessage ||
-              "An error occurred while generating the checklist."}
+          <Notice variant="error" title={t('tab.generationFailedTitle')}>
+            {displayChecklist.errorMessage || t('tab.genericGenerationError')}
           </Notice>
           <div className="mt-4">
             <Button onClick={onGenerate} loading={isGenerating}>
-              Retry
+              {t('tab.retry')}
             </Button>
           </div>
         </Card>
@@ -206,11 +203,12 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
 
   return (
     <div className="space-y-6">
+      <GeneratedLanguageNotice generatedLanguage={displayChecklist.generatedLanguage} />
+
       {/* Stale prep banner */}
       {isStalePrep && (
-        <Notice variant="warning" title="Meeting prep may be outdated">
-          This checklist was generated before the latest analysis. Regenerate to
-          include updated insights.
+        <Notice variant="warning" title={t('tab.staleTitle')}>
+          {t('tab.staleBody')}
         </Notice>
       )}
 
@@ -218,22 +216,22 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
       <p className="text-[13px] text-brand-slate-600" data-testid="meeting-prep-source">
         {displayChecklist.iepDocumentId
           ? displayChecklist.iepDocumentDate
-            ? `Based on the IEP dated ${formatDate(displayChecklist.iepDocumentDate.slice(0, 10))} and your goals`
-            : "Based on your IEP and your goals"
+            ? t('tab.sourceIepDated', { date: formatDate(displayChecklist.iepDocumentDate.slice(0, 10)) })
+            : t('tab.sourceIep')
           : displayChecklist.etrDocumentId
-            ? "Based on your ETR and your goals"
-            : "Based on your goals — no IEP on file yet"}
+            ? t('tab.sourceEtr')
+            : t('tab.sourceGoalsOnly')}
       </p>
 
       {/* Progress bar + regenerate */}
       <div className="space-y-2" data-testid="meeting-prep-progress">
         <div className="flex items-center justify-between">
           <span className="text-[13px] font-medium text-brand-slate-600">
-            {checkedCount} of {totalCount} items checked
+            {t('tab.itemsChecked', { checked: checkedCount, total: totalCount })}
           </span>
           <div className="flex items-center gap-3">
             <span className="text-[13px] font-medium text-brand-teal-500">
-              {progressPercent}%
+              {t('tab.percent', { percent: progressPercent })}
             </span>
             <Button
               variant="ghost"
@@ -242,7 +240,7 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
               data-testid="regenerate-prep-button"
             >
               <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.8} />
-              Regenerate
+              {t('tab.regenerate')}
             </Button>
           </div>
         </div>
@@ -256,33 +254,32 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
 
       {/* Regenerate confirmation */}
       {showRegenerateConfirm && (
-        <Notice variant="warning" title="Regenerate checklist?">
+        <Notice variant="warning" title={t('tab.regenerateConfirmTitle')}>
           <p className="mb-3">
-            This will create a new checklist. Your current progress will not be
-            carried over.
+            {t('tab.regenerateConfirmBody')}
           </p>
           <div className="flex gap-2">
             <Button onClick={handleRegenerate} loading={isGenerating}>
-              Regenerate
+              {t('tab.regenerate')}
             </Button>
             <Button
               variant="ghost"
               onClick={() => setShowRegenerateConfirm(false)}
             >
-              Cancel
+              {t('common:ui.cancel')}
             </Button>
           </div>
         </Notice>
       )}
 
       {/* New sections */}
-      {SECTIONS.map(({ key, title, icon }) => {
+      {SECTIONS.map(({ key, icon }) => {
         const items = displayChecklist[key] ?? [];
         if (!items.length) return null;
         return (
           <ChecklistSection
             key={key}
-            title={title}
+            title={t(`tab.sections.${key}`)}
             icon={icon}
             items={items}
             section={key}
@@ -292,10 +289,10 @@ export function MeetingPrepTab(props: MeetingPrepTabProps) {
       })}
 
       {/* Legacy sections — only render if they have data */}
-      {activeLegacySections.map(({ key, title }) => (
+      {activeLegacySections.map(({ key }) => (
         <ChecklistSection
           key={key}
-          title={title}
+          title={t(`tab.sections.${key}`)}
           icon={ClipboardList}
           items={displayChecklist[key]}
           section={key}

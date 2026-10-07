@@ -1,10 +1,14 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using QuestPDF.Infrastructure;
 using Xunit;
@@ -88,7 +92,7 @@ public sealed class IepVersionServiceTests : IDisposable
 
     private ApplicationDbContext CreateContext() => new(_options);
     private IepVersionService CreateVersionService(ApplicationDbContext ctx, IBlobStorageService? blob = null)
-        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), blob ?? new SuccessBlobStorageFake(), _audit, NullLogger<IepVersionService>.Instance);
+        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), blob ?? new SuccessBlobStorageFake(), _audit, NullLogger<IepVersionService>.Instance, TestSupport.TestLocalizers.Messages());
     private IepDraftService CreateDraftService(ApplicationDbContext ctx)
         => new(ctx, new OrgAccessService(ctx), _audit, NullLogger<IepDraftService>.Instance);
 
@@ -563,6 +567,62 @@ public sealed class IepVersionServiceTests : IDisposable
         Assert.Equal(s.EducatorUserId, entry.ActorUserId);
         Assert.Equal("IepVersion", entry.ResourceType);
         Assert.Equal(v.Id, entry.ResourceId);
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 3: IepVersionService's Permission/NotFound failures now carry ServiceErrorKind explicitly,
+    // so Spanish wording never changes the controller's status routing — see
+    // IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure.
+
+    [Fact]
+    public async Task GetVersion_ByUnrelatedUser_UnderEnglishCulture_MessageIsEnglish()
+    {
+        var s = SeedSchoolWithStudent("ieplangen");
+        var draftId = await CreateDraftAsync(s);
+        var v = await FinalizeAsync(s, draftId);
+        var strangerId = SeedUnrelatedUser("stranger-ieplangen@example.com");
+
+        using var _ = CultureScope.For("en");
+        using var ctx = CreateContext();
+        var result = await CreateVersionService(ctx).GetVersionAsync(strangerId, v.Id);
+
+        Assert.False(result.Success);
+        Assert.Equal("You do not have permission to access this IEP version.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+    }
+
+    [Fact]
+    public async Task GetVersion_ByUnrelatedUser_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind()
+    {
+        var s = SeedSchoolWithStudent("ieplanges");
+        var draftId = await CreateDraftAsync(s);
+        var v = await FinalizeAsync(s, draftId);
+        var strangerId = SeedUnrelatedUser("stranger-ieplanges@example.com");
+
+        using var _ = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateVersionService(ctx).GetVersionAsync(strangerId, v.Id);
+
+        Assert.False(result.Success);
+        Assert.Equal("No tiene permiso para acceder a esta versión del IEP.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    private int SeedUnrelatedUser(string email)
+    {
+        using var ctx = CreateContext();
+        var user = new User { Email = email, PasswordHash = "x", FirstName = "Stranger", LastName = "Parent", Role = UserRole.Parent };
+        ctx.Users.Add(user);
+        ctx.SaveChanges();
+        return user.Id;
+    }
+
+    private sealed class TestController : ControllerBase
+    {
     }
 
     public void Dispose() => _connection.Dispose();

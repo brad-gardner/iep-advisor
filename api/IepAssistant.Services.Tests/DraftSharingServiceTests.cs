@@ -1,12 +1,16 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -59,8 +63,8 @@ public sealed class DraftSharingServiceTests : IDisposable
         var access = new AccessService(ctx);
         var authoring = new TemplateAuthoringService(ctx, _audit, NullLogger<TemplateAuthoringService>.Instance);
         var notifications = new FakeNotifications();
-        var responses = new DraftResponseService(ctx, access, org, notifications, NullLogger<DraftResponseService>.Instance);
-        var sharing = new DraftSharingService(ctx, org, access, authoring, notifications, responses, _audit, NullLogger<DraftSharingService>.Instance);
+        var responses = new DraftResponseService(ctx, access, org, notifications, NullLogger<DraftResponseService>.Instance, TestSupport.TestLocalizers.Messages());
+        var sharing = new DraftSharingService(ctx, org, access, authoring, notifications, responses, _audit, NullLogger<DraftSharingService>.Instance, TestSupport.TestLocalizers.Messages());
         return (sharing, responses, notifications);
     }
 
@@ -498,6 +502,64 @@ public sealed class DraftSharingServiceTests : IDisposable
         var result = await services.Sharing.GetForParentAsync(s.ParentId, 999_999, default);
         Assert.False(result.Success);
         Assert.Contains("not found", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 3: DraftSharingService's Permission/RevisionNotFound failures now carry ServiceErrorKind
+    // explicitly, so Spanish wording never changes the controller's status routing — see
+    // IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure.
+
+    [Fact]
+    public async Task Parent_RevokedLink_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind()
+    {
+        var s = Seed("revokedes");
+        int revisionId;
+        using (var ctx = CreateContext())
+        {
+            var services = Services(ctx);
+            var share = await services.Sharing.ShareAsync(s.TeacherId, s.InstanceId, null, default);
+            Assert.True(share.Success, share.Message);
+            revisionId = share.Data!.Id;
+
+            var link = ctx.ChildLinks.Single(l => l.SchoolStudentId == s.StudentId);
+            link.IsActive = false;
+            ctx.SaveChanges();
+        }
+
+        using var _lang = CultureScope.For("es");
+        using var readCtx = CreateContext();
+        var readServices = Services(readCtx);
+        var denied = await readServices.Sharing.GetForParentAsync(s.ParentId, revisionId, default);
+
+        Assert.False(denied.Success);
+        Assert.Equal("No tiene permiso para acceder a este documento.", denied.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, denied.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(denied);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task Parent_UnknownRevision_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        var s = Seed("nfes");
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var services = Services(ctx);
+        var result = await services.Sharing.GetForParentAsync(s.ParentId, 999_999, default);
+
+        Assert.False(result.Success);
+        Assert.Equal("Revisión del borrador compartido no encontrada.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    private sealed class TestController : ControllerBase
+    {
     }
 
     [Fact]

@@ -1,15 +1,19 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using IepAssistant.Api.BackgroundServices;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Infrastructure;
@@ -62,8 +66,9 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
             new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance),
             blob ?? new SuccessBlobStorageFake(),
             _audit,
-            new GoalRecordService(ctx, new OrgAccessService(ctx), new AccessService(ctx), NullLogger<GoalRecordService>.Instance),
-            NullLogger<AuthoredDocumentVersionService>.Instance);
+            new GoalRecordService(ctx, new OrgAccessService(ctx), new AccessService(ctx), NullLogger<GoalRecordService>.Instance, TestSupport.TestLocalizers.Messages()),
+            NullLogger<AuthoredDocumentVersionService>.Instance,
+            TestSupport.TestLocalizers.Messages());
 
     private AuthoredDocumentPdfService CreatePdfService(ApplicationDbContext ctx, IBlobStorageService blob)
         => new(ctx, new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance), blob, NullLogger<AuthoredDocumentPdfService>.Instance);
@@ -451,6 +456,62 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
 
         Assert.False(result.Success);
         Assert.Contains("permission", result.Message!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 3: FinalizeAsync's Permission/AlreadyFinalizing failures now carry ServiceErrorKind
+    // explicitly, so Spanish wording never changes the controller's status routing — see
+    // IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure.
+
+    [Fact]
+    public async Task Finalize_NonCollaborator_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind()
+    {
+        var s = SeedSchoolWithStudent("authzes");
+        var keys = SeedTemplate(IepTypeId);
+        var instanceId = SeedInstance(s, keys, IepTypeId, ValidValues(keys));
+        var stranger = SeedStranger("authzes-stranger");
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).FinalizeAsync(instanceId, stranger);
+
+        Assert.False(result.Success);
+        Assert.Equal("No tiene permiso para acceder a este documento.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task Finalize_AlreadyFinalizing_UnderSpanishCulture_MessageIsSpanish_AndMapsTo409ViaErrorKind()
+    {
+        var s = SeedSchoolWithStudent("racees");
+        var keys = SeedTemplate(IepTypeId);
+        var instanceId = SeedInstance(s, keys, IepTypeId, ValidValues(keys));
+
+        using (var ctx = CreateContext())
+        {
+            var instance = await ctx.DocumentInstances.SingleAsync(i => i.Id == instanceId);
+            instance.Status = DocumentInstanceStatus.Finalizing;
+            await ctx.SaveChangesAsync();
+        }
+
+        using var _lang = CultureScope.For("es");
+        using var ctx2 = CreateContext();
+        var result = await CreateService(ctx2).FinalizeAsync(instanceId, s.CollaboratorUserId);
+
+        Assert.False(result.Success);
+        Assert.Equal("Este documento ya se está finalizando.", result.Message);
+        Assert.Equal(ServiceErrorKind.Conflict, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<ConflictObjectResult>(action);
+    }
+
+    private sealed class TestController : ControllerBase
+    {
     }
 
     [Fact]

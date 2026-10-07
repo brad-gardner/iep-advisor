@@ -15,6 +15,14 @@ public class MeetingPrepChecklist : BaseEntity, IAuditableEntity
     public string? GeneralTips { get; set; }        // JSON array of ChecklistItem (legacy)
     public string? PreparationNotes { get; set; }   // JSON array of ChecklistItem
     public string? ErrorMessage { get; set; }
+
+    /// <summary>The requester's language ("en"/"es") when this checklist was CREATED (multilingual plan
+    /// 2026-10-06 phase 3, migration AddAiArtifactLanguage) — captured at create time because generation
+    /// runs in a background worker (<c>MeetingPrepWorker</c>) with no ambient request culture of its own;
+    /// <c>MeetingPrepService.GenerateChecklistAsync</c> re-applies it via <c>CultureScope.For</c> before
+    /// calling Claude. Null means English (including every checklist created before this column existed).</summary>
+    public string? Language { get; set; }
+
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

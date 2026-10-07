@@ -1,10 +1,12 @@
 import { useMemo, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { Notice } from '@/components/ui/notice';
 import { Markdown } from '@/components/ui/markdown';
 import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
+import { GeneratedLanguageNotice } from '@/lib/i18n/generated-language-notice';
 import { apiErrorMessage } from '@/lib/api-error';
 import { askDraftQuestion } from '../api/shared-drafts-api';
 import { useDraftReviewContext } from '../hooks/draft-review-context';
@@ -34,6 +36,7 @@ export function AskQuestionDrawer({
   targetLabel,
   'data-testid': testId,
 }: AskQuestionDrawerProps) {
+  const { t } = useTranslation('shared-drafts');
   const ctx = useDraftReviewContext();
   const [question, setQuestion] = useState('');
   const [isAsking, setIsAsking] = useState(false);
@@ -55,6 +58,8 @@ export function AskQuestionDrawer({
   if (!ctx) return null;
   const { addNote, removeNote } = ctx;
 
+  // Click-triggered (never a mount effect), so translating inline here is
+  // safe — see `AcknowledgeControl` for the same reasoning.
   const handleAsk = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = question.trim();
@@ -73,13 +78,14 @@ export function AskQuestionDrawer({
           targetRowId: targetRowId ?? null,
           citations: res.data.citations,
           createdAt: res.data.answeredAt,
+          generatedLanguage: res.data.generatedLanguage ?? null,
         });
         setQuestion('');
       } else {
-        setError(res.message ?? 'Could not get an answer right now.');
+        setError(res.message || t('askQuestion.submitError'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not get an answer right now.'));
+      setError(apiErrorMessage(err, t('askQuestion.submitError')));
     } finally {
       setIsAsking(false);
     }
@@ -87,21 +93,21 @@ export function AskQuestionDrawer({
 
   const handleDelete = async (noteId: number) => {
     const result = await removeNote(noteId);
-    if (!result.ok) setError(result.message ?? 'Could not delete this note.');
+    if (!result.ok) setError(result.message ?? t('askQuestion.deleteError'));
   };
 
   return (
-    <Drawer open={open} onClose={onClose} preventClose={isAsking} title={`Ask about: ${targetLabel}`} data-testid={testId}>
+    <Drawer open={open} onClose={onClose} preventClose={isAsking} title={t('askQuestion.drawerTitle', { label: targetLabel })} data-testid={testId}>
       <div className="space-y-4">
-        <Notice variant="info" title="Private — only you can see this">
-          Your questions and answers here are never visible to the school team.
+        <Notice variant="info" title={t('askQuestion.privateTitle')}>
+          {t('askQuestion.privateBody')}
         </Notice>
 
         {/* Live region: a new answer lands asynchronously after "Ask", so it is
             announced (same idiom as the editor's AssistPopover). */}
         <div aria-live="polite">
         {thread.length === 0 ? (
-          <p className="text-sm text-brand-slate-500">No questions yet.</p>
+          <p className="text-sm text-brand-slate-500">{t('askQuestion.empty')}</p>
         ) : (
           <ul className="space-y-3" data-testid={`${testId}-thread`}>
             {thread.map((note) => (
@@ -115,13 +121,14 @@ export function AskQuestionDrawer({
                   <button
                     type="button"
                     onClick={() => handleDelete(note.id)}
-                    aria-label="Delete this question"
+                    aria-label={t('askQuestion.deleteAriaLabel')}
                     data-testid={`delete-note-${note.id}`}
                     className="shrink-0 text-brand-slate-500 transition-colors hover:text-brand-danger-700"
                   >
                     <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </div>
+                <GeneratedLanguageNotice generatedLanguage={note.generatedLanguage} className="mt-1" />
                 <Markdown
                   content={note.answer}
                   className="mt-1 text-sm text-brand-slate-600"
@@ -131,8 +138,8 @@ export function AskQuestionDrawer({
                   <ul className="mt-2 space-y-1 border-t border-brand-slate-100 pt-2" data-testid={`note-citations-${note.id}`}>
                     {note.citations.map((c, i) => (
                       <li key={i} className="text-xs text-brand-slate-500">
-                        <span className="font-medium text-brand-slate-600">Based on: {c.label}</span>
-                        {c.excerpt && <span> — “{c.excerpt}”</span>}
+                        <span className="font-medium text-brand-slate-600">{t('askQuestion.basedOn', { label: c.label })}</span>
+                        {c.excerpt && <span>{t('askQuestion.excerptQuote', { excerpt: c.excerpt })}</span>}
                       </li>
                     ))}
                   </ul>
@@ -143,7 +150,7 @@ export function AskQuestionDrawer({
         )}
         {isAsking && (
           <p className="text-sm text-brand-slate-500" data-testid={`${testId}-thinking`}>
-            Finding an answer in the draft…
+            {t('askQuestion.thinking')}
           </p>
         )}
         </div>
@@ -156,7 +163,7 @@ export function AskQuestionDrawer({
 
         <form onSubmit={handleAsk} className="space-y-2">
           <RichTextEditor
-            label="Your question"
+            label={t('askQuestion.questionLabel')}
             value={question}
             onChange={setQuestion}
             maxLength={MAX_QUESTION_LENGTH}
@@ -170,7 +177,7 @@ export function AskQuestionDrawer({
             disabled={!question.trim() || isMarkdownOverLimit(question, MAX_QUESTION_LENGTH)}
             data-testid={`${testId}-submit`}
           >
-            Ask
+            {t('askQuestion.submit')}
           </Button>
         </form>
       </div>

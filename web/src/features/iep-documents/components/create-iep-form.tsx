@@ -1,19 +1,16 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input, Select } from '@/components/ui/input';
 import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
+import { documentMeetingTypeLabel } from '@/lib/meeting-labels';
 import { createIep } from '../api/iep-documents-api';
 
 const ATTENDEES_MAX_LENGTH = 1000;
 const NOTES_MAX_LENGTH = 2000;
 
-const MEETING_TYPES = [
-  { value: 'initial', label: 'Initial IEP' },
-  { value: 'annual_review', label: 'Annual Review' },
-  { value: 'amendment', label: 'Amendment' },
-  { value: 'reevaluation', label: 'Reevaluation' },
-] as const;
+const MEETING_TYPE_VALUES = ['initial', 'annual_review', 'amendment', 'reevaluation'] as const;
 
 interface CreateIepFormProps {
   childId: number;
@@ -22,6 +19,7 @@ interface CreateIepFormProps {
 }
 
 export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormProps) {
+  const { t } = useTranslation(['iep-documents', 'common']);
   const [iepDate, setIepDate] = useState('');
   const [meetingType, setMeetingType] = useState('');
   const [attendees, setAttendees] = useState('');
@@ -47,10 +45,10 @@ export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormPro
       if (response.success) {
         onCreated();
       } else {
-        setError(response.message || 'Failed to create IEP');
+        setError(response.message || t('createForm.createFailed'));
       }
     } catch {
-      setError('An error occurred while creating the IEP');
+      setError(t('createForm.createError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -62,7 +60,7 @@ export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormPro
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
-          label="Meeting Date"
+          label={t('createForm.meetingDate')}
           type="date"
           value={iepDate}
           onChange={(e) => setIepDate(e.target.value)}
@@ -70,24 +68,24 @@ export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormPro
           data-testid="iep-meeting-date"
         />
         <Select
-          label="Meeting Type"
+          label={t('createForm.meetingType')}
           value={meetingType}
           onChange={(e) => setMeetingType(e.target.value)}
           required
           data-testid="iep-meeting-type"
         >
-          <option value="">Select type...</option>
-          {MEETING_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
+          <option value="">{t('createForm.selectType')}</option>
+          {MEETING_TYPE_VALUES.map((value) => (
+            <option key={value} value={value}>
+              {documentMeetingTypeLabel(value)}
             </option>
           ))}
         </Select>
       </div>
 
       <RichTextEditor
-        label="Attendees"
-        placeholder="e.g. Teachers, therapists, parents present..."
+        label={t('createForm.attendees')}
+        placeholder={t('createForm.attendeesPlaceholder')}
         value={attendees}
         onChange={setAttendees}
         minRows={2}
@@ -96,8 +94,8 @@ export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormPro
       />
 
       <RichTextEditor
-        label="Notes"
-        placeholder="Any notes about this meeting..."
+        label={t('createForm.notes')}
+        placeholder={t('createForm.notesPlaceholder')}
         value={notes}
         onChange={setNotes}
         minRows={3}
@@ -117,10 +115,10 @@ export function CreateIepForm({ childId, onCreated, onCancel }: CreateIepFormPro
           }
           data-testid="iep-create-submit"
         >
-          {isSubmitting ? 'Creating...' : 'Create IEP'}
+          {isSubmitting ? t('createForm.creating') : t('createForm.create')}
         </Button>
         <Button type="button" variant="ghost" onClick={onCancel} data-testid="iep-create-cancel">
-          Cancel
+          {t('common:ui.cancel')}
         </Button>
       </div>
     </form>

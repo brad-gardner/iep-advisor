@@ -1,5 +1,6 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -22,19 +23,15 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 public class IepVersionService : IIepVersionService
 {
-    private const string PermissionMessage = "You do not have permission to access this IEP version.";
-    private const string DraftPermissionMessage = "You do not have permission to access this IEP draft.";
-    private const string DraftNotFoundMessage = "IEP draft not found.";
-    private const string VersionNotFoundMessage = "IEP version not found.";
-
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _accessService;
     private readonly IOrgAccessService _orgAccess;
     private readonly IBlobStorageService _blob;
     private readonly IAuditLogger _audit;
     private readonly ILogger<IepVersionService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public IepVersionService(ApplicationDbContext context, IAccessService accessService, IOrgAccessService orgAccess, IBlobStorageService blob, IAuditLogger audit, ILogger<IepVersionService> logger)
+    public IepVersionService(ApplicationDbContext context, IAccessService accessService, IOrgAccessService orgAccess, IBlobStorageService blob, IAuditLogger audit, ILogger<IepVersionService> logger, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _accessService = accessService;
@@ -42,7 +39,13 @@ public class IepVersionService : IIepVersionService
         _blob = blob;
         _audit = audit;
         _logger = logger;
+        _localizer = localizer;
     }
+
+    private LocalizedString PermissionMessage => _localizer["IepVersions.Permission"];
+    private LocalizedString DraftPermissionMessage => _localizer["IepVersions.DraftPermission"];
+    private LocalizedString DraftNotFoundMessage => _localizer["IepVersions.DraftNotFound"];
+    private LocalizedString VersionNotFoundMessage => _localizer["IepVersions.VersionNotFound"];
 
     // ---------------------------------------------------------------- Finalize
 
@@ -51,7 +54,7 @@ public class IepVersionService : IIepVersionService
         // 1. Collaborator+ access on the draft's student.
         var access = await ResolveDraftAccessAsync(userId, draftId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult<IepVersionSummaryModel>.FailureResult(access.Message!);
+            return ServiceResult<IepVersionSummaryModel>.FailureResult(access.ErrorKind, access.Message!);
 
         IepVersionSummaryModel summary;
 
@@ -64,13 +67,13 @@ public class IepVersionService : IIepVersionService
             if (draft == null)
             {
                 await transaction.RollbackAsync(ct);
-                return ServiceResult<IepVersionSummaryModel>.FailureResult(DraftNotFoundMessage);
+                return ServiceResult<IepVersionSummaryModel>.FailureResult(ServiceErrorKind.NotFound, DraftNotFoundMessage);
             }
 
             if (draft.Status == IepDraftStatus.Finalizing)
             {
                 await transaction.RollbackAsync(ct);
-                return ServiceResult<IepVersionSummaryModel>.FailureResult("Draft is already being finalized.");
+                return ServiceResult<IepVersionSummaryModel>.FailureResult(ServiceErrorKind.Validation, _localizer["IepVersions.AlreadyFinalizing"]);
             }
 
             // 4. Freeze the draft (blocks concurrent edits via the IepDraftService edit-freeze).
@@ -207,7 +210,7 @@ public class IepVersionService : IIepVersionService
     {
         var access = await CheckStudentAccessAsync(userId, studentId, AccessRole.Viewer, ct);
         if (!access.Success)
-            return ServiceResult<List<IepVersionSummaryModel>>.FailureResult(access.Message!);
+            return ServiceResult<List<IepVersionSummaryModel>>.FailureResult(access.ErrorKind, access.Message!);
 
         var versions = await _context.IepVersions
             .AsNoTracking()
@@ -223,7 +226,7 @@ public class IepVersionService : IIepVersionService
     {
         // Parent must have AccessService access to the child...
         if (!await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Viewer, ct))
-            return ServiceResult<List<IepVersionSummaryModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<IepVersionSummaryModel>>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
         // ...and the version's SchoolStudent must be linked via an active accepted ChildLink.
         var versions = await ChildLinkedVersions(childId)
@@ -243,12 +246,12 @@ public class IepVersionService : IIepVersionService
             .FirstOrDefaultAsync(ct);
 
         if (studentId == null)
-            return ServiceResult<IepVersionModel>.FailureResult(VersionNotFoundMessage);
+            return ServiceResult<IepVersionModel>.FailureResult(ServiceErrorKind.NotFound, VersionNotFoundMessage);
 
         // Authorize: an educator with SchoolStudentAccess OR a linked parent with child access.
         var educatorAccess = await CheckStudentAccessAsync(userId, studentId.Value, AccessRole.Viewer, ct);
         if (!educatorAccess.Success && !await ParentCanViewStudentAsync(userId, studentId.Value, ct))
-            return ServiceResult<IepVersionModel>.FailureResult(PermissionMessage);
+            return ServiceResult<IepVersionModel>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
         var version = await _context.IepVersions
             .AsNoTracking()
@@ -262,7 +265,7 @@ public class IepVersionService : IIepVersionService
             .FirstOrDefaultAsync(v => v.Id == versionId, ct);
 
         if (version == null)
-            return ServiceResult<IepVersionModel>.FailureResult(VersionNotFoundMessage);
+            return ServiceResult<IepVersionModel>.FailureResult(ServiceErrorKind.NotFound, VersionNotFoundMessage);
 
         _audit.Record(AuditAction.View, userId, "IepVersion", versionId);
         return ServiceResult<IepVersionModel>.SuccessResult(MapVersionFull(version));
@@ -279,19 +282,19 @@ public class IepVersionService : IIepVersionService
             .FirstOrDefaultAsync(ct);
 
         if (version == null)
-            return ServiceResult<int>.FailureResult(VersionNotFoundMessage);
+            return ServiceResult<int>.FailureResult(ServiceErrorKind.NotFound, VersionNotFoundMessage);
 
         // Retry is an authoring action — Collaborator+ educator on the student's school.
         var access = await CheckStudentAccessAsync(userId, version.SchoolStudentId, AccessRole.Collaborator, ct);
         if (!access.Success)
-            return ServiceResult<int>.FailureResult(access.Message!);
+            return ServiceResult<int>.FailureResult(access.ErrorKind, access.Message!);
 
         var pdf = await _context.IepVersionPdfs.FirstOrDefaultAsync(p => p.IepVersionId == versionId, ct);
         if (pdf == null)
-            return ServiceResult<int>.FailureResult("This version has no PDF record to retry.");
+            return ServiceResult<int>.FailureResult(ServiceErrorKind.Validation, _localizer["Pdf.NoRecordToRetry"]);
 
         if (pdf.RenderStatus == PdfRenderStatus.Rendered)
-            return ServiceResult<int>.FailureResult("This version's PDF is already rendered.");
+            return ServiceResult<int>.FailureResult(ServiceErrorKind.Validation, _localizer["Pdf.AlreadyRendered"]);
 
         // Error or Pending -> set Pending so the UI shows "generating" until the worker re-renders.
         pdf.RenderStatus = PdfRenderStatus.Pending;
@@ -311,12 +314,12 @@ public class IepVersionService : IIepVersionService
             .FirstOrDefaultAsync(ct);
 
         if (version == null)
-            return ServiceResult<IepVersionPdfStatusModel>.FailureResult(VersionNotFoundMessage);
+            return ServiceResult<IepVersionPdfStatusModel>.FailureResult(ServiceErrorKind.NotFound, VersionNotFoundMessage);
 
         // Same authorization as GetVersionAsync: educator-with-access OR linked-parent-with-access.
         var educatorAccess = await CheckStudentAccessAsync(userId, version.SchoolStudentId, AccessRole.Viewer, ct);
         if (!educatorAccess.Success && !await ParentCanViewStudentAsync(userId, version.SchoolStudentId, ct))
-            return ServiceResult<IepVersionPdfStatusModel>.FailureResult(PermissionMessage);
+            return ServiceResult<IepVersionPdfStatusModel>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
         var pdf = await _context.IepVersionPdfs
             .AsNoTracking()
@@ -354,7 +357,7 @@ public class IepVersionService : IIepVersionService
     {
         return await _orgAccess.CanActOnStudentAsync(userId, studentId, minimumRole, ct)
             ? ServiceResult.SuccessResult()
-            : ServiceResult.FailureResult(PermissionMessage);
+            : ServiceResult.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
     }
 
     private async Task<ServiceResult> ResolveDraftAccessAsync(int userId, int draftId, AccessRole minimumRole, CancellationToken ct)
@@ -366,11 +369,11 @@ public class IepVersionService : IIepVersionService
             .FirstOrDefaultAsync(ct);
 
         if (studentId == null)
-            return ServiceResult.FailureResult(DraftNotFoundMessage);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, DraftNotFoundMessage);
 
         var result = await CheckStudentAccessAsync(userId, studentId.Value, minimumRole, ct);
         // Surface a draft-flavored permission message for the finalize path.
-        return result.Success ? result : ServiceResult.FailureResult(DraftPermissionMessage);
+        return result.Success ? result : ServiceResult.FailureResult(ServiceErrorKind.Forbidden, DraftPermissionMessage);
     }
 
     /// <summary>

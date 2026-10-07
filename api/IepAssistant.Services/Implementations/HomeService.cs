@@ -83,7 +83,7 @@ public class HomeService : IHomeService
             .Select(u => new { u.FirstName, u.LastName, u.Role })
             .FirstOrDefaultAsync(ct);
         if (user == null)
-            return ServiceResult<HomeModel>.FailureResult("User not found.");
+            return ServiceResult<HomeModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Auth.UserNotFound"]);
 
         var displayName = (user.FirstName + " " + user.LastName).Trim();
 
@@ -707,7 +707,7 @@ public class HomeService : IHomeService
             .AnyAsync(e => e.StudentWorkspace.UserId == userId, ct);
         home.WorkspaceNudge = hasWorkspaceEntries
             ? null
-            : "Add your strengths, interests, and goals to your self-advocacy workspace.";
+            : _localizer["Home.WorkspaceNudge"];
 
         return home;
     }

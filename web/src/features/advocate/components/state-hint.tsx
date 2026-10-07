@@ -1,13 +1,13 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { MapPin, X } from 'lucide-react';
+import { stateHintCopy } from '../lib/copy';
 
 interface StateHintProps {
   /** Scopes the "don't show again" choice to this account on this device. */
   userId: number;
 }
-
-export const STATE_HINT_COPY = 'Set your state in Profile so the advocate can include state-specific rules';
 
 const storageKey = (userId: number) => `iep-advisor:advocate:state-hint-dismissed:${userId}`;
 
@@ -25,6 +25,7 @@ function readDismissed(userId: number): boolean {
  * account in this browser; setting the state removes it everywhere.
  */
 export function StateHint({ userId }: StateHintProps) {
+  const { t } = useTranslation('advocate');
   const [dismissed, setDismissed] = useState(() => readDismissed(userId));
   if (dismissed) return null;
 
@@ -46,14 +47,14 @@ export function StateHint({ userId }: StateHintProps) {
       <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-amber-500" strokeWidth={1.8} aria-hidden="true" />
       <p className="min-w-0 flex-1">
         <Link to="/profile" className="font-medium text-brand-teal-600 underline underline-offset-2 hover:text-brand-teal-700">
-          {STATE_HINT_COPY}
+          {stateHintCopy()}
         </Link>
-        . Until then, answers cover the federal rules only.
+        {t('stateHint.body')}
       </p>
       <button
         type="button"
         onClick={dismiss}
-        aria-label="Dismiss this hint"
+        aria-label={t('stateHint.dismissAria')}
         className="shrink-0 rounded p-0.5 text-brand-slate-400 hover:bg-brand-amber-100 hover:text-brand-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-teal-500"
         data-testid="advocate-state-hint-dismiss"
       >

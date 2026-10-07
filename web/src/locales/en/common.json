@@ -163,5 +163,30 @@
       "Declined": "Declined",
       "Tentative": "Tentative"
     }
+  },
+  "meetingType": {
+    "AnnualReview": "Annual review",
+    "InitialIep": "Initial IEP",
+    "Amendment": "Amendment",
+    "EtrEligibility": "ETR / eligibility",
+    "Reevaluation": "Reevaluation",
+    "Transition": "Transition",
+    "ManifestationDetermination": "Manifestation determination",
+    "Other": "Other"
+  },
+  "meetingStatus": {
+    "Proposed": "Proposed",
+    "Scheduled": "Scheduled",
+    "Held": "Held",
+    "Continued": "Continued",
+    "Cancelled": "Cancelled"
+  },
+  "generatedLanguage": {
+    "title": "Generated in {{language}}",
+    "body": "This was written by the assistant in {{language}}. New results will use your current language.",
+    "language": {
+      "en": "English",
+      "es": "Spanish"
+    }
   }
 }

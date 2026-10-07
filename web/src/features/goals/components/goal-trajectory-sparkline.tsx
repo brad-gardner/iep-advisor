@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Sparkline } from '@/components/ui/charts/sparkline';
 import { formatDate } from '@/lib/format-date';
 import type { GoalTrajectoryDto } from '../types';
@@ -7,17 +8,18 @@ import type { GoalTrajectoryDto } from '../types';
  *  fewer than 2 points exist (the server's own `insufficientData` rule —
  *  never inferred client-side from an empty-looking series). */
 export function GoalTrajectorySparkline({ trajectory, goalText }: { trajectory: GoalTrajectoryDto; goalText: string }) {
+  const { t } = useTranslation('goals');
   if (trajectory.insufficientData) {
     return (
       <p className="text-xs text-brand-slate-500" data-testid="goal-trajectory-insufficient">
-        Insufficient data — log at least two observations to see a trend.
+        {t('sparkline.insufficientData')}
       </p>
     );
   }
 
   return (
     <Sparkline
-      title={`Progress trend for ${goalText}`}
+      title={t('sparkline.trendTitle', { goalText })}
       values={trajectory.points.map((p) => p.value)}
       pointLabels={trajectory.points.map((p) => formatDate(p.observedAt))}
       data-testid="goal-trajectory-sparkline"

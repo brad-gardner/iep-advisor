@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { useChildAuthoredVersions } from '@/features/document-authoring/hooks/use-child-authored-versions';
+import { formatDate } from '@/lib/format-date';
 import { useChildVersions } from '../hooks/use-version-list';
 import { PdfStatusBadge } from './pdf-status-badge';
 
@@ -22,6 +24,7 @@ interface SchoolDocumentRow {
 // while loading and nothing when empty, so parents whose child has no school
 // link never see a card appear and vanish.
 export function SchoolIepsCard({ childId }: SchoolIepsCardProps) {
+  const { t } = useTranslation('iep-versions');
   const legacy = useChildVersions(childId);
   const authored = useChildAuthoredVersions(childId);
   if (legacy.isLoading || authored.isLoading) return null;
@@ -36,7 +39,7 @@ export function SchoolIepsCard({ childId }: SchoolIepsCardProps) {
     })),
     ...legacy.versions.map((v) => ({
       id: `legacy-${v.id}`,
-      label: v.title || `IEP v${v.versionNumber}`,
+      label: v.title || t('schoolCard.titleFallback', { number: v.versionNumber }),
       finalizedAt: v.finalizedAt,
       to: `/children/${childId}/iep-versions/${v.id}`,
       pdfStatus: v.pdfRenderStatus,
@@ -47,8 +50,8 @@ export function SchoolIepsCard({ childId }: SchoolIepsCardProps) {
 
   return (
     <Card data-testid="school-ieps-section">
-      <h2 className="font-serif mb-1">School documents</h2>
-      <p className="text-sm text-brand-slate-500 mb-4">Finalized documents shared by your child's school.</p>
+      <h2 className="font-serif mb-1">{t('schoolCard.heading')}</h2>
+      <p className="text-sm text-brand-slate-500 mb-4">{t('schoolCard.body')}</p>
       <ul className="divide-y divide-brand-slate-100" data-testid="school-documents-list">
         {rows.map((row) => (
           <li key={row.id} className="py-3">
@@ -59,7 +62,9 @@ export function SchoolIepsCard({ childId }: SchoolIepsCardProps) {
             >
               <span className="flex flex-col">
                 <span className="text-sm font-medium text-brand-slate-800">{row.label}</span>
-                <span className="text-xs text-brand-slate-500">Finalized {formatDate(row.finalizedAt)}</span>
+                <span className="text-xs text-brand-slate-500">
+                  {t('schoolCard.finalized', { date: formatDate(row.finalizedAt) })}
+                </span>
               </span>
               <PdfStatusBadge status={row.pdfStatus} />
             </Link>
@@ -68,9 +73,4 @@ export function SchoolIepsCard({ childId }: SchoolIepsCardProps) {
       </ul>
     </Card>
   );
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString();
 }

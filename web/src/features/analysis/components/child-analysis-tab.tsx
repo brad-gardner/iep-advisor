@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useOutletContext, useSearchParams } from "react-router-dom";
 import type { SetURLSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Notice } from "@/components/ui/notice";
 import { useToast } from "@/components/ui/toast";
 import type { ChildOutletContext } from "@/features/children/components/child-detail-page";
@@ -33,6 +34,7 @@ function setRunParam(
 }
 
 export function ChildAnalysisTab() {
+  const { t } = useTranslation("analysis");
   const { child, childId } = useOutletContext<ChildOutletContext>();
   const { runs, isLoading, reload, hasInFlight, pollTimedOut } =
     useAnalysisRuns(childId);
@@ -111,10 +113,10 @@ export function ChildAnalysisTab() {
         if (res.message) setWarning(res.message);
         setNotice({ checkedRunId: res.data.id, show: false, correctedTo: null });
         setRunParam(setSearchParams, res.data.id);
-        show({ message: "Analysis started", variant: "success" });
+        show({ message: t("childTab.startedToast"), variant: "success" });
         await reload();
       } else {
-        setError(res.message || "Could not start analysis");
+        setError(res.message || t("createError.generic"));
       }
     } catch (err) {
       const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };
@@ -129,27 +131,26 @@ export function ChildAnalysisTab() {
   return (
     <div className="space-y-6">
       {error && (
-        <Notice variant="error" title="Unable to run analysis" role="alert">
+        <Notice variant="error" title={t("childTab.triggerErrorTitle")} role="alert">
           {error}
         </Notice>
       )}
       {warning && (
-        <Notice variant="warning" title="Heads up" role="status">
+        <Notice variant="warning" title={t("childTab.headsUp")} role="status">
           {warning}
         </Notice>
       )}
       {runNotFound && (
         <Notice
           variant="info"
-          title="That analysis couldn't be found — showing the latest."
+          title={t("childTab.runNotFound")}
           role="status"
           data-testid="analysis-run-not-found"
         />
       )}
       {hasInFlight && pollTimedOut && (
-        <Notice variant="info" title="Still working…" role="status">
-          An analysis is taking longer than usual. It will appear here once it
-          finishes.
+        <Notice variant="info" title={t("childTab.stillWorkingTitle")} role="status">
+          {t("childTab.stillWorkingBody")}
         </Notice>
       )}
 
@@ -179,8 +180,8 @@ export function ChildAnalysisTab() {
               canAsk={!isViewer}
             />
           ) : (
-            <Notice variant="info" title="No analysis selected">
-              Select a past analysis or run a new one to see results here.
+            <Notice variant="info" title={t("childTab.noneSelectedTitle")}>
+              {t("childTab.noneSelectedBody")}
             </Notice>
           )}
         </div>

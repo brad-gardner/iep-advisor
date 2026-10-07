@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Upload } from 'lucide-react';
+import i18n from '@/lib/i18n';
 import { uploadFile } from '../api/etr-documents-api';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
@@ -11,21 +13,25 @@ interface EtrUploadProps {
 }
 
 export function EtrUpload({ etrId, onUploaded }: EtrUploadProps) {
+  const { t } = useTranslation('etr-documents');
   const { show: showToast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  // `i18n.t` directly (not the hook's `t`): see iep-upload.tsx's identical
+  // comment — a stable callback reference matters more here than reacting
+  // to `t`'s identity.
   const handleFile = useCallback(
     async (file: File) => {
       if (!file.name.toLowerCase().endsWith('.pdf')) {
-        setError('Only PDF files are supported');
+        setError(i18n.t('etr-documents:upload.onlyPdf'));
         return;
       }
 
       if (file.size > 50 * 1024 * 1024) {
-        setError('File is too large. Maximum size is 50MB.');
+        setError(i18n.t('etr-documents:upload.tooLarge'));
         return;
       }
 
@@ -36,13 +42,13 @@ export function EtrUpload({ etrId, onUploaded }: EtrUploadProps) {
       try {
         const response = await uploadFile(etrId, file, setProgress);
         if (response.success) {
-          showToast({ message: 'ETR uploaded', variant: 'success' });
+          showToast({ message: i18n.t('etr-documents:upload.uploadedToast'), variant: 'success' });
           onUploaded();
         } else {
-          setError(response.message || 'Upload failed');
+          setError(response.message || i18n.t('etr-documents:upload.uploadFailed'));
         }
       } catch {
-        setError('An error occurred during upload');
+        setError(i18n.t('etr-documents:upload.uploadError'));
       } finally {
         setIsUploading(false);
       }
@@ -101,8 +107,8 @@ export function EtrUpload({ etrId, onUploaded }: EtrUploadProps) {
         />
         {isUploading ? (
           <div className="flex flex-col items-center gap-2">
-            <Spinner size="sm" label="Uploading…" />
-            <p className="text-brand-slate-500 text-sm">Uploading... {progress}%</p>
+            <Spinner size="sm" label={t('upload.uploadingLabel')} />
+            <p className="text-brand-slate-500 text-sm">{t('upload.uploadingProgress', { progress })}</p>
             <div className="w-full max-w-xs bg-brand-slate-100 rounded-full h-1.5 overflow-hidden">
               <div
                 className="bg-brand-teal-500 h-full transition-all"
@@ -114,9 +120,9 @@ export function EtrUpload({ etrId, onUploaded }: EtrUploadProps) {
         ) : (
           <div className="flex flex-col items-center gap-1">
             <Upload className="w-5 h-5 text-brand-slate-400" strokeWidth={1.8} aria-hidden="true" />
-            <p className="text-brand-slate-600 text-sm">Attach PDF</p>
+            <p className="text-brand-slate-600 text-sm">{t('upload.attachPdf')}</p>
             <p className="text-brand-slate-500 text-[11px]">
-              Drop a PDF here or click to browse (max 50MB)
+              {t('upload.dropHint')}
             </p>
           </div>
         )}

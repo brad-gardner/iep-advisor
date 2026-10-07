@@ -60,6 +60,12 @@ public class MeetingPrepChecklistModel
     public List<ChecklistItem> GoalGaps { get; set; } = [];
     public List<ChecklistItem> GeneralTips { get; set; } = [];
     public string? ErrorMessage { get; set; }
+
+    /// <summary>"en" | "es" | null — the language this checklist was generated in (multilingual plan
+    /// 2026-10-06 phase 3); null means English, including every checklist generated before this was
+    /// tracked.</summary>
+    public string? GeneratedLanguage { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }
 

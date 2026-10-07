@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 interface UserMessageProps {
   text: string;
   /** Not yet confirmed by the server (in flight, stopped, or failed). */
@@ -7,10 +9,11 @@ interface UserMessageProps {
 
 /** The parent's own message, right-aligned. Plain text — never markdown-rendered. */
 export function UserMessage({ text, pending = false, 'data-testid': testId = 'advocate-user-message' }: UserMessageProps) {
+  const { t } = useTranslation('advocate');
   return (
     <li className="flex justify-end" data-testid={testId} data-pending={pending ? 'true' : undefined}>
       <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-card rounded-br-sm bg-brand-slate-100 px-3.5 py-2.5 text-sm text-brand-slate-800">
-        <span className="sr-only">You said: </span>
+        <span className="sr-only">{t('messageList.youSaid')}</span>
         {text}
       </p>
     </li>

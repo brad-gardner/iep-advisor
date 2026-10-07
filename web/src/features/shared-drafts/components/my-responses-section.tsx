@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Markdown } from '@/components/ui/markdown';
 import { formatDate } from '@/lib/format-date';
-import { DRAFT_RESPONSE_KIND_LABELS, type DraftResponseDto } from '../types';
+import { draftResponseKindLabel } from '../lib/draft-response-kind-label';
+import type { DraftResponseDto } from '../types';
 
 interface MyResponsesSectionProps {
   responses: DraftResponseDto[];
@@ -11,12 +13,13 @@ interface MyResponsesSectionProps {
 /** Every response this parent has sent on the revision, with the staff reply
  *  once one has resolved it. Renders nothing when the parent hasn't responded. */
 export function MyResponsesSection({ responses }: MyResponsesSectionProps) {
+  const { t } = useTranslation('shared-drafts');
   if (responses.length === 0) return null;
   const sorted = [...responses].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return (
     <section id="my-responses" data-testid="my-responses-section" className="space-y-3">
-      <h2 className="font-serif text-lg text-brand-slate-800">My responses</h2>
+      <h2 className="font-serif text-lg text-brand-slate-800">{t('myResponses.heading')}</h2>
       <ul className="space-y-3">
         {sorted.map((response) => (
           <li key={response.id}>
@@ -24,7 +27,7 @@ export function MyResponsesSection({ responses }: MyResponsesSectionProps) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Badge variant={response.status === 'Resolved' ? 'success' : 'info'}>
-                    {DRAFT_RESPONSE_KIND_LABELS[response.kind]}
+                    {draftResponseKindLabel(response.kind)}
                   </Badge>
                   {response.targetLabel && (
                     <span className="text-sm text-brand-slate-500">{response.targetLabel}</span>
@@ -36,7 +39,7 @@ export function MyResponsesSection({ responses }: MyResponsesSectionProps) {
               {response.staffReply && (
                 <div className="rounded-card bg-brand-slate-50 p-3">
                   <p className="text-xs font-medium text-brand-slate-500">
-                    {response.resolvedByName ? `${response.resolvedByName} replied` : 'School reply'}
+                    {response.resolvedByName ? t('myResponses.repliedBy', { name: response.resolvedByName }) : t('myResponses.schoolReply')}
                   </p>
                   <Markdown
                     content={response.staffReply}
@@ -46,7 +49,7 @@ export function MyResponsesSection({ responses }: MyResponsesSectionProps) {
                 </div>
               )}
               {response.status === 'Resolved' && !response.staffReply && (
-                <p className="text-xs text-brand-slate-500">Marked resolved in the updated draft.</p>
+                <p className="text-xs text-brand-slate-500">{t('myResponses.resolvedNoReply')}</p>
               )}
             </Card>
           </li>

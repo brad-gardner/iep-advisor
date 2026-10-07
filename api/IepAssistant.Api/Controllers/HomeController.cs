@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.District;
 using IepAssistant.Api.DTOs.Home;
 using IepAssistant.Api.DTOs.Obligations;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -17,10 +19,12 @@ namespace IepAssistant.Api.Controllers;
 public class HomeController : ControllerBase
 {
     private readonly IHomeService _homeService;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public HomeController(IHomeService homeService)
+    public HomeController(IHomeService homeService, IStringLocalizer<Messages> localizer)
     {
         _homeService = homeService;
+        _localizer = localizer;
     }
 
     [HttpGet]
@@ -29,8 +33,11 @@ public class HomeController : ControllerBase
     public async Task<IActionResult> Get(CancellationToken ct)
     {
         var result = await _homeService.GetForUserAsync(User.GetUserId(), ct);
+        // Multilingual plan Phase 3: the one failure in HomeService (user not found) now carries
+        // ErrorKind.NotFound explicitly, so this uses the shared kind-based mapper instead of its own
+        // text match.
         if (!result.Success)
-            return MapFailure<HomeDto>(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<HomeDto>.SuccessResponse(MapHome(result.Data!)));
     }
@@ -189,15 +196,4 @@ public class HomeController : ControllerBase
         DueDate = r.DueDate
     };
 
-    private IActionResult MapFailure<T>(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

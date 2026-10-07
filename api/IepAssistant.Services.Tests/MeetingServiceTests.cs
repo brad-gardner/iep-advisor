@@ -1,8 +1,12 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -23,7 +27,8 @@ public sealed class MeetingServiceTests : IDisposable
         new AccessService(ctx),
         new NotificationService(ctx, TestSupport.TestLocalizers.Messages()),
         new CapturingAuditLogger(),
-        NullLogger<MeetingService>.Instance);
+        NullLogger<MeetingService>.Instance,
+        TestSupport.TestLocalizers.Messages());
 
     private static CreateMeetingModel BasicMeeting(DateTime startsAtUtc, List<ParticipantInputModel>? participants = null) => new()
     {
@@ -214,6 +219,64 @@ public sealed class MeetingServiceTests : IDisposable
 
         Assert.False(readResult.Success);
         Assert.Contains("permission", readResult.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 3: GetAsync/ListForChildAsync/RsvpAsync (the parent-reachable paths) now carry
+    // ServiceErrorKind explicitly, so Spanish wording never changes the controller's status routing —
+    // see IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure. Staff-only
+    // scheduling methods (Create/Update/Cancel/etc.) are left English-literal for Phase 5.
+
+    [Fact]
+    public async Task GetAsync_Stranger_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School Es");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (creatorUserId, _) = _db.Staff("owneres@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.TeamMember(studentId, creatorUserId, TeamRole.CaseManager, isLead: true);
+
+        int meetingId;
+        using (var ctx = _db.Context())
+        {
+            var result = await CreateService(ctx).CreateAsync(creatorUserId, studentId, BasicMeeting(DateTime.UtcNow.AddDays(1)));
+            meetingId = result.Data!.Id;
+        }
+
+        var (strangerUserId, _) = _db.Staff("strangeres@example.com", districtId, _db.School(districtId, "School Bes"), Models.OrgRoleIds.Teacher);
+
+        using var _lang = CultureScope.For("es");
+        using var readCtx = _db.Context();
+        var readResult = await CreateService(readCtx).GetAsync(strangerUserId, meetingId);
+
+        Assert.False(readResult.Success);
+        Assert.Equal("No tiene permiso para ver esta reunión.", readResult.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, readResult.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(readResult);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAsync_UnknownMeeting_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        using var _lang = CultureScope.For("es");
+        using var ctx = _db.Context();
+        var userId = _db.SeedUser("unknownmeetinges@example.com", UserRole.Parent);
+
+        var result = await CreateService(ctx).GetAsync(userId, -1);
+
+        Assert.False(result.Success);
+        Assert.Equal("Reunión no encontrada.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    private sealed class TestController : ControllerBase
+    {
     }
 
     [Fact]

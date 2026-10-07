@@ -1,29 +1,31 @@
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { GoalProgressFinding } from "../types";
-
-const RATING_VARIANTS: Record<
-  string,
-  { variant: "neutral" | "warning" | "success" | "error"; label: string }
-> = {
-  met: { variant: "success", label: "Met" },
-  on_track: { variant: "success", label: "On track" },
-  concerning: { variant: "warning", label: "Concerning" },
-  regressing: { variant: "error", label: "Regressing" },
-  insufficient_data: { variant: "neutral", label: "Insufficient data" },
-};
-
-const EVIDENCE_LABELS: Record<string, string> = {
-  strong: "Strong evidence",
-  adequate: "Adequate evidence",
-  weak: "Weak evidence",
-};
 
 interface GoalProgressCardProps {
   finding: GoalProgressFinding;
 }
 
 export function GoalProgressCard({ finding }: GoalProgressCardProps) {
+  const { t } = useTranslation("progress-reports");
+  const RATING_VARIANTS: Record<
+    string,
+    { variant: "neutral" | "warning" | "success" | "error"; label: string }
+  > = {
+    met: { variant: "success", label: t("goalProgressCard.ratingMet") },
+    on_track: { variant: "success", label: t("goalProgressCard.ratingOnTrack") },
+    concerning: { variant: "warning", label: t("goalProgressCard.ratingConcerning") },
+    regressing: { variant: "error", label: t("goalProgressCard.ratingRegressing") },
+    insufficient_data: { variant: "neutral", label: t("goalProgressCard.ratingInsufficientData") },
+  };
+
+  const EVIDENCE_LABELS: Record<string, string> = {
+    strong: t("goalProgressCard.evidenceStrong"),
+    adequate: t("goalProgressCard.evidenceAdequate"),
+    weak: t("goalProgressCard.evidenceWeak"),
+  };
+
   const rating = RATING_VARIANTS[finding.progressRating] ?? {
     variant: "neutral" as const,
     label: finding.progressRating,
@@ -46,7 +48,7 @@ export function GoalProgressCard({ finding }: GoalProgressCardProps) {
 
       <div>
         <p className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold mb-1">
-          What the report says
+          {t("goalProgressCard.whatReportSays")}
         </p>
         <p className="text-sm text-brand-slate-600 whitespace-pre-wrap">
           {finding.reportedProgress}
@@ -56,7 +58,7 @@ export function GoalProgressCard({ finding }: GoalProgressCardProps) {
       {finding.redFlags.length > 0 && (
         <div>
           <p className="text-[11px] text-brand-danger-700 uppercase tracking-wide font-semibold mb-1">
-            Concerns
+            {t("goalProgressCard.concerns")}
           </p>
           <ul className="text-sm text-brand-slate-600 list-disc pl-5 space-y-1">
             {finding.redFlags.map((flag, i) => (
@@ -69,7 +71,7 @@ export function GoalProgressCard({ finding }: GoalProgressCardProps) {
       {finding.parentTalkingPoints.length > 0 && (
         <div>
           <p className="text-[11px] text-brand-teal-600 uppercase tracking-wide font-semibold mb-1">
-            What you can ask
+            {t("goalProgressCard.whatYouCanAsk")}
           </p>
           <ul className="text-sm text-brand-slate-600 list-disc pl-5 space-y-1">
             {finding.parentTalkingPoints.map((p, i) => (

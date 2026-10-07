@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import type { EtrSection } from '../types';
-import { formatSectionTypeLabel } from '../lib/section-type-labels';
+import { sectionTypeLabel } from '@/lib/section-type-label';
 
 interface EtrSectionCardProps {
   section: EtrSection;
@@ -34,10 +35,14 @@ function humanizeKey(key: string): string {
 }
 
 export function EtrSectionCard({ section, defaultOpen = false }: EtrSectionCardProps) {
+  // `iep-documents` isn't this component's own namespace — included so its
+  // Spanish data is loaded before `sectionTypeLabel` (a plain function, not
+  // this hook's `t`) calls into it from render.
+  const { t } = useTranslation(['etr-documents', 'iep-documents']);
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const parsed = useMemo(() => tryParseJson(section.parsedContent), [section.parsedContent]);
   const hasStructured = parsed !== undefined && parsed !== null;
-  const label = formatSectionTypeLabel(section.sectionType);
+  const label = sectionTypeLabel(section.sectionType, 'full');
 
   return (
     <Card className="p-0" data-testid="etr-section-card">
@@ -78,7 +83,7 @@ export function EtrSectionCard({ section, defaultOpen = false }: EtrSectionCardP
             </pre>
           ) : (
             <p className="mt-3 text-sm text-brand-slate-500 italic">
-              No content captured for this section.
+              {t('sectionCard.noContent')}
             </p>
           )}
         </div>
@@ -88,6 +93,7 @@ export function EtrSectionCard({ section, defaultOpen = false }: EtrSectionCardP
 }
 
 function ParsedContentView({ value }: { value: ParsedShape }) {
+  const { t } = useTranslation('etr-documents');
   if (value === null || value === undefined) return null;
 
   if (typeof value === 'string') {
@@ -102,7 +108,7 @@ function ParsedContentView({ value }: { value: ParsedShape }) {
 
   if (Array.isArray(value)) {
     if (value.length === 0) {
-      return <p className="text-sm text-brand-slate-500 italic">None</p>;
+      return <p className="text-sm text-brand-slate-500 italic">{t('sectionCard.none')}</p>;
     }
     return (
       <ul className="space-y-2">
@@ -121,7 +127,7 @@ function ParsedContentView({ value }: { value: ParsedShape }) {
   // object
   const entries = Object.entries(value);
   if (entries.length === 0) {
-    return <p className="text-sm text-brand-slate-500 italic">No details</p>;
+    return <p className="text-sm text-brand-slate-500 italic">{t('sectionCard.noDetails')}</p>;
   }
   return (
     <dl className="space-y-3">

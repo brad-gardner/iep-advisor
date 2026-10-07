@@ -12,6 +12,7 @@ public class ProgressReportAnalysisConfiguration : IEntityTypeConfiguration<Prog
         builder.Property(a => a.Status).HasMaxLength(50).IsRequired();
         builder.Property(a => a.Summary).HasMaxLength(5000);
         builder.Property(a => a.ErrorMessage).HasMaxLength(2000);
+        builder.Property(a => a.Language).HasMaxLength(10);
 
         builder.HasOne(a => a.ProgressReport)
             .WithMany()

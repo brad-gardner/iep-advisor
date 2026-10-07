@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,11 +19,14 @@ export function InviteStudentForm({
   description,
   embedded = false,
 }: InviteStudentFormProps) {
+  const { t } = useTranslation("student");
   const { show } = useToast();
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Click-triggered (never a mount effect), so translating inline here is
+  // safe — see `AcknowledgeControl` (shared-drafts) for the same reasoning.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -33,14 +37,12 @@ export function InviteStudentForm({
     if (result.success) {
       // Transient success → toast; the form resets for the next invite.
       show({
-        message:
-          result.message ||
-          "Invitation sent. The student has a pending invite.",
+        message: result.message || t("inviteForm.successDefault"),
         variant: "success",
       });
       setEmail("");
     } else {
-      setError(result.message ?? "Failed to send invitation");
+      setError(result.message ?? t("inviteForm.failureDefault"));
     }
 
     setIsSubmitting(false);
@@ -59,7 +61,7 @@ export function InviteStudentForm({
 
       <Input
         id="invite-student-email"
-        label="Student Email *"
+        label={t("inviteForm.emailLabel")}
         type="email"
         required
         value={email}
@@ -74,7 +76,7 @@ export function InviteStudentForm({
         className="w-full"
         data-testid="invite-student-submit"
       >
-        Send Invite
+        {t("inviteForm.submit")}
       </Button>
     </form>
   );
@@ -82,10 +84,9 @@ export function InviteStudentForm({
   if (embedded) return form;
   return (
     <Card className="max-w-lg">
-      <h2 className="font-serif text-lg mb-2">Invite student</h2>
+      <h2 className="font-serif text-lg mb-2">{t("inviteForm.cardHeading")}</h2>
       <p className="text-sm text-brand-slate-500 mb-4">
-        {description ??
-          "Invite the student to activate their own account and participate in their IEP process."}
+        {description ?? t("inviteForm.cardDescriptionDefault")}
       </p>
       {form}
     </Card>

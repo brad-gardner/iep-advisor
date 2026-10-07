@@ -264,7 +264,7 @@ public sealed class StudentTeamServiceTests : IDisposable
         var org = new OrgAccessService(ctx);
         var access = new AccessService(ctx);
         var audit = new CapturingAuditLogger();
-        var workspace = new StudentWorkspaceService(ctx, access, org, new NoClaudeClient(), NullLogger<StudentWorkspaceService>.Instance);
+        var workspace = new StudentWorkspaceService(ctx, access, org, new NoClaudeClient(), TestSupport.TestLocalizers.Ai(), NullLogger<StudentWorkspaceService>.Instance);
         var contributions = new ParentContributionService(ctx, access, org, audit);
         var evidence = new StudentEvidenceService(ctx, org, workspace, contributions, audit);
         var result = await evidence.BuildForStaffAsync(o.Admin, o.Student);

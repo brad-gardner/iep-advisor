@@ -20,7 +20,12 @@ public enum ServiceErrorKind
     NotFound,
     Forbidden,
     Conflict,
-    Unavailable
+    Unavailable,
+
+    /// <summary>402 — an active subscription (or similar paid entitlement) is required. Added in the
+    /// multilingual plan's phase 3 for <c>AnalysisRunService</c>'s "Active subscription required."
+    /// failure, which its controller previously detected by matching the English word "subscription".</summary>
+    PaymentRequired
 }
 
 public class ServiceResult
@@ -48,6 +53,7 @@ public class ServiceResult
     public static ServiceResult NotFound(string message) => FailureResult(ServiceErrorKind.NotFound, message);
     public static ServiceResult Forbidden(string message) => FailureResult(ServiceErrorKind.Forbidden, message);
     public static ServiceResult Conflict(string message) => FailureResult(ServiceErrorKind.Conflict, message);
+    public static ServiceResult PaymentRequired(string message) => FailureResult(ServiceErrorKind.PaymentRequired, message);
 }
 
 public class ServiceResult<T> : ServiceResult
@@ -69,4 +75,5 @@ public class ServiceResult<T> : ServiceResult
     public new static ServiceResult<T> NotFound(string message) => FailureResult(ServiceErrorKind.NotFound, message);
     public new static ServiceResult<T> Forbidden(string message) => FailureResult(ServiceErrorKind.Forbidden, message);
     public new static ServiceResult<T> Conflict(string message) => FailureResult(ServiceErrorKind.Conflict, message);
+    public new static ServiceResult<T> PaymentRequired(string message) => FailureResult(ServiceErrorKind.PaymentRequired, message);
 }

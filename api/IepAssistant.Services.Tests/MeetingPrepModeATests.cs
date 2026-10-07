@@ -60,6 +60,7 @@ public class MeetingPrepModeATests
             new SubscriptionService(context, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), NullLogger<SubscriptionService>.Instance, TestSupport.TestLocalizers.Messages()),
             context,
             claudeClient,
+            TestSupport.TestLocalizers.Ai(),
             NullLogger<MeetingPrepService>.Instance);
 
     [Fact]

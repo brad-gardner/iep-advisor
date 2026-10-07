@@ -1,10 +1,14 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -36,7 +40,7 @@ public sealed class StudentInviteServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private StudentInviteService CreateService(ApplicationDbContext ctx, CapturingEmailService email)
-        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), email, NullLogger<StudentInviteService>.Instance);
+        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), email, NullLogger<StudentInviteService>.Instance, TestSupport.TestLocalizers.Messages());
 
     private static EducatorService CreateEducator(ApplicationDbContext ctx)
         => new(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<EducatorService>.Instance);
@@ -364,6 +368,36 @@ public sealed class StudentInviteServiceTests : IDisposable
 
         using (var ctx = CreateContext())
             Assert.Empty(ctx.StudentInvites);
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 3: InviteFromParentAsync's permission failure now carries ServiceErrorKind.Forbidden
+    // explicitly, so Spanish wording never changes the controller's 403 routing — see
+    // IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure.
+
+    [Fact]
+    public async Task ParentInvite_ForChildNotOwned_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind()
+    {
+        var parentId = SeedUser("permes1@x.com");
+        var otherParentId = SeedUser("otheres1@x.com");
+        var notMineChild = await SeedOwnedChild(otherParentId, "NotMineEs");
+        var email = new CapturingEmailService();
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx, email).InviteFromParentAsync(parentId, notMineChild, "s@x.com");
+
+        Assert.False(result.Success);
+        Assert.Equal("No tiene permiso para invitar a un estudiante para este hijo.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    private sealed class TestController : ControllerBase
+    {
     }
 
     [Fact]

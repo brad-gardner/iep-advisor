@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { NotebookPen, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,8 +13,9 @@ import { usePageTitle } from '@/hooks/use-page-title';
 import { apiErrorMessage } from '@/lib/api-error';
 import type { ChildOutletContext } from '@/features/children/components/child-detail-page';
 import { listJournalEntries } from '../api/journal-api';
-import { JOURNAL_EMPTY_COPY } from '../lib/copy';
-import { JOURNAL_TAGS, JOURNAL_TAG_LABELS, type JournalEntryDto, type JournalTag } from '../types/journal';
+import { journalEmptyCopy } from '../lib/copy';
+import { journalTagLabel } from '../lib/tag-label';
+import { JOURNAL_TAGS, type JournalEntryDto, type JournalTag } from '../types/journal';
 import { JournalEntryDrawer, type JournalSaveMode } from './journal-entry-drawer';
 import { journalEntryElementId } from '../lib/entry-anchor';
 import { JournalEntryItem } from './journal-entry-item';
@@ -35,10 +37,14 @@ function isJournalTag(value: string): value is JournalTag {
  * filterable by kind. Rendered inside the child layout (tab bar above), so the
  * child and the viewer's role come from the outlet context.
  */
+/** A server-provided message is already resolved text; the generic case is translated at render time. */
+type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
+
 export function JournalPage() {
+  const { t } = useTranslation(['journal', 'common']);
   const { child, childId } = useOutletContext<ChildOutletContext>();
   const canEdit = child.role === 'owner' || child.role === 'collaborator';
-  usePageTitle('Journal');
+  usePageTitle(t('journal:pageTitle'));
   const { show } = useToast();
 
   const [searchParams] = useSearchParams();
@@ -47,7 +53,7 @@ export function JournalPage() {
 
   const [tagFilter, setTagFilter] = useState<JournalTag | typeof TAG_FILTER_ALL>(TAG_FILTER_ALL);
   const [items, setItems] = useState<JournalEntryDto[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [editing, setEditing] = useState<JournalEntryDto | null | undefined>(undefined);
 
@@ -60,11 +66,13 @@ export function JournalPage() {
           setItems(res.data);
           setError(null);
         } else {
-          setError(res.message ?? 'Could not load the journal.');
+          setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
         }
       })
       .catch((err) => {
-        if (active) setError(apiErrorMessage(err, 'Could not load the journal.'));
+        if (!active) return;
+        const message = apiErrorMessage(err, '');
+        setError(message ? { kind: 'server', message } : { kind: 'generic' });
       });
     return () => {
       active = false;
@@ -79,7 +87,7 @@ export function JournalPage() {
     if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
   }, [targetEntryId, items]);
 
-  const refresh = () => setReloadToken((t) => t + 1);
+  const refresh = () => setReloadToken((t2) => t2 + 1);
 
   // A new filter is a new list: drop the old rows so the spinner shows instead
   // of the previous kind's entries lingering under the wrong heading.
@@ -91,38 +99,39 @@ export function JournalPage() {
 
   const handleSaved = (_entry: JournalEntryDto, mode: JournalSaveMode) => {
     setEditing(undefined);
-    show({ message: mode === 'created' ? 'Update added to the journal' : 'Update saved', variant: 'success' });
+    show({ message: mode === 'created' ? t('journal:card.savedCreated') : t('journal:card.savedUpdated'), variant: 'success' });
     refresh();
   };
 
   const handleDeleted = () => {
     setEditing(undefined);
-    show({ message: 'Update deleted', variant: 'success' });
+    show({ message: t('journal:card.deleted'), variant: 'success' });
     refresh();
   };
 
   const loading = items === null && error === null;
+  const errorMessage = error ? (error.kind === 'server' ? error.message : t('journal:page.loadFailed')) : null;
 
   return (
     <div className="space-y-4" data-testid="journal-page">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-serif">{child.firstName}'s journal</h2>
-          <p className="mt-1 text-sm text-brand-slate-500">Private to your family — never shared with the school team.</p>
+          <h2 className="font-serif">{t('journal:page.heading', { name: child.firstName })}</h2>
+          <p className="mt-1 text-sm text-brand-slate-500">{t('journal:page.description')}</p>
         </div>
         <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
           <div className="min-w-[10rem] flex-1 sm:flex-none">
             <Select
               id="journal-filter-tag"
-              label="Show"
+              label={t('journal:page.showLabel')}
               value={tagFilter}
               onChange={(e) => changeFilter(e.target.value)}
               data-testid="journal-filter-tag"
             >
-              <option value={TAG_FILTER_ALL}>All updates</option>
-              {JOURNAL_TAGS.map((t) => (
-                <option key={t} value={t}>
-                  {JOURNAL_TAG_LABELS[t]}
+              <option value={TAG_FILTER_ALL}>{t('journal:page.allUpdates')}</option>
+              {JOURNAL_TAGS.map((tag) => (
+                <option key={tag} value={tag}>
+                  {journalTagLabel(tag)}
                 </option>
               ))}
             </Select>
@@ -130,7 +139,7 @@ export function JournalPage() {
           {canEdit && (
             <Button onClick={() => setEditing(null)} data-testid="journal-add">
               <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-              Add update
+              {t('journal:card.addUpdate')}
             </Button>
           )}
         </div>
@@ -138,15 +147,15 @@ export function JournalPage() {
 
       {loading && (
         <div className="flex justify-center py-12">
-          <Spinner label="Loading journal…" />
+          <Spinner label={t('journal:page.loading')} />
         </div>
       )}
 
-      {error && (
+      {errorMessage && (
         <div role="alert">
-          <Notice variant="error" title={error}>
+          <Notice variant="error" title={errorMessage}>
             <Button variant="secondary" size="sm" className="mt-2" onClick={refresh}>
-              Try again
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
@@ -156,14 +165,14 @@ export function JournalPage() {
         <Card>
           <EmptyState
             icon={NotebookPen}
-            title={tagFilter ? `No ${JOURNAL_TAG_LABELS[tagFilter].toLowerCase()} updates yet` : 'Nothing in the journal yet'}
-            description={JOURNAL_EMPTY_COPY}
+            title={tagFilter ? t('journal:page.emptyTitleFiltered', { tag: journalTagLabel(tagFilter).toLowerCase() }) : t('journal:page.emptyTitleAll')}
+            description={journalEmptyCopy()}
             data-testid="journal-empty"
             action={
               canEdit ? (
                 <Button onClick={() => setEditing(null)} data-testid="journal-empty-add">
                   <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-                  Add the first update
+                  {t('journal:page.addFirstUpdate')}
                 </Button>
               ) : undefined
             }
@@ -185,7 +194,7 @@ export function JournalPage() {
             ))}
           </ul>
           {items.length >= PAGE_SIZE && (
-            <p className="mt-3 text-xs text-brand-slate-500">Showing the {PAGE_SIZE} most recent updates.</p>
+            <p className="mt-3 text-xs text-brand-slate-500">{t('journal:page.showingMostRecent', { count: PAGE_SIZE })}</p>
           )}
         </Card>
       )}

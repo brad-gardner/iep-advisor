@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -12,10 +14,12 @@ namespace IepAssistant.Api.Controllers;
 public class IepComparisonController : ControllerBase
 {
     private readonly IIepComparisonService _comparisonService;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public IepComparisonController(IIepComparisonService comparisonService)
+    public IepComparisonController(IIepComparisonService comparisonService, IStringLocalizer<Messages> localizer)
     {
         _comparisonService = comparisonService;
+        _localizer = localizer;
     }
 
     [HttpGet("api/children/{childId}/iep-timeline")]
@@ -27,7 +31,7 @@ public class IepComparisonController : ControllerBase
         var result = await _comparisonService.GetTimelineAsync(childId, userId, cancellationToken);
 
         if (result == null)
-            return NotFound(ApiResponse<object>.Error("Child not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["IepComparisonApi.ChildNotFound"]));
 
         return Ok(ApiResponse<TimelineResult>.SuccessResponse(result));
     }
@@ -41,7 +45,7 @@ public class IepComparisonController : ControllerBase
         var result = await _comparisonService.CompareAsync(id, otherId, userId, cancellationToken);
 
         if (result == null)
-            return NotFound(ApiResponse<object>.Error("IEP documents not found or access denied"));
+            return NotFound(ApiResponse<object>.Error(_localizer["IepComparisonApi.DocumentsNotFoundOrAccessDenied"]));
 
         return Ok(ApiResponse<ComparisonResult>.SuccessResponse(result));
     }

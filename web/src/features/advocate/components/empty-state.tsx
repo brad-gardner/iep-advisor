@@ -1,5 +1,6 @@
 import { MessageCircleQuestion } from 'lucide-react';
-import { EXAMPLE_QUESTIONS, JOURNAL_EXAMPLE_QUESTION } from '../lib/copy';
+import { useTranslation } from 'react-i18next';
+import { exampleQuestions, journalExampleQuestion } from '../lib/copy';
 
 interface AdvocateEmptyStateProps {
   /** Puts the example into the composer (it is not sent until the parent chooses to). */
@@ -19,20 +20,21 @@ interface AdvocateEmptyStateProps {
  * component (which always renders its own `title` heading).
  */
 export function AdvocateEmptyState({ onPickExample, canAsk, hasJournalEntries = false }: AdvocateEmptyStateProps) {
-  const examples = hasJournalEntries ? [...EXAMPLE_QUESTIONS, JOURNAL_EXAMPLE_QUESTION] : EXAMPLE_QUESTIONS;
+  const { t } = useTranslation('advocate');
+  const examples = hasJournalEntries ? [...exampleQuestions(), journalExampleQuestion()] : exampleQuestions();
   return (
     <div className="flex max-w-md flex-col items-center px-6 text-center" data-testid="advocate-empty">
       <div className="mb-3 text-brand-teal-500">
         <MessageCircleQuestion className="h-8 w-8" strokeWidth={1.5} aria-hidden="true" />
       </div>
       <p className="text-sm text-brand-slate-600">
-        Plain answers that point back to the rules and to what's actually in the documents.{' '}
-        <span className="text-brand-slate-500">Not legal advice.</span>
+        {t('emptyState.intro')}{' '}
+        <span className="text-brand-slate-500">{t('emptyState.notLegalAdvice')}</span>
       </p>
       {canAsk && (
         <>
-          <p className="mb-2 mt-5 text-xs font-medium text-brand-slate-500">Not sure where to start?</p>
-          <ul className="flex flex-wrap justify-center gap-2" aria-label="Example questions">
+          <p className="mb-2 mt-5 text-xs font-medium text-brand-slate-500">{t('emptyState.notSure')}</p>
+          <ul className="flex flex-wrap justify-center gap-2" aria-label={t('emptyState.examplesAria')}>
             {examples.map((q) => (
               <li key={q}>
                 <button

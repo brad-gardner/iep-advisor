@@ -49,7 +49,7 @@ public sealed class DraftQuestionServiceTests : IDisposable
     }
 
     private DraftQuestionService CreateService(ApplicationDbContext ctx, Microsoft.Extensions.Logging.ILogger<DraftQuestionService>? logger = null) =>
-        new(ctx, new AccessService(ctx), _claude, logger ?? NullLogger<DraftQuestionService>.Instance);
+        new(ctx, new AccessService(ctx), _claude, TestSupport.TestLocalizers.Ai(), logger ?? NullLogger<DraftQuestionService>.Instance);
 
     private sealed record Scenario(int RevisionId, int DistrictId, int ParentId, int CoParentId, int ChildId, Guid GoalsKey, Guid GoalCol, string RowId);
 
@@ -258,10 +258,55 @@ public sealed class DraftQuestionServiceTests : IDisposable
         _claude.CannedResponse = null; // empty Claude response path (LogWarning)
         var empty = await service.AskAsync(s.ParentId, s.RevisionId, new AskDraftQuestionModel { Question = question }, default);
         Assert.False(empty.Success);
+        // Validation (400), not Unavailable (503): matches main's status for this message (multilingual
+        // plan 2026-10-06 phase 3 review fix — localizing "could not be answered right now" must not
+        // silently change its HTTP status).
+        Assert.Equal(ServiceErrorKind.Validation, empty.ErrorKind);
 
         Assert.True(capturing.EventCount > 0, "Expected at least one log event to actually check.");
         Assert.False(capturing.ContainsText(question), "The parent's question must never reach a log line.");
         Assert.False(capturing.ContainsText("Improve fine motor skills daily"), "Draft goal text must never reach a log line.");
+    }
+
+    // ------------------------------------------------------------------ multilingual plan phase 3
+
+    [Fact]
+    public async Task Ask_UnderSpanishCulture_AppendsResponseLanguageLine_PersistsSpanish_DisclaimerIsSpanish()
+    {
+        var s = Seed("lang-es");
+
+        using var ctx = CreateContext();
+        ServiceResult<DraftAnswerModel> result;
+        using (IepAssistant.Services.Localization.CultureScope.For("es"))
+        {
+            result = await CreateService(ctx).AskAsync(
+                s.ParentId, s.RevisionId, new AskDraftQuestionModel { Question = "Is this goal ambitious enough?" }, default);
+        }
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal("es", result.Data!.GeneratedLanguage);
+        Assert.Equal(
+            "Esta es una explicación general en lenguaje sencillo, no es asesoría legal. Si tiene preguntas sobre el plan específico de su hijo, comuníquese con su administrador de caso o con un defensor de educación especial.",
+            result.Data!.Disclaimer);
+
+        Assert.Contains("Spanish", _claude.LastRequest!.SystemPrompt);
+
+        var note = ctx.ParentDraftNotes.Single(n => n.Id == result.Data!.NoteId);
+        Assert.Equal("es", note.Language);
+    }
+
+    [Fact]
+    public async Task Ask_UnderEnglishCulture_NeverAppendsResponseLanguageLine()
+    {
+        var s = Seed("lang-en");
+
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).AskAsync(
+            s.ParentId, s.RevisionId, new AskDraftQuestionModel { Question = "Is this goal ambitious enough?" }, default);
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal("en", result.Data!.GeneratedLanguage);
+        Assert.DoesNotContain("RESPONSE LANGUAGE", _claude.LastRequest!.SystemPrompt, StringComparison.OrdinalIgnoreCase);
     }
 
     public void Dispose() => _connection.Dispose();

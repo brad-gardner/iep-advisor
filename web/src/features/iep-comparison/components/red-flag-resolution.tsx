@@ -1,4 +1,5 @@
 import { CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import type { RedFlagResolutionResult } from '@/types/api';
 
@@ -39,6 +40,7 @@ function FlagGroup({
 }
 
 export function RedFlagResolution({ resolution }: { resolution: RedFlagResolutionResult }) {
+  const { t } = useTranslation('iep-comparison');
   const hasAny =
     resolution.resolved.length > 0 ||
     resolution.persisting.length > 0 ||
@@ -49,13 +51,13 @@ export function RedFlagResolution({ resolution }: { resolution: RedFlagResolutio
   return (
     <Card>
       <h3 className="font-serif text-[17px] font-semibold text-brand-slate-800 mb-4">
-        Red Flag Resolution
+        {t('redFlagResolution.heading')}
       </h3>
 
       <div className="space-y-3">
         <FlagGroup
-          title="Resolved"
-          description="These issues were addressed"
+          title={t('redFlagResolution.resolvedTitle')}
+          description={t('redFlagResolution.resolvedDescription')}
           icon={CheckCircle}
           items={resolution.resolved}
           colorClass="text-brand-teal-600"
@@ -63,8 +65,8 @@ export function RedFlagResolution({ resolution }: { resolution: RedFlagResolutio
         />
 
         <FlagGroup
-          title="Persisting"
-          description="These issues remain"
+          title={t('redFlagResolution.persistingTitle')}
+          description={t('redFlagResolution.persistingDescription')}
           icon={AlertTriangle}
           items={resolution.persisting}
           colorClass="text-brand-amber-500"
@@ -72,8 +74,8 @@ export function RedFlagResolution({ resolution }: { resolution: RedFlagResolutio
         />
 
         <FlagGroup
-          title="New"
-          description="New concerns found"
+          title={t('redFlagResolution.newTitle')}
+          description={t('redFlagResolution.newDescription')}
           icon={XCircle}
           items={resolution.newFlags}
           colorClass="text-brand-danger-700"

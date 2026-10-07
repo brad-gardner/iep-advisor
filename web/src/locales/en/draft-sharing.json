@@ -1,0 +1,76 @@
+{
+  "shareWithFamilyLabel": "Share with family",
+  "documentStatus": {
+    "Draft": "Draft",
+    "Finalizing": "Finalizing",
+    "Finalized": "Finalized"
+  },
+  "converge": {
+    "loading": "Loading converge view…",
+    "loadErrorDefault": "Could not load the converge view.",
+    "notSharedYet": "This draft hasn't been shared with the family yet.",
+    "sharedLine": "Revision {{number}} shared {{date}}",
+    "shareAgainLabel": "Share again",
+    "acknowledgedByHeading": "Acknowledged by",
+    "acknowledgedLine": "{{name}} · {{date}}",
+    "changesSinceLastShare": "Changes since last share",
+    "openResponsesHeading": "Open responses",
+    "noOpenResponses": "Nothing waiting on a reply.",
+    "resolvedHeading": "Resolved"
+  },
+  "familySummary": {
+    "loading": "Loading family summary…",
+    "loadErrorDefault": "Could not load the family summary.",
+    "heading": "Family summary",
+    "draftWithAi": "Draft with AI",
+    "summaryLabel": "Summary for the family",
+    "saveChanges": "Save changes",
+    "savedToast": "Draft saved",
+    "saveErrorDefault": "Could not save your edits.",
+    "sendToFamily": "Send to family",
+    "draftErrorDefault": "Could not draft a summary.",
+    "sendErrorDefault": "Could not send the summary.",
+    "sentToast": "Summary sent to the family",
+    "sentLine": "Sent {{date}}",
+    "sentLineByName": "Sent {{date}} by {{name}}",
+    "confirmTitle": "Send family summary",
+    "confirmBody": "This will send the summary above to:",
+    "confirmSend": "Send",
+    "recipientLine": "{{name}} ({{email}})"
+  },
+  "resolveDialog": {
+    "title": "Reply and resolve",
+    "quotedPrefix": "{{name}} · {{kind}}",
+    "replyLabel": "Reply (sent to the family)",
+    "resolvedInDraftLabel": "Resolved in the draft (no reply needed)",
+    "needsReplyOrResolved": "Add a reply, or check \"resolved in the draft\".",
+    "resolveButton": "Resolve",
+    "submitErrorDefault": "Could not resolve this response."
+  },
+  "responseCard": {
+    "replyHeading": "Reply",
+    "repliedBy": "{{name}} replied",
+    "replyResolveButton": "Reply / resolve"
+  },
+  "sharedToast": "Shared as revision {{number}}",
+  "shareModal": {
+    "loadErrorDefault": "Could not load recipients.",
+    "loadingRecipients": "Loading recipients…",
+    "policyDisabledTitle": "Family draft sharing is disabled",
+    "policyDisabledBody": "This district has turned off family draft sharing. Ask a district admin to enable it before sharing.",
+    "willBeSharedWith": "Will be shared with",
+    "noRecipients": "No linked family or student accounts yet.",
+    "supersedeTitle": "This will supersede revision {{number}}",
+    "lastSharedPrefix": "Last shared {{date}}. ",
+    "supersedeBody": "The family will see this as the newest revision, with what changed highlighted.",
+    "noteLabel": "Note to the family (optional)",
+    "shareErrorDefault": "Could not share this draft.",
+    "shareButton": "Share"
+  },
+  "sharedBanner": {
+    "titleLine": "Shared as revision {{number}} on {{date}}",
+    "openResponses_one": "{{count}} open response from the family.",
+    "openResponses_other": "{{count}} open responses from the family.",
+    "noOpenResponses": "No open responses yet."
+  }
+}

@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.ProgressReports;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -16,15 +18,18 @@ public class ProgressReportsController : ControllerBase
     private readonly IProgressReportService _service;
     private readonly IProgressReportAnalysisService _analysisService;
     private readonly ProgressReportAnalysisQueue _analysisQueue;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public ProgressReportsController(
         IProgressReportService service,
         IProgressReportAnalysisService analysisService,
-        ProgressReportAnalysisQueue analysisQueue)
+        ProgressReportAnalysisQueue analysisQueue,
+        IStringLocalizer<Messages> localizer)
     {
         _service = service;
         _analysisService = analysisService;
         _analysisQueue = analysisQueue;
+        _localizer = localizer;
     }
 
     [HttpGet("api/ieps/{iepId}/progress-reports")]
@@ -44,7 +49,7 @@ public class ProgressReportsController : ControllerBase
         var userId = User.GetUserId();
         var report = await _service.GetByIdAsync(id, userId, cancellationToken);
         if (report == null)
-            return NotFound(ApiResponse<object>.Error("Progress report not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["ProgressReportsApi.NotFound"]));
 
         return Ok(ApiResponse<ProgressReportDto>.SuccessResponse(MapToDto(report)));
     }
@@ -64,10 +69,10 @@ public class ProgressReportsController : ControllerBase
 
         var result = await _service.CreateAsync(iepId, userId, model, cancellationToken);
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Creation failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["DocumentsApi.CreationFailed"].Value));
 
         var dto = MapToDto(result.Data!);
-        return CreatedAtAction(nameof(GetById), new { id = dto.Id }, ApiResponse<ProgressReportDto>.SuccessResponse(dto, "Progress report created"));
+        return CreatedAtAction(nameof(GetById), new { id = dto.Id }, ApiResponse<ProgressReportDto>.SuccessResponse(dto, _localizer["ProgressReportsApi.Created"]));
     }
 
     [HttpPost("api/progress-reports/{id}/upload")]
@@ -77,16 +82,16 @@ public class ProgressReportsController : ControllerBase
     public async Task<IActionResult> AttachFile(int id, IFormFile file, CancellationToken cancellationToken)
     {
         if (file == null || file.Length == 0)
-            return BadRequest(ApiResponse<object>.Error("No file provided"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["DocumentsApi.NoFileProvided"]));
 
         if (!file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-            return BadRequest(ApiResponse<object>.Error("Only PDF files are supported"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["DocumentsApi.OnlyPdfSupported"]));
 
         using var stream = file.OpenReadStream();
         var header = new byte[5];
         var bytesRead = await stream.ReadAsync(header, 0, 5, cancellationToken);
         if (bytesRead < 5 || System.Text.Encoding.ASCII.GetString(header) != "%PDF-")
-            return BadRequest(ApiResponse<object>.Error("File does not appear to be a valid PDF"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["DocumentsApi.InvalidPdf"]));
         stream.Position = 0;
 
         var sanitized = Path.GetFileName(file.FileName);
@@ -94,12 +99,12 @@ public class ProgressReportsController : ControllerBase
         var result = await _service.AttachFileAsync(id, userId, sanitized, stream, file.Length, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Upload failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["DocumentsApi.UploadFailed"].Value));
 
         // Kick off analysis in the background as soon as the file is attached.
         await _analysisQueue.EnqueueAsync(result.Data!.Id, cancellationToken);
 
-        return Ok(ApiResponse<ProgressReportDto>.SuccessResponse(MapToDto(result.Data!), "File attached"));
+        return Ok(ApiResponse<ProgressReportDto>.SuccessResponse(MapToDto(result.Data!), _localizer["ProgressReportsApi.FileAttached"]));
     }
 
     [HttpPut("api/progress-reports/{id}")]
@@ -117,9 +122,9 @@ public class ProgressReportsController : ControllerBase
 
         var result = await _service.UpdateMetadataAsync(id, userId, model, cancellationToken);
         if (!result.Success)
-            return NotFound(ApiResponse<object>.Error(result.Message ?? "Update failed"));
+            return NotFound(ApiResponse<object>.Error(result.Message ?? _localizer["DocumentsApi.UpdateFailed"].Value));
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "Metadata updated"));
+        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["ProgressReportsApi.MetadataUpdated"]));
     }
 
     [HttpGet("api/progress-reports/{id}/download")]
@@ -130,7 +135,7 @@ public class ProgressReportsController : ControllerBase
         var userId = User.GetUserId();
         var url = await _service.GetDownloadUrlAsync(id, userId, cancellationToken);
         if (url == null)
-            return NotFound(ApiResponse<object>.Error("Progress report not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["ProgressReportsApi.NotFound"]));
 
         return Ok(ApiResponse<object>.SuccessResponse(new { url }));
     }
@@ -143,7 +148,7 @@ public class ProgressReportsController : ControllerBase
         var userId = User.GetUserId();
         var analysis = await _analysisService.GetAnalysisAsync(id, userId, cancellationToken);
         if (analysis == null)
-            return NotFound(ApiResponse<object>.Error("Analysis not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["ProgressReportsApi.AnalysisNotFound"]));
 
         return Ok(ApiResponse<ProgressReportAnalysisDto>.SuccessResponse(MapAnalysisToDto(analysis)));
     }
@@ -157,13 +162,13 @@ public class ProgressReportsController : ControllerBase
         var userId = User.GetUserId();
         var report = await _service.GetByIdAsync(id, userId, cancellationToken);
         if (report == null)
-            return NotFound(ApiResponse<object>.Error("Progress report not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["ProgressReportsApi.NotFound"]));
 
         if (string.IsNullOrEmpty(report.FileName))
-            return BadRequest(ApiResponse<object>.Error("Upload the progress report PDF before running analysis."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["ProgressReportsApi.UploadPdfBeforeAnalysis"]));
 
         await _analysisQueue.EnqueueAsync(id, cancellationToken);
-        return Accepted(ApiResponse<object>.SuccessResponse(null, "Analysis queued"));
+        return Accepted(ApiResponse<object>.SuccessResponse(null, _localizer["ProgressReportsApi.AnalysisQueued"]));
     }
 
     [HttpDelete("api/progress-reports/{id}")]
@@ -174,9 +179,9 @@ public class ProgressReportsController : ControllerBase
         var userId = User.GetUserId();
         var result = await _service.DeleteAsync(id, userId, cancellationToken);
         if (!result.Success)
-            return NotFound(ApiResponse<object>.Error(result.Message ?? "Delete failed"));
+            return NotFound(ApiResponse<object>.Error(result.Message ?? _localizer["DocumentsApi.DeleteFailed"].Value));
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "Progress report deleted"));
+        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["ProgressReportsApi.Deleted"]));
     }
 
     private static ProgressReportAnalysisDto MapAnalysisToDto(ProgressReportAnalysisModel m) => new()
@@ -191,7 +196,8 @@ public class ProgressReportsController : ControllerBase
         ParentGoalsSnapshot = m.ParentGoalsSnapshot,
         IepGoalsSnapshot = m.IepGoalsSnapshot,
         ErrorMessage = m.ErrorMessage,
-        CreatedAt = m.CreatedAt
+        CreatedAt = m.CreatedAt,
+        GeneratedLanguage = m.GeneratedLanguage
     };
 
     private static ProgressReportDto MapToDto(ProgressReportModel m) => new()

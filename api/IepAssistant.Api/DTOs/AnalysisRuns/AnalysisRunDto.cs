@@ -15,6 +15,8 @@ public class AnalysisRunDto
     public List<AnalysisRunSourceDto> Sources { get; set; } = [];
     public List<AnalysisRunSectionDto> Sections { get; set; } = [];
     public string? ErrorMessage { get; set; }
+    /// <summary>"en" | "es" | null — the language this run was generated in; null means English.</summary>
+    public string? GeneratedLanguage { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

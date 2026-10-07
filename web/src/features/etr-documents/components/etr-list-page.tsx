@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { FileSearch, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
@@ -37,26 +38,28 @@ function groupByChild(etrs: EtrDocumentListItem[]): ChildGroup[] {
 }
 
 export function EtrListPage() {
-  usePageTitle('Evaluations (ETRs)');
+  const { t } = useTranslation(['etr-documents', 'common']);
+  usePageTitle(t('listPage.title'));
   const { etrs, loading, error, refresh } = useAllEtrs();
+  const errorMessage = error ? (error.kind === 'server' ? error.message : t('common:ui.genericError')) : null;
   const groups = useMemo(() => groupByChild(etrs), [etrs]);
 
   return (
     <PageLayout
-      title="Evaluations (ETRs)"
-      subtitle="An Evaluation Team Report (ETR) is the school's written evaluation that determines whether your child qualifies for special education and what supports they need. Review past evaluations and prepare for upcoming meetings here."
+      title={t('listPage.title')}
+      subtitle={t('listPage.subtitle')}
     >
       {loading && (
         <div className="flex justify-center py-12" data-testid="etr-list-loading">
-          <Spinner label="Loading evaluations…" />
+          <Spinner label={t('listPage.loading')} />
         </div>
       )}
 
-      {!loading && error && (
-        <Notice variant="error" title="Couldn't load evaluations" data-testid="etr-list-error">
-          <p className="mb-3">{error}</p>
+      {!loading && errorMessage && (
+        <Notice variant="error" title={t('listPage.loadErrorTitle')} data-testid="etr-list-error">
+          <p className="mb-3">{errorMessage}</p>
           <Button onClick={refresh} variant="secondary" size="sm">
-            Try again
+            {t('common:ui.tryAgain')}
           </Button>
         </Notice>
       )}
@@ -64,13 +67,13 @@ export function EtrListPage() {
       {!loading && !error && groups.length === 0 && (
         <EmptyState
           icon={FileSearch}
-          title="No evaluations yet."
-          description="Open a child's profile to add or upload an ETR."
+          title={t('listPage.empty')}
+          description={t('listPage.emptyDescription')}
           action={
             <Link to="/children">
               <Button data-testid="etr-list-empty-children-link">
                 <Users className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
-                Go to My Children
+                {t('listPage.goToChildren')}
               </Button>
             </Link>
           }

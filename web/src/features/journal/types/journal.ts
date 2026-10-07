@@ -2,13 +2,9 @@ export type JournalTag = 'Incident' | 'Communication' | 'Medical' | 'Progress' |
 
 export const JOURNAL_TAGS: JournalTag[] = ['Incident', 'Communication', 'Medical', 'Progress', 'Other'];
 
-export const JOURNAL_TAG_LABELS: Record<JournalTag, string> = {
-  Incident: 'Incident',
-  Communication: 'Communication',
-  Medical: 'Medical',
-  Progress: 'Progress',
-  Other: 'Other',
-};
+// Translated display labels moved to `lib/tag-label.ts` (`journalTagLabel`)
+// — see `docs/i18n/README.md`'s "Display-label helpers" pattern. Stored
+// values (above) stay English.
 
 /** Serialized markdown cap — the same number the API enforces. */
 export const JOURNAL_CONTENT_MAX_LENGTH = 4000;

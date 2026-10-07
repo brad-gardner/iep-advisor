@@ -1,4 +1,5 @@
 import { CircleCheck, AlertTriangle, Lightbulb } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { GoalAnalysis } from '@/types/api';
 import { SmartCriteriaGrid } from './smart-criteria-grid';
 import { Badge } from '@/components/ui/badge';
@@ -12,15 +13,17 @@ interface AnalysisGoalCardProps {
   canAsk?: boolean;
 }
 
-const RATING_BADGES: Record<string, { label: string; variant: 'success' | 'warning' | 'error' }> = {
-  green: { label: 'Strong', variant: 'success' },
-  yellow: { label: 'Needs Improvement', variant: 'warning' },
-  red: { label: 'Significant Concerns', variant: 'error' },
-};
-
 export function AnalysisGoalCard({ goalAnalysis, childId, canAsk = false }: AnalysisGoalCardProps) {
+  const { t } = useTranslation('iep-documents');
+  const RATING_BADGES: Record<string, { label: string; variant: 'success' | 'warning' | 'error' }> = {
+    green: { label: t('goalCard.ratingStrong'), variant: 'success' },
+    yellow: { label: t('goalCard.ratingNeedsImprovement'), variant: 'warning' },
+    red: { label: t('goalCard.ratingSignificantConcerns'), variant: 'error' },
+  };
   const badge = RATING_BADGES[goalAnalysis.overallRating] || RATING_BADGES.yellow;
-  const goalName = goalAnalysis.domain ? `${goalAnalysis.domain} goal` : 'goal';
+  const goalName = goalAnalysis.domain
+    ? t('goalCard.domainGoal', { domain: goalAnalysis.domain })
+    : t('goalCard.goalFallback');
 
   return (
     <div
@@ -33,7 +36,7 @@ export function AnalysisGoalCard({ goalAnalysis, childId, canAsk = false }: Anal
         <div className="flex-1">
           {goalAnalysis.domain && (
             <span className="text-[10px] font-semibold text-brand-teal-500 uppercase tracking-wide">
-              GOAL &middot; {goalAnalysis.domain.toUpperCase()}
+              {t('goalCard.eyebrow', { domain: goalAnalysis.domain.toUpperCase() })}
             </span>
           )}
           <h3 className="font-serif text-[17px] font-semibold text-brand-slate-800 mt-1">
@@ -48,9 +51,9 @@ export function AnalysisGoalCard({ goalAnalysis, childId, canAsk = false }: Anal
             <AskAdvocateButton
               childId={childId}
               about={{ kind: 'goal', id: goalAnalysis.goalId }}
-              label={`the ${goalName}`}
+              label={t('goalCard.askLabel', { goalName })}
               appearance="icon"
-              ariaLabel={`Ask the advocate about this ${goalName}`}
+              ariaLabel={t('goalCard.askAriaLabel', { goalName })}
             />
           )}
         </div>
@@ -70,7 +73,7 @@ export function AnalysisGoalCard({ goalAnalysis, childId, canAsk = false }: Anal
         <div className="border-l-2 border-l-brand-teal-500 bg-brand-teal-50 rounded-r-card p-3">
           <h4 className="text-[13px] font-medium text-brand-teal-600 mb-1.5 flex items-center gap-1.5">
             <CircleCheck className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />
-            Strengths
+            {t('goalCard.strengths')}
           </h4>
           <ul className="space-y-1">
             {goalAnalysis.strengths.map((s, i) => (
@@ -88,7 +91,7 @@ export function AnalysisGoalCard({ goalAnalysis, childId, canAsk = false }: Anal
         <div className="border-l-2 border-l-brand-amber-400 bg-brand-amber-50 rounded-r-card p-3">
           <h4 className="text-[13px] font-medium text-brand-amber-500 mb-1.5 flex items-center gap-1.5">
             <AlertTriangle className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />
-            Concerns
+            {t('goalCard.concerns')}
           </h4>
           <ul className="space-y-1">
             {goalAnalysis.concerns.map((c, i) => (
@@ -105,7 +108,7 @@ export function AnalysisGoalCard({ goalAnalysis, childId, canAsk = false }: Anal
         <div className="border-l-2 border-l-brand-teal-500 bg-brand-teal-50 rounded-r-card p-3">
           <h4 className="text-[13px] font-medium text-brand-teal-600 mb-1.5 flex items-center gap-1.5">
             <Lightbulb className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />
-            Suggested Improvements
+            {t('goalCard.suggestedImprovements')}
           </h4>
           <ul className="space-y-1">
             {goalAnalysis.suggestedImprovements.map((imp, i) => (

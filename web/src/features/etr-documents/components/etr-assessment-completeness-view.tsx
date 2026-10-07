@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import type { EtrCompletenessPayload } from '@/features/analysis/types';
 
@@ -6,23 +7,28 @@ interface EtrAssessmentCompletenessViewProps {
   data: EtrCompletenessPayload;
 }
 
-function adequacyBadge(rating: string) {
-  switch (rating) {
-    case 'strong':
-      return { variant: 'success' as const, label: 'Strong' };
-    case 'adequate':
-      return { variant: 'info' as const, label: 'Adequate' };
-    case 'thin':
-      return { variant: 'warning' as const, label: 'Thin' };
-    case 'missing':
-    case 'concerning':
-      return { variant: 'error' as const, label: rating === 'missing' ? 'Missing' : 'Concerning' };
-    default:
-      return { variant: 'neutral' as const, label: String(rating || 'Unknown') };
-  }
-}
-
 export function EtrAssessmentCompletenessView({ data }: EtrAssessmentCompletenessViewProps) {
+  const { t } = useTranslation('etr-documents');
+
+  function adequacyBadge(rating: string) {
+    switch (rating) {
+      case 'strong':
+        return { variant: 'success' as const, label: t('completenessView.ratingStrong') };
+      case 'adequate':
+        return { variant: 'info' as const, label: t('completenessView.ratingAdequate') };
+      case 'thin':
+        return { variant: 'warning' as const, label: t('completenessView.ratingThin') };
+      case 'missing':
+      case 'concerning':
+        return {
+          variant: 'error' as const,
+          label: rating === 'missing' ? t('completenessView.ratingMissing') : t('completenessView.ratingConcerning'),
+        };
+      default:
+        return { variant: 'neutral' as const, label: rating || t('completenessView.ratingUnknown') };
+    }
+  }
+
   const overall = adequacyBadge(data.overallCompletenessRating);
 
   return (
@@ -30,11 +36,11 @@ export function EtrAssessmentCompletenessView({ data }: EtrAssessmentCompletenes
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-serif text-[22px] font-semibold text-brand-slate-800">
-            Assessment Completeness
+            {t('completenessView.heading')}
           </h2>
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-brand-slate-500 uppercase tracking-wide">
-              Overall
+              {t('completenessView.overall')}
             </span>
             <Badge variant={overall.variant}>{overall.label}</Badge>
           </div>
@@ -43,10 +49,10 @@ export function EtrAssessmentCompletenessView({ data }: EtrAssessmentCompletenes
 
       <section>
         <h3 className="text-sm font-semibold text-brand-slate-800 mb-2">
-          Evaluated Domains ({data.evaluatedDomains.length})
+          {t('completenessView.evaluatedDomains', { count: data.evaluatedDomains.length })}
         </h3>
         {data.evaluatedDomains.length === 0 ? (
-          <p className="text-sm text-brand-slate-500">No evaluated domains reported.</p>
+          <p className="text-sm text-brand-slate-500">{t('completenessView.noEvaluatedDomains')}</p>
         ) : (
           <div className="space-y-2">
             {data.evaluatedDomains.map((d, i) => {
@@ -70,7 +76,7 @@ export function EtrAssessmentCompletenessView({ data }: EtrAssessmentCompletenes
                         </p>
                         {tools && (
                           <p className="text-[12px] text-brand-slate-500 mt-0.5">
-                            Tools: {tools}
+                            {t('completenessView.tools', { tools })}
                           </p>
                         )}
                         {d.notes && (
@@ -91,11 +97,11 @@ export function EtrAssessmentCompletenessView({ data }: EtrAssessmentCompletenes
 
       <section>
         <h3 className="text-sm font-semibold text-brand-slate-800 mb-2">
-          Missing or Under-Evaluated Domains ({data.missingDomains.length})
+          {t('completenessView.missingDomains', { count: data.missingDomains.length })}
         </h3>
         {data.missingDomains.length === 0 ? (
           <p className="text-sm text-brand-slate-500">
-            No missing domains identified.
+            {t('completenessView.noMissingDomains')}
           </p>
         ) : (
           <div className="space-y-2">

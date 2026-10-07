@@ -1,0 +1,66 @@
+{
+  "status": {
+    "Active": "Activa",
+    "Met": "Cumplida",
+    "NotMet": "No cumplida",
+    "Retired": "Retirada",
+    "Carried": "Trasladada"
+  },
+  "card": {
+    "stale": "Desactualizada",
+    "baseline": "Línea base",
+    "target": "Objetivo",
+    "never": "Nunca",
+    "lastObserved": "Última observación: {{date}}",
+    "historyButton": "Historial",
+    "logProgressButton": "Registrar progreso",
+    "changeStatusButton": "Cambiar estado"
+  },
+  "historyDrawer": {
+    "title": "Historial de la meta",
+    "noHistory": "Aún no se ha registrado historial.",
+    "versionLabel": "Versión {{number}} · {{date}}",
+    "loadError": "No se pudo cargar el historial de esta meta."
+  },
+  "sparkline": {
+    "insufficientData": "Datos insuficientes — registre al menos dos observaciones para ver una tendencia.",
+    "trendTitle": "Tendencia de progreso de {{goalText}}"
+  },
+  "goalsCard": {
+    "heading": "Metas",
+    "emptyTitle": "Aún no hay metas",
+    "emptyDescription": "Las metas aparecerán aquí cuando un IEP o ETR finalizado las incluya."
+  },
+  "statusDialog": {
+    "title": "Actualizar estado de la meta",
+    "save": "Guardar",
+    "statusLegend": "Estado",
+    "reasonLabel": "Motivo",
+    "reasonLabelRequired": "Motivo *",
+    "updateFailed": "No se pudo actualizar el estado de la meta."
+  },
+  "logProgressForm": {
+    "valueOrNoteRequired": "Ingrese un valor o una nota.",
+    "noteMaxLength": "La nota debe tener {{max}} caracteres o menos.",
+    "valueMustBeNumber": "El valor debe ser un número.",
+    "toastLogged": "Progreso registrado",
+    "logFailed": "No se pudo registrar el progreso.",
+    "valueLabel": "Valor",
+    "unitLabel": "Unidad",
+    "unitPlaceholder": "p. ej. % correcto",
+    "noteLabel": "Nota",
+    "submit": "Registrar progreso"
+  },
+  "removeGoalDialog": {
+    "title": "Eliminar meta",
+    "confirm": "Eliminar meta",
+    "bodyText": "Eliminar \"{{goalLabel}}\" la retira del expediente del estudiante. Esto se conserva como parte del historial de la meta y no se puede deshacer desde aquí.",
+    "defaultGoalLabel": "esta meta",
+    "reasonLabel": "Motivo para eliminar esta meta *",
+    "minLengthHint": "Al menos {{min}} caracteres."
+  },
+  "childProgressCard": {
+    "heading": "Progreso",
+    "description": "Progreso de metas que la escuela de su hijo o hija ha registrado."
+  }
+}

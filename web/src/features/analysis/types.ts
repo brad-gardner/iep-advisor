@@ -106,6 +106,10 @@ export interface AnalysisRun {
   sections: AnalysisRunSection[];
   errorMessage: string | null;
   createdAt: string;
+  /** Language the AI generated this run's content in; null (a run created
+   * before this column existed) means English. Drives `GeneratedLanguageNotice`
+   * on `RunDetail` when it differs from the viewer's active language. */
+  generatedLanguage?: 'en' | 'es' | null;
 }
 
 export interface CreateAnalysisRunRequest {

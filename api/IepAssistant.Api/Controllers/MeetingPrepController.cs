@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.MeetingPrep;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -15,11 +17,22 @@ public class MeetingPrepController : ControllerBase
 {
     private readonly IMeetingPrepService _meetingPrepService;
     private readonly MeetingPrepQueue _queue;
+    private readonly IStringLocalizer<Ai> _localizer;
+    // The one generic ModelState-guard key (Api.InvalidRequest) lives in Messages.resx, alongside every
+    // other Phase 3 controller's — not duplicated into Ai.resx just for this controller (multilingual
+    // plan 2026-10-06 phase 3 review fix, replacing the since-removed MeetingPrep.InvalidRequest).
+    private readonly IStringLocalizer<Messages> _messagesLocalizer;
 
-    public MeetingPrepController(IMeetingPrepService meetingPrepService, MeetingPrepQueue queue)
+    public MeetingPrepController(
+        IMeetingPrepService meetingPrepService,
+        MeetingPrepQueue queue,
+        IStringLocalizer<Ai> localizer,
+        IStringLocalizer<Messages> messagesLocalizer)
     {
         _meetingPrepService = meetingPrepService;
         _queue = queue;
+        _localizer = localizer;
+        _messagesLocalizer = messagesLocalizer;
     }
 
     [HttpPost("api/children/{childId}/meeting-prep")]
@@ -31,17 +44,13 @@ public class MeetingPrepController : ControllerBase
         var result = await _meetingPrepService.GenerateFromGoalsAsync(childId, userId, request?.MeetingDate, cancellationToken);
 
         if (!result.Success)
-        {
-            if (result.Message?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
-                return NotFound(ApiResponse<object>.Error(result.Message));
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Generation failed"));
-        }
+            return this.MapServiceFailure(result);
 
         await _queue.EnqueueAsync(result.Data, cancellationToken);
 
         return Accepted(ApiResponse<object>.SuccessResponse(
             new { id = result.Data },
-            "Meeting prep checklist generation started"));
+            _localizer["MeetingPrep.GenerationStarted"]));
     }
 
     [HttpPost("api/ieps/{iepId}/meeting-prep")]
@@ -53,17 +62,13 @@ public class MeetingPrepController : ControllerBase
         var result = await _meetingPrepService.GenerateFromIepAsync(iepId, userId, request?.MeetingDate, cancellationToken);
 
         if (!result.Success)
-        {
-            if (result.Message?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
-                return NotFound(ApiResponse<object>.Error(result.Message));
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Generation failed"));
-        }
+            return this.MapServiceFailure(result);
 
         await _queue.EnqueueAsync(result.Data, cancellationToken);
 
         return Accepted(ApiResponse<object>.SuccessResponse(
             new { id = result.Data },
-            "Meeting prep checklist generation started"));
+            _localizer["MeetingPrep.GenerationStarted"]));
     }
 
     [HttpPost("api/etrs/{etrId}/meeting-prep")]
@@ -75,17 +80,13 @@ public class MeetingPrepController : ControllerBase
         var result = await _meetingPrepService.GenerateFromEtrAsync(etrId, userId, request?.MeetingDate, cancellationToken);
 
         if (!result.Success)
-        {
-            if (result.Message?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
-                return NotFound(ApiResponse<object>.Error(result.Message));
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Generation failed"));
-        }
+            return this.MapServiceFailure(result);
 
         await _queue.EnqueueAsync(result.Data, cancellationToken);
 
         return Accepted(ApiResponse<object>.SuccessResponse(
             new { id = result.Data },
-            "Meeting prep checklist generation started"));
+            _localizer["MeetingPrep.GenerationStarted"]));
     }
 
     [HttpGet("api/children/{childId}/meeting-prep")]
@@ -106,7 +107,7 @@ public class MeetingPrepController : ControllerBase
         var checklist = await _meetingPrepService.GetByIdAsync(id, userId, cancellationToken);
 
         if (checklist == null)
-            return NotFound(ApiResponse<object>.Error("Checklist not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["MeetingPrep.ChecklistNotFound"]));
 
         return Ok(ApiResponse<MeetingPrepChecklistModel>.SuccessResponse(checklist));
     }
@@ -118,7 +119,7 @@ public class MeetingPrepController : ControllerBase
     public async Task<IActionResult> CheckItem(int id, [FromBody] CheckItemDto dto, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_messagesLocalizer["Api.InvalidRequest"]));
 
         var userId = User.GetUserId();
         var request = new CheckItemRequest
@@ -131,13 +132,9 @@ public class MeetingPrepController : ControllerBase
         var result = await _meetingPrepService.CheckItemAsync(id, userId, request, cancellationToken);
 
         if (!result.Success)
-        {
-            if (result.Message?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
-                return NotFound(ApiResponse<object>.Error(result.Message));
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Update failed"));
-        }
+            return this.MapServiceFailure(result);
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "Item checked"));
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 
     [HttpDelete("api/meeting-prep/{id}")]
@@ -149,8 +146,8 @@ public class MeetingPrepController : ControllerBase
         var result = await _meetingPrepService.DeleteAsync(id, userId, cancellationToken);
 
         if (!result.Success)
-            return NotFound(ApiResponse<object>.Error(result.Message ?? "Delete failed"));
+            return this.MapServiceFailure(result);
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "Checklist deleted"));
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 }

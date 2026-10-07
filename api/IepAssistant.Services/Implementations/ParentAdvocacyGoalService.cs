@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Repositories;
@@ -12,6 +13,7 @@ public class ParentAdvocacyGoalService : IParentAdvocacyGoalService
     private readonly IChildProfileRepository _childRepository;
     private readonly IAccessService _accessService;
     private readonly ApplicationDbContext _context;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     private static readonly HashSet<string> ValidCategories = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -22,12 +24,14 @@ public class ParentAdvocacyGoalService : IParentAdvocacyGoalService
         IParentAdvocacyGoalRepository repository,
         IChildProfileRepository childRepository,
         IAccessService accessService,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        IStringLocalizer<Messages> localizer)
     {
         _repository = repository;
         _childRepository = childRepository;
         _accessService = accessService;
         _context = context;
+        _localizer = localizer;
     }
 
     public async Task<IEnumerable<ParentAdvocacyGoalModel>> GetByChildIdAsync(int childId, int userId, CancellationToken cancellationToken = default)
@@ -42,14 +46,14 @@ public class ParentAdvocacyGoalService : IParentAdvocacyGoalService
     public async Task<ServiceResult<ParentAdvocacyGoalModel>> CreateAsync(int childId, int userId, CreateAdvocacyGoalModel model, CancellationToken cancellationToken = default)
     {
         if (!await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult<ParentAdvocacyGoalModel>.FailureResult("Child profile not found.");
+            return ServiceResult<ParentAdvocacyGoalModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Children.NotFound"]);
 
         if (model.Category != null && !ValidCategories.Contains(model.Category))
-            return ServiceResult<ParentAdvocacyGoalModel>.FailureResult("Invalid category. Must be: academic, behavioral, services, or placement.");
+            return ServiceResult<ParentAdvocacyGoalModel>.FailureResult(ServiceErrorKind.Validation, _localizer["AdvocacyGoals.InvalidCategory"]);
 
         var existingGoals = (await _repository.GetByChildIdAsync(childId, cancellationToken)).ToList();
         if (existingGoals.Count >= 10)
-            return ServiceResult<ParentAdvocacyGoalModel>.FailureResult("Maximum of 10 advocacy goals per child. Consider consolidating goals for better analysis.");
+            return ServiceResult<ParentAdvocacyGoalModel>.FailureResult(ServiceErrorKind.Validation, _localizer["AdvocacyGoals.MaxGoalsReached"]);
 
         var maxOrder = existingGoals.Count > 0 ? existingGoals.Max(g => g.DisplayOrder) : 0;
 
@@ -66,17 +70,17 @@ public class ParentAdvocacyGoalService : IParentAdvocacyGoalService
         await _repository.AddAsync(entity, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult<ParentAdvocacyGoalModel>.SuccessResult(MapToModel(entity), "Advocacy goal created successfully.");
+        return ServiceResult<ParentAdvocacyGoalModel>.SuccessResult(MapToModel(entity), _localizer["AdvocacyGoals.CreatedSuccessfully"]);
     }
 
     public async Task<ServiceResult> UpdateAsync(int id, int userId, UpdateAdvocacyGoalModel model, CancellationToken cancellationToken = default)
     {
         var entity = await _repository.GetByIdWithChildAsync(id, cancellationToken);
         if (entity == null)
-            return ServiceResult.FailureResult("Advocacy goal not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["AdvocacyGoals.NotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(entity.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult.FailureResult("Advocacy goal not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["AdvocacyGoals.NotFound"]);
 
         if (model.GoalText != null)
             entity.GoalText = model.GoalText.Trim();
@@ -84,7 +88,7 @@ public class ParentAdvocacyGoalService : IParentAdvocacyGoalService
         if (model.Category != null)
         {
             if (model.Category != "" && !ValidCategories.Contains(model.Category))
-                return ServiceResult.FailureResult("Invalid category. Must be: academic, behavioral, services, or placement.");
+                return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["AdvocacyGoals.InvalidCategory"]);
             entity.Category = model.Category == "" ? null : model.Category.ToLowerInvariant();
         }
 
@@ -92,30 +96,30 @@ public class ParentAdvocacyGoalService : IParentAdvocacyGoalService
         _repository.Update(entity);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult("Advocacy goal updated successfully.");
+        return ServiceResult.SuccessResult(_localizer["AdvocacyGoals.UpdatedSuccessfully"]);
     }
 
     public async Task<ServiceResult> DeleteAsync(int id, int userId, CancellationToken cancellationToken = default)
     {
         var entity = await _repository.GetByIdWithChildAsync(id, cancellationToken);
         if (entity == null)
-            return ServiceResult.FailureResult("Advocacy goal not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["AdvocacyGoals.NotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(entity.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult.FailureResult("Advocacy goal not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["AdvocacyGoals.NotFound"]);
 
         entity.IsActive = false;
         entity.UpdatedById = userId;
         _repository.Update(entity);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult("Advocacy goal deleted successfully.");
+        return ServiceResult.SuccessResult(_localizer["AdvocacyGoals.DeletedSuccessfully"]);
     }
 
     public async Task<ServiceResult> ReorderAsync(int childId, int userId, List<ReorderAdvocacyGoalItem> items, CancellationToken cancellationToken = default)
     {
         if (!await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult.FailureResult("Child profile not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Children.NotFound"]);
 
         var goals = (await _repository.GetByChildIdAsync(childId, cancellationToken)).ToList();
         var goalMap = goals.ToDictionary(g => g.Id);
@@ -130,7 +134,7 @@ public class ParentAdvocacyGoalService : IParentAdvocacyGoalService
         }
 
         await _context.SaveChangesAsync(cancellationToken);
-        return ServiceResult.SuccessResult("Goals reordered successfully.");
+        return ServiceResult.SuccessResult(_localizer["AdvocacyGoals.ReorderedSuccessfully"]);
     }
 
     private static ParentAdvocacyGoalModel MapToModel(ParentAdvocacyGoal entity) => new()

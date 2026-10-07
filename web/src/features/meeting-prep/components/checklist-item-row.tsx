@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp, Scale } from 'lucide-react';
 import type { ChecklistItem } from '@/types/api';
 
@@ -9,6 +10,7 @@ interface ChecklistItemRowProps {
 }
 
 export function ChecklistItemRow({ item, index, onCheck }: ChecklistItemRowProps) {
+  const { t } = useTranslation('meeting-prep');
   const [expanded, setExpanded] = useState(false);
   const hasDetails = item.context || item.legalBasis;
 
@@ -23,7 +25,7 @@ export function ChecklistItemRow({ item, index, onCheck }: ChecklistItemRowProps
               ? 'bg-brand-teal-500 border-brand-teal-500'
               : 'border-brand-slate-300 hover:border-brand-teal-400'
           }`}
-          aria-label={item.isChecked ? 'Uncheck item' : 'Check item'}
+          aria-label={item.isChecked ? t('checklistItem.uncheck') : t('checklistItem.check')}
         >
           {item.isChecked && (
             <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -48,7 +50,7 @@ export function ChecklistItemRow({ item, index, onCheck }: ChecklistItemRowProps
           <button
             onClick={() => setExpanded(!expanded)}
             className="flex-shrink-0 p-1 rounded hover:bg-brand-slate-100 text-brand-slate-400 hover:text-brand-slate-600 transition-colors"
-            aria-label={expanded ? 'Collapse details' : 'Expand details'}
+            aria-label={expanded ? t('checklistItem.collapse') : t('checklistItem.expand')}
           >
             {expanded ? (
               <ChevronUp className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />

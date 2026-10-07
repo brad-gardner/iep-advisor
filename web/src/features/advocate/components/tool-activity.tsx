@@ -1,4 +1,5 @@
 import { AlertCircle, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/cn';
 import type { ToolActivity as ToolActivityRow } from '../hooks/use-advocate-thread';
@@ -13,12 +14,13 @@ interface ToolActivityProps {
  * uses the shared `Spinner` (its own status role reads the label).
  */
 export function ToolActivity({ tools }: ToolActivityProps) {
+  const { t } = useTranslation('advocate');
   if (tools.length === 0) return null;
   return (
     <ul
       className="space-y-1 text-xs text-brand-slate-500"
       data-testid="advocate-tool-activity"
-      aria-label="What the advocate is checking"
+      aria-label={t('toolActivity.ariaLabel')}
     >
       {tools.map((tool) => (
         <li key={tool.key} className="flex items-center gap-2" data-testid={`advocate-tool-${tool.status}`}>
@@ -31,7 +33,7 @@ export function ToolActivity({ tools }: ToolActivityProps) {
           >
             {tool.label}
             {tool.status === 'started' && '…'}
-            {tool.status === 'failed' && ' — couldn’t check this'}
+            {tool.status === 'failed' && t('toolActivity.failedSuffix')}
           </span>
         </li>
       ))}

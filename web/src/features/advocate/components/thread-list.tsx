@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageSquare, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -9,11 +10,12 @@ import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/cn';
 import { relativeTime } from '@/lib/relative-time';
+import { threadsRenameFailed, threadsDeleteFailed, type ThreadsLoadError } from '../hooks/use-advocate-threads';
 import { ADVOCATE_TITLE_MAX_LENGTH, type AdvocateThreadDto } from '../types/advocate';
 
 interface ThreadListProps {
   threads: AdvocateThreadDto[] | null;
-  error: string | null;
+  error: ThreadsLoadError | null;
   selectedId: number | null;
   onSelect: (id: number) => void;
   onNew: () => void;
@@ -52,8 +54,10 @@ export function ThreadList({
   busy,
   variant = 'panel',
 }: ThreadListProps) {
+  const { t } = useTranslation('advocate');
   const [renaming, setRenaming] = useState<AdvocateThreadDto | null>(null);
   const [deleting, setDeleting] = useState<AdvocateThreadDto | null>(null);
+  const errorMessage = error ? (error.kind === 'server' ? error.message : t('threads.loadError')) : null;
 
   return (
     <div
@@ -65,81 +69,81 @@ export function ThreadList({
             so this visible caption would repeat the name straight after it; the desktop rail has no such
             heading and needs it. The <ul> keeps its own aria-label either way so the list is named. */}
         {variant === 'panel' && (
-          <p className="text-[11px] font-medium uppercase tracking-wide text-brand-slate-500">Conversations</p>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-brand-slate-500">{t('threadList.caption')}</p>
         )}
         {canAsk && (
           <button
             type="button"
             onClick={onNew}
             disabled={busy}
-            aria-label="New conversation"
+            aria-label={t('threadList.newAria')}
             className="flex items-center gap-1 rounded-button px-2 py-1 text-xs font-medium text-brand-teal-600 transition-colors hover:bg-brand-teal-50 focus:outline-none focus:ring-1 focus:ring-brand-teal-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
             data-testid="advocate-new-thread"
           >
             <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-            New
+            {t('threadList.new')}
           </button>
         )}
       </div>
 
-      {error && (
+      {errorMessage && (
         <div role="alert">
-          <Notice variant="error" title={error} />
+          <Notice variant="error" title={errorMessage} />
         </div>
       )}
 
       {threads === null && !error && (
         <div className="flex justify-center py-6">
-          <Spinner size="sm" label="Loading conversations…" />
+          <Spinner size="sm" label={t('threadList.loading')} />
         </div>
       )}
 
       {threads && threads.length === 0 && (
         <p className="px-1 text-xs text-brand-slate-500" data-testid="advocate-thread-list-empty">
-          No conversations yet.
+          {t('threadList.empty')}
         </p>
       )}
 
       {threads && threads.length > 0 && (
-        <ul className="space-y-1" aria-label="Conversations">
-          {threads.map((t) => {
-            const selected = t.id === selectedId;
+        <ul className="space-y-1" aria-label={t('threadList.caption')}>
+          {threads.map((th) => {
+            const selected = th.id === selectedId;
             return (
-              <li key={t.id} className="flex items-center gap-1" data-testid={`advocate-thread-${t.id}`}>
+              <li key={th.id} className="flex items-center gap-1" data-testid={`advocate-thread-${th.id}`}>
                 <button
                   type="button"
-                  onClick={() => onSelect(t.id)}
+                  onClick={() => onSelect(th.id)}
                   aria-current={selected ? 'true' : undefined}
                   className={cn(
                     'flex min-w-0 flex-1 items-start gap-2 rounded-button px-2 py-1.5 text-left transition-colors focus:outline-none focus:ring-1 focus:ring-brand-teal-500 focus:ring-offset-1',
                     selected ? 'bg-brand-teal-50 text-brand-slate-800' : 'text-brand-slate-600 hover:bg-brand-slate-100',
                   )}
-                  data-testid={`advocate-thread-${t.id}-open`}
+                  data-testid={`advocate-thread-${th.id}-open`}
                 >
                   <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-brand-slate-400" aria-hidden="true" />
                   <span className="min-w-0 flex-1">
-                    <span className="line-clamp-2 text-sm font-medium">{t.title}</span>
-                    <span className="block text-[11px] text-brand-slate-500">{relativeTime(t.lastMessageAt)}</span>
+                    <span className="line-clamp-2 text-sm font-medium">{th.title}</span>
+                    <span className="block text-[11px] text-brand-slate-500">{relativeTime(th.lastMessageAt)}</span>
                   </span>
                 </button>
                 {canAsk && (
                   <Menu
-                    label={`Actions for ${t.title}`}
+                    label={t('threadList.actionsFor', { title: th.title })}
                     align="right"
-                    data-testid={`advocate-thread-${t.id}-menu`}
+                    data-testid={`advocate-thread-${th.id}-menu`}
                     items={[
                       {
-                        label: 'Rename',
+                        label: t('threadList.rename'),
                         icon: <Pencil className="h-4 w-4" aria-hidden="true" />,
-                        onSelect: () => setRenaming(t),
-                        'data-testid': `advocate-thread-${t.id}-rename`,
+                        onSelect: () => setRenaming(th),
+                        'data-testid': `advocate-thread-${th.id}-rename`,
                       },
                       {
-                        label: 'Delete',
+                        label: t('threadList.delete'),
                         variant: 'danger',
                         icon: <Trash2 className="h-4 w-4" aria-hidden="true" />,
-                        onSelect: () => setDeleting(t),
-                        'data-testid': `advocate-thread-${t.id}-delete`,
+                        onSelect: () => setDeleting(th),
+                        'data-testid': `advocate-thread-${th.id}-delete`,
                       },
                     ]}
                   />
@@ -163,14 +167,16 @@ interface RenameThreadModalProps {
 }
 
 function RenameThreadModal({ thread, onClose, onRename }: RenameThreadModalProps) {
+  const { t } = useTranslation('advocate');
   return (
-    <Modal open={thread !== null} onClose={onClose} title="Rename conversation" size="sm" data-testid="advocate-rename-dialog">
+    <Modal open={thread !== null} onClose={onClose} title={t('threadList.renameModalTitle')} size="sm" data-testid="advocate-rename-dialog">
       {thread && <RenameThreadForm thread={thread} onClose={onClose} onRename={onRename} />}
     </Modal>
   );
 }
 
 function RenameThreadForm({ thread, onClose, onRename }: RenameThreadModalProps & { thread: AdvocateThreadDto }) {
+  const { t } = useTranslation(['advocate', 'common']);
   const [title, setTitle] = useState(thread.title);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -186,7 +192,7 @@ function RenameThreadForm({ thread, onClose, onRename }: RenameThreadModalProps 
       await onRename(thread.id, clean);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not rename this conversation.');
+      setError(err instanceof Error ? err.message : threadsRenameFailed());
     } finally {
       setSaving(false);
     }
@@ -196,7 +202,7 @@ function RenameThreadForm({ thread, onClose, onRename }: RenameThreadModalProps 
     <form onSubmit={(e) => void submit(e)} className="space-y-4" data-testid="advocate-rename-form">
       <Input
         id="advocate-thread-title"
-        label="Title"
+        label={t('advocate:threadList.renameLabel')}
         value={title}
         maxLength={ADVOCATE_TITLE_MAX_LENGTH}
         onChange={(e) => setTitle(e.target.value)}
@@ -210,10 +216,10 @@ function RenameThreadForm({ thread, onClose, onRename }: RenameThreadModalProps 
       )}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>
-          Cancel
+          {t('common:ui.cancel')}
         </Button>
         <Button type="submit" size="sm" loading={saving} disabled={!canSave} data-testid="advocate-rename-save">
-          Save
+          {t('advocate:threadList.save')}
         </Button>
       </div>
     </form>
@@ -227,6 +233,7 @@ interface DeleteThreadDialogProps {
 }
 
 function DeleteThreadDialog({ thread, onClose, onDelete }: DeleteThreadDialogProps) {
+  const { t } = useTranslation('advocate');
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -238,7 +245,7 @@ function DeleteThreadDialog({ thread, onClose, onDelete }: DeleteThreadDialogPro
       await onDelete(thread.id);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not delete this conversation.');
+      setError(err instanceof Error ? err.message : threadsDeleteFailed());
     } finally {
       setDeleting(false);
     }
@@ -247,9 +254,9 @@ function DeleteThreadDialog({ thread, onClose, onDelete }: DeleteThreadDialogPro
   return (
     <ConfirmDialog
       open={thread !== null}
-      title="Delete conversation"
-      message={`Delete "${thread?.title ?? ''}"? The advocate's answers in it will be gone. This cannot be undone.`}
-      confirmLabel="Delete conversation"
+      title={t('threadList.deleteDialogTitle')}
+      message={t('threadList.deleteDialogMessage', { title: thread?.title ?? '' })}
+      confirmLabel={t('threadList.deleteConfirm')}
       loading={deleting}
       error={error}
       onConfirm={() => void runDelete()}

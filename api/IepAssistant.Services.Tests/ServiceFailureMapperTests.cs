@@ -108,6 +108,50 @@ public sealed class ServiceFailureMapperTests
         Assert.IsType<NotFoundObjectResult>(action);
     }
 
+    // --- Multilingual plan (2026-10-06) phase 3 review fix: these specific sites' status changed when
+    // they were localized — e.g. AnalysisRunService.CreateRunAsync's "Child not found." moved from an
+    // explicit NotFound (404) to Validation (400) to match main's PRE-localization status, which the
+    // English-substring fallback had produced incidentally. Pinned here at the mapper level (the exact
+    // English message each site's _localizer[...] call resolves to, with the ErrorKind that site now
+    // sets) so a future edit can't silently regress the status again.
+
+    [Theory]
+    [InlineData("This summary has already been sent.")]
+    [InlineData("No draft summary exists yet. Generate one first.")]
+    [InlineData("The meeting summary could not be drafted right now. Please try again.")]
+    public void Validation_MapsTo400_MeetingSummaryStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Validation, message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
+    [Fact]
+    public void Validation_MapsTo400_DraftQuestionUnavailableMessage()
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Validation,
+            "This question could not be answered right now. Please try again.");
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
+    [Theory]
+    [InlineData("Child not found.")]
+    [InlineData("Analysis limit reached for this child.")]
+    [InlineData("You do not have access to this child.")]
+    public void Validation_MapsTo400_AnalysisRunStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Validation, message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
     [Fact]
     public void NullMessage_UsesFallbackMessage()
     {

@@ -98,6 +98,7 @@ public class AnalysisRunServiceTests
             subscriptionService,
             goalRepo,
             claudeClient,
+            TestSupport.TestLocalizers.Ai(),
             NullLogger<AnalysisRunService>.Instance);
     }
 
@@ -313,6 +314,64 @@ public class AnalysisRunServiceTests
         Assert.Equal(5, context.AnalysisRuns.Count());
         Assert.Equal(5, context.UsageRecords.Count(u =>
             u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis"));
+        // Validation (400), not Conflict (409): matches main's status for this message (multilingual
+        // plan 2026-10-06 phase 3 review fix — localizing "Analysis limit reached" must not silently
+        // change its HTTP status).
+        Assert.Equal(ServiceErrorKind.Validation, sixth.ErrorKind);
+    }
+
+    [Fact]
+    public async Task CreateRunAsync_ChildNotFound_ReturnsValidationErrorKind()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        using var context = _fixture.CreateContext();
+
+        // An inactive (soft-deleted) child profile: access is granted (so the earlier permission check
+        // passes), but the active-child lookup does not find it — isolating the "child not found"
+        // branch specifically, rather than the earlier permission branch.
+        var inactiveChild = new ChildProfile { UserId = _fixture.OwnerUserId, FirstName = "Gone", IsActive = false };
+        context.ChildProfiles.Add(inactiveChild);
+        context.SaveChanges();
+        context.ChildAccesses.Add(new ChildAccess
+        {
+            ChildProfileId = inactiveChild.Id,
+            UserId = _fixture.OwnerUserId,
+            Role = AccessRole.Owner,
+            IsActive = true,
+            AcceptedAt = DateTime.UtcNow
+        });
+        context.SaveChanges();
+
+        var service = BuildService(context, new FakeClaudeClient(null));
+
+        var result = await service.CreateRunAsync(
+            inactiveChild.Id, _fixture.OwnerUserId,
+            new List<AnalysisRunSourceRef> { new(AnalysisSourceType.IepDocument, 1) },
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        // Validation (400), not NotFound (404): matches main's status for this message (multilingual
+        // plan 2026-10-06 phase 3 review fix).
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+    }
+
+    [Fact]
+    public async Task GetRunsAsync_UserWithoutAccess_ReturnsValidationErrorKind()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        using var context = _fixture.CreateContext();
+        var service = BuildService(context, new FakeClaudeClient(null));
+
+        var stranger = new User { Email = "stranger@example.com", PasswordHash = "x", FirstName = "S", LastName = "T" };
+        context.Users.Add(stranger);
+        context.SaveChanges();
+
+        var result = await service.GetRunsAsync(_fixture.ChildId, stranger.Id, CancellationToken.None);
+
+        Assert.False(result.Success);
+        // Validation (400), not Forbidden (403): matches main's status for this message (multilingual
+        // plan 2026-10-06 phase 3 review fix).
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
     }
 
     [Fact]
@@ -1967,5 +2026,87 @@ public class AnalysisRunServiceTests
             otherChildId, AnalysisSourceType.IepDocument, iepId, _fixture.OwnerUserId, CancellationToken.None);
 
         Assert.False(result.Success);
+    }
+
+    // ------------------------------------------------------------------ multilingual plan phase 3
+
+    [Fact]
+    public async Task CreateRunAsync_UnderSpanishCulture_CapturesSpanishOnTheRun()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+        using var context = _fixture.CreateContext();
+        var service = BuildService(context, new FakeClaudeClient(null));
+
+        ServiceResult<AnalysisRunModel> result;
+        using (IepAssistant.Services.Localization.CultureScope.For("es"))
+        {
+            result = await service.CreateRunAsync(
+                _fixture.ChildId, _fixture.OwnerUserId,
+                new List<AnalysisRunSourceRef> { new(AnalysisSourceType.IepDocument, iepId) },
+                CancellationToken.None);
+        }
+
+        Assert.True(result.Success);
+        Assert.Equal("es", result.Data!.GeneratedLanguage);
+        var run = context.AnalysisRuns.Find(result.Data!.Id)!;
+        Assert.Equal("es", run.Language);
+    }
+
+    [Fact]
+    public async Task CreateRunAsync_UnderEnglishCulture_CapturesEnglishOnTheRun()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+        using var context = _fixture.CreateContext();
+        var service = BuildService(context, new FakeClaudeClient(null));
+
+        var result = await service.CreateRunAsync(
+            _fixture.ChildId, _fixture.OwnerUserId,
+            new List<AnalysisRunSourceRef> { new(AnalysisSourceType.IepDocument, iepId) },
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("en", result.Data!.GeneratedLanguage);
+    }
+
+    [Fact]
+    public async Task ExecuteRunAsync_RunCreatedUnderSpanish_AppendsResponseLanguageLine_EvenWithNoAmbientCultureAtExecuteTime()
+    {
+        // The defining case for a background worker: CreateRunAsync captures "es" while a request
+        // was active, but by the time AnalysisRunWorker calls ExecuteRunAsync there is no ambient
+        // request culture at all — CultureScope.For(run.Language) must re-establish it from the
+        // persisted column, not from whatever happens to be ambient on the worker's thread.
+        using var _fixture = new AnalysisRunTestFixture();
+        var iepId = _fixture.SeedIepDocument();
+
+        int runId;
+        using (var createContext = _fixture.CreateContext())
+        {
+            var createService = BuildService(createContext, new FakeClaudeClient(null));
+            ServiceResult<AnalysisRunModel> created;
+            using (IepAssistant.Services.Localization.CultureScope.For("es"))
+            {
+                created = await createService.CreateRunAsync(
+                    _fixture.ChildId, _fixture.OwnerUserId,
+                    new List<AnalysisRunSourceRef> { new(AnalysisSourceType.IepDocument, iepId) },
+                    CancellationToken.None);
+            }
+            runId = created.Data!.Id;
+        }
+
+        // No CultureScope wraps this — simulating the worker's own ambient (default) culture.
+        var client = new ScriptedClaudeClient(BuildSourceJson());
+        using (var execContext = _fixture.CreateContext())
+        {
+            var execService = BuildService(execContext, client);
+            await execService.ExecuteRunAsync(runId, CancellationToken.None);
+        }
+
+        var spanishMarker = IepAssistant.Services.Localization.ResponseLanguage.SystemLine(System.Globalization.CultureInfo.GetCultureInfo("es"));
+        Assert.Contains(spanishMarker, client.Requests[0].SystemPrompt);
+
+        using var verifyContext = _fixture.CreateContext();
+        Assert.Equal("es", verifyContext.AnalysisRuns.Find(runId)!.Language);
     }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format-date';
 import { getSharedDrafts } from '../api/shared-drafts-api';
@@ -15,6 +16,7 @@ interface RevisionSwitcherProps {
  *  can jump back to what they agreed to before. Renders nothing for a
  *  single-revision document (nothing to switch between) or while loading. */
 export function RevisionSwitcher({ childId, documentInstanceId, currentRevisionId }: RevisionSwitcherProps) {
+  const { t } = useTranslation('shared-drafts');
   const [siblings, setSiblings] = useState<SharedDraftRevisionDto[] | null>(null);
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export function RevisionSwitcher({ childId, documentInstanceId, currentRevisionI
   if (!siblings || siblings.length <= 1) return null;
 
   return (
-    <nav aria-label="Revision history" data-testid="revision-switcher">
+    <nav aria-label={t('revisionSwitcher.navLabel')} data-testid="revision-switcher">
       <ul className="flex flex-wrap gap-2">
         {siblings.map((rev) => {
           const isCurrent = rev.id === currentRevisionId;
@@ -55,8 +57,13 @@ export function RevisionSwitcher({ childId, documentInstanceId, currentRevisionI
                     : 'border-brand-slate-200 text-brand-slate-600 hover:bg-brand-slate-50'
                 )}
               >
-                Revision {rev.revisionNumber} · {formatDate(rev.sharedAt)}
-                {rev.status !== 'Active' ? ` (${rev.status})` : ''}
+                {rev.status !== 'Active'
+                  ? t('revisionSwitcher.itemWithStatus', {
+                      number: rev.revisionNumber,
+                      date: formatDate(rev.sharedAt),
+                      status: t(`status.${rev.status}`, { defaultValue: rev.status }),
+                    })
+                  : t('revisionSwitcher.item', { number: rev.revisionNumber, date: formatDate(rev.sharedAt) })}
               </Link>
             </li>
           );

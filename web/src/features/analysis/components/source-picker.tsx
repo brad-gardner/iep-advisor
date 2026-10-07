@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAnalysisSources } from "../hooks/use-analysis-sources";
@@ -21,6 +22,11 @@ interface SourcePickerProps {
 }
 
 export function SourcePicker({ childId, isRunning, onRun }: SourcePickerProps) {
+  // `etr-documents` and `common` aren't `SourcePicker`'s own namespace keys —
+  // included so their Spanish data is loaded before `etrLabel`/`iepLabel`
+  // (plain functions, not this hook's `t`) call `evaluationTypeLabel`/
+  // `documentMeetingTypeLabel` from render (see docs/i18n/README.md).
+  const { t } = useTranslation(["analysis", "etr-documents", "common"]);
   const { sources, isLoading } = useAnalysisSources(childId);
   const [selected, setSelected] = useState<Map<string, SourceOption>>(
     new Map()
@@ -88,33 +94,33 @@ export function SourcePicker({ childId, isRunning, onRun }: SourcePickerProps) {
 
   return (
     <Card data-testid="analysis-source-picker">
-      <h2 className="font-serif mb-1">New Analysis</h2>
+      <h2 className="font-serif mb-1">{t("sourcePicker.heading")}</h2>
       <p className="text-sm text-brand-slate-500 mb-4">
-        Select one or more documents to analyze together.
+        {t("sourcePicker.body")}
       </p>
 
       {isLoading ? (
-        <p className="text-sm text-brand-slate-500">Loading documents…</p>
+        <p className="text-sm text-brand-slate-500">{t("sourcePicker.loading")}</p>
       ) : !hasAnySource ? (
         <p className="text-sm text-brand-slate-500">
-          No documents available yet. Add an IEP, ETR, or progress report first.
+          {t("sourcePicker.empty")}
         </p>
       ) : (
         <div className="space-y-4">
           <SourceCheckboxGroup
-            title="IEPs"
+            title={t("sourcePicker.iepsGroup")}
             options={iepOptions}
             selected={selectedKeys}
             onToggle={toggle}
           />
           <SourceCheckboxGroup
-            title="ETRs"
+            title={t("sourcePicker.etrsGroup")}
             options={etrOptions}
             selected={selectedKeys}
             onToggle={toggle}
           />
           <SourceCheckboxGroup
-            title="Progress Reports"
+            title={t("sourcePicker.progressReportsGroup")}
             options={progressReportOptions}
             selected={selectedKeys}
             onToggle={toggle}
@@ -129,7 +135,7 @@ export function SourcePicker({ childId, isRunning, onRun }: SourcePickerProps) {
           disabled={selected.size === 0}
           data-testid="run-analysis-button"
         >
-          Run analysis
+          {t("sourcePicker.run")}
         </Button>
       </div>
     </Card>

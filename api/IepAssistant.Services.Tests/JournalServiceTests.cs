@@ -1,8 +1,11 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -30,7 +33,7 @@ public sealed class JournalServiceTests : IDisposable
 
     private ApplicationDbContext CreateContext() => new(_options);
 
-    private static JournalService CreateService(ApplicationDbContext ctx) => new(ctx, new AccessService(ctx));
+    private static JournalService CreateService(ApplicationDbContext ctx) => new(ctx, new AccessService(ctx), TestSupport.TestLocalizers.Messages());
 
     private sealed record Family(int OwnerId, int CoParentId, int ViewerId, int StrangerId, int ChildId, int OtherChildId);
 
@@ -430,6 +433,46 @@ public sealed class JournalServiceTests : IDisposable
 
         Assert.True(result.Success, result.Message);
         Assert.False(await ctx.JournalEntries.AnyAsync(j => j.Id == id));
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 3: the collapsed "not found" (unknown/inaccessible child or entry) always carries
+    // ServiceErrorKind.NotFound, never Forbidden — see the class doc — so Spanish wording never changes
+    // status routing. See IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure.
+
+    [Fact]
+    public async Task GetForChild_ByStranger_UnderEnglishCulture_MessageIsEnglish()
+    {
+        var f = SeedFamily("journalen");
+
+        using var _ = CultureScope.For("en");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).GetForChildAsync(f.ChildId, f.StrangerId);
+
+        Assert.False(result.Success);
+        Assert.Equal("Child profile not found.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+    }
+
+    [Fact]
+    public async Task GetForChild_ByStranger_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        var f = SeedFamily("journales");
+
+        using var _ = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).GetForChildAsync(f.ChildId, f.StrangerId);
+
+        Assert.False(result.Success);
+        Assert.Equal("Perfil del hijo no encontrado.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    private sealed class TestController : ControllerBase
+    {
     }
 
     public void Dispose() => _connection.Dispose();

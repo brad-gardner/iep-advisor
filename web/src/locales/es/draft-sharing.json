@@ -1,0 +1,76 @@
+{
+  "shareWithFamilyLabel": "Compartir con la familia",
+  "documentStatus": {
+    "Draft": "Borrador",
+    "Finalizing": "Finalizando",
+    "Finalized": "Finalizado"
+  },
+  "converge": {
+    "loading": "Cargando vista de convergencia…",
+    "loadErrorDefault": "No se pudo cargar la vista de convergencia.",
+    "notSharedYet": "Este borrador aún no se ha compartido con la familia.",
+    "sharedLine": "Revisión {{number}} compartida el {{date}}",
+    "shareAgainLabel": "Compartir de nuevo",
+    "acknowledgedByHeading": "Revisado por",
+    "acknowledgedLine": "{{name}} · {{date}}",
+    "changesSinceLastShare": "Cambios desde la última vez que se compartió",
+    "openResponsesHeading": "Respuestas abiertas",
+    "noOpenResponses": "No hay nada pendiente de respuesta.",
+    "resolvedHeading": "Resueltas"
+  },
+  "familySummary": {
+    "loading": "Cargando resumen familiar…",
+    "loadErrorDefault": "No se pudo cargar el resumen familiar.",
+    "heading": "Resumen familiar",
+    "draftWithAi": "Redactar con IA",
+    "summaryLabel": "Resumen para la familia",
+    "saveChanges": "Guardar cambios",
+    "savedToast": "Borrador guardado",
+    "saveErrorDefault": "No se pudieron guardar sus cambios.",
+    "sendToFamily": "Enviar a la familia",
+    "draftErrorDefault": "No se pudo redactar un resumen.",
+    "sendErrorDefault": "No se pudo enviar el resumen.",
+    "sentToast": "Resumen enviado a la familia",
+    "sentLine": "Enviado el {{date}}",
+    "sentLineByName": "Enviado el {{date}} por {{name}}",
+    "confirmTitle": "Enviar resumen familiar",
+    "confirmBody": "Esto enviará el resumen anterior a:",
+    "confirmSend": "Enviar",
+    "recipientLine": "{{name}} ({{email}})"
+  },
+  "resolveDialog": {
+    "title": "Responder y resolver",
+    "quotedPrefix": "{{name}} · {{kind}}",
+    "replyLabel": "Respuesta (enviada a la familia)",
+    "resolvedInDraftLabel": "Resuelto en el borrador (no se necesita respuesta)",
+    "needsReplyOrResolved": "Agregue una respuesta o marque \"resuelto en el borrador\".",
+    "resolveButton": "Resolver",
+    "submitErrorDefault": "No se pudo resolver esta respuesta."
+  },
+  "responseCard": {
+    "replyHeading": "Respuesta",
+    "repliedBy": "{{name}} respondió",
+    "replyResolveButton": "Responder / resolver"
+  },
+  "sharedToast": "Compartido como revisión {{number}}",
+  "shareModal": {
+    "loadErrorDefault": "No se pudieron cargar los destinatarios.",
+    "loadingRecipients": "Cargando destinatarios…",
+    "policyDisabledTitle": "El uso compartido de borradores con la familia está deshabilitado",
+    "policyDisabledBody": "Este distrito ha deshabilitado el uso compartido de borradores con la familia. Pida a un administrador del distrito que lo habilite antes de compartir.",
+    "willBeSharedWith": "Se compartirá con",
+    "noRecipients": "Aún no hay cuentas de familiares o estudiantes vinculadas.",
+    "supersedeTitle": "Esto reemplazará la revisión {{number}}",
+    "lastSharedPrefix": "Compartido por última vez el {{date}}. ",
+    "supersedeBody": "La familia verá esto como la revisión más reciente, con los cambios resaltados.",
+    "noteLabel": "Nota para la familia (opcional)",
+    "shareErrorDefault": "No se pudo compartir este borrador.",
+    "shareButton": "Compartir"
+  },
+  "sharedBanner": {
+    "titleLine": "Compartido como revisión {{number}} el {{date}}",
+    "openResponses_one": "{{count}} respuesta abierta de la familia.",
+    "openResponses_other": "{{count}} respuestas abiertas de la familia.",
+    "noOpenResponses": "Aún no hay respuestas abiertas."
+  }
+}

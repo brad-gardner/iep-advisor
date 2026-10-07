@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Markdown } from '@/components/ui/markdown';
@@ -79,6 +80,7 @@ const PAGE_PIN_THRESHOLD_PX = 96;
  * it because the reader asked for that.
  */
 export function MessageList({ childId, messages, pending, streaming, announcement, handlers }: MessageListProps) {
+  const { t } = useTranslation('advocate');
   const scrollerRef = useRef<HTMLDivElement>(null);
   const tailRef = useRef<HTMLDivElement>(null);
   const announcementText = useMemo(() => (announcement ? markdownToPlainText(announcement.text) : ''), [announcement]);
@@ -184,7 +186,7 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
         onScroll={onScroll}
         tabIndex={0}
         role="region"
-        aria-label="Conversation"
+        aria-label={t('page.conversationLabel')}
         // `relative` is load-bearing, not decoration: the sr-only speaker labels inside the bubbles
         // ("You said: ", "Advocate: ") are `position: absolute`, and an absolutely-positioned box is
         // only clipped by an ancestor's `overflow` when that ancestor is also its containing block.
@@ -207,6 +209,7 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
                 citations={m.citations}
                 suggestions={m.suggestions}
                 truncated={m.truncated}
+                generatedLanguage={m.generatedLanguage}
                 handlers={handlers}
               />
             ),
@@ -230,7 +233,7 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
             ) : (
               streaming.tools.length === 0 && (
                 <p className="text-xs text-brand-slate-500" data-testid="advocate-thinking">
-                  The advocate is thinking…
+                  {t('messageList.thinking')}
                 </p>
               )
             )}
@@ -270,7 +273,7 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
             data-testid="advocate-jump-latest"
           >
             <ArrowDown className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-            New answer
+            {t('messageList.newAnswer')}
           </Button>
         </div>
       )}

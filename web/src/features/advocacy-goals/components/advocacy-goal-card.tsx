@@ -1,7 +1,9 @@
+import { useTranslation } from 'react-i18next';
 import { ChevronUp, ChevronDown, Pencil, Trash2 } from 'lucide-react';
 import type { AdvocacyGoal } from '@/types/api';
 import { Badge } from '@/components/ui/badge';
 import { Markdown } from '@/components/ui/markdown';
+import { advocacyGoalCategoryLabel } from '../lib/category-label';
 
 interface AdvocacyGoalCardProps {
   goal: AdvocacyGoal;
@@ -22,6 +24,7 @@ export function AdvocacyGoalCard({
   onEdit,
   onDelete,
 }: AdvocacyGoalCardProps) {
+  const { t } = useTranslation('advocacy-goals');
   return (
     <div className="bg-white rounded-card p-4 border border-brand-slate-200 flex gap-3" data-testid="goal-card">
       {(onMoveUp || onMoveDown) && (
@@ -31,7 +34,7 @@ export function AdvocacyGoalCard({
             disabled={isFirst}
             className="p-1 text-brand-slate-300 hover:text-brand-slate-600 disabled:opacity-30 transition-colors"
             data-testid="goal-move-up"
-            aria-label="Move goal up"
+            aria-label={t('card.moveUp')}
           >
             <ChevronUp size={16} strokeWidth={1.8} aria-hidden="true" />
           </button>
@@ -40,7 +43,7 @@ export function AdvocacyGoalCard({
             disabled={isLast}
             className="p-1 text-brand-slate-300 hover:text-brand-slate-600 disabled:opacity-30 transition-colors"
             data-testid="goal-move-down"
-            aria-label="Move goal down"
+            aria-label={t('card.moveDown')}
           >
             <ChevronDown size={16} strokeWidth={1.8} aria-hidden="true" />
           </button>
@@ -51,7 +54,7 @@ export function AdvocacyGoalCard({
         {goal.category && (
           <div className="mb-1">
             <Badge variant={goal.category === 'academic' || goal.category === 'services' ? 'success' : goal.category === 'behavioral' ? 'warning' : 'neutral'}>
-              {goal.category}
+              {advocacyGoalCategoryLabel(goal.category)}
             </Badge>
           </div>
         )}
@@ -65,7 +68,7 @@ export function AdvocacyGoalCard({
               onClick={onEdit}
               className="p-1.5 text-brand-slate-300 hover:text-brand-teal-500 transition-colors"
               data-testid="goal-edit"
-              aria-label="Edit goal"
+              aria-label={t('card.edit')}
             >
               <Pencil size={16} strokeWidth={1.8} aria-hidden="true" />
             </button>
@@ -75,7 +78,7 @@ export function AdvocacyGoalCard({
               onClick={onDelete}
               className="p-1.5 text-brand-slate-300 hover:text-brand-danger-700 transition-colors"
               data-testid="goal-delete"
-              aria-label="Delete goal"
+              aria-label={t('card.delete')}
             >
               <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />
             </button>

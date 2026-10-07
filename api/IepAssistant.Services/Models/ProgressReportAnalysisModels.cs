@@ -82,5 +82,11 @@ public class ProgressReportAnalysisModel
     public List<ParentGoalSnapshot> ParentGoalsSnapshot { get; set; } = [];
     public List<IepGoalSnapshot> IepGoalsSnapshot { get; set; } = [];
     public string? ErrorMessage { get; set; }
+
+    /// <summary>"en" | "es" | null — the language this analysis was generated in (multilingual plan
+    /// 2026-10-06 phase 3); null means English, including every analysis generated before this was
+    /// tracked.</summary>
+    public string? GeneratedLanguage { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }

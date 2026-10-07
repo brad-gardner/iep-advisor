@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -679,6 +680,27 @@ public sealed class HomeServiceTests : IDisposable
             var result = await CreateService(ctx).GetForUserAsync(studentUserId);
             Assert.Null(result.Data!.Student!.WorkspaceNudge);
         }
+    }
+
+    // Multilingual plan (2026-10-06) phase 3: the student-home workspace nudge renders in the UI
+    // culture — English under "en", Spanish under "es".
+    [Fact]
+    public async Task StudentHome_WorkspaceNudge_UnderSpanishCulture_IsSpanish()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School Es");
+        var studentUserId = _db.SeedUser("student-es@example.com", UserRole.Student, "Stu", "Dentes");
+        var studentId = _db.Student(schoolId, "Stu", "Dentes");
+        _db.StudentProfile(studentId, studentUserId);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).GetForUserAsync(studentUserId);
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal(
+            "Agregue sus fortalezas, intereses y metas a su espacio de autogestión.",
+            result.Data!.Student!.WorkspaceNudge);
     }
 
     [Fact]

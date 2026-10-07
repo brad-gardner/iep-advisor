@@ -310,6 +310,21 @@ prerequisite for marketing Spanish, not for shipping it.
 | `child-links` | Phase 2 | Draft — needs native review |
 | `sharing` | Phase 2 | Draft — needs native review |
 | `knowledge-base` | Phase 2 (page chrome only — article bodies stay English) | Draft — needs native review |
+| `iep-documents` | Phase 3 | Draft — needs native review |
+| `etr-documents` | Phase 3 | Draft — needs native review |
+| `analysis` | Phase 3 | Draft — needs native review |
+| `iep-comparison` | Phase 3 | Draft — needs native review |
+| `iep-versions` | Phase 3 | Draft — needs native review |
+| `progress-reports` | Phase 3 | Draft — needs native review |
+| `goals` | Phase 3 | Draft — needs native review |
+| `advocacy-goals` | Phase 3 | Draft — needs native review |
+| `meeting-prep` | Phase 3 | Draft — needs native review |
+| `journal` | Phase 3 | Draft — needs native review |
+| `advocate` | Phase 3 | Draft — needs native review |
+| `shared-drafts` | Phase 3 | Draft — needs native review |
+| `draft-sharing` | Phase 3 | Draft — needs native review |
+| `meetings` | Phase 3 | Draft — needs native review |
+| `student` | Phase 3 | Draft — needs native review |
 
 ## Tests
 
@@ -384,3 +399,10 @@ prerequisite for marketing Spanish, not for shipping it.
   namespace, not just the one a hand-written regex happened to name.
 - **`<html lang>` follows the active language:** `src/lib/i18n/index.test.ts`
   asserts `document.documentElement.lang` updates on `changeLanguage`.
+
+## Server-side AI language (Phase 3)
+
+- Non-parser prompt builders append `ResponseLanguage.SystemLine(culture)`. It's empty for English, and for Spanish it's a fixed instruction carrying the glossary terms. The IEP/ETR document parsers never get it, and a test enforces that.
+- Persisted AI artifacts store `Language` and expose `generatedLanguage`: analysis runs, meeting prep, advocate messages, family meeting summaries, draft explanations and answers, and progress-report analyses.
+- The web renders `GeneratedLanguageNotice` when that language differs from the viewer's. Nothing is regenerated automatically.
+- Canned AI strings live in `Ai.resx`.

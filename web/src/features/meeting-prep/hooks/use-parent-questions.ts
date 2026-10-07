@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/toast';
+import i18n from '@/lib/i18n';
 import {
   createPrepQuestion,
   deletePrepQuestion,
@@ -21,8 +23,19 @@ export type AddParentQuestionResult = 'added' | 'duplicate' | 'invalid' | 'faile
 export type SaveParentQuestionResult = 'saved' | 'duplicate' | 'invalid' | 'failed';
 export type MoveDirection = 'up' | 'down';
 
-export const QUESTIONS_FORBIDDEN_MESSAGE = "You don't have permission to change these questions.";
-export const QUESTIONS_LOAD_ERROR = 'Could not load your questions.';
+/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
+export type ParentQuestionsLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
+
+// Live `i18n.t()` calls (not frozen constants) — see `docs/i18n/README.md`'s
+// "Display-label helpers" pattern. Exported as functions so a test calls them
+// the same way the hook does, rather than asserting a value frozen at
+// module-load time.
+export function questionsForbiddenMessage(): string {
+  return i18n.t('meeting-prep:forbiddenMessage');
+}
+export function questionsLoadError(): string {
+  return i18n.t('meeting-prep:loadError');
+}
 
 function normalise(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
@@ -45,10 +58,11 @@ function isForbidden(err: unknown): boolean {
  * hide the controls for a viewer whose role changed mid-session.
  */
 export function useParentQuestions(childId: number) {
+  const { t } = useTranslation('meeting-prep');
   const { show } = useToast();
   const [questions, setQuestions] = useState<ParentQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<ParentQuestionsLoadError | null>(null);
   const [isReordering, setIsReordering] = useState(false);
   const [writeForbidden, setWriteForbidden] = useState(false);
   /** Ids with a check-toggle PUT in flight — the checkbox is disabled meanwhile so a
@@ -72,10 +86,10 @@ export function useParentQuestions(childId: number) {
       .then((res) => {
         if (!active) return;
         if (res.success && res.data) setQuestions(res.data);
-        else setLoadError(res.message ?? QUESTIONS_LOAD_ERROR);
+        else setLoadError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
       })
       .catch(() => {
-        if (active) setLoadError(QUESTIONS_LOAD_ERROR);
+        if (active) setLoadError({ kind: 'generic' });
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -90,7 +104,7 @@ export function useParentQuestions(childId: number) {
     (err: unknown, fallback: string | null) => {
       if (isForbidden(err)) {
         setWriteForbidden(true);
-        show({ message: QUESTIONS_FORBIDDEN_MESSAGE, variant: 'error' });
+        show({ message: questionsForbiddenMessage(), variant: 'error' });
       } else if (fallback) {
         show({ message: fallback, variant: 'error' });
       }
@@ -139,7 +153,7 @@ export function useParentQuestions(childId: number) {
         setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, isChecked: applied } : q)));
       } catch (err) {
         setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, isChecked: previous ?? !isChecked } : q)));
-        reportWriteFailure(err, 'Could not update that question.');
+        reportWriteFailure(err, t('updateCheckFailed'));
       } finally {
         setCheckingIds((prev) => {
           const next = new Set(prev);
@@ -148,7 +162,7 @@ export function useParentQuestions(childId: number) {
         });
       }
     },
-    [questions, checkingIds, reportWriteFailure],
+    [questions, checkingIds, reportWriteFailure, t],
   );
 
   const updateText = useCallback(
@@ -218,12 +232,12 @@ export function useParentQuestions(childId: number) {
           [reverted[i], reverted[j]] = [reverted[j], reverted[i]];
           return reverted;
         });
-        reportWriteFailure(err, 'Could not reorder your questions.');
+        reportWriteFailure(err, t('reorderFailed'));
       } finally {
         setIsReordering(false);
       }
     },
-    [childId, questions, isReordering, reportWriteFailure],
+    [childId, questions, isReordering, reportWriteFailure, t],
   );
 
   return {

@@ -1,4 +1,5 @@
 import { useId, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageSquarePlus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -11,6 +12,7 @@ import {
   type AddParentQuestionResult,
   type MoveDirection,
   type ParentQuestion,
+  type ParentQuestionsLoadError,
   type SaveParentQuestionResult,
 } from '../hooks/use-parent-questions';
 import { ParentQuestionRow } from './parent-question-row';
@@ -18,7 +20,7 @@ import { ParentQuestionRow } from './parent-question-row';
 interface ParentQuestionsProps {
   questions: ParentQuestion[];
   isLoading?: boolean;
-  loadError?: string | null;
+  loadError?: ParentQuestionsLoadError | null;
   /** True while an up/down move is being saved; the arrows wait for it. */
   isReordering?: boolean;
   /** Ids with a check-toggle PUT in flight — their checkbox waits for it. */
@@ -32,14 +34,6 @@ interface ParentQuestionsProps {
   /** Viewers see the list but cannot change it. */
   readOnly?: boolean;
 }
-
-const ADD_ERRORS: Record<Exclude<AddParentQuestionResult, 'added'>, string> = {
-  duplicate: 'That question is already on your list.',
-  invalid: `Write a question of up to ${PARENT_QUESTION_MAX_LENGTH} characters.`,
-  failed: 'Could not save your question. Please try again.',
-};
-
-const REMOVE_ERROR = 'Could not remove this question.';
 
 /**
  * "Your questions": the parent's own list for the meeting, next to the
@@ -59,6 +53,7 @@ export function ParentQuestions({
   onRemove,
   readOnly = false,
 }: ParentQuestionsProps) {
+  const { t } = useTranslation(['meeting-prep', 'common']);
   const inputId = useId();
   const [draft, setDraft] = useState('');
   const [adding, setAdding] = useState(false);
@@ -67,6 +62,12 @@ export function ParentQuestions({
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const checkedCount = questions.filter((q) => q.isChecked).length;
+
+  const addErrors: Record<Exclude<AddParentQuestionResult, 'added'>, string> = {
+    duplicate: t('meeting-prep:parentQuestions.duplicateError'),
+    invalid: t('meeting-prep:parentQuestions.invalidError', { max: PARENT_QUESTION_MAX_LENGTH }),
+    failed: t('meeting-prep:parentQuestions.saveFailedError'),
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -78,7 +79,7 @@ export function ParentQuestions({
         setDraft('');
         setError(null);
       } else {
-        setError(ADD_ERRORS[result]);
+        setError(addErrors[result]);
       }
     } finally {
       setAdding(false);
@@ -94,7 +95,7 @@ export function ParentQuestions({
     try {
       const ok = await onRemove(confirmRemove.id);
       if (ok) setConfirmRemove(null);
-      else setRemoveError(REMOVE_ERROR);
+      else setRemoveError(t('meeting-prep:parentQuestions.removeError'));
     } finally {
       setRemoving(false);
     }
@@ -106,30 +107,32 @@ export function ParentQuestions({
     setRemoveError(null);
   };
 
+  const loadErrorMessage = loadError ? (loadError.kind === 'server' ? loadError.message : t('meeting-prep:loadError')) : null;
+
   return (
     <Card data-testid="parent-questions">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <MessageSquarePlus className="h-5 w-5 text-brand-teal-500" strokeWidth={1.8} aria-hidden="true" />
-          <h3 className="font-serif text-[17px] font-semibold text-brand-slate-800">Your questions</h3>
+          <h3 className="font-serif text-[17px] font-semibold text-brand-slate-800">{t('meeting-prep:parentQuestions.heading')}</h3>
         </div>
         {questions.length > 0 && (
           <span className="text-[12px] font-medium text-brand-slate-500">
-            {checkedCount} of {questions.length} asked
+            {t('meeting-prep:parentQuestions.askedCount', { checked: checkedCount, total: questions.length })}
           </span>
         )}
       </div>
-      <p className="mt-1 text-[12px] text-brand-slate-500">Questions you add yourself or accept from the advocate.</p>
+      <p className="mt-1 text-[12px] text-brand-slate-500">{t('meeting-prep:parentQuestions.description')}</p>
 
       {isLoading ? (
-        <div className="mt-3 space-y-2" role="status" aria-label="Loading your questions" data-testid="parent-questions-loading">
+        <div className="mt-3 space-y-2" role="status" aria-label={t('meeting-prep:parentQuestions.loadingLabel')} data-testid="parent-questions-loading">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
         </div>
-      ) : loadError ? (
-        <Notice variant="error" title={loadError} className="mt-3" data-testid="parent-questions-error" />
+      ) : loadErrorMessage ? (
+        <Notice variant="error" title={loadErrorMessage} className="mt-3" data-testid="parent-questions-error" />
       ) : questions.length > 0 ? (
-        <ul className="mt-3 space-y-2" aria-label="Your questions" data-testid="parent-questions-list">
+        <ul className="mt-3 space-y-2" aria-label={t('meeting-prep:parentQuestions.heading')} data-testid="parent-questions-list">
           {questions.map((q, index) => (
             <ParentQuestionRow
               key={q.id}
@@ -151,7 +154,7 @@ export function ParentQuestions({
         </ul>
       ) : (
         <p className="mt-3 text-sm text-brand-slate-500" data-testid="parent-questions-empty">
-          Nothing yet. Add a question below, or accept one the advocate suggests.
+          {t('meeting-prep:parentQuestions.empty')}
         </p>
       )}
 
@@ -164,10 +167,10 @@ export function ParentQuestions({
           <div className="min-w-0 flex-1">
             <Input
               id={inputId}
-              label="Add a question"
+              label={t('meeting-prep:parentQuestions.addLabel')}
               value={draft}
               maxLength={PARENT_QUESTION_MAX_LENGTH}
-              placeholder="What would you like to ask the team?"
+              placeholder={t('meeting-prep:parentQuestions.addPlaceholder')}
               disabled={adding}
               onChange={(e) => {
                 setDraft(e.target.value);
@@ -179,7 +182,7 @@ export function ParentQuestions({
           </div>
           <Button type="submit" variant="secondary" loading={adding} disabled={!draft.trim()} data-testid="parent-questions-add">
             <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-            Add
+            {t('meeting-prep:parentQuestions.add')}
           </Button>
         </form>
       )}
@@ -191,9 +194,9 @@ export function ParentQuestions({
 
       <ConfirmDialog
         open={confirmRemove !== null}
-        title="Remove question"
-        message={confirmRemove ? `Remove "${confirmRemove.text}" from your list?` : ''}
-        confirmLabel="Remove question"
+        title={t('meeting-prep:parentQuestions.removeDialogTitle')}
+        message={confirmRemove ? t('meeting-prep:parentQuestions.removeDialogMessage', { text: confirmRemove.text }) : ''}
+        confirmLabel={t('meeting-prep:parentQuestions.removeConfirm')}
         loading={removing}
         error={removeError}
         onConfirm={() => void remove()}

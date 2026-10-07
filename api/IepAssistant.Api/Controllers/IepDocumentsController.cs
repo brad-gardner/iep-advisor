@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.IepDocuments;
 using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -19,19 +21,22 @@ public class IepDocumentsController : ControllerBase
     private readonly IAccessService _accessService;
     private readonly ISubscriptionService _subscriptionService;
     private readonly IepProcessingQueue _processingQueue;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public IepDocumentsController(
         IIepDocumentService iepDocumentService,
         IIepProcessingService iepProcessingService,
         IAccessService accessService,
         ISubscriptionService subscriptionService,
-        IepProcessingQueue processingQueue)
+        IepProcessingQueue processingQueue,
+        IStringLocalizer<Messages> localizer)
     {
         _iepDocumentService = iepDocumentService;
         _iepProcessingService = iepProcessingService;
         _accessService = accessService;
         _subscriptionService = subscriptionService;
         _processingQueue = processingQueue;
+        _localizer = localizer;
     }
 
     [HttpGet("api/children/{childId}/ieps")]
@@ -53,7 +58,7 @@ public class IepDocumentsController : ControllerBase
         var document = await _iepDocumentService.GetByIdAsync(id, userId, cancellationToken);
 
         if (document == null)
-            return NotFound(ApiResponse<object>.Error("IEP document not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["IepDocumentsApi.NotFound"]));
 
         return Ok(ApiResponse<IepDocumentDto>.SuccessResponse(MapToDto(document)));
     }
@@ -64,7 +69,7 @@ public class IepDocumentsController : ControllerBase
     public async Task<IActionResult> Create(int childId, [FromBody] CreateIepRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var userId = User.GetUserId();
         var model = new CreateIepDocumentModel
@@ -78,10 +83,10 @@ public class IepDocumentsController : ControllerBase
         var result = await _iepDocumentService.CreateAsync(childId, userId, model, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Creation failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["DocumentsApi.CreationFailed"].Value));
 
         var dto = MapToDto(result.Data!);
-        return CreatedAtAction(nameof(GetById), new { id = dto.Id }, ApiResponse<IepDocumentDto>.SuccessResponse(dto, "IEP created successfully"));
+        return CreatedAtAction(nameof(GetById), new { id = dto.Id }, ApiResponse<IepDocumentDto>.SuccessResponse(dto, _localizer["IepDocumentsApi.Created"]));
     }
 
     [HttpPost("api/ieps/{id}/upload")]
@@ -91,17 +96,17 @@ public class IepDocumentsController : ControllerBase
     public async Task<IActionResult> AttachFile(int id, IFormFile file, CancellationToken cancellationToken)
     {
         if (file == null || file.Length == 0)
-            return BadRequest(ApiResponse<object>.Error("No file provided"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["DocumentsApi.NoFileProvided"]));
 
         if (!file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-            return BadRequest(ApiResponse<object>.Error("Only PDF files are supported"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["DocumentsApi.OnlyPdfSupported"]));
 
         // Validate PDF magic bytes
         using var stream = file.OpenReadStream();
         var header = new byte[5];
         var bytesRead = await stream.ReadAsync(header, 0, 5, cancellationToken);
         if (bytesRead < 5 || System.Text.Encoding.ASCII.GetString(header) != "%PDF-")
-            return BadRequest(ApiResponse<object>.Error("File does not appear to be a valid PDF"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["DocumentsApi.InvalidPdf"]));
         stream.Position = 0;
 
         var sanitizedFileName = Path.GetFileName(file.FileName);
@@ -109,19 +114,19 @@ public class IepDocumentsController : ControllerBase
 
         // Check subscription before processing
         if (!await _subscriptionService.HasActiveSubscriptionAsync(userId, cancellationToken))
-            return StatusCode(402, ApiResponse<object>.Error("Active subscription required to upload and process IEP documents"));
+            return StatusCode(402, ApiResponse<object>.Error(_localizer["IepDocumentsApi.SubscriptionRequired"]));
 
         var result = await _iepDocumentService.AttachFileAsync(id, userId, sanitizedFileName, stream, file.Length, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Upload failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["DocumentsApi.UploadFailed"].Value));
 
         var dto = MapToDto(result.Data!);
 
         // Enqueue background processing
         await _processingQueue.EnqueueAsync(dto.Id, cancellationToken);
 
-        return Ok(ApiResponse<IepDocumentDto>.SuccessResponse(dto, "File attached successfully"));
+        return Ok(ApiResponse<IepDocumentDto>.SuccessResponse(dto, _localizer["DocumentsApi.FileAttached"]));
     }
 
     [HttpPut("api/ieps/{id}/metadata")]
@@ -140,14 +145,13 @@ public class IepDocumentsController : ControllerBase
 
         var result = await _iepDocumentService.UpdateMetadataAsync(id, userId, model, cancellationToken);
 
+        // Multilingual plan Phase 3: status came from matching translated text ("not found"), which
+        // breaks once UpdateMetadataAsync's failure messages are localized (see ServiceErrorKind docs).
+        // The service now sets ErrorKind.NotFound/Validation explicitly; use the shared kind-based mapper.
         if (!result.Success)
-        {
-            if (result.Message?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
-                return NotFound(ApiResponse<object>.Error(result.Message));
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Update failed"));
-        }
+            return this.MapServiceFailure(result, _localizer["DocumentsApi.UpdateFailed"]);
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "Metadata updated successfully"));
+        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["IepDocumentsApi.MetadataUpdated"]));
     }
 
     [HttpGet("api/ieps/{id}/download")]
@@ -159,7 +163,7 @@ public class IepDocumentsController : ControllerBase
         var url = await _iepDocumentService.GetDownloadUrlAsync(id, userId, cancellationToken);
 
         if (url == null)
-            return NotFound(ApiResponse<object>.Error("Document not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["DocumentsApi.DocumentNotFound"]));
 
         return Ok(ApiResponse<object>.SuccessResponse(new { url }));
     }
@@ -173,9 +177,9 @@ public class IepDocumentsController : ControllerBase
         var result = await _iepDocumentService.DeleteAsync(id, userId, cancellationToken);
 
         if (!result.Success)
-            return NotFound(ApiResponse<object>.Error(result.Message ?? "Delete failed"));
+            return NotFound(ApiResponse<object>.Error(result.Message ?? _localizer["DocumentsApi.DeleteFailed"].Value));
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "Document deleted successfully"));
+        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["DocumentsApi.DocumentDeleted"]));
     }
 
     [HttpGet("api/ieps/{id}/sections")]
@@ -197,13 +201,13 @@ public class IepDocumentsController : ControllerBase
         var document = await _iepDocumentService.GetByIdAsync(id, userId, cancellationToken);
 
         if (document == null)
-            return NotFound(ApiResponse<object>.Error("Document not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["DocumentsApi.DocumentNotFound"]));
 
         if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return StatusCode(403, ApiResponse<object>.Error("Insufficient permissions"));
+            return StatusCode(403, ApiResponse<object>.Error(_localizer["DocumentsApi.InsufficientPermissions"]));
 
         await _processingQueue.EnqueueAsync(id, cancellationToken);
-        return Accepted(ApiResponse<object>.SuccessResponse(null, "Document queued for processing"));
+        return Accepted(ApiResponse<object>.SuccessResponse(null, _localizer["DocumentsApi.QueuedForProcessing"]));
     }
 
     private static IepDocumentDto MapToDto(IepDocumentModel model) => new()

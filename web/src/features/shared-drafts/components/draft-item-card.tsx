@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageCircleQuestion, Reply } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ export function DraftItemCard({
   otherColumns,
   changeState,
 }: DraftItemCardProps) {
+  const { t } = useTranslation('shared-drafts');
   const ctx = useDraftReviewContext();
   const [askOpen, setAskOpen] = useState(false);
   const [respondOpen, setRespondOpen] = useState(false);
@@ -46,7 +48,7 @@ export function DraftItemCard({
         <h3 className="font-serif text-base text-brand-slate-800">{label}</h3>
         {changeState && (
           <Badge variant={changeState === 'added' ? 'success' : 'warning'}>
-            {changeState === 'added' ? 'Added' : 'Changed'}
+            {changeState === 'added' ? t('itemCard.addedBadge') : t('itemCard.changedBadge')}
           </Badge>
         )}
       </div>
@@ -55,18 +57,14 @@ export function DraftItemCard({
         <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
           {otherColumns.map(({ column, value }) => (
             <div key={column.columnKey}>
-              <dt className="text-[13px] font-medium text-brand-slate-500">{column.label || 'Detail'}</dt>
+              <dt className="text-[13px] font-medium text-brand-slate-500">{column.label || t('frozenSections.detailFallback')}</dt>
               <dd className="text-brand-slate-700"><CellValue column={column} value={value} /></dd>
             </div>
           ))}
         </dl>
       )}
 
-      {myResponseCount > 0 && (
-        <p className="text-xs text-brand-slate-500">
-          You already responded to this — see "My responses" below.
-        </p>
-      )}
+      {myResponseCount > 0 && <p className="text-xs text-brand-slate-500">{t('itemCard.alreadyResponded')}</p>}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-brand-slate-100 pt-3">
         <ExplainPanel target={{ kind: 'item', fieldKey, rowId }} data-testid={`explain-${fieldKey}-${rowId ?? 'field'}`} />
@@ -77,7 +75,7 @@ export function DraftItemCard({
           data-testid={`ask-question-open-${fieldKey}-${rowId ?? 'field'}`}
         >
           <MessageCircleQuestion className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-          Ask a question
+          {t('itemCard.askQuestionButton')}
         </Button>
         {canRespond && (
           <Button
@@ -87,7 +85,7 @@ export function DraftItemCard({
             data-testid={`respond-open-${fieldKey}-${rowId ?? 'field'}`}
           >
             <Reply className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-            Respond
+            {t('itemCard.respondButton')}
           </Button>
         )}
       </div>

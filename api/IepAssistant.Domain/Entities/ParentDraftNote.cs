@@ -26,6 +26,12 @@ public class ParentDraftNote : BaseEntity, IAuditableEntity
     /// </summary>
     public string? CitationsJson { get; set; }
 
+    /// <summary>The language ("en"/"es") <see cref="Answer"/> was generated in (multilingual plan
+    /// 2026-10-06 phase 3, migration AddAiArtifactLanguage) — set from the asking parent's UI culture
+    /// when <c>DraftQuestionService.AskAsync</c> runs (synchronous within the request). Null means
+    /// English, including every note answered before this column existed.</summary>
+    public string? Language { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public int? CreatedById { get; set; }

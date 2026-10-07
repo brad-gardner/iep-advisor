@@ -77,6 +77,8 @@ export interface AdvocateMessageDto {
   suggestions: AdvocateSuggestion[];
   truncated: boolean;
   createdAt: string;
+  /** The language this AI-generated assistant message was written in (`AddAiArtifactLanguage`); null/unknown = English. Not meaningful on a `User` message. */
+  generatedLanguage?: 'en' | 'es' | null;
 }
 
 export interface AdvocateThreadDetailDto extends AdvocateThreadDto {
@@ -123,6 +125,8 @@ export interface AdvocateDoneFrame {
   suggestions: AdvocateSuggestion[];
   truncated: boolean;
   disclaimer: string;
+  /** The language this answer was generated in; null/unknown = English — mirrors `AdvocateMessageDto.generatedLanguage`. */
+  generatedLanguage?: 'en' | 'es' | null;
 }
 
 export interface AdvocateErrorFrame {

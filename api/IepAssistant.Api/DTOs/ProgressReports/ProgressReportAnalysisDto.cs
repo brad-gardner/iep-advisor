@@ -4,6 +4,9 @@ namespace IepAssistant.Api.DTOs.ProgressReports;
 
 public class ProgressReportAnalysisDto
 {
+    /// <summary>Language the AI generated this in ("en"/"es"); null = English (pre-i18n rows).</summary>
+    public string? GeneratedLanguage { get; set; }
+
     public int Id { get; set; }
     public int ProgressReportId { get; set; }
     public string Status { get; set; } = string.Empty;

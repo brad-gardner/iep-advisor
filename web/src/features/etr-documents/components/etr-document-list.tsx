@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Trash2, Eye, FileSearch } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,12 +9,11 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
+import { formatDate } from "@/lib/format-date";
+import { documentStatusLabel } from "@/lib/document-status-label";
 import { remove as removeEtr } from "../api/etr-documents-api";
-import {
-  DOCUMENT_STATE_LABELS,
-  EVALUATION_TYPE_LABELS,
-  type EtrDocument,
-} from "../types";
+import { evaluationTypeLabel, documentStateLabel } from "../lib/document-labels";
+import type { EtrDocument } from "../types";
 
 interface EtrDocumentListProps {
   etrs: EtrDocument[];
@@ -32,16 +32,12 @@ const STATUS_VARIANTS: Record<
   error: "error",
 };
 
-function formatDate(value: string | null): string {
-  if (!value) return "";
-  return new Date(value).toLocaleDateString();
-}
-
 export function EtrDocumentList({
   etrs,
   isLoading,
   onDeleted,
 }: EtrDocumentListProps) {
+  const { t } = useTranslation(["etr-documents", "iep-documents"]);
   const { show: showToast } = useToast();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
@@ -49,13 +45,13 @@ export function EtrDocumentList({
   if (isLoading) {
     return (
       <div className="flex justify-center py-4">
-        <Spinner size="sm" label="Loading ETR documents…" />
+        <Spinner size="sm" label={t("documentList.loading")} />
       </div>
     );
   }
 
   if (etrs.length === 0) {
-    return <EmptyState icon={FileSearch} title="No ETR documents yet." />;
+    return <EmptyState icon={FileSearch} title={t("documentList.empty")} />;
   }
 
   const confirmDelete = async () => {
@@ -65,7 +61,7 @@ export function EtrDocumentList({
     try {
       const response = await removeEtr(id);
       if (response.success) {
-        showToast({ message: "ETR deleted", variant: "success" });
+        showToast({ message: t("documentList.deletedToast"), variant: "success" });
         setPendingDeleteId(null);
         onDeleted();
       }
@@ -82,8 +78,8 @@ export function EtrDocumentList({
         const title =
           etr.fileName ||
           (etr.evaluationType
-            ? EVALUATION_TYPE_LABELS[etr.evaluationType] || etr.evaluationType
-            : `ETR #${etr.id}`);
+            ? evaluationTypeLabel(etr.evaluationType)
+            : t("documentIdFallback", { id: etr.id }));
 
         return (
           <Card key={etr.id} className="p-3" data-testid="etr-document-card">
@@ -99,8 +95,7 @@ export function EtrDocumentList({
                   </Link>
                   {etr.evaluationType && (
                     <Badge variant="neutral">
-                      {EVALUATION_TYPE_LABELS[etr.evaluationType] ||
-                        etr.evaluationType}
+                      {evaluationTypeLabel(etr.evaluationType)}
                     </Badge>
                   )}
                   {etr.documentState && (
@@ -109,19 +104,18 @@ export function EtrDocumentList({
                         etr.documentState === "final" ? "success" : "neutral"
                       }
                     >
-                      {DOCUMENT_STATE_LABELS[etr.documentState] ||
-                        etr.documentState}
+                      {documentStateLabel(etr.documentState)}
                     </Badge>
                   )}
                   <Badge variant={STATUS_VARIANTS[etr.status] || "neutral"}>
-                    {etr.status}
+                    {documentStatusLabel(etr.status)}
                   </Badge>
                 </div>
                 <div className="flex gap-3 text-[11px] text-brand-slate-500 mt-1">
                   {etr.evaluationDate && (
-                    <span>Evaluated: {formatDate(etr.evaluationDate)}</span>
+                    <span>{t("documentList.evaluated", { date: formatDate(etr.evaluationDate) })}</span>
                   )}
-                  <span>Created {formatDate(etr.createdAt)}</span>
+                  <span>{t("documentList.created", { date: formatDate(etr.createdAt) })}</span>
                 </div>
               </div>
               <div className="flex gap-2 ml-3 shrink-0">
@@ -135,7 +129,7 @@ export function EtrDocumentList({
                     strokeWidth={1.8}
                     aria-hidden="true"
                   />
-                  View
+                  {t("documentList.view")}
                 </Link>
                 <Button
                   variant="danger"
@@ -149,7 +143,7 @@ export function EtrDocumentList({
                     strokeWidth={1.8}
                     aria-hidden="true"
                   />
-                  Delete
+                  {t("documentList.delete")}
                 </Button>
               </div>
             </div>
@@ -159,9 +153,9 @@ export function EtrDocumentList({
 
       <ConfirmDialog
         open={pendingDeleteId !== null}
-        title="Delete ETR document"
-        message="Delete this ETR document? This cannot be undone."
-        confirmLabel="Delete ETR"
+        title={t("documentList.deleteDialogTitle")}
+        message={t("documentList.deleteDialogMessage")}
+        confirmLabel={t("documentList.deleteConfirmLabel")}
         loading={deletingId !== null}
         onConfirm={confirmDelete}
         onCancel={() => setPendingDeleteId(null)}

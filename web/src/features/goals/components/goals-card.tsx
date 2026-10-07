@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -17,9 +18,11 @@ interface GoalsCardProps {
  *  `?goal={id}` deep link (from the home obligation row / a notification)
  *  that scrolls to and focuses the matching card once it has loaded. */
 export function GoalsCard({ studentId }: GoalsCardProps) {
+  const { t } = useTranslation(['goals', 'common']);
   const { goals, isLoading, error, retry, applyObservation, applyStatusChange } = useStudentGoals(studentId);
   const [searchParams] = useSearchParams();
   const focusGoalId = searchParams.get('goal');
+  const errorMessage = error ? (error.kind === 'server' ? error.message : t('common:ui.genericError')) : null;
 
   // Scroll/focus the deep-linked card exactly once, when it first exists. `goals` is a fresh
   // array after every log/status update, so keying only on it would yank focus back to the
@@ -36,13 +39,13 @@ export function GoalsCard({ studentId }: GoalsCardProps) {
 
   return (
     <Card data-testid="goals-card">
-      <h2 className="mb-4 font-serif text-lg text-brand-slate-800">Goals</h2>
+      <h2 className="mb-4 font-serif text-lg text-brand-slate-800">{t('goals:goalsCard.heading')}</h2>
 
-      {error && (
+      {errorMessage && (
         <div role="alert">
-          <Notice variant="error" title={error}>
+          <Notice variant="error" title={errorMessage}>
             <Button size="sm" variant="secondary" onClick={retry} data-testid="goals-card-retry">
-              Try again
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
@@ -58,8 +61,8 @@ export function GoalsCard({ studentId }: GoalsCardProps) {
       {!error && !isLoading && goals && goals.length === 0 && (
         <EmptyState
           icon={Target}
-          title="No goals yet"
-          description="Goals appear here once a finalized IEP or ETR includes them."
+          title={t('goals:goalsCard.emptyTitle')}
+          description={t('goals:goalsCard.emptyDescription')}
         />
       )}
 

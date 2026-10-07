@@ -1,0 +1,63 @@
+{
+  "pageTitle": "Comparar IEP",
+  "loading": "Cargando comparación…",
+  "backToChild": "Volver al hijo",
+  "failedTitle": "Error en la comparación",
+  "failedGeneric": "No se pudo cargar la comparación. Inténtelo de nuevo.",
+  "title": "Comparación de IEP",
+  "comparisonBreadcrumb": "Comparación",
+  "summary": {
+    "goalsAdded": "Metas agregadas",
+    "goalsRemoved": "Metas eliminadas",
+    "goalsModified": "Metas modificadas",
+    "goalsUnchanged": "Metas sin cambios",
+    "sectionsAdded": "Secciones agregadas",
+    "sectionsRemoved": "Secciones eliminadas",
+    "flagsResolved": "Señales resueltas",
+    "flagsPersisting": "Señales persistentes",
+    "newFlags": "Señales nuevas"
+  },
+  "goalChanges": {
+    "heading": "Cambios en las metas",
+    "empty": "No se detectaron cambios en las metas entre estos IEP."
+  },
+  "goalDiff": {
+    "fieldTargetCriteria": "Criterios de la meta",
+    "fieldBaseline": "Línea de base",
+    "fieldMeasurementMethod": "Método de medición",
+    "fieldTimeframe": "Plazo",
+    "fieldGoalText": "Texto de la meta",
+    "added": "Agregada",
+    "removed": "Eliminada",
+    "modified": "Modificada",
+    "changes": "Cambios",
+    "none": "(ninguno)"
+  },
+  "sectionDiff": {
+    "heading": "Cambios en las secciones"
+  },
+  "timeline": {
+    "noDate": "Sin fecha",
+    "goalsCount_one": "{{count}} meta",
+    "goalsCount_other": "{{count}} metas",
+    "sectionsCount_one": "{{count}} sección",
+    "sectionsCount_other": "{{count}} secciones",
+    "redFlagsCount_one": "{{count}} señal de alerta",
+    "redFlagsCount_other": "{{count}} señales de alerta",
+    "compare": "Comparar",
+    "empty": "No se encontraron IEP. Suba al menos dos IEP para ver una cronología y comparar versiones."
+  },
+  "redFlagResolution": {
+    "heading": "Resolución de señales de alerta",
+    "resolvedTitle": "Resueltas",
+    "resolvedDescription": "Estos problemas fueron atendidos",
+    "persistingTitle": "Persistentes",
+    "persistingDescription": "Estos problemas persisten",
+    "newTitle": "Nuevas",
+    "newDescription": "Se encontraron nuevas inquietudes"
+  },
+  "loadErrors": {
+    "loadFailed": "No se pudo cargar la comparación",
+    "loadError": "Ocurrió un error al cargar la comparación"
+  }
+}

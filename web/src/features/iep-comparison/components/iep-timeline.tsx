@@ -1,20 +1,17 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowRightLeft } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { getActiveLanguage } from '@/lib/i18n/format';
+import { formatDate } from '@/lib/format-date';
+import { documentMeetingTypeLabel } from '@/lib/meeting-labels';
+import { documentStatusLabel } from '@/lib/document-status-label';
 import { useIepTimeline } from '../hooks/use-iep-timeline';
 import type { TimelineEntry } from '@/types/api';
 
-const MEETING_TYPE_LABELS: Record<string, string> = {
-  initial: 'Initial IEP',
-  annual_review: 'Annual Review',
-  amendment: 'Amendment',
-  reevaluation: 'Reevaluation',
-};
-
 function TimelineEntryCard({ entry }: { entry: TimelineEntry }) {
+  const { t } = useTranslation('iep-comparison');
   const statusVariant = entry.status === 'parsed' ? 'success' : entry.status === 'error' ? 'error' : 'neutral';
 
   return (
@@ -22,34 +19,28 @@ function TimelineEntryCard({ entry }: { entry: TimelineEntry }) {
       <div className="flex justify-between items-start">
         <div>
           <p className="font-serif text-[17px] font-semibold text-brand-slate-800">
-            {entry.iepDate
-              ? new Date(entry.iepDate).toLocaleDateString(getActiveLanguage(), {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })
-              : 'No date'}
+            {entry.iepDate ? formatDate(entry.iepDate) : t('timeline.noDate')}
           </p>
           <div className="flex items-center gap-2 mt-1.5">
             {entry.meetingType && (
               <Badge variant="info">
-                {MEETING_TYPE_LABELS[entry.meetingType] || entry.meetingType}
+                {documentMeetingTypeLabel(entry.meetingType)}
               </Badge>
             )}
-            <Badge variant={statusVariant}>{entry.status}</Badge>
+            <Badge variant={statusVariant}>{documentStatusLabel(entry.status)}</Badge>
           </div>
         </div>
       </div>
       <div className="flex gap-4 mt-3 text-[13px] text-brand-slate-500">
-        <span>
-          <span className="font-medium text-brand-slate-700">{entry.goalCount}</span> goals
+        <span className="font-medium text-brand-slate-700">
+          {t('timeline.goalsCount', { count: entry.goalCount })}
         </span>
-        <span>
-          <span className="font-medium text-brand-slate-700">{entry.sectionCount}</span> sections
+        <span className="font-medium text-brand-slate-700">
+          {t('timeline.sectionsCount', { count: entry.sectionCount })}
         </span>
         {entry.redFlagCount > 0 && (
-          <span className="text-brand-danger-700">
-            <span className="font-medium">{entry.redFlagCount}</span> red flags
+          <span className="font-medium text-brand-danger-700">
+            {t('timeline.redFlagsCount', { count: entry.redFlagCount })}
           </span>
         )}
       </div>
@@ -66,6 +57,7 @@ function CompareLink({
   currentId: number;
   previousId: number;
 }) {
+  const { t } = useTranslation('iep-comparison');
   return (
     <div className="flex justify-center py-1">
       <Link
@@ -73,13 +65,14 @@ function CompareLink({
         className="inline-flex items-center gap-1.5 text-[12px] font-medium text-brand-teal-500 hover:text-brand-teal-600 transition-colors"
       >
         <ArrowRightLeft className="w-3.5 h-3.5" strokeWidth={1.8} />
-        Compare
+        {t('timeline.compare')}
       </Link>
     </div>
   );
 }
 
 export function IepTimeline({ childId }: { childId: number }) {
+  const { t } = useTranslation(['iep-comparison', 'iep-documents']);
   const { timeline, isLoading } = useIepTimeline(childId);
 
   if (isLoading) {
@@ -93,7 +86,7 @@ export function IepTimeline({ childId }: { childId: number }) {
   if (!timeline || timeline.ieps.length === 0) {
     return (
       <p className="text-[13px] text-brand-slate-500 py-4">
-        No IEPs found. Upload at least two IEPs to see a timeline and compare versions.
+        {t('timeline.empty')}
       </p>
     );
   }

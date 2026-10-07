@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
 import { Markdown } from '@/components/ui/markdown';
 import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
+import { draftResponseKindLabel } from '@/features/shared-drafts/lib/draft-response-kind-label';
 import { resolveResponse } from '../api/draft-sharing-api';
-import { DRAFT_RESPONSE_KIND_LABELS, type DraftResponseDto } from '../types';
+import type { DraftResponseDto } from '../types';
 
 interface ResolveResponseDialogProps {
   open: boolean;
@@ -21,6 +23,7 @@ const MAX_REPLY_LENGTH = 2000;
  *  one of a reply or "resolved in the draft" — enforced client-side too so the
  *  submit button can't fire an empty resolve. */
 export function ResolveResponseDialog({ open, onClose, response, onResolved }: ResolveResponseDialogProps) {
+  const { t } = useTranslation(['draft-sharing', 'common']);
   const [reply, setReply] = useState('');
   const [resolvedInDraft, setResolvedInDraft] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,6 +46,8 @@ export function ResolveResponseDialog({ open, onClose, response, onResolved }: R
 
   const canSubmit = (reply.trim().length > 0 || resolvedInDraft) && !isMarkdownOverLimit(reply, MAX_REPLY_LENGTH);
 
+  // Click-triggered (never a mount effect), so translating inline here is
+  // safe — see `AcknowledgeControl` for the same reasoning.
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
@@ -57,21 +62,21 @@ export function ResolveResponseDialog({ open, onClose, response, onResolved }: R
         onResolved(res.data);
         onClose();
       } else {
-        setError(res.message ?? 'Could not resolve this response.');
+        setError(res.message || t('resolveDialog.submitErrorDefault'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not resolve this response.'));
+      setError(apiErrorMessage(err, t('resolveDialog.submitErrorDefault')));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Modal open={open} onClose={onClose} preventClose={isSubmitting} title="Reply and resolve" data-testid="resolve-response-dialog">
+    <Modal open={open} onClose={onClose} preventClose={isSubmitting} title={t('resolveDialog.title')} data-testid="resolve-response-dialog">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="rounded-card border border-brand-slate-200 p-3 text-sm text-brand-slate-600">
           <p className="font-medium text-brand-slate-800">
-            {response.parentName} · {DRAFT_RESPONSE_KIND_LABELS[response.kind]}
+            {t('resolveDialog.quotedPrefix', { name: response.parentName, kind: draftResponseKindLabel(response.kind) })}
           </p>
           <Markdown content={response.text} className="mt-1" data-testid="resolve-response-quoted-text" />
         </div>
@@ -83,7 +88,7 @@ export function ResolveResponseDialog({ open, onClose, response, onResolved }: R
         )}
 
         <RichTextEditor
-          label="Reply (sent to the family)"
+          label={t('resolveDialog.replyLabel')}
           value={reply}
           onChange={setReply}
           maxLength={MAX_REPLY_LENGTH}
@@ -98,16 +103,16 @@ export function ResolveResponseDialog({ open, onClose, response, onResolved }: R
             onChange={(e) => setResolvedInDraft(e.target.checked)}
             data-testid="resolve-in-draft-checkbox"
           />
-          Resolved in the draft (no reply needed)
+          {t('resolveDialog.resolvedInDraftLabel')}
         </label>
-        {!canSubmit && <p className="text-xs text-brand-slate-500">Add a reply, or check "resolved in the draft".</p>}
+        {!canSubmit && <p className="text-xs text-brand-slate-500">{t('resolveDialog.needsReplyOrResolved')}</p>}
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
-            Cancel
+            {t('common:ui.cancel')}
           </Button>
           <Button type="submit" loading={isSubmitting} disabled={!canSubmit} data-testid="resolve-response-submit">
-            Resolve
+            {t('resolveDialog.resolveButton')}
           </Button>
         </div>
       </form>

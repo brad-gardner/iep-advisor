@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
@@ -14,19 +15,22 @@ public class ProgressReportService : IProgressReportService
     private readonly IAccessService _accessService;
     private readonly IBlobStorageService _blobStorage;
     private readonly ApplicationDbContext _context;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public ProgressReportService(
         IProgressReportRepository repository,
         IIepDocumentRepository iepRepository,
         IAccessService accessService,
         IBlobStorageService blobStorage,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        IStringLocalizer<Messages> localizer)
     {
         _repository = repository;
         _iepRepository = iepRepository;
         _accessService = accessService;
         _blobStorage = blobStorage;
         _context = context;
+        _localizer = localizer;
     }
 
     public async Task<IEnumerable<ProgressReportModel>> GetByIepIdAsync(int iepDocumentId, int userId, CancellationToken cancellationToken = default)
@@ -60,10 +64,10 @@ public class ProgressReportService : IProgressReportService
     {
         var iep = await _iepRepository.GetByIdAsync(iepDocumentId, cancellationToken);
         if (iep == null)
-            return ServiceResult<ProgressReportModel>.FailureResult("IEP not found.");
+            return ServiceResult<ProgressReportModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["ProgressReports.IepNotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(iep.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult<ProgressReportModel>.FailureResult("IEP not found.");
+            return ServiceResult<ProgressReportModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["ProgressReports.IepNotFound"]);
 
         var entity = new ProgressReport
         {
@@ -80,20 +84,20 @@ public class ProgressReportService : IProgressReportService
         await _repository.AddAsync(entity, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult<ProgressReportModel>.SuccessResult(MapToModel(entity), "Progress report created.");
+        return ServiceResult<ProgressReportModel>.SuccessResult(MapToModel(entity), _localizer["ProgressReports.Created"]);
     }
 
     public async Task<ServiceResult<ProgressReportModel>> AttachFileAsync(int id, int userId, string fileName, Stream fileStream, long fileSize, CancellationToken cancellationToken = default)
     {
         var report = await _repository.GetByIdWithIepAsync(id, cancellationToken);
         if (report == null)
-            return ServiceResult<ProgressReportModel>.FailureResult("Progress report not found.");
+            return ServiceResult<ProgressReportModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["ProgressReports.NotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(report.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult<ProgressReportModel>.FailureResult("Progress report not found.");
+            return ServiceResult<ProgressReportModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["ProgressReports.NotFound"]);
 
         if (report.Status == "processing")
-            return ServiceResult<ProgressReportModel>.FailureResult("Cannot replace file while document is being processed.");
+            return ServiceResult<ProgressReportModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["ProgressReports.ProcessingInProgress"]);
 
         if (!string.IsNullOrEmpty(report.BlobUri))
             await _blobStorage.DeleteAsync(report.BlobUri, cancellationToken);
@@ -111,17 +115,17 @@ public class ProgressReportService : IProgressReportService
         _repository.Update(report);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult<ProgressReportModel>.SuccessResult(MapToModel(report), "File attached.");
+        return ServiceResult<ProgressReportModel>.SuccessResult(MapToModel(report), _localizer["ProgressReports.FileAttached"]);
     }
 
     public async Task<ServiceResult> UpdateMetadataAsync(int id, int userId, CreateProgressReportModel model, CancellationToken cancellationToken = default)
     {
         var report = await _repository.GetByIdWithIepAsync(id, cancellationToken);
         if (report == null)
-            return ServiceResult.FailureResult("Progress report not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["ProgressReports.NotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(report.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult.FailureResult("Progress report not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["ProgressReports.NotFound"]);
 
         if (model.ReportingPeriodStart.HasValue)
             report.ReportingPeriodStart = model.ReportingPeriodStart;
@@ -134,17 +138,17 @@ public class ProgressReportService : IProgressReportService
         _repository.Update(report);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult("Metadata updated.");
+        return ServiceResult.SuccessResult(_localizer["ProgressReports.MetadataUpdated"]);
     }
 
     public async Task<ServiceResult> DeleteAsync(int id, int userId, CancellationToken cancellationToken = default)
     {
         var report = await _repository.GetByIdWithIepAsync(id, cancellationToken);
         if (report == null)
-            return ServiceResult.FailureResult("Progress report not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["ProgressReports.NotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(report.ChildProfileId, userId, AccessRole.Owner, cancellationToken))
-            return ServiceResult.FailureResult("Progress report not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["ProgressReports.NotFound"]);
 
         if (!string.IsNullOrEmpty(report.BlobUri))
             await _blobStorage.DeleteAsync(report.BlobUri, cancellationToken);
@@ -154,7 +158,7 @@ public class ProgressReportService : IProgressReportService
         _repository.Update(report);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult("Progress report deleted.");
+        return ServiceResult.SuccessResult(_localizer["ProgressReports.Deleted"]);
     }
 
     public async Task<string?> GetDownloadUrlAsync(int id, int userId, CancellationToken cancellationToken = default)

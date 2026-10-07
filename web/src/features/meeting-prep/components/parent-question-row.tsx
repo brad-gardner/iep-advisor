@@ -1,4 +1,5 @@
 import { useId, useState, type ButtonHTMLAttributes, type FormEvent, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Check, ChevronDown, ChevronUp, Pencil, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,12 +25,6 @@ interface ParentQuestionRowProps {
   onEdit: (id: number, text: string) => Promise<SaveParentQuestionResult>;
   onRemoveRequest: (question: ParentQuestion) => void;
 }
-
-const EDIT_ERRORS: Record<Exclude<SaveParentQuestionResult, 'saved'>, string> = {
-  duplicate: 'That question is already on your list.',
-  invalid: `Write a question of up to ${PARENT_QUESTION_MAX_LENGTH} characters.`,
-  failed: 'Could not save your change. Please try again.',
-};
 
 function IconButton({ className, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
@@ -60,6 +55,7 @@ export function ParentQuestionRow({
   onEdit,
   onRemoveRequest,
 }: ParentQuestionRowProps) {
+  const { t } = useTranslation(['meeting-prep', 'common']);
   const id = useId();
   const checkboxId = `${id}-check`;
   const editId = `${id}-edit`;
@@ -68,6 +64,12 @@ export function ParentQuestionRow({
   const [draft, setDraft] = useState(question.text);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const editErrors: Record<Exclude<SaveParentQuestionResult, 'saved'>, string> = {
+    duplicate: t('meeting-prep:parentQuestionRow.duplicateError'),
+    invalid: t('meeting-prep:parentQuestionRow.invalidError', { max: PARENT_QUESTION_MAX_LENGTH }),
+    failed: t('meeting-prep:parentQuestionRow.saveFailedError'),
+  };
 
   const startEdit = () => {
     setDraft(question.text);
@@ -92,7 +94,7 @@ export function ParentQuestionRow({
     try {
       const result = await onEdit(question.id, draft);
       if (result === 'saved') setEditing(false);
-      else setError(EDIT_ERRORS[result]);
+      else setError(editErrors[result]);
     } finally {
       setSaving(false);
     }
@@ -126,7 +128,7 @@ export function ParentQuestionRow({
           <form onSubmit={(e) => void saveEdit(e)} className="min-w-0 flex-1" data-testid="parent-question-edit-form">
             <Input
               id={editId}
-              aria-label="Edit question"
+              aria-label={t('meeting-prep:parentQuestionRow.editQuestionLabel')}
               value={draft}
               maxLength={PARENT_QUESTION_MAX_LENGTH}
               autoFocus
@@ -147,10 +149,10 @@ export function ParentQuestionRow({
             <div className="mt-2 flex gap-2">
               <Button type="submit" size="sm" loading={saving} disabled={!draft.trim()} data-testid="parent-question-save">
                 <Check className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                Save
+                {t('meeting-prep:parentQuestionRow.save')}
               </Button>
               <Button type="button" size="sm" variant="ghost" disabled={saving} onClick={cancelEdit}>
-                Cancel
+                {t('common:ui.cancel')}
               </Button>
             </div>
           </form>
@@ -166,11 +168,11 @@ export function ParentQuestionRow({
           </label>
         )}
         {!readOnly && !editing && (
-          <div className="flex shrink-0 items-center" role="group" aria-label={`Actions for: ${question.text}`}>
+          <div className="flex shrink-0 items-center" role="group" aria-label={t('meeting-prep:parentQuestionRow.actionsFor', { text: question.text })}>
             <IconButton
               onClick={() => onMove(question.id, 'up')}
               disabled={isFirst || isReordering}
-              aria-label={`Move up: ${question.text}`}
+              aria-label={t('meeting-prep:parentQuestionRow.moveUp', { text: question.text })}
               data-testid="parent-question-move-up"
             >
               <ChevronUp className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
@@ -178,17 +180,17 @@ export function ParentQuestionRow({
             <IconButton
               onClick={() => onMove(question.id, 'down')}
               disabled={isLast || isReordering}
-              aria-label={`Move down: ${question.text}`}
+              aria-label={t('meeting-prep:parentQuestionRow.moveDown', { text: question.text })}
               data-testid="parent-question-move-down"
             >
               <ChevronDown className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
             </IconButton>
-            <IconButton onClick={startEdit} aria-label={`Edit question: ${question.text}`} data-testid="parent-question-edit">
+            <IconButton onClick={startEdit} aria-label={t('meeting-prep:parentQuestionRow.editQuestion', { text: question.text })} data-testid="parent-question-edit">
               <Pencil className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
             </IconButton>
             <IconButton
               onClick={() => onRemoveRequest(question)}
-              aria-label={`Remove question: ${question.text}`}
+              aria-label={t('meeting-prep:parentQuestionRow.removeQuestion', { text: question.text })}
               data-testid="parent-question-remove"
             >
               <X className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />

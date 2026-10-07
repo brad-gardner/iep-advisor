@@ -2,11 +2,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Advocate;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.Extensions;
 using IepAssistant.Api.Streaming;
-using IepAssistant.Services.Implementations;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -23,17 +24,19 @@ public class AdvocateController : ControllerBase
     public static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(15);
 
     private readonly IAdvocateService _service;
+    private readonly IStringLocalizer<Ai> _localizer;
 
-    public AdvocateController(IAdvocateService service)
+    public AdvocateController(IAdvocateService service, IStringLocalizer<Ai> localizer)
     {
         _service = service;
+        _localizer = localizer;
     }
 
     [HttpGet("api/children/{childId:int}/advocate/threads")]
     public async Task<IActionResult> ListThreads(int childId, CancellationToken ct)
     {
         var result = await _service.ListThreadsAsync(User.GetUserId(), childId, ct);
-        if (!result.Success) return MapFailure(result.Message ?? "Not found");
+        if (!result.Success) return this.MapServiceFailure(result);
         return Ok(ApiResponse<List<AdvocateThreadDto>>.SuccessResponse(result.Data!.Select(MapThread).ToList()));
     }
 
@@ -41,7 +44,7 @@ public class AdvocateController : ControllerBase
     public async Task<IActionResult> CreateThread(int childId, [FromBody] CreateAdvocateThreadRequest? request, CancellationToken ct)
     {
         var result = await _service.CreateThreadAsync(User.GetUserId(), childId, request?.Title, ct);
-        if (!result.Success) return MapFailure(result.Message ?? "Creation failed");
+        if (!result.Success) return this.MapServiceFailure(result);
         return Created($"/api/advocate/threads/{result.Data!.Id}", ApiResponse<AdvocateThreadDto>.SuccessResponse(MapThread(result.Data)));
     }
 
@@ -49,7 +52,7 @@ public class AdvocateController : ControllerBase
     public async Task<IActionResult> GetThread(int id, CancellationToken ct)
     {
         var result = await _service.GetThreadAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return MapFailure(result.Message ?? "Not found");
+        if (!result.Success) return this.MapServiceFailure(result);
         var t = result.Data!;
         var dto = new AdvocateThreadDetailDto
         {
@@ -60,7 +63,9 @@ public class AdvocateController : ControllerBase
             UpdatedAt = t.UpdatedAt,
             LastMessageAt = t.LastMessageAt,
             Messages = t.Messages.Select(MapMessage).ToList(),
-            Disclaimer = AdvocatePrompts.Disclaimer
+            // The viewer's OWN current language, independent of whatever language any individual
+            // message was generated in (see each message's own GeneratedLanguage for that).
+            Disclaimer = _localizer["Advocate.Disclaimer"]
         };
         return Ok(ApiResponse<AdvocateThreadDetailDto>.SuccessResponse(dto));
     }
@@ -69,7 +74,7 @@ public class AdvocateController : ControllerBase
     public async Task<IActionResult> RenameThread(int id, [FromBody] RenameAdvocateThreadRequest request, CancellationToken ct)
     {
         var result = await _service.RenameThreadAsync(User.GetUserId(), id, request.Title, ct);
-        if (!result.Success) return MapFailure(result.Message ?? "Update failed");
+        if (!result.Success) return this.MapServiceFailure(result);
         return Ok(ApiResponse<object>.SuccessResponse(new { }));
     }
 
@@ -77,7 +82,7 @@ public class AdvocateController : ControllerBase
     public async Task<IActionResult> DeleteThread(int id, CancellationToken ct)
     {
         var result = await _service.DeleteThreadAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return MapFailure(result.Message ?? "Not found");
+        if (!result.Success) return this.MapServiceFailure(result);
         return Ok(ApiResponse<object>.SuccessResponse(new { }));
     }
 
@@ -86,7 +91,7 @@ public class AdvocateController : ControllerBase
     public async Task<IActionResult> GetChildContext(int childId, CancellationToken ct)
     {
         var result = await _service.GetChildContextAsync(User.GetUserId(), childId, ct);
-        if (!result.Success) return MapFailure(result.Message ?? "Not found");
+        if (!result.Success) return this.MapServiceFailure(result);
         return Ok(ApiResponse<AdvocateChildContextDto>.SuccessResponse(new AdvocateChildContextDto { StateCode = result.Data!.StateCode }));
     }
 
@@ -94,7 +99,7 @@ public class AdvocateController : ControllerBase
     public async Task<IActionResult> GetUsage(CancellationToken ct)
     {
         var result = await _service.GetUsageAsync(User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message ?? "Not found");
+        if (!result.Success) return this.MapServiceFailure(result);
         var u = result.Data!;
         return Ok(ApiResponse<AdvocateUsageDto>.SuccessResponse(new AdvocateUsageDto { Used = u.Used, Limit = u.Limit, SubscriptionActive = u.SubscriptionActive }));
     }
@@ -114,7 +119,7 @@ public class AdvocateController : ControllerBase
         await using var enumerator = events.GetAsyncEnumerator(ct);
 
         if (!await enumerator.MoveNextAsync())
-            return StatusCode(StatusCodes.Status500InternalServerError, ApiResponse<object>.Error(AdvocatePrompts.UnavailableMessage));
+            return StatusCode(StatusCodes.Status500InternalServerError, ApiResponse<object>.Error(_localizer["Advocate.UnavailableMessage"]));
 
         var first = enumerator.Current;
         if (first.Kind == AdvocateStreamEventKind.Error)
@@ -169,22 +174,22 @@ public class AdvocateController : ControllerBase
             Citations = (evt.Citations ?? new List<AdvocateCitation>()).Select(MapCitation).ToList(),
             Suggestions = (evt.Suggestions ?? new List<AdvocateSuggestion>()).Select(MapSuggestion).ToList(),
             Truncated = evt.Truncated,
-            Disclaimer = evt.Disclaimer ?? AdvocatePrompts.Disclaimer
+            // evt.Disclaimer is always set by AdvocateService on a Done event — this is a defensive
+            // fallback for the DTO's non-nullable string, not a real "no disclaimer" case (multilingual
+            // plan 2026-10-06 phase 3 review fix: dropped the unreachable ?? AdvocatePrompts.Disclaimer
+            // fallback — the actual localized text always comes from evt.Disclaimer itself).
+            Disclaimer = evt.Disclaimer ?? string.Empty,
+            // Carried straight through — no ?? English defaulting at the DTO layer (multilingual plan
+            // 2026-10-06 phase 3 review fix, for consistency with every other GeneratedLanguage-bearing
+            // model/DTO, where null is a meaningful "unknown/legacy" value the CLIENT interprets as
+            // English, not something the server collapses away).
+            GeneratedLanguage = evt.GeneratedLanguage
         }, ct),
-        AdvocateStreamEventKind.Error => SseWriter.WriteEventAsync(body, "error", new AdvocateErrorFrame { Code = evt.Code ?? AdvocateErrorCodes.Unavailable, Message = evt.Message ?? AdvocatePrompts.UnavailableMessage }, ct),
+        // evt.Message is always set by AdvocateService on an Error event — same defensive-only fallback
+        // as Disclaimer above; dropped the unreachable ?? AdvocatePrompts.UnavailableMessage fallback.
+        AdvocateStreamEventKind.Error => SseWriter.WriteEventAsync(body, "error", new AdvocateErrorFrame { Code = evt.Code ?? AdvocateErrorCodes.Unavailable, Message = evt.Message ?? string.Empty }, ct),
         _ => Task.CompletedTask
     };
-
-    /// <summary>"not found" (unknown child/thread or no access) ⇒ 404; a Viewer who lacks Collaborator
-    /// access ⇒ 403 (same distinction <see cref="SendMessage"/> makes); anything else ⇒ 400.</summary>
-    private IActionResult MapFailure(string message)
-    {
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-        if (message == AdvocateService.CollaboratorRequired)
-            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Error(message));
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 
     private static AdvocateThreadDto MapThread(AdvocateThreadModel t) => new()
     {
@@ -204,6 +209,7 @@ public class AdvocateController : ControllerBase
         Citations = m.Citations.Select(MapCitation).ToList(),
         Suggestions = m.Suggestions.Select(MapSuggestion).ToList(),
         Truncated = m.Truncated,
+        GeneratedLanguage = m.GeneratedLanguage,
         CreatedAt = m.CreatedAt
     };
 

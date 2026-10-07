@@ -109,6 +109,10 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Property<int?>("InputTokens")
                         .HasColumnType("int");
 
+                    b.Property<string>("Language")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<int?>("OutputTokens")
                         .HasColumnType("int");
 
@@ -201,6 +205,10 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("OverallRedFlags")
                         .HasColumnType("nvarchar(max)");
@@ -3183,6 +3191,10 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<string>("Language")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<DateTime?>("MeetingDate")
                         .HasColumnType("datetime2");
 
@@ -3276,6 +3288,10 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.Property<DateTime?>("GeneratedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
 
                     b.Property<int>("MeetingId")
                         .HasColumnType("int");
@@ -3648,6 +3664,10 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Property<int?>("CreatedById")
                         .HasColumnType("int");
 
+                    b.Property<string>("Language")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<int>("ParentUserId")
                         .HasColumnType("int");
 
@@ -3902,6 +3922,10 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Property<string>("IepGoalsSnapshot")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Language")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<string>("ParentGoalsSnapshot")
                         .HasColumnType("nvarchar(max)");
 
@@ -4154,6 +4178,10 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.Property<DateTime>("GeneratedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
 
                     b.Property<int>("SharedDraftRevisionId")
                         .HasColumnType("int");

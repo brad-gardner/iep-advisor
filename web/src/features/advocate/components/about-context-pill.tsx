@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { aboutContextLabel, type AboutRef } from '../lib/about';
 
 interface AboutContextPillProps {
@@ -14,6 +15,7 @@ interface AboutContextPillProps {
  * conversation about. Derived client-side; the raw `about` token is never shown.
  */
 export function AboutContextPill({ about, label, onClear }: AboutContextPillProps) {
+  const { t } = useTranslation('advocate');
   return (
     <div className="flex items-center gap-2" data-testid="advocate-about-pill">
       <span className="inline-flex max-w-full items-center gap-1 rounded-badge border border-brand-teal-100 bg-brand-teal-50 px-2.5 py-1 text-xs font-medium text-brand-teal-600">
@@ -22,7 +24,7 @@ export function AboutContextPill({ about, label, onClear }: AboutContextPillProp
           <button
             type="button"
             onClick={onClear}
-            aria-label="Clear the conversation context"
+            aria-label={t('pill.clearAria')}
             className="ml-0.5 rounded-full p-0.5 text-brand-teal-500 hover:bg-brand-teal-100 focus:outline-none focus:ring-1 focus:ring-brand-teal-500"
             data-testid="advocate-about-clear"
           >
@@ -30,7 +32,7 @@ export function AboutContextPill({ about, label, onClear }: AboutContextPillProp
           </button>
         )}
       </span>
-      <span className="text-xs text-brand-slate-500">Your first question starts a new conversation about it.</span>
+      <span className="text-xs text-brand-slate-500">{t('pill.hint')}</span>
     </div>
   );
 }

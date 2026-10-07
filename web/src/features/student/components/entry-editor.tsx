@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 
@@ -24,6 +25,7 @@ export function EntryEditor({
   onCancel,
   testIdPrefix,
 }: EntryEditorProps) {
+  const { t } = useTranslation(['student', 'common']);
   const [content, setContent] = useState(initialContent);
   const [isShareable, setIsShareable] = useState(initialShareable);
   const [saving, setSaving] = useState(false);
@@ -48,7 +50,7 @@ export function EntryEditor({
         value={content}
         onChange={setContent}
         placeholder={placeholder}
-        aria-label="Entry content"
+        aria-label={t('entryEditor.contentAriaLabel')}
         data-testid={`${testIdPrefix}-content`}
       />
       <label htmlFor={checkboxId} className="flex items-center gap-2 text-sm text-brand-slate-600">
@@ -60,7 +62,7 @@ export function EntryEditor({
           className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-500"
           data-testid={checkboxId}
         />
-        Share this with my team
+        {t('entryEditor.shareLabel')}
       </label>
       <div className="flex items-center gap-2">
         <Button
@@ -72,7 +74,7 @@ export function EntryEditor({
           {submitLabel}
         </Button>
         <Button variant="ghost" onClick={onCancel} data-testid={`${testIdPrefix}-cancel`}>
-          Cancel
+          {t('common:ui.cancel')}
         </Button>
       </div>
     </div>

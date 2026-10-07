@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -15,10 +16,7 @@ import { useEtrProcessing } from '../hooks/use-etr-processing';
 import { useEtrSections } from '../hooks/use-etr-sections';
 import { useEtrAnalysis } from '../hooks/use-etr-analysis';
 import { getDownloadUrl } from '../api/etr-documents-api';
-import {
-  DOCUMENT_STATE_LABELS,
-  EVALUATION_TYPE_LABELS,
-} from '../types';
+import { evaluationTypeLabel, documentStateLabel } from '../lib/document-labels';
 import { EtrUpload } from './etr-upload';
 import { EtrProcessingBanner } from './etr-processing-banner';
 import { EtrErrorBanner } from './etr-error-banner';
@@ -26,6 +24,7 @@ import { EtrSectionsList } from './etr-sections-list';
 import { EtrAnalysisTab } from './etr-analysis-tab';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { formatDate } from '@/lib/format-date';
+import { documentStatusLabel } from '@/lib/document-status-label';
 import { AskAdvocateButton } from '@/features/advocate/components/ask-advocate-button';
 
 type TabKey = 'overview' | 'sections' | 'analysis';
@@ -33,6 +32,7 @@ type TabKey = 'overview' | 'sections' | 'analysis';
 const IN_FLIGHT = new Set(['uploaded', 'processing']);
 
 export function EtrViewerPage() {
+  const { t } = useTranslation(['etr-documents', 'iep-documents']);
   usePageTitle('ETR');
   const { id } = useParams<{ id: string }>();
   const documentId = Number(id);
@@ -71,52 +71,52 @@ export function EtrViewerPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading evaluation…" />
+        <Spinner label={t('loadingEvaluation')} />
       </div>
     );
   }
 
   if (!etr) {
-    return <EmptyState icon={FileX} title="ETR document not found." />;
+    return <EmptyState icon={FileX} title={t('viewerPage.notFound')} />;
   }
 
   const headerTitle =
     etr.fileName ||
     (etr.evaluationType
-      ? EVALUATION_TYPE_LABELS[etr.evaluationType] || etr.evaluationType
-      : `ETR #${etr.id}`);
+      ? evaluationTypeLabel(etr.evaluationType)
+      : t('documentIdFallback', { id: etr.id }));
 
   const sectionsTabDisabled = etr.status !== 'parsed';
   const sectionsTabHint =
     etr.status === 'created'
-      ? 'Upload a document to see sections'
+      ? t('viewerPage.hintUploadFirst')
       : etr.status === 'error'
-        ? 'Processing failed'
+        ? t('viewerPage.hintProcessingFailed')
         : IN_FLIGHT.has(etr.status)
-          ? 'Processing...'
+          ? t('viewerPage.hintProcessing')
           : undefined;
 
   const analysisTabDisabled = etr.status !== 'parsed';
   const analysisTabHint =
     etr.status === 'created'
-      ? 'Upload a document first'
+      ? t('viewerPage.hintUploadFirstAnalysis')
       : etr.status === 'error'
-        ? 'Processing failed'
+        ? t('viewerPage.hintProcessingFailed')
         : IN_FLIGHT.has(etr.status)
-          ? 'Processing...'
+          ? t('viewerPage.hintProcessing')
           : undefined;
 
   const TABS: { key: TabKey; label: string; disabled: boolean; hint?: string }[] = [
-    { key: 'overview', label: 'Overview', disabled: false },
+    { key: 'overview', label: t('viewerPage.tabOverview'), disabled: false },
     {
       key: 'sections',
-      label: 'Sections',
+      label: t('viewerPage.tabSections'),
       disabled: sectionsTabDisabled,
       hint: sectionsTabHint,
     },
     {
       key: 'analysis',
-      label: 'Analysis',
+      label: t('viewerPage.tabAnalysis'),
       disabled: analysisTabDisabled,
       hint: analysisTabHint,
     },
@@ -129,17 +129,17 @@ export function EtrViewerPage() {
         className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" strokeWidth={1.8} aria-hidden="true" />
-        Back to child
+        {t('backToChild')}
       </Link>
 
       <PageHeader
         title={headerTitle}
-        subtitle="Evaluation Team Report"
+        subtitle={t('evaluationTeamReport')}
         actions={
           <AskAdvocateButton
             childId={etr.childProfileId}
             about={{ kind: 'etr', id: etr.id }}
-            label={etr.evaluationDate ? `ETR from ${formatDate(etr.evaluationDate)}` : undefined}
+            label={etr.evaluationDate ? t('askAbout.etr', { date: formatDate(etr.evaluationDate) }) : undefined}
             data-testid="etr-ask-advocate"
           />
         }
@@ -148,18 +148,18 @@ export function EtrViewerPage() {
       <div className="flex items-center gap-3 flex-wrap">
         {etr.evaluationType && (
           <Badge variant="neutral">
-            {EVALUATION_TYPE_LABELS[etr.evaluationType] || etr.evaluationType}
+            {evaluationTypeLabel(etr.evaluationType)}
           </Badge>
         )}
         {etr.documentState && (
           <Badge variant={etr.documentState === 'final' ? 'success' : 'neutral'}>
-            {DOCUMENT_STATE_LABELS[etr.documentState] || etr.documentState}
+            {documentStateLabel(etr.documentState)}
           </Badge>
         )}
-        <Badge variant="neutral">{etr.status}</Badge>
+        <Badge variant="neutral">{documentStatusLabel(etr.status)}</Badge>
         {etr.evaluationDate && (
           <span className="text-[13px] text-brand-slate-500">
-            Evaluated: {new Date(etr.evaluationDate).toLocaleDateString()}
+            {t('viewerPage.evaluated', { date: formatDate(etr.evaluationDate) })}
           </span>
         )}
         {isPolling && (
@@ -168,7 +168,7 @@ export function EtrViewerPage() {
             data-testid="etr-polling-indicator"
           >
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-amber-500 animate-pulse" />
-            Refreshing...
+            {t('viewerPage.refreshing')}
           </span>
         )}
       </div>
@@ -186,7 +186,7 @@ export function EtrViewerPage() {
             ) : (
               <ChevronDown className="w-3.5 h-3.5 mr-1" strokeWidth={1.8} aria-hidden="true" />
             )}
-            Notes
+            {t('viewerPage.notes')}
           </Button>
           {notesExpanded && (
             <div className="mt-1 bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200">
@@ -221,11 +221,6 @@ export function EtrViewerPage() {
               }`}
             >
               {tab.label}
-              {tab.disabled && tab.hint && (
-                <span className="ml-2 text-[10px] uppercase tracking-wide text-brand-slate-300">
-                  {tab.hint === 'Soon' ? 'Soon' : ''}
-                </span>
-              )}
             </button>
           );
         })}
@@ -279,6 +274,7 @@ interface OverviewTabProps {
 }
 
 function OverviewTab({ etrId, etr, onUploaded }: OverviewTabProps) {
+  const { t } = useTranslation(['etr-documents', 'iep-documents']);
   const handleDownload = async () => {
     const res = await getDownloadUrl(etrId);
     if (res.success && res.data) {
@@ -292,46 +288,41 @@ function OverviewTab({ etrId, etr, onUploaded }: OverviewTabProps) {
     <div className="space-y-4 max-w-5xl">
       <Card data-testid="etr-overview-card">
         <h2 className="font-serif text-[22px] font-semibold mb-4 text-brand-slate-800">
-          Overview
+          {t('viewerPage.tabOverview')}
         </h2>
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <OverviewItem
-            label="Evaluation Date"
+            label={t('viewerPage.evaluationDate')}
             value={
               etr.evaluationDate
-                ? new Date(etr.evaluationDate).toLocaleDateString()
+                ? formatDate(etr.evaluationDate)
                 : '—'
             }
           />
           <OverviewItem
-            label="Evaluation Type"
-            value={
-              etr.evaluationType
-                ? EVALUATION_TYPE_LABELS[etr.evaluationType] || etr.evaluationType
-                : '—'
-            }
+            label={t('viewerPage.evaluationType')}
+            value={etr.evaluationType ? evaluationTypeLabel(etr.evaluationType) : '—'}
           />
           <OverviewItem
-            label="Document State"
-            value={DOCUMENT_STATE_LABELS[etr.documentState] || etr.documentState || '—'}
+            label={t('viewerPage.documentState')}
+            value={etr.documentState ? documentStateLabel(etr.documentState) : '—'}
           />
-          <OverviewItem label="Status" value={etr.status} />
+          <OverviewItem label={t('viewerPage.status')} value={documentStatusLabel(etr.status)} />
           <OverviewItem
-            label="Created"
-            value={new Date(etr.createdAt).toLocaleDateString()}
+            label={t('viewerPage.created')}
+            value={formatDate(etr.createdAt)}
           />
-          <OverviewItem label="File" value={etr.fileName || '—'} />
+          <OverviewItem label={t('viewerPage.file')} value={etr.fileName || '—'} />
         </dl>
       </Card>
 
       {etr.status === 'created' ? (
         <Card data-testid="etr-upload-card">
           <h2 className="font-serif text-[18px] font-semibold mb-2 text-brand-slate-800">
-            Upload the ETR document
+            {t('viewerPage.uploadHeading')}
           </h2>
           <p className="text-sm text-brand-slate-500 mb-4">
-            Attach a PDF to start parsing. Once uploaded, we'll extract the sections
-            and prepare them for analysis.
+            {t('viewerPage.uploadBody')}
           </p>
           <EtrUpload
             etrId={etrId}
@@ -351,7 +342,7 @@ function OverviewTab({ etrId, etr, onUploaded }: OverviewTabProps) {
                   {etr.fileName}
                 </h2>
                 <p className="text-sm text-brand-slate-500 mt-1">
-                  Uploaded document
+                  {t('viewerPage.uploadedDocument')}
                 </p>
               </div>
               <Button
@@ -360,7 +351,7 @@ function OverviewTab({ etrId, etr, onUploaded }: OverviewTabProps) {
                 data-testid="etr-download-button"
               >
                 <Download className="w-4 h-4 mr-1.5" strokeWidth={1.8} aria-hidden="true" />
-                View document
+                {t('viewerPage.viewDocument')}
               </Button>
             </div>
           </Card>
@@ -368,9 +359,8 @@ function OverviewTab({ etrId, etr, onUploaded }: OverviewTabProps) {
       )}
 
       {etr.status !== 'created' && etr.status !== 'parsed' && etr.status !== 'error' && (
-        <Notice variant="info" title="Analysis and meeting prep coming soon">
-          Once processing completes, you'll see parsed sections. Analysis and meeting
-          prep tabs are in progress.
+        <Notice variant="info" title={t('viewerPage.comingSoonTitle')}>
+          {t('viewerPage.comingSoonBody')}
         </Notice>
       )}
     </div>

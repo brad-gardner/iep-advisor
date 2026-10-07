@@ -21,4 +21,6 @@ public static class TestLocalizers
     public static IStringLocalizer<Messages> Messages() => Provider.GetRequiredService<IStringLocalizer<Messages>>();
 
     public static IStringLocalizer<Emails> Emails() => Provider.GetRequiredService<IStringLocalizer<Emails>>();
+
+    public static IStringLocalizer<Ai> Ai() => Provider.GetRequiredService<IStringLocalizer<Ai>>();
 }

@@ -1,0 +1,79 @@
+{
+  "createError": {
+    "subscriptionRequired": "Active subscription required",
+    "noPermission": "You don't have permission",
+    "generic": "Could not start analysis"
+  },
+  "sourceAnalysis": {
+    "loadError": "Could not load this analysis."
+  },
+  "childTab": {
+    "triggerErrorTitle": "Unable to run analysis",
+    "headsUp": "Heads up",
+    "runNotFound": "That analysis couldn't be found — showing the latest.",
+    "stillWorkingTitle": "Still working…",
+    "stillWorkingBody": "An analysis is taking longer than usual. It will appear here once it finishes.",
+    "noneSelectedTitle": "No analysis selected",
+    "noneSelectedBody": "Select a past analysis or run a new one to see results here.",
+    "startedToast": "Analysis started"
+  },
+  "runDetail": {
+    "loading": "Loading analysis…",
+    "selectPrompt": "Select an analysis to view.",
+    "heading": "Analysis",
+    "askAbout": "analysis from {{date}}",
+    "failedTitle": "Analysis failed",
+    "failedGeneric": "Something went wrong while running this analysis.",
+    "stillWorkingTitle": "Still working…",
+    "stillWorkingBody": "This analysis is taking longer than usual. Check back shortly.{{progress}}",
+    "inProgressTitle": "Analysis in progress",
+    "inProgressWithProgress": "{{progress}} This page updates automatically.",
+    "inProgressGeneric": "We're analyzing your documents. This page updates automatically.",
+    "completedWithNoteTitle": "Analysis completed with a note",
+    "summary": "Summary",
+    "overallConcerns": "Overall Concerns",
+    "sourcesProgress": "{{completed}} of {{total}} documents analyzed."
+  },
+  "historyList": {
+    "heading": "Past Analyses",
+    "empty": "No analyses yet.",
+    "sourceCount_one": "{{count}} source",
+    "sourceCount_other": "{{count}} sources"
+  },
+  "sourceSections": {
+    "failedTitle": "Couldn't analyze this document — start a new analysis to try again."
+  },
+  "synthesis": {
+    "heading": "Cross-Document Synthesis",
+    "progression": "Progression",
+    "timeline": "Timeline",
+    "contradictions": "Contradictions"
+  },
+  "runStatus": {
+    "pending": "Pending",
+    "running": "Running",
+    "completed": "Completed",
+    "error": "Error"
+  },
+  "sourcePicker": {
+    "heading": "New Analysis",
+    "body": "Select one or more documents to analyze together.",
+    "loading": "Loading documents…",
+    "empty": "No documents available yet. Add an IEP, ETR, or progress report first.",
+    "iepsGroup": "IEPs",
+    "etrsGroup": "ETRs",
+    "progressReportsGroup": "Progress Reports",
+    "run": "Run analysis"
+  },
+  "sourceLabel": {
+    "iep": "IEP {{date}}{{type}}",
+    "etr": "ETR {{date}}{{type}}",
+    "progressReportRange": "Progress Report {{start}} – {{end}}",
+    "progressReport": "Progress Report {{date}}",
+    "sourceType": {
+      "IepDocument": "IEP",
+      "EtrDocument": "ETR",
+      "ProgressReport": "Progress report"
+    }
+  }
+}

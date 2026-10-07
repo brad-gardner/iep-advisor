@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
@@ -22,8 +23,12 @@ const MAX_MESSAGE_LENGTH = 1000;
  *  whether this would supersede a prior revision) before the irreversible
  *  snapshot happens. Fetches a fresh preview every time it opens. */
 export function ShareWithFamilyModal({ open, onClose, instanceId, onShared }: ShareWithFamilyModalProps) {
+  const { t } = useTranslation(['draft-sharing', 'common']);
   const [preview, setPreview] = useState<RecipientPreviewDto | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // A server-provided message is already resolved text; the generic fallback
+  // is translated at RENDER time below, from the stored KIND, so the mount
+  // effect never needs `t` in its dependency array (same idiom as `useHome`).
+  const [loadError, setLoadError] = useState<{ kind: 'server'; message: string } | { kind: 'generic' } | null>(null);
   const [message, setMessage] = useState('');
   const [isSharing, setIsSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -40,16 +45,21 @@ export function ShareWithFamilyModal({ open, onClose, instanceId, onShared }: Sh
         const res = await getSharePreview(instanceId);
         if (!active) return;
         if (res.success && res.data) setPreview(res.data);
-        else setLoadError(res.message ?? 'Could not load recipients.');
+        else setLoadError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
       } catch (err) {
-        if (active) setLoadError(apiErrorMessage(err, 'Could not load recipients.'));
+        if (!active) return;
+        const serverMessage = apiErrorMessage(err, '');
+        setLoadError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
       }
     })();
     return () => {
       active = false;
     };
+    // `t` deliberately excluded — see `loadError`'s own comment above.
   }, [open, instanceId]);
 
+  // Click-triggered (never a mount effect), so translating inline here is
+  // safe — see `AcknowledgeControl` for the same reasoning.
   const handleShare = async () => {
     setIsSharing(true);
     setShareError(null);
@@ -58,10 +68,10 @@ export function ShareWithFamilyModal({ open, onClose, instanceId, onShared }: Sh
       if (res.success && res.data) {
         onShared(res.data);
       } else {
-        setShareError(res.message ?? 'Could not share this draft.');
+        setShareError(res.message || t('shareModal.shareErrorDefault'));
       }
     } catch (err) {
-      setShareError(apiErrorMessage(err, 'Could not share this draft.'));
+      setShareError(apiErrorMessage(err, t('shareModal.shareErrorDefault')));
     } finally {
       setIsSharing(false);
     }
@@ -74,33 +84,32 @@ export function ShareWithFamilyModal({ open, onClose, instanceId, onShared }: Sh
     !isMarkdownOverLimit(message, MAX_MESSAGE_LENGTH);
 
   return (
-    <Modal open={open} onClose={onClose} preventClose={isSharing} title="Share with family" data-testid="share-with-family-modal">
+    <Modal open={open} onClose={onClose} preventClose={isSharing} title={t('shareWithFamilyLabel')} data-testid="share-with-family-modal">
       <div className="space-y-4">
         {loadError && (
           <div role="alert">
-            <Notice variant="error" title={loadError} />
+            <Notice variant="error" title={loadError.kind === 'server' ? loadError.message : t('shareModal.loadErrorDefault')} />
           </div>
         )}
 
         {!preview && !loadError && (
           <div className="flex justify-center py-6">
-            <Spinner label="Loading recipients…" />
+            <Spinner label={t('shareModal.loadingRecipients')} />
           </div>
         )}
 
         {preview && (
           <>
             {!preview.policyEnabled && (
-              <Notice variant="warning" title="Family draft sharing is disabled" data-testid="share-policy-notice">
-                This district has turned off family draft sharing. Ask a district admin to enable it before
-                sharing.
+              <Notice variant="warning" title={t('shareModal.policyDisabledTitle')} data-testid="share-policy-notice">
+                {t('shareModal.policyDisabledBody')}
               </Notice>
             )}
 
             <div>
-              <p className="mb-2 text-[13px] font-medium text-brand-slate-600">Will be shared with</p>
+              <p className="mb-2 text-[13px] font-medium text-brand-slate-600">{t('shareModal.willBeSharedWith')}</p>
               {preview.recipients.length === 0 ? (
-                <p className="text-sm text-brand-slate-500">No linked family or student accounts yet.</p>
+                <p className="text-sm text-brand-slate-500">{t('shareModal.noRecipients')}</p>
               ) : (
                 <ul className="space-y-1.5" data-testid="share-recipient-list">
                   {preview.recipients.map((r) => (
@@ -118,16 +127,16 @@ export function ShareWithFamilyModal({ open, onClose, instanceId, onShared }: Sh
             {preview.willSupersedeRevision != null && (
               <Notice
                 variant="info"
-                title={`This will supersede revision ${preview.willSupersedeRevision}`}
+                title={t('shareModal.supersedeTitle', { number: preview.willSupersedeRevision })}
                 data-testid="share-supersede-notice"
               >
-                {preview.lastSharedAt ? `Last shared ${formatDate(preview.lastSharedAt)}. ` : ''}
-                The family will see this as the newest revision, with what changed highlighted.
+                {preview.lastSharedAt ? t('shareModal.lastSharedPrefix', { date: formatDate(preview.lastSharedAt) }) : ''}
+                {t('shareModal.supersedeBody')}
               </Notice>
             )}
 
             <RichTextEditor
-              label="Note to the family (optional)"
+              label={t('shareModal.noteLabel')}
               value={message}
               onChange={setMessage}
               maxLength={MAX_MESSAGE_LENGTH}
@@ -143,10 +152,10 @@ export function ShareWithFamilyModal({ open, onClose, instanceId, onShared }: Sh
 
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={onClose} disabled={isSharing}>
-                Cancel
+                {t('common:ui.cancel')}
               </Button>
               <Button onClick={handleShare} loading={isSharing} disabled={!canShare} data-testid="share-with-family-submit">
-                Share
+                {t('shareModal.shareButton')}
               </Button>
             </div>
           </>

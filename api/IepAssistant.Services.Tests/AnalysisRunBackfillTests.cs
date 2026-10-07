@@ -30,6 +30,7 @@ public class AnalysisRunBackfillTests
         new SubscriptionService(context, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), NullLogger<SubscriptionService>.Instance, TestSupport.TestLocalizers.Messages()),
         new ParentAdvocacyGoalRepository(context),
         new NullClaudeClient(),
+        TestSupport.TestLocalizers.Ai(),
         NullLogger<AnalysisRunService>.Instance);
 
     private static int SeedIepAnalysis(

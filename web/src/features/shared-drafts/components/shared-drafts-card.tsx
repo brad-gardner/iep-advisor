@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { formatDate } from '@/lib/format-date';
@@ -15,6 +16,7 @@ interface SharedDraftsCardProps {
  *  the school has shared for this child. Renders nothing while loading and
  *  nothing when there are none, matching `SchoolIepsCard`'s empty-safe idiom. */
 export function SharedDraftsCard({ childId }: SharedDraftsCardProps) {
+  const { t } = useTranslation('shared-drafts');
   const [drafts, setDrafts] = useState<SharedDraftRevisionDto[] | null>(null);
 
   useEffect(() => {
@@ -44,10 +46,8 @@ export function SharedDraftsCard({ childId }: SharedDraftsCardProps) {
 
   return (
     <Card data-testid="shared-drafts-card">
-      <h2 className="font-serif mb-1">Shared drafts</h2>
-      <p className="mb-4 text-sm text-brand-slate-500">
-        Drafts your child's school has shared for your review.
-      </p>
+      <h2 className="font-serif mb-1">{t('card.heading')}</h2>
+      <p className="mb-4 text-sm text-brand-slate-500">{t('card.description')}</p>
       <ul className="divide-y divide-brand-slate-100" data-testid="shared-drafts-card-list">
         {rows.map((rev) => (
           <li key={rev.id} className="py-3">
@@ -58,11 +58,11 @@ export function SharedDraftsCard({ childId }: SharedDraftsCardProps) {
             >
               <span className="flex flex-col">
                 <span className="text-sm font-medium text-brand-slate-800">
-                  {rev.documentTypeDisplayName} · Revision {rev.revisionNumber}
+                  {t('listPage.revisionLine', { documentType: rev.documentTypeDisplayName, number: rev.revisionNumber })}
                 </span>
-                <span className="text-xs text-brand-slate-500">Shared {formatDate(rev.sharedAt)}</span>
+                <span className="text-xs text-brand-slate-500">{t('card.sharedLine', { date: formatDate(rev.sharedAt) })}</span>
               </span>
-              <Badge variant={SHARED_DRAFT_STATUS_BADGE[rev.status]}>{rev.status}</Badge>
+              <Badge variant={SHARED_DRAFT_STATUS_BADGE[rev.status]}>{t(`status.${rev.status}`, { defaultValue: rev.status })}</Badge>
             </Link>
           </li>
         ))}
@@ -73,7 +73,7 @@ export function SharedDraftsCard({ childId }: SharedDraftsCardProps) {
           className="text-sm text-brand-teal-600 hover:underline"
           data-testid="shared-drafts-card-view-all"
         >
-          View all shared drafts
+          {t('card.viewAll')}
         </Link>
       </div>
     </Card>

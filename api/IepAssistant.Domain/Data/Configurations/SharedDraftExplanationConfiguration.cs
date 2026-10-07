@@ -11,6 +11,7 @@ public class SharedDraftExplanationConfiguration : IEntityTypeConfiguration<Shar
         builder.HasKey(e => e.Id);
 
         builder.Property(e => e.ExplanationJson).IsRequired();
+        builder.Property(e => e.Language).HasMaxLength(10);
 
         // Restrict, not Cascade (pilot-gates plan, phase 1): SQL Server refuses to create an INSTEAD
         // OF UPDATE/DELETE trigger on a table that has an incoming cascading FK, and

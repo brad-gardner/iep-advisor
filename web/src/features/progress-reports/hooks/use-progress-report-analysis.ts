@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { usePolling } from "@/hooks/use-polling";
 import { useToast } from "@/components/ui/toast";
+import i18n from "@/lib/i18n";
 import { getAnalysis, startAnalysis as startAnalysisApi } from "../api/progress-reports-api";
 import type { ProgressReportAnalysis } from "../types";
 
@@ -49,7 +50,7 @@ export function useProgressReportAnalysis(
         setError(
           axios.isAxiosError(err)
             ? err.response?.data?.message || err.message
-            : "Failed to load analysis"
+            : i18n.t("progress-reports:analysisTab.loadErrorGeneric")
         );
         setAnalysis(null);
       }
@@ -68,7 +69,7 @@ export function useProgressReportAnalysis(
     try {
       const response = await startAnalysisApi(progressReportId);
       if (!response.success) {
-        setError(response.message || "Failed to start analysis");
+        setError(response.message || i18n.t("progress-reports:analysisTab.startErrorGeneric"));
         return;
       }
       prevStatusRef.current = "analyzing";
@@ -93,7 +94,7 @@ export function useProgressReportAnalysis(
       setError(
         axios.isAxiosError(err)
           ? err.response?.data?.message || err.message
-          : "Failed to start analysis"
+          : i18n.t("progress-reports:analysisTab.startErrorGeneric")
       );
     } finally {
       setIsTriggering(false);
@@ -111,7 +112,7 @@ export function useProgressReportAnalysis(
           (prevStatus === "analyzing" || prevStatus === "pending") &&
           next.status === "completed"
         ) {
-          show({ message: "Analysis ready", variant: "success" });
+          show({ message: i18n.t("progress-reports:analysisTab.readyToast"), variant: "success" });
         }
         prevStatusRef.current = next.status;
       }

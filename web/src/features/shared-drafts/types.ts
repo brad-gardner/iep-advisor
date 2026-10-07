@@ -10,12 +10,10 @@ export type SharedDraftStatus = (typeof SHARED_DRAFT_STATUSES)[number];
 
 export const DRAFT_RESPONSE_KINDS = ['Agree', 'Question', 'ChangeRequest', 'Comment'] as const;
 export type DraftResponseKind = (typeof DRAFT_RESPONSE_KINDS)[number];
-export const DRAFT_RESPONSE_KIND_LABELS: Record<DraftResponseKind, string> = {
-  Agree: 'Agree',
-  Question: 'Question',
-  ChangeRequest: 'Request a change',
-  Comment: 'Comment',
-};
+// Translated label: `lib/draft-response-kind-label.ts`'s `draftResponseKindLabel`
+// (`shared-drafts:responseKind.<Kind>`). The old English-only map lived here;
+// every caller (this feature and `draft-sharing`, its staff mirror) now goes
+// through the helper instead.
 
 export const DRAFT_RESPONSE_STATUSES = ['Open', 'Resolved'] as const;
 export type DraftResponseStatus = (typeof DRAFT_RESPONSE_STATUSES)[number];
@@ -96,6 +94,9 @@ export interface DraftExplanationDto {
   sections: DraftExplanationSectionDto[];
   items: DraftExplanationItemDto[];
   disclaimer: string;
+  /** Language the AI generated these explanations in — drives `GeneratedLanguageNotice`
+   *  when it differs from the viewer's. Null/absent on a pre-i18n-migration record = English. */
+  generatedLanguage?: 'en' | 'es' | null;
 }
 
 export interface AskQuestionRequest {
@@ -119,6 +120,9 @@ export interface DraftAnswerDto {
   citations: DraftAnswerCitationDto[];
   answeredAt: string;
   disclaimer: string;
+  /** Language the AI generated this answer in — drives `GeneratedLanguageNotice`
+   *  when it differs from the viewer's. Null/absent on a pre-i18n-migration record = English. */
+  generatedLanguage?: 'en' | 'es' | null;
 }
 
 /** Private to the parent who asked — never exposed to staff. */
@@ -132,6 +136,8 @@ export interface ParentDraftNoteDto {
   /** What in the revision the answer was grounded in (persisted with the note). */
   citations: DraftAnswerCitationDto[];
   createdAt: string;
+  /** Carried over from the `DraftAnswerDto` that created this note — see there. */
+  generatedLanguage?: 'en' | 'es' | null;
 }
 
 export interface DraftResponseDto {
@@ -176,4 +182,7 @@ export interface MeetingSummaryDto {
   sentAt: string | null;
   sentByName: string | null;
   recipients: MeetingSummaryRecipientDto[];
+  /** Language the AI drafted this summary in — drives `GeneratedLanguageNotice`
+   *  when it differs from the viewer's. Null/absent on a pre-i18n-migration record = English. */
+  generatedLanguage?: 'en' | 'es' | null;
 }

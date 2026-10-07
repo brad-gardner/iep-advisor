@@ -1,10 +1,12 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Journal;
 using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -18,10 +20,12 @@ public class JournalController : ControllerBase
     private const string DateFormat = "yyyy-MM-dd";
 
     private readonly IJournalService _service;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public JournalController(IJournalService service)
+    public JournalController(IJournalService service, IStringLocalizer<Messages> localizer)
     {
         _service = service;
+        _localizer = localizer;
     }
 
     /// <summary>Newest first by the day it happened. <c>tag</c> filters; <c>take</c> caps (default 50, max 200).</summary>
@@ -31,12 +35,15 @@ public class JournalController : ControllerBase
         JournalTag? tagFilter = null;
         if (!string.IsNullOrWhiteSpace(tag))
         {
-            if (!TryParseTag(tag, out var parsed)) return BadRequest(ApiResponse<object>.Error("Invalid tag."));
+            if (!TryParseTag(tag, out var parsed)) return BadRequest(ApiResponse<object>.Error(_localizer["Journal.InvalidTag"]));
             tagFilter = parsed;
         }
 
         var result = await _service.GetForChildAsync(childId, User.GetUserId(), tagFilter, take, ct);
-        if (!result.Success) return MapFailure(result.Message ?? "Not found");
+        // Multilingual plan Phase 3: JournalService now sets ErrorKind.NotFound on every "unknown or
+        // inaccessible" failure (never Forbidden, by design — see JournalService's class doc), so the
+        // shared kind-based mapper replaces this file's own "not found" text match.
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["JournalApi.NotFound"]);
         return Ok(ApiResponse<List<JournalEntryDto>>.SuccessResponse(result.Data!.Select(Map).ToList()));
     }
 
@@ -45,7 +52,7 @@ public class JournalController : ControllerBase
     {
         if (!TryBuildModel(request, out var model, out var error)) return BadRequest(ApiResponse<object>.Error(error));
         var result = await _service.CreateAsync(childId, User.GetUserId(), model, ct);
-        if (!result.Success) return MapFailure(result.Message ?? "Creation failed");
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["DocumentsApi.CreationFailed"]);
         return Created($"/api/journal/{result.Data!.Id}", ApiResponse<JournalEntryDto>.SuccessResponse(Map(result.Data)));
     }
 
@@ -54,7 +61,7 @@ public class JournalController : ControllerBase
     {
         if (!TryBuildModel(request, out var model, out var error)) return BadRequest(ApiResponse<object>.Error(error));
         var result = await _service.UpdateAsync(id, User.GetUserId(), model, ct);
-        if (!result.Success) return MapFailure(result.Message ?? "Update failed");
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["DocumentsApi.UpdateFailed"]);
         return Ok(ApiResponse<JournalEntryDto>.SuccessResponse(Map(result.Data!)));
     }
 
@@ -62,23 +69,17 @@ public class JournalController : ControllerBase
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
         var result = await _service.DeleteAsync(id, User.GetUserId(), ct);
-        if (!result.Success) return NotFound(ApiResponse<object>.Error(result.Message ?? "Not found"));
+        if (!result.Success) return NotFound(ApiResponse<object>.Error(result.Message ?? _localizer["JournalApi.NotFound"].Value));
         return Ok(ApiResponse<object>.SuccessResponse(new { }));
     }
 
-    /// <summary>"not found" (unknown child/entry or no access) ⇒ 404; validation (including an unresolvable link) ⇒ 400.</summary>
-    private IActionResult MapFailure(string message)
-        => message.Contains("not found", StringComparison.OrdinalIgnoreCase)
-            ? NotFound(ApiResponse<object>.Error(message))
-            : BadRequest(ApiResponse<object>.Error(message));
-
-    private static bool TryBuildModel(SaveJournalEntryRequest request, out SaveJournalEntryModel model, out string error)
+    private bool TryBuildModel(SaveJournalEntryRequest request, out SaveJournalEntryModel model, out string error)
     {
         model = new SaveJournalEntryModel();
-        if (!TryParseTag(request.Tag, out var tag)) { error = "Invalid tag."; return false; }
+        if (!TryParseTag(request.Tag, out var tag)) { error = _localizer["Journal.InvalidTag"]; return false; }
         if (!DateOnly.TryParseExact(request.OccurredOn, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var occurredOn))
         {
-            error = "occurredOn must be a date in yyyy-MM-dd format.";
+            error = _localizer["JournalApi.InvalidOccurredOnFormat"];
             return false;
         }
 

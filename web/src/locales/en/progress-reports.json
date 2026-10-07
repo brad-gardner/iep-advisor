@@ -1,0 +1,98 @@
+{
+  "createForm": {
+    "createdToast": "Progress report created",
+    "createFailed": "Failed to create progress report",
+    "createError": "An error occurred while creating the progress report",
+    "periodStart": "Reporting Period Start",
+    "periodEnd": "Reporting Period End",
+    "notes": "Notes (optional)",
+    "notesPlaceholder": "Anything worth flagging about this report...",
+    "create": "Create"
+  },
+  "goalProgressCard": {
+    "ratingMet": "Met",
+    "ratingOnTrack": "On track",
+    "ratingConcerning": "Concerning",
+    "ratingRegressing": "Regressing",
+    "ratingInsufficientData": "Insufficient data",
+    "evidenceStrong": "Strong evidence",
+    "evidenceAdequate": "Adequate evidence",
+    "evidenceWeak": "Weak evidence",
+    "whatReportSays": "What the report says",
+    "concerns": "Concerns",
+    "whatYouCanAsk": "What you can ask"
+  },
+  "analysisTab": {
+    "loading": "Loading analysis…",
+    "loadErrorTitle": "Couldn't load analysis",
+    "loadErrorGeneric": "Failed to load analysis",
+    "startErrorGeneric": "Failed to start analysis",
+    "readyToast": "Analysis ready",
+    "startHeading": "Analyze this progress report",
+    "startBody": "We'll review the report against this IEP's goals and any advocacy goals you've set. You'll get per-goal progress findings, red flags, and concrete questions to bring to the next meeting.",
+    "runAnalysis": "Run Analysis",
+    "analyzingLabel": "Analyzing progress report…",
+    "analyzingBody": "Analyzing the progress report. This usually takes 1–3 minutes.",
+    "failedTitle": "Analysis failed",
+    "failedGeneric": "An error occurred while analyzing this report.",
+    "retryAnalysis": "Retry Analysis",
+    "summary": "Summary",
+    "goalProgress": "Goal Progress ({{count}})",
+    "redFlags": "Red Flags ({{count}})",
+    "severityHigh": "High",
+    "severityMedium": "Medium",
+    "severityLow": "Low",
+    "category": {
+      "missing_data": "Missing data",
+      "boilerplate": "Boilerplate",
+      "regression": "Regression",
+      "insufficient_evidence": "Insufficient evidence",
+      "compliance": "Compliance",
+      "other": "Other"
+    }
+  },
+  "list": {
+    "periodNotSet": "Reporting period not set",
+    "empty": "No progress reports yet for this IEP.",
+    "view": "View",
+    "download": "Download",
+    "delete": "Delete",
+    "deletingEllipsis": "...",
+    "idFallback": "Progress Report #{{id}}",
+    "created": "Created {{date}}",
+    "deletedToast": "Progress report deleted",
+    "deleteDialogTitle": "Delete progress report",
+    "deleteDialogMessage": "Delete this progress report? This cannot be undone.",
+    "deleteConfirmLabel": "Delete report"
+  },
+  "upload": {
+    "onlyPdf": "Only PDF files are supported",
+    "tooLarge": "File is too large. Maximum size is 50MB.",
+    "uploadedToast": "File uploaded",
+    "uploadFailed": "Upload failed",
+    "uploadError": "An error occurred during upload",
+    "uploadingLabel": "Uploading…",
+    "uploadingEllipsis": "Uploading...",
+    "attachPdf": "Attach PDF",
+    "dropHint": "Drop a PDF here or click to browse"
+  },
+  "viewerPage": {
+    "loading": "Loading progress report…",
+    "notFound": "Progress report not found.",
+    "backToIep": "Back to IEP",
+    "idFallback": "Progress Report #{{id}}",
+    "breadcrumbTitle": "Progress Report",
+    "askAbout": "progress report for {{period}}",
+    "processingFailedTitle": "Processing failed",
+    "noFileTitle": "No file attached",
+    "noFileBody": "Upload the progress report PDF from the IEP's Progress Reports tab to continue.",
+    "tabDocument": "Document",
+    "tabAnalysis": "Analysis"
+  },
+  "tab": {
+    "heading": "Progress Reports",
+    "body": "School-issued reports tracking progress against this IEP's goals.",
+    "newReport": "New Report",
+    "newReportModalTitle": "New progress report"
+  }
+}

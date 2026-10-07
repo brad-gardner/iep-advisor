@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Eye, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
@@ -12,6 +13,7 @@ interface ShareToggleProps {
 // A clear private/shared switch. Uses a Button with aria-pressed so the state is
 // announced and keyboard-operable. The label spells out the consequence.
 export function ShareToggle({ entry, onToggle, testIdPrefix }: ShareToggleProps) {
+  const { t } = useTranslation('student');
   const { isShareable } = entry;
 
   return (
@@ -27,12 +29,12 @@ export function ShareToggle({ entry, onToggle, testIdPrefix }: ShareToggleProps)
       {isShareable ? (
         <>
           <Eye className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
-          Shared with your team
+          {t('shareToggle.shared')}
         </>
       ) : (
         <>
           <Lock className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
-          Only you can see this
+          {t('shareToggle.private')}
         </>
       )}
     </Button>

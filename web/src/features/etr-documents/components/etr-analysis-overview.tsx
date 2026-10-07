@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle2, XCircle, FileSearch } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { RedFlag } from '@/types/api';
 import type { EtrCompletenessPayload, EtrEligibilityPayload } from '@/features/analysis/types';
 import { RedFlagCard } from '@/features/iep-documents/components/red-flag-card';
@@ -65,6 +66,7 @@ export function EtrAnalysisOverview({
   completeness,
   eligibility,
 }: EtrAnalysisOverviewProps) {
+  const { t } = useTranslation('etr-documents');
   const urgentFlagCount = redFlags.filter((f) => f.severity === 'red').length;
   const missingDomainCount = completeness?.missingDomains.length ?? 0;
   const supported = eligibility?.dataSupportsConclusion ?? null;
@@ -74,7 +76,7 @@ export function EtrAnalysisOverview({
       {overallSummary && (
         <section>
           <h2 className="font-serif text-[22px] font-semibold mb-3 text-brand-slate-800">
-            Overview
+            {t('overview.heading')}
           </h2>
           <p className="text-brand-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
             {overallSummary}
@@ -84,13 +86,13 @@ export function EtrAnalysisOverview({
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <StatTile
-          label="Red Flags"
+          label={t('overview.redFlags')}
           value={
             <span>
               {redFlags.length}
               {urgentFlagCount > 0 && (
                 <span className="text-[11px] font-normal text-brand-danger-700 ml-1.5">
-                  ({urgentFlagCount} urgent)
+                  {t('overview.urgentCount', { count: urgentFlagCount })}
                 </span>
               )}
             </span>
@@ -99,19 +101,19 @@ export function EtrAnalysisOverview({
           tone={urgentFlagCount > 0 ? 'red' : redFlags.length > 0 ? 'amber' : 'slate'}
         />
         <StatTile
-          label="Missing Domains"
+          label={t('overview.missingDomains')}
           value={missingDomainCount}
           Icon={FileSearch}
           tone={missingDomainCount > 0 ? 'amber' : 'slate'}
         />
         <StatTile
-          label="Eligibility"
+          label={t('overview.eligibility')}
           value={
             supported === null
-              ? '—'
+              ? t('overview.unknown')
               : supported
-                ? 'Supported'
-                : 'Unsupported'
+                ? t('overview.supported')
+                : t('overview.unsupported')
           }
           Icon={supported ? CheckCircle2 : XCircle}
           tone={supported === null ? 'slate' : supported ? 'teal' : 'red'}
@@ -121,7 +123,7 @@ export function EtrAnalysisOverview({
       {redFlags.length > 0 && (
         <section>
           <h2 className="font-serif text-[22px] font-semibold mb-3 text-brand-slate-800">
-            Areas of Concern ({redFlags.length})
+            {t('overview.areasOfConcern', { count: redFlags.length })}
           </h2>
           <div className="space-y-3">
             {redFlags.map((flag, i) => (

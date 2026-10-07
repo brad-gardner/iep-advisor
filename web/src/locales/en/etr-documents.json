@@ -1,0 +1,187 @@
+{
+  "documentIdFallback": "ETR #{{id}}",
+  "evaluationType": {
+    "initial": "Initial Evaluation",
+    "reevaluation": "Reevaluation",
+    "transfer": "Transfer",
+    "other": "Other"
+  },
+  "documentState": {
+    "draft": "Draft",
+    "final": "Final"
+  },
+  "loadingEvaluation": "Loading evaluation…",
+  "backToChild": "Back to child",
+  "evaluationTeamReport": "Evaluation Team Report",
+  "askAbout": {
+    "etr": "ETR from {{date}}"
+  },
+  "createForm": {
+    "description": "An ETR (Evaluation Team Report) documents the team's assessment findings and eligibility determination for special education.",
+    "evaluationDate": "Evaluation Date",
+    "evaluationType": "Evaluation Type",
+    "selectType": "Select type...",
+    "documentState": "Document State",
+    "notes": "Notes",
+    "notesPlaceholder": "Any notes about this evaluation...",
+    "create": "Create ETR",
+    "createFailed": "Failed to create ETR",
+    "createError": "An error occurred while creating the ETR"
+  },
+  "upload": {
+    "onlyPdf": "Only PDF files are supported",
+    "tooLarge": "File is too large. Maximum size is 50MB.",
+    "uploadedToast": "ETR uploaded",
+    "uploadFailed": "Upload failed",
+    "uploadError": "An error occurred during upload",
+    "uploadingLabel": "Uploading…",
+    "uploadingProgress": "Uploading... {{progress}}%",
+    "attachPdf": "Attach PDF",
+    "dropHint": "Drop a PDF here or click to browse (max 50MB)"
+  },
+  "emptyState": {
+    "heading": "Analyze this ETR",
+    "body": "Get a comprehensive analysis of this evaluation, including assessment completeness, eligibility review, and potential concerns.",
+    "analyze": "Analyze ETR"
+  },
+  "processing": {
+    "label": "Analyzing…",
+    "heading": "Analyzing Your ETR",
+    "body": "This usually takes a few minutes. We're reviewing assessment completeness, eligibility determination, and identifying areas that may need attention.",
+    "checkStatus": "Check Status"
+  },
+  "analysisTab": {
+    "triggerErrorTitle": "Unable to run analysis",
+    "loadErrorTitle": "Unable to load analysis",
+    "loadingAnalysis": "Loading analysis…",
+    "analysisFailedTitle": "Analysis Failed",
+    "analysisErrorGeneric": "An error occurred during analysis.",
+    "retryAnalysis": "Retry Analysis",
+    "sourceFailedTitle": "Couldn't analyze this document",
+    "sourceErrorGeneric": "Something went wrong while analyzing this document.",
+    "analyzeThisEtr": "Analyze this ETR",
+    "multiSourceInfo": "Part of an analysis with {{sources}}",
+    "viewFullAnalysis": "View full analysis →",
+    "staleTitle": "Analysis may be outdated",
+    "staleBody": "This analysis was made before the ETR was last updated. Re-analyze to refresh it.",
+    "reanalyze": "Re-analyze",
+    "overviewNav": "Overview",
+    "yourGoalsNav": "Your Goals",
+    "completenessNav": "Assessment Completeness",
+    "eligibilityNav": "Eligibility Review"
+  },
+  "overview": {
+    "heading": "Overview",
+    "redFlags": "Red Flags",
+    "missingDomains": "Missing Domains",
+    "eligibility": "Eligibility",
+    "supported": "Supported",
+    "unsupported": "Unsupported",
+    "unknown": "—",
+    "urgentCount_one": "({{count}} urgent)",
+    "urgentCount_other": "({{count}} urgent)",
+    "areasOfConcern": "Areas of Concern ({{count}})"
+  },
+  "completenessView": {
+    "heading": "Assessment Completeness",
+    "overall": "Overall",
+    "ratingStrong": "Strong",
+    "ratingAdequate": "Adequate",
+    "ratingThin": "Thin",
+    "ratingMissing": "Missing",
+    "ratingConcerning": "Concerning",
+    "ratingUnknown": "Unknown",
+    "evaluatedDomains": "Evaluated Domains ({{count}})",
+    "noEvaluatedDomains": "No evaluated domains reported.",
+    "tools": "Tools: {{tools}}",
+    "missingDomains": "Missing or Under-Evaluated Domains ({{count}})",
+    "noMissingDomains": "No missing domains identified."
+  },
+  "eligibilityReview": {
+    "heading": "Eligibility Review",
+    "statedCategory": "Stated Category",
+    "statedConclusion": "Stated Conclusion",
+    "dataSupports": "Data supports the stated conclusion",
+    "dataDoesNotSupport": "Data does NOT clearly support the stated conclusion",
+    "supported": "Supported",
+    "notSupported": "Not Supported",
+    "supportingEvidence": "Supporting Evidence ({{count}})",
+    "contradictingEvidence": "Contradicting Evidence ({{count}})",
+    "alternativeConsiderations": "Alternative Considerations ({{count}})"
+  },
+  "errorBanner": {
+    "title": "Processing failed",
+    "body": "We couldn't finish analyzing your ETR. This can happen when the PDF is scanned or has unusual formatting. You can retry processing below.",
+    "retryFailed": "Failed to queue reprocessing",
+    "retry": "Retry processing"
+  },
+  "listGroup": {
+    "viewProfile": "View profile"
+  },
+  "listPage": {
+    "title": "Evaluations (ETRs)",
+    "subtitle": "An Evaluation Team Report (ETR) is the school's written evaluation that determines whether your child qualifies for special education and what supports they need. Review past evaluations and prepare for upcoming meetings here.",
+    "loading": "Loading evaluations…",
+    "loadErrorTitle": "Couldn't load evaluations",
+    "empty": "No evaluations yet.",
+    "emptyDescription": "Open a child's profile to add or upload an ETR.",
+    "goToChildren": "Go to My Children"
+  },
+  "listRow": {
+    "evaluationFallback": "Evaluation",
+    "uploaded": "Uploaded {{date}}"
+  },
+  "sectionCard": {
+    "noContent": "No content captured for this section.",
+    "none": "None",
+    "noDetails": "No details"
+  },
+  "sectionsList": {
+    "loading": "Loading sections…",
+    "empty": "No sections parsed yet."
+  },
+  "documentList": {
+    "loading": "Loading ETR documents…",
+    "empty": "No ETR documents yet.",
+    "deletedToast": "ETR deleted",
+    "view": "View",
+    "delete": "Delete",
+    "deleteDialogTitle": "Delete ETR document",
+    "deleteDialogMessage": "Delete this ETR document? This cannot be undone.",
+    "deleteConfirmLabel": "Delete ETR",
+    "evaluated": "Evaluated: {{date}}",
+    "created": "Created {{date}}"
+  },
+  "viewerPage": {
+    "refreshing": "Refreshing...",
+    "notes": "Notes",
+    "tabOverview": "Overview",
+    "tabSections": "Sections",
+    "tabAnalysis": "Analysis",
+    "hintUploadFirst": "Upload a document to see sections",
+    "hintUploadFirstAnalysis": "Upload a document first",
+    "hintProcessingFailed": "Processing failed",
+    "hintProcessing": "Processing...",
+    "evaluated": "Evaluated: {{date}}",
+    "evaluationDate": "Evaluation Date",
+    "evaluationType": "Evaluation Type",
+    "documentState": "Document State",
+    "status": "Status",
+    "created": "Created",
+    "file": "File",
+    "uploadHeading": "Upload the ETR document",
+    "uploadBody": "Attach a PDF to start parsing. Once uploaded, we'll extract the sections and prepare them for analysis.",
+    "uploadedDocument": "Uploaded document",
+    "viewDocument": "View document",
+    "comingSoonTitle": "Analysis and meeting prep coming soon",
+    "comingSoonBody": "Once processing completes, you'll see parsed sections. Analysis and meeting prep tabs are in progress.",
+    "notFound": "ETR document not found."
+  },
+  "processingBanner": {
+    "queuedTitle": "Queued for analysis",
+    "analyzingTitle": "We're analyzing your ETR...",
+    "queuedBody": "Your document has been uploaded and will be processed shortly.",
+    "analyzingBody": "Extracting sections and structuring content. This usually takes under two minutes.",
+    "processingLabel": "Processing…"
+  }
+}

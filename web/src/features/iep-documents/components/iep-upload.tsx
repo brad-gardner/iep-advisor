@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Upload } from 'lucide-react';
+import i18n from '@/lib/i18n';
 import { attachFile } from '../api/iep-documents-api';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
@@ -11,20 +13,26 @@ interface IepUploadProps {
 }
 
 export function IepUpload({ iepId, onUploaded }: IepUploadProps) {
+  const { t } = useTranslation('iep-documents');
   const { show: showToast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // `i18n.t` directly (not the hook's `t`): this callback is a `useCallback`
+  // dependency of nothing re-run on language change, but it IS invoked from
+  // drag/drop and file-input handlers outside render, so a stable function
+  // reference matters more than reacting to `t`'s identity — same reasoning
+  // as the plain-function label helpers (see docs/i18n/README.md).
   const handleFile = useCallback(
     async (file: File) => {
       if (!file.name.toLowerCase().endsWith('.pdf')) {
-        setError('Only PDF files are supported');
+        setError(i18n.t('iep-documents:upload.onlyPdf'));
         return;
       }
 
       if (file.size > 50 * 1024 * 1024) {
-        setError('File is too large. Maximum size is 50MB.');
+        setError(i18n.t('iep-documents:upload.tooLarge'));
         return;
       }
 
@@ -34,13 +42,13 @@ export function IepUpload({ iepId, onUploaded }: IepUploadProps) {
       try {
         const response = await attachFile(iepId, file);
         if (response.success) {
-          showToast({ message: 'IEP uploaded', variant: 'success' });
+          showToast({ message: i18n.t('iep-documents:upload.uploadedToast'), variant: 'success' });
           onUploaded();
         } else {
-          setError(response.message || 'Upload failed');
+          setError(response.message || i18n.t('iep-documents:upload.uploadFailed'));
         }
       } catch {
-        setError('An error occurred during upload');
+        setError(i18n.t('iep-documents:upload.uploadError'));
       } finally {
         setIsUploading(false);
       }
@@ -99,14 +107,14 @@ export function IepUpload({ iepId, onUploaded }: IepUploadProps) {
         />
         {isUploading ? (
           <div className="flex flex-col items-center gap-2">
-            <Spinner size="sm" label="Uploading…" />
-            <p className="text-brand-slate-500 text-sm">Uploading...</p>
+            <Spinner size="sm" label={t('upload.uploadingLabel')} />
+            <p className="text-brand-slate-500 text-sm">{t('upload.uploadingEllipsis')}</p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1">
             <Upload className="w-5 h-5 text-brand-slate-400" strokeWidth={1.8} aria-hidden="true" />
-            <p className="text-brand-slate-600 text-sm">Attach PDF</p>
-            <p className="text-brand-slate-500 text-[11px]">Drop a PDF here or click to browse</p>
+            <p className="text-brand-slate-600 text-sm">{t('upload.attachPdf')}</p>
+            <p className="text-brand-slate-500 text-[11px]">{t('upload.dropHint')}</p>
           </div>
         )}
       </label>

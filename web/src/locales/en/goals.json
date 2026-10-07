@@ -1,0 +1,66 @@
+{
+  "status": {
+    "Active": "Active",
+    "Met": "Met",
+    "NotMet": "Not met",
+    "Retired": "Retired",
+    "Carried": "Carried"
+  },
+  "card": {
+    "stale": "Stale",
+    "baseline": "Baseline",
+    "target": "Target",
+    "never": "Never",
+    "lastObserved": "Last observed: {{date}}",
+    "historyButton": "History",
+    "logProgressButton": "Log progress",
+    "changeStatusButton": "Change status"
+  },
+  "historyDrawer": {
+    "title": "Goal history",
+    "noHistory": "No history recorded yet.",
+    "versionLabel": "Version {{number}} · {{date}}",
+    "loadError": "Could not load this goal’s history."
+  },
+  "sparkline": {
+    "insufficientData": "Insufficient data — log at least two observations to see a trend.",
+    "trendTitle": "Progress trend for {{goalText}}"
+  },
+  "goalsCard": {
+    "heading": "Goals",
+    "emptyTitle": "No goals yet",
+    "emptyDescription": "Goals appear here once a finalized IEP or ETR includes them."
+  },
+  "statusDialog": {
+    "title": "Update goal status",
+    "save": "Save",
+    "statusLegend": "Status",
+    "reasonLabel": "Reason",
+    "reasonLabelRequired": "Reason *",
+    "updateFailed": "Could not update the goal status."
+  },
+  "logProgressForm": {
+    "valueOrNoteRequired": "Enter a value or a note.",
+    "noteMaxLength": "Note must be {{max}} characters or fewer.",
+    "valueMustBeNumber": "Value must be a number.",
+    "toastLogged": "Progress logged",
+    "logFailed": "Could not log progress.",
+    "valueLabel": "Value",
+    "unitLabel": "Unit",
+    "unitPlaceholder": "e.g. % correct",
+    "noteLabel": "Note",
+    "submit": "Log progress"
+  },
+  "removeGoalDialog": {
+    "title": "Remove goal",
+    "confirm": "Remove goal",
+    "bodyText": "Removing \"{{goalLabel}}\" retires it from the student's record. This is kept as part of the goal's history and cannot be undone from here.",
+    "defaultGoalLabel": "this goal",
+    "reasonLabel": "Reason for removing this goal *",
+    "minLengthHint": "At least {{min}} characters."
+  },
+  "childProgressCard": {
+    "heading": "Progress",
+    "description": "Goal progress your child's school has logged."
+  }
+}

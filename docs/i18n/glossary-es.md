@@ -32,6 +32,8 @@ Every Spanish string in the app, emails, PDFs and AI instructions uses these ter
 | transition plan | plan de transición |
 | eligibility | elegibilidad |
 | evaluation / reevaluation | evaluación / reevaluación |
+| assessment completeness (ETR) | exhaustividad de la evaluación (not "integridad de las pruebas") |
+| evaluation type: transfer (ETR) | traslado (not "transferencia") |
 | disability category | categoría de discapacidad |
 | case manager | administrador de caso |
 | IEP team | equipo del IEP |
@@ -54,7 +56,7 @@ Every Spanish string in the app, emails, PDFs and AI instructions uses these ter
 | finalize | finalizar |
 | share | compartir |
 | invite / invitation | invitar / invitación |
-| advocate (Virtual Advocate) | Asesor virtual |
+| advocate (Virtual Advocate) | Asesor virtual as a title/heading/tab label (sentence case, first word capitalized); lowercase "asesor virtual" everywhere it appears inside running text (e.g. "con el asesor virtual") |
 | analysis | análisis |
 | journal | diario |
 | knowledge base | centro de recursos |

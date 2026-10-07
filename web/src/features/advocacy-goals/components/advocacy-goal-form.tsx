@@ -1,23 +1,18 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Select } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
+import { ADVOCACY_GOAL_CATEGORIES } from '../lib/category-label';
 
 const GOAL_TEXT_MAX_LENGTH = 500;
-
-const CATEGORIES = [
-  { value: '', label: 'No category' },
-  { value: 'academic', label: 'Academic' },
-  { value: 'behavioral', label: 'Behavioral' },
-  { value: 'services', label: 'Services' },
-  { value: 'placement', label: 'Placement' },
-];
 
 interface AdvocacyGoalFormProps {
   initialValues?: { goalText: string; category: string };
   onSubmit: (data: { goalText: string; category?: string }) => Promise<{ success: boolean; error?: string }>;
   onCancel?: () => void;
+  /** Defaults to the "Add Goal" translation; pass a translated label to override (e.g. "Save Changes"). */
   submitLabel?: string;
 }
 
@@ -25,8 +20,9 @@ export function AdvocacyGoalForm({
   initialValues,
   onSubmit,
   onCancel,
-  submitLabel = 'Add Goal',
+  submitLabel,
 }: AdvocacyGoalFormProps) {
+  const { t } = useTranslation(['advocacy-goals', 'common']);
   const [goalText, setGoalText] = useState(initialValues?.goalText ?? '');
   const [category, setCategory] = useState(initialValues?.category ?? '');
   const [error, setError] = useState('');
@@ -38,11 +34,11 @@ export function AdvocacyGoalForm({
 
     const trimmed = goalText.trim();
     if (trimmed.length < 10) {
-      setError('Goal must be at least 10 characters.');
+      setError(t('advocacy-goals:form.minLengthError'));
       return;
     }
     if (isMarkdownOverLimit(goalText, GOAL_TEXT_MAX_LENGTH)) {
-      setError(`Goal must be ${GOAL_TEXT_MAX_LENGTH} characters or fewer.`);
+      setError(t('advocacy-goals:form.maxLengthError', { max: GOAL_TEXT_MAX_LENGTH }));
       return;
     }
 
@@ -53,13 +49,13 @@ export function AdvocacyGoalForm({
         category: category || undefined,
       });
       if (!result.success) {
-        setError(result.error || 'Failed to save goal.');
+        setError(result.error || t('advocacy-goals:form.saveFailed'));
       } else {
         setGoalText('');
         setCategory('');
       }
     } catch {
-      setError('An error occurred.');
+      setError(t('common:ui.genericError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -70,11 +66,11 @@ export function AdvocacyGoalForm({
       {error && <div data-testid="goal-form-error"><Notice variant="error" title={error} /></div>}
 
       <RichTextEditor
-        label="Advocacy Goal"
+        label={t('advocacy-goals:form.label')}
         id="goal-text"
         value={goalText}
         onChange={setGoalText}
-        placeholder="Describe your priority for your child (e.g., 'Improve reading fluency to grade level')"
+        placeholder={t('advocacy-goals:form.placeholder')}
         minRows={3}
         maxLength={GOAL_TEXT_MAX_LENGTH}
         data-testid="goal-text-input"
@@ -83,15 +79,16 @@ export function AdvocacyGoalForm({
       <div className="flex gap-3 items-end">
         <div className="flex-1">
           <Select
-            label="Category (optional)"
+            label={t('advocacy-goals:form.categoryLabel')}
             id="goal-category"
             value={category}
             onChange={(e) => setCategory((e.target as HTMLSelectElement).value)}
             data-testid="goal-category-select"
           >
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
+            <option value="">{t('advocacy-goals:category.none')}</option>
+            {ADVOCACY_GOAL_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {t(`advocacy-goals:category.${c}`)}
               </option>
             ))}
           </Select>
@@ -100,7 +97,7 @@ export function AdvocacyGoalForm({
         <div className="flex gap-2">
           {onCancel && (
             <Button variant="ghost" type="button" onClick={onCancel} data-testid="goal-form-cancel">
-              Cancel
+              {t('common:ui.cancel')}
             </Button>
           )}
           <Button
@@ -109,7 +106,7 @@ export function AdvocacyGoalForm({
             disabled={goalText.trim().length < 10 || isMarkdownOverLimit(goalText, GOAL_TEXT_MAX_LENGTH)}
             data-testid="goal-form-submit"
           >
-            {submitLabel}
+            {submitLabel ?? t('advocacy-goals:form.addGoal')}
           </Button>
         </div>
       </div>

@@ -1,0 +1,64 @@
+{
+  "pageTitle": "Journal",
+  "tag": {
+    "Incident": "Incident",
+    "Communication": "Communication",
+    "Medical": "Medical",
+    "Progress": "Progress",
+    "Other": "Other"
+  },
+  "emptyCopy": "Keep a dated record of what happens: incidents, calls with the school, medical updates, progress you notice. Private to your family.",
+  "card": {
+    "heading": "{{name}}'s journal",
+    "description": "A dated record of what happens — private to your family, never shared with the school team.",
+    "addUpdate": "Add update",
+    "loadingLabel": "Loading journal",
+    "loadError": "Could not load the journal",
+    "loadFailed": "Could not load the journal.",
+    "seeAll": "See all updates",
+    "savedCreated": "Update added to the journal",
+    "savedUpdated": "Update saved",
+    "deleted": "Update deleted"
+  },
+  "page": {
+    "heading": "{{name}}'s journal",
+    "description": "Private to your family — never shared with the school team.",
+    "showLabel": "Show",
+    "allUpdates": "All updates",
+    "loading": "Loading journal…",
+    "loadFailed": "Could not load the journal.",
+    "emptyTitleFiltered": "No {{tag}} updates yet",
+    "emptyTitleAll": "Nothing in the journal yet",
+    "addFirstUpdate": "Add the first update",
+    "showingMostRecent": "Showing the {{count}} most recent updates."
+  },
+  "drawer": {
+    "editTitle": "Edit update",
+    "addTitle": "Add an update",
+    "dateLabel": "Date",
+    "kindLabel": "Kind of update",
+    "contentLabel": "What happened",
+    "contentPlaceholder": "Sent home early after a meltdown at recess. Called Ms. Rivera — she said…",
+    "linkLegend": "Link to (optional)",
+    "undated": "undated",
+    "linkIep": "IEP",
+    "linkEtr": "ETR",
+    "linkMeeting": "Meeting",
+    "notLinked": "Not linked",
+    "linkedItem": "Linked item #{{id}}",
+    "dateFutureError": "The date can't be in the future.",
+    "saveFailed": "Could not save this update.",
+    "deleteFailed": "Could not delete this update.",
+    "delete": "Delete",
+    "saveChanges": "Save changes",
+    "saveNew": "Save update",
+    "deleteDialogTitle": "Delete update",
+    "deleteDialogMessage": "Delete this journal update? This cannot be undone.",
+    "deleteConfirm": "Delete"
+  },
+  "entryItem": {
+    "askLabel": "journal entry from {{day}}",
+    "askAria": "Ask the advocate about the update from {{day}}",
+    "editAria": "Edit update from {{day}}"
+  }
+}

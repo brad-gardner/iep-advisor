@@ -47,6 +47,26 @@ export default defineConfig([
       // component is in scope, because the parent-home "next meeting"/
       // "upcoming meeting" cards (phase 2) render it (phase 2 review).
       'src/features/meetings/components/rsvp-button-group.tsx',
+      // Phase 3 — parent documents and AI.
+      'src/features/iep-documents/**/*.{ts,tsx}',
+      'src/features/etr-documents/**/*.{ts,tsx}',
+      'src/features/analysis/**/*.{ts,tsx}',
+      'src/features/iep-comparison/**/*.{ts,tsx}',
+      'src/features/iep-versions/**/*.{ts,tsx}',
+      'src/features/progress-reports/**/*.{ts,tsx}',
+      'src/features/goals/**/*.{ts,tsx}',
+      'src/features/advocacy-goals/**/*.{ts,tsx}',
+      'src/features/meeting-prep/**/*.{ts,tsx}',
+      'src/features/journal/**/*.{ts,tsx}',
+      'src/features/advocate/**/*.{ts,tsx}',
+      'src/features/shared-drafts/**/*.{ts,tsx}',
+      'src/features/draft-sharing/**/*.{ts,tsx}',
+      'src/features/student/**/*.{ts,tsx}',
+      'src/features/meetings/pages/meeting-rsvp-page.tsx',
+      'src/features/document-authoring/pages/parent-authored-version-page.tsx',
+      'src/lib/section-type-label.ts',
+      'src/lib/document-status-label.ts',
+      'src/lib/meeting-labels.ts',
     ],
     ignores: [
       '**/*.test.{ts,tsx}',

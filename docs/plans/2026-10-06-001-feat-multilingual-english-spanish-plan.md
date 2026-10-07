@@ -105,7 +105,7 @@ This follows the approved design (`docs/designs/2026-10-06-multilingual-english-
 - **English is fully bundled (Phase 2 review).** Lazy English namespaces showed raw keys before load and got stuck on them when a chunk failed. All `en/*.json` files are now eager, and only Spanish is lazy. Watch the main-chunk gzip each phase against the 15% budget (≤418 kB). If it gets close, split English by route and preload, rather than going back to render-time loading.
   - **Trigger (set at the Phase 2 review):** the main chunk measured 396.33 kB gzip after Phase 2, against a 418 kB budget. The projection is about 421–431 kB by Phase 7.
   - **Phase 5 starts by splitting English by role.** Shell and parent namespaces stay eager. Staff, district-admin and platform-admin page trees become lazy route chunks, and each chunk's entry module imports its own `en/*.json` and calls `i18n.addResourceBundle` when it loads, so English always arrives with the code that uses it.
-  - **Phase 5 also adds a CI size check:** fail above 418 kB gzip, warn above 405 kB.
+  - **CI size check moved up to Phase 4 (Phase 3 review):** fail above 418 kB gzip, warn above 405 kB. After Phase 3 the main chunk measured 409.72 kB gzip.
   - Each phase's PR records the main-chunk gzip.
 - **`ServiceErrorKind` is a prerequisite for translating server messages (Phase 2 review).** About 30 controllers chose 403/404/409/503 by matching English words in `ServiceResult.Message`, and translating the messages silently turned those into 400. Before any phase translates a service, that service must set `ErrorKind` on every failure its controller maps to a status, and the controller must use the shared mapper. Never match on translated text.
 

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
@@ -14,6 +15,7 @@ public class IepDocumentService : IIepDocumentService
     private readonly IAccessService _accessService;
     private readonly IBlobStorageService _blobStorage;
     private readonly ApplicationDbContext _context;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     private static readonly HashSet<string> ValidMeetingTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -25,13 +27,15 @@ public class IepDocumentService : IIepDocumentService
         IChildProfileRepository childProfileRepository,
         IAccessService accessService,
         IBlobStorageService blobStorage,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        IStringLocalizer<Messages> localizer)
     {
         _documentRepository = documentRepository;
         _childProfileRepository = childProfileRepository;
         _accessService = accessService;
         _blobStorage = blobStorage;
         _context = context;
+        _localizer = localizer;
     }
 
     public async Task<IEnumerable<IepDocumentModel>> GetByChildIdAsync(int childProfileId, int userId, CancellationToken cancellationToken = default)
@@ -60,10 +64,10 @@ public class IepDocumentService : IIepDocumentService
     public async Task<ServiceResult<IepDocumentModel>> CreateAsync(int childProfileId, int userId, CreateIepDocumentModel model, CancellationToken cancellationToken = default)
     {
         if (!await _accessService.HasMinimumRoleAsync(childProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult<IepDocumentModel>.FailureResult("Child profile not found.");
+            return ServiceResult<IepDocumentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Children.NotFound"]);
 
         if (!ValidMeetingTypes.Contains(model.MeetingType))
-            return ServiceResult<IepDocumentModel>.FailureResult("Invalid meeting type. Must be: initial, annual_review, amendment, or reevaluation.");
+            return ServiceResult<IepDocumentModel>.FailureResult(ServiceErrorKind.Validation, _localizer["IepDocuments.InvalidMeetingTypeDetailed"]);
 
         var entity = new IepDocument
         {
@@ -82,20 +86,20 @@ public class IepDocumentService : IIepDocumentService
 
         await EnsureCurrentIepAsync(childProfileId, entity.Id, cancellationToken);
 
-        return ServiceResult<IepDocumentModel>.SuccessResult(MapToModel(entity), "IEP created successfully.");
+        return ServiceResult<IepDocumentModel>.SuccessResult(MapToModel(entity), _localizer["IepDocuments.CreatedSuccessfully"]);
     }
 
     public async Task<ServiceResult<IepDocumentModel>> AttachFileAsync(int id, int userId, string fileName, Stream fileStream, long fileSize, CancellationToken cancellationToken = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
         if (document == null)
-            return ServiceResult<IepDocumentModel>.FailureResult("Document not found.");
+            return ServiceResult<IepDocumentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult<IepDocumentModel>.FailureResult("Document not found.");
+            return ServiceResult<IepDocumentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (document.Status == "processing")
-            return ServiceResult<IepDocumentModel>.FailureResult("Cannot replace file while document is being processed. Please wait for processing to complete.");
+            return ServiceResult<IepDocumentModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["Documents.ProcessingInProgress"]);
 
         // Delete existing blob if replacing
         if (!string.IsNullOrEmpty(document.BlobUri))
@@ -116,17 +120,17 @@ public class IepDocumentService : IIepDocumentService
         _documentRepository.Update(document);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult<IepDocumentModel>.SuccessResult(MapToModel(document), "File attached successfully.");
+        return ServiceResult<IepDocumentModel>.SuccessResult(MapToModel(document), _localizer["Documents.FileAttachedSuccessfully"]);
     }
 
     public async Task<ServiceResult> UpdateMetadataAsync(int id, int userId, UpdateIepMetadataModel model, CancellationToken cancellationToken = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
         if (document == null)
-            return ServiceResult.FailureResult("Document not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult.FailureResult("Document not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (model.IepDate.HasValue)
             document.IepDate = model.IepDate.Value;
@@ -134,7 +138,7 @@ public class IepDocumentService : IIepDocumentService
         if (model.MeetingType != null)
         {
             if (!ValidMeetingTypes.Contains(model.MeetingType))
-                return ServiceResult.FailureResult("Invalid meeting type.");
+                return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["IepDocuments.InvalidMeetingType"]);
             document.MeetingType = model.MeetingType.ToLowerInvariant();
         }
 
@@ -148,13 +152,13 @@ public class IepDocumentService : IIepDocumentService
         _documentRepository.Update(document);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult("Metadata updated successfully.");
+        return ServiceResult.SuccessResult(_localizer["IepDocumentsApi.MetadataUpdated"]);
     }
 
     public async Task<ServiceResult<IepDocumentModel>> UploadAsync(int childProfileId, int userId, string fileName, Stream fileStream, long fileSize, CancellationToken cancellationToken = default)
     {
         if (!await _accessService.HasMinimumRoleAsync(childProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult<IepDocumentModel>.FailureResult("Child profile not found.");
+            return ServiceResult<IepDocumentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Children.NotFound"]);
 
         var blobPath = $"children/{childProfileId}/{Guid.NewGuid()}/{fileName}";
         await _blobStorage.UploadAsync(blobPath, fileStream, "application/pdf", cancellationToken);
@@ -175,17 +179,17 @@ public class IepDocumentService : IIepDocumentService
 
         await EnsureCurrentIepAsync(childProfileId, entity.Id, cancellationToken);
 
-        return ServiceResult<IepDocumentModel>.SuccessResult(MapToModel(entity), "IEP document uploaded successfully.");
+        return ServiceResult<IepDocumentModel>.SuccessResult(MapToModel(entity), _localizer["IepDocuments.UploadedSuccessfully"]);
     }
 
     public async Task<ServiceResult> DeleteAsync(int id, int userId, CancellationToken cancellationToken = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
         if (document == null)
-            return ServiceResult.FailureResult("Document not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Owner, cancellationToken))
-            return ServiceResult.FailureResult("Document not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (!string.IsNullOrEmpty(document.BlobUri))
         {
@@ -204,7 +208,7 @@ public class IepDocumentService : IIepDocumentService
         _documentRepository.Update(document);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult("Document deleted successfully.");
+        return ServiceResult.SuccessResult(_localizer["Documents.DeletedSuccessfully"]);
     }
 
     public async Task<string?> GetDownloadUrlAsync(int id, int userId, CancellationToken cancellationToken = default)

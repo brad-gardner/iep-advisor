@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { MessageCircleQuestion } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -20,8 +21,6 @@ interface AskAdvocateButtonProps {
   'data-testid'?: string;
 }
 
-const HELPER_TEXT = 'Opens a private conversation with the Virtual Advocate about this item.';
-
 const buttonClass =
   'inline-flex items-center justify-center rounded-button border-[1.5px] border-brand-teal-300 bg-transparent font-medium leading-[1.3] text-brand-teal-500 transition-colors hover:bg-brand-teal-50 focus:outline-none focus:ring-1 focus:ring-brand-teal-500 focus:ring-offset-2';
 
@@ -41,29 +40,31 @@ export function AskAdvocateButton({
   className,
   'data-testid': testId = 'ask-advocate',
 }: AskAdvocateButtonProps) {
+  const { t } = useTranslation('advocate');
   const helperId = useId();
   if (!canAsk) return null;
 
   const state: AboutNavigationState | undefined = label ? { aboutLabel: label } : undefined;
   const iconOnly = appearance === 'icon';
+  const helperText = t('askButton.helperText');
 
   return (
     <>
       <Link
         to={advocateHref(childId, formatAbout(about.kind, about.id))}
         state={state}
-        title={HELPER_TEXT}
+        title={helperText}
         aria-describedby={helperId}
-        aria-label={iconOnly ? (ariaLabel ?? 'Ask the advocate') : undefined}
+        aria-label={iconOnly ? (ariaLabel ?? t('askButton.label')) : undefined}
         className={cn(buttonClass, iconOnly ? 'h-8 w-8 p-0' : 'gap-1.5 px-3 py-1.5 text-xs', className)}
         data-testid={testId}
         data-about={formatAbout(about.kind, about.id)}
       >
         <MessageCircleQuestion className="h-4 w-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-        {!iconOnly && 'Ask the advocate'}
+        {!iconOnly && t('askButton.label')}
       </Link>
       <span id={helperId} className="sr-only">
-        {HELPER_TEXT}
+        {helperText}
       </span>
     </>
   );

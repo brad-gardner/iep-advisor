@@ -1,0 +1,13 @@
+{
+  "rsvpPage": {
+    "pageTitle": "Meeting RSVP",
+    "heading": "Meeting invitation",
+    "missingToken": "This link is missing its invitation token.",
+    "invalidLink": "This invitation link is no longer valid.",
+    "loadingInvitation": "Loading invitation…",
+    "respondedTitle": "Thanks — your response was recorded",
+    "respondedBody": "You responded: {{status}}.",
+    "changeResponse": "Change response",
+    "submitFailed": "Could not record your response."
+  }
+}

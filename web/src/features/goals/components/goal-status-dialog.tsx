@@ -1,11 +1,15 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
 import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
+import { goalStatusLabel } from '../lib/status-label';
 import { updateGoalStatus } from '../api/goals-api';
 import type { GoalRecordDto, SettableGoalRecordStatus } from '../types';
+
+const SETTABLE_STATUSES: SettableGoalRecordStatus[] = ['Met', 'NotMet', 'Active'];
 
 interface GoalStatusDialogProps {
   open: boolean;
@@ -21,6 +25,7 @@ const REASON_MAX_LENGTH = 1000;
  *  reason for Not met; the dialog mirrors that so a blank reason never
  *  round-trips. */
 export function GoalStatusDialog({ open, goal, onClose, onChanged }: GoalStatusDialogProps) {
+  const { t } = useTranslation(['goals', 'common']);
   const [status, setStatus] = useState<SettableGoalRecordStatus>('Met');
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,10 +58,10 @@ export function GoalStatusDialog({ open, goal, onClose, onChanged }: GoalStatusD
         onChanged(res.data);
         handleClose();
       } else {
-        setError(res.message ?? 'Could not update the goal status.');
+        setError(res.message ?? t('goals:statusDialog.updateFailed'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not update the goal status.'));
+      setError(apiErrorMessage(err, t('goals:statusDialog.updateFailed')));
     } finally {
       setIsSubmitting(false);
     }
@@ -67,12 +72,12 @@ export function GoalStatusDialog({ open, goal, onClose, onChanged }: GoalStatusD
       open={open}
       onClose={handleClose}
       preventClose={isSubmitting}
-      title="Update goal status"
+      title={t('goals:statusDialog.title')}
       data-testid="goal-status-dialog"
       footer={
         <>
           <Button variant="ghost" onClick={handleClose} disabled={isSubmitting}>
-            Cancel
+            {t('common:ui.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -80,7 +85,7 @@ export function GoalStatusDialog({ open, goal, onClose, onChanged }: GoalStatusD
             disabled={!canSubmit}
             data-testid="goal-status-dialog-submit"
           >
-            Save
+            {t('goals:statusDialog.save')}
           </Button>
         </>
       }
@@ -93,9 +98,9 @@ export function GoalStatusDialog({ open, goal, onClose, onChanged }: GoalStatusD
         )}
 
         <fieldset>
-          <legend className="mb-1 block text-[13px] font-medium text-brand-slate-600">Status</legend>
+          <legend className="mb-1 block text-[13px] font-medium text-brand-slate-600">{t('goals:statusDialog.statusLegend')}</legend>
           <div className="flex flex-wrap gap-3">
-            {(['Met', 'NotMet', 'Active'] as SettableGoalRecordStatus[]).map((s) => (
+            {SETTABLE_STATUSES.map((s) => (
               <label key={s} className="inline-flex items-center gap-1.5 text-sm text-brand-slate-700">
                 <input
                   type="radio"
@@ -105,14 +110,14 @@ export function GoalStatusDialog({ open, goal, onClose, onChanged }: GoalStatusD
                   onChange={() => setStatus(s)}
                   data-testid={`goal-status-dialog-status-${s}`}
                 />
-                {s === 'NotMet' ? 'Not met' : s}
+                {goalStatusLabel(s)}
               </label>
             ))}
           </div>
         </fieldset>
 
         <RichTextEditor
-          label={reasonRequired ? 'Reason *' : 'Reason'}
+          label={reasonRequired ? t('goals:statusDialog.reasonLabelRequired') : t('goals:statusDialog.reasonLabel')}
           value={reason}
           onChange={setReason}
           minRows={3}

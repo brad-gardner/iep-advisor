@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { RedFlag } from '@/types/api';
 import type {
   AnalysisRunLatest,
@@ -11,6 +12,9 @@ import type {
 } from '@/features/analysis/types';
 import { RunSectionDetail } from '@/features/analysis/components/run-section-detail';
 import { AdvocacyGapAnalysisSection } from '@/features/iep-documents/components/advocacy-gap-analysis';
+import { sectionTypeLabel } from '@/lib/section-type-label';
+import { analysisSourceTypeLabel } from '@/features/analysis/lib/source-type-label';
+import { GeneratedLanguageNotice } from '@/lib/i18n/generated-language-notice';
 import { EtrAnalysisEmptyState } from './etr-analysis-empty-state';
 import { EtrAnalysisProcessing } from './etr-analysis-processing';
 import { EtrAnalysisOverview } from './etr-analysis-overview';
@@ -41,25 +45,8 @@ interface EtrAnalysisTabProps {
   onReload: () => void;
 }
 
-const SECTION_LABELS: Record<string, string> = {
-  referral_reason: 'Referral Reason',
-  background_information: 'Background Information',
-  parent_input: 'Parent Input',
-  teacher_input: 'Teacher Input',
-  student_input: 'Student Input',
-  health_vision_hearing: 'Health, Vision & Hearing',
-  cognitive_assessment: 'Cognitive Assessment',
-  academic_assessment: 'Academic Assessment',
-  behavioral_social_emotional: 'Behavioral/Social-Emotional',
-  speech_language: 'Speech & Language',
-  occupational_physical_therapy: 'OT/PT',
-  adaptive_functional: 'Adaptive/Functional',
-  eligibility_determination: 'Eligibility Determination',
-  other: 'Other',
-};
-
 function otherSourceLabel(source: AnalysisRunOtherSource): string {
-  return source.label ?? `${source.sourceType} #${source.sourceId}`;
+  return source.label ?? `${analysisSourceTypeLabel(source.sourceType)} #${source.sourceId}`;
 }
 
 export function EtrAnalysisTab({
@@ -78,6 +65,7 @@ export function EtrAnalysisTab({
   onTrigger,
   onReload,
 }: EtrAnalysisTabProps) {
+  const { t } = useTranslation(['etr-documents', 'iep-documents', 'common', 'analysis']);
   const [activeView, setActiveView] = useState<string>('overview');
 
   // Ordinary (non-`etr_completeness`/`etr_eligibility`) sections for this
@@ -90,7 +78,7 @@ export function EtrAnalysisTab({
   const triggerErrorNotice = triggerError && (
     <Notice
       variant="error"
-      title="Unable to run analysis"
+      title={t('analysisTab.triggerErrorTitle')}
       role="alert"
       data-testid="analysis-trigger-error"
     >
@@ -101,7 +89,7 @@ export function EtrAnalysisTab({
   const loadErrorNotice = loadError && (
     <Notice
       variant="error"
-      title="Unable to load analysis"
+      title={t('analysisTab.loadErrorTitle')}
       role="alert"
       data-testid="analysis-load-error"
     >
@@ -114,7 +102,7 @@ export function EtrAnalysisTab({
           loading={isLoading}
           data-testid="analysis-load-retry"
         >
-          Try again
+          {t('common:ui.tryAgain')}
         </Button>
       </div>
     </Notice>
@@ -128,7 +116,7 @@ export function EtrAnalysisTab({
   if (isLoading && !run && !loadError) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading analysis…" />
+        <Spinner label={t('analysisTab.loadingAnalysis')} />
       </div>
     );
   }
@@ -164,12 +152,12 @@ export function EtrAnalysisTab({
         {loadErrorNotice}
         <div className="flex flex-col items-center justify-center py-16 px-4">
           <Card className="max-w-md text-center">
-            <Notice variant="error" title="Analysis Failed">
-              {run.errorMessage || 'An error occurred during analysis.'}
+            <Notice variant="error" title={t('analysisTab.analysisFailedTitle')}>
+              {run.errorMessage || t('analysisTab.analysisErrorGeneric')}
             </Notice>
             <div className="mt-4">
               <Button onClick={onTrigger} loading={isTriggering} data-testid="etr-analyze-button">
-                Retry Analysis
+                {t('analysisTab.retryAnalysis')}
               </Button>
             </div>
           </Card>
@@ -186,12 +174,12 @@ export function EtrAnalysisTab({
         {loadErrorNotice}
         <div className="flex flex-col items-center justify-center py-16 px-4">
           <Card className="max-w-md text-center">
-            <Notice variant="warning" title="Couldn't analyze this document">
-              {source.errorMessage || 'Something went wrong while analyzing this document.'}
+            <Notice variant="warning" title={t('analysisTab.sourceFailedTitle')}>
+              {source.errorMessage || t('analysisTab.sourceErrorGeneric')}
             </Notice>
             <div className="mt-4">
               <Button onClick={onTrigger} loading={isTriggering} data-testid="etr-analyze-button">
-                Analyze this ETR
+                {t('analysisTab.analyzeThisEtr')}
               </Button>
             </div>
           </Card>
@@ -233,6 +221,26 @@ export function EtrAnalysisTab({
     </button>
   );
 
+  // Built here, outside any JSX expression container, so the literal nav
+  // keys ('overview', 'gap-analysis', …) and `sectionTypeLabel`'s 'short'
+  // style argument don't trip `i18next/no-literal-string` — see
+  // iep-documents/analysis-tab.tsx's identical comment.
+  const sidebarButtons = [
+    sidebarButton('overview', t('analysisTab.overviewNav')),
+    hasGapAnalysis
+      ? sidebarButton(
+          'gap-analysis',
+          t('analysisTab.yourGoalsNav'),
+          run.advocacyGapAnalysis?.goalAlignments.length ?? 0,
+        )
+      : null,
+    completeness ? sidebarButton('completeness', t('analysisTab.completenessNav')) : null,
+    eligibility ? sidebarButton('eligibility', t('analysisTab.eligibilityNav')) : null,
+  ];
+  const sectionSidebarButtons = sectionKinds.map((kind) =>
+    sidebarButton(kind, sectionTypeLabel(kind, 'short')),
+  );
+
   const renderContent = () => {
     if (activeView === 'overview') {
       return (
@@ -270,17 +278,19 @@ export function EtrAnalysisTab({
       {triggerErrorNotice}
       {loadErrorNotice}
 
+      <GeneratedLanguageNotice generatedLanguage={run.generatedLanguage} />
+
       {isMultiSource && (
         <Notice
           variant="info"
-          title={`Part of an analysis with ${otherSources.map(otherSourceLabel).join(', ')}`}
+          title={t('analysisTab.multiSourceInfo', { sources: otherSources.map(otherSourceLabel).join(', ') })}
           data-testid="analysis-multi-source-info"
         >
           <Link
             to={`/children/${childId}/analysis?run=${run.id}`}
             className="font-medium text-brand-teal-600 underline underline-offset-2 hover:text-brand-teal-700 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal-500"
           >
-            View full analysis →
+            {t('analysisTab.viewFullAnalysis')}
           </Link>
         </Notice>
       )}
@@ -288,8 +298,8 @@ export function EtrAnalysisTab({
       {stale && (
         <div className="flex flex-wrap items-center justify-between gap-4" data-testid="analysis-stale-banner">
           <div className="min-w-[16rem] flex-1">
-            <Notice variant="warning" title="Analysis may be outdated">
-              This analysis was made before the ETR was last updated. Re-analyze to refresh it.
+            <Notice variant="warning" title={t('analysisTab.staleTitle')}>
+              {t('analysisTab.staleBody')}
             </Notice>
           </div>
           <Button
@@ -299,30 +309,18 @@ export function EtrAnalysisTab({
             data-testid="reanalyze-button"
             className="shrink-0"
           >
-            Re-analyze
+            {t('analysisTab.reanalyze')}
           </Button>
         </div>
       )}
 
       <div className="flex gap-4 min-h-[500px]">
         <nav className="w-56 shrink-0 space-y-0.5">
-          {sidebarButton('overview', 'Overview')}
-
-          {hasGapAnalysis &&
-            sidebarButton(
-              'gap-analysis',
-              'Your Goals',
-              run.advocacyGapAnalysis?.goalAlignments.length ?? 0,
-            )}
-
-          {completeness && sidebarButton('completeness', 'Assessment Completeness')}
-          {eligibility && sidebarButton('eligibility', 'Eligibility Review')}
+          {sidebarButtons}
 
           <div className="border-t border-brand-slate-200 my-2" />
 
-          {sectionKinds.map((kind) =>
-            sidebarButton(kind, SECTION_LABELS[kind] || kind),
-          )}
+          {sectionSidebarButtons}
         </nav>
 
         <Card className="flex-1 overflow-y-auto">{renderContent()}</Card>

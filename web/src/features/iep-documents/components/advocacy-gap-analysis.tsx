@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { AdvocacyGapAnalysis } from '@/types/api';
 import { GoalAlignmentCard } from './goal-alignment-card';
 
@@ -6,6 +7,7 @@ interface AdvocacyGapAnalysisProps {
 }
 
 export function AdvocacyGapAnalysisSection({ gapAnalysis }: AdvocacyGapAnalysisProps) {
+  const { t } = useTranslation('iep-documents');
   const addressed = gapAnalysis.goalAlignments.filter(
     (g) => g.alignmentStatus === 'addressed'
   ).length;
@@ -15,7 +17,7 @@ export function AdvocacyGapAnalysisSection({ gapAnalysis }: AdvocacyGapAnalysisP
     <section className="space-y-4">
       <div>
         <h2 className="font-serif text-[22px] font-semibold text-brand-slate-800 mb-1">
-          Your Advocacy Goals ({addressed}/{total} addressed)
+          {t('gapAnalysis.heading', { addressed, total })}
         </h2>
         <p className="text-sm text-brand-slate-600">{gapAnalysis.summary}</p>
       </div>

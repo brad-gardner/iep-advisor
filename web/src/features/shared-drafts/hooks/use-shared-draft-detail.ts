@@ -3,10 +3,17 @@ import { apiErrorMessage } from '@/lib/api-error';
 import { getSharedDraft } from '../api/shared-drafts-api';
 import type { SharedDraftRevisionDetailDto } from '../types';
 
+// A server-provided message is already resolved text (localized server-side);
+// the generic fallback is translated at RENDER time by the sole consumer
+// (`SharedDraftReviewPage`, via `shared-drafts:reviewPage.unavailableDefault`)
+// instead of here, so a language switch after a failed load shows the new
+// language immediately, without needing to refetch — same idiom as `useHome`.
+export type SharedDraftDetailError = { kind: 'server'; message: string } | { kind: 'generic' };
+
 interface UseSharedDraftDetailResult {
   detail: SharedDraftRevisionDetailDto | null;
   isLoading: boolean;
-  error: string | null;
+  error: SharedDraftDetailError | null;
   retry: () => void;
   /** Merge a server response (e.g. after acknowledging) into the loaded detail. */
   applyUpdate: (patch: Partial<SharedDraftRevisionDetailDto>) => void;
@@ -17,7 +24,7 @@ interface UseSharedDraftDetailResult {
  *  their status banner rather than treating them as an error. */
 export function useSharedDraftDetail(revisionId: number): UseSharedDraftDetailResult {
   const [detail, setDetail] = useState<SharedDraftRevisionDetailDto | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<SharedDraftDetailError | null>(null);
   const [retryToken, setRetryToken] = useState(0);
 
   // A revision switch (the revision-switcher `<Link>`) changes `revisionId`
@@ -42,14 +49,17 @@ export function useSharedDraftDetail(revisionId: number): UseSharedDraftDetailRe
         if (!active) return;
         setError(null);
         if (res.success && res.data) setDetail(res.data);
-        else setError(res.message ?? 'This shared draft is unavailable.');
+        else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'This shared draft is unavailable.'));
+        if (!active) return;
+        const serverMessage = apiErrorMessage(err, '');
+        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
       }
     })();
     return () => {
       active = false;
     };
+    // `t` deliberately excluded — see the module comment on `SharedDraftDetailError`.
   }, [revisionId, retryToken]);
 
   const applyUpdate = useCallback((patch: Partial<SharedDraftRevisionDetailDto>) => {

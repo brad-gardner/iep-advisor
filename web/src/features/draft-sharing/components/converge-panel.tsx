@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
@@ -29,6 +30,10 @@ interface ConvergePanelProps {
  *  changed in the live draft since then, and every family response grouped by
  *  open/resolved with jump-to-field and reply/resolve. */
 export function ConvergePanel({ instanceId, status, templateVersion, onBeforeJump }: ConvergePanelProps) {
+  // `shared-drafts` reached for `ChangeSummaryChips`'s own `t()` calls — loading
+  // this namespace's Spanish here guarantees it for that shared component too
+  // (see the README's "reach another namespace" gotcha).
+  const { t } = useTranslation(['draft-sharing', 'shared-drafts', 'common']);
   const { converge, isLoading, error, retry, applyResolvedResponse } = useConverge(instanceId);
   const [resolving, setResolving] = useState<DraftResponseDto | null>(null);
   const fieldLookup = useMemo(() => buildFieldLocationLookup(templateVersion), [templateVersion]);
@@ -36,7 +41,7 @@ export function ConvergePanel({ instanceId, status, templateVersion, onBeforeJum
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
-        <Spinner label="Loading converge view…" />
+        <Spinner label={t('converge.loading')} />
       </div>
     );
   }
@@ -46,9 +51,9 @@ export function ConvergePanel({ instanceId, status, templateVersion, onBeforeJum
   if (!converge) {
     return (
       <div role="alert">
-        <Notice variant="error" title={error ?? 'Could not load the converge view.'}>
+        <Notice variant="error" title={error && error.kind === 'server' ? error.message : t('converge.loadErrorDefault')}>
           <Button variant="secondary" className="mt-2" onClick={retry} data-testid="converge-retry">
-            Try again
+            {t('common:ui.tryAgain')}
           </Button>
         </Notice>
       </div>
@@ -68,9 +73,9 @@ export function ConvergePanel({ instanceId, status, templateVersion, onBeforeJum
     <div className="space-y-6" data-testid="converge-panel">
       {error && (
         <div role="alert">
-          <Notice variant="error" title={error}>
+          <Notice variant="error" title={error.kind === 'server' ? error.message : t('converge.loadErrorDefault')}>
             <Button variant="secondary" className="mt-2" onClick={retry} data-testid="converge-retry">
-              Try again
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
@@ -78,27 +83,25 @@ export function ConvergePanel({ instanceId, status, templateVersion, onBeforeJum
       <div className="flex flex-wrap items-center justify-between gap-3">
         {converge.latestRevision ? (
           <p className="text-sm text-brand-slate-600">
-            Revision {converge.latestRevision.revisionNumber} shared {formatDate(converge.latestRevision.sharedAt)}
+            {t('converge.sharedLine', { number: converge.latestRevision.revisionNumber, date: formatDate(converge.latestRevision.sharedAt) })}
           </p>
         ) : (
-          <p className="text-sm text-brand-slate-500">This draft hasn't been shared with the family yet.</p>
+          <p className="text-sm text-brand-slate-500">{t('converge.notSharedYet')}</p>
         )}
         <ShareWithFamilyButton
           instanceId={instanceId}
           status={status}
-          label={converge.latestRevision ? 'Share again' : 'Share with family'}
+          label={converge.latestRevision ? t('converge.shareAgainLabel') : t('shareWithFamilyLabel')}
           onShared={retry}
         />
       </div>
 
       {converge.acknowledgements.length > 0 && (
         <Card>
-          <h2 className="mb-2 font-serif text-base text-brand-slate-800">Acknowledged by</h2>
+          <h2 className="mb-2 font-serif text-base text-brand-slate-800">{t('converge.acknowledgedByHeading')}</h2>
           <ul className="space-y-1 text-sm text-brand-slate-600">
             {converge.acknowledgements.map((a, i) => (
-              <li key={`${a.parentName}-${i}`}>
-                {a.parentName} · {formatDate(a.acknowledgedAt)}
-              </li>
+              <li key={`${a.parentName}-${i}`}>{t('converge.acknowledgedLine', { name: a.parentName, date: formatDate(a.acknowledgedAt) })}</li>
             ))}
           </ul>
         </Card>
@@ -106,15 +109,15 @@ export function ConvergePanel({ instanceId, status, templateVersion, onBeforeJum
 
       {converge.changesSinceShare && (
         <Card data-testid="converge-changes-since-share">
-          <h2 className="mb-2 font-serif text-base text-brand-slate-800">Changes since last share</h2>
+          <h2 className="mb-2 font-serif text-base text-brand-slate-800">{t('converge.changesSinceLastShare')}</h2>
           <ChangeSummaryChips summary={converge.changesSinceShare} data-testid="converge-change-chips" />
         </Card>
       )}
 
       <div>
-        <h2 className="mb-3 font-serif text-lg text-brand-slate-800">Open responses</h2>
+        <h2 className="mb-3 font-serif text-lg text-brand-slate-800">{t('converge.openResponsesHeading')}</h2>
         {converge.openResponses.length === 0 ? (
-          <p className="text-sm text-brand-slate-500">Nothing waiting on a reply.</p>
+          <p className="text-sm text-brand-slate-500">{t('converge.noOpenResponses')}</p>
         ) : (
           <div className="space-y-3" data-testid="converge-open-responses">
             {converge.openResponses.map((r) => (
@@ -131,7 +134,7 @@ export function ConvergePanel({ instanceId, status, templateVersion, onBeforeJum
 
       {converge.resolvedResponses.length > 0 && (
         <div>
-          <h2 className="mb-3 font-serif text-lg text-brand-slate-800">Resolved</h2>
+          <h2 className="mb-3 font-serif text-lg text-brand-slate-800">{t('converge.resolvedHeading')}</h2>
           <div className="space-y-3" data-testid="converge-resolved-responses">
             {converge.resolvedResponses.map((r) => (
               <ResponseCard key={r.id} response={r} onJump={r.targetFieldKey ? () => jumpTo(r) : undefined} />

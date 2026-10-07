@@ -1,5 +1,7 @@
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Markdown } from '@/components/ui/markdown';
+import { formatDate } from '@/lib/format-date';
 import type { IepVersionDto } from '../types';
 
 interface VersionSnapshotProps {
@@ -27,6 +29,9 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 }
 
 function SectionsBlock({ sections }: { sections: IepVersionDto['sections'] }) {
+  // `s.sectionKind` below is the district's own template-authored section
+  // title (district content, like `orgRoleLabel`'s stored value) — NOT
+  // translated, same as the rest of this frozen snapshot's values.
   if (sections.length === 0) return null;
   return (
     <section data-testid="snapshot-sections" className="space-y-4">
@@ -45,10 +50,11 @@ function SectionsBlock({ sections }: { sections: IepVersionDto['sections'] }) {
 }
 
 function GoalsBlock({ goals }: { goals: IepVersionDto['goals'] }) {
+  const { t } = useTranslation('iep-versions');
   if (goals.length === 0) return null;
   return (
     <section data-testid="snapshot-goals">
-      <SectionHeading>Goals</SectionHeading>
+      <SectionHeading>{t('snapshot.goals')}</SectionHeading>
       <div className="space-y-4">
         {goals.map((g) => (
           <Card key={g.id}>
@@ -61,10 +67,10 @@ function GoalsBlock({ goals }: { goals: IepVersionDto['goals'] }) {
               {g.goalText || <span className="text-brand-slate-500">—</span>}
             </p>
             <dl className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
-              <Field label="Baseline" value={g.baseline} />
-              <Field label="Target criteria" value={g.targetCriteria} />
-              <Field label="Measurement" value={g.measurementMethod} />
-              <Field label="Timeframe" value={g.timeframe} />
+              <Field label={t('snapshot.baseline')} value={g.baseline} />
+              <Field label={t('snapshot.targetCriteria')} value={g.targetCriteria} />
+              <Field label={t('snapshot.measurement')} value={g.measurementMethod} />
+              <Field label={t('snapshot.timeframe')} value={g.timeframe} />
             </dl>
           </Card>
         ))}
@@ -74,20 +80,21 @@ function GoalsBlock({ goals }: { goals: IepVersionDto['goals'] }) {
 }
 
 function ServicesBlock({ serviceLines }: { serviceLines: IepVersionDto['serviceLines'] }) {
+  const { t } = useTranslation('iep-versions');
   if (serviceLines.length === 0) return null;
   return (
     <section data-testid="snapshot-services">
-      <SectionHeading>Services</SectionHeading>
+      <SectionHeading>{t('snapshot.services')}</SectionHeading>
       <Card className="overflow-x-auto p-0">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-brand-slate-500 border-b border-brand-slate-100">
-              <Th>Service</Th>
-              <Th>Frequency</Th>
-              <Th>Duration</Th>
-              <Th>Location</Th>
-              <Th>Provider</Th>
-              <Th>Dates</Th>
+              <Th>{t('snapshot.serviceColumn')}</Th>
+              <Th>{t('snapshot.frequencyColumn')}</Th>
+              <Th>{t('snapshot.durationColumn')}</Th>
+              <Th>{t('snapshot.locationColumn')}</Th>
+              <Th>{t('snapshot.providerColumn')}</Th>
+              <Th>{t('snapshot.datesColumn')}</Th>
             </tr>
           </thead>
           <tbody>
@@ -113,10 +120,11 @@ function AccommodationsBlock({
 }: {
   accommodations: IepVersionDto['accommodations'];
 }) {
+  const { t } = useTranslation('iep-versions');
   if (accommodations.length === 0) return null;
   return (
     <section data-testid="snapshot-accommodations">
-      <SectionHeading>Accommodations</SectionHeading>
+      <SectionHeading>{t('snapshot.accommodations')}</SectionHeading>
       <Card>
         <ul className="space-y-2 text-sm">
           {accommodations.map((a) => (
@@ -134,19 +142,20 @@ function AccommodationsBlock({
 }
 
 function TransitionBlock({ items }: { items: IepVersionDto['transitionItems'] }) {
+  const { t } = useTranslation('iep-versions');
   return (
     <section data-testid="snapshot-transition">
-      <SectionHeading>Transition</SectionHeading>
+      <SectionHeading>{t('snapshot.transition')}</SectionHeading>
       <div className="space-y-4">
-        {items.map((t) => (
-          <Card key={t.id}>
-            {t.postsecondaryGoalArea && (
+        {items.map((item) => (
+          <Card key={item.id}>
+            {item.postsecondaryGoalArea && (
               <p className="text-sm font-medium text-brand-slate-700 mb-1">
-                {t.postsecondaryGoalArea}
+                {item.postsecondaryGoalArea}
               </p>
             )}
             <p className="text-sm text-brand-slate-600 whitespace-pre-wrap">
-              {t.servicesText || <span className="text-brand-slate-500">—</span>}
+              {item.servicesText || <span className="text-brand-slate-500">—</span>}
             </p>
           </Card>
         ))}
@@ -174,13 +183,8 @@ function Td({ children }: { children: React.ReactNode }) {
 }
 
 function formatRange(start: string | null, end: string | null): string {
-  const fmt = (iso: string | null) => {
-    if (!iso) return '';
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString();
-  };
-  const s = fmt(start);
-  const e = fmt(end);
+  const s = start ? formatDate(start) : '';
+  const e = end ? formatDate(end) : '';
   if (s && e) return `${s} – ${e}`;
   return s || e || '';
 }

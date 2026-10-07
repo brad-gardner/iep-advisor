@@ -1,10 +1,14 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -52,7 +56,7 @@ public sealed class DraftResponseServiceTests : IDisposable
     private (DraftResponseService Service, FakeNotifications Notifications) CreateService(ApplicationDbContext ctx)
     {
         var notifications = new FakeNotifications();
-        return (new DraftResponseService(ctx, new AccessService(ctx), new OrgAccessService(ctx), notifications, NullLogger<DraftResponseService>.Instance), notifications);
+        return (new DraftResponseService(ctx, new AccessService(ctx), new OrgAccessService(ctx), notifications, NullLogger<DraftResponseService>.Instance, TestSupport.TestLocalizers.Messages()), notifications);
     }
 
     private sealed record Scenario(int InstanceId, int StudentId, int TeacherId, int ParentId);
@@ -142,6 +146,34 @@ public sealed class DraftResponseServiceTests : IDisposable
             var result = await service.CreateAsync(s2.ParentId, withdrawnId, new CreateDraftResponseModel { Kind = DraftResponseKind.Agree, Text = "OK" }, default);
             Assert.False(result.Success);
         }
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 3: CreateAsync/GetForParentAsync (the parent-reachable paths) now carry ServiceErrorKind
+    // explicitly, so Spanish wording never changes the controller's status routing — see
+    // IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure. The staff-only
+    // ResolveAsync/GetForInstanceAsync stay English-literal, deferred to Phase 5.
+
+    [Fact]
+    public async Task Create_OnNonActiveRevision_UnderSpanishCulture_MessageIsSpanish_AndMapsTo400ViaErrorKind()
+    {
+        var supersededId = SeedRevision("supersededes", SharedDraftStatus.Superseded, out var s1);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var (service, _) = CreateService(ctx);
+        var result = await service.CreateAsync(s1.ParentId, supersededId, new CreateDraftResponseModel { Kind = DraftResponseKind.Agree, Text = "OK" }, default);
+
+        Assert.False(result.Success);
+        Assert.Equal("Solo puede responder a la revisión actualmente activa.", result.Message);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
+    private sealed class TestController : ControllerBase
+    {
     }
 
     [Fact]

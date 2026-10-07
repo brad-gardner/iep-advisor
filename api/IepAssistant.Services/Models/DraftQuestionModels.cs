@@ -24,6 +24,11 @@ public class DraftAnswerModel
     public List<DraftCitationModel> Citations { get; set; } = new();
     public DateTime AnsweredAt { get; set; }
     public string Disclaimer { get; set; } = string.Empty;
+
+    /// <summary>"en" | "es" | null — the language this answer was generated in (multilingual plan
+    /// 2026-10-06 phase 3); always set (never null) for a freshly-answered question, matching the sibling
+    /// <see cref="ParentDraftNoteModel.GeneratedLanguage"/>'s nullable contract for a later read.</summary>
+    public string? GeneratedLanguage { get; set; }
 }
 
 /// <summary>A parent's own private note (question + answer). Never exposed to staff.</summary>
@@ -36,5 +41,10 @@ public class ParentDraftNoteModel
     public Guid? TargetFieldKey { get; set; }
     public string? TargetRowId { get; set; }
     public List<DraftCitationModel> Citations { get; set; } = new();
+
+    /// <summary>"en" | "es" | null — the language this answer was generated in; null means English,
+    /// including every note answered before this was tracked.</summary>
+    public string? GeneratedLanguage { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }

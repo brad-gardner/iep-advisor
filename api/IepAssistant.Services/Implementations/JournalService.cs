@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Data.Configurations;
 using IepAssistant.Domain.Entities;
@@ -10,7 +11,8 @@ namespace IepAssistant.Services.Implementations;
 /// <summary>
 /// Journal entries are markdown-at-rest: content goes through <see cref="RichTextSanitizer"/> BEFORE the
 /// length check so the stored value is what was measured. Access failures and unknown ids collapse to the
-/// same "not found" message so a caller can never probe whether an entry or child exists.
+/// same "not found" message (and <see cref="ServiceErrorKind.NotFound"/>, never Forbidden) so a caller can
+/// never probe whether an entry or child exists.
 /// </summary>
 public class JournalService : IJournalService
 {
@@ -18,26 +20,28 @@ public class JournalService : IJournalService
     public const int DefaultTake = 50;
     public const int MaxTake = 200;
 
-    private const string ChildNotFound = "Child profile not found.";
-    private const string EntryNotFound = "Journal entry not found.";
-
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _access;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public JournalService(ApplicationDbContext context, IAccessService access)
+    public JournalService(ApplicationDbContext context, IAccessService access, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _access = access;
+        _localizer = localizer;
     }
+
+    private LocalizedString ChildNotFound => _localizer["Children.NotFound"];
+    private LocalizedString EntryNotFound => _localizer["Journal.EntryNotFound"];
 
     public async Task<ServiceResult<List<JournalEntryModel>>> GetForChildAsync(int childId, int userId, JournalTag? tag = null, int? take = null, CancellationToken ct = default)
     {
         if (!await _access.HasMinimumRoleAsync(childId, userId, AccessRole.Viewer, ct))
-            return ServiceResult<List<JournalEntryModel>>.FailureResult(ChildNotFound);
+            return ServiceResult<List<JournalEntryModel>>.FailureResult(ServiceErrorKind.NotFound, ChildNotFound);
         if (tag is { } t && !Enum.IsDefined(t))
-            return ServiceResult<List<JournalEntryModel>>.FailureResult("Invalid tag.");
+            return ServiceResult<List<JournalEntryModel>>.FailureResult(ServiceErrorKind.Validation, _localizer["Journal.InvalidTag"]);
         if (take is < 1 or > MaxTake)
-            return ServiceResult<List<JournalEntryModel>>.FailureResult($"take must be between 1 and {MaxTake}.");
+            return ServiceResult<List<JournalEntryModel>>.FailureResult(ServiceErrorKind.Validation, _localizer["Journal.TakeOutOfRange", MaxTake]);
 
         var query = _context.JournalEntries.AsNoTracking().Where(j => j.ChildProfileId == childId);
         if (tag != null) query = query.Where(j => j.Tag == tag.Value);
@@ -52,10 +56,10 @@ public class JournalService : IJournalService
     public async Task<ServiceResult<JournalEntryModel>> CreateAsync(int childId, int userId, SaveJournalEntryModel model, CancellationToken ct = default)
     {
         if (!await _access.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult<JournalEntryModel>.FailureResult(ChildNotFound);
+            return ServiceResult<JournalEntryModel>.FailureResult(ServiceErrorKind.NotFound, ChildNotFound);
 
         var (content, error) = await ValidateAsync(childId, model, ct);
-        if (error != null) return ServiceResult<JournalEntryModel>.FailureResult(error);
+        if (error != null) return ServiceResult<JournalEntryModel>.FailureResult(ServiceErrorKind.Validation, error);
 
         var entity = new JournalEntry
         {
@@ -78,10 +82,10 @@ public class JournalService : IJournalService
     {
         var entity = await _context.JournalEntries.FirstOrDefaultAsync(j => j.Id == entryId, ct);
         if (entity == null || !await _access.HasMinimumRoleAsync(entity.ChildProfileId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult<JournalEntryModel>.FailureResult(EntryNotFound);
+            return ServiceResult<JournalEntryModel>.FailureResult(ServiceErrorKind.NotFound, EntryNotFound);
 
         var (content, error) = await ValidateAsync(entity.ChildProfileId, model, ct);
-        if (error != null) return ServiceResult<JournalEntryModel>.FailureResult(error);
+        if (error != null) return ServiceResult<JournalEntryModel>.FailureResult(ServiceErrorKind.Validation, error);
 
         entity.OccurredOn = model.OccurredOn;
         entity.Tag = model.Tag;
@@ -99,7 +103,7 @@ public class JournalService : IJournalService
     {
         var entity = await _context.JournalEntries.FirstOrDefaultAsync(j => j.Id == entryId, ct);
         if (entity == null || !await _access.HasMinimumRoleAsync(entity.ChildProfileId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult.FailureResult(EntryNotFound);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, EntryNotFound);
         _context.JournalEntries.Remove(entity);
         await _context.SaveChangesAsync(ct);
         return ServiceResult.SuccessResult();
@@ -108,25 +112,26 @@ public class JournalService : IJournalService
     /// <summary>Returns the sanitized content to persist, or an error. Sanitize first, then measure.</summary>
     private async Task<(string? Content, string? Error)> ValidateAsync(int childId, SaveJournalEntryModel model, CancellationToken ct)
     {
-        if (!Enum.IsDefined(model.Tag)) return (null, "Invalid tag.");
-        if (string.IsNullOrWhiteSpace(model.ContentMarkdown)) return (null, "Content is required.");
+        if (!Enum.IsDefined(model.Tag)) return (null, _localizer["Journal.InvalidTag"]);
+        if (string.IsNullOrWhiteSpace(model.ContentMarkdown)) return (null, _localizer["Journal.ContentRequired"]);
 
         var content = RichTextSanitizer.Sanitize(model.ContentMarkdown).Trim();
-        if (content.Length == 0) return (null, "Content is required.");
-        if (content.Length > MaxContentLength) return (null, $"Content must be {MaxContentLength} characters or fewer.");
+        if (content.Length == 0) return (null, _localizer["Journal.ContentRequired"]);
+        if (content.Length > MaxContentLength) return (null, _localizer["Journal.ContentTooLong", MaxContentLength]);
 
         if (model.OccurredOn > DateOnly.FromDateTime(DateTime.UtcNow))
-            return (null, "Date cannot be in the future.");
+            return (null, _localizer["Journal.DateInFuture"]);
 
         // Every optional link must resolve for THIS child — an id from another child is reported exactly
-        // like a nonexistent one (a 400, worded without "not found" so the controller does not map it to 404).
+        // like a nonexistent one (a 400 via ErrorKind.Validation, never ErrorKind.NotFound, so the
+        // controller never maps it to 404).
         if (model.LinkedIepDocumentId is { } iepId
             && !await _context.IepDocuments.AsNoTracking().AnyAsync(d => d.Id == iepId && d.ChildProfileId == childId && d.IsActive, ct))
-            return (null, "Linked IEP document is not available for this child.");
+            return (null, _localizer["Journal.LinkedIepUnavailable"]);
 
         if (model.LinkedEtrDocumentId is { } etrId
             && !await _context.EtrDocuments.AsNoTracking().AnyAsync(d => d.Id == etrId && d.ChildProfileId == childId && d.IsActive, ct))
-            return (null, "Linked ETR document is not available for this child.");
+            return (null, _localizer["Journal.LinkedEtrUnavailable"]);
 
         // Meetings belong to a SchoolStudent; a parent sees them through an accepted, active ChildLink
         // (same rule as MeetingService.ListForChildAsync). A parent-only child has no links, so no meeting
@@ -134,7 +139,7 @@ public class JournalService : IJournalService
         if (model.LinkedMeetingId is { } meetingId
             && !await _context.Meetings.AsNoTracking().AnyAsync(m => m.Id == meetingId
                 && _context.ChildLinks.Any(l => l.ChildProfileId == childId && l.IsActive && l.AcceptedAt != null && l.SchoolStudentId == m.SchoolStudentId), ct))
-            return (null, "Linked meeting is not available for this child.");
+            return (null, _localizer["Journal.LinkedMeetingUnavailable"]);
 
         return (content, null);
     }

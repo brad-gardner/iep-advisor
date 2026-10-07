@@ -1,15 +1,28 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
 using IepAssistant.Domain.Repositories;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
+/// <summary>
+/// Multilingual plan (2026-10-06) phase 3: <see cref="AnalyzeAsync"/> runs entirely in
+/// <c>ProgressReportAnalysisWorker</c>, a background queue — with no requester-specific request culture
+/// of its own — and the controller action that enqueues it (<c>ProgressReportsController</c>) belongs to
+/// a different, concurrently active work item, so this service cannot capture an ephemeral request
+/// culture the way <c>AnalysisRunService</c>/<c>MeetingPrepService</c> do. Instead it resolves the
+/// language from the owning child's parent's own saved <see cref="Domain.Entities.User.PreferredLanguage"/>
+/// — a stable, account-level signal available entirely from within this service, scoped to exactly the
+/// child this report belongs to.
+/// </summary>
 public class ProgressReportAnalysisService : IProgressReportAnalysisService
 {
     private readonly IProgressReportRepository _reportRepository;
@@ -20,6 +33,7 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
     private readonly IBlobStorageService _blobStorage;
     private readonly ApplicationDbContext _context;
     private readonly IClaudeClient _claudeClient;
+    private readonly IStringLocalizer<Ai> _localizer;
     private readonly ILogger<ProgressReportAnalysisService> _logger;
 
     private static readonly JsonSerializerOptions CamelCaseOptions = new()
@@ -41,6 +55,7 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
         IBlobStorageService blobStorage,
         ApplicationDbContext context,
         IClaudeClient claudeClient,
+        IStringLocalizer<Ai> localizer,
         ILogger<ProgressReportAnalysisService> logger)
     {
         _reportRepository = reportRepository;
@@ -51,6 +66,7 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
         _blobStorage = blobStorage;
         _context = context;
         _claudeClient = claudeClient;
+        _localizer = localizer;
         _logger = logger;
     }
 
@@ -80,6 +96,30 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
             return;
         }
 
+        // This runs in ProgressReportAnalysisWorker, outside any request — see the class doc comment for
+        // why the language comes from a saved account preference rather than a captured request
+        // culture. Prefers the UPLOADER's (report.CreatedById) own preference — they are the one who
+        // chose to upload this file and the most likely reader of the resulting analysis — falling back
+        // to the owning parent's preference, then English, when either is unset/invalid/missing.
+        string? uploaderLanguage = null;
+        if (report.CreatedById.HasValue)
+        {
+            uploaderLanguage = await _context.Users.AsNoTracking()
+                .Where(u => u.Id == report.CreatedById.Value)
+                .Select(u => u.PreferredLanguage)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        var ownerLanguage = await _context.ChildProfiles.AsNoTracking()
+            .Where(c => c.Id == report.ChildProfileId)
+            .Select(c => c.User!.PreferredLanguage)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var language = SupportedLanguages.Normalize(uploaderLanguage)
+            ?? SupportedLanguages.Normalize(ownerLanguage)
+            ?? SupportedLanguages.English;
+        using var _ = CultureScope.For(language);
+
         if (string.IsNullOrEmpty(report.BlobUri))
         {
             _logger.LogWarning("Progress report {Id} has no attached file", progressReportId);
@@ -95,6 +135,9 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
 
         analysis.Status = "analyzing";
         analysis.ErrorMessage = null;
+        // Set before every branch below (error rows included), not only on success — an error row must
+        // still record which language its (localized) ErrorMessage was written in.
+        analysis.Language = language;
         report.Status = "processing";
         _reportRepository.Update(report);
         await _context.SaveChangesAsync(cancellationToken);
@@ -125,7 +168,7 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
             if (pdfBytes.Length == 0)
             {
                 analysis.Status = "error";
-                analysis.ErrorMessage = "Could not download progress report file.";
+                analysis.ErrorMessage = _localizer["ProgressReportAnalysis.DownloadFailed"];
                 report.Status = "error";
                 _reportRepository.Update(report);
                 await _context.SaveChangesAsync(cancellationToken);
@@ -137,7 +180,7 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
             if (analysisResult == null)
             {
                 analysis.Status = "error";
-                analysis.ErrorMessage = "Failed to generate analysis.";
+                analysis.ErrorMessage = _localizer["ProgressReportAnalysis.GenerationFailed"];
                 report.Status = "error";
                 _reportRepository.Update(report);
                 await _context.SaveChangesAsync(cancellationToken);
@@ -182,7 +225,7 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
             try
             {
                 analysis.Status = "error";
-                analysis.ErrorMessage = "An unexpected error occurred during analysis.";
+                analysis.ErrorMessage = _localizer["ProgressReportAnalysis.UnexpectedError"];
                 report.Status = "error";
                 _reportRepository.Update(report);
                 await _context.SaveChangesAsync(cancellationToken);
@@ -213,9 +256,11 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
         var systemPrompt = BuildSystemPrompt(hasParentGoals);
         var userText = BuildUserPrompt(iepGoals, parentGoals);
 
+        // CurrentUICulture is the owning parent's PreferredLanguage here — AnalyzeAsync (the only
+        // caller) wraps its whole body in CultureScope.For(ownerLanguage) before this runs.
         var responseText = await _claudeClient.CompleteAsync(new ClaudeCompletionRequest
         {
-            SystemPrompt = systemPrompt,
+            SystemPrompt = systemPrompt + ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture),
             UserText = userText,
             PdfDocument = pdfBytes,
             MaxTokens = 32000,
@@ -240,13 +285,48 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
 
         try
         {
-            return JsonSerializer.Deserialize<ProgressReportAnalysisResponse>(responseText, CaseInsensitiveOptions);
+            var parsed = JsonSerializer.Deserialize<ProgressReportAnalysisResponse>(responseText, CaseInsensitiveOptions);
+            if (parsed != null)
+                NormalizeEnums(parsed);
+            return parsed;
         }
         catch (JsonException ex)
         {
             var head = responseText[..Math.Min(500, responseText.Length)];
             _logger.LogError(ex, "Failed to parse progress report analysis JSON. HEAD: {Head}", head);
             return null;
+        }
+    }
+
+    // Enum-like string fields (progress rating, evidence quality, severity, category, alignment
+    // status) are normalized right after a successful parse: ResponseLanguage's instruction tells a
+    // Spanish-responding model to keep these in English, but that is an instruction, not a guarantee —
+    // see AiEnumNormalization's doc comment for the "unknown -> more severe/conservative" fallback rule.
+    internal static void NormalizeEnums(ProgressReportAnalysisResponse response)
+    {
+        // RemoveNullElements drops any explicit JSON `null` array entries before the loops below
+        // dereference every element unconditionally — see its doc comment for why deserialization can
+        // produce those despite each element type being non-nullable.
+        response.GoalProgressFindings = AiEnumNormalization.RemoveNullElements(response.GoalProgressFindings);
+        foreach (var finding in response.GoalProgressFindings)
+        {
+            finding.ProgressRating = AiEnumNormalization.NormalizeProgressRating(finding.ProgressRating);
+            finding.EvidenceQuality = AiEnumNormalization.NormalizeEvidenceQuality(finding.EvidenceQuality);
+        }
+
+        response.RedFlags = AiEnumNormalization.RemoveNullElements(response.RedFlags);
+        foreach (var flag in response.RedFlags)
+        {
+            flag.Severity = AiEnumNormalization.NormalizeHighMediumLowSeverity(flag.Severity);
+            flag.Category = AiEnumNormalization.NormalizeRedFlagCategory(flag.Category);
+        }
+
+        if (response.AdvocacyGapAnalysis != null)
+        {
+            response.AdvocacyGapAnalysis.GoalAlignments =
+                AiEnumNormalization.RemoveNullElements(response.AdvocacyGapAnalysis.GoalAlignments);
+            foreach (var alignment in response.AdvocacyGapAnalysis.GoalAlignments)
+                alignment.AlignmentStatus = AiEnumNormalization.NormalizeAlignmentStatus(alignment.AlignmentStatus);
         }
     }
 
@@ -389,6 +469,7 @@ OUTPUT RULES:
             ParentGoalsSnapshot = DeserializeOrEmpty<List<ParentGoalSnapshot>>(entity.ParentGoalsSnapshot),
             IepGoalsSnapshot = DeserializeOrEmpty<List<IepGoalSnapshot>>(entity.IepGoalsSnapshot),
             ErrorMessage = entity.ErrorMessage,
+            GeneratedLanguage = entity.Language,
             CreatedAt = entity.CreatedAt,
         };
     }

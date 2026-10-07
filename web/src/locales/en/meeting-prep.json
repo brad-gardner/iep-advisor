@@ -1,0 +1,95 @@
+{
+  "checklistItem": {
+    "uncheck": "Uncheck item",
+    "check": "Check item",
+    "collapse": "Collapse details",
+    "expand": "Expand details"
+  },
+  "checklistSection": {
+    "completedCount": "{{checked}} of {{total}} completed"
+  },
+  "toast": {
+    "questionAdded": "Added to your questions",
+    "questionExists": "Already in your questions",
+    "questionFailed": "Could not add that question",
+    "checklistReady": "Meeting prep ready"
+  },
+  "dateControl": {
+    "label": "Meeting date (optional)",
+    "generate": "Generate",
+    "savedDate": "Current checklist meeting date: {{date}}"
+  },
+  "emptyState": {
+    "title": "Prepare for Your Meeting",
+    "descriptionIep": "on your child's IEP.",
+    "descriptionEtr": "on your child's ETR.",
+    "description": "Generate a personalized meeting prep checklist with questions to ask, documents to bring, rights to reference, and potential red flags based {{source}}",
+    "generate": "Generate Meeting Prep"
+  },
+  "tab": {
+    "loading": "Loading meeting prep…",
+    "generatingSpinner": "Generating your checklist…",
+    "generatingTitle": "Generating Your Checklist",
+    "generatingBody": "Building a personalized meeting prep checklist. This typically takes 30-60 seconds.",
+    "generationFailedTitle": "Generation Failed",
+    "genericGenerationError": "An error occurred while generating the checklist.",
+    "retry": "Retry",
+    "staleTitle": "Meeting prep may be outdated",
+    "staleBody": "This checklist was generated before the latest analysis. Regenerate to include updated insights.",
+    "sourceIepDated": "Based on the IEP dated {{date}} and your goals",
+    "sourceIep": "Based on your IEP and your goals",
+    "sourceEtr": "Based on your ETR and your goals",
+    "sourceGoalsOnly": "Based on your goals — no IEP on file yet",
+    "itemsChecked": "{{checked}} of {{total}} items checked",
+    "percent": "{{percent}}%",
+    "regenerate": "Regenerate",
+    "regenerateConfirmTitle": "Regenerate checklist?",
+    "regenerateConfirmBody": "This will create a new checklist. Your current progress will not be carried over.",
+    "sections": {
+      "questionsToAsk": "Questions to Ask",
+      "redFlagsToRaise": "Red Flags to Raise",
+      "preparationNotes": "Preparation Notes",
+      "documentsToBring": "Documents to Bring",
+      "rightsToReference": "Rights to Reference",
+      "goalGaps": "Goal Gaps",
+      "generalTips": "General Tips"
+    }
+  },
+  "parentQuestionRow": {
+    "duplicateError": "That question is already on your list.",
+    "invalidError": "Write a question of up to {{max}} characters.",
+    "saveFailedError": "Could not save your change. Please try again.",
+    "actionsFor": "Actions for: {{text}}",
+    "moveUp": "Move up: {{text}}",
+    "moveDown": "Move down: {{text}}",
+    "editQuestion": "Edit question: {{text}}",
+    "editQuestionLabel": "Edit question",
+    "removeQuestion": "Remove question: {{text}}",
+    "save": "Save"
+  },
+  "parentQuestions": {
+    "duplicateError": "That question is already on your list.",
+    "invalidError": "Write a question of up to {{max}} characters.",
+    "saveFailedError": "Could not save your question. Please try again.",
+    "removeError": "Could not remove this question.",
+    "heading": "Your questions",
+    "description": "Questions you add yourself or accept from the advocate.",
+    "loadingLabel": "Loading your questions",
+    "empty": "Nothing yet. Add a question below, or accept one the advocate suggests.",
+    "askedCount": "{{checked}} of {{total}} asked",
+    "addLabel": "Add a question",
+    "addPlaceholder": "What would you like to ask the team?",
+    "add": "Add",
+    "removeDialogTitle": "Remove question",
+    "removeDialogMessage": "Remove \"{{text}}\" from your list?",
+    "removeConfirm": "Remove question"
+  },
+  "studentSharedEntries": {
+    "heading": "From your student",
+    "description": "What your student chose to share to help you prepare."
+  },
+  "forbiddenMessage": "You don't have permission to change these questions.",
+  "loadError": "Could not load your questions.",
+  "updateCheckFailed": "Could not update that question.",
+  "reorderFailed": "Could not reorder your questions."
+}

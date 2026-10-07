@@ -1,0 +1,95 @@
+{
+  "checklistItem": {
+    "uncheck": "Desmarcar elemento",
+    "check": "Marcar elemento",
+    "collapse": "Contraer detalles",
+    "expand": "Expandir detalles"
+  },
+  "checklistSection": {
+    "completedCount": "{{checked}} de {{total}} completados"
+  },
+  "toast": {
+    "questionAdded": "Agregada a sus preguntas",
+    "questionExists": "Ya está en sus preguntas",
+    "questionFailed": "No se pudo agregar esa pregunta",
+    "checklistReady": "La preparación para la reunión está lista"
+  },
+  "dateControl": {
+    "label": "Fecha de la reunión (opcional)",
+    "generate": "Generar",
+    "savedDate": "Fecha de la reunión de la lista actual: {{date}}"
+  },
+  "emptyState": {
+    "title": "Prepárese para su reunión",
+    "descriptionIep": "el IEP de su hijo o hija.",
+    "descriptionEtr": "el ETR de su hijo o hija.",
+    "description": "Genere una lista de preparación personalizada con preguntas para hacer, documentos para llevar, derechos a los que referirse y posibles señales de alerta basadas en {{source}}",
+    "generate": "Generar preparación para la reunión"
+  },
+  "tab": {
+    "loading": "Cargando la preparación para la reunión…",
+    "generatingSpinner": "Generando su lista…",
+    "generatingTitle": "Generando su lista de preparación",
+    "generatingBody": "Elaborando una lista de preparación personalizada para la reunión. Esto suele tardar entre 30 y 60 segundos.",
+    "generationFailedTitle": "Error al generar",
+    "genericGenerationError": "Ocurrió un error al generar la lista.",
+    "retry": "Reintentar",
+    "staleTitle": "La preparación para la reunión podría estar desactualizada",
+    "staleBody": "Esta lista se generó antes del análisis más reciente. Vuelva a generarla para incluir información actualizada.",
+    "sourceIepDated": "Basado en el IEP con fecha {{date}} y sus metas",
+    "sourceIep": "Basado en su IEP y sus metas",
+    "sourceEtr": "Basado en su ETR y sus metas",
+    "sourceGoalsOnly": "Basado en sus metas — aún no hay un IEP registrado",
+    "itemsChecked": "{{checked}} de {{total}} elementos marcados",
+    "percent": "{{percent}}%",
+    "regenerate": "Volver a generar",
+    "regenerateConfirmTitle": "¿Volver a generar la lista?",
+    "regenerateConfirmBody": "Esto creará una nueva lista. Su progreso actual no se conservará.",
+    "sections": {
+      "questionsToAsk": "Preguntas para hacer",
+      "redFlagsToRaise": "Señales de alerta para plantear",
+      "preparationNotes": "Notas de preparación",
+      "documentsToBring": "Documentos para llevar",
+      "rightsToReference": "Derechos a los que referirse",
+      "goalGaps": "Brechas en las metas",
+      "generalTips": "Consejos generales"
+    }
+  },
+  "parentQuestionRow": {
+    "duplicateError": "Esa pregunta ya está en su lista.",
+    "invalidError": "Escriba una pregunta de hasta {{max}} caracteres.",
+    "saveFailedError": "No se pudo guardar su cambio. Intente de nuevo.",
+    "actionsFor": "Acciones para: {{text}}",
+    "moveUp": "Subir: {{text}}",
+    "moveDown": "Bajar: {{text}}",
+    "editQuestion": "Editar pregunta: {{text}}",
+    "editQuestionLabel": "Editar pregunta",
+    "removeQuestion": "Eliminar pregunta: {{text}}",
+    "save": "Guardar"
+  },
+  "parentQuestions": {
+    "duplicateError": "Esa pregunta ya está en su lista.",
+    "invalidError": "Escriba una pregunta de hasta {{max}} caracteres.",
+    "saveFailedError": "No se pudo guardar su pregunta. Intente de nuevo.",
+    "removeError": "No se pudo eliminar esta pregunta.",
+    "heading": "Sus preguntas",
+    "description": "Preguntas que usted agrega o acepta del asesor virtual.",
+    "loadingLabel": "Cargando sus preguntas",
+    "empty": "Aún no hay nada. Agregue una pregunta abajo o acepte una que sugiera el asesor virtual.",
+    "askedCount": "{{checked}} de {{total}} preguntadas",
+    "addLabel": "Agregar una pregunta",
+    "addPlaceholder": "¿Qué le gustaría preguntarle al equipo?",
+    "add": "Agregar",
+    "removeDialogTitle": "Eliminar pregunta",
+    "removeDialogMessage": "¿Eliminar \"{{text}}\" de su lista?",
+    "removeConfirm": "Eliminar pregunta"
+  },
+  "studentSharedEntries": {
+    "heading": "De su estudiante",
+    "description": "Lo que su estudiante decidió compartir para ayudarle a prepararse."
+  },
+  "forbiddenMessage": "No tiene permiso para cambiar estas preguntas.",
+  "loadError": "No se pudieron cargar sus preguntas.",
+  "updateCheckFailed": "No se pudo actualizar esa pregunta.",
+  "reorderFailed": "No se pudo reordenar sus preguntas."
+}

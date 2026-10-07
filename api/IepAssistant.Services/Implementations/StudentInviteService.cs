@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -27,19 +28,22 @@ public class StudentInviteService : IStudentInviteService
     private readonly IOrgAccessService _orgAccess;
     private readonly IEmailService _emailService;
     private readonly ILogger<StudentInviteService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public StudentInviteService(
         ApplicationDbContext context,
         IAccessService accessService,
         IOrgAccessService orgAccess,
         IEmailService emailService,
-        ILogger<StudentInviteService> logger)
+        ILogger<StudentInviteService> logger,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _accessService = accessService;
         _orgAccess = orgAccess;
         _emailService = emailService;
         _logger = logger;
+        _localizer = localizer;
     }
 
     // ----------------------------------------------------------------- Parent: invite
@@ -47,13 +51,13 @@ public class StudentInviteService : IStudentInviteService
     public async Task<ServiceResult<StudentInviteModel>> InviteFromParentAsync(int parentUserId, int childProfileId, string studentEmail, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(studentEmail))
-            return ServiceResult<StudentInviteModel>.FailureResult("Student email is required.");
+            return ServiceResult<StudentInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StudentInvites.EmailRequired"]);
 
         studentEmail = studentEmail.Trim();
 
         var isOwner = await _accessService.HasMinimumRoleAsync(childProfileId, parentUserId, AccessRole.Owner, ct);
         if (!isOwner)
-            return ServiceResult<StudentInviteModel>.FailureResult("You do not have permission to invite a student for this child.");
+            return ServiceResult<StudentInviteModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["StudentInvites.NoPermissionParent"]);
 
         var now = DateTime.UtcNow;
 
@@ -65,7 +69,7 @@ public class StudentInviteService : IStudentInviteService
                                    && i.AcceptedAt == null
                                    && i.InviteExpiresAt > now, ct);
         if (existing != null)
-            return ServiceResult<StudentInviteModel>.SuccessResult(MapToModel(existing), "A pending invite already exists.");
+            return ServiceResult<StudentInviteModel>.SuccessResult(MapToModel(existing), _localizer["ChildLinks.PendingInviteExists"]);
 
         var rawToken = InviteTokenHelper.Generate();
         var invite = new StudentInvite
@@ -95,7 +99,7 @@ public class StudentInviteService : IStudentInviteService
 
         _logger.LogInformation("Parent {ParentUserId} invited student {Email} for child {ChildId}", parentUserId, studentEmail, childProfileId);
 
-        return ServiceResult<StudentInviteModel>.SuccessResult(MapToModel(invite), "Invite sent successfully.");
+        return ServiceResult<StudentInviteModel>.SuccessResult(MapToModel(invite), _localizer["Invites.SentSuccessfully"]);
     }
 
     // ----------------------------------------------------------------- Educator: invite
@@ -103,13 +107,13 @@ public class StudentInviteService : IStudentInviteService
     public async Task<ServiceResult<StudentInviteModel>> InviteFromEducatorAsync(int educatorUserId, int schoolStudentId, string studentEmail, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(studentEmail))
-            return ServiceResult<StudentInviteModel>.FailureResult("Student email is required.");
+            return ServiceResult<StudentInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StudentInvites.EmailRequired"]);
 
         studentEmail = studentEmail.Trim();
 
         var access = await GetEducatorStudentAccessAsync(educatorUserId, schoolStudentId, ct);
         if (access.student == null)
-            return ServiceResult<StudentInviteModel>.FailureResult("You do not have permission to invite a student for this record.");
+            return ServiceResult<StudentInviteModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["StudentInvites.NoPermissionEducator"]);
 
         var student = access.student;
         var now = DateTime.UtcNow;
@@ -122,7 +126,7 @@ public class StudentInviteService : IStudentInviteService
                                    && i.AcceptedAt == null
                                    && i.InviteExpiresAt > now, ct);
         if (existing != null)
-            return ServiceResult<StudentInviteModel>.SuccessResult(MapToModel(existing), "A pending invite already exists.");
+            return ServiceResult<StudentInviteModel>.SuccessResult(MapToModel(existing), _localizer["ChildLinks.PendingInviteExists"]);
 
         var rawToken = InviteTokenHelper.Generate();
         var invite = new StudentInvite
@@ -152,7 +156,7 @@ public class StudentInviteService : IStudentInviteService
 
         _logger.LogInformation("Educator {EducatorUserId} invited student {Email} for school student {StudentId}", educatorUserId, studentEmail, schoolStudentId);
 
-        return ServiceResult<StudentInviteModel>.SuccessResult(MapToModel(invite), "Invite sent successfully.");
+        return ServiceResult<StudentInviteModel>.SuccessResult(MapToModel(invite), _localizer["Invites.SentSuccessfully"]);
     }
 
     // ----------------------------------------------------------------- Student: preview
@@ -161,11 +165,11 @@ public class StudentInviteService : IStudentInviteService
     {
         var invite = await FindActiveInviteAsync(token, ct);
         if (invite == null)
-            return ServiceResult<StudentInvitePreviewModel>.FailureResult("Invalid or expired invite token.");
+            return ServiceResult<StudentInvitePreviewModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Invites.InvalidOrExpired"]);
 
         var emailCheck = await VerifyEmailMatchAsync(userId, invite, ct);
         if (!emailCheck.Success)
-            return ServiceResult<StudentInvitePreviewModel>.FailureResult(emailCheck.Message!);
+            return ServiceResult<StudentInvitePreviewModel>.FailureResult(emailCheck.ErrorKind, emailCheck.Message!);
 
         var preview = new StudentInvitePreviewModel { InviteExpiresAt = invite.InviteExpiresAt };
 
@@ -176,7 +180,7 @@ public class StudentInviteService : IStudentInviteService
                 .Select(c => c.FirstName)
                 .FirstOrDefaultAsync(ct);
             if (firstName == null)
-                return ServiceResult<StudentInvitePreviewModel>.FailureResult("The invited record was not found.");
+                return ServiceResult<StudentInvitePreviewModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["StudentInvites.RecordNotFound"]);
             preview.InviteSource = "Parent";
             preview.LinkedToFirstName = firstName;
         }
@@ -186,7 +190,7 @@ public class StudentInviteService : IStudentInviteService
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.Id == invite.SchoolStudentId.Value, ct);
             if (student == null)
-                return ServiceResult<StudentInvitePreviewModel>.FailureResult("The invited record was not found.");
+                return ServiceResult<StudentInvitePreviewModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["StudentInvites.RecordNotFound"]);
             preview.InviteSource = "Educator";
             preview.LinkedToFirstName = student.FirstName;
             preview.SchoolName = await _context.Schools
@@ -196,7 +200,7 @@ public class StudentInviteService : IStudentInviteService
         }
         else
         {
-            return ServiceResult<StudentInvitePreviewModel>.FailureResult("Invalid or expired invite token.");
+            return ServiceResult<StudentInvitePreviewModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Invites.InvalidOrExpired"]);
         }
 
         return ServiceResult<StudentInvitePreviewModel>.SuccessResult(preview);
@@ -208,19 +212,19 @@ public class StudentInviteService : IStudentInviteService
     {
         // CONSENT GATE — do NOT activate the account without explicit consent.
         if (!consentAccepted)
-            return ServiceResult<AcceptStudentInviteModel>.FailureResult("Consent is required to activate your student account.");
+            return ServiceResult<AcceptStudentInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StudentInvites.ConsentRequired"]);
 
         var invite = await FindActiveInviteAsync(token, ct);
         if (invite == null)
-            return ServiceResult<AcceptStudentInviteModel>.FailureResult("Invalid or expired invite token.");
+            return ServiceResult<AcceptStudentInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Invites.InvalidOrExpired"]);
 
         var user = await _context.Users.FindAsync(new object[] { studentUserId }, ct);
         if (user == null)
-            return ServiceResult<AcceptStudentInviteModel>.FailureResult("User not found.");
+            return ServiceResult<AcceptStudentInviteModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Auth.UserNotFound"]);
 
         if (!string.IsNullOrEmpty(invite.InviteEmail) &&
             !string.Equals(user.Email, invite.InviteEmail, StringComparison.OrdinalIgnoreCase))
-            return ServiceResult<AcceptStudentInviteModel>.FailureResult("This invite was sent to a different email address.");
+            return ServiceResult<AcceptStudentInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Invites.SentToDifferentEmail"]);
 
         var now = DateTime.UtcNow;
 
@@ -243,12 +247,12 @@ public class StudentInviteService : IStudentInviteService
         if (invite.ChildProfileId.HasValue
             && profile.ChildProfileId.HasValue
             && profile.ChildProfileId.Value != invite.ChildProfileId.Value)
-            return ServiceResult<AcceptStudentInviteModel>.FailureResult("Your student account is already linked to a different child.");
+            return ServiceResult<AcceptStudentInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StudentInvites.AlreadyLinkedDifferentChild"]);
 
         if (invite.SchoolStudentId.HasValue
             && profile.SchoolStudentId.HasValue
             && profile.SchoolStudentId.Value != invite.SchoolStudentId.Value)
-            return ServiceResult<AcceptStudentInviteModel>.FailureResult("Your student account is already linked to a different school record.");
+            return ServiceResult<AcceptStudentInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StudentInvites.AlreadyLinkedDifferentSchool"]);
 
         // Same-person guard: when this invite would set the SECOND side, the two sides must describe
         // the SAME real student — i.e. an active accepted ChildLink already pairs them. Otherwise a
@@ -265,7 +269,7 @@ public class StudentInviteService : IStudentInviteService
                   && l.IsActive && l.AcceptedAt != null, ct);
             if (!sidesArePaired)
                 return ServiceResult<AcceptStudentInviteModel>.FailureResult(
-                    "This invite is for a different student than your account is already linked to.");
+                    ServiceErrorKind.Validation, _localizer["StudentInvites.DifferentStudentMismatch"]);
         }
 
         // Atomically claim the token (single-use) BEFORE writing the links, so two concurrent accepts
@@ -277,7 +281,7 @@ public class StudentInviteService : IStudentInviteService
                 .SetProperty(i => i.AcceptedAt, now)
                 .SetProperty(i => i.InviteToken, (string?)null), ct);
         if (claimed == 0)
-            return ServiceResult<AcceptStudentInviteModel>.FailureResult("Invalid or expired invite token.");
+            return ServiceResult<AcceptStudentInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Invites.InvalidOrExpired"]);
         // Keep the tracked entity consistent with the out-of-band claim.
         invite.AcceptedAt = now;
         invite.InviteToken = null;
@@ -309,7 +313,7 @@ public class StudentInviteService : IStudentInviteService
             ChildProfileId = profile.ChildProfileId,
             SchoolStudentId = profile.SchoolStudentId,
             ConsentAcceptedAt = profile.ConsentAcceptedAt
-        }, "Student account activated.");
+        }, _localizer["StudentInvites.AccountActivated"]);
     }
 
     // ----------------------------------------------------------------- Helpers
@@ -350,11 +354,11 @@ public class StudentInviteService : IStudentInviteService
     {
         var user = await _context.Users.FindAsync(new object[] { userId }, ct);
         if (user == null)
-            return ServiceResult.FailureResult("User not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Auth.UserNotFound"]);
 
         if (!string.IsNullOrEmpty(invite.InviteEmail) &&
             !string.Equals(user.Email, invite.InviteEmail, StringComparison.OrdinalIgnoreCase))
-            return ServiceResult.FailureResult("This invite was sent to a different email address.");
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Invites.SentToDifferentEmail"]);
 
         return ServiceResult.SuccessResult();
     }

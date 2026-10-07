@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RefreshCw } from 'lucide-react';
 import { Notice } from '@/components/ui/notice';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ interface EtrErrorBannerProps {
 }
 
 export function EtrErrorBanner({ etrId, onRetried }: EtrErrorBannerProps) {
+  const { t } = useTranslation('etr-documents');
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
 
@@ -21,10 +23,10 @@ export function EtrErrorBanner({ etrId, onRetried }: EtrErrorBannerProps) {
       if (response.success) {
         onRetried();
       } else {
-        setRetryError(response.message || 'Failed to queue reprocessing');
+        setRetryError(response.message || t('errorBanner.retryFailed'));
       }
     } catch {
-      setRetryError('Failed to queue reprocessing');
+      setRetryError(t('errorBanner.retryFailed'));
     } finally {
       setIsRetrying(false);
     }
@@ -32,11 +34,10 @@ export function EtrErrorBanner({ etrId, onRetried }: EtrErrorBannerProps) {
 
   return (
     <div data-testid="etr-error-banner">
-      <Notice variant="error" title="Processing failed">
+      <Notice variant="error" title={t('errorBanner.title')}>
         <div className="space-y-2">
           <p>
-            We couldn't finish analyzing your ETR. This can happen when the PDF is
-            scanned or has unusual formatting. You can retry processing below.
+            {t('errorBanner.body')}
           </p>
           {retryError && <p className="text-brand-danger-700">{retryError}</p>}
           <Button
@@ -50,7 +51,7 @@ export function EtrErrorBanner({ etrId, onRetried }: EtrErrorBannerProps) {
               strokeWidth={1.8}
               aria-hidden="true"
             />
-            Retry processing
+            {t('errorBanner.retry')}
           </Button>
         </div>
       </Notice>

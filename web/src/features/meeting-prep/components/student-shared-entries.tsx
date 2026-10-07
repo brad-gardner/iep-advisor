@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageSquareQuote } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Markdown } from '@/components/ui/markdown';
@@ -16,6 +17,7 @@ interface StudentSharedEntriesProps {
  * entries (e.g. the child has no linked student account).
  */
 export function StudentSharedEntries({ childId }: StudentSharedEntriesProps) {
+  const { t } = useTranslation('meeting-prep');
   const [entries, setEntries] = useState<StudentWorkspaceEntryDto[]>([]);
 
   useEffect(() => {
@@ -44,9 +46,9 @@ export function StudentSharedEntries({ childId }: StudentSharedEntriesProps) {
           aria-hidden="true"
         />
         <div>
-          <h2 className="font-serif text-lg">From your student</h2>
+          <h2 className="font-serif text-lg">{t('studentSharedEntries.heading')}</h2>
           <p className="text-sm text-brand-slate-500">
-            What your student chose to share to help you prepare.
+            {t('studentSharedEntries.description')}
           </p>
         </div>
       </div>

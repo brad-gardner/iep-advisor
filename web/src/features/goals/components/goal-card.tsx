@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -33,6 +34,7 @@ export function GoalCard({
   onStatusChanged,
   'data-testid': testId,
 }: GoalCardProps) {
+  const { t } = useTranslation('goals');
   const [loggingProgress, setLoggingProgress] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -52,7 +54,7 @@ export function GoalCard({
         <div className="flex shrink-0 items-center gap-2">
           {goal.isStale && (
             <Badge variant="warning" data-testid={`goal-stale-${goal.id}`}>
-              Stale
+              {t('card.stale')}
             </Badge>
           )}
           <GoalStatusBadge status={goal.status} />
@@ -62,13 +64,13 @@ export function GoalCard({
       <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
         {goal.baseline && (
           <div>
-            <dt className="text-[13px] font-medium text-brand-slate-500">Baseline</dt>
+            <dt className="text-[13px] font-medium text-brand-slate-500">{t('card.baseline')}</dt>
             <dd className="text-brand-slate-700">{goal.baseline}</dd>
           </div>
         )}
         {goal.targetCriteria && (
           <div>
-            <dt className="text-[13px] font-medium text-brand-slate-500">Target</dt>
+            <dt className="text-[13px] font-medium text-brand-slate-500">{t('card.target')}</dt>
             <dd className="text-brand-slate-700">{goal.targetCriteria}</dd>
           </div>
         )}
@@ -80,7 +82,7 @@ export function GoalCard({
 
       <div>
         <p className="mb-1 text-xs text-brand-slate-500">
-          Last observed: {formatDate(goal.lastObservedAt, 'Never')}
+          {t('card.lastObserved', { date: formatDate(goal.lastObservedAt, t('card.never')) })}
         </p>
         <GoalTrajectorySparkline trajectory={goal.trajectory} goalText={goal.goalText} />
       </div>
@@ -93,7 +95,7 @@ export function GoalCard({
             onClick={() => setHistoryOpen(true)}
             data-testid={`goal-history-open-${goal.id}`}
           >
-            History
+            {t('card.historyButton')}
           </Button>
           <Button
             variant="secondary"
@@ -101,7 +103,7 @@ export function GoalCard({
             onClick={() => setLoggingProgress((v) => !v)}
             data-testid={`goal-log-progress-open-${goal.id}`}
           >
-            Log progress
+            {t('card.logProgressButton')}
           </Button>
           {goal.status !== 'Retired' && goal.status !== 'Carried' && (
             <Button
@@ -110,7 +112,7 @@ export function GoalCard({
               onClick={() => setStatusDialogOpen(true)}
               data-testid={`goal-status-open-${goal.id}`}
             >
-              Change status
+              {t('card.changeStatusButton')}
             </Button>
           )}
         </div>

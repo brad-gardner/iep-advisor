@@ -40,7 +40,7 @@ public sealed class AdvocateServiceTests : IDisposable
     private AdvocateService CreateService(ApplicationDbContext ctx)
     {
         var access = new AccessService(ctx);
-        return new AdvocateService(ctx, access, new KnowledgeBaseService(ctx), new IepComparisonService(ctx, new ChildProfileRepository(ctx), access), _claude, NullLogger<AdvocateService>.Instance);
+        return new AdvocateService(ctx, access, new KnowledgeBaseService(ctx), new IepComparisonService(ctx, new ChildProfileRepository(ctx), access), _claude, TestSupport.TestLocalizers.Ai(), NullLogger<AdvocateService>.Instance);
     }
 
     // ------------------------------------------------------------------ scripted model
@@ -389,10 +389,13 @@ public sealed class AdvocateServiceTests : IDisposable
         Assert.Empty(list.Data!);
         Assert.False(create.Success);
         // A Viewer gets the same Forbidden-style message (and, at the controller, 403) as SendMessage —
-        // never the "not found" wording a stranger with no access at all gets (todos/198).
-        Assert.Equal(AdvocateService.CollaboratorRequired, create.Message);
+        // never the "not found" wording a stranger with no access at all gets (todos/198). ErrorKind, not
+        // message text, is what a controller now switches status on (multilingual plan phase 3).
+        Assert.Equal(TestSupport.TestLocalizers.Ai()["Advocate.CollaboratorRequired"].Value, create.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, create.ErrorKind);
         Assert.DoesNotContain("not found", create.Message, StringComparison.OrdinalIgnoreCase);
         Assert.False(stranger.Success);
+        Assert.Equal(ServiceErrorKind.NotFound, stranger.ErrorKind);
         Assert.Contains("not found", stranger.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -681,7 +684,7 @@ public sealed class AdvocateServiceTests : IDisposable
         Assert.Equal(("kb", kbId, "Prior written notice"), (citation.Kind, citation.Id, citation.Label));
         Assert.Equal(2, done.Suggestions!.Count);
         Assert.False(done.Truncated);
-        Assert.Equal(AdvocatePrompts.Disclaimer, done.Disclaimer);
+        Assert.Equal(TestSupport.TestLocalizers.Ai()["Advocate.Disclaimer"].Value, done.Disclaimer);
 
         var snapshot = Snapshot(threadId);
         Assert.Collection(snapshot.Messages,
@@ -842,9 +845,10 @@ public sealed class AdvocateServiceTests : IDisposable
     public void ToolLabel_NamesTheDocumentTypeOnlyForRecognisedValues_NeverEchoesInput(string tool, string inputJson, string expected)
     {
         var input = JsonDocument.Parse(inputJson).RootElement.Clone();
+        var localizer = TestSupport.TestLocalizers.Ai();
 
-        Assert.Equal(expected, AdvocatePrompts.ToolLabel(tool, input));
-        Assert.Equal(AdvocatePrompts.ToolLabel(tool), AdvocatePrompts.ToolLabel(tool, null));
+        Assert.Equal(expected, AdvocatePrompts.ToolLabel(localizer, tool, input));
+        Assert.Equal(AdvocatePrompts.ToolLabel(localizer, tool), AdvocatePrompts.ToolLabel(localizer, tool, null));
     }
 
     [Fact]
@@ -898,7 +902,7 @@ public sealed class AdvocateServiceTests : IDisposable
 
         Assert.Equal(new[] { AdvocateStreamEventKind.Delta, AdvocateStreamEventKind.Error }, events.Select(e => e.Kind));
         Assert.Equal(AdvocateErrorCodes.Unavailable, events[1].Code);
-        Assert.Equal(AdvocatePrompts.UnavailableMessage, events[1].Message);
+        Assert.Equal(TestSupport.TestLocalizers.Ai()["Advocate.UnavailableMessage"].Value, events[1].Message);
         var snapshot = Snapshot(threadId);
         var only = Assert.Single(snapshot.Messages);
         Assert.Equal(AdvocateMessageRole.User, only.Role);
@@ -1240,6 +1244,76 @@ public sealed class AdvocateServiceTests : IDisposable
 
         Assert.Equal("failed", events[1].ToolStatus);
         Assert.Equal(AdvocateStreamEventKind.Done, events.Last().Kind);
+    }
+
+    // ------------------------------------------------------------------ multilingual plan phase 3
+
+    [Fact]
+    public async Task Send_UnderSpanishCulture_SystemPromptCarriesTheResponseLanguageLine_AndNeverUnderEnglish()
+    {
+        var f = SeedFamily("lang-es");
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+
+        using (IepAssistant.Services.Localization.CultureScope.For("es"))
+            await SendAsync(f.OwnerId, threadId, "¿Qué dice el IEP?");
+
+        var spanishPrompt = _claude.Requests.Last().SystemPrompt;
+        Assert.StartsWith(AdvocatePrompts.System, spanishPrompt);
+        Assert.NotEqual(AdvocatePrompts.System, spanishPrompt);
+        Assert.Contains("Spanish", spanishPrompt);
+
+        await SendAsync(f.OwnerId, threadId, "What does the IEP say?");
+        Assert.Equal(AdvocatePrompts.System, _claude.Requests.Last().SystemPrompt);
+    }
+
+    [Fact]
+    public async Task Send_UnderSpanishCulture_PersistsSpanishOnTheAssistantMessage_AndReturnsItOnDone()
+    {
+        var f = SeedFamily("lang-persist");
+        var threadId = await CreateThreadAsync(f.OwnerId, f.ChildId);
+
+        List<AdvocateStreamEvent> events;
+        using (IepAssistant.Services.Localization.CultureScope.For("es"))
+            events = await SendAsync(f.OwnerId, threadId, "Hola");
+
+        var done = events.Last();
+        Assert.Equal("es", done.GeneratedLanguage);
+
+        var snapshot = Snapshot(threadId);
+        var assistantMessage = snapshot.Messages.Single(m => m.Role == AdvocateMessageRole.Assistant);
+        Assert.Equal("es", assistantMessage.Language);
+
+        using var ctx = CreateContext();
+        var userMessage = ctx.AdvocateMessages.First(m => m.AdvocateThreadId == threadId && m.Role == AdvocateMessageRole.User);
+        Assert.Null(userMessage.Language);
+    }
+
+    [Fact]
+    public async Task CreateThread_UnderSpanishCulture_DefaultTitleIsSpanish()
+    {
+        var f = SeedFamily("lang-title");
+
+        int threadId;
+        using (IepAssistant.Services.Localization.CultureScope.For("es"))
+            threadId = await CreateThreadAsync(f.OwnerId, f.ChildId, title: null);
+
+        var snapshot = Snapshot(threadId);
+        Assert.Equal("Conversación nueva", snapshot.Thread.Title);
+    }
+
+    [Fact]
+    public async Task CreateThread_ViewerOnly_UnderSpanishCulture_ForbiddenMessageIsSpanish_ErrorKindStillForbidden()
+    {
+        var f = SeedFamily("lang-forbidden");
+        using var ctx = CreateContext();
+
+        ServiceResult<AdvocateThreadModel> create;
+        using (IepAssistant.Services.Localization.CultureScope.For("es"))
+            create = await CreateService(ctx).CreateThreadAsync(f.ViewerId, f.ChildId, null);
+
+        Assert.False(create.Success);
+        Assert.Equal(ServiceErrorKind.Forbidden, create.ErrorKind);
+        Assert.Equal("Puede ver a este niño, pero no puede hacerle preguntas al asesor sobre él.", create.Message);
     }
 
     public void Dispose() => _connection.Dispose();

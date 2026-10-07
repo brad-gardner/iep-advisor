@@ -1,16 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { GoalDiff, ModifiedGoalDiff } from '@/types/api';
 
-const FIELD_LABELS: Record<string, string> = {
-  TargetCriteria: 'Target Criteria',
-  Baseline: 'Baseline',
-  MeasurementMethod: 'Measurement Method',
-  Timeframe: 'Timeframe',
-  GoalText: 'Goal Text',
-};
-
 function AddedGoalCard({ goal }: { goal: GoalDiff }) {
+  const { t } = useTranslation('iep-comparison');
   return (
     <Card className="border-l-4 border-l-brand-teal-500">
       <div className="flex items-start justify-between gap-3">
@@ -22,13 +16,14 @@ function AddedGoalCard({ goal }: { goal: GoalDiff }) {
           )}
           <p className="text-sm text-brand-slate-700">{goal.goalText}</p>
         </div>
-        <Badge variant="success">Added</Badge>
+        <Badge variant="success">{t('goalDiff.added')}</Badge>
       </div>
     </Card>
   );
 }
 
 function RemovedGoalCard({ goal }: { goal: GoalDiff }) {
+  const { t } = useTranslation('iep-comparison');
   return (
     <Card className="border-l-4 border-l-brand-danger-700">
       <div className="flex items-start justify-between gap-3">
@@ -40,13 +35,21 @@ function RemovedGoalCard({ goal }: { goal: GoalDiff }) {
           )}
           <p className="text-sm text-brand-slate-700 line-through opacity-70">{goal.goalText}</p>
         </div>
-        <Badge variant="error">Removed</Badge>
+        <Badge variant="error">{t('goalDiff.removed')}</Badge>
       </div>
     </Card>
   );
 }
 
 function ModifiedGoalCard({ goal }: { goal: ModifiedGoalDiff }) {
+  const { t } = useTranslation('iep-comparison');
+  const FIELD_LABELS: Record<string, string> = {
+    TargetCriteria: t('goalDiff.fieldTargetCriteria'),
+    Baseline: t('goalDiff.fieldBaseline'),
+    MeasurementMethod: t('goalDiff.fieldMeasurementMethod'),
+    Timeframe: t('goalDiff.fieldTimeframe'),
+    GoalText: t('goalDiff.fieldGoalText'),
+  };
   return (
     <Card className="border-l-4 border-l-brand-amber-400">
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -58,13 +61,13 @@ function ModifiedGoalCard({ goal }: { goal: ModifiedGoalDiff }) {
           )}
           <p className="text-sm text-brand-slate-700">{goal.newerGoalText}</p>
         </div>
-        <Badge variant="warning">Modified</Badge>
+        <Badge variant="warning">{t('goalDiff.modified')}</Badge>
       </div>
 
       {goal.changes.length > 0 && (
         <div className="space-y-2 pt-3 border-t border-brand-slate-100">
           <p className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold">
-            Changes
+            {t('goalDiff.changes')}
           </p>
           {goal.changes.map((change, i) => (
             <div key={i} className="flex items-baseline gap-2 text-sm">
@@ -72,13 +75,13 @@ function ModifiedGoalCard({ goal }: { goal: ModifiedGoalDiff }) {
                 {FIELD_LABELS[change.field] || change.field}:
               </span>
               <span className="text-brand-slate-500 line-through">
-                {change.older || '(none)'}
+                {change.older || t('goalDiff.none')}
               </span>
               <span className="text-brand-slate-400" aria-hidden="true">
                 &rarr;
               </span>
               <span className="text-brand-slate-700 font-medium">
-                {change.newer || '(none)'}
+                {change.newer || t('goalDiff.none')}
               </span>
             </div>
           ))}

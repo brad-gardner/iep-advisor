@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { usePdfStatus } from '../hooks/use-pdf-status';
@@ -17,17 +18,18 @@ export function DownloadPdfButton({
   initialStatus,
   canRetry = false,
 }: DownloadPdfButtonProps) {
+  const { t } = useTranslation('iep-versions');
   const { status, url, errorMessage, isLoading, timedOut, retry, isRetrying } =
     usePdfStatus(versionId, initialStatus);
 
   if (isLoading && status === null) {
-    return <span className="text-sm text-brand-slate-500">Checking PDF…</span>;
+    return <span className="text-sm text-brand-slate-500">{t('downloadButton.checking')}</span>;
   }
 
   if (status === 'Rendered' && url) {
     return (
       <a href={url} target="_blank" rel="noopener noreferrer" data-testid="download-pdf">
-        <Button variant="secondary">Download PDF</Button>
+        <Button variant="secondary">{t('downloadButton.download')}</Button>
       </a>
     );
   }
@@ -35,8 +37,8 @@ export function DownloadPdfButton({
   if (status === 'Error') {
     return (
       <div className="space-y-2">
-        <Notice variant="error" title="PDF could not be generated">
-          {errorMessage || 'The PDF render failed.'}
+        <Notice variant="error" title={t('downloadButton.failedTitle')}>
+          {errorMessage || t('downloadButton.failedGeneric')}
         </Notice>
         {canRetry && (
           <Button
@@ -45,7 +47,7 @@ export function DownloadPdfButton({
             disabled={isRetrying}
             data-testid="retry-pdf"
           >
-            {isRetrying ? 'Retrying…' : 'Retry'}
+            {isRetrying ? t('downloadButton.retrying') : t('downloadButton.retry')}
           </Button>
         )}
       </div>
@@ -55,7 +57,7 @@ export function DownloadPdfButton({
   // Pending (or unknown): show generating, and a softer note past the cap.
   return (
     <span className="text-sm text-brand-slate-500" data-testid="pdf-generating">
-      {timedOut ? 'Still generating — check back shortly.' : 'Generating PDF…'}
+      {timedOut ? t('downloadButton.timedOut') : t('downloadButton.generating')}
     </span>
   );
 }

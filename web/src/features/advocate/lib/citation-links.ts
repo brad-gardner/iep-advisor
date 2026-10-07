@@ -1,3 +1,4 @@
+import i18n from '@/lib/i18n';
 import type { AdvocateCitation } from '../types/advocate';
 
 /** DOM id of one goal's card on the IEP page — `#goal-340` scrolls to it. */
@@ -77,13 +78,13 @@ export function citationLabel(citation: AdvocateCitation): string {
   if (citation.label && citation.label.trim()) return citation.label.trim();
   switch (citation.kind) {
     case 'kb':
-      return `Knowledge base #${citation.id}`;
+      return i18n.t('advocate:citation.kb', { id: citation.id });
     case 'child':
-      return 'Child profile';
+      return i18n.t('advocate:citation.child');
     case 'comparison':
-      return 'IEP comparison';
+      return i18n.t('advocate:citation.comparison');
     default:
-      return `Source #${citation.id}`;
+      return i18n.t('advocate:citation.source', { id: citation.id });
   }
 }
 

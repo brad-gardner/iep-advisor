@@ -13,6 +13,7 @@ public class ParentDraftNoteConfiguration : IEntityTypeConfiguration<ParentDraft
         builder.Property(n => n.Question).HasMaxLength(1000).IsRequired();
         builder.Property(n => n.Answer).IsRequired();
         builder.Property(n => n.TargetRowId).HasMaxLength(64);
+        builder.Property(n => n.Language).HasMaxLength(10);
 
         // Restrict, not Cascade (pilot-gates plan, phase 1): SQL Server refuses to create an INSTEAD
         // OF UPDATE/DELETE trigger on a table that has an incoming cascading FK, and

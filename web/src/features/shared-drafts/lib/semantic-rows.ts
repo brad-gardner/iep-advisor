@@ -1,3 +1,4 @@
+import i18n from '@/lib/i18n';
 import { parseConfig } from '@/features/admin/templates/template-config';
 import type { ColumnSemantic, FieldSemantic } from '@/features/admin/templates/document-semantics';
 import type { TemplateFieldDto } from '@/features/admin/templates/types';
@@ -44,8 +45,33 @@ export function rowId(row: Row): string | null {
   return typeof id === 'string' ? id : null;
 }
 
+export type RowChangeState = 'added' | 'changed' | null;
+
+// Lives here (a `.ts` file, not `.tsx`) rather than inline in
+// `frozen-section-list.tsx`'s render body: `i18next/no-literal-string`'s
+// `jsx-only` mode still flags a plain string literal in a ternary sitting in
+// a component's render scope, even one that's a lookup tag (not displayed
+// text) assigned to a `const` well before any JSX — same gotcha as
+// `analysis-tab.tsx`'s sidebar-key comment. Pulling the ternary out into an
+// ordinary function in a non-JSX file sidesteps it entirely, and reads
+// better besides.
+export function rowChangeState(
+  id: string | null,
+  fieldKey: string,
+  addedRowKeys: ReadonlySet<string>,
+  changedRowKeys: ReadonlySet<string>
+): RowChangeState {
+  if (!id) return null;
+  if (addedRowKeys.has(`${fieldKey}:${id}`)) return 'added';
+  if (changedRowKeys.has(`${fieldKey}:${id}`)) return 'changed';
+  return null;
+}
+
+// Plain function over `i18n.t` (not `useTranslation`), same shape as
+// `meetingTypeLabel`/`inviteStatusLabel` — this is a non-component helper
+// called from render bodies, not a hook.
 export function rowLabel(row: Row, primaryKey: string | undefined, index: number): string {
   const text = primaryKey ? row[primaryKey] : undefined;
   if (typeof text === 'string' && text.trim()) return text.trim();
-  return `Row ${index + 1}`;
+  return i18n.t('shared-drafts:frozenSections.rowFallback', { number: index + 1 });
 }

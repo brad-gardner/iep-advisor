@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Markdown } from '@/components/ui/markdown';
@@ -28,6 +29,7 @@ import { useSharedDraftDetail } from '../hooks/use-shared-draft-detail';
  * snapshot renderer), and the parent's own responses with staff replies.
  */
 export function SharedDraftReviewPage() {
+  const { t } = useTranslation(['shared-drafts', 'common']);
   const { childId: childIdParam, rev: revParam } = useParams<{ childId: string; rev: string }>();
   const childId = Number(childIdParam);
   const revisionId = Number(revParam);
@@ -37,7 +39,9 @@ export function SharedDraftReviewPage() {
   const responsesState = useDraftResponses(revisionId);
   const explanations = useDraftExplanations(revisionId);
 
-  usePageTitle(detail ? `${detail.documentTypeDisplayName} · Revision ${detail.revisionNumber}` : 'Shared draft');
+  usePageTitle(
+    detail ? t('reviewPage.titleLine', { documentType: detail.documentTypeDisplayName, number: detail.revisionNumber }) : t('listPage.breadcrumbSelf')
+  );
 
   const backTo = `/children/${childId}/shared-drafts`;
 
@@ -71,18 +75,18 @@ export function SharedDraftReviewPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading shared draft…" />
+        <Spinner label={t('reviewPage.loading')} />
       </div>
     );
   }
 
   if (error || !detail) {
     return (
-      <PageLayout title="Shared draft unavailable" breadcrumb={[{ label: 'Shared drafts', to: backTo }]}>
+      <PageLayout title={t('reviewPage.unavailableTitle')} breadcrumb={[{ label: t('listPage.breadcrumbSelf'), to: backTo }]}>
         <div role="alert">
-          <Notice variant="error" title={error ?? 'This shared draft is unavailable.'}>
+          <Notice variant="error" title={error && error.kind === 'server' ? error.message : t('reviewPage.unavailableDefault')}>
             <Button variant="secondary" className="mt-2" onClick={retry} data-testid="shared-draft-retry">
-              Try again
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
@@ -92,9 +96,12 @@ export function SharedDraftReviewPage() {
 
   return (
     <PageLayout
-      title={`${detail.documentTypeDisplayName} · Revision ${detail.revisionNumber}`}
-      subtitle={`Shared ${formatDate(detail.sharedAt)} by ${detail.sharedByName}`}
-      breadcrumb={[{ label: 'Shared drafts', to: backTo }, { label: `Revision ${detail.revisionNumber}` }]}
+      title={t('reviewPage.titleLine', { documentType: detail.documentTypeDisplayName, number: detail.revisionNumber })}
+      subtitle={t('reviewPage.subtitleLine', { date: formatDate(detail.sharedAt), name: detail.sharedByName })}
+      breadcrumb={[
+        { label: t('listPage.breadcrumbSelf'), to: backTo },
+        { label: t('reviewPage.revisionCrumb', { number: detail.revisionNumber }) },
+      ]}
       data-testid="shared-draft-review-page"
     >
       <DraftReviewContext.Provider value={contextValue}>
@@ -105,7 +112,7 @@ export function SharedDraftReviewPage() {
           <Card className="flex flex-wrap items-start justify-between gap-4">
             {detail.message ? (
               <div>
-                <p className="text-xs font-medium text-brand-slate-500">Note from the school</p>
+                <p className="text-xs font-medium text-brand-slate-500">{t('reviewPage.noteFromSchool')}</p>
                 <Markdown content={detail.message} className="mt-1" data-testid="shared-draft-message" />
               </div>
             ) : (
@@ -120,19 +127,25 @@ export function SharedDraftReviewPage() {
 
           {detail.changeSummary && (
             <Card data-testid="review-change-summary">
-              <h2 className="mb-2 font-serif text-base text-brand-slate-800">What's new in this revision</h2>
+              <h2 className="mb-2 font-serif text-base text-brand-slate-800">{t('reviewPage.whatsNew')}</h2>
               <ChangeSummaryChips summary={detail.changeSummary} data-testid="review-change-chips" />
             </Card>
           )}
 
           {notesState.error && (
             <div role="alert">
-              <Notice variant="error" title={notesState.error} />
+              <Notice
+                variant="error"
+                title={notesState.error.kind === 'server' ? notesState.error.message : t('notesLoadError')}
+              />
             </div>
           )}
           {responsesState.error && (
             <div role="alert">
-              <Notice variant="error" title={responsesState.error} />
+              <Notice
+                variant="error"
+                title={responsesState.error.kind === 'server' ? responsesState.error.message : t('responsesLoadError')}
+              />
             </div>
           )}
 

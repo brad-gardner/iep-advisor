@@ -1,26 +1,26 @@
 using System.Text.Json;
+using Microsoft.Extensions.Localization;
 
 namespace IepAssistant.Services.Implementations;
 
 /// <summary>
 /// The Virtual Advocate's frozen system prompt plus the strings that sit beside it. <see cref="System"/> is
 /// byte-stable on purpose — no dates, names or per-child facts — so Anthropic prompt caching pays for it
-/// once per conversation; everything dynamic goes into the user turn's <c>&lt;context&gt;</c> block.
+/// once per conversation; everything dynamic goes into the user turn's <c>&lt;context&gt;</c> block
+/// (<see cref="Localization.ResponseLanguage.SystemLine"/> is appended separately by the caller, never
+/// baked into this constant, for exactly that reason — see <see cref="AdvocateService"/>).
+///
+/// <para><b>Multilingual plan (2026-10-06) phase 3 review fix:</b> the disclaimer, unavailable-error and
+/// usage-cap text <see cref="AdvocateService"/> and <c>AdvocateController</c> show to a user comes
+/// entirely from <c>IStringLocalizer&lt;Ai&gt;</c> (<c>Resources/Ai.resx</c>/<c>Ai.es.resx</c>, keys
+/// <c>Advocate.Disclaimer</c>/<c>Advocate.UnavailableMessage</c>/<c>Advocate.UsageCapMessage</c>) — there
+/// is no English-constant fallback for any of them; every real code path already supplies the localized
+/// value, so a fallback here would be dead code hiding a real bug if it were ever reached.
+/// <see cref="ToolLabel"/> likewise takes an <see cref="IStringLocalizer{Ai}"/>, since the activity label
+/// streamed to the parent while a tool runs must follow their language too.</para>
 /// </summary>
 public static class AdvocatePrompts
 {
-    public const string Disclaimer =
-        "The Virtual Advocate gives general information to help you understand your child's plan and your " +
-        "options. It is not legal advice. For decisions with legal consequences, confirm with a licensed " +
-        "special-education advocate or attorney.";
-
-    /// <summary>Canned text for an <c>unavailable</c> error event. Never derived from an API response.</summary>
-    public const string UnavailableMessage =
-        "The advocate could not answer right now. Your question was saved — please try again in a moment.";
-
-    public const string UsageCapMessage =
-        "You have used all of this year's advocate messages. Upgrade your subscription to keep the conversation going.";
-
     public const string System =
         "You are the Virtual Advocate: a calm, experienced special-education advocate talking with a parent " +
         "about ONE child. The parent is not a lawyer or a teacher. You are on their side, and you are honest " +
@@ -89,45 +89,47 @@ public static class AdvocatePrompts
         "- Never put <sources> or <suggest> anywhere except at the very end, and never mention these tags " +
         "in the answer text.";
 
-    private static readonly IReadOnlyDictionary<string, string> ToolLabels = new Dictionary<string, string>(StringComparer.Ordinal)
+    private static readonly IReadOnlyDictionary<string, string> ToolLabelKeys = new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        ["search_knowledge_base"] = "Checking the rules",
-        ["get_child_summary"] = "Reading the child's profile",
-        ["list_documents"] = "Listing documents",
-        ["get_document_analysis"] = "Reading the analysis",
-        ["get_document_section"] = "Reading the document",
-        ["get_goals_and_progress"] = "Checking goals and progress",
-        ["compare_iep_versions"] = "Comparing IEPs",
-        ["list_journal"] = "Reading your journal",
-        ["list_contributions"] = "Reading your notes",
-        ["list_advocacy_goals"] = "Reading your advocacy goals",
-        ["get_meeting_prep"] = "Reading your meeting prep",
-        ["list_meetings_and_deadlines"] = "Checking meetings and deadlines",
-        ["get_shared_draft"] = "Reading the shared draft"
+        ["search_knowledge_base"] = "Advocate.ToolLabel.SearchKnowledgeBase",
+        ["get_child_summary"] = "Advocate.ToolLabel.GetChildSummary",
+        ["list_documents"] = "Advocate.ToolLabel.ListDocuments",
+        ["get_document_analysis"] = "Advocate.ToolLabel.GetDocumentAnalysis",
+        ["get_document_section"] = "Advocate.ToolLabel.GetDocumentSection",
+        ["get_goals_and_progress"] = "Advocate.ToolLabel.GetGoalsAndProgress",
+        ["compare_iep_versions"] = "Advocate.ToolLabel.CompareIepVersions",
+        ["list_journal"] = "Advocate.ToolLabel.ListJournal",
+        ["list_contributions"] = "Advocate.ToolLabel.ListContributions",
+        ["list_advocacy_goals"] = "Advocate.ToolLabel.ListAdvocacyGoals",
+        ["get_meeting_prep"] = "Advocate.ToolLabel.GetMeetingPrep",
+        ["list_meetings_and_deadlines"] = "Advocate.ToolLabel.ListMeetingsAndDeadlines",
+        ["get_shared_draft"] = "Advocate.ToolLabel.GetSharedDraft"
     };
 
     /// <summary>
-    /// Parent-facing activity label for a tool, shown while it runs ("Checking the rules…"). For the two
-    /// document readers the label names the document type when <paramref name="input"/> carries a recognised
-    /// <c>documentType</c>; the input is model-supplied, so only fixed strings ever come out of here.
+    /// Parent-facing activity label for a tool, shown while it runs ("Checking the rules…"), in
+    /// <paramref name="localizer"/>'s culture. For the two document readers the label names the document
+    /// type when <paramref name="input"/> carries a recognised <c>documentType</c>; the input is
+    /// model-supplied, so only the fixed, localized document-type labels below ever come out of here —
+    /// never anything read directly from <paramref name="input"/>.
     /// </summary>
-    public static string ToolLabel(string toolName, JsonElement? input = null)
+    public static string ToolLabel(IStringLocalizer<Ai> localizer, string toolName, JsonElement? input = null)
     {
-        var documentType = DocumentTypeOf(input);
+        var documentType = DocumentTypeOf(localizer, input);
         if (documentType != null)
         {
             switch (toolName)
             {
                 case "get_document_section":
-                    return $"Reading the {documentType}";
+                    return localizer["Advocate.ToolLabel.ReadingDocument", documentType];
                 case "get_document_analysis":
-                    return $"Reading the {documentType} analysis";
+                    return localizer["Advocate.ToolLabel.ReadingDocumentAnalysis", documentType];
             }
         }
-        return ToolLabels.TryGetValue(toolName, out var label) ? label : "Looking something up";
+        return localizer[ToolLabelKeys.TryGetValue(toolName, out var key) ? key : "Advocate.ToolLabel.Default"];
     }
 
-    private static string? DocumentTypeOf(JsonElement? input)
+    private static string? DocumentTypeOf(IStringLocalizer<Ai> localizer, JsonElement? input)
     {
         if (input is not { ValueKind: JsonValueKind.Object } element
             || !element.TryGetProperty("documentType", out var value)
@@ -135,9 +137,9 @@ public static class AdvocatePrompts
             return null;
         return value.GetString() switch
         {
-            "iep" => "IEP",
-            "etr" => "ETR",
-            "progress_report" => "progress report",
+            "iep" => localizer["Advocate.DocumentType.Iep"],
+            "etr" => localizer["Advocate.DocumentType.Etr"],
+            "progress_report" => localizer["Advocate.DocumentType.ProgressReport"],
             _ => null
         };
     }

@@ -1,9 +1,11 @@
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Markdown } from '@/components/ui/markdown';
 import { formatDate } from '@/lib/format-date';
-import { DRAFT_RESPONSE_KIND_LABELS, type DraftResponseDto } from '../types';
+import { draftResponseKindLabel } from '@/features/shared-drafts/lib/draft-response-kind-label';
+import type { DraftResponseDto } from '../types';
 
 interface ResponseCardProps {
   response: DraftResponseDto;
@@ -16,12 +18,13 @@ interface ResponseCardProps {
 /** One family response in the Converge view: who/what/when, a jump-to-field
  *  link when it targets a specific item, the staff reply once resolved. */
 export function ResponseCard({ response, onJump, onResolve }: ResponseCardProps) {
+  const { t } = useTranslation('draft-sharing');
   return (
     <Card className="space-y-2" data-testid={`response-card-${response.id}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Badge variant={response.status === 'Resolved' ? 'success' : 'warning'}>
-            {DRAFT_RESPONSE_KIND_LABELS[response.kind]}
+            {draftResponseKindLabel(response.kind)}
           </Badge>
           <span className="text-sm font-medium text-brand-slate-800">{response.parentName}</span>
         </div>
@@ -46,7 +49,7 @@ export function ResponseCard({ response, onJump, onResolve }: ResponseCardProps)
       {response.staffReply && (
         <div className="rounded-card bg-brand-slate-50 p-3">
           <p className="text-xs font-medium text-brand-slate-500">
-            {response.resolvedByName ? `${response.resolvedByName} replied` : 'Reply'}
+            {response.resolvedByName ? t('responseCard.repliedBy', { name: response.resolvedByName }) : t('responseCard.replyHeading')}
           </p>
           <Markdown
             content={response.staffReply}
@@ -59,7 +62,7 @@ export function ResponseCard({ response, onJump, onResolve }: ResponseCardProps)
       {onResolve && (
         <div>
           <Button size="sm" variant="secondary" onClick={onResolve} data-testid={`response-resolve-open-${response.id}`}>
-            Reply / resolve
+            {t('responseCard.replyResolveButton')}
           </Button>
         </div>
       )}

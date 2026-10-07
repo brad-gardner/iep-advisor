@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
@@ -24,7 +25,14 @@ const SHAREABLE_STATUSES: DocumentInstanceStatus[] = ['Draft', 'Finalizing'];
  * button. Reused for the editor header's "Share with family" and the
  * Converge tab's "Share again".
  */
-export function ShareWithFamilyButton({ instanceId, status, label = 'Share with family', variant = 'secondary', onShared }: ShareWithFamilyButtonProps) {
+export function ShareWithFamilyButton({
+  instanceId,
+  status,
+  label,
+  variant = 'secondary',
+  onShared,
+}: ShareWithFamilyButtonProps) {
+  const { t } = useTranslation('draft-sharing');
   const { preview, isLoading } = useRecipientPreview(instanceId);
   const { show: showToast } = useToast();
   const [open, setOpen] = useState(false);
@@ -32,11 +40,13 @@ export function ShareWithFamilyButton({ instanceId, status, label = 'Share with 
   const eligible = SHAREABLE_STATUSES.includes(status);
   if (isLoading || !preview || !preview.policyEnabled || !eligible) return null;
 
+  const resolvedLabel = label ?? t('shareWithFamilyLabel');
+
   return (
     <>
       <Button variant={variant} size="sm" onClick={() => setOpen(true)} data-testid="share-with-family-open">
         <Share2 className="mr-1 h-4 w-4" aria-hidden="true" />
-        {label}
+        {resolvedLabel}
       </Button>
       <ShareWithFamilyModal
         open={open}
@@ -44,7 +54,7 @@ export function ShareWithFamilyButton({ instanceId, status, label = 'Share with 
         instanceId={instanceId}
         onShared={(revision) => {
           setOpen(false);
-          showToast({ message: `Shared as revision ${revision.revisionNumber}`, variant: 'success' });
+          showToast({ message: t('sharedToast', { number: revision.revisionNumber }), variant: 'success' });
           onShared?.(revision);
         }}
       />

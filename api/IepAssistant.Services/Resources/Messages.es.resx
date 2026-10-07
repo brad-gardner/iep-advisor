@@ -396,4 +396,394 @@
   <data name="Api.RequestFailed" xml:space="preserve">
     <value>No se pudo completar la solicitud</value>
   </data>
+  <data name="Api.InvalidRequest" xml:space="preserve">
+    <value>Solicitud no válida</value>
+  </data>
+  <data name="StudentWorkspaceApi.InvalidEntryKind" xml:space="preserve">
+    <value>Tipo de entrada no válido.</value>
+  </data>
+  <data name="StudentWorkspaceApi.EntryDeleted" xml:space="preserve">
+    <value>Entrada eliminada.</value>
+  </data>
+  <data name="Documents.NotFound" xml:space="preserve">
+    <value>Documento no encontrado.</value>
+  </data>
+  <data name="Documents.Permission" xml:space="preserve">
+    <value>No tiene permiso para acceder a este documento.</value>
+  </data>
+  <data name="Documents.ProcessingInProgress" xml:space="preserve">
+    <value>No se puede reemplazar el archivo mientras el documento se está procesando. Espere a que el procesamiento termine.</value>
+  </data>
+  <data name="Documents.FileAttachedSuccessfully" xml:space="preserve">
+    <value>Archivo adjuntado correctamente.</value>
+  </data>
+  <data name="Documents.DeletedSuccessfully" xml:space="preserve">
+    <value>Documento eliminado correctamente.</value>
+  </data>
+  <data name="IepDocuments.InvalidMeetingTypeDetailed" xml:space="preserve">
+    <value>Tipo de reunión no válido. Debe ser: initial, annual_review, amendment o reevaluation.</value>
+  </data>
+  <data name="IepDocuments.InvalidMeetingType" xml:space="preserve">
+    <value>Tipo de reunión no válido.</value>
+  </data>
+  <data name="IepDocuments.CreatedSuccessfully" xml:space="preserve">
+    <value>IEP creado correctamente.</value>
+  </data>
+  <data name="IepDocuments.UploadedSuccessfully" xml:space="preserve">
+    <value>Documento del IEP subido correctamente.</value>
+  </data>
+  <data name="EtrDocuments.InvalidEvaluationTypeDetailed" xml:space="preserve">
+    <value>Tipo de evaluación no válido. Debe ser: initial, reevaluation, transfer u other.</value>
+  </data>
+  <data name="EtrDocuments.InvalidDocumentStateDetailed" xml:space="preserve">
+    <value>Estado del documento no válido. Debe ser: draft o final.</value>
+  </data>
+  <data name="EtrDocuments.CreatedSuccessfully" xml:space="preserve">
+    <value>ETR creado correctamente.</value>
+  </data>
+  <data name="EtrDocuments.InvalidEvaluationType" xml:space="preserve">
+    <value>Tipo de evaluación no válido.</value>
+  </data>
+  <data name="EtrDocuments.InvalidDocumentState" xml:space="preserve">
+    <value>Estado del documento no válido.</value>
+  </data>
+  <data name="DocumentsApi.NoFileProvided" xml:space="preserve">
+    <value>No se proporcionó ningún archivo</value>
+  </data>
+  <data name="DocumentsApi.OnlyPdfSupported" xml:space="preserve">
+    <value>Solo se admiten archivos PDF</value>
+  </data>
+  <data name="DocumentsApi.InvalidPdf" xml:space="preserve">
+    <value>El archivo no parece ser un PDF válido</value>
+  </data>
+  <data name="DocumentsApi.InsufficientPermissions" xml:space="preserve">
+    <value>Permisos insuficientes</value>
+  </data>
+  <data name="DocumentsApi.UploadFailed" xml:space="preserve">
+    <value>Error al subir el archivo</value>
+  </data>
+  <data name="DocumentsApi.UpdateFailed" xml:space="preserve">
+    <value>Error al actualizar</value>
+  </data>
+  <data name="DocumentsApi.DeleteFailed" xml:space="preserve">
+    <value>Error al eliminar</value>
+  </data>
+  <data name="DocumentsApi.CreationFailed" xml:space="preserve">
+    <value>Error al crear</value>
+  </data>
+  <data name="DocumentsApi.FileAttached" xml:space="preserve">
+    <value>Archivo adjuntado correctamente</value>
+  </data>
+  <data name="DocumentsApi.DocumentDeleted" xml:space="preserve">
+    <value>Documento eliminado correctamente</value>
+  </data>
+  <data name="DocumentsApi.DocumentNotFound" xml:space="preserve">
+    <value>Documento no encontrado</value>
+  </data>
+  <data name="DocumentsApi.QueuedForProcessing" xml:space="preserve">
+    <value>Documento en cola para procesamiento</value>
+  </data>
+  <data name="IepDocumentsApi.NotFound" xml:space="preserve">
+    <value>IEP no encontrado</value>
+  </data>
+  <data name="IepDocumentsApi.SubscriptionRequired" xml:space="preserve">
+    <value>Se requiere una suscripción activa para subir y procesar documentos del IEP</value>
+  </data>
+  <data name="EtrDocumentsApi.NotFound" xml:space="preserve">
+    <value>ETR no encontrado</value>
+  </data>
+  <data name="EtrDocumentsApi.SubscriptionRequired" xml:space="preserve">
+    <value>Se requiere una suscripción activa para subir y procesar documentos del ETR</value>
+  </data>
+  <data name="EtrDocumentsApi.AlreadyProcessing" xml:space="preserve">
+    <value>El documento ya se está procesando</value>
+  </data>
+  <data name="IepDocumentsApi.Created" xml:space="preserve">
+    <value>IEP creado correctamente</value>
+  </data>
+  <data name="EtrDocumentsApi.Created" xml:space="preserve">
+    <value>ETR creado correctamente</value>
+  </data>
+  <data name="IepDocumentsApi.MetadataUpdated" xml:space="preserve">
+    <value>Metadatos actualizados correctamente</value>
+  </data>
+  <data name="EtrDocumentsApi.MetadataUpdated" xml:space="preserve">
+    <value>Metadatos actualizados correctamente</value>
+  </data>
+  <data name="ProgressReports.NotFound" xml:space="preserve">
+    <value>Informe de progreso no encontrado.</value>
+  </data>
+  <data name="ProgressReports.ProcessingInProgress" xml:space="preserve">
+    <value>No se puede reemplazar el archivo mientras el documento se está procesando.</value>
+  </data>
+  <data name="ProgressReports.Created" xml:space="preserve">
+    <value>Informe de progreso creado.</value>
+  </data>
+  <data name="ProgressReports.FileAttached" xml:space="preserve">
+    <value>Archivo adjuntado.</value>
+  </data>
+  <data name="ProgressReports.MetadataUpdated" xml:space="preserve">
+    <value>Metadatos actualizados.</value>
+  </data>
+  <data name="ProgressReports.Deleted" xml:space="preserve">
+    <value>Informe de progreso eliminado.</value>
+  </data>
+  <data name="ProgressReportsApi.NotFound" xml:space="preserve">
+    <value>Informe de progreso no encontrado</value>
+  </data>
+  <data name="ProgressReportsApi.Created" xml:space="preserve">
+    <value>Informe de progreso creado</value>
+  </data>
+  <data name="ProgressReportsApi.MetadataUpdated" xml:space="preserve">
+    <value>Metadatos actualizados</value>
+  </data>
+  <data name="ProgressReportsApi.FileAttached" xml:space="preserve">
+    <value>Archivo adjuntado</value>
+  </data>
+  <data name="ProgressReportsApi.AnalysisNotFound" xml:space="preserve">
+    <value>Análisis no encontrado</value>
+  </data>
+  <data name="ProgressReportsApi.AnalysisQueued" xml:space="preserve">
+    <value>Análisis en cola</value>
+  </data>
+  <data name="ProgressReportsApi.UploadPdfBeforeAnalysis" xml:space="preserve">
+    <value>Suba el PDF del informe de progreso antes de ejecutar el análisis.</value>
+  </data>
+  <data name="ProgressReportsApi.Deleted" xml:space="preserve">
+    <value>Informe de progreso eliminado</value>
+  </data>
+  <data name="ProgressReports.IepNotFound" xml:space="preserve">
+    <value>IEP no encontrado.</value>
+  </data>
+  <data name="IepComparisonApi.ChildNotFound" xml:space="preserve">
+    <value>Niño no encontrado</value>
+  </data>
+  <data name="IepComparisonApi.DocumentsNotFoundOrAccessDenied" xml:space="preserve">
+    <value>Documentos del IEP no encontrados o acceso denegado</value>
+  </data>
+  <data name="AdvocacyGoals.InvalidCategory" xml:space="preserve">
+    <value>Categoría no válida. Debe ser: academic, behavioral, services o placement.</value>
+  </data>
+  <data name="AdvocacyGoals.MaxGoalsReached" xml:space="preserve">
+    <value>Máximo de 10 metas para el IEP por hijo. Considere consolidar las metas para un mejor análisis.</value>
+  </data>
+  <data name="AdvocacyGoals.CreatedSuccessfully" xml:space="preserve">
+    <value>Meta para el IEP creada correctamente.</value>
+  </data>
+  <data name="AdvocacyGoals.NotFound" xml:space="preserve">
+    <value>Meta para el IEP no encontrada.</value>
+  </data>
+  <data name="AdvocacyGoals.UpdatedSuccessfully" xml:space="preserve">
+    <value>Meta para el IEP actualizada correctamente.</value>
+  </data>
+  <data name="AdvocacyGoals.DeletedSuccessfully" xml:space="preserve">
+    <value>Meta para el IEP eliminada correctamente.</value>
+  </data>
+  <data name="AdvocacyGoals.ReorderedSuccessfully" xml:space="preserve">
+    <value>Metas reordenadas correctamente.</value>
+  </data>
+  <data name="AdvocacyGoalsApi.ReorderFailed" xml:space="preserve">
+    <value>Error al reordenar</value>
+  </data>
+  <data name="AdvocacyGoalsApi.Created" xml:space="preserve">
+    <value>Meta para el IEP creada correctamente</value>
+  </data>
+  <data name="AdvocacyGoalsApi.Updated" xml:space="preserve">
+    <value>Meta para el IEP actualizada correctamente</value>
+  </data>
+  <data name="AdvocacyGoalsApi.Deleted" xml:space="preserve">
+    <value>Meta para el IEP eliminada correctamente</value>
+  </data>
+  <data name="AdvocacyGoalsApi.Reordered" xml:space="preserve">
+    <value>Metas reordenadas correctamente</value>
+  </data>
+  <data name="Journal.EntryNotFound" xml:space="preserve">
+    <value>Entrada de diario no encontrada.</value>
+  </data>
+  <data name="Journal.InvalidTag" xml:space="preserve">
+    <value>Etiqueta no válida.</value>
+  </data>
+  <data name="Journal.TakeOutOfRange" xml:space="preserve">
+    <value>take debe estar entre 1 y {0}.</value>
+  </data>
+  <data name="Journal.ContentRequired" xml:space="preserve">
+    <value>El contenido es obligatorio.</value>
+  </data>
+  <data name="Journal.ContentTooLong" xml:space="preserve">
+    <value>El contenido debe tener {0} caracteres o menos.</value>
+  </data>
+  <data name="Journal.DateInFuture" xml:space="preserve">
+    <value>La fecha no puede ser en el futuro.</value>
+  </data>
+  <data name="Journal.LinkedIepUnavailable" xml:space="preserve">
+    <value>El documento del IEP vinculado no está disponible para este hijo.</value>
+  </data>
+  <data name="Journal.LinkedEtrUnavailable" xml:space="preserve">
+    <value>El documento del ETR vinculado no está disponible para este hijo.</value>
+  </data>
+  <data name="Journal.LinkedMeetingUnavailable" xml:space="preserve">
+    <value>La reunión vinculada no está disponible para este hijo.</value>
+  </data>
+  <data name="JournalApi.NotFound" xml:space="preserve">
+    <value>No encontrado</value>
+  </data>
+  <data name="JournalApi.InvalidOccurredOnFormat" xml:space="preserve">
+    <value>occurredOn debe ser una fecha en formato yyyy-MM-dd.</value>
+  </data>
+  <data name="StudentInvites.EmailRequired" xml:space="preserve">
+    <value>Se requiere el correo electrónico del estudiante.</value>
+  </data>
+  <data name="StudentInvites.NoPermissionParent" xml:space="preserve">
+    <value>No tiene permiso para invitar a un estudiante para este hijo.</value>
+  </data>
+  <data name="StudentInvites.NoPermissionEducator" xml:space="preserve">
+    <value>No tiene permiso para invitar a un estudiante para este registro.</value>
+  </data>
+  <data name="StudentInvites.RecordNotFound" xml:space="preserve">
+    <value>No se encontró el registro de la invitación.</value>
+  </data>
+  <data name="StudentInvites.ConsentRequired" xml:space="preserve">
+    <value>Se requiere consentimiento para activar su cuenta de estudiante.</value>
+  </data>
+  <data name="StudentInvites.AlreadyLinkedDifferentChild" xml:space="preserve">
+    <value>Su cuenta de estudiante ya está vinculada a otro hijo.</value>
+  </data>
+  <data name="StudentInvites.AlreadyLinkedDifferentSchool" xml:space="preserve">
+    <value>Su cuenta de estudiante ya está vinculada a otro registro escolar.</value>
+  </data>
+  <data name="StudentInvites.DifferentStudentMismatch" xml:space="preserve">
+    <value>Esta invitación es para un estudiante diferente al que ya está vinculado a su cuenta.</value>
+  </data>
+  <data name="StudentInvites.AccountActivated" xml:space="preserve">
+    <value>Cuenta de estudiante activada.</value>
+  </data>
+  <data name="StudentInvitesApi.TokenRequired" xml:space="preserve">
+    <value>Se requiere el token.</value>
+  </data>
+  <data name="GoalRecords.Permission" xml:space="preserve">
+    <value>No tiene permiso para acceder a las metas de este estudiante.</value>
+  </data>
+  <data name="IepVersions.Permission" xml:space="preserve">
+    <value>No tiene permiso para acceder a esta versión del IEP.</value>
+  </data>
+  <data name="IepVersions.DraftPermission" xml:space="preserve">
+    <value>No tiene permiso para acceder a este borrador del IEP.</value>
+  </data>
+  <data name="IepVersions.DraftNotFound" xml:space="preserve">
+    <value>Borrador del IEP no encontrado.</value>
+  </data>
+  <data name="IepVersions.VersionNotFound" xml:space="preserve">
+    <value>Versión del IEP no encontrada.</value>
+  </data>
+  <data name="IepVersions.AlreadyFinalizing" xml:space="preserve">
+    <value>El borrador ya se está finalizando.</value>
+  </data>
+  <data name="Pdf.NoRecordToRetry" xml:space="preserve">
+    <value>Esta versión no tiene un registro de PDF para reintentar.</value>
+  </data>
+  <data name="Pdf.AlreadyRendered" xml:space="preserve">
+    <value>El PDF de esta versión ya está generado.</value>
+  </data>
+  <data name="AuthoredDocuments.VersionPermission" xml:space="preserve">
+    <value>No tiene permiso para acceder a esta versión del documento.</value>
+  </data>
+  <data name="AuthoredDocuments.VersionNotFound" xml:space="preserve">
+    <value>Versión del documento no encontrada.</value>
+  </data>
+  <data name="AuthoredDocuments.AlreadyFinalizing" xml:space="preserve">
+    <value>Este documento ya se está finalizando.</value>
+  </data>
+  <data name="AuthoredDocuments.NotDraft" xml:space="preserve">
+    <value>Este documento no se puede finalizar en su estado actual.</value>
+  </data>
+  <data name="AuthoredDocuments.FinalizeRace" xml:space="preserve">
+    <value>Otra versión de este documento se finalizó al mismo tiempo. Inténtelo de nuevo.</value>
+  </data>
+  <data name="AuthoredDocuments.ValidationSummary" xml:space="preserve">
+    <value>Este documento tiene campos obligatorios faltantes o no válidos y no se puede finalizar.</value>
+  </data>
+  <data name="AuthoredDocuments.TemplateVersionLoadFailed" xml:space="preserve">
+    <value>No se pudo cargar la versión de la plantilla fijada.</value>
+  </data>
+  <data name="AuthoredDocuments.AmendmentReasonRequired" xml:space="preserve">
+    <value>Se requiere un motivo de enmienda.</value>
+  </data>
+  <data name="AuthoredDocuments.AmendmentReasonTooLong" xml:space="preserve">
+    <value>El motivo de la enmienda debe tener 1000 caracteres o menos.</value>
+  </data>
+  <data name="AuthoredDocuments.PdfNotAvailableYet" xml:space="preserve">
+    <value>El PDF de esta versión todavía no está disponible para descargar.</value>
+  </data>
+  <data name="AuthoredDocumentsApi.MultipartFileRequired" xml:space="preserve">
+    <value>Se requiere un formulario multipart con un archivo.</value>
+  </data>
+  <data name="AuthoredDocumentsApi.FileRequired" xml:space="preserve">
+    <value>Se requiere el archivo.</value>
+  </data>
+  <data name="AuthoredDocumentsApi.SignatureStatusInvalid" xml:space="preserve">
+    <value>signatureStatus debe ser PartiallySigned o Signed.</value>
+  </data>
+  <data name="DraftSharing.RevisionNotFound" xml:space="preserve">
+    <value>Revisión del borrador compartido no encontrada.</value>
+  </data>
+  <data name="DraftSharing.PolicyDisabled" xml:space="preserve">
+    <value>El uso compartido de borradores con la familia está deshabilitado para este distrito.</value>
+  </data>
+  <data name="DraftSharing.NotShareableStatus" xml:space="preserve">
+    <value>Este documento no se puede compartir en su estado actual.</value>
+  </data>
+  <data name="DraftSharing.NoRecipients" xml:space="preserve">
+    <value>Este documento no tiene destinatarios familiares con quienes compartir. Vincule primero una cuenta de padre/madre o de estudiante.</value>
+  </data>
+  <data name="DraftSharing.RevisionNotActive" xml:space="preserve">
+    <value>Esta revisión no está activa actualmente.</value>
+  </data>
+  <data name="DraftSharing.ShareRace" xml:space="preserve">
+    <value>Otro uso compartido de este documento ocurrió al mismo tiempo. Inténtelo de nuevo.</value>
+  </data>
+  <data name="DraftSharing.MessageTooLong" xml:space="preserve">
+    <value>El mensaje debe tener {0} caracteres o menos.</value>
+  </data>
+  <data name="DraftResponses.InvalidKind" xml:space="preserve">
+    <value>Tipo no válido.</value>
+  </data>
+  <data name="DraftResponses.TextRequired" xml:space="preserve">
+    <value>El texto es obligatorio.</value>
+  </data>
+  <data name="DraftResponses.TextTooLong" xml:space="preserve">
+    <value>El texto debe tener {0} caracteres o menos.</value>
+  </data>
+  <data name="DraftResponses.TargetRowIdTooLong" xml:space="preserve">
+    <value>El id de la fila de destino debe tener {0} caracteres o menos.</value>
+  </data>
+  <data name="DraftResponses.NotActiveRevision" xml:space="preserve">
+    <value>Solo puede responder a la revisión actualmente activa.</value>
+  </data>
+  <data name="DraftSharingApi.InvalidStatusFilter" xml:space="preserve">
+    <value>Filtro de estado no válido.</value>
+  </data>
+  <data name="Api.NotFound" xml:space="preserve">
+    <value>No encontrado</value>
+  </data>
+  <data name="Meetings.NotFound" xml:space="preserve">
+    <value>Reunión no encontrada.</value>
+  </data>
+  <data name="Meetings.NoPermissionToView" xml:space="preserve">
+    <value>No tiene permiso para ver esta reunión.</value>
+  </data>
+  <data name="Meetings.NoPermissionToViewChildMeetings" xml:space="preserve">
+    <value>No tiene permiso para ver las reuniones de este hijo.</value>
+  </data>
+  <data name="Meetings.NoPermissionToRespond" xml:space="preserve">
+    <value>No tiene permiso para responder a esta reunión.</value>
+  </data>
+  <data name="Meetings.InvalidRsvpLink" xml:space="preserve">
+    <value>El enlace de confirmación de asistencia no es válido.</value>
+  </data>
+  <data name="Meetings.RsvpWindowClosed" xml:space="preserve">
+    <value>Esta reunión ya comenzó; la confirmación de asistencia ya no está disponible.</value>
+  </data>
+  <data name="Home.WorkspaceNudge" xml:space="preserve">
+    <value>Agregue sus fortalezas, intereses y metas a su espacio de autogestión.</value>
+  </data>
 </root>
