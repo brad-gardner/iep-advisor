@@ -148,6 +148,7 @@ public class CalendarService : ICalendarService
             return ServiceResult<byte[]>.FailureResult("You do not have permission to view this meeting.");
 
         var input = IcsMeetingInputMapper.Map(meeting, _localizer);
+        input.VideoLabel = _localizer["Meeting.VideoLabel"].Value;
         var ics = _icsBuilder.BuildMeetingEvent(input, meeting.Status == MeetingStatus.Cancelled ? "CANCEL" : "REQUEST");
         return ServiceResult<byte[]>.SuccessResult(ics);
     }

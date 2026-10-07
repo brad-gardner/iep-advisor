@@ -204,7 +204,7 @@ public sealed class DigestServiceTests : IDisposable
     }
 
     // ----------------------------------------------------------------- multilingual plan (2026-10-06)
-    // phase 4: the bell notification (not the rich digest EMAIL, owned elsewhere) follows each staff
+    // phase 4: the bell notification (the digest email itself is covered by EmailService tests) follows each staff
     // member's own PreferredLanguage, resolved from the same already-batched user-info query.
 
     [Fact]

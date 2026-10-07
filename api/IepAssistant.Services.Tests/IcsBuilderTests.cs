@@ -233,8 +233,7 @@ public class IcsBuilderTests
     // a hardcoded string, so a CALLER that knows the recipient's language (NotificationEmailService) can
     // supply the localized label while every other caller (the default "Video", which happens to be the
     // same word in Spanish too) is unaffected. Title/Location/Notes passed in are meeting CONTENT, not UI
-    // chrome, and the service that supplies them (NotificationEmailService, via IcsMeetingInputMapper) is
-    // outside this worker's ownership for this phase. What IS this component's job is correctly carrying
+    // chrome, supplied by NotificationEmailService/CalendarService via IcsMeetingInputMapper. This component's job is correctly carrying
     // Spanish (accented, multi-byte UTF-8) text through SUMMARY/DESCRIPTION/LOCATION without corruption —
     // including across RFC 5545's 75-octet line folding, which must never split a multi-byte UTF-8 sequence.
 

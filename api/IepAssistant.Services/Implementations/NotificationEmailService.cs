@@ -156,9 +156,9 @@ public class NotificationEmailService : INotificationEmailService
 
         // The "Your school team"/"Organizer" fallbacks (no CreatedByUser on file) and the emailed .ics's
         // DESCRIPTION "Video:" label are all resolved under THIS recipient's language in one scope —
-        // IcsMeetingInputMapper's own defaults stay English, so CalendarService's authoritative
-        // single-meeting download (which has no per-recipient language of its own to resolve) is
-        // unaffected.
+        // IcsMeetingInputMapper resolves the organizer fallback under the ambient UI culture (this
+        // recipient's CultureScope here; the request culture in CalendarService's download). VideoLabel
+        // is set explicitly per recipient below.
         string organizerName;
         IcsMeetingInput icsInput;
         using (CultureScope.For(recipientLanguage))

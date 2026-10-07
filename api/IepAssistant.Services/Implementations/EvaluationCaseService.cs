@@ -345,7 +345,7 @@ public class EvaluationCaseService : IEvaluationCaseService
 
             (string Title, string Body) BuildText(string lang) => (
                 _notificationsLocalizer["Notifications.EvaluatorOverdue.Title", domain],
-                _notificationsLocalizer["Notifications.EvaluatorOverdue.Body", domain, studentName, LocalizedDateFormat.LongDate(dueDate, lang)]);
+                _notificationsLocalizer["Notifications.EvaluatorOverdue.Body", domain, studentName, LocalizedDateFormat.ShortDate(dueDate, lang)]);
 
             try
             {
