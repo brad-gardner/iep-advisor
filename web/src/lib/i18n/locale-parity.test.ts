@@ -3,12 +3,21 @@ import { describe, expect, it } from 'vitest';
 // Eager (not lazy) on purpose: a test needs both languages' full content at
 // once, and this file is never shipped to the browser. Discovering
 // namespaces by glob (rather than a hardcoded list) means a new namespace
-// added in a later phase is covered automatically.
-const enModules = import.meta.glob('/src/locales/en/*.json', { eager: true }) as Record<
+// added in a later phase is covered automatically. `**/*.json` (recursive)
+// so this also covers `locales/{en,es}/staff/*.json` — a staff/admin
+// namespace's parity matters exactly as much as a parent/shell one's, even
+// though only the latter is eagerly bundled at runtime (see
+// `lib/i18n/index.ts`). `namespaceOf` keys by filename alone, so a staff
+// namespace and a parent one resolve to the same identity as `useTranslation`
+// uses — the one place that would hide a true collision is a mismatched
+// subdirectory between `en` and `es` for the same namespace name, which
+// isn't this test's job to catch (the runtime loader resolves by namespace,
+// not directory, so it still works; see `index.ts`'s `esLoaders`).
+const enModules = import.meta.glob('/src/locales/en/**/*.json', { eager: true }) as Record<
   string,
   { default: Record<string, unknown> }
 >;
-const esModules = import.meta.glob('/src/locales/es/*.json', { eager: true }) as Record<
+const esModules = import.meta.glob('/src/locales/es/**/*.json', { eager: true }) as Record<
   string,
   { default: Record<string, unknown> }
 >;

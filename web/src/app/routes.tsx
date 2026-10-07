@@ -40,27 +40,8 @@ import { RedeemInvitePage } from '@/features/subscription/components/redeem-invi
 import { SubscriptionSuccessPage } from '@/features/subscription/components/subscription-success-page';
 import { SubscriptionCancelPage } from '@/features/subscription/components/subscription-cancel-page';
 import { KnowledgeBasePage } from '@/features/knowledge-base/components/knowledge-base-page';
-import { AdminRouteGuard } from '@/features/admin/components/admin-route-guard';
-import { AdminDashboardPage } from '@/features/admin/components/admin-dashboard-page';
-import { AdminUsersPage } from '@/features/admin/components/admin-users-page';
-import { AdminUserDetail } from '@/features/admin/components/admin-user-detail';
-import { TemplateListPage } from '@/features/admin/templates/template-list-page';
-import { TemplateBuilderPage } from '@/features/admin/templates/template-builder-page';
-import { StaffHomePage } from '@/features/home/pages/staff-home-page';
-import { EducatorStudentsPage } from '@/features/educator/pages/educator-students-page';
-import { EducatorStudentDetailPage } from '@/features/educator/pages/educator-student-detail-page';
-import { DistrictSchoolsPage } from '@/features/district-admin/pages/district-schools-page';
-import { ComplianceBoardPage } from '@/features/district-admin/pages/compliance-board-page';
-import { DistrictAuditLogPage } from '@/features/district-admin/pages/district-audit-log-page';
-import { DistrictSetupWizard } from '@/features/district-admin/pages/district-setup-wizard';
-import { DistrictStaffPage } from '@/features/staff-invites/pages/district-staff-page';
-import { ImportPage } from '@/features/roster-import/pages/import-page';
 import { StaffAcceptInvitePage } from '@/features/staff-invites/pages/staff-accept-invite-page';
-import { DocumentListPage } from '@/features/document-authoring/pages/document-list-page';
-import { DocumentEditorPage } from '@/features/document-authoring/pages/document-editor-page';
-import { AuthoredVersionDetailPage } from '@/features/document-authoring/pages/authored-version-detail-page';
 import { AcceptLinkPage } from '@/features/child-links/components/accept-link-page';
-import { EducatorVersionDetailPage } from '@/features/iep-versions/components/educator-version-detail-page';
 import { StudentHomePage } from '@/features/student/pages/student-home-page';
 import { StudentAcceptInvitePage } from '@/features/student/components/student-accept-invite-page';
 import { ParentVersionDetailPage } from '@/features/iep-versions/components/parent-version-detail-page';
@@ -71,16 +52,99 @@ import { MeetingSummaryPage } from '@/features/shared-drafts/pages/meeting-summa
 import { RoleHome, RoleRoute } from '@/app/role-routing';
 import { roleHome } from '@/app/role-home';
 import { Spinner } from '@/components/ui/spinner';
-import { EducatorCalendarPage } from '@/features/calendar/pages/educator-calendar-page';
 import { NotificationsPage } from '@/features/notifications/pages/notifications-page';
-import { AdminNotificationFailuresPage } from '@/features/notifications/pages/admin-notification-failures-page';
 import { MeetingRsvpPage } from '@/features/meetings/pages/meeting-rsvp-page';
-import { MeetingBriefPage } from '@/features/meeting-brief/pages/meeting-brief-page';
-import { ExportsAdminPage } from '@/features/exports/pages/exports-admin-page';
-import { AdminEmailPage } from '@/features/admin/email/components/admin-email-page';
-import { AdminAuditPage } from '@/features/admin/audit/components/admin-audit-page';
 import { MagicLinkConsumePage } from '@/features/auth/components/magic-link-consume-page';
 import { CancelDeletionPage } from '@/features/auth/components/cancel-deletion-page';
+
+// Educator ("staff") area — `/educator/*`, minus the district-admin pages
+// under `/educator/admin/*` (their own chunk below). One `import()`
+// specifier shared by every page here so Vite bundles them as a single
+// chunk (multilingual plan, phase 5 — "one chunk per area is fine"); see
+// `app/lazy-routes/staff-routes.tsx`'s doc comment for why, and for the
+// `educator` namespace's English registration this chunk carries with it.
+const StaffHomePage = lazy(() =>
+  import('@/app/lazy-routes/staff-routes').then((m) => ({ default: m.StaffHomePage }))
+);
+const EducatorStudentsPage = lazy(() =>
+  import('@/app/lazy-routes/staff-routes').then((m) => ({ default: m.EducatorStudentsPage }))
+);
+const EducatorStudentDetailPage = lazy(() =>
+  import('@/app/lazy-routes/staff-routes').then((m) => ({ default: m.EducatorStudentDetailPage }))
+);
+const EducatorCalendarPage = lazy(() =>
+  import('@/app/lazy-routes/staff-routes').then((m) => ({ default: m.EducatorCalendarPage }))
+);
+const MeetingBriefPage = lazy(() =>
+  import('@/app/lazy-routes/staff-routes').then((m) => ({ default: m.MeetingBriefPage }))
+);
+const DocumentListPage = lazy(() =>
+  import('@/app/lazy-routes/staff-routes').then((m) => ({ default: m.DocumentListPage }))
+);
+const DocumentEditorPage = lazy(() =>
+  import('@/app/lazy-routes/staff-routes').then((m) => ({ default: m.DocumentEditorPage }))
+);
+const AuthoredVersionDetailPage = lazy(() =>
+  import('@/app/lazy-routes/staff-routes').then((m) => ({ default: m.AuthoredVersionDetailPage }))
+);
+const EducatorVersionDetailPage = lazy(() =>
+  import('@/app/lazy-routes/staff-routes').then((m) => ({ default: m.EducatorVersionDetailPage }))
+);
+
+// District-admin — `/educator/admin/*` plus the district first-run wizard at
+// `/educator/setup`. Its own chunk, separate from the staff area above; see
+// `app/lazy-routes/district-admin-routes.tsx`.
+const DistrictSchoolsPage = lazy(() =>
+  import('@/app/lazy-routes/district-admin-routes').then((m) => ({ default: m.DistrictSchoolsPage }))
+);
+const ComplianceBoardPage = lazy(() =>
+  import('@/app/lazy-routes/district-admin-routes').then((m) => ({ default: m.ComplianceBoardPage }))
+);
+const DistrictAuditLogPage = lazy(() =>
+  import('@/app/lazy-routes/district-admin-routes').then((m) => ({ default: m.DistrictAuditLogPage }))
+);
+const DistrictSetupWizard = lazy(() =>
+  import('@/app/lazy-routes/district-admin-routes').then((m) => ({ default: m.DistrictSetupWizard }))
+);
+const DistrictStaffPage = lazy(() =>
+  import('@/app/lazy-routes/district-admin-routes').then((m) => ({ default: m.DistrictStaffPage }))
+);
+const ImportPage = lazy(() =>
+  import('@/app/lazy-routes/district-admin-routes').then((m) => ({ default: m.ImportPage }))
+);
+const ExportsAdminPage = lazy(() =>
+  import('@/app/lazy-routes/district-admin-routes').then((m) => ({ default: m.ExportsAdminPage }))
+);
+
+// Platform admin — `/admin/*`. Its own chunk; see
+// `app/lazy-routes/platform-admin-routes.tsx`.
+const AdminRouteGuard = lazy(() =>
+  import('@/app/lazy-routes/platform-admin-routes').then((m) => ({ default: m.AdminRouteGuard }))
+);
+const AdminDashboardPage = lazy(() =>
+  import('@/app/lazy-routes/platform-admin-routes').then((m) => ({ default: m.AdminDashboardPage }))
+);
+const AdminUsersPage = lazy(() =>
+  import('@/app/lazy-routes/platform-admin-routes').then((m) => ({ default: m.AdminUsersPage }))
+);
+const AdminUserDetail = lazy(() =>
+  import('@/app/lazy-routes/platform-admin-routes').then((m) => ({ default: m.AdminUserDetail }))
+);
+const TemplateListPage = lazy(() =>
+  import('@/app/lazy-routes/platform-admin-routes').then((m) => ({ default: m.TemplateListPage }))
+);
+const TemplateBuilderPage = lazy(() =>
+  import('@/app/lazy-routes/platform-admin-routes').then((m) => ({ default: m.TemplateBuilderPage }))
+);
+const AdminNotificationFailuresPage = lazy(() =>
+  import('@/app/lazy-routes/platform-admin-routes').then((m) => ({ default: m.AdminNotificationFailuresPage }))
+);
+const AdminEmailPage = lazy(() =>
+  import('@/app/lazy-routes/platform-admin-routes').then((m) => ({ default: m.AdminEmailPage }))
+);
+const AdminAuditPage = lazy(() =>
+  import('@/app/lazy-routes/platform-admin-routes').then((m) => ({ default: m.AdminAuditPage }))
+);
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -139,6 +203,19 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 export function AppRouter() {
   const { t } = useTranslation('common');
+  // Shared fallback for every lazy staff/district-admin/platform-admin route
+  // chunk below — same `justify-center py-12` in-page loading treatment used
+  // elsewhere in the app (e.g. `journal-page.tsx`, `iep-viewer-page.tsx`),
+  // rather than a full-screen spinner, since these render inside MainLayout's
+  // already-visible chrome. Reuses the existing generic `common:ui.loading`
+  // label rather than adding a new per-area key (`docs/i18n/README.md`'s
+  // "Generic loading… text" rule) — the Advocate route below keeps its own
+  // more specific fallback text.
+  const lazyRouteFallback = (
+    <div className="flex justify-center py-12">
+      <Spinner label={t('ui.loading')} />
+    </div>
+  );
   return (
     <Routes>
       <Route
@@ -423,7 +500,9 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <StaffHomePage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <StaffHomePage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -436,7 +515,9 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
-              <DistrictSetupWizard />
+              <Suspense fallback={lazyRouteFallback}>
+                <DistrictSetupWizard />
+              </Suspense>
             </RoleRoute>
           </ProtectedRoute>
         }
@@ -447,7 +528,9 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <DistrictSchoolsPage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <DistrictSchoolsPage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -459,7 +542,9 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <ComplianceBoardPage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <ComplianceBoardPage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -471,7 +556,9 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <ExportsAdminPage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <ExportsAdminPage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -483,7 +570,9 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <DistrictStaffPage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <DistrictStaffPage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -495,7 +584,9 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <DistrictAuditLogPage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <DistrictAuditLogPage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -507,7 +598,9 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <ImportPage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <ImportPage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -519,7 +612,9 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <EducatorCalendarPage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <EducatorCalendarPage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -531,7 +626,9 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <MeetingBriefPage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <MeetingBriefPage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -543,7 +640,9 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <EducatorStudentsPage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <EducatorStudentsPage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -555,7 +654,9 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <EducatorStudentDetailPage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <EducatorStudentDetailPage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -567,7 +668,9 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <DocumentListPage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <DocumentListPage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -583,7 +686,9 @@ export function AppRouter() {
                   2026-10-02-002) — wraps the back-link, tabs AND editor
                   together (DocumentEditorPage's own outer div) so they align. */}
               <MainLayout wide>
-                <DocumentEditorPage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <DocumentEditorPage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -595,7 +700,9 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <AuthoredVersionDetailPage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <AuthoredVersionDetailPage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -607,7 +714,9 @@ export function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allow={['Educator']}>
               <MainLayout>
-                <EducatorVersionDetailPage />
+                <Suspense fallback={lazyRouteFallback}>
+                  <EducatorVersionDetailPage />
+                </Suspense>
               </MainLayout>
             </RoleRoute>
           </ProtectedRoute>
@@ -750,9 +859,11 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <MainLayout>
-              <AdminRouteGuard>
-                <AdminDashboardPage />
-              </AdminRouteGuard>
+              <Suspense fallback={lazyRouteFallback}>
+                <AdminRouteGuard>
+                  <AdminDashboardPage />
+                </AdminRouteGuard>
+              </Suspense>
             </MainLayout>
           </ProtectedRoute>
         }
@@ -762,9 +873,11 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <MainLayout>
-              <AdminRouteGuard>
-                <AdminUsersPage />
-              </AdminRouteGuard>
+              <Suspense fallback={lazyRouteFallback}>
+                <AdminRouteGuard>
+                  <AdminUsersPage />
+                </AdminRouteGuard>
+              </Suspense>
             </MainLayout>
           </ProtectedRoute>
         }
@@ -774,9 +887,11 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <MainLayout>
-              <AdminRouteGuard>
-                <AdminUserDetail />
-              </AdminRouteGuard>
+              <Suspense fallback={lazyRouteFallback}>
+                <AdminRouteGuard>
+                  <AdminUserDetail />
+                </AdminRouteGuard>
+              </Suspense>
             </MainLayout>
           </ProtectedRoute>
         }
@@ -786,9 +901,11 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <MainLayout>
-              <AdminRouteGuard>
-                <TemplateListPage />
-              </AdminRouteGuard>
+              <Suspense fallback={lazyRouteFallback}>
+                <AdminRouteGuard>
+                  <TemplateListPage />
+                </AdminRouteGuard>
+              </Suspense>
             </MainLayout>
           </ProtectedRoute>
         }
@@ -798,9 +915,11 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <MainLayout>
-              <AdminRouteGuard>
-                <TemplateBuilderPage />
-              </AdminRouteGuard>
+              <Suspense fallback={lazyRouteFallback}>
+                <AdminRouteGuard>
+                  <TemplateBuilderPage />
+                </AdminRouteGuard>
+              </Suspense>
             </MainLayout>
           </ProtectedRoute>
         }
@@ -810,9 +929,11 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <MainLayout>
-              <AdminRouteGuard>
-                <AdminNotificationFailuresPage />
-              </AdminRouteGuard>
+              <Suspense fallback={lazyRouteFallback}>
+                <AdminRouteGuard>
+                  <AdminNotificationFailuresPage />
+                </AdminRouteGuard>
+              </Suspense>
             </MainLayout>
           </ProtectedRoute>
         }
@@ -822,9 +943,11 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <MainLayout>
-              <AdminRouteGuard>
-                <AdminEmailPage />
-              </AdminRouteGuard>
+              <Suspense fallback={lazyRouteFallback}>
+                <AdminRouteGuard>
+                  <AdminEmailPage />
+                </AdminRouteGuard>
+              </Suspense>
             </MainLayout>
           </ProtectedRoute>
         }
@@ -834,9 +957,11 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <MainLayout>
-              <AdminRouteGuard>
-                <AdminAuditPage />
-              </AdminRouteGuard>
+              <Suspense fallback={lazyRouteFallback}>
+                <AdminRouteGuard>
+                  <AdminAuditPage />
+                </AdminRouteGuard>
+              </Suspense>
             </MainLayout>
           </ProtectedRoute>
         }

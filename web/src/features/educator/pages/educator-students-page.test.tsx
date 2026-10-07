@@ -1,11 +1,20 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { ToastProvider } from '@/components/ui/toast';
 import { apiRejection } from '@/test/axios-rejection';
+import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import { ORG_ROLE } from '../types';
 import { makeProfile, makeStudent } from '../test/fixtures';
+// `educator` is a staff-only namespace (plan phase 5) — its English isn't
+// bundled in `resources` (see `lib/i18n/index.ts`), only registered by this
+// side-effect import, exactly as the page's real lazy route chunk
+// (`app/lazy-routes/staff-routes.tsx`) registers it before the page can
+// render. Without this, `useTranslation('educator')` inside the page would
+// try (and, correctly, fail loudly) to fetch it from the Spanish-only
+// backend for English.
+import '../staff-locales';
 
 const useEducatorProfileMock = vi.fn();
 vi.mock('../hooks/use-educator-profile', () => ({
@@ -82,6 +91,10 @@ describe('EducatorStudentsPage', () => {
     });
     staffApi.getStaffList.mockResolvedValue({ success: true, data: { members: [], pendingInvites: [] } });
   });
+
+  // Only the one Spanish test below switches the shared i18next instance —
+  // restore English so it never leaks into a later English-text test.
+  afterEach(() => resetTestLanguage());
 
   it('fetches the active roster by default and renders ID + status columns', async () => {
     renderPage();
@@ -375,5 +388,39 @@ describe('EducatorStudentsPage', () => {
       'Casey Manager is not allowed at Lincoln Elementary.'
     );
     expect(screen.getByTestId('roster-bulk-bar')).toBeInTheDocument();
+  });
+
+  // Proves the staff/admin namespace split end to end (plan phase 5): the
+  // `educator` namespace's English is registered above via the
+  // `staff-locales` side-effect import (mirroring the real lazy route
+  // chunk), and its Spanish still lazy-loads like any other namespace — so
+  // `renderInSpanish` needs the extra `ns: 'educator'` (`docs/i18n/
+  // README.md`'s "Namespace coverage" / test conventions).
+  it('shows the Spanish caseload empty state for a caseload member with no students', async () => {
+    useEducatorProfileMock.mockReturnValue({
+      profile: makeProfile({ orgRoleId: ORG_ROLE.RelatedServiceProvider, orgRoleName: 'RelatedServiceProvider' }),
+      isLoading: false,
+    });
+    api.searchStudents.mockResolvedValue({
+      success: true,
+      data: { items: [], total: 0, page: 1, pageSize: 50 },
+    });
+
+    await renderInSpanish(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/educator/students']}>
+          <Routes>
+            <Route path="/educator/students" element={<EducatorStudentsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>,
+      { ns: 'educator' }
+    );
+
+    expect(
+      await screen.findByText(
+        'Aún no tiene estudiantes en su lista de casos. El administrador escolar puede agregarlo al equipo del IEP de un estudiante o crear uno.'
+      )
+    ).toBeInTheDocument();
   });
 });

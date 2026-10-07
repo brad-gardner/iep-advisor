@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { GraduationCap, Plus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -34,10 +35,15 @@ import {
   studentDisplayName,
 } from "../components/roster/roster-columns";
 
-const CASELOAD_EMPTY =
-  "No students on your caseload yet — your school admin can add you to a student's IEP team, or create one.";
-
 export function EducatorStudentsPage() {
+  // `educator` is a staff-only namespace (plan phase 5): its English is NOT
+  // in the main chunk — it's registered by `features/educator/staff-locales`,
+  // imported at the top of this page's lazy route chunk
+  // (`app/lazy-routes/staff-routes.tsx`) — and its Spanish still lazy-loads
+  // like any other namespace. This is the one wired-through example other
+  // staff pages' namespaces follow; the rest of this page's strings convert
+  // in a later phase (`docs/i18n/README.md`'s "Staff and admin namespaces").
+  const { t } = useTranslation('educator');
   usePageTitle("Students");
   const { show: showToast } = useToast();
   const { profile } = useEducatorProfile();
@@ -256,7 +262,7 @@ export function EducatorStudentsPage() {
             title="No students found"
             description={
               isCaseload
-                ? CASELOAD_EMPTY
+                ? t('studentsPage.caseloadEmptyState')
                 : "Adjust the filters, add a student, or import a roster."
             }
           />
