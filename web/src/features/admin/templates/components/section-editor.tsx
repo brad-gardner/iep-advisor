@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ export function SectionEditor({
   onMoveUp,
   onMoveDown,
 }: SectionEditorProps) {
+  const { t } = useTranslation('admin');
   const [title, setTitle] = useState(section.title);
   const [addingField, setAddingField] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -38,7 +40,7 @@ export function SectionEditor({
 
   const titleAutosave = useAutosave<void>(async () => {
     const result = await builder.updateSectionTitle(section.id, title);
-    if (!result.ok) throw new Error(result.message ?? 'Save failed');
+    if (!result.ok) throw new Error(result.message ?? t('templates.sectionEditor.saveFailed'));
   });
 
   const handleTitle = (value: string) => {
@@ -48,7 +50,7 @@ export function SectionEditor({
 
   const handleAddField = async () => {
     setAddingField(true);
-    await builder.addField(section.id, { fieldType: 'Text', label: 'New field', required: false });
+    await builder.addField(section.id, { fieldType: 'Text', label: t('templates.sectionEditor.newFieldDefaultLabel'), required: false });
     setAddingField(false);
   };
 
@@ -59,7 +61,7 @@ export function SectionEditor({
     const result = await builder.deleteSection(section.id);
     setDeleting(false);
     if (result.ok) setConfirmDelete(false);
-    else setDeleteError(result.message ?? 'Failed to delete section.');
+    else setDeleteError(result.message ?? t('templates.sectionEditor.deleteFailed'));
   };
 
   const moveField = (index: number, direction: -1 | 1) => {
@@ -75,7 +77,7 @@ export function SectionEditor({
       <div className="mb-4 flex items-start gap-3">
         <div className="flex-1">
           <Input
-            label="Section title"
+            label={t('templates.sectionEditor.titleLabel')}
             id={`section-${section.id}-title`}
             value={title}
             onChange={(e) => handleTitle(e.target.value)}
@@ -94,7 +96,7 @@ export function SectionEditor({
               size="sm"
               onClick={onMoveUp}
               disabled={!canMoveUp || builder.isMutating}
-              aria-label="Move section up"
+              aria-label={t('templates.sectionEditor.moveUp')}
               data-testid={`section-${section.id}-move-up`}
             >
               <ChevronUp size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -105,7 +107,7 @@ export function SectionEditor({
               size="sm"
               onClick={onMoveDown}
               disabled={!canMoveDown || builder.isMutating}
-              aria-label="Move section down"
+              aria-label={t('templates.sectionEditor.moveDown')}
               data-testid={`section-${section.id}-move-down`}
             >
               <ChevronDown size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -115,7 +117,7 @@ export function SectionEditor({
               variant="danger"
               size="sm"
               onClick={() => setConfirmDelete(true)}
-              aria-label="Delete section"
+              aria-label={t('templates.sectionEditor.delete')}
               data-testid={`section-${section.id}-delete`}
             >
               <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -126,7 +128,7 @@ export function SectionEditor({
 
       <div className="space-y-3">
         {section.fields.length === 0 ? (
-          <p className="text-sm text-brand-slate-500">No fields yet.</p>
+          <p className="text-sm text-brand-slate-500">{t('templates.sectionEditor.noFieldsYet')}</p>
         ) : (
           section.fields.map((f, i) => (
             <FieldEditor
@@ -154,16 +156,18 @@ export function SectionEditor({
             data-testid={`section-${section.id}-add-field`}
           >
             <Plus size={14} strokeWidth={1.8} className="mr-1" aria-hidden="true" />
-            Add field
+            {t('templates.sectionEditor.addField')}
           </Button>
         </div>
       )}
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Delete section"
-        message={`Delete "${title.trim() || 'this section'}" and all its fields? This cannot be undone.`}
-        confirmLabel="Delete section"
+        title={t('templates.sectionEditor.deleteConfirmTitle')}
+        message={t('templates.sectionEditor.deleteConfirmMessage', {
+          title: title.trim() || t('templates.sectionEditor.untitled'),
+        })}
+        confirmLabel={t('templates.sectionEditor.deleteConfirmLabel')}
         loading={deleting}
         error={deleteError}
         onConfirm={handleDelete}

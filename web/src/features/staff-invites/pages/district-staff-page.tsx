@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Plus, Ban, RotateCcw, Send, Trash2, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { PageLayout } from "@/components/ui/page-layout";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { formatDate } from "@/lib/format-date";
 import { orgRoleLabel } from "@/lib/org-role-label";
 import { useEducatorProfile } from "@/features/educator/hooks/use-educator-profile";
 import { getDistrictSchools } from "@/features/district-admin/api/district-api";
@@ -36,18 +38,9 @@ import type {
 
 const EMPTY_LIST: StaffListData = { members: [], pendingInvites: [] };
 
-function formatExpiry(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 export function DistrictStaffPage() {
-  usePageTitle("Staff");
+  const { t } = useTranslation('staff-invites');
+  usePageTitle(t('districtStaffPage.title'));
   const { profile } = useEducatorProfile();
   const { show: showToast } = useToast();
   const [staff, setStaff] = useState<StaffListData>(EMPTY_LIST);
@@ -102,17 +95,17 @@ export function DistrictStaffPage() {
       if (response.success && response.data) {
         await reloadStaff();
         showToast({
-          message: `Invite sent to ${data.email}`,
+          message: t('districtStaffPage.toasts.inviteSent', { email: data.email }),
           variant: "success",
         });
         return { success: true, invite: response.data };
       }
       return {
         success: false,
-        error: response.message || "Failed to send invite",
+        error: response.message || t('districtStaffPage.errors.sendFailed'),
       };
     } catch {
-      return { success: false, error: "An error occurred" };
+      return { success: false, error: t('districtStaffPage.errors.generic') };
     }
   };
 
@@ -125,12 +118,12 @@ export function DistrictStaffPage() {
       if (response.success) {
         await reloadStaff();
         setRevoking(null);
-        showToast({ message: "Invite revoked", variant: "success" });
+        showToast({ message: t('districtStaffPage.toasts.inviteRevoked'), variant: "success" });
       } else {
-        setRevokeError(response.message || "Failed to revoke invite");
+        setRevokeError(response.message || t('districtStaffPage.errors.revokeFailed'));
       }
     } catch {
-      setRevokeError("An error occurred");
+      setRevokeError(t('districtStaffPage.errors.generic'));
     } finally {
       setIsRevoking(false);
     }
@@ -142,18 +135,18 @@ export function DistrictStaffPage() {
       if (response.success) {
         await reloadStaff();
         showToast({
-          message: `Invite resent to ${invite.email}`,
+          message: t('districtStaffPage.toasts.inviteResent', { email: invite.email }),
           variant: "success",
         });
         if (response.data?.inviteUrl) setResendUrl(response.data.inviteUrl);
       } else {
         showToast({
-          message: response.message || "Failed to resend invite",
+          message: response.message || t('districtStaffPage.errors.resendFailed'),
           variant: "error",
         });
       }
     } catch {
-      showToast({ message: "An error occurred", variant: "error" });
+      showToast({ message: t('districtStaffPage.errors.generic'), variant: "error" });
     }
   };
 
@@ -170,16 +163,15 @@ export function DistrictStaffPage() {
           setSolelyOwned(response.data);
         }
         setDeactivating(null);
-        showToast({ message: "Staff member deactivated", variant: "success" });
+        showToast({ message: t('districtStaffPage.toasts.staffDeactivated'), variant: "success" });
       } else {
         // Backend returns an explicit message for the last-DistrictAdmin guard.
         setDeactivateError(
-          response.message ||
-            "This staff member cannot be deactivated right now",
+          response.message || t('districtStaffPage.errors.deactivateFailed'),
         );
       }
     } catch {
-      setDeactivateError("An error occurred");
+      setDeactivateError(t('districtStaffPage.errors.generic'));
     } finally {
       setIsDeactivating(false);
     }
@@ -190,29 +182,29 @@ export function DistrictStaffPage() {
       const response = await reactivateStaff(member.staffProfileId);
       if (response.success) {
         await reloadStaff();
-        showToast({ message: "Staff member reactivated", variant: "success" });
+        showToast({ message: t('districtStaffPage.toasts.staffReactivated'), variant: "success" });
       } else {
         showToast({
-          message: response.message || "Failed to reactivate",
+          message: response.message || t('districtStaffPage.errors.reactivateFailed'),
           variant: "error",
         });
       }
     } catch {
-      showToast({ message: "An error occurred", variant: "error" });
+      showToast({ message: t('districtStaffPage.errors.generic'), variant: "error" });
     }
   };
 
   const staffColumns: TableColumn<StaffMember>[] = [
     {
       key: "name",
-      header: "Name",
+      header: t('districtStaffPage.columns.name'),
       cell: (m) => (
         <div className="flex items-center gap-2">
           <span className="font-medium text-brand-slate-800">
             {`${m.firstName} ${m.lastName}`.trim() || m.email}
           </span>
           <Badge variant={m.isActive ? "success" : "neutral"}>
-            {m.isActive ? "Active" : "Inactive"}
+            {m.isActive ? t('districtStaffPage.statusActive') : t('districtStaffPage.statusInactive')}
           </Badge>
         </div>
       ),
@@ -220,17 +212,17 @@ export function DistrictStaffPage() {
     },
     {
       key: "email",
-      header: "Email",
+      header: t('districtStaffPage.columns.email'),
       hideBelow: "md",
       cell: (m) => m.email,
       sortValue: (m) => m.email,
     },
     {
       key: "role",
-      header: "Role",
+      header: t('districtStaffPage.columns.role'),
       hideBelow: "lg",
       cell: (m) =>
-        `${orgRoleLabel(m.orgRoleName)}${m.schoolName ? ` · ${m.schoolName}` : " · District-wide"}`,
+        `${orgRoleLabel(m.orgRoleName)}${m.schoolName ? ` · ${m.schoolName}` : ` · ${t('districtStaffPage.districtWide')}`}`,
       sortValue: (m) => m.orgRoleName,
     },
   ];
@@ -238,36 +230,36 @@ export function DistrictStaffPage() {
   const inviteColumns: TableColumn<StaffPendingInvite>[] = [
     {
       key: "email",
-      header: "Email",
+      header: t('districtStaffPage.columns.email'),
       cell: (i) => (
         <div className="flex items-center gap-2">
           <span className="font-medium text-brand-slate-800">{i.email}</span>
-          {i.status === "expired" && <Badge variant="error">Expired</Badge>}
+          {i.status === "expired" && <Badge variant="error">{t('districtStaffPage.expiredBadge')}</Badge>}
         </div>
       ),
       sortValue: (i) => i.email,
     },
     {
       key: "role",
-      header: "Role",
+      header: t('districtStaffPage.columns.role'),
       hideBelow: "md",
       cell: (i) =>
-        `${orgRoleLabel(i.orgRoleName)}${i.schoolName ? ` · ${i.schoolName}` : " · District-wide"}`,
+        `${orgRoleLabel(i.orgRoleName)}${i.schoolName ? ` · ${i.schoolName}` : ` · ${t('districtStaffPage.districtWide')}`}`,
       sortValue: (i) => i.orgRoleName,
     },
     {
       key: "expires",
-      header: "Expires",
+      header: t('districtStaffPage.columns.expires'),
       align: "right",
       hideBelow: "lg",
-      cell: (i) => formatExpiry(i.inviteExpiresAt),
+      cell: (i) => formatDate(i.inviteExpiresAt, ""),
       sortValue: (i) => i.inviteExpiresAt,
     },
   ];
 
   return (
     <PageLayout
-      title="Staff"
+      title={t('districtStaffPage.title')}
       data-testid="district-staff-page"
       actions={
         profile && (
@@ -275,7 +267,7 @@ export function DistrictStaffPage() {
             <Link to="/educator/admin/imports?kind=Staff">
               <Button variant="secondary" data-testid="district-staff-import-link">
                 <Upload className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-                Import staff
+                {t('districtStaffPage.importStaff')}
               </Button>
             </Link>
             <Button
@@ -283,7 +275,7 @@ export function DistrictStaffPage() {
               data-testid="district-staff-invite-open"
             >
               <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-              Invite staff
+              {t('districtStaffPage.inviteStaff')}
             </Button>
           </div>
         )
@@ -296,9 +288,9 @@ export function DistrictStaffPage() {
       ) : (
         <>
           <section className="space-y-3">
-            <h2 className="font-serif text-lg">Pending invites</h2>
+            <h2 className="font-serif text-lg">{t('districtStaffPage.pendingInvitesHeading')}</h2>
             <Table
-              label="Pending invites"
+              label={t('districtStaffPage.pendingInvitesHeading')}
               data-testid="staff-invites-list"
               columns={inviteColumns}
               rows={staff.pendingInvites}
@@ -307,13 +299,13 @@ export function DistrictStaffPage() {
               rowActionLabel={(i) => i.email}
               rowActions={(i) => [
                 {
-                  label: "Resend",
+                  label: t('districtStaffPage.resend'),
                   icon: <Send className="h-3.5 w-3.5" strokeWidth={1.8} />,
                   onSelect: () => handleResend(i),
                   "data-testid": `staff-invite-resend-${i.id}`,
                 },
                 {
-                  label: "Revoke",
+                  label: t('districtStaffPage.revoke'),
                   icon: <Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} />,
                   variant: "danger",
                   onSelect: () => {
@@ -327,15 +319,15 @@ export function DistrictStaffPage() {
                 <EmptyState
                   data-testid="staff-invites-empty"
                   icon={Send}
-                  title="No pending invites"
-                  description="Invited staff appear here until they accept."
+                  title={t('districtStaffPage.pendingEmptyTitle')}
+                  description={t('districtStaffPage.pendingEmptyDescription')}
                 />
               }
             />
           </section>
 
           <section className="space-y-3">
-            <h2 className="font-serif text-lg">Staff</h2>
+            <h2 className="font-serif text-lg">{t('districtStaffPage.staffHeading')}</h2>
             {solelyOwned && (
               <DeactivateSolelyOwnedNotice
                 result={solelyOwned}
@@ -343,7 +335,7 @@ export function DistrictStaffPage() {
               />
             )}
             <Table
-              label="Staff"
+              label={t('districtStaffPage.staffHeading')}
               data-testid="district-staff-list"
               columns={staffColumns}
               rows={staff.members}
@@ -356,7 +348,7 @@ export function DistrictStaffPage() {
                 m.isActive
                   ? [
                       {
-                        label: "Deactivate",
+                        label: t('districtStaffPage.deactivate'),
                         icon: <Ban className="h-3.5 w-3.5" strokeWidth={1.8} />,
                         variant: "danger",
                         onSelect: () => {
@@ -368,7 +360,7 @@ export function DistrictStaffPage() {
                     ]
                   : [
                       {
-                        label: "Reactivate",
+                        label: t('districtStaffPage.reactivate'),
                         icon: (
                           <RotateCcw
                             className="h-3.5 w-3.5"
@@ -384,8 +376,8 @@ export function DistrictStaffPage() {
                 <EmptyState
                   data-testid="district-staff-empty"
                   icon={Plus}
-                  title="No staff yet"
-                  description="Invite school admins and teachers to get started."
+                  title={t('districtStaffPage.staffEmptyTitle')}
+                  description={t('districtStaffPage.staffEmptyDescription')}
                 />
               }
             />
@@ -397,7 +389,7 @@ export function DistrictStaffPage() {
         <Modal
           open={isInviteOpen}
           onClose={() => setIsInviteOpen(false)}
-          title="Invite a staff member"
+          title={t('districtStaffPage.inviteModalTitle')}
           data-testid="district-staff-invite-modal"
         >
           <InviteForm
@@ -415,13 +407,15 @@ export function DistrictStaffPage() {
 
       <ConfirmDialog
         open={deactivating !== null}
-        title="Deactivate staff member"
+        title={t('districtStaffPage.deactivateDialogTitle')}
         message={
           deactivating
-            ? `Deactivate ${`${deactivating.firstName} ${deactivating.lastName}`.trim() || deactivating.email}? They will lose access until reactivated.`
+            ? t('districtStaffPage.deactivateMessage', {
+                name: `${deactivating.firstName} ${deactivating.lastName}`.trim() || deactivating.email,
+              })
             : ""
         }
-        confirmLabel="Deactivate"
+        confirmLabel={t('districtStaffPage.deactivateConfirmLabel')}
         loading={isDeactivating}
         error={deactivateError}
         onConfirm={confirmDeactivate}
@@ -431,9 +425,9 @@ export function DistrictStaffPage() {
 
       <ConfirmDialog
         open={revoking !== null}
-        title="Revoke invite"
-        message={revoking ? `Revoke the invite sent to ${revoking.email}?` : ""}
-        confirmLabel="Revoke invite"
+        title={t('districtStaffPage.revokeDialogTitle')}
+        message={revoking ? t('districtStaffPage.revokeMessage', { email: revoking.email }) : ""}
+        confirmLabel={t('districtStaffPage.revokeConfirmLabel')}
         loading={isRevoking}
         error={revokeError}
         onConfirm={confirmRevoke}
@@ -444,7 +438,7 @@ export function DistrictStaffPage() {
       <Modal
         open={resendUrl !== null}
         onClose={() => setResendUrl(null)}
-        title="Invite link"
+        title={t('districtStaffPage.resendUrlModalTitle')}
         size="sm"
         data-testid="staff-resend-url-modal"
       >

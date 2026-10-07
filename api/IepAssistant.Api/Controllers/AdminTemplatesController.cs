@@ -28,7 +28,7 @@ public class AdminTemplatesController : ControllerBase
     public async Task<IActionResult> ListDocumentTypes(CancellationToken ct)
     {
         var result = await _service.ListDocumentTypesAsync(ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<IEnumerable<DocumentTypeDto>>.SuccessResponse(
             result.Data!.Select(DocumentTemplateMappers.MapDocumentType)));
@@ -39,7 +39,7 @@ public class AdminTemplatesController : ControllerBase
     public async Task<IActionResult> ListTemplates(CancellationToken ct)
     {
         var result = await _service.ListTemplatesAsync(ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<IEnumerable<DocumentTemplateDto>>.SuccessResponse(
             result.Data!.Select(DocumentTemplateMappers.MapTemplate)));
@@ -55,22 +55,9 @@ public class AdminTemplatesController : ControllerBase
 
         var result = await _service.CreateTemplateAsync(
             User.GetUserId(), request.StateCode, request.DocumentTypeId, request.Name, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result);
 
         var dto = DocumentTemplateMappers.MapTemplate(result.Data!);
         return CreatedAtAction(nameof(ListTemplates), null, ApiResponse<DocumentTemplateDto>.SuccessResponse(dto));
-    }
-
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
     }
 }

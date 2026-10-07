@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +14,7 @@ interface SelectOptionsEditorProps {
 
 /** Manage a Select field's (or Select column's) option list: value + optional label. */
 export function SelectOptionsEditor({ options, onChange, disabled, idPrefix }: SelectOptionsEditorProps) {
+  const { t } = useTranslation('admin');
   const update = (index: number, patch: Partial<SelectOption>) => {
     onChange(options.map((o, i) => (i === index ? { ...o, ...patch } : o)));
   };
@@ -21,26 +23,28 @@ export function SelectOptionsEditor({ options, onChange, disabled, idPrefix }: S
 
   return (
     <fieldset className="space-y-2" disabled={disabled}>
-      <legend className="text-[13px] font-medium text-brand-slate-600">Options</legend>
+      <legend className="text-[13px] font-medium text-brand-slate-600">
+        {t('templates.configEditors.optionsLegend')}
+      </legend>
       {options.map((opt, i) => (
         <div key={i} className="flex items-end gap-2">
           <div className="flex-1">
             <Input
-              label="Value"
+              label={t('templates.configEditors.optionValueLabel')}
               id={`${idPrefix}-option-value-${i}`}
               value={opt.value}
               onChange={(e) => update(i, { value: e.target.value })}
-              placeholder="e.g. yes"
+              placeholder={t('templates.configEditors.optionValuePlaceholder')}
               data-testid={`${idPrefix}-option-value-${i}`}
             />
           </div>
           <div className="flex-1">
             <Input
-              label="Label (optional)"
+              label={t('templates.configEditors.optionLabelLabel')}
               id={`${idPrefix}-option-label-${i}`}
               value={opt.label ?? ''}
               onChange={(e) => update(i, { label: e.target.value })}
-              placeholder="e.g. Yes"
+              placeholder={t('templates.configEditors.optionLabelPlaceholder')}
               data-testid={`${idPrefix}-option-label-${i}`}
             />
           </div>
@@ -50,7 +54,7 @@ export function SelectOptionsEditor({ options, onChange, disabled, idPrefix }: S
             size="sm"
             onClick={() => remove(i)}
             disabled={disabled || options.length <= 1}
-            aria-label={`Remove option ${i + 1}`}
+            aria-label={t('templates.configEditors.removeOption', { number: i + 1 })}
             data-testid={`${idPrefix}-option-remove-${i}`}
           >
             <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" />
@@ -66,7 +70,7 @@ export function SelectOptionsEditor({ options, onChange, disabled, idPrefix }: S
         data-testid={`${idPrefix}-option-add`}
       >
         <Plus size={14} strokeWidth={1.8} className="mr-1" aria-hidden="true" />
-        Add option
+        {t('templates.configEditors.addOption')}
       </Button>
     </fieldset>
   );

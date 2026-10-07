@@ -11,6 +11,12 @@ using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
+/// <summary>
+/// Multilingual plan (2026-10-06) phase 6 (todos/249): <see cref="ServiceErrorKind"/> added to every
+/// failure for consistency with later-phase services, even though <c>AuthController</c>/
+/// <c>AccountController</c> map every one of these to a fixed status today (not via
+/// <c>MapServiceFailure</c>) — see todos/249.
+/// </summary>
 public class AccountService : IAccountService
 {
     /// <summary>Grace period before <c>AccountPurgeWorker</c> is eligible to purge a pending deletion
@@ -255,20 +261,20 @@ public class AccountService : IAccountService
     {
         var user = await _userRepository.GetByIdAsync(userId, ct);
         if (user == null)
-            return ServiceResult.FailureResult(_localizer["AuthApi.UserNotFound"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["AuthApi.UserNotFound"]);
 
         if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
-            return ServiceResult.FailureResult(_localizer["Account.InvalidPassword"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Account.InvalidPassword"]);
 
         if (user.MfaEnabled)
         {
             if (string.IsNullOrWhiteSpace(mfaCode))
-                return ServiceResult.FailureResult(_localizer["Account.MfaCodeRequired"]);
+                return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Account.MfaCodeRequired"]);
 
             var decryptedSecret = _protector.Unprotect(user.MfaSecret!);
             var valid = _totpService.ValidateCode(decryptedSecret, mfaCode);
             if (!valid)
-                return ServiceResult.FailureResult(_localizer["AuthApi.InvalidMfaCode"]);
+                return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["AuthApi.InvalidMfaCode"]);
         }
 
         user.DeletionRequestedAt = DateTime.UtcNow;
@@ -297,14 +303,14 @@ public class AccountService : IAccountService
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
         if (user == null)
-            return ServiceResult.FailureResult(_localizer["AuthApi.UserNotFound"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["AuthApi.UserNotFound"]);
 
         if (user.DeletionRequestedAt == null)
-            return ServiceResult.FailureResult(_localizer["Account.NoPendingDeletionRequest"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Account.NoPendingDeletionRequest"]);
 
         var daysSinceRequest = (DateTime.UtcNow - user.DeletionRequestedAt.Value).TotalDays;
         if (daysSinceRequest > DeletionGraceDays)
-            return ServiceResult.FailureResult(_localizer["Account.GracePeriodExpired"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Account.GracePeriodExpired"]);
 
         user.DeletionRequestedAt = null;
         user.IsActive = true;
@@ -316,7 +322,7 @@ public class AccountService : IAccountService
     public async Task<ServiceResult> CancelDeletionByTokenAsync(string token, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(token))
-            return ServiceResult.FailureResult(_localizer["Account.InvalidOrExpiredCancellationLink"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Account.InvalidOrExpiredCancellationLink"]);
 
         int userId;
         long requestedAtTicks;
@@ -325,14 +331,14 @@ public class AccountService : IAccountService
             var payload = _deletionTokenProtector.Unprotect(token);
             var parts = payload.Split('|');
             if (parts.Length != 2 || !int.TryParse(parts[0], out userId) || !long.TryParse(parts[1], out requestedAtTicks))
-                return ServiceResult.FailureResult(_localizer["Account.InvalidOrExpiredCancellationLink"]);
+                return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Account.InvalidOrExpiredCancellationLink"]);
         }
         catch
         {
             // IDataProtector.Unprotect throws (CryptographicException, FormatException, ...) on any
             // forged, corrupted, or garbage token. Never let the exact exception surface to an
             // anonymous caller.
-            return ServiceResult.FailureResult(_localizer["Account.InvalidOrExpiredCancellationLink"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Account.InvalidOrExpiredCancellationLink"]);
         }
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
@@ -342,13 +348,13 @@ public class AccountService : IAccountService
         // purged (parent: user gone entirely; staff: DeletionRequestedAt cleared by the purge worker) —
         // which is what makes an old token stop working without needing a separate hard expiry.
         if (user == null || user.DeletionRequestedAt == null || user.DeletionRequestedAt.Value.Ticks != requestedAtTicks)
-            return ServiceResult.FailureResult(_localizer["Account.InvalidOrExpiredCancellationLink"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Account.InvalidOrExpiredCancellationLink"]);
 
         // Hard expiry independent of the purge worker: the link is good for the grace period only, so a
         // delayed purge never leaves an old email able to reactivate an account months later.
         var requestedAt = new DateTime(requestedAtTicks, DateTimeKind.Utc);
         if (DateTime.UtcNow - requestedAt > TimeSpan.FromDays(DeletionGraceDays))
-            return ServiceResult.FailureResult(_localizer["Account.InvalidOrExpiredCancellationLink"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Account.InvalidOrExpiredCancellationLink"]);
 
         user.DeletionRequestedAt = null;
         user.IsActive = true;

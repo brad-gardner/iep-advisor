@@ -1,0 +1,139 @@
+{
+  "page": {
+    "title": "Importar",
+    "subtitle": "Agregue o actualice muchos registros a la vez desde un libro de Excel.",
+    "notAvailableTitle": "No disponible",
+    "notAvailableDescription": "La importación está disponible solo para administradores de distrito y de escuela.",
+    "backToStudents": "Volver a estudiantes",
+    "importCommittedToast": "Importación confirmada"
+  },
+  "wizard": {
+    "stepTemplate": "Plantilla",
+    "stepUpload": "Subir",
+    "stepPreview": "Vista previa",
+    "stepCommit": "Confirmar",
+    "stepResult": "Resultado"
+  },
+  "kindToggle": {
+    "legend": "Qué importar",
+    "students": "Estudiantes",
+    "staff": "Personal"
+  },
+  "templateStep": {
+    "heading": "Descargar la plantilla",
+    "intro": "Complete la hoja <sheetName>{{sheet}}</sheetName> — una fila por {{noun}}. La hoja <values>Values</values> enumera las entradas permitidas, incluidas las escuelas de su distrito.",
+    "nounStudent": "estudiante",
+    "nounStaff": "miembro del personal",
+    "columnsLabel": "Columnas: {{columns}}",
+    "studentNote": "Las filas se emparejan por StudentId. Las celdas en blanco conservan el valor actual; escriba <code>CLEAR</code> para borrar uno. Las filas faltantes nunca dan de baja a nadie.",
+    "downloadTemplate": "Descargar plantilla",
+    "continueToUpload": "Continuar a subir archivo",
+    "downloadError": "No se pudo descargar la plantilla. Intente de nuevo."
+  },
+  "uploadStep": {
+    "heading": "Suba su libro de Excel",
+    "description": "Solo .xlsx, hasta 5 MB y 5000 filas. Las fórmulas y macros nunca se ejecutan.",
+    "fileLabel": "Libro de Excel (.xlsx)",
+    "back": "Atrás",
+    "previewChanges": "Ver vista previa de cambios",
+    "chooseFile": "Elija un libro de Excel para subir",
+    "couldNotRead": "No se pudo leer el libro de Excel"
+  },
+  "previewStep": {
+    "heading": "Vista previa",
+    "fileSummary_one": "{{fileName}} · {{count}} fila",
+    "fileSummary_other": "{{fileName}} · {{count}} filas",
+    "downloadErrorReport": "Descargar informe de errores",
+    "downloadErrorReportFailed": "No se pudo descargar el informe de errores",
+    "rowsHaveErrors_one": "{{count}} fila tiene errores",
+    "rowsHaveErrors_other": "{{count}} filas tienen errores",
+    "errorRowsNotice_one": "Las filas con errores se omiten. Corríjalas en el libro de Excel y vuelva a subirlo, o importe ahora la {{count}} fila válida.",
+    "errorRowsNotice_other": "Las filas con errores se omiten. Corríjalas en el libro de Excel y vuelva a subirlo, o importe ahora las {{count}} filas válidas.",
+    "startOver": "Comenzar de nuevo",
+    "importValidOnly_one": "Importar solo {{count}} fila válida",
+    "importValidOnly_other": "Importar solo {{count}} filas válidas",
+    "importAll_one": "Importar {{count}} fila",
+    "importAll_other": "Importar {{count}} filas",
+    "errorsOnly": "Solo errores",
+    "rowCountErrorsOnly_one": "{{count}} fila con error",
+    "rowCountErrorsOnly_other": "{{count}} filas con error",
+    "rowCount_one": "{{count}} fila",
+    "rowCount_other": "{{count}} filas",
+    "columns": {
+      "row": "Fila",
+      "outcome": "Resultado",
+      "key": "Clave",
+      "name": "Nombre",
+      "message": "Mensaje",
+      "changes": "Cambios"
+    },
+    "tableLabel": "Filas de vista previa",
+    "noErrorRows": "Ninguna fila tiene errores.",
+    "noDataRows": "El libro de Excel no tiene filas de datos.",
+    "paginationLabel": "Paginación de filas de vista previa",
+    "commitDialogTitle": "Confirmar importación",
+    "commitMessageWithErrors_one": "¿Importar {{count}} fila válida y omitir {{errorCount}} con errores? Esto escribe {{newCount}} nuevas y actualiza {{updatedCount}}.",
+    "commitMessageWithErrors_other": "¿Importar {{count}} filas válidas y omitir {{errorCount}} con errores? Esto escribe {{newCount}} nuevas y actualiza {{updatedCount}}.",
+    "commitMessage_one": "¿Importar {{count}} fila? Esto escribe {{newCount}} nuevas y actualiza {{updatedCount}}.",
+    "commitMessage_other": "¿Importar {{count}} filas? Esto escribe {{newCount}} nuevas y actualiza {{updatedCount}}.",
+    "confirmValidOnly": "Importar solo filas válidas",
+    "confirmAll": "Importar filas",
+    "commitFailed": "No se pudo confirmar la importación",
+    "outcomes": {
+      "New": "Nueva",
+      "Updated": "Actualizada",
+      "Unchanged": "Sin cambios",
+      "Error": "Error"
+    }
+  },
+  "resultStep": {
+    "heading": "Importación completa",
+    "rowsWritten_one": "{{count}} fila escrita",
+    "rowsWritten_other": "{{count}} filas escritas",
+    "summary": "{{newCount}} nuevas, {{updatedCount}} actualizadas, {{unchangedCount}} sin cambios.",
+    "summarySkipped": "{{newCount}} nuevas, {{updatedCount}} actualizadas, {{unchangedCount}} sin cambios, {{skippedCount}} omitidas.",
+    "importAnother": "Importar otro archivo",
+    "viewStaff": "Ver personal",
+    "viewStudents": "Ver estudiantes"
+  },
+  "countsBadges": {
+    "ariaLabel": "Resumen de importación",
+    "new_one": "{{count}} nueva",
+    "new_other": "{{count}} nuevas",
+    "updated_one": "{{count}} actualizada",
+    "updated_other": "{{count}} actualizadas",
+    "unchanged": "{{count}} sin cambios",
+    "errors_one": "{{count}} error",
+    "errors_other": "{{count}} errores"
+  },
+  "history": {
+    "heading": "Importaciones anteriores",
+    "tableLabel": "Importaciones anteriores",
+    "columns": {
+      "file": "Archivo",
+      "kind": "Tipo",
+      "status": "Estado",
+      "rows": "Filas",
+      "date": "Fecha",
+      "by": "Por"
+    },
+    "emptyTitle": "Aún no hay importaciones",
+    "emptyDescription": "Los libros de Excel confirmados y con vista previa se mostrarán aquí.",
+    "status": {
+      "Committed": "Confirmada",
+      "Previewed": "Vista previa",
+      "Committing": "Confirmando",
+      "Discarded": "Descartada"
+    },
+    "kind": {
+      "Students": "Estudiantes",
+      "Staff": "Personal"
+    }
+  },
+  "file": {
+    "onlyXlsx": "Solo se aceptan libros de Excel .xlsx",
+    "tooLarge": "El archivo supera los 5 MB",
+    "countsSummary_one": "{{newCount}} nuevas · {{updatedCount}} actualizadas · {{errorCount}} error",
+    "countsSummary_other": "{{newCount}} nuevas · {{updatedCount}} actualizadas · {{errorCount}} errores"
+  }
+}

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
@@ -14,6 +15,7 @@ interface ResultStepProps {
 
 // Step 5: what was written. Skipped = error rows left out of the commit.
 export function ResultStep({ kind, result, onImportAnother, headingRef }: ResultStepProps) {
+  const { t } = useTranslation('roster-import');
   const { committed, skipped } = result;
   const written = committed.new + committed.updated;
   return (
@@ -24,23 +26,33 @@ export function ResultStep({ kind, result, onImportAnother, headingRef }: Result
           tabIndex={-1}
           className="font-serif text-lg text-brand-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
         >
-          Import complete
+          {t('resultStep.heading')}
         </h2>
         <Notice
           variant="success"
-          title={`${written} ${written === 1 ? 'row' : 'rows'} written`}
+          title={t('resultStep.rowsWritten', { count: written })}
           data-testid="import-result-notice"
         >
-          {committed.new} new, {committed.updated} updated, {committed.unchanged} unchanged
-          {skipped > 0 ? `, ${skipped} skipped` : ''}.
+          {skipped > 0
+            ? t('resultStep.summarySkipped', {
+                newCount: committed.new,
+                updatedCount: committed.updated,
+                unchangedCount: committed.unchanged,
+                skippedCount: skipped,
+              })
+            : t('resultStep.summary', {
+                newCount: committed.new,
+                updatedCount: committed.updated,
+                unchangedCount: committed.unchanged,
+              })}
         </Notice>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={onImportAnother} data-testid="import-result-another">
-            Import another file
+            {t('resultStep.importAnother')}
           </Button>
           <Link to={kind === 'Staff' ? '/educator/admin/staff' : '/educator/students'}>
             <Button data-testid="import-result-view">
-              {kind === 'Staff' ? 'View staff' : 'View students'}
+              {kind === 'Staff' ? t('resultStep.viewStaff') : t('resultStep.viewStudents')}
             </Button>
           </Link>
         </div>

@@ -1,5 +1,6 @@
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -20,6 +21,21 @@ namespace IepAssistant.Services.Implementations;
 /// history / detail / error workbook for both import kinds. Admin-only (DistrictAdmin: district;
 /// SchoolAdmin: own school rows only — students of other buildings are invisible to them, so a
 /// cross-school id reads as unknown and never discloses a name).
+///
+/// Multilingual plan (2026-10-06) phase 6: every failure <see cref="Api.Controllers.DistrictImportsController"/>
+/// maps to a status carries an explicit <see cref="ServiceErrorKind"/>, matching that controller's
+/// PRE-existing English-substring heuristic so status is unchanged. Per-row <see cref="RowEvaluation.Fail"/>
+/// messages (stored in <c>ImportRow.Message</c>, shown in the preview table) are localized too, but carry
+/// no <see cref="ServiceErrorKind"/> — they never affect HTTP status. CSV column header tokens
+/// (<c>StudentId</c>, <c>FirstName</c>, etc. — see <see cref="Columns"/>) stay English in both languages,
+/// matching the literal header text in the workbook the user is editing;
+/// <see cref="ImportWorkbook"/>'s shared file-level validation messages (used by
+/// <c>StaffImportService</c> too) are intentionally left English-only this phase.
+///
+/// <para><c>ImportRow.Message</c> is written in whichever language is active for the request that wrote
+/// it — the uploader's at preview, the committer's at commit (which re-evaluates and overwrites every
+/// row's message; see <see cref="CommitClaimedAsync"/>). A batch previewed in one language and committed
+/// in another ends up with its stored row messages in the committer's language, not the uploader's.</para>
 /// </summary>
 public class RosterImportService : IRosterImportService
 {
@@ -34,9 +50,6 @@ public class RosterImportService : IRosterImportService
         new[] { "StudentId" }, new[] { "SchoolName", "SchoolCode" }, new[] { "FirstName" }, new[] { "LastName" }, new[] { "DateOfBirth" }, new[] { "Grade" }
     };
 
-    private const string PermissionMessage = "You do not have permission to import students.";
-    private const string AlreadyCommittedMessage = "This import has already been committed.";
-
     /// <summary>Rows applied per unit of work at commit (bounds the change tracker; SaveChanges runs once or twice per chunk).</summary>
     internal const int CommitChunkSize = 500;
 
@@ -44,22 +57,24 @@ public class RosterImportService : IRosterImportService
     private readonly IOrgAccessService _orgAccess;
     private readonly IAuditLogger _audit;
     private readonly ILogger<RosterImportService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public RosterImportService(ApplicationDbContext context, IOrgAccessService orgAccess, IAuditLogger audit, ILogger<RosterImportService> logger)
+    public RosterImportService(ApplicationDbContext context, IOrgAccessService orgAccess, IAuditLogger audit, ILogger<RosterImportService> logger, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
         _audit = audit;
         _logger = logger;
+        _localizer = localizer;
     }
 
     // ================================================================= Template
 
     public async Task<ServiceResult<byte[]>> GenerateTemplateAsync(int userId, CancellationToken ct = default)
     {
-        var (ctxOrNull, denied) = await RequireAdminAsync(userId, ct);
+        var (ctxOrNull, denied, deniedKind) = await RequireAdminAsync(userId, ct);
         if (denied != null)
-            return ServiceResult<byte[]>.FailureResult(denied);
+            return ServiceResult<byte[]>.FailureResult(deniedKind, denied);
         var ctx = ctxOrNull!;
 
         var refs = await LoadReferenceDataAsync(ctx, ct);
@@ -116,18 +131,18 @@ public class RosterImportService : IRosterImportService
 
     public async Task<ServiceResult<ImportPreviewModel>> PreviewAsync(int userId, ImportUploadModel upload, CancellationToken ct = default)
     {
-        var (ctxOrNull, denied) = await RequireAdminAsync(userId, ct);
+        var (ctxOrNull, denied, deniedKind) = await RequireAdminAsync(userId, ct);
         if (denied != null)
-            return ServiceResult<ImportPreviewModel>.FailureResult(denied);
+            return ServiceResult<ImportPreviewModel>.FailureResult(deniedKind, denied);
         var ctx = ctxOrNull!;
 
         var rejection = ImportWorkbook.ValidateUpload(upload);
         if (rejection != null)
-            return ServiceResult<ImportPreviewModel>.FailureResult(rejection);
+            return ServiceResult<ImportPreviewModel>.FailureResult(ServiceErrorKind.Validation, rejection);
 
         var (parsedRows, readError) = ImportWorkbook.ReadSheet(upload.Content, SheetName, Columns, RequiredColumns);
         if (readError != null)
-            return ServiceResult<ImportPreviewModel>.FailureResult(readError);
+            return ServiceResult<ImportPreviewModel>.FailureResult(ServiceErrorKind.Validation, readError);
         var sheetRows = parsedRows!;
 
         var refs = await LoadReferenceDataAsync(ctx, ct);
@@ -175,25 +190,25 @@ public class RosterImportService : IRosterImportService
 
     public async Task<ServiceResult<ImportResultModel>> CommitAsync(int userId, int batchId, bool commitValid, CancellationToken ct = default)
     {
-        var (ctxOrNull, denied) = await RequireAdminAsync(userId, ct);
+        var (ctxOrNull, denied, deniedKind) = await RequireAdminAsync(userId, ct);
         if (denied != null)
-            return ServiceResult<ImportResultModel>.FailureResult(denied);
+            return ServiceResult<ImportResultModel>.FailureResult(deniedKind, denied);
         var ctx = ctxOrNull!;
 
         var batch = await FindBatchAsync(ctx, batchId, ct, track: false);
         if (batch == null)
-            return ServiceResult<ImportResultModel>.FailureResult("Import not found.");
+            return ServiceResult<ImportResultModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["RosterImport.ImportNotFound"]);
         if (batch.Kind != ImportKind.Students)
-            return ServiceResult<ImportResultModel>.FailureResult("This import is not a student roster.");
+            return ServiceResult<ImportResultModel>.FailureResult(ServiceErrorKind.Validation, _localizer["RosterImport.NotStudentRoster"]);
         if (batch.Status != ImportBatchStatus.Previewed)
-            return ServiceResult<ImportResultModel>.FailureResult(AlreadyCommittedMessage);
+            return ServiceResult<ImportResultModel>.FailureResult(ServiceErrorKind.Validation, _localizer["RosterImport.AlreadyCommitted"]);
         if (!commitValid && batch.ErrorCount > 0)
-            return ServiceResult<ImportResultModel>.FailureResult("Fix the errors or choose to import valid rows only.");
+            return ServiceResult<ImportResultModel>.FailureResult(ServiceErrorKind.Validation, _localizer["RosterImport.FixErrorsOrImportValidOnly"]);
 
         // Claim the batch (Previewed → Committing) before touching any row so an overlapping commit of
         // the same batch is refused rather than racing this one on the external-id index.
         if (!await ImportBatchClaim.TryClaimAsync(_context, batchId, ct))
-            return ServiceResult<ImportResultModel>.FailureResult(AlreadyCommittedMessage);
+            return ServiceResult<ImportResultModel>.FailureResult(ServiceErrorKind.Validation, _localizer["RosterImport.AlreadyCommitted"]);
 
         try
         {
@@ -323,9 +338,9 @@ public class RosterImportService : IRosterImportService
 
     public async Task<ServiceResult<List<ImportBatchModel>>> GetHistoryAsync(int userId, CancellationToken ct = default)
     {
-        var (ctxOrNull, denied) = await RequireAdminAsync(userId, ct);
+        var (ctxOrNull, denied, deniedKind) = await RequireAdminAsync(userId, ct);
         if (denied != null)
-            return ServiceResult<List<ImportBatchModel>>.FailureResult(denied);
+            return ServiceResult<List<ImportBatchModel>>.FailureResult(deniedKind, denied);
         var ctx = ctxOrNull!;
 
         var batches = await ScopedBatches(ctx)
@@ -353,14 +368,14 @@ public class RosterImportService : IRosterImportService
 
     public async Task<ServiceResult<ImportPreviewModel>> GetBatchAsync(int userId, int batchId, CancellationToken ct = default)
     {
-        var (ctxOrNull, denied) = await RequireAdminAsync(userId, ct);
+        var (ctxOrNull, denied, deniedKind) = await RequireAdminAsync(userId, ct);
         if (denied != null)
-            return ServiceResult<ImportPreviewModel>.FailureResult(denied);
+            return ServiceResult<ImportPreviewModel>.FailureResult(deniedKind, denied);
         var ctx = ctxOrNull!;
 
         var batch = await FindBatchAsync(ctx, batchId, ct, track: false);
         if (batch == null)
-            return ServiceResult<ImportPreviewModel>.FailureResult("Import not found.");
+            return ServiceResult<ImportPreviewModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["RosterImport.ImportNotFound"]);
 
         var rows = await _context.ImportRows.AsNoTracking().Where(r => r.BatchId == batchId).ToListAsync(ct);
         return ServiceResult<ImportPreviewModel>.SuccessResult(ImportWorkbook.MapPreview(batch, rows));
@@ -368,14 +383,14 @@ public class RosterImportService : IRosterImportService
 
     public async Task<ServiceResult<ImportBatchModel>> GetBatchSummaryAsync(int userId, int batchId, CancellationToken ct = default)
     {
-        var (ctxOrNull, denied) = await RequireAdminAsync(userId, ct);
+        var (ctxOrNull, denied, deniedKind) = await RequireAdminAsync(userId, ct);
         if (denied != null)
-            return ServiceResult<ImportBatchModel>.FailureResult(denied);
+            return ServiceResult<ImportBatchModel>.FailureResult(deniedKind, denied);
         var ctx = ctxOrNull!;
 
         var batch = await FindBatchAsync(ctx, batchId, ct, track: false);
         if (batch == null)
-            return ServiceResult<ImportBatchModel>.FailureResult("Import not found.");
+            return ServiceResult<ImportBatchModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["RosterImport.ImportNotFound"]);
 
         return ServiceResult<ImportBatchModel>.SuccessResult(new ImportBatchModel
         {
@@ -391,14 +406,14 @@ public class RosterImportService : IRosterImportService
 
     public async Task<ServiceResult<byte[]>> BuildErrorWorkbookAsync(int userId, int batchId, CancellationToken ct = default)
     {
-        var (ctxOrNull, denied) = await RequireAdminAsync(userId, ct);
+        var (ctxOrNull, denied, deniedKind) = await RequireAdminAsync(userId, ct);
         if (denied != null)
-            return ServiceResult<byte[]>.FailureResult(denied);
+            return ServiceResult<byte[]>.FailureResult(deniedKind, denied);
         var ctx = ctxOrNull!;
 
         var batch = await FindBatchAsync(ctx, batchId, ct, track: false);
         if (batch == null)
-            return ServiceResult<byte[]>.FailureResult("Import not found.");
+            return ServiceResult<byte[]>.FailureResult(ServiceErrorKind.NotFound, _localizer["RosterImport.ImportNotFound"]);
 
         var errorRows = await _context.ImportRows.AsNoTracking()
             .Where(r => r.BatchId == batchId && r.Outcome == ImportRowOutcome.Error)
@@ -511,7 +526,7 @@ public class RosterImportService : IRosterImportService
         }
     }
 
-    internal static RowEvaluation Evaluate(StaffContext ctx, ReferenceData refs, ExistingStudents existingStudents, Dictionary<string, string> cells)
+    internal RowEvaluation Evaluate(StaffContext ctx, ReferenceData refs, ExistingStudents existingStudents, Dictionary<string, string> cells)
     {
         string Cell(string column) => cells.TryGetValue(column, out var v) ? v.Trim() : string.Empty;
 
@@ -520,11 +535,11 @@ public class RosterImportService : IRosterImportService
         var eval = new RowEvaluation(sheetDisplayName: $"{first} {last}".Trim()) { Key = Cell("StudentId") };
 
         if (eval.Key.Length == 0)
-            return eval.Fail("StudentId is required.");
+            return eval.Fail(_localizer["RosterImport.StudentIdRequired"]);
         if (eval.Key.Length > 64)
-            return eval.Fail("StudentId must be 64 characters or fewer.");
+            return eval.Fail(_localizer["RosterImport.StudentIdTooLong"]);
         if (ImportWorkbook.IsClear(eval.Key))
-            return eval.Fail("StudentId cannot be cleared.");
+            return eval.Fail(_localizer["RosterImport.StudentIdCannotBeCleared"]);
 
         var existing = existingStudents.Find(eval.Key);
         eval.Existing = existing;
@@ -536,17 +551,19 @@ public class RosterImportService : IRosterImportService
         var code = Cell("SchoolCode");
         var schoolName = Cell("SchoolName");
         if (ImportWorkbook.IsClear(code) || ImportWorkbook.IsClear(schoolName))
-            return eval.Fail("School cannot be cleared.");
+            return eval.Fail(_localizer["RosterImport.SchoolCannotBeCleared"]);
         if (code.Length > 0 || schoolName.Length > 0)
         {
             var school = refs.FindSchool(code, schoolName);
             if (school == null)
-                return eval.Fail(code.Length > 0 ? $"Unknown school code '{code}'." : $"Unknown school '{schoolName}'.");
+                return eval.Fail(code.Length > 0
+                    ? _localizer["RosterImport.UnknownSchoolCode", code]
+                    : _localizer["RosterImport.UnknownSchoolName", schoolName]);
             eval.School = school;
         }
         else if (isNew)
         {
-            return eval.Fail("SchoolName (or SchoolCode) is required for a new student.");
+            return eval.Fail(_localizer["RosterImport.SchoolRequiredForNewStudent"]);
         }
 
         // A SchoolAdmin may only touch rows for their own building — both the target school and the
@@ -555,40 +572,40 @@ public class RosterImportService : IRosterImportService
         {
             var own = refs.Schools.FirstOrDefault(s => s.Id == ctx.SchoolId);
             if (own == null)
-                return eval.Fail("Your account is not assigned to a school.");
+                return eval.Fail(_localizer["RosterImport.CallerNoSchool"]);
             if ((eval.School != null && eval.School.Id != own.Id) || (existing != null && existing.SchoolId != own.Id))
-                return eval.Fail($"You can only import students for {own.Name}.");
+                return eval.Fail(_localizer["RosterImport.OnlyImportForSchool", own.Name]);
         }
 
         // ---- Names
-        if (ImportWorkbook.IsClear(first)) return eval.Fail("FirstName cannot be cleared.");
-        if (ImportWorkbook.IsClear(last)) return eval.Fail("LastName cannot be cleared.");
-        if (first.Length > 100 || last.Length > 100) return eval.Fail("Names must be 100 characters or fewer.");
-        if (isNew && first.Length == 0) return eval.Fail("FirstName is required for a new student.");
-        if (isNew && last.Length == 0) return eval.Fail("LastName is required for a new student.");
+        if (ImportWorkbook.IsClear(first)) return eval.Fail(_localizer["RosterImport.FirstNameCannotBeCleared"]);
+        if (ImportWorkbook.IsClear(last)) return eval.Fail(_localizer["RosterImport.LastNameCannotBeCleared"]);
+        if (first.Length > 100 || last.Length > 100) return eval.Fail(_localizer["RosterImport.NamesTooLong"]);
+        if (isNew && first.Length == 0) return eval.Fail(_localizer["RosterImport.FirstNameRequiredForNewStudent"]);
+        if (isNew && last.Length == 0) return eval.Fail(_localizer["RosterImport.LastNameRequiredForNewStudent"]);
         eval.FirstName = first.Length > 0 ? first : null;
         eval.LastName = last.Length > 0 ? last : null;
 
         // ---- Date of birth
         var dobText = Cell("DateOfBirth");
-        if (ImportWorkbook.IsClear(dobText)) return eval.Fail("DateOfBirth cannot be cleared.");
+        if (ImportWorkbook.IsClear(dobText)) return eval.Fail(_localizer["RosterImport.DateOfBirthCannotBeCleared"]);
         var (dob, dobOk) = ImportWorkbook.ParseDate(dobText);
-        if (!dobOk) return eval.Fail($"Unrecognized DateOfBirth '{dobText}' (use yyyy-mm-dd).");
-        if (isNew && dob == null) return eval.Fail("DateOfBirth is required for a new student.");
+        if (!dobOk) return eval.Fail(_localizer["RosterImport.UnrecognizedDateOfBirth", dobText]);
+        if (isNew && dob == null) return eval.Fail(_localizer["RosterImport.DateOfBirthRequiredForNewStudent"]);
         eval.DateOfBirth = dob;
 
         // ---- Grade
         var gradeText = Cell("Grade");
-        if (ImportWorkbook.IsClear(gradeText)) return eval.Fail("Grade cannot be cleared.");
+        if (ImportWorkbook.IsClear(gradeText)) return eval.Fail(_localizer["RosterImport.GradeCannotBeCleared"]);
         if (gradeText.Length > 0)
         {
             var grade = GradeLevelExtensions.TryParseDisplay(gradeText);
-            if (grade == null) return eval.Fail($"Unknown grade '{gradeText}' (use PK, K, 1–12 or Ungraded).");
+            if (grade == null) return eval.Fail(_localizer["RosterImport.UnknownGrade", gradeText]);
             eval.Grade = grade;
         }
         else if (isNew)
         {
-            return eval.Fail("Grade is required for a new student.");
+            return eval.Fail(_localizer["RosterImport.GradeRequiredForNewStudent"]);
         }
 
         // ---- Disability
@@ -597,7 +614,7 @@ public class RosterImportService : IRosterImportService
         else if (disabilityText.Length > 0)
         {
             var category = DisabilityCategoryExtensions.TryParseDisplay(disabilityText);
-            if (category == null) return eval.Fail($"Unknown disability category '{disabilityText}'.");
+            if (category == null) return eval.Fail(_localizer["RosterImport.UnknownDisabilityCategory", disabilityText]);
             eval.Disability = (true, category);
         }
 
@@ -606,7 +623,7 @@ public class RosterImportService : IRosterImportService
         if (ImportWorkbook.IsClear(language)) eval.HomeLanguage = (true, null);
         else if (language.Length > 0)
         {
-            if (language.Length > 32) return eval.Fail("HomeLanguage must be 32 characters or fewer.");
+            if (language.Length > 32) return eval.Fail(_localizer["RosterImport.HomeLanguageTooLong"]);
             eval.HomeLanguage = (true, language);
         }
 
@@ -621,12 +638,12 @@ public class RosterImportService : IRosterImportService
             if (ctx.OrgRoleId == OrgRoleIds.SchoolAdmin
                 && (staff == null || staff.OrgRoleId == OrgRoleIds.DistrictAdmin
                     || (staff.OrgRoleId != OrgRoleIds.RelatedServiceProvider && staff.SchoolId != ctx.SchoolId)))
-                return eval.Fail($"Case manager '{managerEmail}' is not available for your school.");
-            if (staff == null) return eval.Fail($"Case manager '{managerEmail}' is not an active staff member in this district.");
-            if (staff.OrgRoleId == OrgRoleIds.DistrictAdmin) return eval.Fail($"Case manager '{managerEmail}' is a District Admin and cannot be assigned to a student.");
+                return eval.Fail(_localizer["RosterImport.CaseManagerNotAvailable", managerEmail]);
+            if (staff == null) return eval.Fail(_localizer["RosterImport.CaseManagerNotActiveStaff", managerEmail]);
+            if (staff.OrgRoleId == OrgRoleIds.DistrictAdmin) return eval.Fail(_localizer["RosterImport.CaseManagerIsDistrictAdmin", managerEmail]);
             var targetSchoolId = eval.School?.Id ?? existing?.SchoolId;
             if (staff.OrgRoleId != OrgRoleIds.RelatedServiceProvider && targetSchoolId != null && staff.SchoolId != targetSchoolId)
-                return eval.Fail($"Case manager '{managerEmail}' is not at the student's school.");
+                return eval.Fail(_localizer["RosterImport.CaseManagerNotAtStudentSchool", managerEmail]);
             eval.CaseManager = (true, staff);
         }
 
@@ -639,11 +656,11 @@ public class RosterImportService : IRosterImportService
 
         // ---- Status
         var statusText = Cell("Status");
-        if (ImportWorkbook.IsClear(statusText)) return eval.Fail("Status cannot be cleared.");
+        if (ImportWorkbook.IsClear(statusText)) return eval.Fail(_localizer["RosterImport.StatusCannotBeCleared"]);
         if (statusText.Length > 0)
         {
             if (!Enum.TryParse<StudentStatus>(statusText, ignoreCase: true, out var status))
-                return eval.Fail($"Unknown status '{statusText}' (use Active, Exited or Archived).");
+                return eval.Fail(_localizer["RosterImport.UnknownStatus", statusText]);
             eval.Status = status;
         }
 
@@ -692,12 +709,12 @@ public class RosterImportService : IRosterImportService
         return eval;
     }
 
-    private static string? ParseOptionalDate(string text, string column, Action<(bool, DateTime?)> assign)
+    private string? ParseOptionalDate(string text, string column, Action<(bool, DateTime?)> assign)
     {
         if (ImportWorkbook.IsClear(text)) { assign((true, null)); return null; }
         if (text.Length == 0) return null;
         var (value, ok) = ImportWorkbook.ParseDate(text);
-        if (!ok) return $"Unrecognized {column} '{text}' (use yyyy-mm-dd).";
+        if (!ok) return _localizer["RosterImport.UnrecognizedDate", column, text];
         assign((true, value));
         return null;
     }
@@ -725,7 +742,7 @@ public class RosterImportService : IRosterImportService
             _context.ChangeTracker.Clear();
             if (chunk.Count == 1)
             {
-                chunk[0].Error = EducatorService.DuplicateExternalIdMessage;
+                chunk[0].Error = _localizer["Educator.DuplicateExternalId"];
                 chunk[0].Student = null;
                 return;
             }
@@ -759,7 +776,7 @@ public class RosterImportService : IRosterImportService
             }
             if (!tracked.TryGetValue(eval.Existing.Id, out var student))
             {
-                p.Error = "This student no longer exists.";
+                p.Error = _localizer["RosterImport.StudentNoLongerExists"];
                 continue;
             }
             p.Student = student;
@@ -858,16 +875,16 @@ public class RosterImportService : IRosterImportService
 
     // ================================================================= Data access helpers
 
-    private async Task<(StaffContext? Ctx, string? Denied)> RequireAdminAsync(int userId, CancellationToken ct)
+    private async Task<(StaffContext? Ctx, string? Denied, ServiceErrorKind Kind)> RequireAdminAsync(int userId, CancellationToken ct)
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return (null, "Educator profile not found.");
+            return (null, _localizer["RosterImport.ProfileNotFound"], ServiceErrorKind.NotFound);
         if (!OrgRoleIds.IsAdmin(ctx.OrgRoleId))
-            return (null, PermissionMessage);
+            return (null, _localizer["RosterImport.NoPermissionImportStudents"], ServiceErrorKind.Forbidden);
         if (ctx.OrgRoleId == OrgRoleIds.SchoolAdmin && ctx.SchoolId == null)
-            return (null, "Your account is not assigned to a school.");
-        return (ctx, null);
+            return (null, _localizer["RosterImport.CallerNoSchool"], ServiceErrorKind.Validation);
+        return (ctx, null, ServiceErrorKind.None);
     }
 
     private IQueryable<ImportBatch> ScopedBatches(StaffContext ctx)

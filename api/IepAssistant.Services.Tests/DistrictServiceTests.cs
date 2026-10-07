@@ -36,7 +36,7 @@ public sealed class DistrictServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private DistrictService CreateService(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), NullLogger<DistrictService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), NullLogger<DistrictService>.Instance, TestSupport.TestLocalizers.Messages());
 
     // ----------------------------------------------------------------- seed helpers
 
@@ -210,6 +210,7 @@ public sealed class DistrictServiceTests : IDisposable
         using var ctx = CreateContext();
         var result = await CreateService(ctx).GetOverviewAsync(stranger);
         Assert.False(result.Success);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
     }
 
     [Fact]
@@ -538,6 +539,7 @@ public sealed class DistrictServiceTests : IDisposable
 
         Assert.False(result.Success);
         Assert.Contains("permission", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
     }
 
     [Fact]
@@ -761,6 +763,7 @@ public sealed class DistrictServiceTests : IDisposable
 
         Assert.False(result.Success);
         Assert.Contains("student", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
         using var verify = CreateContext();
         Assert.True(verify.Schools.Single(s => s.Id == schoolId).IsActive);
     }

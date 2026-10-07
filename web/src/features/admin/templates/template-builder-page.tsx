@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -14,12 +15,13 @@ import { SectionEditor } from './components/section-editor';
 import { FormPreview } from './components/form-preview';
 
 export function TemplateBuilderPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { templateId } = useParams<{ templateId: string }>();
   const id = Number(templateId);
   const { show: showToast } = useToast();
   const builder = useTemplateBuilder(id);
   const { template, version, isLoading, loadError, conflict, readOnly } = builder;
-  usePageTitle(template ? template.name : 'Template');
+  usePageTitle(template ? template.name : t('templates.builder.pageTitleFallback'));
 
   const [addingSection, setAddingSection] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -31,7 +33,7 @@ export function TemplateBuilderPage() {
 
   const handleAddSection = async () => {
     setAddingSection(true);
-    await builder.addSection('New section');
+    await builder.addSection(t('templates.sectionEditor.newSectionDefaultTitle'));
     setAddingSection(false);
   };
 
@@ -49,9 +51,11 @@ export function TemplateBuilderPage() {
     const result = await builder.publish();
     setPublishing(false);
     if (result.ok) {
-      showToast({ message: 'Template version published.', variant: 'success' });
+      showToast({ message: t('templates.builder.publishedToast'), variant: 'success' });
     } else if (!result.conflict) {
-      setPublishErrors(result.errors && result.errors.length ? result.errors : [result.message ?? 'Publish failed.']);
+      setPublishErrors(
+        result.errors && result.errors.length ? result.errors : [result.message ?? t('templates.builder.publishFailedFallback')]
+      );
     }
   };
 
@@ -61,16 +65,16 @@ export function TemplateBuilderPage() {
     const result = await builder.fork();
     setForking(false);
     if (result.ok) {
-      showToast({ message: 'New draft version created.', variant: 'success' });
+      showToast({ message: t('templates.builder.newDraftToast'), variant: 'success' });
     } else {
-      showToast({ message: result.message ?? 'Failed to start a new version.', variant: 'error' });
+      showToast({ message: result.message ?? t('templates.builder.forkFailedFallback'), variant: 'error' });
     }
   };
 
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading template…" />
+        <Spinner label={t('templates.builder.loading')} />
       </div>
     );
   }
@@ -78,9 +82,9 @@ export function TemplateBuilderPage() {
   if (loadError || !version || !template) {
     return (
       <div>
-        <Notice variant="error" title={loadError ?? 'Failed to load template.'}>
+        <Notice variant="error" title={loadError ?? t('templates.builder.loadErrorFallback')}>
           <Button variant="secondary" size="sm" onClick={builder.reload} className="mt-3">
-            Retry
+            {t('common:ui.tryAgain')}
           </Button>
         </Notice>
         <Link
@@ -88,25 +92,31 @@ export function TemplateBuilderPage() {
           className="mt-4 inline-flex items-center gap-1.5 text-sm text-brand-teal-500 hover:text-brand-teal-600"
         >
           <ArrowLeft size={14} strokeWidth={1.8} aria-hidden="true" />
-          Back to templates
+          {t('templates.builder.backToTemplates')}
         </Link>
       </div>
     );
   }
 
-  const subtitle = `${template.stateCode ?? 'Default'} · ${template.documentTypeDisplayName} · v${version.versionNumber}`;
+  const subtitle = t('templates.builder.subtitle', {
+    state: template.stateCode ?? t('templates.list.column.stateDefault'),
+    docType: template.documentTypeDisplayName,
+    version: version.versionNumber,
+  });
 
   return (
     <PageLayout
       title={template.name}
       subtitle={subtitle}
-      breadcrumb={[{ label: 'Templates', to: '/admin/templates' }, { label: template.name }]}
+      breadcrumb={[{ label: t('templates.list.pageTitle'), to: '/admin/templates' }, { label: template.name }]}
       actions={
         <div className="flex items-center gap-2">
-          <Badge variant={version.status === 'Published' ? 'success' : 'neutral'}>{version.status}</Badge>
+          <Badge variant={version.status === 'Published' ? 'success' : 'neutral'}>
+            {t(`templates.versionStatus.${version.status}`)}
+          </Badge>
           {readOnly ? (
             <Button onClick={handleFork} loading={forking} data-testid="template-fork-button">
-              Edit (new version)
+              {t('templates.builder.editNewVersion')}
             </Button>
           ) : (
             <Button
@@ -115,7 +125,7 @@ export function TemplateBuilderPage() {
               disabled={!canPublish}
               data-testid="template-publish-button"
             >
-              Publish
+              {t('templates.builder.publish')}
             </Button>
           )}
         </div>
@@ -124,24 +134,24 @@ export function TemplateBuilderPage() {
       {conflict && (
         <Notice
           variant="warning"
-          title="This template changed in another session."
+          title={t('templates.builder.conflictTitle')}
           data-testid="template-conflict-notice"
         >
-          <p>Your working copy is out of date. Reload to get the latest before editing further.</p>
+          <p>{t('templates.builder.conflictMessage')}</p>
           <Button variant="secondary" size="sm" onClick={builder.reload} className="mt-3">
-            Reload template
+            {t('templates.builder.reloadTemplate')}
           </Button>
         </Notice>
       )}
 
       {readOnly && (
-        <Notice variant="info" title="This version is published and read-only." data-testid="template-readonly-notice">
-          Published versions are immutable. Choose “Edit (new version)” to start a new draft from this version.
+        <Notice variant="info" title={t('templates.builder.readOnlyTitle')} data-testid="template-readonly-notice">
+          {t('templates.builder.readOnlyMessage')}
         </Notice>
       )}
 
       {publishErrors && (
-        <Notice variant="error" title="This template can’t be published yet." data-testid="template-publish-errors">
+        <Notice variant="error" title={t('templates.builder.publishErrorsTitle')} data-testid="template-publish-errors">
           <ul className="ml-4 list-disc space-y-1">
             {publishErrors.map((e, i) => (
               <li key={i}>{e}</li>
@@ -151,20 +161,16 @@ export function TemplateBuilderPage() {
       )}
 
       {!readOnly && !canPublish && (
-        <p className="text-sm text-brand-slate-500">
-          Add at least one section, and at least one field to every section, to publish.
-        </p>
+        <p className="text-sm text-brand-slate-500">{t('templates.builder.needsSectionAndField')}</p>
       )}
 
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
         {/* Builder column */}
         <div className="space-y-4">
-          <h2 className="text-sm font-medium text-brand-slate-800">Structure</h2>
+          <h2 className="text-sm font-medium text-brand-slate-800">{t('templates.builder.structure')}</h2>
           {sections.length === 0 ? (
             <Card>
-              <p className="text-sm text-brand-slate-500">
-                No sections yet. Add a section to start building this template.
-              </p>
+              <p className="text-sm text-brand-slate-500">{t('templates.builder.noSections')}</p>
             </Card>
           ) : (
             sections.map((section, i) => (
@@ -189,14 +195,14 @@ export function TemplateBuilderPage() {
               data-testid="template-add-section"
             >
               <Plus size={14} strokeWidth={1.8} className="mr-1.5" aria-hidden="true" />
-              Add section
+              {t('templates.builder.addSection')}
             </Button>
           )}
         </div>
 
         {/* Preview column */}
         <div className="space-y-4">
-          <h2 className="text-sm font-medium text-brand-slate-800">Form preview</h2>
+          <h2 className="text-sm font-medium text-brand-slate-800">{t('templates.builder.formPreviewHeading')}</h2>
           <FormPreview sections={sections} />
         </div>
       </div>

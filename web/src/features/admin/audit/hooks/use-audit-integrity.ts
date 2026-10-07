@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiErrorMessage } from '@/lib/api-error';
+import { useTranslation } from 'react-i18next';
+import { apiErrorMessage, loadErrorText, toLoadError, type LoadError } from '@/lib/api-error';
 import { listAuditIntegrityRuns, runAuditIntegrityCheck } from '../api/audit-admin-api';
 import type { AuditIntegrityRunDto } from '../types';
 
@@ -19,9 +20,14 @@ interface UseAuditIntegrityResult {
  *  against a stale response landing after a newer load/run, the same
  *  "latest wins" shape used by `useDistrictExports`. */
 export function useAuditIntegrity(): UseAuditIntegrityResult {
+  const { t } = useTranslation('admin');
   const [runs, setRuns] = useState<AuditIntegrityRunDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // A flag (shared `LoadError` shape), not pre-translated text — translated
+  // at render, below, so a language switch after a failed load shows the new
+  // language immediately rather than a stale snapshot (see
+  // `docs/i18n/README.md`'s "Load errors: the shared `LoadError` pattern").
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
   const reloadRef = useRef<() => void>(() => {});
@@ -37,12 +43,12 @@ export function useAuditIntegrity(): UseAuditIntegrityResult {
         if (!active || mine !== generation) return;
         if (res.success && res.data) {
           setRuns(res.data);
-          setError(null);
+          setLoadError(null);
         } else {
-          setError(res.message ?? 'Could not load integrity runs.');
+          setLoadError(toLoadError(res));
         }
       } catch (err) {
-        if (active && mine === generation) setError(apiErrorMessage(err, 'Could not load integrity runs.'));
+        if (active && mine === generation) setLoadError(toLoadError(err));
       } finally {
         if (active && mine === generation) setIsLoading(false);
       }
@@ -54,7 +60,10 @@ export function useAuditIntegrity(): UseAuditIntegrityResult {
     return () => {
       active = false;
     };
+    // `t` deliberately excluded — see the `loadError` comment above.
   }, []);
+
+  const error = loadErrorText(loadError, t('audit.loadFailed'));
 
   const runCheck = useCallback(async () => {
     setIsRunning(true);
@@ -64,14 +73,14 @@ export function useAuditIntegrity(): UseAuditIntegrityResult {
       if (res.success) {
         reloadRef.current();
       } else {
-        setRunError(res.message ?? 'Could not run the integrity check.');
+        setRunError(res.message ?? t('audit.runFailed'));
       }
     } catch (err) {
-      setRunError(apiErrorMessage(err, 'Could not run the integrity check.'));
+      setRunError(apiErrorMessage(err, t('audit.runFailed')));
     } finally {
       setIsRunning(false);
     }
-  }, []);
+  }, [t]);
 
   return {
     runs,

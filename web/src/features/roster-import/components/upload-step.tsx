@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
@@ -20,6 +21,7 @@ interface UploadStepProps {
 // Step 2: pick a workbook and send it for preview. Nothing is written until
 // the commit step.
 export function UploadStep({ kind, onPreviewed, onBack, onBusyChange, headingRef }: UploadStepProps) {
+  const { t } = useTranslation('roster-import');
   const inputId = useId();
   const errorId = useId();
   const [file, setFile] = useState<File | null>(null);
@@ -49,7 +51,7 @@ export function UploadStep({ kind, onPreviewed, onBack, onBusyChange, headingRef
 
   const handlePreview = async () => {
     if (!file) {
-      setError('Choose a workbook to upload');
+      setError(t('uploadStep.chooseFile'));
       return;
     }
     const validation = validateImportFile(file);
@@ -65,11 +67,11 @@ export function UploadStep({ kind, onPreviewed, onBack, onBusyChange, headingRef
       if (response.success && response.data) {
         onPreviewed(response.data);
       } else {
-        setError(response.message || 'The workbook could not be read');
+        setError(response.message || t('uploadStep.couldNotRead'));
       }
     } catch (err) {
       // e.g. "Missing required column: StudentId" — a 400 with the envelope.
-      if (alive.current) setError(apiErrorMessage(err, 'The workbook could not be read'));
+      if (alive.current) setError(apiErrorMessage(err, t('uploadStep.couldNotRead')));
     } finally {
       if (alive.current) setBusy(false);
       else onBusyChange?.(false);
@@ -85,10 +87,10 @@ export function UploadStep({ kind, onPreviewed, onBack, onBusyChange, headingRef
             tabIndex={-1}
             className="font-serif text-lg text-brand-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
           >
-            Upload your workbook
+            {t('uploadStep.heading')}
           </h2>
           <p className="mt-1 text-sm text-brand-slate-600">
-            .xlsx only, up to 5 MB and 5,000 rows. Formulas and macros are never run.
+            {t('uploadStep.description')}
           </p>
         </div>
 
@@ -103,7 +105,7 @@ export function UploadStep({ kind, onPreviewed, onBack, onBusyChange, headingRef
             htmlFor={inputId}
             className="mb-1 block text-[13px] font-medium text-brand-slate-600"
           >
-            Workbook (.xlsx)
+            {t('uploadStep.fileLabel')}
           </label>
           <input
             id={inputId}
@@ -124,7 +126,7 @@ export function UploadStep({ kind, onPreviewed, onBack, onBusyChange, headingRef
 
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={onBack} disabled={isPreviewing} data-testid="import-upload-back">
-            Back
+            {t('uploadStep.back')}
           </Button>
           <Button
             onClick={handlePreview}
@@ -132,7 +134,7 @@ export function UploadStep({ kind, onPreviewed, onBack, onBusyChange, headingRef
             disabled={!file || error !== null}
             data-testid="import-upload-preview"
           >
-            Preview changes
+            {t('uploadStep.previewChanges')}
           </Button>
         </div>
       </div>

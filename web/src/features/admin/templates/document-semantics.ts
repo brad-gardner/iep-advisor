@@ -32,32 +32,18 @@ export const FIELD_SEMANTICS = [
 ] as const;
 export type FieldSemantic = (typeof FIELD_SEMANTICS)[number];
 
-export const FIELD_SEMANTIC_LABELS: Record<FieldSemantic, string> = {
-  studentProfile: 'Student profile',
-  presentLevels: 'Present levels (PLAAFP)',
-  eligibility: 'Eligibility / disability category',
-  placement: 'Placement',
-  progressMonitoring: 'Progress monitoring / reporting',
-  specialFactors: 'Special factors',
-  goals: 'Goals (repeating block)',
-  services: 'Services (repeating block)',
-  accommodations: 'Accommodations (repeating block)',
-  transition: 'Transition (repeating block)',
-  futurePlanning: 'Future planning',
-  extendedSchoolYear: 'Extended school year',
-  testing: 'Statewide / district testing',
-  transportation: 'Transportation',
-  lre: 'Least restrictive environment',
-  participants: 'Meeting participants (repeating block)',
-  signatures: 'Signatures',
-  referralReason: 'Referral reason',
-  evaluationPlan: 'Evaluation plan',
-  evaluatorReports: 'Evaluator reports (repeating block)',
-  teamSummary: 'Team summary',
-  eligibilityDetermination: 'Eligibility determination',
-  meetingDate: 'Meeting date',
-  effectiveDates: 'Effective dates',
-};
+// Human-facing labels for these vocabularies used to live here as plain
+// English `Record`s (`FIELD_SEMANTIC_LABELS`/`COLUMN_SEMANTIC_LABELS`), but
+// this file sits on an EAGERLY reachable import path (`features/shared-drafts/
+// lib/semantic-rows.ts` imports its types, and that feature is bundled
+// eagerly) — `lib/i18n/staff-namespace-boundary.test.ts` would flag any
+// `t('admin:...')` call placed directly in this file as a staff-only
+// namespace reached from eager code. The translated replacements
+// (`fieldSemanticLabel`/`columnSemanticLabel`) live in
+// `./lib/semantic-labels.ts` instead — a file only `features/admin/templates`'
+// own (lazy, platform-admin-only) components import — same reasoning as
+// `features/document-authoring/lib/row-block-item-label.ts`'s own doc
+// comment. See `docs/i18n/README.md`'s "Staff and admin namespaces".
 
 /** Semantics that mark a repeating structured block whose rows carry identity. */
 export const ROW_BLOCK_SEMANTICS: ReadonlySet<FieldSemantic> = new Set<FieldSemantic>([
@@ -82,20 +68,12 @@ export const OWNER_ELIGIBLE_SEMANTICS: ReadonlySet<FieldSemantic> = new Set<Fiel
   'transition',
 ]);
 
-/** Human, singular label for one row of a semantic block ("Goal 2", "Service 1",
- *  used both in the row editor and in completeness advisory messages). */
-export const ROW_BLOCK_ITEM_LABELS: Partial<Record<FieldSemantic, string>> = {
-  goals: 'Goal',
-  services: 'Service',
-  accommodations: 'Accommodation',
-  transition: 'Transition item',
-  participants: 'Participant',
-  evaluatorReports: 'Evaluator report',
-};
-
-export function rowBlockItemLabel(semantic: FieldSemantic | undefined): string {
-  return (semantic && ROW_BLOCK_ITEM_LABELS[semantic]) || 'Row';
-}
+// A translated singular row-item label ("Goal", "Service", …) used to live
+// here too (`ROW_BLOCK_ITEM_LABELS`/`rowBlockItemLabel`), but nothing calls
+// it any more — `features/document-authoring` (the only consumer of this
+// concept) has its own translated `rowBlockItemNoun` in
+// `lib/row-block-item-label.ts`, covering the same semantics. Removed rather
+// than kept as dead English-only code.
 
 export const COLUMN_SEMANTICS = [
   'domain',
@@ -123,32 +101,6 @@ export const COLUMN_SEMANTICS = [
   'findings',
 ] as const;
 export type ColumnSemantic = (typeof COLUMN_SEMANTICS)[number];
-
-export const COLUMN_SEMANTIC_LABELS: Record<ColumnSemantic, string> = {
-  domain: 'Goal domain / area',
-  goalText: 'Goal text',
-  baseline: 'Baseline',
-  targetCriteria: 'Target criteria',
-  measurementMethod: 'Measurement method',
-  timeframe: 'Timeframe',
-  serviceType: 'Service type',
-  frequency: 'Frequency',
-  duration: 'Duration',
-  location: 'Location',
-  providerRole: 'Provider role',
-  startDate: 'Start date',
-  endDate: 'End date',
-  category: 'Accommodation category',
-  accommodation: 'Accommodation',
-  goalArea: 'Postsecondary goal area',
-  transitionServices: 'Transition services',
-  participantName: 'Participant name',
-  participantRole: 'Participant role',
-  attended: 'Attended',
-  evaluationDomain: 'Evaluation area',
-  evaluatorName: 'Evaluator',
-  findings: 'Findings',
-};
 
 export function isFieldSemantic(v: unknown): v is FieldSemantic {
   return typeof v === 'string' && (FIELD_SEMANTICS as readonly string[]).includes(v);

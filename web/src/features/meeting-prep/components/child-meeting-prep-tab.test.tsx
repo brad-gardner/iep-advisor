@@ -118,9 +118,9 @@ describe('ChildMeetingPrepTab — parent questions', () => {
     const list = await screen.findByTestId('parent-questions-list');
     expect(within(list).getAllByTestId('parent-question')).toHaveLength(1);
     expect(list).toHaveTextContent(QUESTION);
-    expect(prepQuestionsApi.createPrepQuestion).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(prepQuestionsApi.createPrepQuestion).toHaveBeenCalledTimes(1));
     expect(prepQuestionsApi.createPrepQuestion).toHaveBeenCalledWith(4, { text: QUESTION, source: 'advocate' });
-    expect(toast.show).toHaveBeenCalledWith({ message: 'Added to your questions', variant: 'success' });
+    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: 'Added to your questions', variant: 'success' }));
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/children/4/meeting-prep'));
     expect(screen.getByTestId('location')).not.toHaveTextContent('addQuestion');
     expect(toast.show).toHaveBeenCalledTimes(1);

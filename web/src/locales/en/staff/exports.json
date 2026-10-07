@@ -1,0 +1,35 @@
+{
+  "page": {
+    "title": "Exports",
+    "breadcrumb": "Exports",
+    "requestExport": "Request district export",
+    "requestExportFailed": "Could not request the export.",
+    "couldNotLoadTitle": "Could not load export jobs",
+    "tryAgain": "Try again",
+    "couldNotPrepareDownload": "Could not prepare the download.",
+    "columns": {
+      "requested": "Requested",
+      "requestedBy": "{{date}} by {{name}}",
+      "scope": "Scope",
+      "scopeStudentFallback": "Student",
+      "scopeDistrict": "District",
+      "status": "Status",
+      "size": "Size",
+      "counts": "Students / files",
+      "download": "Download"
+    },
+    "tableLabel": "Export jobs",
+    "status": {
+      "Queued": "Queued",
+      "Running": "Running",
+      "Completed": "Completed",
+      "Failed": "Failed"
+    }
+  },
+  "recordButton": {
+    "label": "Export record",
+    "requestedToast": "Export requested",
+    "requestFailed": "Could not request the export.",
+    "viewExports": "View exports"
+  }
+}

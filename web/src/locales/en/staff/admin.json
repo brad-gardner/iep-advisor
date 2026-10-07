@@ -1,0 +1,396 @@
+{
+  "common": {
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "column": {
+      "name": "Name",
+      "email": "Email",
+      "joined": "Joined",
+      "status": "Status"
+    },
+    "required": "Required",
+    "noneOption": "— none —"
+  },
+  "dashboard": {
+    "pageTitle": "Admin Dashboard",
+    "loading": "Loading dashboard…",
+    "unknownError": "Unknown error",
+    "loadFailed": "Failed to load dashboard stats.",
+    "stat": {
+      "totalUsers": "Total Users",
+      "activeChildren": "Active Children",
+      "iepDocuments": "IEP Documents",
+      "aiAnalyses": "AI Analyses"
+    },
+    "deltaThisWeek": "+{{delta}} this week",
+    "status": {
+      "documentStatus": "Document Status",
+      "analysisStatus": "Analysis Status",
+      "subscriptionStatus": "Subscription Status"
+    },
+    "documentItem": {
+      "created": "Created",
+      "parsed": "Parsed",
+      "error": "Error"
+    },
+    "analysisItem": {
+      "completed": "Completed",
+      "pending": "Pending",
+      "error": "Error"
+    },
+    "subscriptionStatusValue": {
+      "none": "None",
+      "active": "Active",
+      "pastDue": "Past due",
+      "canceled": "Canceled",
+      "expired": "Expired"
+    },
+    "breakdown": {
+      "childrenByDisability": "Children by Disability Category",
+      "goalsByCategory": "Goals by Category",
+      "noDataYet": "No data yet."
+    },
+    "recentUsers": {
+      "title": "Recent Users",
+      "emptyTitle": "No users yet"
+    },
+    "betaCodes": {
+      "title": "Beta Codes",
+      "redeemed": "{{count}} redeemed",
+      "total": "{{count}} total"
+    },
+    "quickStats": {
+      "title": "Quick Stats",
+      "advocacyGoals": "Advocacy Goals",
+      "meetingChecklists": "Meeting Checklists",
+      "totalAiUsage": "Total AI Usage"
+    }
+  },
+  "users": {
+    "pageTitle": "User Management",
+    "subtitle_one": "{{count}} user",
+    "subtitle_other": "{{count}} users",
+    "searchPlaceholder": "Search by name or email...",
+    "inviteButton": "Invite Beta User",
+    "tableLabel": "Users",
+    "emptyTitle": "No users found.",
+    "column": {
+      "role": "Role"
+    },
+    "loadFailed": "Failed to load users.",
+    "inviteModal": {
+      "title": "Invite Beta User",
+      "description": "Enter their email. They'll receive a signup link with a beta code that auto-fills on the registration page.",
+      "emailLabel": "Email",
+      "invalidEmail": "Please enter a valid email address",
+      "sendFailed": "Failed to send invite",
+      "sentToast": "Invite sent to {{email}}",
+      "submit": "Send Invite",
+      "emailPlaceholder": "email@example.com"
+    }
+  },
+  "userDetail": {
+    "pageTitleFallback": "User",
+    "loading": "Loading user…",
+    "loadFailed": "Failed to load user.",
+    "backToUsers": "Back to users",
+    "editUser": "Edit User",
+    "roleLabel": "Role",
+    "roleUser": "User",
+    "roleAdmin": "Admin",
+    "activeLabel": "Active",
+    "saveChanges": "Save Changes",
+    "saveFailed": "Failed to update user.",
+    "savedToast": "User updated successfully.",
+    "statusToggleFailed": "Failed to update user status.",
+    "reactivatedToast": "User reactivated.",
+    "deactivatedToast": "User deactivated.",
+    "details": "Details",
+    "stateLabel": "State",
+    "actions": "Actions",
+    "deactivate": "Deactivate User",
+    "reactivate": "Reactivate User"
+  },
+  "templates": {
+    "versionStatus": {
+      "Draft": "Draft",
+      "Published": "Published"
+    },
+    "list": {
+      "pageTitle": "Document Templates",
+      "subtitle_one": "{{count}} template",
+      "subtitle_other": "{{count}} templates",
+      "createButton": "Create Template",
+      "tableLabel": "Document templates",
+      "emptyTitle": "No templates yet.",
+      "createdToast": "Template created.",
+      "loadFailedFallback": "Failed to load templates.",
+      "column": {
+        "state": "State",
+        "stateDefault": "Default",
+        "documentType": "Document Type",
+        "name": "Name",
+        "latestVersion": "Latest Version",
+        "status": "Status"
+      }
+    },
+    "createModal": {
+      "title": "Create Template",
+      "cancel": "Cancel",
+      "submit": "Create Template",
+      "nameLabel": "Template name",
+      "namePlaceholder": "e.g. Ohio IEP",
+      "docTypeLabel": "Document type",
+      "docTypeLoading": "Loading…",
+      "docTypePlaceholder": "Select a document type…",
+      "isDefaultLabel": "Default template (applies to all states)",
+      "stateLabel": "State",
+      "errorNameRequired": "Please enter a template name.",
+      "errorDocTypeRequired": "Please select a document type.",
+      "errorStateRequired": "Please select a state, or mark this template as the default.",
+      "errorCreateFailed": "Failed to create template.",
+      "errorDocTypesLoadFailed": "Failed to load document types."
+    },
+    "builder": {
+      "pageTitleFallback": "Template",
+      "backToTemplates": "Back to templates",
+      "loading": "Loading template…",
+      "loadErrorFallback": "Failed to load template.",
+      "noWorkingVersion": "No working version loaded.",
+      "notFound": "Template not found.",
+      "noVersionToEdit": "This template has no version to edit.",
+      "versionLoadFailed": "Failed to load template version.",
+      "editNewVersion": "Edit (new version)",
+      "publish": "Publish",
+      "publishedToast": "Template version published.",
+      "publishFailedFallback": "Publish failed.",
+      "newDraftToast": "New draft version created.",
+      "forkFailedFallback": "Failed to start a new version.",
+      "conflictTitle": "This template changed in another session.",
+      "conflictMessage": "Your working copy is out of date. Reload to get the latest before editing further.",
+      "reloadTemplate": "Reload template",
+      "readOnlyTitle": "This version is published and read-only.",
+      "readOnlyMessage": "Published versions are immutable. Choose “Edit (new version)” to start a new draft from this version.",
+      "publishErrorsTitle": "This template can’t be published yet.",
+      "needsSectionAndField": "Add at least one section, and at least one field to every section, to publish.",
+      "structure": "Structure",
+      "noSections": "No sections yet. Add a section to start building this template.",
+      "addSection": "Add section",
+      "formPreviewHeading": "Form preview",
+      "subtitle": "{{state}} · {{docType}} · v{{version}}"
+    },
+    "sectionEditor": {
+      "titleLabel": "Section title",
+      "moveUp": "Move section up",
+      "moveDown": "Move section down",
+      "delete": "Delete section",
+      "noFieldsYet": "No fields yet.",
+      "addField": "Add field",
+      "deleteConfirmTitle": "Delete section",
+      "deleteConfirmMessage": "Delete \"{{title}}\" and all its fields? This cannot be undone.",
+      "deleteConfirmLabel": "Delete section",
+      "deleteFailed": "Failed to delete section.",
+      "untitled": "this section",
+      "saveFailed": "Save failed",
+      "newFieldDefaultLabel": "New field",
+      "newSectionDefaultTitle": "New section"
+    },
+    "fieldEditor": {
+      "labelLabel": "Field label",
+      "typeLabel": "Field type",
+      "semanticLabel": "Semantic (what this field means)",
+      "semanticHelp": "Lets AI help, prefill and PDF layout recognise this field in any template.",
+      "moveUp": "Move field up",
+      "moveDown": "Move field down",
+      "delete": "Delete field",
+      "deleteConfirmTitle": "Delete field",
+      "deleteConfirmMessage": "Delete \"{{label}}\"? This cannot be undone.",
+      "deleteConfirmLabel": "Delete field",
+      "deleteFailed": "Failed to delete field.",
+      "untitled": "this field",
+      "saveFailed": "Save failed",
+      "configErrorSuffix": "Changes won’t be saved until this is fixed.",
+      "noExtraConfig": "This field type has no extra configuration."
+    },
+    "autosave": {
+      "saving": "Saving…",
+      "saved": "Saved",
+      "failed": "Save failed"
+    },
+    "formPreview": {
+      "emptyMessage": "Add a section to see the form preview.",
+      "ariaLabel": "Form preview",
+      "untitledSection": "Untitled section",
+      "noFields": "No fields.",
+      "untitledField": "Untitled field",
+      "requiredSuffix": "(required)",
+      "selectPlaceholder": "Select…",
+      "untitledColumn": "Column",
+      "columnValueLabel": "{{column}} value"
+    },
+    "configEditors": {
+      "maxLengthLabel": "Max length (optional)",
+      "maxLengthPlaceholder": "No limit",
+      "dateFormatLabel": "Date format (optional)",
+      "dateFormatPlaceholder": "e.g. MM/dd/yyyy",
+      "optionsLegend": "Options",
+      "optionValueLabel": "Value",
+      "optionValuePlaceholder": "e.g. yes",
+      "optionLabelLabel": "Label (optional)",
+      "optionLabelPlaceholder": "e.g. Yes",
+      "removeOption": "Remove option {{number}}",
+      "addOption": "Add option",
+      "columnsLegend": "Columns",
+      "columnLabelLabel": "Column label",
+      "columnLabelPlaceholder": "e.g. Goal",
+      "columnTypeLabel": "Type",
+      "removeColumn": "Remove column {{number}}",
+      "columnSemanticLabel": "Semantic",
+      "addColumn": "Add column",
+      "minRowsLabel": "Min rows",
+      "maxRowsLabel": "Max rows",
+      "noneLabel": "None"
+    },
+    "fieldType": {
+      "Text": "Text",
+      "RichText": "Rich text",
+      "Date": "Date",
+      "Select": "Select",
+      "Checkbox": "Checkbox",
+      "Table": "Table"
+    },
+    "fieldSemantic": {
+      "studentProfile": "Student profile",
+      "presentLevels": "Present levels (PLAAFP)",
+      "eligibility": "Eligibility / disability category",
+      "placement": "Placement",
+      "progressMonitoring": "Progress monitoring / reporting",
+      "specialFactors": "Special factors",
+      "goals": "Goals (repeating block)",
+      "services": "Services (repeating block)",
+      "accommodations": "Accommodations (repeating block)",
+      "transition": "Transition (repeating block)",
+      "futurePlanning": "Future planning",
+      "extendedSchoolYear": "Extended school year",
+      "testing": "Statewide / district testing",
+      "transportation": "Transportation",
+      "lre": "Least restrictive environment",
+      "participants": "Meeting participants (repeating block)",
+      "signatures": "Signatures",
+      "referralReason": "Referral reason",
+      "evaluationPlan": "Evaluation plan",
+      "evaluatorReports": "Evaluator reports (repeating block)",
+      "teamSummary": "Team summary",
+      "eligibilityDetermination": "Eligibility determination",
+      "meetingDate": "Meeting date",
+      "effectiveDates": "Effective dates"
+    },
+    "validation": {
+      "addOption": "Add at least one option.",
+      "optionValueRequired": "Every option needs a non-empty value.",
+      "optionValuesUnique": "Option values must be unique.",
+      "addColumn": "Add at least one column.",
+      "columnLabelRequired": "Every column needs a label.",
+      "columnSemanticsUnique": "Column semantics must be unique within the table.",
+      "columnOptionError": "Column \"{{label}}\": {{error}}",
+      "minMaxRows": "Min rows cannot exceed max rows."
+    },
+    "columnSemantic": {
+      "domain": "Goal domain / area",
+      "goalText": "Goal text",
+      "baseline": "Baseline",
+      "targetCriteria": "Target criteria",
+      "measurementMethod": "Measurement method",
+      "timeframe": "Timeframe",
+      "serviceType": "Service type",
+      "frequency": "Frequency",
+      "duration": "Duration",
+      "location": "Location",
+      "providerRole": "Provider role",
+      "startDate": "Start date",
+      "endDate": "End date",
+      "category": "Accommodation category",
+      "accommodation": "Accommodation",
+      "goalArea": "Postsecondary goal area",
+      "transitionServices": "Transition services",
+      "participantName": "Participant name",
+      "participantRole": "Participant role",
+      "attended": "Attended",
+      "evaluationDomain": "Evaluation area",
+      "evaluatorName": "Evaluator",
+      "findings": "Findings"
+    }
+  },
+  "audit": {
+    "pageTitle": "Audit integrity",
+    "subtitle": "Hash-chain integrity runs over the access audit log.",
+    "runCheckNow": "Run check now",
+    "tableLabel": "Integrity runs",
+    "column": {
+      "started": "Started",
+      "completed": "Completed",
+      "rowsChecked": "Rows checked",
+      "firstBrokenId": "First broken id",
+      "detail": "Detail"
+    },
+    "emptyTitle": "No integrity runs yet",
+    "emptyDescription": "Run a check now, or wait for the nightly worker.",
+    "status": {
+      "Ok": "Ok",
+      "Broken": "Broken",
+      "Failed": "Failed"
+    },
+    "loadFailed": "Could not load integrity runs.",
+    "runFailed": "Could not run the integrity check."
+  },
+  "email": {
+    "pageTitle": "Outbound email",
+    "subtitle": "Every email the app has queued, sent, or failed to send.",
+    "unconfiguredTitle": "Email delivery is not configured",
+    "unconfiguredMessage": "No email will be delivered until Azure Communication Services is configured for this environment.",
+    "statusSummary": "{{queued}} queued · {{sending}} sending · {{failed}} failed",
+    "statusSummaryLastSent": "{{queued}} queued · {{sending}} sending · {{failed}} failed · last sent {{when}}",
+    "statusFilterLabel": "Status",
+    "filter": {
+      "Failed": "Failed",
+      "Queued": "Queued",
+      "Sending": "Sending",
+      "Sent": "Sent",
+      "Cancelled": "Cancelled",
+      "All": "All"
+    },
+    "status": {
+      "Queued": "Queued",
+      "Sending": "Sending",
+      "Sent": "Sent",
+      "Failed": "Failed",
+      "Cancelled": "Cancelled"
+    },
+    "column": {
+      "to": "To",
+      "subject": "Subject",
+      "kind": "Kind",
+      "attempts": "Attempts",
+      "lastError": "Last error",
+      "when": "Next attempt / sent"
+    },
+    "sentAt": "Sent {{when}}",
+    "nextAttempt": "Next: {{when}}",
+    "tableLabel": "Outbound emails",
+    "noneMatch": "No emails match this filter.",
+    "resend": "Resend",
+    "cancel": "Cancel",
+    "resendConfirmTitle": "Resend email",
+    "cancelConfirmTitle": "Cancel email",
+    "resendConfirmMessage": "Re-queue this email to {{email}} for immediate delivery?",
+    "cancelConfirmMessage": "Cancel this queued email to {{email}}? It will never be sent.",
+    "keepAsIs": "Keep as is",
+    "resentToast": "Email to {{email}} re-queued",
+    "cancelledToast": "Email to {{email}} cancelled",
+    "resendFailedFallback": "Could not resend this email.",
+    "cancelFailedFallback": "Could not cancel this email.",
+    "loadFailed": "Could not load outbound emails."
+  }
+}

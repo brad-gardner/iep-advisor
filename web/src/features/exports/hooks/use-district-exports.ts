@@ -1,19 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiErrorMessage } from '@/lib/api-error';
+import { toLoadError, type LoadError } from '@/lib/api-error';
 import { enqueueDistrictExport, listDistrictExports } from '../api/exports-api';
 import { IN_FLIGHT_EXPORT_STATUSES } from '../types';
 import type { ExportJobDto } from '../types';
 
 const POLL_INTERVAL_MS = 10_000;
 
+/** The shared `LoadError` shape, or `null` for "no error" — see
+ * `docs/i18n/README.md`'s "Load errors: the shared `LoadError` pattern". A
+ * server-provided message is shown as-is; the generic case is translated by
+ * the caller at render time (it has the current `t`). */
+export type ExportsLoadError = LoadError | null;
+
 interface UseDistrictExportsResult {
   jobs: ExportJobDto[];
   isLoading: boolean;
-  error: string | null;
+  error: ExportsLoadError;
   retry: () => void;
   requestExport: () => Promise<void>;
   isRequesting: boolean;
-  requestError: string | null;
+  requestError: ExportsLoadError;
 }
 
 /** District export jobs (district- and student-scoped): loads once, then
@@ -29,9 +35,9 @@ interface UseDistrictExportsResult {
 export function useDistrictExports(): UseDistrictExportsResult {
   const [jobs, setJobs] = useState<ExportJobDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ExportsLoadError>(null);
   const [isRequesting, setIsRequesting] = useState(false);
-  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<ExportsLoadError>(null);
   const jobsRef = useRef<ExportJobDto[]>([]);
   const reloadRef = useRef<() => void>(() => {});
 
@@ -51,10 +57,10 @@ export function useDistrictExports(): UseDistrictExportsResult {
           setJobs(res.data);
           setError(null);
         } else {
-          setError(res.message ?? 'Could not load export jobs.');
+          setError(toLoadError(res));
         }
       } catch (err) {
-        if (active && mine === generation) setError(apiErrorMessage(err, 'Could not load export jobs.'));
+        if (active && mine === generation) setError(toLoadError(err));
       } finally {
         if (active && mine === generation) setIsLoading(false);
       }
@@ -83,10 +89,10 @@ export function useDistrictExports(): UseDistrictExportsResult {
       if (res.success) {
         reloadRef.current();
       } else {
-        setRequestError(res.message ?? 'Could not request the export.');
+        setRequestError(toLoadError(res));
       }
     } catch (err) {
-      setRequestError(apiErrorMessage(err, 'Could not request the export.'));
+      setRequestError(toLoadError(err));
     } finally {
       setIsRequesting(false);
     }

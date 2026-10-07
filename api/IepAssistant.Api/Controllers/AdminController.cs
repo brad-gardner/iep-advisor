@@ -1,16 +1,24 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Admin;
 using IepAssistant.Api.DTOs.Auth;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Notifications;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 
 namespace IepAssistant.Api.Controllers;
 
+/// <summary>
+/// Multilingual plan (2026-10-06) phase 6: every route here returns a FIXED status (never derived from
+/// matching message text), so only the messages need localizing — see
+/// <see cref="Api.Extensions.ServiceFailureMapperExtensions"/>'s doc comment for why that distinction
+/// matters.
+/// </summary>
 [ApiController]
 [Route("api/admin")]
 [Authorize(Roles = "Admin")]
@@ -20,17 +28,20 @@ public class AdminController : ControllerBase
     private readonly INotificationService _notificationService;
     private readonly IAuditIntegrityService _auditIntegrityService;
     private readonly IEmailTransport _emailTransport;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public AdminController(
         ApplicationDbContext db,
         INotificationService notificationService,
         IAuditIntegrityService auditIntegrityService,
-        IEmailTransport emailTransport)
+        IEmailTransport emailTransport,
+        IStringLocalizer<Messages> localizer)
     {
         _db = db;
         _notificationService = notificationService;
         _auditIntegrityService = auditIntegrityService;
         _emailTransport = emailTransport;
+        _localizer = localizer;
     }
 
     // ----------------------------------------------------------------- Pilot-gates plan, phase 1: audit integrity
@@ -78,7 +89,7 @@ public class AdminController : ControllerBase
         if (!string.Equals(status, "All", StringComparison.OrdinalIgnoreCase))
         {
             if (!Enum.TryParse<OutboundEmailStatus>(status, ignoreCase: true, out var parsed))
-                return BadRequest(ApiResponse<object>.Error($"Invalid status: {status}"));
+                return BadRequest(ApiResponse<object>.Error(_localizer["Admin.InvalidStatus", status]));
             query = query.Where(e => e.Status == parsed);
         }
 
@@ -113,12 +124,12 @@ public class AdminController : ControllerBase
     {
         var email = await _db.OutboundEmails.FirstOrDefaultAsync(e => e.Id == id, ct);
         if (email == null)
-            return NotFound(ApiResponse<object>.Error("Email not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["Admin.EmailNotFound"]));
 
         if (email.Status is not (OutboundEmailStatus.Failed or OutboundEmailStatus.Cancelled))
-            return BadRequest(ApiResponse<object>.Error($"Only a Failed or Cancelled email can be resent (current status: {email.Status})."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Admin.OnlyFailedOrCancelledCanResend", email.Status]));
         if (OutboundEmailKinds.IsRedacted(email) || OutboundEmailKinds.CarriesOneTimeSecret(email.Kind))
-            return BadRequest(ApiResponse<object>.Error("This message carried a one-time link and its content is not kept; ask the user to request a new link instead."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Admin.OneTimeLinkContentNotKept"]));
 
         email.Status = OutboundEmailStatus.Queued;
         email.Attempts = 0;
@@ -126,7 +137,7 @@ public class AdminController : ControllerBase
         email.NextAttemptAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "Email re-queued for delivery"));
+        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["Admin.EmailRequeued"]));
     }
 
     /// <summary>Cancels a not-yet-sent email so it will never be attempted again.</summary>
@@ -138,16 +149,16 @@ public class AdminController : ControllerBase
     {
         var email = await _db.OutboundEmails.FirstOrDefaultAsync(e => e.Id == id, ct);
         if (email == null)
-            return NotFound(ApiResponse<object>.Error("Email not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["Admin.EmailNotFound"]));
 
         if (email.Status == OutboundEmailStatus.Sent)
-            return BadRequest(ApiResponse<object>.Error("A sent email cannot be cancelled."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Admin.SentEmailCannotBeCancelled"]));
 
         email.Status = OutboundEmailStatus.Cancelled;
         IepAssistant.Api.BackgroundServices.OutboundEmailWorker.RedactSecretsIfTerminal(email);
         await _db.SaveChangesAsync(ct);
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "Email cancelled"));
+        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["Admin.EmailCancelled"]));
     }
 
     /// <summary>Delivery-configuration + at-a-glance queue health for the admin banner.</summary>

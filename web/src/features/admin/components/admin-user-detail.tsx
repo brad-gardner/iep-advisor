@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -11,16 +12,27 @@ import { PageLayout } from "@/components/ui/page-layout";
 import { DetailLayout } from "@/components/ui/detail-layout";
 import { useToast } from "@/components/ui/toast";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { formatDate } from "@/lib/format-date";
 import type { AdminUser } from "@/types/api";
 import { getUser, updateUser } from "../api/admin-api";
 
 export function AdminUserDetail() {
+  const { t } = useTranslation(['admin', 'common']);
   const { id } = useParams<{ id: string }>();
   const { show: showToast } = useToast();
   const [user, setUser] = useState<AdminUser | null>(null);
-  usePageTitle(user ? `${user.firstName} ${user.lastName}` : "User");
+  usePageTitle(user ? `${user.firstName} ${user.lastName}` : t('userDetail.pageTitleFallback'));
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // The LOAD effect's own failure is a flag, not the translated string —
+  // translated at render, below, so a language switch after a failed load
+  // shows the new language immediately rather than a stale snapshot (see
+  // `docs/i18n/README.md`'s note on never putting `t` in a mount-effect's
+  // dependency array). An action failure (save/toggle), by contrast, is set
+  // fresh inside its own click handler, which always has the CURRENT `t` —
+  // no flag needed there.
+  const [hasLoadError, setHasLoadError] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const error = actionError ?? (hasLoadError ? t('userDetail.loadFailed') : null);
   // Which mutation is in flight, so only the pressed button shows its spinner
   // while both stay disabled to prevent concurrent edits.
   const [savingAction, setSavingAction] = useState<null | "save" | "toggle">(
@@ -45,9 +57,9 @@ export function AdminUserDetail() {
         setUser(data);
         setRole(data.role);
         setIsActive(data.isActive);
-        setError(null);
+        setHasLoadError(false);
       } catch {
-        if (active) setError("Failed to load user.");
+        if (active) setHasLoadError(true);
       } finally {
         if (active) setIsLoading(false);
       }
@@ -55,26 +67,27 @@ export function AdminUserDetail() {
     return () => {
       active = false;
     };
+    // `t` deliberately excluded — see the `hasLoadError` comment above.
   }, [id, reloadKey]);
 
   const retry = () => {
     setIsLoading(true);
-    setError(null);
+    setHasLoadError(false);
     setReloadKey((k) => k + 1);
   };
 
   const handleSave = async () => {
     if (!user) return;
     setSavingAction("save");
-    setError(null);
+    setActionError(null);
     try {
       const updated = await updateUser(user.id, { role, isActive });
       setUser(updated);
       setRole(updated.role);
       setIsActive(updated.isActive);
-      showToast({ message: "User updated successfully.", variant: "success" });
+      showToast({ message: t('userDetail.savedToast'), variant: "success" });
     } catch {
-      setError("Failed to update user.");
+      setActionError(t('userDetail.saveFailed'));
     } finally {
       setSavingAction(null);
     }
@@ -83,7 +96,7 @@ export function AdminUserDetail() {
   const handleToggleActive = async () => {
     if (!user) return;
     setSavingAction("toggle");
-    setError(null);
+    setActionError(null);
     try {
       const newActive = !user.isActive;
       const updated = await updateUser(user.id, { isActive: newActive });
@@ -91,11 +104,11 @@ export function AdminUserDetail() {
       setRole(updated.role);
       setIsActive(updated.isActive);
       showToast({
-        message: newActive ? "User reactivated." : "User deactivated.",
+        message: newActive ? t('userDetail.reactivatedToast') : t('userDetail.deactivatedToast'),
         variant: "success",
       });
     } catch {
-      setError("Failed to update user status.");
+      setActionError(t('userDetail.statusToggleFailed'));
     } finally {
       setSavingAction(null);
     }
@@ -104,7 +117,7 @@ export function AdminUserDetail() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading user…" />
+        <Spinner label={t('userDetail.loading')} />
       </div>
     );
   }
@@ -119,7 +132,7 @@ export function AdminUserDetail() {
             onClick={retry}
             className="mt-3"
           >
-            Retry
+            {t('common:ui.tryAgain')}
           </Button>
         </Notice>
         <Link
@@ -127,7 +140,7 @@ export function AdminUserDetail() {
           className="inline-flex items-center gap-1.5 text-sm text-brand-teal-500 hover:text-brand-teal-600 mt-4"
         >
           <ArrowLeft size={14} strokeWidth={1.8} aria-hidden="true" />
-          Back to users
+          {t('userDetail.backToUsers')}
         </Link>
       </div>
     );
@@ -139,7 +152,7 @@ export function AdminUserDetail() {
     <PageLayout
       title={`${user.firstName} ${user.lastName}`}
       breadcrumb={[
-        { label: "Users", to: "/admin/users" },
+        { label: t('users.pageTitle'), to: "/admin/users" },
         { label: `${user.firstName} ${user.lastName}` },
       ]}
     >
@@ -149,28 +162,28 @@ export function AdminUserDetail() {
         main={
           <Card>
             <h2 className="text-sm font-medium text-brand-slate-800 mb-4">
-              Edit User
+              {t('userDetail.editUser')}
             </h2>
             <div className="space-y-4">
               <Select
-                label="Role"
+                label={t('userDetail.roleLabel')}
                 value={role}
                 onChange={(e) => setRole((e.target as HTMLSelectElement).value)}
                 data-testid="admin-user-role"
               >
-                <option value="User">User</option>
-                <option value="Admin">Admin</option>
+                <option value="User">{t('userDetail.roleUser')}</option>
+                <option value="Admin">{t('userDetail.roleAdmin')}</option>
               </Select>
 
               <div className="flex items-center gap-3">
                 <span className="text-[13px] font-medium text-brand-slate-600">
-                  Active
+                  {t('userDetail.activeLabel')}
                 </span>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={isActive}
-                  aria-label="Active"
+                  aria-label={t('userDetail.activeLabel')}
                   onClick={() => setIsActive(!isActive)}
                   data-testid="admin-user-active"
                   className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
@@ -192,7 +205,7 @@ export function AdminUserDetail() {
                   disabled={saving}
                   data-testid="admin-user-save"
                 >
-                  Save Changes
+                  {t('userDetail.saveChanges')}
                 </Button>
               </div>
             </div>
@@ -202,29 +215,29 @@ export function AdminUserDetail() {
           <>
             <Card>
               <h2 className="text-sm font-medium text-brand-slate-800 mb-4">
-                Details
+                {t('userDetail.details')}
               </h2>
               <div className="space-y-4">
-                <InfoRow label="Email" value={user.email} />
-                <InfoRow label="State" value={user.state ?? "Not set"} />
+                <InfoRow label={t('common.column.email')} value={user.email} />
+                <InfoRow label={t('userDetail.stateLabel')} value={user.state ?? t('common:ui.notSet')} />
                 <InfoRow
-                  label="Status"
+                  label={t('common.column.status')}
                   value={
                     <Badge variant={user.isActive ? "success" : "error"}>
-                      {user.isActive ? "Active" : "Inactive"}
+                      {user.isActive ? t('common.status.active') : t('common.status.inactive')}
                     </Badge>
                   }
                 />
                 <InfoRow
-                  label="Joined"
-                  value={new Date(user.createdAt).toLocaleDateString()}
+                  label={t('common.column.joined')}
+                  value={formatDate(user.createdAt)}
                 />
               </div>
             </Card>
 
             <Card>
               <h2 className="text-sm font-medium text-brand-slate-800 mb-3">
-                Actions
+                {t('userDetail.actions')}
               </h2>
               {user.isActive ? (
                 <Button
@@ -234,7 +247,7 @@ export function AdminUserDetail() {
                   loading={savingAction === "toggle"}
                   disabled={saving}
                 >
-                  Deactivate User
+                  {t('userDetail.deactivate')}
                 </Button>
               ) : (
                 <Button
@@ -244,7 +257,7 @@ export function AdminUserDetail() {
                   loading={savingAction === "toggle"}
                   disabled={saving}
                 >
-                  Reactivate User
+                  {t('userDetail.reactivate')}
                 </Button>
               )}
             </Card>

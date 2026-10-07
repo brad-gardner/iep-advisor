@@ -25,7 +25,7 @@ public class ParentPrepQuestionsController : ControllerBase
     public async Task<IActionResult> GetForChild(int childId, CancellationToken ct)
     {
         var result = await _service.GetForChildAsync(childId, User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message ?? "Not found");
+        if (!result.Success) return this.MapServiceFailure(result);
         return Ok(ApiResponse<List<ParentPrepQuestionDto>>.SuccessResponse(result.Data!.Select(m => Map(m)).ToList()));
     }
 
@@ -34,7 +34,7 @@ public class ParentPrepQuestionsController : ControllerBase
     public async Task<IActionResult> Add(int childId, [FromBody] AddParentPrepQuestionRequest request, CancellationToken ct)
     {
         var result = await _service.AddAsync(childId, User.GetUserId(), request.Text, request.Source, ct);
-        if (!result.Success) return MapFailure(result.Message ?? "Creation failed");
+        if (!result.Success) return this.MapServiceFailure(result);
 
         var dto = Map(result.Data!.Question, result.Data.AlreadyExisted);
         var body = ApiResponse<ParentPrepQuestionDto>.SuccessResponse(dto);
@@ -45,7 +45,7 @@ public class ParentPrepQuestionsController : ControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] UpdateParentPrepQuestionRequest request, CancellationToken ct)
     {
         var result = await _service.UpdateAsync(id, User.GetUserId(), request.Text, request.IsChecked, ct);
-        if (!result.Success) return MapFailure(result.Message ?? "Update failed");
+        if (!result.Success) return this.MapServiceFailure(result);
         return Ok(ApiResponse<ParentPrepQuestionDto>.SuccessResponse(Map(result.Data!)));
     }
 
@@ -54,7 +54,7 @@ public class ParentPrepQuestionsController : ControllerBase
     public async Task<IActionResult> Reorder(int childId, [FromBody] ReorderParentPrepQuestionsRequest request, CancellationToken ct)
     {
         var result = await _service.ReorderAsync(childId, User.GetUserId(), request.Ids ?? new List<int>(), ct);
-        if (!result.Success) return MapFailure(result.Message ?? "Reorder failed");
+        if (!result.Success) return this.MapServiceFailure(result);
         return Ok(ApiResponse<List<ParentPrepQuestionDto>>.SuccessResponse(result.Data!.Select(m => Map(m)).ToList()));
     }
 
@@ -62,15 +62,9 @@ public class ParentPrepQuestionsController : ControllerBase
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
         var result = await _service.DeleteAsync(id, User.GetUserId(), ct);
-        if (!result.Success) return NotFound(ApiResponse<object>.Error(result.Message ?? "Not found"));
+        if (!result.Success) return this.MapServiceFailure(result);
         return Ok(ApiResponse<object>.SuccessResponse(new { }));
     }
-
-    /// <summary>"not found" (unknown child/question or no access) ⇒ 404; validation ⇒ 400.</summary>
-    private IActionResult MapFailure(string message)
-        => message.Contains("not found", StringComparison.OrdinalIgnoreCase)
-            ? NotFound(ApiResponse<object>.Error(message))
-            : BadRequest(ApiResponse<object>.Error(message));
 
     private static ParentPrepQuestionDto Map(ParentPrepQuestionModel m, bool? alreadyExisted = null) => new()
     {

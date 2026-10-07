@@ -1,5 +1,6 @@
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -15,6 +16,19 @@ namespace IepAssistant.Services.Implementations;
 /// non-admin staff of their own school), unknown emails become invites through
 /// <see cref="IStaffInviteService.InviteAsync"/> on commit. Batch history/detail/errors are served by
 /// <see cref="IRosterImportService"/> for both kinds.
+///
+/// Multilingual plan (2026-10-06) phase 6: every failure <see cref="Api.Controllers.DistrictImportsController"/>
+/// maps to a status carries an explicit <see cref="ServiceErrorKind"/>, matching that controller's
+/// PRE-existing English-substring heuristic so status is unchanged. Per-row evaluation/update messages
+/// (stored in <c>ImportRow.Message</c>, shown in the preview table — see <see cref="Evaluate"/> and
+/// <see cref="ApplyUpdateAsync"/>) are localized too, but carry no <see cref="ServiceErrorKind"/> — they
+/// never affect HTTP status. <c>ImportRow.Message</c> is written in whichever language is active for the
+/// request that wrote it — the uploader's at preview, the committer's at commit (which re-evaluates and
+/// overwrites every row's message). CSV column header tokens (<c>Email</c>, <c>FirstName</c>, etc. — see
+/// <see cref="Columns"/>) and the <c>Role</c> cell's accepted values (<c>DistrictAdmin</c>,
+/// <c>SchoolAdmin</c>, <c>Teacher</c>, <c>RelatedServiceProvider</c>, <c>GeneralEducator</c> — see
+/// <see cref="OrgRoleIds.FromName"/>) stay English in both languages: they are literal tokens the parser
+/// matches, not prose.
 /// </summary>
 public class StaffImportService : IStaffImportService
 {
@@ -25,28 +39,30 @@ public class StaffImportService : IStaffImportService
         new[] { "Email" }, new[] { "FirstName" }, new[] { "LastName" }, new[] { "Role" }
     };
 
-    private const string PermissionMessage = "You do not have permission to import staff.";
-
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
     private readonly IStaffInviteService _staffInvites;
     private readonly IAuditLogger _audit;
     private readonly ILogger<StaffImportService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public StaffImportService(ApplicationDbContext context, IOrgAccessService orgAccess, IStaffInviteService staffInvites, IAuditLogger audit, ILogger<StaffImportService> logger)
+    private LocalizedString PermissionMessage => _localizer["StaffImport.NoPermissionImportStaff"];
+
+    public StaffImportService(ApplicationDbContext context, IOrgAccessService orgAccess, IStaffInviteService staffInvites, IAuditLogger audit, ILogger<StaffImportService> logger, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
         _staffInvites = staffInvites;
         _audit = audit;
         _logger = logger;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<byte[]>> GenerateTemplateAsync(int userId, CancellationToken ct = default)
     {
-        var (ctxOrNull, denied) = await RequireAdminAsync(userId, ct);
+        var (ctxOrNull, denied, deniedKind) = await RequireAdminAsync(userId, ct);
         if (denied != null)
-            return ServiceResult<byte[]>.FailureResult(denied);
+            return ServiceResult<byte[]>.FailureResult(deniedKind, denied);
         var ctx = ctxOrNull!;
 
         var schools = await LoadSchoolsAsync(ctx, ct);
@@ -82,18 +98,18 @@ public class StaffImportService : IStaffImportService
 
     public async Task<ServiceResult<ImportPreviewModel>> PreviewAsync(int userId, ImportUploadModel upload, CancellationToken ct = default)
     {
-        var (ctxOrNull, denied) = await RequireAdminAsync(userId, ct);
+        var (ctxOrNull, denied, deniedKind) = await RequireAdminAsync(userId, ct);
         if (denied != null)
-            return ServiceResult<ImportPreviewModel>.FailureResult(denied);
+            return ServiceResult<ImportPreviewModel>.FailureResult(deniedKind, denied);
         var ctx = ctxOrNull!;
 
         var rejection = ImportWorkbook.ValidateUpload(upload);
         if (rejection != null)
-            return ServiceResult<ImportPreviewModel>.FailureResult(rejection);
+            return ServiceResult<ImportPreviewModel>.FailureResult(ServiceErrorKind.Validation, rejection);
 
         var (parsedRows, readError) = ImportWorkbook.ReadSheet(upload.Content, SheetName, Columns, RequiredColumns);
         if (readError != null)
-            return ServiceResult<ImportPreviewModel>.FailureResult(readError);
+            return ServiceResult<ImportPreviewModel>.FailureResult(ServiceErrorKind.Validation, readError);
         var sheetRows = parsedRows!;
 
         var refs = await LoadReferenceAsync(ctx, sheetRows.Select(r => r.Get("Email")), ct);
@@ -136,9 +152,9 @@ public class StaffImportService : IStaffImportService
 
     public async Task<ServiceResult<ImportResultModel>> CommitAsync(int userId, int batchId, bool commitValid, CancellationToken ct = default)
     {
-        var (ctxOrNull, denied) = await RequireAdminAsync(userId, ct);
+        var (ctxOrNull, denied, deniedKind) = await RequireAdminAsync(userId, ct);
         if (denied != null)
-            return ServiceResult<ImportResultModel>.FailureResult(denied);
+            return ServiceResult<ImportResultModel>.FailureResult(deniedKind, denied);
         var ctx = ctxOrNull!;
 
         var batchQuery = _context.ImportBatches.Where(b => b.Id == batchId && b.DistrictId == ctx.DistrictId);
@@ -146,15 +162,15 @@ public class StaffImportService : IStaffImportService
             batchQuery = batchQuery.Where(b => b.CreatedById == ctx.UserId);
         var batch = await batchQuery.FirstOrDefaultAsync(ct);
         if (batch == null)
-            return ServiceResult<ImportResultModel>.FailureResult("Import not found.");
+            return ServiceResult<ImportResultModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["StaffImport.ImportNotFound"]);
         if (batch.Kind != ImportKind.Staff)
-            return ServiceResult<ImportResultModel>.FailureResult("This import is not a staff list.");
+            return ServiceResult<ImportResultModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StaffImport.NotStaffList"]);
         if (batch.Status != ImportBatchStatus.Previewed)
-            return ServiceResult<ImportResultModel>.FailureResult("This import has already been committed.");
+            return ServiceResult<ImportResultModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StaffImport.AlreadyCommitted"]);
         if (!commitValid && batch.ErrorCount > 0)
-            return ServiceResult<ImportResultModel>.FailureResult("Fix the errors or choose to import valid rows only.");
+            return ServiceResult<ImportResultModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StaffImport.FixErrorsOrImportValidOnly"]);
         if (!await ImportBatchClaim.TryClaimAsync(_context, batchId, ct))
-            return ServiceResult<ImportResultModel>.FailureResult("This import has already been committed.");
+            return ServiceResult<ImportResultModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StaffImport.AlreadyCommitted"]);
         batch.Status = ImportBatchStatus.Committing; // mirror the claim on the tracked copy
 
         try
@@ -282,42 +298,42 @@ public class StaffImportService : IStaffImportService
         }
     }
 
-    internal static RowEvaluation Evaluate(StaffContext ctx, ReferenceData refs, Dictionary<string, string> cells)
+    internal RowEvaluation Evaluate(StaffContext ctx, ReferenceData refs, Dictionary<string, string> cells)
     {
         string Cell(string column) => cells.TryGetValue(column, out var v) ? v.Trim() : string.Empty;
 
         var eval = new RowEvaluation { Key = Cell("Email") };
         eval.DisplayName = $"{Cell("FirstName")} {Cell("LastName")}".Trim();
-        if (eval.Key.Length == 0) return eval.Fail("Email is required.");
-        if (eval.Key.Length > 256 || !eval.Key.Contains('@') || eval.Key.Contains(' ')) return eval.Fail($"'{eval.Key}' is not a valid email.");
+        if (eval.Key.Length == 0) return eval.Fail(_localizer["StaffImport.EmailRequired"]);
+        if (eval.Key.Length > 256 || !eval.Key.Contains('@') || eval.Key.Contains(' ')) return eval.Fail(_localizer["StaffImport.InvalidEmail", eval.Key]);
 
         refs.StaffByEmail.TryGetValue(eval.Key, out var existing);
         eval.Existing = existing;
 
         var roleText = Cell("Role");
-        if (roleText.Length == 0) return eval.Fail("Role is required.");
+        if (roleText.Length == 0) return eval.Fail(_localizer["StaffImport.RoleRequired"]);
         var roleId = OrgRoleIds.FromName(roleText);
-        if (roleId == null) return eval.Fail($"Unknown role '{roleText}' (use DistrictAdmin, SchoolAdmin, Teacher, RelatedServiceProvider or GeneralEducator).");
+        if (roleId == null) return eval.Fail(_localizer["StaffImport.UnknownRole", roleText]);
         eval.OrgRoleId = roleId;
 
         var schoolName = Cell("SchoolName");
-        if (ImportWorkbook.IsClear(schoolName)) return eval.Fail("SchoolName cannot be cleared.");
+        if (ImportWorkbook.IsClear(schoolName)) return eval.Fail(_localizer["StaffImport.SchoolNameCannotBeCleared"]);
         if (roleId == OrgRoleIds.DistrictAdmin)
         {
-            if (schoolName.Length > 0) return eval.Fail("A District Admin must not have a school.");
+            if (schoolName.Length > 0) return eval.Fail(_localizer["StaffImport.DistrictAdminMustNotHaveSchool"]);
         }
         else if (schoolName.Length == 0)
         {
             // Blank keeps an existing member's school; a new member (or a district admin becoming
             // school-bound) needs one.
             var kept = existing?.SchoolId != null ? refs.Schools.FirstOrDefault(s => s.Id == existing.SchoolId) : null;
-            if (kept == null) return eval.Fail("SchoolName is required for this role.");
+            if (kept == null) return eval.Fail(_localizer["StaffImport.SchoolNameRequiredForRole"]);
             eval.School = kept;
         }
         else
         {
             var school = refs.Schools.FirstOrDefault(s => string.Equals(s.Name, schoolName, StringComparison.OrdinalIgnoreCase));
-            if (school == null) return eval.Fail($"Unknown school '{schoolName}'.");
+            if (school == null) return eval.Fail(_localizer["StaffImport.UnknownSchool", schoolName]);
             eval.School = school;
         }
 
@@ -325,25 +341,25 @@ public class StaffImportService : IStaffImportService
         if (ImportWorkbook.IsClear(title)) eval.Title = (true, null);
         else if (title.Length > 0)
         {
-            if (title.Length > 150) return eval.Fail("Title must be 150 characters or fewer.");
+            if (title.Length > 150) return eval.Fail(_localizer["StaffImport.TitleTooLong"]);
             eval.Title = (true, title);
         }
 
         // Caller scope (mirrors StaffInviteService): SchoolAdmins only manage non-admin staff of their own school.
         if (ctx.OrgRoleId == OrgRoleIds.SchoolAdmin)
         {
-            if (roleId == OrgRoleIds.DistrictAdmin) return eval.Fail("You do not have permission to import a District Admin.");
-            if (eval.School == null || eval.School.Id != ctx.SchoolId) return eval.Fail("You can only import staff for your own school.");
+            if (roleId == OrgRoleIds.DistrictAdmin) return eval.Fail(_localizer["StaffImport.NoPermissionImportDistrictAdmin"]);
+            if (eval.School == null || eval.School.Id != ctx.SchoolId) return eval.Fail(_localizer["StaffImport.OnlyImportForOwnSchool"]);
             if (existing != null && (existing.OrgRoleId == OrgRoleIds.DistrictAdmin || existing.SchoolId != ctx.SchoolId))
-                return eval.Fail("You do not have permission to manage that staff member.");
+                return eval.Fail(_localizer["StaffImport.NoPermissionManageThatStaffMember"]);
         }
 
         if (existing == null)
         {
             if (refs.OtherAccountEmails.Contains(eval.Key))
-                return eval.Fail("That email already has an account. Staff must be invited with an email that isn't already registered.");
+                return eval.Fail(_localizer["StaffImport.EmailAlreadyHasAccount"]);
             if (refs.PendingInviteEmails.Contains(eval.Key))
-                return eval.Fail("That email has already been invited.");
+                return eval.Fail(_localizer["StaffImport.EmailAlreadyInvited"]);
             eval.Outcome = ImportRowOutcome.New;
             return eval;
         }
@@ -351,7 +367,7 @@ public class StaffImportService : IStaffImportService
         if (existing.OrgRoleId != roleId)
         {
             if (existing.OrgRoleId == OrgRoleIds.DistrictAdmin && existing.IsActive && refs.ActiveDistrictAdminCount <= 1)
-                return eval.Fail("You cannot change the role of the last active District Admin of the district.");
+                return eval.Fail(_localizer["StaffImport.CannotChangeRoleOfLastAdmin"]);
             eval.Changes.Add($"Role: {OrgRoleIds.NameOf(existing.OrgRoleId)} → {OrgRoleIds.NameOf(roleId.Value)}");
         }
         if ((eval.School?.Id) != existing.SchoolId)
@@ -367,7 +383,7 @@ public class StaffImportService : IStaffImportService
     {
         var profile = await _context.StaffProfiles.FirstOrDefaultAsync(p => p.Id == eval.Existing!.ProfileId, ct);
         if (profile == null)
-            return "Staff member not found.";
+            return _localizer["StaffImport.StaffMemberNotFound"];
         profile.OrgRoleId = eval.OrgRoleId!.Value;
         profile.SchoolId = eval.School?.Id;
         if (eval.Title.Set) profile.Title = eval.Title.Value;
@@ -377,16 +393,16 @@ public class StaffImportService : IStaffImportService
 
     // ================================================================= Helpers
 
-    private async Task<(StaffContext? Ctx, string? Denied)> RequireAdminAsync(int userId, CancellationToken ct)
+    private async Task<(StaffContext? Ctx, string? Denied, ServiceErrorKind Kind)> RequireAdminAsync(int userId, CancellationToken ct)
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return (null, "Educator profile not found.");
+            return (null, _localizer["StaffImport.ProfileNotFound"], ServiceErrorKind.NotFound);
         if (!OrgRoleIds.IsAdmin(ctx.OrgRoleId))
-            return (null, PermissionMessage);
+            return (null, PermissionMessage, ServiceErrorKind.Forbidden);
         if (ctx.OrgRoleId == OrgRoleIds.SchoolAdmin && ctx.SchoolId == null)
-            return (null, "Your account is not assigned to a school.");
-        return (ctx, null);
+            return (null, _localizer["StaffImport.CallerNoSchool"], ServiceErrorKind.Validation);
+        return (ctx, null, ServiceErrorKind.None);
     }
 
     private Task<List<RefSchool>> LoadSchoolsAsync(StaffContext ctx, CancellationToken ct)

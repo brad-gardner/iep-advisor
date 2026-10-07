@@ -58,15 +58,21 @@ import type EnSubscription from '@/locales/en/subscription.json';
 // (the one shared module that registers every one of these at runtime).
 // The TYPE import below is exactly as cost-free as every import above
 // (erased by `tsc`); only the RUNTIME path differs for these namespaces.
+import type EnAdmin from '@/locales/en/staff/admin.json';
+import type EnDistrictAdmin from '@/locales/en/staff/district-admin.json';
 import type EnDocumentAuthoring from '@/locales/en/staff/document-authoring.json';
 import type EnEducator from '@/locales/en/staff/educator.json';
 import type EnEvaluation from '@/locales/en/staff/evaluation.json';
+import type EnExports from '@/locales/en/staff/exports.json';
 import type EnFamilyContact from '@/locales/en/staff/family-contact.json';
 import type EnMeetingBrief from '@/locales/en/staff/meeting-brief.json';
 import type EnMeetingsStaff from '@/locales/en/staff/meetings-staff.json';
 import type EnObligations from '@/locales/en/staff/obligations.json';
+import type EnRosterImport from '@/locales/en/staff/roster-import.json';
+import type EnStaffInvites from '@/locales/en/staff/staff-invites.json';
 
 export interface EnResources {
+  admin: typeof EnAdmin;
   'advocacy-goals': typeof EnAdvocacyGoals;
   advocate: typeof EnAdvocate;
   analysis: typeof EnAnalysis;
@@ -76,12 +82,14 @@ export interface EnResources {
   children: typeof EnChildren;
   common: typeof EnCommon;
   contributions: typeof EnContributions;
+  'district-admin': typeof EnDistrictAdmin;
   'document-authoring': typeof EnDocumentAuthoring;
   'document-authoring-shared': typeof EnDocumentAuthoringShared;
   'draft-sharing': typeof EnDraftSharing;
   educator: typeof EnEducator;
   'etr-documents': typeof EnEtrDocuments;
   evaluation: typeof EnEvaluation;
+  exports: typeof EnExports;
   'family-contact': typeof EnFamilyContact;
   goals: typeof EnGoals;
   home: typeof EnHome;
@@ -98,8 +106,10 @@ export interface EnResources {
   obligations: typeof EnObligations;
   onboarding: typeof EnOnboarding;
   'progress-reports': typeof EnProgressReports;
+  'roster-import': typeof EnRosterImport;
   'shared-drafts': typeof EnSharedDrafts;
   sharing: typeof EnSharing;
+  'staff-invites': typeof EnStaffInvites;
   student: typeof EnStudent;
   subscription: typeof EnSubscription;
 }

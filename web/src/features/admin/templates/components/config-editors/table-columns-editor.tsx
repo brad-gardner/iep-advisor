@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
@@ -10,7 +11,8 @@ import {
   type TableConfig,
 } from '../../template-config';
 import { SelectOptionsEditor } from './select-options-editor';
-import { COLUMN_SEMANTICS, COLUMN_SEMANTIC_LABELS, isColumnSemantic } from '../../document-semantics';
+import { COLUMN_SEMANTICS, isColumnSemantic } from '../../document-semantics';
+import { columnSemanticLabel, fieldTypeLabel } from '../../lib/semantic-labels';
 
 const COLUMN_TYPES: TableColumnType[] = ['Text', 'Date', 'Select', 'Checkbox'];
 
@@ -23,6 +25,7 @@ interface TableColumnsEditorProps {
 
 /** Manage a Table field's columns (no nested Table/RichText) plus row bounds. */
 export function TableColumnsEditor({ config, onChange, disabled, idPrefix }: TableColumnsEditorProps) {
+  const { t } = useTranslation('admin');
   const { columns, minRows, maxRows } = config;
 
   const updateColumn = (index: number, patch: Partial<TableColumn>) => {
@@ -50,7 +53,9 @@ export function TableColumnsEditor({ config, onChange, disabled, idPrefix }: Tab
   return (
     <div className="space-y-4">
       <fieldset className="space-y-3" disabled={disabled}>
-        <legend className="text-[13px] font-medium text-brand-slate-600">Columns</legend>
+        <legend className="text-[13px] font-medium text-brand-slate-600">
+          {t('templates.configEditors.columnsLegend')}
+        </legend>
         {columns.map((col, i) => {
           const colId = `${idPrefix}-col-${i}`;
           return (
@@ -58,25 +63,25 @@ export function TableColumnsEditor({ config, onChange, disabled, idPrefix }: Tab
               <div className="flex items-end gap-2">
                 <div className="flex-1">
                   <Input
-                    label="Column label"
+                    label={t('templates.configEditors.columnLabelLabel')}
                     id={`${colId}-label`}
                     value={col.label}
                     onChange={(e) => updateColumn(i, { label: e.target.value })}
-                    placeholder="e.g. Goal"
+                    placeholder={t('templates.configEditors.columnLabelPlaceholder')}
                     data-testid={`${colId}-label`}
                   />
                 </div>
                 <div className="w-32">
                   <Select
-                    label="Type"
+                    label={t('templates.configEditors.columnTypeLabel')}
                     id={`${colId}-type`}
                     value={col.type}
                     onChange={(e) => changeType(i, e.target.value as TableColumnType)}
                     data-testid={`${colId}-type`}
                   >
-                    {COLUMN_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
+                    {COLUMN_TYPES.map((ct) => (
+                      <option key={ct} value={ct}>
+                        {fieldTypeLabel(ct)}
                       </option>
                     ))}
                   </Select>
@@ -87,7 +92,7 @@ export function TableColumnsEditor({ config, onChange, disabled, idPrefix }: Tab
                   size="sm"
                   onClick={() => removeColumn(i)}
                   disabled={disabled || columns.length <= 1}
-                  aria-label={`Remove column ${i + 1}`}
+                  aria-label={t('templates.configEditors.removeColumn', { number: i + 1 })}
                   data-testid={`${colId}-remove`}
                 >
                   <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" />
@@ -96,7 +101,7 @@ export function TableColumnsEditor({ config, onChange, disabled, idPrefix }: Tab
 
               <div className="max-w-[18rem]">
                 <Select
-                  label="Semantic"
+                  label={t('templates.configEditors.columnSemanticLabel')}
                   id={`${colId}-semantic`}
                   value={col.semantic ?? ''}
                   onChange={(e) =>
@@ -104,10 +109,10 @@ export function TableColumnsEditor({ config, onChange, disabled, idPrefix }: Tab
                   }
                   data-testid={`${colId}-semantic`}
                 >
-                  <option value="">— none —</option>
+                  <option value="">{t('common.noneOption')}</option>
                   {COLUMN_SEMANTICS.map((s) => (
                     <option key={s} value={s}>
-                      {COLUMN_SEMANTIC_LABELS[s]}
+                      {columnSemanticLabel(s)}
                     </option>
                   ))}
                 </Select>
@@ -122,7 +127,7 @@ export function TableColumnsEditor({ config, onChange, disabled, idPrefix }: Tab
                   className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-500"
                   data-testid={`${colId}-required`}
                 />
-                Required
+                {t('common.required')}
               </label>
 
               {col.type === 'Select' && (
@@ -145,7 +150,7 @@ export function TableColumnsEditor({ config, onChange, disabled, idPrefix }: Tab
           data-testid={`${idPrefix}-col-add`}
         >
           <Plus size={14} strokeWidth={1.8} className="mr-1" aria-hidden="true" />
-          Add column
+          {t('templates.configEditors.addColumn')}
         </Button>
       </fieldset>
 
@@ -154,11 +159,11 @@ export function TableColumnsEditor({ config, onChange, disabled, idPrefix }: Tab
           <Input
             type="number"
             min={0}
-            label="Min rows"
+            label={t('templates.configEditors.minRowsLabel')}
             id={`${idPrefix}-minrows`}
             value={minRows ?? ''}
             onChange={(e) => onChange({ ...config, minRows: numberOrUndefined(e.target.value) })}
-            placeholder="None"
+            placeholder={t('templates.configEditors.noneLabel')}
             disabled={disabled}
             data-testid={`${idPrefix}-minrows`}
           />
@@ -167,11 +172,11 @@ export function TableColumnsEditor({ config, onChange, disabled, idPrefix }: Tab
           <Input
             type="number"
             min={0}
-            label="Max rows"
+            label={t('templates.configEditors.maxRowsLabel')}
             id={`${idPrefix}-maxrows`}
             value={maxRows ?? ''}
             onChange={(e) => onChange({ ...config, maxRows: numberOrUndefined(e.target.value) })}
-            placeholder="None"
+            placeholder={t('templates.configEditors.noneLabel')}
             disabled={disabled}
             data-testid={`${idPrefix}-maxrows`}
           />

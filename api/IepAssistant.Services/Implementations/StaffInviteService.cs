@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -20,6 +21,16 @@ namespace IepAssistant.Services.Implementations;
 ///   <item>Teacher-tier (Teacher/RelatedServiceProvider/GeneralEducator): denied.</item>
 /// </list>
 /// Accept is anonymous, transactional (claim-first), and mints a JWT.
+///
+/// Multilingual plan (2026-10-06) phase 6: every failure <see cref="Api.Controllers.StaffController"/>
+/// maps to a status carries an explicit <see cref="ServiceErrorKind"/>, and every message is localized
+/// (<c>Messages.resx</c>/<c>.es.resx</c>) — see
+/// <see cref="IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure"/>. Every kind
+/// below reproduces <c>StaffController</c>'s PRE-existing English-substring heuristic (permission -&gt;
+/// 403, not found -&gt; 404, else -&gt; 400) so each route's status is unchanged.
+/// <see cref="AcceptStaffInviteResult"/> (the anonymous accept flow) has no <see cref="ServiceErrorKind"/>
+/// of its own — <see cref="Api.Controllers.StaffInviteController"/> always returns 400 for it regardless
+/// of message text, so only its message needs localizing, not a kind.
 /// </summary>
 public class StaffInviteService : IStaffInviteService
 {
@@ -32,6 +43,7 @@ public class StaffInviteService : IStaffInviteService
     private readonly InviteLinkExposure _linkExposure;
     private readonly string _frontendUrl;
     private readonly ILogger<StaffInviteService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public StaffInviteService(
         ApplicationDbContext context,
@@ -40,7 +52,8 @@ public class StaffInviteService : IStaffInviteService
         JwtTokenFactory jwtTokenFactory,
         InviteLinkExposure linkExposure,
         IConfiguration configuration,
-        ILogger<StaffInviteService> logger)
+        ILogger<StaffInviteService> logger,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
@@ -49,6 +62,7 @@ public class StaffInviteService : IStaffInviteService
         _linkExposure = linkExposure;
         _frontendUrl = configuration["App:FrontendUrl"] ?? "http://localhost:5173";
         _logger = logger;
+        _localizer = localizer;
     }
 
     // ================================================================= Invite
@@ -57,16 +71,16 @@ public class StaffInviteService : IStaffInviteService
     {
         var caller = await _orgAccess.GetStaffContextAsync(callerUserId, ct);
         if (caller == null)
-            return ServiceResult<StaffInviteModel>.FailureResult("Staff profile not found.");
+            return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["StaffInvite.ProfileNotFound"]);
 
         if (string.IsNullOrWhiteSpace(model.Email))
-            return ServiceResult<StaffInviteModel>.FailureResult("Email is required.");
+            return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StaffInvite.EmailRequired"]);
         var email = model.Email.Trim();
         if (email.Length > 256)
-            return ServiceResult<StaffInviteModel>.FailureResult("Email must be 256 characters or fewer.");
+            return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StaffInvite.EmailTooLong"]);
 
         if (!OrgRoleIds.IsKnown(model.OrgRoleId))
-            return ServiceResult<StaffInviteModel>.FailureResult("Invalid org role.");
+            return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StaffInvite.InvalidOrgRole"]);
 
         // ------- Caller role gate + school resolution -------
         int? schoolId;
@@ -76,18 +90,18 @@ public class StaffInviteService : IStaffInviteService
             {
                 // DistrictAdmin invite is district-scoped only; a school target is meaningless.
                 if (model.SchoolId != null)
-                    return ServiceResult<StaffInviteModel>.FailureResult("A District Admin invite must not specify a school.");
+                    return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StaffInvite.DistrictAdminInviteNoSchool"]);
                 schoolId = null;
             }
             else
             {
                 if (model.SchoolId == null)
-                    return ServiceResult<StaffInviteModel>.FailureResult("A school is required for School Admin and Teacher invites.");
+                    return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StaffInvite.SchoolRequiredForInvite"]);
 
                 var schoolOk = await _context.Schools.AsNoTracking()
                     .AnyAsync(s => s.Id == model.SchoolId.Value && s.DistrictId == caller.DistrictId && s.IsActive, ct);
                 if (!schoolOk)
-                    return ServiceResult<StaffInviteModel>.FailureResult("School not found.");
+                    return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["StaffInvite.SchoolNotFound"]);
                 schoolId = model.SchoolId.Value;
             }
         }
@@ -95,17 +109,17 @@ public class StaffInviteService : IStaffInviteService
         {
             // SchoolAdmin may invite SchoolAdmin/Teacher only, and only into their OWN school.
             if (model.OrgRoleId == OrgRoleIds.DistrictAdmin)
-                return ServiceResult<StaffInviteModel>.FailureResult("You do not have permission to invite a District Admin.");
+                return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["StaffInvite.NoPermissionInviteDistrictAdmin"]);
             if (caller.SchoolId == null)
-                return ServiceResult<StaffInviteModel>.FailureResult("Your account is not assigned to a school.");
+                return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StaffInvite.CallerNoSchool"]);
             // Force/validate the school to the caller's own; a mismatched explicit school is denied.
             if (model.SchoolId != null && model.SchoolId.Value != caller.SchoolId.Value)
-                return ServiceResult<StaffInviteModel>.FailureResult("You do not have permission to invite staff to another school.");
+                return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["StaffInvite.NoPermissionInviteOtherSchool"]);
             schoolId = caller.SchoolId.Value;
         }
         else
         {
-            return ServiceResult<StaffInviteModel>.FailureResult("You do not have permission to invite staff.");
+            return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["StaffInvite.NoPermissionInviteStaff"]);
         }
 
         // ------- Rejections that must precede token generation -------
@@ -113,8 +127,8 @@ public class StaffInviteService : IStaffInviteService
         var emailHasAccount = await _context.Users.AsNoTracking()
             .AnyAsync(u => u.Email.ToLower() == email.ToLower(), ct);
         if (emailHasAccount)
-            return ServiceResult<StaffInviteModel>.FailureResult(
-                "That email already has an account. Staff must be invited with an email that isn't already registered — please use your work email.");
+            return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.Validation,
+                _localizer["StaffInvite.EmailAlreadyHasAccount"]);
 
         // Global duplicate-pending guard (single-role world): one live staff invite per email anywhere.
         // A "live" row (IsActive && AcceptedAt == null && InviteToken != null) occupies the filtered unique
@@ -129,7 +143,7 @@ public class StaffInviteService : IStaffInviteService
                         && i.AcceptedAt == null
                         && i.InviteToken != null, ct);
         if (existingLive != null && existingLive.InviteExpiresAt > now)
-            return ServiceResult<StaffInviteModel>.FailureResult("That email has already been invited.");
+            return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StaffInvite.EmailAlreadyInvited"]);
 
         // ------- Create (or refresh an expired row) + email -------
         var rawToken = InviteTokenHelper.Generate();
@@ -173,7 +187,7 @@ public class StaffInviteService : IStaffInviteService
             // rejected a concurrent duplicate that slipped past the check-then-insert window. Detach the
             // unsaved entity and surface the SAME friendly message the pre-check does.
             _context.Entry(invite).State = EntityState.Detached;
-            return ServiceResult<StaffInviteModel>.FailureResult("That email has already been invited.");
+            return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StaffInvite.EmailAlreadyInvited"]);
         }
 
         var (districtName, schoolName, roleName) = await ResolveNamesAsync(invite.DistrictId, invite.SchoolId, invite.OrgRoleId, ct);
@@ -183,7 +197,7 @@ public class StaffInviteService : IStaffInviteService
             invite.Id, email, invite.OrgRoleId, invite.SchoolId, callerUserId);
 
         return ServiceResult<StaffInviteModel>.SuccessResult(
-            MapInvite(invite, districtName, schoolName, roleName, rawToken), "Invite sent successfully.");
+            MapInvite(invite, districtName, schoolName, roleName, rawToken), _localizer["StaffInvite.InviteSent"]);
     }
 
     // ================================================================= List
@@ -192,10 +206,10 @@ public class StaffInviteService : IStaffInviteService
     {
         var caller = await _orgAccess.GetStaffContextAsync(callerUserId, ct);
         if (caller == null)
-            return ServiceResult<StaffListModel>.FailureResult("Staff profile not found.");
+            return ServiceResult<StaffListModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["StaffInvite.ProfileNotFound"]);
 
         if (!OrgRoleIds.IsAdmin(caller.OrgRoleId))
-            return ServiceResult<StaffListModel>.FailureResult("You do not have permission to view the staff list.");
+            return ServiceResult<StaffListModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["StaffInvite.NoPermissionViewStaffList"]);
 
         var isDistrictAdmin = caller.OrgRoleId == OrgRoleIds.DistrictAdmin;
         var now = DateTime.UtcNow;
@@ -260,19 +274,19 @@ public class StaffInviteService : IStaffInviteService
     {
         var caller = await _orgAccess.GetStaffContextAsync(callerUserId, ct);
         if (caller == null)
-            return ServiceResult.FailureResult("Staff profile not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["StaffInvite.ProfileNotFound"]);
 
         var invite = await _context.StaffInvites
             .FirstOrDefaultAsync(i => i.Id == inviteId && i.DistrictId == caller.DistrictId, ct);
         if (invite == null)
-            return ServiceResult.FailureResult("Invite not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["StaffInvite.InviteNotFound"]);
 
         var scope = CheckInviteScope(caller, invite.SchoolId, invite.OrgRoleId);
         if (!scope.Success)
             return scope;
 
         if (!invite.IsActive || invite.AcceptedAt != null)
-            return ServiceResult.SuccessResult("Invite is no longer pending.");
+            return ServiceResult.SuccessResult(_localizer["StaffInvite.NoLongerPending"]);
 
         invite.IsActive = false;
         invite.InviteToken = null; // dead token can't preview/accept after revoke
@@ -280,7 +294,7 @@ public class StaffInviteService : IStaffInviteService
         await _context.SaveChangesAsync(ct);
 
         _logger.LogInformation("Staff invite {InviteId} revoked by user {CallerId}", inviteId, callerUserId);
-        return ServiceResult.SuccessResult("Invite revoked.");
+        return ServiceResult.SuccessResult(_localizer["StaffInvite.InviteRevoked"]);
     }
 
     // ================================================================= Resend
@@ -289,19 +303,19 @@ public class StaffInviteService : IStaffInviteService
     {
         var caller = await _orgAccess.GetStaffContextAsync(callerUserId, ct);
         if (caller == null)
-            return ServiceResult<StaffInviteModel>.FailureResult("Staff profile not found.");
+            return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["StaffInvite.ProfileNotFound"]);
 
         var invite = await _context.StaffInvites
             .FirstOrDefaultAsync(i => i.Id == inviteId && i.DistrictId == caller.DistrictId, ct);
         if (invite == null)
-            return ServiceResult<StaffInviteModel>.FailureResult("Invite not found.");
+            return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["StaffInvite.InviteNotFound"]);
 
         var scope = CheckInviteScope(caller, invite.SchoolId, invite.OrgRoleId);
         if (!scope.Success)
-            return ServiceResult<StaffInviteModel>.FailureResult(scope.Message!);
+            return ServiceResult<StaffInviteModel>.FailureResult(scope.ErrorKind, scope.Message!);
 
         if (!invite.IsActive || invite.AcceptedAt != null)
-            return ServiceResult<StaffInviteModel>.FailureResult("Invite is no longer pending.");
+            return ServiceResult<StaffInviteModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StaffInvite.NoLongerPending"]);
 
         // New token + fresh clock on the SAME row; the old raw token stops working immediately.
         var rawToken = InviteTokenHelper.Generate();
@@ -317,7 +331,7 @@ public class StaffInviteService : IStaffInviteService
 
         _logger.LogInformation("Staff invite {InviteId} resent by user {CallerId}", inviteId, callerUserId);
         return ServiceResult<StaffInviteModel>.SuccessResult(
-            MapInvite(invite, districtName, schoolName, roleName, rawToken), "Invite resent.");
+            MapInvite(invite, districtName, schoolName, roleName, rawToken), _localizer["StaffInvite.InviteResent"]);
     }
 
     // ================================================================= Deactivate / reactivate staff
@@ -326,19 +340,19 @@ public class StaffInviteService : IStaffInviteService
     {
         var caller = await _orgAccess.GetStaffContextAsync(callerUserId, ct);
         if (caller == null)
-            return ServiceResult<DeactivateStaffResult>.FailureResult("Staff profile not found.");
+            return ServiceResult<DeactivateStaffResult>.FailureResult(ServiceErrorKind.NotFound, _localizer["StaffInvite.ProfileNotFound"]);
 
         var target = await _context.StaffProfiles
             .FirstOrDefaultAsync(p => p.Id == staffProfileId && p.DistrictId == caller.DistrictId, ct);
         if (target == null)
-            return ServiceResult<DeactivateStaffResult>.FailureResult("Staff member not found.");
+            return ServiceResult<DeactivateStaffResult>.FailureResult(ServiceErrorKind.NotFound, _localizer["StaffInvite.StaffMemberNotFound"]);
 
         var scope = CheckStaffMutationScope(caller, target);
         if (!scope.Success)
-            return ServiceResult<DeactivateStaffResult>.FailureResult(scope.Message!);
+            return ServiceResult<DeactivateStaffResult>.FailureResult(scope.ErrorKind, scope.Message!);
 
         if (!target.IsActive)
-            return ServiceResult<DeactivateStaffResult>.SuccessResult(new DeactivateStaffResult(), "Staff member is already deactivated.");
+            return ServiceResult<DeactivateStaffResult>.SuccessResult(new DeactivateStaffResult(), _localizer["StaffInvite.AlreadyDeactivated"]);
 
         // Last-admin guard: never strip a district of its final active DistrictAdmin (incl. self).
         if (target.OrgRoleId == OrgRoleIds.DistrictAdmin)
@@ -348,7 +362,7 @@ public class StaffInviteService : IStaffInviteService
                               && p.OrgRoleId == OrgRoleIds.DistrictAdmin
                               && p.IsActive, ct);
             if (activeAdmins <= 1)
-                return ServiceResult<DeactivateStaffResult>.FailureResult("You cannot deactivate the last active District Admin of the district.");
+                return ServiceResult<DeactivateStaffResult>.FailureResult(ServiceErrorKind.Validation, _localizer["StaffInvite.CannotDeactivateLastAdmin"]);
         }
 
         // Reassignment hint: students where the target holds the ONLY active non-admin (Teacher/SchoolAdmin
@@ -376,7 +390,7 @@ public class StaffInviteService : IStaffInviteService
         {
             SolelyOwnedStudentCount = solelyOwned.Count,
             SolelyOwnedStudents = solelyOwned
-        }, "Staff member deactivated.");
+        }, _localizer["StaffInvite.Deactivated"]);
     }
 
     /// <summary>
@@ -427,26 +441,26 @@ public class StaffInviteService : IStaffInviteService
     {
         var caller = await _orgAccess.GetStaffContextAsync(callerUserId, ct);
         if (caller == null)
-            return ServiceResult.FailureResult("Staff profile not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["StaffInvite.ProfileNotFound"]);
 
         var target = await _context.StaffProfiles
             .FirstOrDefaultAsync(p => p.Id == staffProfileId && p.DistrictId == caller.DistrictId, ct);
         if (target == null)
-            return ServiceResult.FailureResult("Staff member not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["StaffInvite.StaffMemberNotFound"]);
 
         var scope = CheckStaffMutationScope(caller, target);
         if (!scope.Success)
             return scope;
 
         if (target.IsActive)
-            return ServiceResult.SuccessResult("Staff member is already active.");
+            return ServiceResult.SuccessResult(_localizer["StaffInvite.AlreadyActive"]);
 
         target.IsActive = true;
         target.UpdatedById = callerUserId;
         await _context.SaveChangesAsync(ct);
 
         _logger.LogInformation("Staff profile {StaffProfileId} reactivated by user {CallerId}", staffProfileId, callerUserId);
-        return ServiceResult.SuccessResult("Staff member reactivated.");
+        return ServiceResult.SuccessResult(_localizer["StaffInvite.Reactivated"]);
     }
 
     // ================================================================= Preview (anonymous)
@@ -481,11 +495,11 @@ public class StaffInviteService : IStaffInviteService
     public async Task<AcceptStaffInviteResult> AcceptAsync(AcceptStaffInviteModel model, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(model.Token))
-            return AcceptStaffInviteResult.Failure("Invalid or expired invite.");
+            return AcceptStaffInviteResult.Failure(_localizer["StaffInvite.InvalidOrExpiredInvite"]);
         if (string.IsNullOrWhiteSpace(model.FirstName) || string.IsNullOrWhiteSpace(model.LastName))
-            return AcceptStaffInviteResult.Failure("First and last name are required.");
+            return AcceptStaffInviteResult.Failure(_localizer["StaffInvite.NameRequired"]);
         if (string.IsNullOrWhiteSpace(model.Password))
-            return AcceptStaffInviteResult.Failure("A password is required.");
+            return AcceptStaffInviteResult.Failure(_localizer["StaffInvite.PasswordRequired"]);
 
         var tokenHash = InviteTokenHelper.Hash(model.Token);
 
@@ -493,9 +507,9 @@ public class StaffInviteService : IStaffInviteService
         var invite = await _context.StaffInvites
             .FirstOrDefaultAsync(i => i.InviteToken == tokenHash && i.IsActive && i.AcceptedAt == null, ct);
         if (invite == null)
-            return AcceptStaffInviteResult.Failure("This invite is no longer valid.");
+            return AcceptStaffInviteResult.Failure(_localizer["StaffInvite.AcceptNoLongerValid"]);
         if (invite.InviteExpiresAt <= DateTime.UtcNow)
-            return AcceptStaffInviteResult.Failure("This invite has expired.");
+            return AcceptStaffInviteResult.Failure(_localizer["StaffInvite.AcceptExpired"]);
 
         var email = invite.Email;
 
@@ -504,8 +518,7 @@ public class StaffInviteService : IStaffInviteService
         var emailHasAccount = await _context.Users.AsNoTracking()
             .AnyAsync(u => u.Email.ToLower() == email.ToLower(), ct);
         if (emailHasAccount)
-            return AcceptStaffInviteResult.Failure(
-                "An account already exists for this email. This invite can't be used with an existing account.");
+            return AcceptStaffInviteResult.Failure(_localizer["StaffInvite.AccountAlreadyExists"]);
 
         await using var transaction = await _context.Database.BeginTransactionAsync(ct);
         try
@@ -525,7 +538,7 @@ public class StaffInviteService : IStaffInviteService
             if (claimed == 0)
             {
                 await transaction.RollbackAsync(ct);
-                return AcceptStaffInviteResult.Failure("This invite has already been used.");
+                return AcceptStaffInviteResult.Failure(_localizer["StaffInvite.AlreadyUsed"]);
             }
 
             var user = new User
@@ -581,7 +594,7 @@ public class StaffInviteService : IStaffInviteService
     // ================================================================= Helpers
 
     /// <summary>Scope check for revoke/resend against an invite's school + role.</summary>
-    private static ServiceResult CheckInviteScope(StaffContext caller, int? inviteSchoolId, int inviteOrgRoleId)
+    private ServiceResult CheckInviteScope(StaffContext caller, int? inviteSchoolId, int inviteOrgRoleId)
     {
         if (caller.OrgRoleId == OrgRoleIds.DistrictAdmin)
             return ServiceResult.SuccessResult();
@@ -589,17 +602,17 @@ public class StaffInviteService : IStaffInviteService
         if (caller.OrgRoleId == OrgRoleIds.SchoolAdmin)
         {
             if (inviteOrgRoleId == OrgRoleIds.DistrictAdmin)
-                return ServiceResult.FailureResult("You do not have permission to manage District Admin invites.");
+                return ServiceResult.FailureResult(ServiceErrorKind.Forbidden, _localizer["StaffInvite.NoPermissionManageDistrictAdminInvites"]);
             if (caller.SchoolId == null || inviteSchoolId != caller.SchoolId)
-                return ServiceResult.FailureResult("You do not have permission to manage invites for another school.");
+                return ServiceResult.FailureResult(ServiceErrorKind.Forbidden, _localizer["StaffInvite.NoPermissionManageInvitesOtherSchool"]);
             return ServiceResult.SuccessResult();
         }
 
-        return ServiceResult.FailureResult("You do not have permission to manage staff invites.");
+        return ServiceResult.FailureResult(ServiceErrorKind.Forbidden, _localizer["StaffInvite.NoPermissionManageStaffInvites"]);
     }
 
     /// <summary>Scope check for deactivate/reactivate against a target StaffProfile.</summary>
-    private static ServiceResult CheckStaffMutationScope(StaffContext caller, StaffProfile target)
+    private ServiceResult CheckStaffMutationScope(StaffContext caller, StaffProfile target)
     {
         if (caller.OrgRoleId == OrgRoleIds.DistrictAdmin)
             return ServiceResult.SuccessResult(); // any staff in the district (subject to last-admin guard)
@@ -608,13 +621,13 @@ public class StaffInviteService : IStaffInviteService
         {
             // Own-school SchoolAdmin/Teacher only; never a DistrictAdmin or other-school staff.
             if (target.OrgRoleId == OrgRoleIds.DistrictAdmin)
-                return ServiceResult.FailureResult("You do not have permission to manage a District Admin.");
+                return ServiceResult.FailureResult(ServiceErrorKind.Forbidden, _localizer["StaffInvite.NoPermissionManageDistrictAdmin"]);
             if (caller.SchoolId == null || target.SchoolId != caller.SchoolId)
-                return ServiceResult.FailureResult("You do not have permission to manage staff at another school.");
+                return ServiceResult.FailureResult(ServiceErrorKind.Forbidden, _localizer["StaffInvite.NoPermissionManageStaffOtherSchool"]);
             return ServiceResult.SuccessResult();
         }
 
-        return ServiceResult.FailureResult("You do not have permission to manage staff.");
+        return ServiceResult.FailureResult(ServiceErrorKind.Forbidden, _localizer["StaffInvite.NoPermissionManageStaff"]);
     }
 
     private async Task<(string districtName, string? schoolName, string roleName)> ResolveNamesAsync(

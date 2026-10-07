@@ -14,14 +14,13 @@ namespace IepAssistant.Services.Implementations;
 /// carries an explicit <see cref="ServiceErrorKind"/>, and every message is localized
 /// (<c>Messages.resx</c>/<c>.es.resx</c>) — see
 /// <see cref="IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure"/>.
-/// <see cref="DuplicateExternalIdMessage"/> stays an English-literal const: <c>RosterImportService</c>
-/// (phase 6) assigns it verbatim into an import report row, unlocalized until that phase. The two
-/// FailureResult call sites below that reach a controller use the localized
-/// <c>Educator.DuplicateExternalId</c> resource instead (same English text, byte-identical).
+/// Phase 6 switched <c>RosterImportService</c>'s duplicate-external-id row error from this class's old
+/// English-literal <c>DuplicateExternalIdMessage</c> const to the shared localized
+/// <c>Educator.DuplicateExternalId</c> resource too, so that const is gone — every call site (here and
+/// in <c>RosterImportService</c>) now reads the same resource.
 /// </summary>
 public class EducatorService : IEducatorService
 {
-    internal const string DuplicateExternalIdMessage = "Student ID already in use in this district.";
     private const string StudentResource = "SchoolStudent";
 
     /// <summary>Server-side bound on a bulk case-manager selection (mirrored by the request DTO).</summary>

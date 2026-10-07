@@ -104,7 +104,11 @@ export function defaultConfig(fieldType: FieldType): FieldConfig {
   }
 }
 
-function asRecord(raw: string | null | undefined): Record<string, unknown> {
+// Exported (not just used internally) so `./lib/validate-config.ts` can read
+// a Select field/column's raw options the same way, without duplicating the
+// parsing logic — plain data helpers, not translated text, so exporting them
+// has no bearing on the eager-reachability concern described above.
+export function asRecord(raw: string | null | undefined): Record<string, unknown> {
   if (!raw) return {};
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -118,7 +122,7 @@ function toNumberOrUndefined(v: unknown): number | undefined {
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 }
 
-function parseSelectOptions(raw: unknown): SelectOption[] {
+export function parseSelectOptions(raw: unknown): SelectOption[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((o) => {
     const rec = (o ?? {}) as Record<string, unknown>;
@@ -256,46 +260,14 @@ export function serializeConfig(config: FieldConfig): string | undefined {
   }
 }
 
-/** Non-empty unique-value check shared by Select fields and Select columns. */
-function validateSelectOptions(options: SelectOption[]): string | null {
-  const values = options.map((o) => o.value.trim());
-  if (values.length === 0) return 'Add at least one option.';
-  if (values.some((v) => v === '')) return 'Every option needs a non-empty value.';
-  if (new Set(values).size !== values.length) return 'Option values must be unique.';
-  return null;
-}
-
-/**
- * Client-side validity of a typed config. Returns `null` when valid, else a
- * human-readable reason. Mirrors the backend's per-type rules so autosave can be
- * gated (we never PUT an invalid config) and the UI can hint inline.
- */
-export function validateConfig(config: FieldConfig): string | null {
-  switch (config.kind) {
-    case 'Text':
-    case 'RichText':
-    case 'Date':
-    case 'Checkbox':
-      return null;
-    case 'Select':
-      return validateSelectOptions(config.select.options);
-    case 'Table': {
-      const { columns, minRows, maxRows } = config.table;
-      if (columns.length === 0) return 'Add at least one column.';
-      if (columns.some((c) => c.label.trim() === '')) return 'Every column needs a label.';
-      const sems = columns.map((c) => c.semantic).filter((s): s is ColumnSemantic => s != null);
-      if (new Set(sems).size !== sems.length) return 'Column semantics must be unique within the table.';
-      for (const col of columns) {
-        if (col.type === 'Select') {
-          const opts = parseSelectOptions(asRecord(col.configJson).options);
-          const err = validateSelectOptions(opts);
-          if (err) return `Column "${col.label.trim() || 'Untitled'}": ${err}`;
-        }
-      }
-      if (minRows != null && maxRows != null && minRows > maxRows) {
-        return 'Min rows cannot exceed max rows.';
-      }
-      return null;
-    }
-  }
-}
+// `validateConfig` (and its `validateSelectOptions` helper) used to live here,
+// returning plain English reason strings. Moved to `./lib/validate-config.ts`
+// — imported directly from there by its one caller, `field-editor.tsx` — and
+// NOT re-exported from this file: this file sits on an EAGERLY reachable
+// import path (`features/shared-drafts/lib/semantic-rows.ts` imports
+// `parseConfig` from here at runtime), and `lib/i18n/staff-namespace-boundary.
+// test.ts` scans a whole FILE's source text for any staff-only namespace
+// reference, following a static `export ... from` just as it follows an
+// `import` — a re-export here would make the eager walk reach
+// `./lib/validate-config.ts` too, defeating the split. See that new file's
+// doc comment, and `document-semantics.ts`'s own.

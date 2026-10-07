@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { CheckCircle, Circle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +17,13 @@ interface ChecklistItem {
 // "Finish setting up" nudge for DistrictAdmins. Self-contained: fetches the
 // district overview and derives completion from active school/staff counts. Hides
 // itself entirely once both counts are non-zero. No schema — purely derived.
+//
+// `district-admin` is a staff-only namespace (multilingual plan phase 6) —
+// this card renders only behind the lazy staff route chunk (inside
+// `StaffHomePage` → `AdminHome`), never eagerly, so using it here is safe;
+// see `docs/i18n/README.md`'s "Staff and admin namespaces".
 export function SetupChecklistCard() {
+  const { t } = useTranslation('district-admin');
   const [overview, setOverview] = useState<DistrictOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -54,13 +61,13 @@ export function SetupChecklistCard() {
   const items: ChecklistItem[] = [
     {
       key: 'school',
-      label: 'Create your first school',
+      label: t('setupChecklist.schoolItem'),
       done: hasSchool,
       to: '/educator/admin/schools',
     },
     {
       key: 'staff',
-      label: 'Invite your first staff member',
+      label: t('setupChecklist.staffItem'),
       done: hasStaff,
       to: '/educator/admin/staff',
     },
@@ -68,9 +75,9 @@ export function SetupChecklistCard() {
 
   return (
     <Card className="max-w-lg" accent data-testid="district-setup-checklist">
-      <h2 className="font-serif text-xl mb-1">Finish setting up</h2>
+      <h2 className="font-serif text-xl mb-1">{t('setupChecklist.title')}</h2>
       <p className="text-sm text-brand-slate-500 mb-4">
-        A couple of steps left to get your district ready.
+        {t('setupChecklist.subtitle')}
       </p>
       <ul className="space-y-2">
         {items.map((item) => (
@@ -111,7 +118,7 @@ export function SetupChecklistCard() {
                   variant="secondary"
                   data-testid={`district-setup-checklist-${item.key}-link`}
                 >
-                  Start
+                  {t('setupChecklist.start')}
                 </Button>
               </Link>
             )}

@@ -36,7 +36,7 @@ public sealed class AuditLogQueryServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private AuditLogQueryService CreateService(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx));
+        => new(ctx, new OrgAccessService(ctx), TestSupport.TestLocalizers.Messages());
 
     // ----------------------------------------------------------------- seed helpers
 
@@ -391,6 +391,8 @@ public sealed class AuditLogQueryServiceTests : IDisposable
         Assert.False(result.Success);
         Assert.DoesNotContain("permission", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("not found", result.Message, StringComparison.OrdinalIgnoreCase);
+        // Status comes from ErrorKind now, not message text (MapServiceFailure) — assert the kind directly.
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
     }
 
     [Fact]
@@ -512,6 +514,7 @@ public sealed class AuditLogQueryServiceTests : IDisposable
 
         Assert.False(result.Success);
         Assert.Contains("permission", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
     }
 
     [Fact]

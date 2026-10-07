@@ -30,7 +30,7 @@ public class IepDraftController : ControllerBase
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.CreateDraftAsync(User.GetUserId(), studentId, request.Title, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result);
 
         var dto = IepDraftMappers.MapDraft(result.Data!);
         return CreatedAtAction(nameof(GetDraft), new { draftId = dto.Id }, ApiResponse<IepDraftDto>.SuccessResponse(dto));
@@ -43,7 +43,7 @@ public class IepDraftController : ControllerBase
     {
 
         var result = await _service.ListDraftsAsync(User.GetUserId(), studentId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<IEnumerable<IepDraftDto>>.SuccessResponse(result.Data!.Select(IepDraftMappers.MapDraft)));
     }
@@ -56,7 +56,7 @@ public class IepDraftController : ControllerBase
     {
 
         var result = await _service.GetDraftAsync(User.GetUserId(), draftId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<IepDraftDto>.SuccessResponse(IepDraftMappers.MapDraft(result.Data!)));
     }
@@ -75,7 +75,7 @@ public class IepDraftController : ControllerBase
         }, ct);
         return result.Success
             ? Ok(ApiResponse<SectionDto>.SuccessResponse(IepDraftMappers.MapSection(result.Data!)))
-            : MapFailure(result.Message);
+            : this.MapServiceFailure(result);
     }
 
     [HttpPut("api/iep-drafts/{draftId}/sections/{id}")]
@@ -90,14 +90,14 @@ public class IepDraftController : ControllerBase
         }, ct);
         return result.Success
             ? Ok(ApiResponse<SectionDto>.SuccessResponse(IepDraftMappers.MapSection(result.Data!)))
-            : MapFailure(result.Message);
+            : this.MapServiceFailure(result);
     }
 
     [HttpDelete("api/iep-drafts/{draftId}/sections/{id}")]
     public async Task<IActionResult> DeleteSection(int draftId, int id, CancellationToken ct)
     {
         var result = await _service.DeleteSectionAsync(User.GetUserId(), draftId, id, ct);
-        return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : MapFailure(result.Message);
+        return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : this.MapServiceFailure(result);
     }
 
     // ---------------------------------------------------------------- Goals
@@ -110,7 +110,7 @@ public class IepDraftController : ControllerBase
         var result = await _service.AddGoalAsync(User.GetUserId(), draftId, MapGoalInput(request), ct);
         return result.Success
             ? Ok(ApiResponse<GoalDto>.SuccessResponse(IepDraftMappers.MapGoal(result.Data!)))
-            : MapFailure(result.Message);
+            : this.MapServiceFailure(result);
     }
 
     [HttpPut("api/iep-drafts/{draftId}/goals/{id}")]
@@ -121,14 +121,14 @@ public class IepDraftController : ControllerBase
         var result = await _service.UpdateGoalAsync(User.GetUserId(), draftId, id, MapGoalInput(request), ct);
         return result.Success
             ? Ok(ApiResponse<GoalDto>.SuccessResponse(IepDraftMappers.MapGoal(result.Data!)))
-            : MapFailure(result.Message);
+            : this.MapServiceFailure(result);
     }
 
     [HttpDelete("api/iep-drafts/{draftId}/goals/{id}")]
     public async Task<IActionResult> DeleteGoal(int draftId, int id, CancellationToken ct)
     {
         var result = await _service.DeleteGoalAsync(User.GetUserId(), draftId, id, ct);
-        return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : MapFailure(result.Message);
+        return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : this.MapServiceFailure(result);
     }
 
     // ---------------------------------------------------------------- Service lines
@@ -141,7 +141,7 @@ public class IepDraftController : ControllerBase
         var result = await _service.AddServiceLineAsync(User.GetUserId(), draftId, MapServiceLineInput(request), ct);
         return result.Success
             ? Ok(ApiResponse<ServiceLineDto>.SuccessResponse(IepDraftMappers.MapServiceLine(result.Data!)))
-            : MapFailure(result.Message);
+            : this.MapServiceFailure(result);
     }
 
     [HttpPut("api/iep-drafts/{draftId}/service-lines/{id}")]
@@ -152,14 +152,14 @@ public class IepDraftController : ControllerBase
         var result = await _service.UpdateServiceLineAsync(User.GetUserId(), draftId, id, MapServiceLineInput(request), ct);
         return result.Success
             ? Ok(ApiResponse<ServiceLineDto>.SuccessResponse(IepDraftMappers.MapServiceLine(result.Data!)))
-            : MapFailure(result.Message);
+            : this.MapServiceFailure(result);
     }
 
     [HttpDelete("api/iep-drafts/{draftId}/service-lines/{id}")]
     public async Task<IActionResult> DeleteServiceLine(int draftId, int id, CancellationToken ct)
     {
         var result = await _service.DeleteServiceLineAsync(User.GetUserId(), draftId, id, ct);
-        return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : MapFailure(result.Message);
+        return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : this.MapServiceFailure(result);
     }
 
     // ---------------------------------------------------------------- Accommodations
@@ -176,7 +176,7 @@ public class IepDraftController : ControllerBase
         }, ct);
         return result.Success
             ? Ok(ApiResponse<AccommodationDto>.SuccessResponse(IepDraftMappers.MapAccommodation(result.Data!)))
-            : MapFailure(result.Message);
+            : this.MapServiceFailure(result);
     }
 
     [HttpPut("api/iep-drafts/{draftId}/accommodations/{id}")]
@@ -191,14 +191,14 @@ public class IepDraftController : ControllerBase
         }, ct);
         return result.Success
             ? Ok(ApiResponse<AccommodationDto>.SuccessResponse(IepDraftMappers.MapAccommodation(result.Data!)))
-            : MapFailure(result.Message);
+            : this.MapServiceFailure(result);
     }
 
     [HttpDelete("api/iep-drafts/{draftId}/accommodations/{id}")]
     public async Task<IActionResult> DeleteAccommodation(int draftId, int id, CancellationToken ct)
     {
         var result = await _service.DeleteAccommodationAsync(User.GetUserId(), draftId, id, ct);
-        return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : MapFailure(result.Message);
+        return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : this.MapServiceFailure(result);
     }
 
     // ---------------------------------------------------------------- Transition items
@@ -215,7 +215,7 @@ public class IepDraftController : ControllerBase
         }, ct);
         return result.Success
             ? Ok(ApiResponse<TransitionItemDto>.SuccessResponse(IepDraftMappers.MapTransitionItem(result.Data!)))
-            : MapFailure(result.Message);
+            : this.MapServiceFailure(result);
     }
 
     [HttpPut("api/iep-drafts/{draftId}/transition-items/{id}")]
@@ -230,14 +230,14 @@ public class IepDraftController : ControllerBase
         }, ct);
         return result.Success
             ? Ok(ApiResponse<TransitionItemDto>.SuccessResponse(IepDraftMappers.MapTransitionItem(result.Data!)))
-            : MapFailure(result.Message);
+            : this.MapServiceFailure(result);
     }
 
     [HttpDelete("api/iep-drafts/{draftId}/transition-items/{id}")]
     public async Task<IActionResult> DeleteTransitionItem(int draftId, int id, CancellationToken ct)
     {
         var result = await _service.DeleteTransitionItemAsync(User.GetUserId(), draftId, id, ct);
-        return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : MapFailure(result.Message);
+        return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : this.MapServiceFailure(result);
     }
 
     // ---------------------------------------------------------------- Helpers
@@ -263,16 +263,4 @@ public class IepDraftController : ControllerBase
         EndDate = r.EndDate
     };
 
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

@@ -17,7 +17,7 @@ public sealed class DistrictComplianceTests : IDisposable
     private readonly RosterTestDb _db = new();
 
     private DistrictService CreateDistrictService(Domain.Data.ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), NullLogger<DistrictService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), NullLogger<DistrictService>.Instance, TestSupport.TestLocalizers.Messages());
 
     private EducatorService CreateEducatorService(Domain.Data.ApplicationDbContext ctx)
         => new(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<EducatorService>.Instance, TestSupport.TestLocalizers.Messages());

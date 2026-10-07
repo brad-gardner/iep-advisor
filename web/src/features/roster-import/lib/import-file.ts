@@ -1,10 +1,19 @@
+import i18n from '@/lib/i18n';
 import { MAX_IMPORT_FILE_BYTES, type ImportCounts } from '../types';
 
 // Client-side pre-checks that mirror the server's rejections so the common
 // mistakes (.xlsm, oversized file) fail before an upload round-trip.
+//
+// These call `i18n.t` directly (the `orgRoleLabel` shape), rather than
+// `useTranslation`, since they're plain functions called from event handlers
+// and other plain functions alike, not render bodies — see
+// `docs/i18n/README.md`'s "Display-label helpers" and "A plain `i18n.t`
+// helper doesn't load anything by itself" (the caller's OWN `useTranslation`
+// call, e.g. `upload-step.tsx`'s `useTranslation('roster-import')`, is what
+// actually subscribes to and loads this namespace).
 export function validateImportFile(file: File): string | null {
-  if (!/\.xlsx$/i.test(file.name)) return 'Only .xlsx workbooks are accepted';
-  if (file.size > MAX_IMPORT_FILE_BYTES) return 'File is larger than 5 MB';
+  if (!/\.xlsx$/i.test(file.name)) return i18n.t('roster-import:file.onlyXlsx');
+  if (file.size > MAX_IMPORT_FILE_BYTES) return i18n.t('roster-import:file.tooLarge');
   return null;
 }
 
@@ -15,7 +24,10 @@ export function formatFileSize(bytes: number): string {
 }
 
 export function countsSummary(counts: ImportCounts): string {
-  return `${counts.new} new · ${counts.updated} updated · ${counts.error} ${
-    counts.error === 1 ? 'error' : 'errors'
-  }`;
+  return i18n.t('roster-import:file.countsSummary', {
+    newCount: counts.new,
+    updatedCount: counts.updated,
+    errorCount: counts.error,
+    count: counts.error,
+  });
 }

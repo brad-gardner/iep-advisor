@@ -4,12 +4,6 @@
 
 export const EXPORT_JOB_STATUSES = ['Queued', 'Running', 'Completed', 'Failed'] as const;
 export type ExportJobStatus = (typeof EXPORT_JOB_STATUSES)[number];
-export const EXPORT_JOB_STATUS_LABELS: Record<ExportJobStatus, string> = {
-  Queued: 'Queued',
-  Running: 'Running',
-  Completed: 'Completed',
-  Failed: 'Failed',
-};
 
 /** Jobs Queued or Running are still in flight — the admin page polls while any exist. */
 export const IN_FLIGHT_EXPORT_STATUSES: ReadonlySet<ExportJobStatus> = new Set(['Queued', 'Running']);

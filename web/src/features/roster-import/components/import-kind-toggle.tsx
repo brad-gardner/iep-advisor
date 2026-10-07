@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import type { ImportKind } from '../types';
 
@@ -9,23 +10,23 @@ interface ImportKindToggleProps {
   disabled?: boolean;
 }
 
-const OPTIONS: { kind: ImportKind; label: string }[] = [
-  { kind: 'Students', label: 'Students' },
-  { kind: 'Staff', label: 'Staff' },
-];
-
 // Students | Staff switch: real radio inputs in a fieldset (native arrow-key
 // group navigation) styled as a segmented control. The selected option is
 // filled AND checked, so the state is never colour-only.
 export function ImportKindToggle({ value, onChange, disabled = false }: ImportKindToggleProps) {
+  const { t } = useTranslation('roster-import');
+  const options: { kind: ImportKind; label: string }[] = [
+    { kind: 'Students', label: t('kindToggle.students') },
+    { kind: 'Staff', label: t('kindToggle.staff') },
+  ];
   return (
     <fieldset
       className="inline-flex gap-1 rounded-card border border-brand-slate-200 bg-brand-slate-50 p-1"
       disabled={disabled}
       data-testid="import-kind-toggle"
     >
-      <legend className="sr-only">What to import</legend>
-      {OPTIONS.map((option) => {
+      <legend className="sr-only">{t('kindToggle.legend')}</legend>
+      {options.map((option) => {
         const selected = option.kind === value;
         return (
           <label key={option.kind} className="relative">

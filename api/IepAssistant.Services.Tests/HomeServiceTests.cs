@@ -26,7 +26,7 @@ public sealed class HomeServiceTests : IDisposable
         // Shares the same IOrgAccessService instance HomeService uses (matches production DI, where
         // IOrgAccessService is Scoped) so its per-request staff-context memo is actually shared across
         // HomeService/ObligationService/DistrictService, as it would be for a real request.
-        var districtService = new DistrictService(ctx, orgAccess, NullLogger<DistrictService>.Instance);
+        var districtService = new DistrictService(ctx, orgAccess, NullLogger<DistrictService>.Instance, TestSupport.TestLocalizers.Messages());
         return new HomeService(ctx, orgAccess, obligationService, completeness, districtService, TestSupport.TestLocalizers.Messages());
     }
 
@@ -441,7 +441,7 @@ public sealed class HomeServiceTests : IDisposable
         Assert.True(homeResult.Success, homeResult.Message);
         var summary = homeResult.Data!.Staff!.ComplianceSummary!;
 
-        var districtService = new DistrictService(ctx, new OrgAccessService(ctx), NullLogger<DistrictService>.Instance);
+        var districtService = new DistrictService(ctx, new OrgAccessService(ctx), NullLogger<DistrictService>.Instance, TestSupport.TestLocalizers.Messages());
         var boardResult = await districtService.GetComplianceBoardAsync(adminId, null, null, null);
         Assert.True(boardResult.Success, boardResult.Message);
         var board = boardResult.Data!.Summary;

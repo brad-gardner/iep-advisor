@@ -185,6 +185,325 @@ public sealed class ServiceFailureMapperTests
         Assert.IsType<NotFoundObjectResult>(action);
     }
 
+    // --- Multilingual plan (2026-10-06) phase 6: DistrictController switched from its own private
+    // MapFailure<T> (an inline copy of the same English-substring heuristic) to the shared
+    // MapServiceFailure. Every DistrictService failure site below sets the ErrorKind that reproduces
+    // the PRE-existing heuristic's outcome for that exact English message, so the route's status is
+    // unchanged even though the message can now be Spanish.
+
+    [Theory]
+    [InlineData("Educator profile not found.")]
+    [InlineData("District not found.")]
+    [InlineData("School not found.")]
+    public void NotFound_MapsTo404_DistrictStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.NotFound, message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    [Theory]
+    [InlineData("You do not have permission to change district settings.")]
+    [InlineData("You do not have permission to view the district dashboard.")]
+    [InlineData("You do not have permission to create schools.")]
+    [InlineData("You do not have permission to edit schools.")]
+    [InlineData("You do not have permission to deactivate schools.")]
+    [InlineData("You do not have permission to view this data.")]
+    [InlineData("You do not have permission to view this school's data.")]
+    public void Forbidden_MapsTo403_DistrictStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Forbidden, message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("School name is required.")]
+    [InlineData("School name must be 200 characters or fewer.")]
+    [InlineData("State code must be 2 characters.")]
+    [InlineData("This school cannot be deactivated while it has 3 active student(s). Move or remove them first.")]
+    [InlineData("This school cannot be deactivated while it has 2 active staff member(s). Reassign or deactivate them first.")]
+    [InlineData("The requested date range is out of bounds.")]
+    public void Validation_MapsTo400_DistrictStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Validation, message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
+    // --- Multilingual plan (2026-10-06) phase 6: StaffController switched from its own private
+    // MapFailure (an inline copy of the same English-substring heuristic) to the shared
+    // MapServiceFailure. Every StaffInviteService failure site below sets the ErrorKind that reproduces
+    // the PRE-existing heuristic's outcome for that exact English message, so the route's status is
+    // unchanged even though the message can now be Spanish.
+
+    [Theory]
+    [InlineData("Staff profile not found.")]
+    [InlineData("Invite not found.")]
+    [InlineData("School not found.")]
+    [InlineData("Staff member not found.")]
+    public void NotFound_MapsTo404_StaffInviteStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.NotFound, message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    [Theory]
+    [InlineData("You do not have permission to invite a District Admin.")]
+    [InlineData("You do not have permission to invite staff to another school.")]
+    [InlineData("You do not have permission to invite staff.")]
+    [InlineData("You do not have permission to view the staff list.")]
+    [InlineData("You do not have permission to manage District Admin invites.")]
+    [InlineData("You do not have permission to manage invites for another school.")]
+    [InlineData("You do not have permission to manage staff invites.")]
+    [InlineData("You do not have permission to manage a District Admin.")]
+    [InlineData("You do not have permission to manage staff at another school.")]
+    [InlineData("You do not have permission to manage staff.")]
+    public void Forbidden_MapsTo403_StaffInviteStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Forbidden, message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("Email is required.")]
+    [InlineData("Email must be 256 characters or fewer.")]
+    [InlineData("Invalid org role.")]
+    [InlineData("A District Admin invite must not specify a school.")]
+    [InlineData("A school is required for School Admin and Teacher invites.")]
+    [InlineData("Your account is not assigned to a school.")]
+    [InlineData("That email already has an account. Staff must be invited with an email that isn't already registered — please use your work email.")]
+    [InlineData("That email has already been invited.")]
+    [InlineData("Invite is no longer pending.")]
+    [InlineData("You cannot deactivate the last active District Admin of the district.")]
+    public void Validation_MapsTo400_StaffInviteStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Validation, message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
+    // --- Multilingual plan (2026-10-06) phase 6: DistrictImportsController switched from its own private
+    // MapFailure (an inline copy of the same English-substring heuristic) to the shared
+    // MapServiceFailure. Every RosterImportService failure site below sets the ErrorKind that reproduces
+    // the PRE-existing heuristic's outcome for that exact English message, so the route's status is
+    // unchanged even though the message can now be Spanish.
+
+    [Theory]
+    [InlineData("Educator profile not found.")]
+    [InlineData("Import not found.")]
+    public void NotFound_MapsTo404_RosterImportStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.NotFound, message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    [Fact]
+    public void Forbidden_MapsTo403_RosterImportNoPermissionToImport()
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Forbidden, "You do not have permission to import students.");
+
+        var action = new TestController().MapServiceFailure(result);
+
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("Your account is not assigned to a school.")]
+    [InlineData("This import is not a student roster.")]
+    [InlineData("This import has already been committed.")]
+    [InlineData("Fix the errors or choose to import valid rows only.")]
+    public void Validation_MapsTo400_RosterImportStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Validation, message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
+    // --- Multilingual plan (2026-10-06) phase 6: ExportsController switched from its own private
+    // MapFailure (an inline copy of the same English-substring heuristic) to the shared
+    // MapServiceFailure. Every ExportService failure site below sets the ErrorKind that reproduces the
+    // PRE-existing heuristic's outcome for that exact English message, so the route's status is
+    // unchanged even though the message can now be Spanish.
+
+    [Theory]
+    [InlineData("Export not found.")]
+    [InlineData("Student not found.")]
+    public void NotFound_MapsTo404_ExportStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.NotFound, message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    [Fact]
+    public void Forbidden_MapsTo403_ExportNoPermissionToRequest()
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Forbidden, "You do not have permission to request this export.");
+
+        var action = new TestController().MapServiceFailure(result);
+
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public void Validation_MapsTo400_ExportNotReadyMessage()
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Validation, "This export is not ready for download yet.");
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
+    // --- Multilingual plan (2026-10-06) phase 6: AdminTemplatesController switched from its own private
+    // MapFailure (an inline copy of the English-substring heuristic) to the shared MapServiceFailure.
+    // None of DocumentTemplateService's PRE-existing English messages contained "permission" or
+    // "not found", so every one of its failures was ALREADY 400 under the old heuristic — pinned here as
+    // Validation so that never silently changes.
+
+    [Theory]
+    [InlineData("Template name is required.")]
+    [InlineData("State code must be a 2-letter code (e.g. OH), or left blank for the default template.")]
+    [InlineData("The selected document type does not exist.")]
+    [InlineData("The selected document type is not active.")]
+    [InlineData("A template for IEP in OH already exists.")]
+    public void Validation_MapsTo400_DocumentTemplateStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Validation, message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
+    // --- Multilingual plan (2026-10-06) phase 6: AuditLogController switched from its own private
+    // MapFailure (an inline copy of the same English-substring heuristic) to the shared
+    // MapServiceFailure. Every AuditLogQueryService failure site below sets the ErrorKind that
+    // reproduces the PRE-existing heuristic's outcome for that exact English message, so the route's
+    // status is unchanged even though the message can now be Spanish.
+
+    [Fact]
+    public void Forbidden_MapsTo403_AuditLogNoPermission()
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Forbidden, "You do not have permission to view the activity log.");
+
+        var action = new TestController().MapServiceFailure(result);
+
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("Page size must be greater than zero.")]
+    [InlineData("Cursor must not be negative.")]
+    [InlineData("Invalid action 'Bogus'.")]
+    public void Validation_MapsTo400_AuditLogStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Validation, message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
+    // --- Multilingual plan (2026-10-06) phase 6 project sweep: IepDraftController and
+    // ParentPrepQuestionsController switched from their own private MapFailure (each an inline copy of
+    // the same English-substring heuristic) to the shared MapServiceFailure. Neither service sets
+    // ErrorKind yet (still ServiceErrorKind.None), so these pin the None-fallback's outcome for each
+    // service's exact PRE-existing English messages — unchanged behavior, verified at the mapper level.
+
+    [Theory]
+    [InlineData("IEP draft not found.")]
+    [InlineData("Section not found.")]
+    [InlineData("Goal not found.")]
+    [InlineData("Service line not found.")]
+    [InlineData("Accommodation not found.")]
+    [InlineData("Transition item not found.")]
+    public void NotFound_FallsBackToEnglishHeuristic_IepDraftStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    [Fact]
+    public void Forbidden_FallsBackToEnglishHeuristic_IepDraftNoPermissionMessage()
+    {
+        var result = ServiceResult.FailureResult("You do not have permission to access this IEP draft.");
+
+        var action = new TestController().MapServiceFailure(result);
+
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public void Validation_FallsBackToEnglishHeuristic_IepDraftBeingFinalizedMessage()
+    {
+        var result = ServiceResult.FailureResult("The draft is being finalized; try again in a moment.");
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
+    [Theory]
+    [InlineData("Child profile not found.")]
+    [InlineData("Prep question not found.")]
+    public void NotFound_FallsBackToEnglishHeuristic_ParentPrepQuestionStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    [Theory]
+    [InlineData("Source must be 'parent' or 'advocate'.")]
+    [InlineData("Question text is required.")]
+    [InlineData("Question must be 500 characters or fewer.")]
+    [InlineData("Provide text or isChecked.")]
+    [InlineData("ids is required.")]
+    [InlineData("ids must not repeat.")]
+    [InlineData("Every id must be one of this child's prep questions.")]
+    public void Validation_FallsBackToEnglishHeuristic_ParentPrepQuestionStatusParitySites(string message)
+    {
+        var result = ServiceResult.FailureResult(message);
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
     [Fact]
     public void NullMessage_UsesFallbackMessage()
     {

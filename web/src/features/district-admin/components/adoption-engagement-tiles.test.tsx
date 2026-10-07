@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+// `district-admin` is a staff-only namespace (plan phase 6) — this component
+// renders behind the lazy district-admin route chunk in the real app, which
+// registers its English as a side effect of importing `staff-locales`; this
+// test renders the component directly, so it imports the same module itself.
+import '@/app/lazy-routes/staff-locales';
 
 const useAdoptionEngagementMock = vi.fn();
 vi.mock('../hooks/use-adoption-engagement', () => ({
@@ -45,7 +50,7 @@ describe('AdoptionEngagementTiles', () => {
       adoption: adoptionDto,
       engagement: null,
       adoptionError: null,
-      engagementError: 'Engagement is down',
+      engagementError: { kind: 'server', message: 'Engagement is down' },
       isLoading: false,
       error: null,
       retry: vi.fn(),
@@ -62,7 +67,7 @@ describe('AdoptionEngagementTiles', () => {
     useAdoptionEngagementMock.mockReturnValue({
       adoption: null,
       engagement: engagementDto,
-      adoptionError: 'Adoption is down',
+      adoptionError: { kind: 'server', message: 'Adoption is down' },
       engagementError: null,
       isLoading: false,
       error: null,
@@ -79,10 +84,10 @@ describe('AdoptionEngagementTiles', () => {
     useAdoptionEngagementMock.mockReturnValue({
       adoption: null,
       engagement: null,
-      adoptionError: 'Adoption is down',
-      engagementError: 'Engagement is down',
+      adoptionError: { kind: 'server', message: 'Adoption is down' },
+      engagementError: { kind: 'server', message: 'Engagement is down' },
       isLoading: false,
-      error: 'Adoption is down',
+      error: { kind: 'server', message: 'Adoption is down' },
       retry: vi.fn(),
     });
     renderTiles();

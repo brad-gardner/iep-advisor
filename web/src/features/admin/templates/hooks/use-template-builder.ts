@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AxiosError } from 'axios';
 import type { ApiResponse } from '@/types/api';
 import {
@@ -36,6 +37,19 @@ export interface MutationResult {
 
 const OK: MutationResult = { ok: true };
 
+// The mount-effect load can fail for several distinct reasons, each with its
+// own message — a flag/kind per reason, not the translated string, so a
+// language switch after a failed load shows the new language immediately
+// rather than a stale snapshot (see `docs/i18n/README.md`'s note on never
+// putting `t` in a mount-effect's dependency array). A server-provided
+// message is already resolved text and shown as-is.
+type LoadErrorKind =
+  | { kind: 'server'; message: string }
+  | { kind: 'notFound' }
+  | { kind: 'noVersion' }
+  | { kind: 'versionLoadFailed' }
+  | { kind: 'generic' };
+
 /**
  * Holds a template's working version tree and exposes structural + text
  * mutations against it. Every backend mutation returns the refreshed full tree
@@ -47,10 +61,11 @@ const OK: MutationResult = { ok: true };
  * a ref at execution time) keeps concurrent autosaves + structural edits safe.
  */
 export function useTemplateBuilder(templateId: number) {
+  const { t } = useTranslation(['admin', 'common']);
   const [template, setTemplate] = useState<DocumentTemplateDto | null>(null);
   const [version, setVersion] = useState<TemplateVersionDetailDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadErrorKind, setLoadErrorKind] = useState<LoadErrorKind | null>(null);
   const [conflict, setConflict] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   // Count of queued/in-flight mutations. Structural controls (reorder) disable
@@ -76,28 +91,33 @@ export function useTemplateBuilder(templateId: number) {
       try {
         const listRes = await listTemplates();
         if (cancelled) return;
-        setLoadError(null);
+        setLoadErrorKind(null);
         setConflict(false);
         if (!listRes.success || !listRes.data) {
-          setLoadError(listRes.message ?? 'Failed to load template.');
+          setLoadErrorKind(listRes.message ? { kind: 'server', message: listRes.message } : { kind: 'generic' });
           return;
         }
-        const tmpl = listRes.data.find((t) => t.id === templateId);
+        const tmpl = listRes.data.find((tpl) => tpl.id === templateId);
         if (!tmpl) {
-          setLoadError('Template not found.');
+          setLoadErrorKind({ kind: 'notFound' });
           return;
         }
         setTemplate(tmpl);
         if (!tmpl.latestVersion) {
-          setLoadError('This template has no version to edit.');
+          setLoadErrorKind({ kind: 'noVersion' });
           return;
         }
         const verRes = await getTemplateVersion(tmpl.latestVersion.id);
         if (cancelled) return;
-        if (verRes.success && verRes.data) setVersionTree(verRes.data);
-        else setLoadError(verRes.message ?? 'Failed to load template version.');
+        if (verRes.success && verRes.data) {
+          setVersionTree(verRes.data);
+        } else {
+          setLoadErrorKind(
+            verRes.message ? { kind: 'server', message: verRes.message } : { kind: 'versionLoadFailed' }
+          );
+        }
       } catch {
-        if (!cancelled) setLoadError('Failed to load template.');
+        if (!cancelled) setLoadErrorKind({ kind: 'generic' });
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -105,11 +125,33 @@ export function useTemplateBuilder(templateId: number) {
     return () => {
       cancelled = true;
     };
+    // `t` deliberately excluded — see the `LoadErrorKind` comment above.
   }, [templateId, reloadKey, setVersionTree]);
+
+  let loadError: string | null = null;
+  if (loadErrorKind) {
+    switch (loadErrorKind.kind) {
+      case 'server':
+        loadError = loadErrorKind.message;
+        break;
+      case 'notFound':
+        loadError = t('templates.builder.notFound');
+        break;
+      case 'noVersion':
+        loadError = t('templates.builder.noVersionToEdit');
+        break;
+      case 'versionLoadFailed':
+        loadError = t('templates.builder.versionLoadFailed');
+        break;
+      case 'generic':
+        loadError = t('templates.builder.loadErrorFallback');
+        break;
+    }
+  }
 
   const reload = useCallback(() => {
     setIsLoading(true);
-    setLoadError(null);
+    setLoadErrorKind(null);
     setConflict(false);
     setReloadKey((k) => k + 1);
   }, []);
@@ -123,7 +165,7 @@ export function useTemplateBuilder(templateId: number) {
       setPendingCount((n) => n + 1);
       const run = chainRef.current.then(async (): Promise<MutationResult> => {
         const current = versionRef.current;
-        if (!current) return { ok: false, message: 'No working version loaded.' };
+        if (!current) return { ok: false, message: t('templates.builder.noWorkingVersion') };
         try {
           const res = await fn(current);
           if (res.success && res.data) {
@@ -141,7 +183,7 @@ export function useTemplateBuilder(templateId: number) {
             }
             return { ok: false, errors: body?.errors, message: body?.message };
           }
-          return { ok: false, message: 'Something went wrong.' };
+          return { ok: false, message: t('common:ui.genericError') };
         }
       });
       // Keep the chain alive even if this op rejected.
@@ -149,7 +191,7 @@ export function useTemplateBuilder(templateId: number) {
       void run.finally(() => setPendingCount((n) => n - 1));
       return run;
     },
-    [setVersionTree]
+    [setVersionTree, t]
   );
 
   const addSection = useCallback(
@@ -220,9 +262,9 @@ export function useTemplateBuilder(templateId: number) {
     } catch (err) {
       const body =
         err instanceof AxiosError ? (err.response?.data as ApiResponse<unknown> | undefined) : undefined;
-      return { ok: false, message: body?.message ?? 'Failed to start a new version.' };
+      return { ok: false, message: body?.message ?? t('templates.builder.forkFailedFallback') };
     }
-  }, [templateId, setVersionTree]);
+  }, [templateId, setVersionTree, t]);
 
   return {
     template,

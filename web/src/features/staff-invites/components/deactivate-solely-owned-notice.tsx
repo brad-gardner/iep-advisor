@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Notice } from '@/components/ui/notice';
 import { Button } from '@/components/ui/button';
 import type { DeactivateStaffResponse } from '../types';
@@ -14,14 +15,14 @@ export function DeactivateSolelyOwnedNotice({
   result,
   onDismiss,
 }: DeactivateSolelyOwnedNoticeProps) {
+  const { t } = useTranslation('staff-invites');
   const { solelyOwnedStudentCount, solelyOwnedStudents } = result;
-  const noun = solelyOwnedStudentCount === 1 ? 'student was' : 'students were';
 
   return (
     <div data-testid="staff-deactivate-solely-owned">
       <Notice
         variant="warning"
-        title={`${solelyOwnedStudentCount} ${noun} only accessible to this staff member — reassign them from their student pages`}
+        title={t('deactivateSolelyOwnedNotice.title', { count: solelyOwnedStudentCount })}
       >
         <ul className="mt-1 space-y-1">
           {solelyOwnedStudents.map((student) => (
@@ -42,7 +43,7 @@ export function DeactivateSolelyOwnedNotice({
             onClick={onDismiss}
             data-testid="staff-deactivate-solely-owned-dismiss"
           >
-            Dismiss
+            {t('deactivateSolelyOwnedNotice.dismiss')}
           </Button>
         </div>
       </Notice>

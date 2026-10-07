@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
@@ -34,8 +35,15 @@ function parseRangeDays(raw: string | null): ComplianceRangeDays {
  * date range. Every tile and per-school cell drills to the roster with the
  * matching filter, so the counts here and there always agree.
  */
+// A server-provided message is already resolved text and is shown as-is; the
+// generic fallback is translated at RENDER time (see the `error` derivation
+// below) rather than baked into state at fetch time, so a language switch
+// after a failed load shows the new language immediately without refetching.
+type BoardLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
+
 export function ComplianceBoardPage() {
-  usePageTitle('Compliance');
+  const { t } = useTranslation('district-admin');
+  usePageTitle(t('complianceBoard.title'));
   const { profile } = useEducatorProfile();
   const isDistrictAdmin = profile?.orgRoleId === ORG_ROLE.DistrictAdmin;
 
@@ -69,7 +77,7 @@ export function ComplianceBoardPage() {
   const [loaded, setLoaded] = useState<{
     key: string;
     board: ComplianceBoardDto | null;
-    error: string | null;
+    error: BoardLoadError | null;
   } | null>(null);
 
   // DistrictAdmin needs the school list for the picker; SchoolAdmin never
@@ -106,15 +114,19 @@ export function ComplianceBoardPage() {
           setLoaded({
             key: requestKey,
             board: null,
-            error: response.message ?? 'Could not load the compliance board',
+            error: response.message ? { kind: 'server', message: response.message } : { kind: 'generic' },
           });
         }
       } catch (err) {
         if (active) {
+          // `apiErrorMessage` with no fallback (`''`) tells us ONLY whether the
+          // server itself supplied a message — the generic text is filled in
+          // at render, in whichever language is active then.
+          const serverMessage = apiErrorMessage(err, '');
           setLoaded({
             key: requestKey,
             board: null,
-            error: apiErrorMessage(err, 'Could not load the compliance board'),
+            error: serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' },
           });
         }
       }
@@ -126,12 +138,17 @@ export function ComplianceBoardPage() {
 
   const isLoading = loaded?.key !== requestKey;
   const board = isLoading ? null : (loaded?.board ?? null);
-  const error = isLoading ? null : (loaded?.error ?? null);
+  const loadError = isLoading ? null : (loaded?.error ?? null);
+  const error = loadError
+    ? loadError.kind === 'server'
+      ? loadError.message
+      : t('complianceBoard.loadError')
+    : null;
 
   return (
     <PageLayout
-      title="Compliance"
-      subtitle="Overdue and upcoming procedural deadlines, with the evidence behind them."
+      title={t('complianceBoard.title')}
+      subtitle={t('complianceBoard.subtitle')}
       data-testid="compliance-board-page"
     >
       <ComplianceFilters
@@ -148,10 +165,10 @@ export function ComplianceBoardPage() {
             <Button
               variant="secondary"
               className="mt-2"
-              onClick={() => setRetryToken((t) => t + 1)}
+              onClick={() => setRetryToken((n) => n + 1)}
               data-testid="compliance-board-retry"
             >
-              Try again
+              {t('complianceBoard.tryAgain')}
             </Button>
           </Notice>
         </div>

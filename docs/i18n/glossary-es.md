@@ -88,6 +88,14 @@ Every Spanish string in the app, emails, PDFs and AI instructions uses these ter
 | student status: active / exited / archived | activo / egresado / archivado |
 | exit reason: graduated / transferred / withdrawn / declassified | graduado / trasladado / retirado / desclasificado |
 | home language | idioma del hogar |
+| template | plantilla |
+| role | rol |
+| audit / audit integrity | auditoría / integridad de la auditoría |
+| least restrictive environment (LRE) | entorno menos restrictivo |
+| outbound email | correo saliente |
+| roster | lista de estudiantes |
+| compliance | cumplimiento |
+| referral | remisión |
 | grade (level) | grado |
 | Pre-K / Kindergarten | prekínder / kínder |
 | 1st grade … 12th grade | 1.er grado … 12.º grado |

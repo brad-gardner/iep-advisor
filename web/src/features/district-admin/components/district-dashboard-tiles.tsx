@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { DashboardAttentionTile } from './dashboard-attention-tile';
 // presentational tiles, so admins get one loading state instead of four. Shown
 // to both admin tiers; SchoolAdmin receives a server-sliced own-school view.
 export function DistrictDashboardTiles() {
+  const { t } = useTranslation('district-admin');
   const [dashboard, setDashboard] = useState<DistrictDashboard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -57,7 +59,7 @@ export function DistrictDashboardTiles() {
     return (
       <Card data-testid="district-dashboard-tiles-loading">
         <div className="flex justify-center py-6">
-          <Spinner label="Loading dashboard…" />
+          <Spinner label={t('dashboard.loading')} />
         </div>
       </Card>
     );
@@ -68,15 +70,15 @@ export function DistrictDashboardTiles() {
   if (loadFailed || !dashboard) {
     return (
       <Card data-testid="district-dashboard-tiles-error">
-        <Notice variant="error" title="Couldn't load the dashboard">
-          <p>Something went wrong loading your district overview.</p>
+        <Notice variant="error" title={t('dashboard.errorTitle')}>
+          <p>{t('dashboard.errorBody')}</p>
           <Button
             variant="secondary"
             className="mt-3"
             onClick={retry}
             data-testid="district-dashboard-tiles-retry"
           >
-            Try again
+            {t('dashboard.retry')}
           </Button>
         </Notice>
       </Card>

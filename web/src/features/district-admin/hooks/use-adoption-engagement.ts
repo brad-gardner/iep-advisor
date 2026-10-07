@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import { apiErrorMessage } from '@/lib/api-error';
+import { toLoadError, type LoadError } from '@/lib/api-error';
 import { getAdoption, getEngagement } from '../api/district-api';
 import type { AdoptionDto, EngagementDto } from '../types';
+
+/** The shared `LoadError` shape, or `null` for "no error" — see
+ * `docs/i18n/README.md`'s "Load errors: the shared `LoadError` pattern". A
+ * server-provided message is shown as-is; the generic case is translated by
+ * the caller at render time (it has the current `t`). */
+export type AdoptionEngagementLoadError = LoadError | null;
 
 interface Loaded {
   key: string;
   adoption: AdoptionDto | null;
-  adoptionError: string | null;
+  adoptionError: AdoptionEngagementLoadError;
   engagement: EngagementDto | null;
-  engagementError: string | null;
+  engagementError: AdoptionEngagementLoadError;
 }
 
 interface UseAdoptionEngagementResult {
@@ -16,35 +22,36 @@ interface UseAdoptionEngagementResult {
   engagement: EngagementDto | null;
   isLoading: boolean;
   /** Set only when BOTH pieces failed (nothing at all to render). */
-  error: string | null;
+  error: AdoptionEngagementLoadError;
   /** Per-piece failures, so a caller can still render whichever DTO
    * succeeded alongside a small inline notice for the one that didn't. */
-  adoptionError: string | null;
-  engagementError: string | null;
+  adoptionError: AdoptionEngagementLoadError;
+  engagementError: AdoptionEngagementLoadError;
   retry: () => void;
 }
 
-async function loadAdoption(schoolId: number | null): Promise<{ data: AdoptionDto | null; error: string | null }> {
+interface LoadResult<T> {
+  data: T | null;
+  error: AdoptionEngagementLoadError;
+}
+
+async function loadAdoption(schoolId: number | null): Promise<LoadResult<AdoptionDto>> {
   try {
     const res = await getAdoption({ schoolId: schoolId ?? undefined });
-    return res.success && res.data
-      ? { data: res.data, error: null }
-      : { data: null, error: res.message || 'Could not load adoption data' };
+    if (res.success && res.data) return { data: res.data, error: null };
+    return { data: null, error: toLoadError(res) };
   } catch (err) {
-    return { data: null, error: apiErrorMessage(err, 'Could not load adoption data') };
+    return { data: null, error: toLoadError(err) };
   }
 }
 
-async function loadEngagement(
-  schoolId: number | null
-): Promise<{ data: EngagementDto | null; error: string | null }> {
+async function loadEngagement(schoolId: number | null): Promise<LoadResult<EngagementDto>> {
   try {
     const res = await getEngagement({ schoolId: schoolId ?? undefined });
-    return res.success && res.data
-      ? { data: res.data, error: null }
-      : { data: null, error: res.message || 'Could not load engagement data' };
+    if (res.success && res.data) return { data: res.data, error: null };
+    return { data: null, error: toLoadError(res) };
   } catch (err) {
-    return { data: null, error: apiErrorMessage(err, 'Could not load engagement data') };
+    return { data: null, error: toLoadError(err) };
   }
 }
 

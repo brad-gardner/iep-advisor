@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -11,25 +12,34 @@ namespace IepAssistant.Services.Implementations;
 /// District/school management. Org authorization is resolved per-request from the caller's active
 /// <see cref="StaffContext"/> (DB-backed, never claim-backed). Reads are open to any active staff in
 /// the district; mutations are DistrictAdmin-only and confined to the caller's own district.
+///
+/// Multilingual plan (2026-10-06) phase 6: every failure <see cref="DistrictController"/> maps to a
+/// status carries an explicit <see cref="ServiceErrorKind"/>, and every message is localized
+/// (<c>Messages.resx</c>/<c>.es.resx</c>) — see
+/// <see cref="IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure"/>. Every
+/// kind below reproduces <see cref="DistrictController"/>'s PRE-existing English-substring heuristic
+/// (permission -&gt; 403, not found -&gt; 404, else -&gt; 400) so the route's status is unchanged.
 /// </summary>
 public class DistrictService : IDistrictService
 {
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
     private readonly ILogger<DistrictService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public DistrictService(ApplicationDbContext context, IOrgAccessService orgAccess, ILogger<DistrictService> logger)
+    public DistrictService(ApplicationDbContext context, IOrgAccessService orgAccess, ILogger<DistrictService> logger, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
         _logger = logger;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<DistrictOverviewModel>> GetOverviewAsync(int userId, CancellationToken ct = default)
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return ServiceResult<DistrictOverviewModel>.FailureResult("Educator profile not found.");
+            return ServiceResult<DistrictOverviewModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["District.ProfileNotFound"]);
 
         var district = await _context.Districts
             .AsNoTracking()
@@ -37,7 +47,7 @@ public class DistrictService : IDistrictService
             .Select(d => new { d.Id, d.Name, d.StateCode, d.FamilyDraftSharingEnabled })
             .FirstOrDefaultAsync(ct);
         if (district == null)
-            return ServiceResult<DistrictOverviewModel>.FailureResult("District not found.");
+            return ServiceResult<DistrictOverviewModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["District.NotFound"]);
 
         var activeSchoolCount = await _context.Schools
             .AsNoTracking()
@@ -62,13 +72,13 @@ public class DistrictService : IDistrictService
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return ServiceResult<DistrictOverviewModel>.FailureResult("Educator profile not found.");
+            return ServiceResult<DistrictOverviewModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["District.ProfileNotFound"]);
         if (ctx.OrgRoleId != OrgRoleIds.DistrictAdmin)
-            return ServiceResult<DistrictOverviewModel>.FailureResult("You do not have permission to change district settings.");
+            return ServiceResult<DistrictOverviewModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["District.NoPermissionChangeSettings"]);
 
         var district = await _context.Districts.FirstOrDefaultAsync(d => d.Id == ctx.DistrictId, ct);
         if (district == null)
-            return ServiceResult<DistrictOverviewModel>.FailureResult("District not found.");
+            return ServiceResult<DistrictOverviewModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["District.NotFound"]);
 
         district.FamilyDraftSharingEnabled = enabled;
         district.UpdatedById = userId;
@@ -81,9 +91,9 @@ public class DistrictService : IDistrictService
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return ServiceResult<DistrictDashboardModel>.FailureResult("Educator profile not found.");
+            return ServiceResult<DistrictDashboardModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["District.ProfileNotFound"]);
         if (!OrgRoleIds.IsAdmin(ctx.OrgRoleId))
-            return ServiceResult<DistrictDashboardModel>.FailureResult("You do not have permission to view the district dashboard.");
+            return ServiceResult<DistrictDashboardModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["District.NoPermissionViewDashboard"]);
 
         var isDistrictAdmin = ctx.OrgRoleId == OrgRoleIds.DistrictAdmin;
 
@@ -212,7 +222,7 @@ public class DistrictService : IDistrictService
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return ServiceResult<List<DistrictSchoolModel>>.FailureResult("Educator profile not found.");
+            return ServiceResult<List<DistrictSchoolModel>>.FailureResult(ServiceErrorKind.NotFound, _localizer["District.ProfileNotFound"]);
 
         // Any active staff in the district may read the school directory (school pickers need it);
         // SchoolAdmin/Teacher get the full district list as read-only directory info.
@@ -237,19 +247,19 @@ public class DistrictService : IDistrictService
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return ServiceResult<DistrictSchoolModel>.FailureResult("Educator profile not found.");
+            return ServiceResult<DistrictSchoolModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["District.ProfileNotFound"]);
         if (ctx.OrgRoleId != OrgRoleIds.DistrictAdmin)
-            return ServiceResult<DistrictSchoolModel>.FailureResult("You do not have permission to create schools.");
+            return ServiceResult<DistrictSchoolModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["District.NoPermissionCreateSchools"]);
 
         if (string.IsNullOrWhiteSpace(model.Name))
-            return ServiceResult<DistrictSchoolModel>.FailureResult("School name is required.");
+            return ServiceResult<DistrictSchoolModel>.FailureResult(ServiceErrorKind.Validation, _localizer["District.SchoolNameRequired"]);
         var name = model.Name.Trim();
         if (name.Length > 200)
-            return ServiceResult<DistrictSchoolModel>.FailureResult("School name must be 200 characters or fewer.");
+            return ServiceResult<DistrictSchoolModel>.FailureResult(ServiceErrorKind.Validation, _localizer["District.SchoolNameTooLong"]);
 
         var stateCode = NormalizeStateCode(model.StateCode);
         if (stateCode != null && stateCode.Length != 2)
-            return ServiceResult<DistrictSchoolModel>.FailureResult("State code must be 2 characters.");
+            return ServiceResult<DistrictSchoolModel>.FailureResult(ServiceErrorKind.Validation, _localizer["District.StateCodeInvalidLength"]);
 
         // Default the state code from the district when the caller omits one.
         if (stateCode == null)
@@ -286,25 +296,25 @@ public class DistrictService : IDistrictService
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return ServiceResult<DistrictSchoolModel>.FailureResult("Educator profile not found.");
+            return ServiceResult<DistrictSchoolModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["District.ProfileNotFound"]);
         if (ctx.OrgRoleId != OrgRoleIds.DistrictAdmin)
-            return ServiceResult<DistrictSchoolModel>.FailureResult("You do not have permission to edit schools.");
+            return ServiceResult<DistrictSchoolModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["District.NoPermissionEditSchools"]);
 
         if (string.IsNullOrWhiteSpace(model.Name))
-            return ServiceResult<DistrictSchoolModel>.FailureResult("School name is required.");
+            return ServiceResult<DistrictSchoolModel>.FailureResult(ServiceErrorKind.Validation, _localizer["District.SchoolNameRequired"]);
         var name = model.Name.Trim();
         if (name.Length > 200)
-            return ServiceResult<DistrictSchoolModel>.FailureResult("School name must be 200 characters or fewer.");
+            return ServiceResult<DistrictSchoolModel>.FailureResult(ServiceErrorKind.Validation, _localizer["District.SchoolNameTooLong"]);
 
         var stateCode = NormalizeStateCode(model.StateCode);
         if (stateCode != null && stateCode.Length != 2)
-            return ServiceResult<DistrictSchoolModel>.FailureResult("State code must be 2 characters.");
+            return ServiceResult<DistrictSchoolModel>.FailureResult(ServiceErrorKind.Validation, _localizer["District.StateCodeInvalidLength"]);
 
         // Confine to the caller's own district; don't leak existence of schools elsewhere.
         var school = await _context.Schools
             .FirstOrDefaultAsync(s => s.Id == schoolId && s.DistrictId == ctx.DistrictId, ct);
         if (school == null)
-            return ServiceResult<DistrictSchoolModel>.FailureResult("School not found.");
+            return ServiceResult<DistrictSchoolModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["District.SchoolNotFound"]);
 
         school.Name = name;
         school.StateCode = stateCode;
@@ -331,37 +341,37 @@ public class DistrictService : IDistrictService
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return ServiceResult.FailureResult("Educator profile not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["District.ProfileNotFound"]);
         if (ctx.OrgRoleId != OrgRoleIds.DistrictAdmin)
-            return ServiceResult.FailureResult("You do not have permission to deactivate schools.");
+            return ServiceResult.FailureResult(ServiceErrorKind.Forbidden, _localizer["District.NoPermissionDeactivateSchools"]);
 
         // Confine to the caller's own district; a cross-district id reads as not-found (no existence leak).
         var school = await _context.Schools
             .FirstOrDefaultAsync(s => s.Id == schoolId && s.DistrictId == ctx.DistrictId, ct);
         if (school == null)
-            return ServiceResult.FailureResult("School not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["District.SchoolNotFound"]);
 
         if (!school.IsActive)
-            return ServiceResult.SuccessResult("School is already deactivated.");
+            return ServiceResult.SuccessResult(_localizer["District.SchoolAlreadyDeactivated"]);
 
         var activeStudentCount = await _context.SchoolStudents
             .AsNoTracking()
             .CountAsync(st => st.SchoolId == schoolId && st.Status == StudentStatus.Active, ct);
         if (activeStudentCount > 0)
-            return ServiceResult.FailureResult(
-                $"This school cannot be deactivated while it has {activeStudentCount} active student(s). Move or remove them first.");
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation,
+                _localizer["District.CannotDeactivateActiveStudents", activeStudentCount]);
 
         var activeStaffCount = await _context.StaffProfiles
             .AsNoTracking()
             .CountAsync(p => p.SchoolId == schoolId && p.IsActive, ct);
         if (activeStaffCount > 0)
-            return ServiceResult.FailureResult(
-                $"This school cannot be deactivated while it has {activeStaffCount} active staff member(s). Reassign or deactivate them first.");
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation,
+                _localizer["District.CannotDeactivateActiveStaff", activeStaffCount]);
 
         school.IsActive = false;
         await _context.SaveChangesAsync(ct);
 
-        return ServiceResult.SuccessResult("School deactivated.");
+        return ServiceResult.SuccessResult(_localizer["District.SchoolDeactivated"]);
     }
 
     private static string? NormalizeStateCode(string? raw)
@@ -373,11 +383,11 @@ public class DistrictService : IDistrictService
     {
         var today = DateTime.UtcNow.Date;
         if (!AdminQueryLimits.IsWithinRange(from, today) || !AdminQueryLimits.IsWithinRange(to, today))
-            return ServiceResult<ComplianceBoardModel>.FailureResult("The requested date range is out of bounds.");
+            return ServiceResult<ComplianceBoardModel>.FailureResult(ServiceErrorKind.Validation, _localizer["District.DateRangeOutOfBounds"]);
 
         var scope = await ResolveAdminScopeAsync(userId, schoolId, ct);
         if (scope.Error != null)
-            return ServiceResult<ComplianceBoardModel>.FailureResult(scope.Error);
+            return ServiceResult<ComplianceBoardModel>.FailureResult(scope.ErrorKind, scope.Error);
         if (scope.Empty)
             return ServiceResult<ComplianceBoardModel>.SuccessResult(EmptyComplianceBoard());
 
@@ -442,7 +452,7 @@ public class DistrictService : IDistrictService
 
         var scope = await ResolveAdminScopeAsync(userId, schoolId, ct);
         if (scope.Error != null)
-            return ServiceResult<AdoptionModel>.FailureResult(scope.Error);
+            return ServiceResult<AdoptionModel>.FailureResult(scope.ErrorKind, scope.Error);
         if (scope.Empty)
             return ServiceResult<AdoptionModel>.SuccessResult(new AdoptionModel { Days = days, ActiveRule = AdoptionActiveRule });
 
@@ -490,7 +500,7 @@ public class DistrictService : IDistrictService
     {
         var scope = await ResolveAdminScopeAsync(userId, schoolId, ct);
         if (scope.Error != null)
-            return ServiceResult<EngagementModel>.FailureResult(scope.Error);
+            return ServiceResult<EngagementModel>.FailureResult(scope.ErrorKind, scope.Error);
         if (scope.Empty)
             return ServiceResult<EngagementModel>.SuccessResult(new EngagementModel());
 
@@ -521,7 +531,7 @@ public class DistrictService : IDistrictService
 
     private const string AdoptionActiveRule = "Active = at least one FERPA access-audit entry (view, edit, share, finalize, or export) for that staff member in the window.";
 
-    private sealed record AdminScope(int DistrictId, int? SchoolId, bool Empty, string? Error);
+    private sealed record AdminScope(int DistrictId, int? SchoolId, bool Empty, string? Error, ServiceErrorKind ErrorKind = ServiceErrorKind.None);
 
     /// <summary>
     /// Resolves the caller's admin scope for the plan-5 board reads: DistrictAdmin gets the whole
@@ -533,14 +543,14 @@ public class DistrictService : IDistrictService
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return new AdminScope(0, null, true, "Educator profile not found.");
+            return new AdminScope(0, null, true, _localizer["District.ProfileNotFound"], ServiceErrorKind.NotFound);
         if (!OrgRoleIds.IsAdmin(ctx.OrgRoleId))
-            return new AdminScope(0, null, true, "You do not have permission to view this data.");
+            return new AdminScope(0, null, true, _localizer["District.NoPermissionViewData"], ServiceErrorKind.Forbidden);
 
         if (ctx.OrgRoleId == OrgRoleIds.DistrictAdmin)
         {
             if (schoolId.HasValue && !await _orgAccess.CanActOnSchoolAsync(userId, schoolId.Value, ct))
-                return new AdminScope(0, null, true, "You do not have permission to view this school's data.");
+                return new AdminScope(0, null, true, _localizer["District.NoPermissionViewSchoolData"], ServiceErrorKind.Forbidden);
             return new AdminScope(ctx.DistrictId, schoolId, false, null);
         }
 

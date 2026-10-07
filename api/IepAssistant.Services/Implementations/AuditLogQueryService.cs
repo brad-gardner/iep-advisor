@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
@@ -10,6 +11,11 @@ namespace IepAssistant.Services.Implementations;
 /// Read-side of the FERPA access audit trail (Phase 2, district-admin pilot readiness). See
 /// <see cref="IAuditLogQueryService"/>. Kept intentionally separate from the write-only
 /// <c>AuditLogger</c>/<c>AccessAuditLogWorker</c> path: this class only reads.
+///
+/// Multilingual plan (2026-10-06) phase 6: every failure <see cref="Api.Controllers.AuditLogController"/>
+/// maps to a status carries an explicit <see cref="ServiceErrorKind"/>, matching that controller's
+/// PRE-existing English-substring heuristic so status is unchanged, and every message — including the
+/// enrichment fallback display strings below — is localized.
 /// </summary>
 public class AuditLogQueryService : IAuditLogQueryService
 {
@@ -23,11 +29,13 @@ public class AuditLogQueryService : IAuditLogQueryService
 
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public AuditLogQueryService(ApplicationDbContext context, IOrgAccessService orgAccess)
+    public AuditLogQueryService(ApplicationDbContext context, IOrgAccessService orgAccess, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<AuditLogPageModel>> QueryAsync(int userId, AuditLogQuery filters, CancellationToken ct = default)
@@ -35,7 +43,7 @@ public class AuditLogQueryService : IAuditLogQueryService
         // ------- Authorization (actor scope) -------
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null || !OrgRoleIds.IsAdmin(ctx.OrgRoleId))
-            return ServiceResult<AuditLogPageModel>.FailureResult("You do not have permission to view the activity log.");
+            return ServiceResult<AuditLogPageModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["AuditLog.NoPermissionViewActivityLog"]);
 
         var isDistrictAdmin = ctx.OrgRoleId == OrgRoleIds.DistrictAdmin;
 
@@ -47,19 +55,19 @@ public class AuditLogQueryService : IAuditLogQueryService
         // ------- Filter validation (→ 400) -------
         var pageSize = filters.PageSize ?? DefaultPageSize;
         if (pageSize <= 0)
-            return ServiceResult<AuditLogPageModel>.FailureResult("Page size must be greater than zero.");
+            return ServiceResult<AuditLogPageModel>.FailureResult(ServiceErrorKind.Validation, _localizer["AuditLog.PageSizeMustBePositive"]);
         if (pageSize > MaxPageSize)
             pageSize = MaxPageSize;
 
         if (filters.Cursor is < 0)
-            return ServiceResult<AuditLogPageModel>.FailureResult("Cursor must not be negative.");
+            return ServiceResult<AuditLogPageModel>.FailureResult(ServiceErrorKind.Validation, _localizer["AuditLog.CursorMustNotBeNegative"]);
 
         AuditAction? action = null;
         if (!string.IsNullOrWhiteSpace(filters.Action))
         {
             if (!Enum.TryParse<AuditAction>(filters.Action.Trim(), ignoreCase: true, out var parsed)
                 || !Enum.IsDefined(typeof(AuditAction), parsed))
-                return ServiceResult<AuditLogPageModel>.FailureResult($"Invalid action '{filters.Action}'.");
+                return ServiceResult<AuditLogPageModel>.FailureResult(ServiceErrorKind.Validation, _localizer["AuditLog.InvalidAction", filters.Action]);
             action = parsed;
         }
 
@@ -216,21 +224,21 @@ public class AuditLogQueryService : IAuditLogQueryService
                 Id = r.Id,
                 Action = r.Action.ToString(),
                 ActorUserId = r.ActorUserId,
-                ActorName = userNames.TryGetValue(r.ActorUserId, out var actorName) ? actorName : "Former staff member",
+                ActorName = userNames.TryGetValue(r.ActorUserId, out var actorName) ? actorName : _localizer["AuditLog.FormerStaffMember"],
                 ResourceType = r.ResourceType,
                 ResourceId = r.ResourceId,
                 ResourceDisplayName = ResolveResourceDisplay(r, draftStudentByDraftId, versionStudentByVersionId, studentNames),
                 RecipientUserId = r.RecipientUserId,
                 RecipientName = r.RecipientUserId == null
                     ? null
-                    : userNames.TryGetValue(r.RecipientUserId.Value, out var recipientName) ? recipientName : "Unknown user",
+                    : userNames.TryGetValue(r.RecipientUserId.Value, out var recipientName) ? recipientName : _localizer["AuditLog.UnknownUser"],
                 CreatedAt = r.CreatedAt
             });
         }
         return entries;
     }
 
-    private static string ResolveResourceDisplay(
+    private string ResolveResourceDisplay(
         RawRow r,
         IReadOnlyDictionary<int, int> draftStudentByDraftId,
         IReadOnlyDictionary<int, int> versionStudentByVersionId,
@@ -239,30 +247,31 @@ public class AuditLogQueryService : IAuditLogQueryService
         switch (r.ResourceType)
         {
             case ResourceStudent:
-                return studentNames.TryGetValue(r.ResourceId, out var directName) ? directName : "Deleted student";
+                return studentNames.TryGetValue(r.ResourceId, out var directName) ? directName : _localizer["AuditLog.DeletedStudent"];
 
             case ResourceDraft:
                 if (draftStudentByDraftId.TryGetValue(r.ResourceId, out var draftStudentId)
                     && studentNames.TryGetValue(draftStudentId, out var draftStudentName))
-                    return $"IEP draft for {draftStudentName}";
-                return $"Draft #{r.ResourceId}";
+                    return _localizer["AuditLog.IepDraftFor", draftStudentName];
+                return _localizer["AuditLog.DraftNumber", r.ResourceId];
 
             case ResourceVersion:
                 if (versionStudentByVersionId.TryGetValue(r.ResourceId, out var versionStudentId)
                     && studentNames.TryGetValue(versionStudentId, out var versionStudentName))
-                    return $"IEP version for {versionStudentName}";
-                return $"Version #{r.ResourceId}";
+                    return _localizer["AuditLog.IepVersionFor", versionStudentName];
+                return _localizer["AuditLog.VersionNumber", r.ResourceId];
 
             default:
-                // Unknown/future resource type: never throw, surface a stable identifier.
+                // Unknown/future resource type: never throw, surface a stable identifier. ResourceType is
+                // an internal code (e.g. "SchoolStudent"), not translated.
                 return $"{r.ResourceType} #{r.ResourceId}";
         }
     }
 
-    private static string FormatName(string? firstName, string? lastName)
+    private string FormatName(string? firstName, string? lastName)
     {
         var name = $"{firstName} {lastName}".Trim();
-        return string.IsNullOrEmpty(name) ? "Unknown user" : name;
+        return string.IsNullOrEmpty(name) ? _localizer["AuditLog.UnknownUser"] : name;
     }
 
     /// <summary>Lightweight projection of the audit row before enrichment.</summary>

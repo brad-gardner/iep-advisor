@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -10,6 +11,7 @@ import type { DistrictOverview } from '../types';
 // Self-contained: fetches its own overview so the dashboard can drop it in for
 // admins without threading extra state.
 export function DistrictOverviewCard() {
+  const { t } = useTranslation('district-admin');
   const [overview, setOverview] = useState<DistrictOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -52,27 +54,27 @@ export function DistrictOverviewCard() {
           `StaffHomePage`) — repeating it here as an <h2> would duplicate the
           same text at two heading levels, so this card's heading names the
           card's own content instead. */}
-      <h2 className="font-serif text-xl mb-4">District snapshot</h2>
+      <h2 className="font-serif text-xl mb-4">{t('dashboard.overview.title')}</h2>
       <dl className="grid grid-cols-2 gap-4 text-sm">
         {overview.stateCode && (
           <div>
-            <dt className="text-brand-slate-500">State</dt>
+            <dt className="text-brand-slate-500">{t('dashboard.overview.state')}</dt>
             <dd className="text-brand-slate-800">{overview.stateCode}</dd>
           </div>
         )}
         <div>
-          <dt className="text-brand-slate-500">Active schools</dt>
+          <dt className="text-brand-slate-500">{t('dashboard.overview.activeSchools')}</dt>
           <dd className="text-brand-slate-800">{overview.activeSchoolCount}</dd>
         </div>
         <div>
-          <dt className="text-brand-slate-500">Active staff</dt>
+          <dt className="text-brand-slate-500">{t('dashboard.overview.activeStaff')}</dt>
           <dd className="text-brand-slate-800">{overview.activeStaffCount}</dd>
         </div>
       </dl>
       <div className="mt-6">
         <Link to="/educator/admin/schools">
           <Button variant="secondary" data-testid="district-overview-manage-schools">
-            Manage schools
+            {t('dashboard.overview.manageSchools')}
           </Button>
         </Link>
       </div>

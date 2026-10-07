@@ -3,6 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '@/components/ui/toast';
 import { apiRejection } from '@/test/axios-rejection';
+// `district-admin` is a staff-only namespace (plan phase 6) — see the same
+// note in `adoption-engagement-tiles.test.tsx`.
+import '@/app/lazy-routes/staff-locales';
 import type { DistrictOverview } from '../types';
 
 const districtApi = vi.hoisted(() => ({

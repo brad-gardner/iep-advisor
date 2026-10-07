@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
+// `admin` is a staff-only namespace (plan phase 6) — its English isn't
+// bundled in `resources` (see `lib/i18n/index.ts`), only registered by this
+// side-effect import, exactly as the page's real lazy route chunk
+// (`app/lazy-routes/platform-admin-routes.tsx`) registers it before any
+// component using the namespace can render. See `docs/i18n/README.md`'s
+// "Staff and admin namespaces". This hook calls `useTranslation('admin')`
+// itself, so it needs this too, even though these tests don't assert on the
+// translated text.
+import '@/app/lazy-routes/staff-locales';
 import type { OutboundEmailDto, OutboundEmailStatusFilter } from '../types';
 
 const api = vi.hoisted(() => ({

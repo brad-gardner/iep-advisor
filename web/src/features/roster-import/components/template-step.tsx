@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -21,6 +22,7 @@ const STAFF_COLUMNS = 'Email, FirstName, LastName, Role, SchoolName, Title';
 // Step 1: fetch the server-generated workbook (its Values sheet carries the
 // live list of schools/roles/case managers) and explain what goes in it.
 export function TemplateStep({ kind, onContinue, headingRef }: TemplateStepProps) {
+  const { t } = useTranslation('roster-import');
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,14 +33,20 @@ export function TemplateStep({ kind, onContinue, headingRef }: TemplateStepProps
       const { blob, fileName } = await downloadImportTemplate(kind);
       downloadBlob(blob, fileName);
     } catch {
-      setError('Could not download the template. Try again.');
+      setError(t('templateStep.downloadError'));
     } finally {
       setIsDownloading(false);
     }
   };
 
+  // The workbook's own sheet names ("Students"/"Staff"/"Values") are a file
+  // format detail (like a CSV column header), not UI copy — they stay
+  // English regardless of the active language; only the surrounding
+  // description is translated. See `docs/i18n/README.md`'s note on keeping
+  // file-format tokens stable.
   const sheet = kind === 'Staff' ? 'Staff' : 'Students';
   const columns = kind === 'Staff' ? STAFF_COLUMNS : STUDENT_COLUMNS;
+  const noun = kind === 'Staff' ? t('templateStep.nounStaff') : t('templateStep.nounStudent');
 
   return (
     <Card data-testid="import-template-step">
@@ -49,19 +57,27 @@ export function TemplateStep({ kind, onContinue, headingRef }: TemplateStepProps
             tabIndex={-1}
             className="font-serif text-lg text-brand-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
           >
-            Download the template
+            {t('templateStep.heading')}
           </h2>
           <p className="mt-1 text-sm text-brand-slate-600">
-            Fill in the <span className="font-medium">{sheet}</span> sheet — one row per{' '}
-            {kind === 'Staff' ? 'staff member' : 'student'}. The <span className="font-medium">Values</span>{' '}
-            sheet lists the allowed entries, including your district&apos;s schools.
+            <Trans
+              t={t}
+              i18nKey="templateStep.intro"
+              values={{ sheet, noun }}
+              components={{
+                sheetName: <span className="font-medium" />,
+                values: <span className="font-medium" />,
+              }}
+            />
           </p>
-          <p className="mt-2 text-xs text-brand-slate-500">Columns: {columns}</p>
+          <p className="mt-2 text-xs text-brand-slate-500">{t('templateStep.columnsLabel', { columns })}</p>
           {kind === 'Students' && (
             <p className="mt-2 text-xs text-brand-slate-500">
-              Rows are matched on StudentId. Blank cells keep the current value; type{' '}
-              <code className="rounded-badge bg-brand-slate-100 px-1">CLEAR</code> to clear one.
-              Missing rows never exit anyone.
+              <Trans
+                t={t}
+                i18nKey="templateStep.studentNote"
+                components={{ code: <code className="rounded-badge bg-brand-slate-100 px-1" /> }}
+              />
             </p>
           )}
         </div>
@@ -80,10 +96,10 @@ export function TemplateStep({ kind, onContinue, headingRef }: TemplateStepProps
             data-testid="import-template-download"
           >
             <Download className="mr-1.5 h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-            Download template
+            {t('templateStep.downloadTemplate')}
           </Button>
           <Button onClick={onContinue} data-testid="import-template-continue">
-            Continue to upload
+            {t('templateStep.continueToUpload')}
           </Button>
         </div>
       </div>

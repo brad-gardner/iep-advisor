@@ -1,5 +1,7 @@
+import { useTranslation } from 'react-i18next';
 import { StatTile } from '@/features/home/components/stat-tile';
 import { formatDate } from '@/lib/format-date';
+import { complianceTileLabel } from '@/lib/compliance-tile-label';
 import { COMPLIANCE_SUMMARY_TILES } from '../lib/compliance-tiles';
 import { districtDrillHref } from '../lib/drill-link';
 import type { ComplianceSummaryDto } from '../types';
@@ -19,22 +21,23 @@ interface ComplianceSummaryTilesProps {
 /** The compliance board's headline tiles — every one links to the roster,
  * pre-filtered by the server's `drill` map (and the current school filter). */
 export function ComplianceSummaryTiles({ summary, drill, schoolId, from, to }: ComplianceSummaryTilesProps) {
-  const denominator = `of ${summary.activeStudents} active students`;
+  const { t } = useTranslation('district-admin');
+  const denominator = t('complianceTiles.denominator', { count: summary.activeStudents });
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="compliance-summary-tiles">
-      {COMPLIANCE_SUMMARY_TILES.map((t) => (
+      {COMPLIANCE_SUMMARY_TILES.map((tile) => (
         <StatTile
-          key={t.key}
-          label={t.label}
-          value={summary[t.key]}
+          key={tile.key}
+          label={complianceTileLabel(t, tile.key)}
+          value={summary[tile.key]}
           denominator={denominator}
-          href={districtDrillHref(drill, t.key, schoolId)}
-          tone={t.tone}
-          data-testid={`compliance-summary-${t.key}`}
+          href={districtDrillHref(drill, tile.key, schoolId)}
+          tone={tile.tone}
+          data-testid={`compliance-summary-${tile.key}`}
         />
       ))}
       <StatTile
-        label="Due in selected range"
+        label={t('complianceTiles.dueInRange')}
         value={summary.dueInRange}
         denominator={`${formatDate(from)} – ${formatDate(to)}`}
         href={districtDrillHref(drill, 'dueInRange', schoolId)}

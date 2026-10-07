@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { DistrictSchool } from '../../types';
@@ -9,6 +10,7 @@ interface SetupDoneStepProps {
 
 // Step 4: recap what was set up and hand off to the dashboard.
 export function SetupDoneStep({ createdSchool, onFinish }: SetupDoneStepProps) {
+  const { t } = useTranslation('district-admin');
   return (
     <div className="space-y-6 text-center" data-testid="district-setup-done">
       <div className="flex justify-center">
@@ -23,16 +25,16 @@ export function SetupDoneStep({ createdSchool, onFinish }: SetupDoneStepProps) {
       </div>
 
       <div className="space-y-2">
-        <h2 className="font-serif text-2xl text-brand-slate-800">You're all set</h2>
+        <h2 className="font-serif text-2xl text-brand-slate-800">{t('setupWizard.done.heading')}</h2>
         <p className="text-sm text-brand-slate-500 max-w-md mx-auto leading-relaxed">
           {createdSchool
-            ? `${createdSchool.name} is ready. You can manage schools, invite staff, and add students any time from your dashboard.`
-            : 'You can create schools, invite staff, and add students any time from your dashboard.'}
+            ? t('setupWizard.done.bodyWithSchool', { name: createdSchool.name })
+            : t('setupWizard.done.bodyWithoutSchool')}
         </p>
       </div>
 
       <Button onClick={onFinish} className="mt-2" data-testid="district-setup-finish">
-        Go to dashboard
+        {t('setupWizard.done.finish')}
       </Button>
     </div>
   );

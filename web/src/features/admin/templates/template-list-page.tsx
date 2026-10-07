@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FileText, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,8 @@ import { CreateTemplateModal } from './create-template-modal';
 import type { DocumentTemplateDto } from './types';
 
 export function TemplateListPage() {
-  usePageTitle('Document Templates');
+  const { t } = useTranslation(['admin', 'common']);
+  usePageTitle(t('templates.list.pageTitle'));
   const { templates, isLoading, error, reload, create } = useTemplates();
   const { show: showToast } = useToast();
   const [showCreate, setShowCreate] = useState(false);
@@ -21,7 +23,7 @@ export function TemplateListPage() {
   const handleCreate = async (data: Parameters<typeof create>[0]) => {
     const result = await create(data);
     if (result.success) {
-      showToast({ message: 'Template created.', variant: 'success' });
+      showToast({ message: t('templates.list.createdToast'), variant: 'success' });
     }
     return result;
   };
@@ -29,73 +31,73 @@ export function TemplateListPage() {
   const columns: TableColumn<DocumentTemplateDto>[] = [
     {
       key: 'state',
-      header: 'State',
-      cell: (t) => t.stateCode ?? 'Default',
-      sortValue: (t) => t.stateCode ?? '',
+      header: t('templates.list.column.state'),
+      cell: (row) => row.stateCode ?? t('templates.list.column.stateDefault'),
+      sortValue: (row) => row.stateCode ?? '',
     },
     {
       key: 'documentType',
-      header: 'Document Type',
-      cell: (t) => t.documentTypeDisplayName,
-      sortValue: (t) => t.documentTypeDisplayName,
+      header: t('templates.list.column.documentType'),
+      cell: (row) => row.documentTypeDisplayName,
+      sortValue: (row) => row.documentTypeDisplayName,
     },
     {
       key: 'name',
-      header: 'Name',
-      cell: (t) => t.name,
-      sortValue: (t) => t.name.toLowerCase(),
+      header: t('templates.list.column.name'),
+      cell: (row) => row.name,
+      sortValue: (row) => row.name.toLowerCase(),
     },
     {
       key: 'version',
-      header: 'Latest Version',
+      header: t('templates.list.column.latestVersion'),
       hideBelow: 'md',
-      cell: (t) => (t.latestVersion ? `v${t.latestVersion.versionNumber}` : '—'),
-      sortValue: (t) => t.latestVersion?.versionNumber ?? 0,
+      cell: (row) => (row.latestVersion ? `v${row.latestVersion.versionNumber}` : '—'),
+      sortValue: (row) => row.latestVersion?.versionNumber ?? 0,
     },
     {
       key: 'status',
-      header: 'Status',
-      cell: (t) =>
-        t.latestVersion ? (
-          <Badge variant={t.latestVersion.status === 'Published' ? 'success' : 'neutral'}>
-            {t.latestVersion.status}
+      header: t('templates.list.column.status'),
+      cell: (row) =>
+        row.latestVersion ? (
+          <Badge variant={row.latestVersion.status === 'Published' ? 'success' : 'neutral'}>
+            {t(`templates.versionStatus.${row.latestVersion.status}`)}
           </Badge>
         ) : (
           '—'
         ),
-      sortValue: (t) => t.latestVersion?.status ?? '',
+      sortValue: (row) => row.latestVersion?.status ?? '',
     },
   ];
 
   return (
     <PageLayout
-      title="Document Templates"
-      subtitle={`${templates.length} template${templates.length !== 1 ? 's' : ''}`}
+      title={t('templates.list.pageTitle')}
+      subtitle={t('templates.list.subtitle', { count: templates.length })}
       actions={
         <Button onClick={() => setShowCreate(true)} data-testid="create-template-button">
           <Plus size={14} strokeWidth={1.8} className="mr-1.5" aria-hidden="true" />
-          Create Template
+          {t('templates.list.createButton')}
         </Button>
       }
     >
       {error && (
         <Notice variant="error" title={error}>
           <Button variant="secondary" size="sm" onClick={reload} className="mt-3">
-            Retry
+            {t('common:ui.tryAgain')}
           </Button>
         </Notice>
       )}
 
       <Table
-        label="Document templates"
+        label={t('templates.list.tableLabel')}
         data-testid="admin-templates-table"
         columns={columns}
         rows={templates}
-        rowKey={(t) => t.id}
-        rowHref={(t) => `/admin/templates/${t.id}`}
+        rowKey={(row) => row.id}
+        rowHref={(row) => `/admin/templates/${row.id}`}
         loading={isLoading}
         defaultSort={{ key: 'state', direction: 'asc' }}
-        empty={<EmptyState icon={FileText} title="No templates yet." />}
+        empty={<EmptyState icon={FileText} title={t('templates.list.emptyTitle')} />}
       />
 
       {/* Mounted only while open so the document-types fetch defers until the

@@ -1,0 +1,396 @@
+{
+  "common": {
+    "status": {
+      "active": "Activo",
+      "inactive": "Inactivo"
+    },
+    "column": {
+      "name": "Nombre",
+      "email": "Correo electrónico",
+      "joined": "Fecha de registro",
+      "status": "Estado"
+    },
+    "required": "Obligatorio",
+    "noneOption": "— ninguno —"
+  },
+  "dashboard": {
+    "pageTitle": "Panel de administración",
+    "loading": "Cargando panel…",
+    "unknownError": "Error desconocido",
+    "loadFailed": "No se pudieron cargar las estadísticas del panel.",
+    "stat": {
+      "totalUsers": "Usuarios totales",
+      "activeChildren": "Hijos activos",
+      "iepDocuments": "Documentos del IEP",
+      "aiAnalyses": "Análisis de IA"
+    },
+    "deltaThisWeek": "+{{delta}} esta semana",
+    "status": {
+      "documentStatus": "Estado de los documentos",
+      "analysisStatus": "Estado de los análisis",
+      "subscriptionStatus": "Estado de la suscripción"
+    },
+    "documentItem": {
+      "created": "Creado",
+      "parsed": "Procesado",
+      "error": "Error"
+    },
+    "analysisItem": {
+      "completed": "Completado",
+      "pending": "Pendiente",
+      "error": "Error"
+    },
+    "subscriptionStatusValue": {
+      "none": "Ninguna",
+      "active": "Activa",
+      "pastDue": "Vencida",
+      "canceled": "Cancelada",
+      "expired": "Expirada"
+    },
+    "breakdown": {
+      "childrenByDisability": "Hijos por categoría de discapacidad",
+      "goalsByCategory": "Metas por categoría",
+      "noDataYet": "Aún no hay datos."
+    },
+    "recentUsers": {
+      "title": "Usuarios recientes",
+      "emptyTitle": "Aún no hay usuarios"
+    },
+    "betaCodes": {
+      "title": "Códigos beta",
+      "redeemed": "{{count}} canjeados",
+      "total": "{{count}} en total"
+    },
+    "quickStats": {
+      "title": "Estadísticas rápidas",
+      "advocacyGoals": "Metas para el IEP",
+      "meetingChecklists": "Listas de verificación de reuniones",
+      "totalAiUsage": "Uso total de IA"
+    }
+  },
+  "users": {
+    "pageTitle": "Gestión de usuarios",
+    "subtitle_one": "{{count}} usuario",
+    "subtitle_other": "{{count}} usuarios",
+    "searchPlaceholder": "Buscar por nombre o correo electrónico...",
+    "inviteButton": "Invitar usuario beta",
+    "tableLabel": "Usuarios",
+    "emptyTitle": "No se encontraron usuarios.",
+    "column": {
+      "role": "Rol"
+    },
+    "loadFailed": "No se pudieron cargar los usuarios.",
+    "inviteModal": {
+      "title": "Invitar usuario beta",
+      "description": "Ingrese su correo electrónico. Recibirá un enlace de registro con un código beta que se completa automáticamente en la página de registro.",
+      "emailLabel": "Correo electrónico",
+      "invalidEmail": "Ingrese una dirección de correo electrónico válida",
+      "sendFailed": "No se pudo enviar la invitación",
+      "sentToast": "Invitación enviada a {{email}}",
+      "submit": "Enviar invitación",
+      "emailPlaceholder": "correo@ejemplo.com"
+    }
+  },
+  "userDetail": {
+    "pageTitleFallback": "Usuario",
+    "loading": "Cargando usuario…",
+    "loadFailed": "No se pudo cargar el usuario.",
+    "backToUsers": "Volver a usuarios",
+    "editUser": "Editar usuario",
+    "roleLabel": "Rol",
+    "roleUser": "Usuario",
+    "roleAdmin": "Administrador",
+    "activeLabel": "Activo",
+    "saveChanges": "Guardar cambios",
+    "saveFailed": "No se pudo actualizar el usuario.",
+    "savedToast": "Usuario actualizado correctamente.",
+    "statusToggleFailed": "No se pudo actualizar el estado del usuario.",
+    "reactivatedToast": "Usuario reactivado.",
+    "deactivatedToast": "Usuario desactivado.",
+    "details": "Detalles",
+    "stateLabel": "Estado",
+    "actions": "Acciones",
+    "deactivate": "Desactivar usuario",
+    "reactivate": "Reactivar usuario"
+  },
+  "templates": {
+    "versionStatus": {
+      "Draft": "Borrador",
+      "Published": "Publicada"
+    },
+    "list": {
+      "pageTitle": "Plantillas de documentos",
+      "subtitle_one": "{{count}} plantilla",
+      "subtitle_other": "{{count}} plantillas",
+      "createButton": "Crear plantilla",
+      "tableLabel": "Plantillas de documentos",
+      "emptyTitle": "Aún no hay plantillas.",
+      "createdToast": "Plantilla creada.",
+      "loadFailedFallback": "No se pudieron cargar las plantillas.",
+      "column": {
+        "state": "Estado",
+        "stateDefault": "Predeterminado",
+        "documentType": "Tipo de documento",
+        "name": "Nombre",
+        "latestVersion": "Última versión",
+        "status": "Estado"
+      }
+    },
+    "createModal": {
+      "title": "Crear plantilla",
+      "cancel": "Cancelar",
+      "submit": "Crear plantilla",
+      "nameLabel": "Nombre de la plantilla",
+      "namePlaceholder": "p. ej. IEP de Ohio",
+      "docTypeLabel": "Tipo de documento",
+      "docTypeLoading": "Cargando…",
+      "docTypePlaceholder": "Seleccione un tipo de documento…",
+      "isDefaultLabel": "Plantilla predeterminada (se aplica a todos los estados)",
+      "stateLabel": "Estado",
+      "errorNameRequired": "Ingrese un nombre para la plantilla.",
+      "errorDocTypeRequired": "Seleccione un tipo de documento.",
+      "errorStateRequired": "Seleccione un estado, o marque esta plantilla como predeterminada.",
+      "errorCreateFailed": "No se pudo crear la plantilla.",
+      "errorDocTypesLoadFailed": "No se pudieron cargar los tipos de documento."
+    },
+    "builder": {
+      "pageTitleFallback": "Plantilla",
+      "backToTemplates": "Volver a plantillas",
+      "loading": "Cargando plantilla…",
+      "loadErrorFallback": "No se pudo cargar la plantilla.",
+      "noWorkingVersion": "No hay ninguna versión de trabajo cargada.",
+      "notFound": "Plantilla no encontrada.",
+      "noVersionToEdit": "Esta plantilla no tiene ninguna versión para editar.",
+      "versionLoadFailed": "No se pudo cargar la versión de la plantilla.",
+      "editNewVersion": "Editar (nueva versión)",
+      "publish": "Publicar",
+      "publishedToast": "Versión de la plantilla publicada.",
+      "publishFailedFallback": "No se pudo publicar.",
+      "newDraftToast": "Nuevo borrador de versión creado.",
+      "forkFailedFallback": "No se pudo iniciar una nueva versión.",
+      "conflictTitle": "Esta plantilla cambió en otra sesión.",
+      "conflictMessage": "Su copia de trabajo está desactualizada. Recargue para obtener la más reciente antes de seguir editando.",
+      "reloadTemplate": "Recargar plantilla",
+      "readOnlyTitle": "Esta versión está publicada y es de solo lectura.",
+      "readOnlyMessage": "Las versiones publicadas son inmutables. Elija “Editar (nueva versión)” para comenzar un nuevo borrador a partir de esta versión.",
+      "publishErrorsTitle": "Esta plantilla aún no se puede publicar.",
+      "needsSectionAndField": "Agregue al menos una sección y al menos un campo a cada sección para poder publicar.",
+      "structure": "Estructura",
+      "noSections": "Aún no hay secciones. Agregue una sección para comenzar a construir esta plantilla.",
+      "addSection": "Agregar sección",
+      "formPreviewHeading": "Vista previa del formulario",
+      "subtitle": "{{state}} · {{docType}} · v{{version}}"
+    },
+    "sectionEditor": {
+      "titleLabel": "Título de la sección",
+      "moveUp": "Mover sección hacia arriba",
+      "moveDown": "Mover sección hacia abajo",
+      "delete": "Eliminar sección",
+      "noFieldsYet": "Aún no hay campos.",
+      "addField": "Agregar campo",
+      "deleteConfirmTitle": "Eliminar sección",
+      "deleteConfirmMessage": "¿Eliminar \"{{title}}\" y todos sus campos? Esto no se puede deshacer.",
+      "deleteConfirmLabel": "Eliminar sección",
+      "deleteFailed": "No se pudo eliminar la sección.",
+      "untitled": "esta sección",
+      "saveFailed": "Error al guardar",
+      "newFieldDefaultLabel": "Campo nuevo",
+      "newSectionDefaultTitle": "Sección nueva"
+    },
+    "fieldEditor": {
+      "labelLabel": "Etiqueta del campo",
+      "typeLabel": "Tipo de campo",
+      "semanticLabel": "Semántica (qué representa este campo)",
+      "semanticHelp": "Permite que la asistencia de IA, el prellenado y el diseño del PDF reconozcan este campo en cualquier plantilla.",
+      "moveUp": "Mover campo hacia arriba",
+      "moveDown": "Mover campo hacia abajo",
+      "delete": "Eliminar campo",
+      "deleteConfirmTitle": "Eliminar campo",
+      "deleteConfirmMessage": "¿Eliminar \"{{label}}\"? Esto no se puede deshacer.",
+      "deleteConfirmLabel": "Eliminar campo",
+      "deleteFailed": "No se pudo eliminar el campo.",
+      "untitled": "este campo",
+      "saveFailed": "Error al guardar",
+      "configErrorSuffix": "Los cambios no se guardarán hasta que esto se corrija.",
+      "noExtraConfig": "Este tipo de campo no tiene configuración adicional."
+    },
+    "autosave": {
+      "saving": "Guardando…",
+      "saved": "Guardado",
+      "failed": "Error al guardar"
+    },
+    "formPreview": {
+      "emptyMessage": "Agregue una sección para ver la vista previa del formulario.",
+      "ariaLabel": "Vista previa del formulario",
+      "untitledSection": "Sección sin título",
+      "noFields": "Sin campos.",
+      "untitledField": "Campo sin título",
+      "requiredSuffix": "(obligatorio)",
+      "selectPlaceholder": "Seleccionar…",
+      "untitledColumn": "Columna",
+      "columnValueLabel": "Valor de {{column}}"
+    },
+    "configEditors": {
+      "maxLengthLabel": "Longitud máxima (opcional)",
+      "maxLengthPlaceholder": "Sin límite",
+      "dateFormatLabel": "Formato de fecha (opcional)",
+      "dateFormatPlaceholder": "p. ej. MM/dd/aaaa",
+      "optionsLegend": "Opciones",
+      "optionValueLabel": "Valor",
+      "optionValuePlaceholder": "p. ej. sí",
+      "optionLabelLabel": "Etiqueta (opcional)",
+      "optionLabelPlaceholder": "p. ej. Sí",
+      "removeOption": "Eliminar opción {{number}}",
+      "addOption": "Agregar opción",
+      "columnsLegend": "Columnas",
+      "columnLabelLabel": "Etiqueta de la columna",
+      "columnLabelPlaceholder": "p. ej. Meta",
+      "columnTypeLabel": "Tipo",
+      "removeColumn": "Eliminar columna {{number}}",
+      "columnSemanticLabel": "Semántica",
+      "addColumn": "Agregar columna",
+      "minRowsLabel": "Filas mínimas",
+      "maxRowsLabel": "Filas máximas",
+      "noneLabel": "Ninguno"
+    },
+    "fieldType": {
+      "Text": "Texto",
+      "RichText": "Texto enriquecido",
+      "Date": "Fecha",
+      "Select": "Lista desplegable",
+      "Checkbox": "Casilla de verificación",
+      "Table": "Tabla"
+    },
+    "fieldSemantic": {
+      "studentProfile": "Perfil del estudiante",
+      "presentLevels": "Niveles actuales de desempeño (PLAAFP)",
+      "eligibility": "Elegibilidad / categoría de discapacidad",
+      "placement": "Ubicación",
+      "progressMonitoring": "Monitoreo de progreso / informes",
+      "specialFactors": "Factores especiales",
+      "goals": "Metas (bloque repetible)",
+      "services": "Servicios (bloque repetible)",
+      "accommodations": "Adaptaciones (bloque repetible)",
+      "transition": "Transición (bloque repetible)",
+      "futurePlanning": "Planificación futura",
+      "extendedSchoolYear": "Año escolar extendido",
+      "testing": "Pruebas estatales / distritales",
+      "transportation": "Transporte",
+      "lre": "Entorno menos restrictivo",
+      "participants": "Participantes de la reunión (bloque repetible)",
+      "signatures": "Firmas",
+      "referralReason": "Motivo de la remisión",
+      "evaluationPlan": "Plan de evaluación",
+      "evaluatorReports": "Informes de evaluadores (bloque repetible)",
+      "teamSummary": "Resumen del equipo",
+      "eligibilityDetermination": "Determinación de elegibilidad",
+      "meetingDate": "Fecha de la reunión",
+      "effectiveDates": "Fechas de vigencia"
+    },
+    "validation": {
+      "addOption": "Agregue al menos una opción.",
+      "optionValueRequired": "Cada opción necesita un valor no vacío.",
+      "optionValuesUnique": "Los valores de las opciones deben ser únicos.",
+      "addColumn": "Agregue al menos una columna.",
+      "columnLabelRequired": "Cada columna necesita una etiqueta.",
+      "columnSemanticsUnique": "La semántica de las columnas debe ser única dentro de la tabla.",
+      "columnOptionError": "Columna \"{{label}}\": {{error}}",
+      "minMaxRows": "Las filas mínimas no pueden superar a las máximas."
+    },
+    "columnSemantic": {
+      "domain": "Dominio / área de la meta",
+      "goalText": "Texto de la meta",
+      "baseline": "Línea de base",
+      "targetCriteria": "Criterios objetivo",
+      "measurementMethod": "Método de medición",
+      "timeframe": "Plazo",
+      "serviceType": "Tipo de servicio",
+      "frequency": "Frecuencia",
+      "duration": "Duración",
+      "location": "Entorno",
+      "providerRole": "Función del proveedor",
+      "startDate": "Fecha de inicio",
+      "endDate": "Fecha de finalización",
+      "category": "Categoría de la adaptación",
+      "accommodation": "Adaptación",
+      "goalArea": "Área de la meta postsecundaria",
+      "transitionServices": "Servicios de transición",
+      "participantName": "Nombre del participante",
+      "participantRole": "Función del participante",
+      "attended": "Asistencia",
+      "evaluationDomain": "Área de evaluación",
+      "evaluatorName": "Evaluador",
+      "findings": "Hallazgos"
+    }
+  },
+  "audit": {
+    "pageTitle": "Integridad de la auditoría",
+    "subtitle": "Ejecuciones de integridad de cadena de hash sobre el registro de auditoría de acceso.",
+    "runCheckNow": "Ejecutar verificación ahora",
+    "tableLabel": "Ejecuciones de integridad",
+    "column": {
+      "started": "Iniciado",
+      "completed": "Completado",
+      "rowsChecked": "Filas verificadas",
+      "firstBrokenId": "Primer ID dañado",
+      "detail": "Detalle"
+    },
+    "emptyTitle": "Aún no hay ejecuciones de integridad",
+    "emptyDescription": "Ejecute una verificación ahora, o espere al proceso nocturno.",
+    "status": {
+      "Ok": "Correcto",
+      "Broken": "Dañado",
+      "Failed": "Fallido"
+    },
+    "loadFailed": "No se pudieron cargar las ejecuciones de integridad.",
+    "runFailed": "No se pudo ejecutar la verificación de integridad."
+  },
+  "email": {
+    "pageTitle": "Correo saliente",
+    "subtitle": "Todos los correos que la aplicación ha puesto en cola, enviado o no pudo enviar.",
+    "unconfiguredTitle": "El envío de correo no está configurado",
+    "unconfiguredMessage": "No se enviará ningún correo hasta que Azure Communication Services esté configurado para este entorno.",
+    "statusSummary": "{{queued}} en cola · {{sending}} enviándose · {{failed}} fallidos",
+    "statusSummaryLastSent": "{{queued}} en cola · {{sending}} enviándose · {{failed}} fallidos · último envío {{when}}",
+    "statusFilterLabel": "Estado",
+    "filter": {
+      "Failed": "Fallidos",
+      "Queued": "En cola",
+      "Sending": "Enviando",
+      "Sent": "Enviados",
+      "Cancelled": "Cancelados",
+      "All": "Todos"
+    },
+    "status": {
+      "Queued": "En cola",
+      "Sending": "Enviando",
+      "Sent": "Enviado",
+      "Failed": "Fallido",
+      "Cancelled": "Cancelado"
+    },
+    "column": {
+      "to": "Para",
+      "subject": "Asunto",
+      "kind": "Tipo",
+      "attempts": "Intentos",
+      "lastError": "Último error",
+      "when": "Próximo intento / enviado"
+    },
+    "sentAt": "Enviado {{when}}",
+    "nextAttempt": "Próximo: {{when}}",
+    "tableLabel": "Correos salientes",
+    "noneMatch": "Ningún correo coincide con este filtro.",
+    "resend": "Reenviar",
+    "cancel": "Cancelar",
+    "resendConfirmTitle": "Reenviar correo",
+    "cancelConfirmTitle": "Cancelar correo",
+    "resendConfirmMessage": "¿Volver a poner en cola este correo a {{email}} para entrega inmediata?",
+    "cancelConfirmMessage": "¿Cancelar este correo en cola a {{email}}? Nunca se enviará.",
+    "keepAsIs": "Dejar como está",
+    "resentToast": "Correo a {{email}} reenviado a la cola",
+    "cancelledToast": "Correo a {{email}} cancelado",
+    "resendFailedFallback": "No se pudo reenviar este correo.",
+    "cancelFailedFallback": "No se pudo cancelar este correo.",
+    "loadFailed": "No se pudieron cargar los correos salientes."
+  }
+}

@@ -11,6 +11,11 @@ using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
+/// <summary>
+/// Multilingual plan (2026-10-06) phase 6 (todos/249): <see cref="ServiceErrorKind"/> added to every
+/// failure for consistency with later-phase services, even though <c>AuthController</c> maps every one
+/// of these to a fixed status today (not via <c>MapServiceFailure</c>) — see todos/249.
+/// </summary>
 public class MfaService : IMfaService
 {
     private readonly IUserRepository _userRepository;
@@ -66,14 +71,14 @@ public class MfaService : IMfaService
             ?? throw new InvalidOperationException("User not found");
 
         if (string.IsNullOrEmpty(user.MfaSecret))
-            return ServiceResult<List<string>>.FailureResult(_localizer["Mfa.SetupNotInitiated"]);
+            return ServiceResult<List<string>>.FailureResult(ServiceErrorKind.Validation, _localizer["Mfa.SetupNotInitiated"]);
 
         if (user.MfaEnabled)
-            return ServiceResult<List<string>>.FailureResult(_localizer["Mfa.AlreadyEnabled"]);
+            return ServiceResult<List<string>>.FailureResult(ServiceErrorKind.Validation, _localizer["Mfa.AlreadyEnabled"]);
 
         var secret = _protector.Unprotect(user.MfaSecret);
         if (!_totpService.ValidateCode(secret, code))
-            return ServiceResult<List<string>>.FailureResult(_localizer["Mfa.InvalidVerificationCode"]);
+            return ServiceResult<List<string>>.FailureResult(ServiceErrorKind.Validation, _localizer["Mfa.InvalidVerificationCode"]);
 
         user.MfaEnabled = true;
         user.LastTotpTimestamp = _totpService.GetTimestamp();
@@ -185,22 +190,22 @@ public class MfaService : IMfaService
     {
         var user = await _userRepository.GetByIdAsync(userId, ct);
         if (user == null)
-            return ServiceResult.FailureResult(_localizer["Auth.UserNotFound"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Auth.UserNotFound"]);
 
         if (!user.MfaEnabled)
-            return ServiceResult.FailureResult(_localizer["Mfa.NotEnabled"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Mfa.NotEnabled"]);
 
         // Verify password
         if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
-            return ServiceResult.FailureResult(_localizer["Mfa.InvalidPassword"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Mfa.InvalidPassword"]);
 
         // Verify TOTP code
         if (string.IsNullOrEmpty(user.MfaSecret))
-            return ServiceResult.FailureResult(_localizer["Mfa.SecretNotFound"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Mfa.SecretNotFound"]);
 
         var secret = _protector.Unprotect(user.MfaSecret);
         if (!_totpService.ValidateCode(secret, totpCode))
-            return ServiceResult.FailureResult(_localizer["Mfa.InvalidTotpCode"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Mfa.InvalidTotpCode"]);
 
         // Disable MFA
         user.MfaEnabled = false;

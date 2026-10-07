@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageLayout } from '@/components/ui/page-layout';
@@ -14,7 +15,7 @@ import type { ImportBatch, ImportKind, ImportPreview, ImportResult } from '../ty
 import {
   useImportWizard,
   WIZARD_STEP_INDEX,
-  WIZARD_STEP_LABELS,
+  WIZARD_STEP_LABEL_KEYS,
   type WizardStep,
 } from '../hooks/use-import-wizard';
 import { ImportKindToggle } from '../components/import-kind-toggle';
@@ -32,7 +33,8 @@ function parseKind(raw: string | null): ImportKind {
 // The wizard is linear — template → upload → preview → commit → result — and
 // the batch history below reloads after every commit.
 export function ImportPage() {
-  usePageTitle('Import');
+  const { t } = useTranslation('roster-import');
+  usePageTitle(t('page.title'));
   const { profile, isLoading: profileLoading } = useEducatorProfile();
   const isAdmin = isAdminOrgRole(profile?.orgRoleId);
   const { show: showToast } = useToast();
@@ -102,7 +104,7 @@ export function ImportPage() {
   const handleCommitted = async (result: ImportResult) => {
     setIsConfirming(false);
     wizard.showResult(result);
-    showToast({ message: 'Import committed', variant: 'success' });
+    showToast({ message: t('page.importCommittedToast'), variant: 'success' });
     await reloadHistory();
   };
 
@@ -122,14 +124,14 @@ export function ImportPage() {
 
   if (!isAdmin) {
     return (
-      <PageLayout title="Import" data-testid="roster-import-page">
+      <PageLayout title={t('page.title')} data-testid="roster-import-page">
         <EmptyState
           data-testid="roster-import-not-available"
-          title="Not available"
-          description="Importing is available to district and school administrators only."
+          title={t('page.notAvailableTitle')}
+          description={t('page.notAvailableDescription')}
           action={
             <Link to="/educator/students">
-              <Button variant="secondary">Back to students</Button>
+              <Button variant="secondary">{t('page.backToStudents')}</Button>
             </Link>
           }
         />
@@ -138,11 +140,12 @@ export function ImportPage() {
   }
 
   const stepIndex = isConfirming && wizard.step === 'preview' ? 3 : WIZARD_STEP_INDEX[wizard.step];
+  const stepLabels = WIZARD_STEP_LABEL_KEYS.map((key) => t(key));
 
   return (
     <PageLayout
-      title="Import"
-      subtitle="Add or update many records at once from an Excel workbook."
+      title={t('page.title')}
+      subtitle={t('page.subtitle')}
       data-testid="roster-import-page"
       actions={
         <ImportKindToggle value={kind} onChange={changeKind} disabled={isUploading || isConfirming} />
@@ -150,8 +153,8 @@ export function ImportPage() {
     >
       <ProgressDots
         current={stepIndex}
-        total={WIZARD_STEP_LABELS.length}
-        labels={WIZARD_STEP_LABELS}
+        total={stepLabels.length}
+        labels={stepLabels}
         testId="import-progress"
       />
 

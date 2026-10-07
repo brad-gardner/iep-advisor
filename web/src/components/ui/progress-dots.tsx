@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 interface ProgressDotsProps {
   // Zero-based index of the active step.
   current: number;
@@ -10,18 +12,22 @@ interface ProgressDotsProps {
 // A small, reusable step indicator. Renders a filled dot per completed/active
 // step and exposes its position to assistive tech via role="progressbar".
 export function ProgressDots({ current, total, labels, testId }: ProgressDotsProps) {
+  const { t } = useTranslation('common');
   const label = labels?.[current];
+  // One interpolated key for the accessible name, with a `withLabel` context
+  // variant for the step-label case — never English glue text concatenated
+  // around a translated label (see `docs/i18n/README.md`'s note on mixed-
+  // language sentences).
+  const ariaLabel = label
+    ? t('ui.stepProgress', { current: current + 1, total, label, context: 'withLabel' })
+    : t('ui.stepProgress', { current: current + 1, total });
   return (
     <div
       role="progressbar"
       aria-valuenow={current + 1}
       aria-valuemin={1}
       aria-valuemax={total}
-      aria-label={
-        label
-          ? `Step ${current + 1} of ${total}: ${label}`
-          : `Step ${current + 1} of ${total}`
-      }
+      aria-label={ariaLabel}
       data-testid={testId}
       className="flex items-center justify-center gap-2"
     >

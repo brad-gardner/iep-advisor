@@ -58,6 +58,8 @@
     "currentValueSuffix": "{{value}} (current value)",
     "tryAgain": "Try again",
     "genericError": "Something went wrong. Please try again.",
+    "stepProgress": "Step {{current}} of {{total}}",
+    "stepProgress_withLabel": "Step {{current}} of {{total}}: {{label}}",
     "reload": "Reload"
   },
   "toast": {

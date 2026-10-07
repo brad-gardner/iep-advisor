@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -21,7 +22,8 @@ const PAGE_SIZE = 25;
 // (server-scoped). Keyset ("Load more") paging — offset paging would drift as
 // the audit worker appends rows.
 export function DistrictAuditLogPage() {
-  usePageTitle('Activity log');
+  const { t } = useTranslation('district-admin');
+  usePageTitle(t('auditLog.pageTitle'));
   const { profile, isLoading: profileLoading } = useEducatorProfile();
   const isAdmin =
     profile?.orgRoleId === ORG_ROLE.DistrictAdmin ||
@@ -122,9 +124,9 @@ export function DistrictAuditLogPage() {
 
   if (!isAdmin) {
     return (
-      <PageLayout title="Activity log" data-testid="audit-log-page">
-        <Notice variant="warning" title="Access restricted">
-          The activity log is available to district and school administrators only.
+      <PageLayout title={t('auditLog.pageTitle')} data-testid="audit-log-page">
+        <Notice variant="warning" title={t('auditLog.accessRestrictedTitle')}>
+          {t('auditLog.accessRestrictedBody')}
         </Notice>
       </PageLayout>
     );
@@ -132,19 +134,19 @@ export function DistrictAuditLogPage() {
 
   return (
     <PageLayout
-      title="Activity log"
-      subtitle="Who accessed which student records, and when."
+      title={t('auditLog.pageTitle')}
+      subtitle={t('auditLog.subtitle')}
       data-testid="audit-log-page"
     >
       <AuditLogFilters onChange={applyFilters} />
 
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <Spinner label="Loading activity…" />
+          <Spinner label={t('auditLog.loadingActivity')} />
         </div>
       ) : loadFailed ? (
-        <Notice variant="error" title="Couldn't load activity">
-          <p>Something went wrong loading the activity log.</p>
+        <Notice variant="error" title={t('auditLog.couldNotLoadTitle')}>
+          <p>{t('auditLog.couldNotLoadBody')}</p>
           <Button
             variant="ghost"
             size="sm"
@@ -152,19 +154,15 @@ export function DistrictAuditLogPage() {
             onClick={() => applyFilters({ ...filters })}
             data-testid="audit-log-retry"
           >
-            Try again
+            {t('auditLog.tryAgain')}
           </Button>
         </Notice>
       ) : entries.length === 0 ? (
         <Card data-testid="audit-log-empty" className="p-0">
           <EmptyState
             icon={ClipboardList}
-            title={hasFilters ? 'No matching activity' : 'No activity yet'}
-            description={
-              hasFilters
-                ? 'No records were accessed under these filters. Try widening the date range or clearing a filter.'
-                : 'Once staff start opening student records, their access will show up here.'
-            }
+            title={hasFilters ? t('auditLog.emptyFilteredTitle') : t('auditLog.emptyTitle')}
+            description={hasFilters ? t('auditLog.emptyFilteredDescription') : t('auditLog.emptyDescription')}
           />
         </Card>
       ) : (
@@ -183,7 +181,7 @@ export function DistrictAuditLogPage() {
                 disabled={isLoadingMore}
                 data-testid="audit-log-load-more"
               >
-                {isLoadingMore ? 'Loading…' : 'Load more'}
+                {isLoadingMore ? t('auditLog.loadingMore') : t('auditLog.loadMore')}
               </Button>
             </div>
           )}

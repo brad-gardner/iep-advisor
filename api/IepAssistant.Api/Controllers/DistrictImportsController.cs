@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.District;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -12,6 +14,14 @@ namespace IepAssistant.Api.Controllers;
 /// XLSX roster / staff import (plan 3). DistrictAdmin and SchoolAdmin only (enforced in the services).
 /// Uploads are capped at 5 MB before the body is read; the services additionally reject non-.xlsx
 /// files (incl. macro-enabled .xlsm), macro payloads, missing columns and more than 5,000 rows.
+///
+/// Multilingual plan (2026-10-06) phase 6: switched from this controller's own private MapFailure (an
+/// inline copy of the English-substring heuristic) to the shared MapServiceFailure. Both
+/// <see cref="RosterImportService"/> and <see cref="StaffImportService"/> now set a matching
+/// <see cref="ServiceErrorKind"/> on every failure this controller maps to a status — each reproducing
+/// its PRE-existing English-substring heuristic result so no route's status changed — and localize every
+/// message they return. <see cref="ReadUploadAsync"/>'s own upload-shape rejections always return a fixed
+/// 400 (never from message text), so their messages only need localizing, not a kind.
 /// </summary>
 [ApiController]
 [Authorize]
@@ -23,11 +33,13 @@ public class DistrictImportsController : ControllerBase
 
     private readonly IRosterImportService _rosterImports;
     private readonly IStaffImportService _staffImports;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public DistrictImportsController(IRosterImportService rosterImports, IStaffImportService staffImports)
+    public DistrictImportsController(IRosterImportService rosterImports, IStaffImportService staffImports, IStringLocalizer<Messages> localizer)
     {
         _rosterImports = rosterImports;
         _staffImports = staffImports;
+        _localizer = localizer;
     }
 
     [HttpGet("students/template")]
@@ -37,7 +49,7 @@ public class DistrictImportsController : ControllerBase
     {
         var result = await _rosterImports.GenerateTemplateAsync(User.GetUserId(), ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
         return File(result.Data!, XlsxContentType, "students-import-template.xlsx");
     }
 
@@ -48,7 +60,7 @@ public class DistrictImportsController : ControllerBase
     {
         var result = await _staffImports.GenerateTemplateAsync(User.GetUserId(), ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
         return File(result.Data!, XlsxContentType, "staff-import-template.xlsx");
     }
 
@@ -66,7 +78,7 @@ public class DistrictImportsController : ControllerBase
 
         var result = await _rosterImports.PreviewAsync(User.GetUserId(), upload!, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
         return Ok(ApiResponse<ImportPreviewDto>.SuccessResponse(MapPreview(result.Data!)));
     }
 
@@ -84,7 +96,7 @@ public class DistrictImportsController : ControllerBase
 
         var result = await _staffImports.PreviewAsync(User.GetUserId(), upload!, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
         return Ok(ApiResponse<ImportPreviewDto>.SuccessResponse(MapPreview(result.Data!)));
     }
 
@@ -98,13 +110,13 @@ public class DistrictImportsController : ControllerBase
         // The batch's kind decides which pipeline applies it.
         var batch = await _rosterImports.GetBatchSummaryAsync(User.GetUserId(), batchId, ct);
         if (!batch.Success)
-            return MapFailure(batch.Message);
+            return this.MapServiceFailure(batch);
 
         var result = batch.Data!.Kind == Domain.Entities.ImportKind.Staff
             ? await _staffImports.CommitAsync(User.GetUserId(), batchId, request.CommitValid, ct)
             : await _rosterImports.CommitAsync(User.GetUserId(), batchId, request.CommitValid, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<ImportResultDto>.SuccessResponse(new ImportResultDto
         {
@@ -127,7 +139,7 @@ public class DistrictImportsController : ControllerBase
     {
         var result = await _rosterImports.GetHistoryAsync(User.GetUserId(), ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<IEnumerable<ImportBatchDto>>.SuccessResponse(result.Data!.Select(b => new ImportBatchDto
         {
@@ -150,7 +162,7 @@ public class DistrictImportsController : ControllerBase
     {
         var result = await _rosterImports.GetBatchAsync(User.GetUserId(), batchId, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
         return Ok(ApiResponse<ImportPreviewDto>.SuccessResponse(MapPreview(result.Data!)));
     }
 
@@ -162,30 +174,30 @@ public class DistrictImportsController : ControllerBase
     {
         var result = await _rosterImports.BuildErrorWorkbookAsync(User.GetUserId(), batchId, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
         return File(result.Data!, XlsxContentType, $"import-{batchId}-errors.xlsx");
     }
 
     // ----------------------------------------------------------------- helpers
 
-    private static async Task<(ImportUploadModel? Upload, string? Error)> ReadUploadAsync(IFormFile? file, CancellationToken ct)
+    private async Task<(ImportUploadModel? Upload, string? Error)> ReadUploadAsync(IFormFile? file, CancellationToken ct)
     {
         if (file == null || file.Length == 0)
-            return (null, "Choose a file to upload.");
+            return (null, _localizer["DistrictImports.ChooseFileToUpload"]);
         if (file.Length > MaxUploadBytes)
-            return (null, "The file is larger than 5 MB.");
+            return (null, _localizer["DistrictImports.FileTooLarge"]);
 
         var extension = Path.GetExtension(file.FileName);
         if (!string.Equals(extension, ".xlsx", StringComparison.OrdinalIgnoreCase))
             return (null, string.Equals(extension, ".xlsm", StringComparison.OrdinalIgnoreCase)
-                ? "Macro-enabled workbooks (.xlsm) are not accepted. Save the file as .xlsx and try again."
-                : "Only .xlsx workbooks are accepted.");
+                ? _localizer["DistrictImports.MacroWorkbooksNotAccepted"]
+                : _localizer["DistrictImports.OnlyXlsxAccepted"]);
 
         var contentType = (file.ContentType ?? string.Empty).Split(';')[0].Trim();
         if (contentType.Length > 0
             && !contentType.Equals(XlsxContentType, StringComparison.OrdinalIgnoreCase)
             && !contentType.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase))
-            return (null, "Only .xlsx workbooks are accepted.");
+            return (null, _localizer["DistrictImports.OnlyXlsxAccepted"]);
 
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms, ct);
@@ -227,16 +239,4 @@ public class DistrictImportsController : ControllerBase
         Error = c.Error
     };
 
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

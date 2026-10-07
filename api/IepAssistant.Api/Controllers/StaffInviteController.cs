@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Auth;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Staff;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -13,6 +15,8 @@ namespace IepAssistant.Api.Controllers;
 /// P4 anonymous staff-invite accept flow: preview the invite and accept it (create account + sign in).
 /// Both endpoints are <c>[AllowAnonymous]</c> and rate-limited with the shared login policy. Accept mints
 /// a JWT (same <see cref="LoginResponse"/> shape as login/register-district) so the frontend auto-logs-in.
+/// Multilingual plan (2026-10-06) phase 6: both routes always return a fixed 400 on failure (never from
+/// matching message text), so only the message needs localizing here — see <see cref="StaffInviteService"/>.
 /// </summary>
 [ApiController]
 [AllowAnonymous]
@@ -20,10 +24,12 @@ namespace IepAssistant.Api.Controllers;
 public class StaffInviteController : ControllerBase
 {
     private readonly IStaffInviteService _service;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public StaffInviteController(IStaffInviteService service)
+    public StaffInviteController(IStaffInviteService service, IStringLocalizer<Messages> localizer)
     {
         _service = service;
+        _localizer = localizer;
     }
 
     [HttpGet("preview")]
@@ -33,11 +39,11 @@ public class StaffInviteController : ControllerBase
     public async Task<IActionResult> Preview([FromQuery] string token, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(token))
-            return BadRequest(ApiResponse<object>.Error("Token is required."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["StaffInvite.TokenRequired"]));
 
         var preview = await _service.PreviewAsync(token, ct);
         if (preview == null)
-            return BadRequest(ApiResponse<object>.Error("Token is required."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["StaffInvite.TokenRequired"]));
 
         return Ok(ApiResponse<StaffInvitePreviewDto>.SuccessResponse(new StaffInvitePreviewDto
         {
@@ -67,7 +73,7 @@ public class StaffInviteController : ControllerBase
         }, ct);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Could not accept invite."));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["StaffInvite.CouldNotAccept"].Value));
 
         var auth = result.AuthResult!;
         var response = new LoginResponse

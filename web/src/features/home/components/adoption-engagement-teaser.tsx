@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
+import { loadErrorText } from '@/lib/api-error';
 import { useAdoptionEngagement } from '@/features/district-admin/hooks/use-adoption-engagement';
 import { HomeSection } from './home-section';
 import { StatTile } from './stat-tile';
@@ -40,7 +41,7 @@ export function AdoptionEngagementTeaser() {
 
       {!isLoading && error && (
         <div role="alert">
-          <Notice variant="error" title={error}>
+          <Notice variant="error" title={loadErrorText(error, t('common:ui.genericError')) ?? ''}>
             <Button
               size="sm"
               variant="secondary"
@@ -55,7 +56,14 @@ export function AdoptionEngagementTeaser() {
 
       {!isLoading && !error && (adoptionError || engagementError) && (
         <div role="alert" className="mb-3">
-          <Notice variant="error" title={adoptionError ?? engagementError ?? ''}>
+          <Notice
+            variant="error"
+            title={
+              loadErrorText(adoptionError, t('common:ui.genericError')) ??
+              loadErrorText(engagementError, t('common:ui.genericError')) ??
+              ''
+            }
+          >
             <Button
               size="sm"
               variant="secondary"

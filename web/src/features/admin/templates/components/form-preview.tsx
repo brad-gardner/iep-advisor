@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import type { TemplateFieldDto, TemplateSectionDto } from '../types';
@@ -6,22 +7,26 @@ import { parseConfig, readColumnOptions, type TableColumn } from '../template-co
 /**
  * Read-only preview of the template as the form an educator would see. Every
  * control is disabled — this is a layout preview, not a working editor. (PDF
- * preview is deferred to Phase 4.)
+ * preview is deferred to Phase 4.) Field/section/column LABELS themselves
+ * (`field.label`, `section.title`, `column.label`) are district-authored
+ * template content, never translated — only this file's own UI chrome
+ * (fallback placeholders, "Select…", etc.) is.
  */
 export function FormPreview({ sections }: { sections: TemplateSectionDto[] }) {
+  const { t } = useTranslation('admin');
   if (sections.length === 0) {
-    return <p className="text-sm text-brand-slate-500">Add a section to see the form preview.</p>;
+    return <p className="text-sm text-brand-slate-500">{t('templates.formPreview.emptyMessage')}</p>;
   }
 
   return (
-    <div className="space-y-6" aria-label="Form preview">
+    <div className="space-y-6" aria-label={t('templates.formPreview.ariaLabel')}>
       {sections.map((section) => (
         <Card key={section.id} data-testid={`preview-section-${section.id}`}>
           <h3 className="mb-4 font-serif text-base text-brand-slate-800">
-            {section.title || 'Untitled section'}
+            {section.title || t('templates.formPreview.untitledSection')}
           </h3>
           {section.fields.length === 0 ? (
-            <p className="text-sm text-brand-slate-500">No fields.</p>
+            <p className="text-sm text-brand-slate-500">{t('templates.formPreview.noFields')}</p>
           ) : (
             <div className="space-y-4">
               {section.fields.map((field) => (
@@ -40,18 +45,20 @@ const inputClass =
   'w-full px-3 py-2 bg-brand-slate-50 rounded-input text-brand-slate-500 text-sm border border-brand-slate-200';
 
 function PreviewField({ field }: { field: TemplateFieldDto }) {
+  const { t } = useTranslation('admin');
   const fieldId = `preview-field-${field.id}`;
   const config = parseConfig(field.fieldType, field.configJson);
+  const untitledField = t('templates.formPreview.untitledField');
 
   const labelNode = (
     <label htmlFor={fieldId} className={labelClass}>
-      {field.label || 'Untitled field'}
+      {field.label || untitledField}
       {field.required && (
         <span className="ml-1 text-brand-danger-700" aria-hidden="true">
           *
         </span>
       )}
-      {field.required && <span className="sr-only"> (required)</span>}
+      {field.required && <span className="sr-only"> {t('templates.formPreview.requiredSuffix')}</span>}
     </label>
   );
 
@@ -60,8 +67,8 @@ function PreviewField({ field }: { field: TemplateFieldDto }) {
       <div className="flex items-center gap-2">
         <input id={fieldId} type="checkbox" disabled className="h-4 w-4 rounded border-brand-slate-300" />
         <label htmlFor={fieldId} className="text-[13px] font-medium text-brand-slate-600">
-          {field.label || 'Untitled field'}
-          {field.required && <span className="sr-only"> (required)</span>}
+          {field.label || untitledField}
+          {field.required && <span className="sr-only"> {t('templates.formPreview.requiredSuffix')}</span>}
         </label>
       </div>
     );
@@ -78,13 +85,13 @@ function PreviewField({ field }: { field: TemplateFieldDto }) {
           onChange={() => {}}
           disabled
           minRows={3}
-          aria-label={field.label || 'Untitled field'}
+          aria-label={field.label || untitledField}
         />
       )}
       {config.kind === 'Date' && <input id={fieldId} type="date" disabled className={inputClass} />}
       {config.kind === 'Select' && (
         <select id={fieldId} disabled className={inputClass}>
-          <option>Select…</option>
+          <option>{t('templates.formPreview.selectPlaceholder')}</option>
           {config.select.options.map((o, i) => (
             <option key={i}>{o.label?.trim() || o.value}</option>
           ))}
@@ -96,6 +103,8 @@ function PreviewField({ field }: { field: TemplateFieldDto }) {
 }
 
 function PreviewTable({ columns }: { columns: TableColumn[] }) {
+  const { t } = useTranslation('admin');
+  const untitledColumn = t('templates.formPreview.untitledColumn');
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-sm">
@@ -106,7 +115,7 @@ function PreviewTable({ columns }: { columns: TableColumn[] }) {
                 key={c.columnKey}
                 className="border border-brand-slate-200 bg-brand-slate-50 px-2 py-1 text-left text-[13px] font-medium text-brand-slate-600"
               >
-                {c.label || 'Column'}
+                {c.label || untitledColumn}
                 {c.required && (
                   <span className="ml-1 text-brand-danger-700" aria-hidden="true">
                     *
@@ -131,6 +140,8 @@ function PreviewTable({ columns }: { columns: TableColumn[] }) {
 }
 
 function PreviewCell({ column }: { column: TableColumn }) {
+  const { t } = useTranslation('admin');
+  const untitledColumn = t('templates.formPreview.untitledColumn');
   switch (column.type) {
     case 'Checkbox':
       return <input type="checkbox" disabled className="h-4 w-4 rounded border-brand-slate-300" />;
@@ -138,14 +149,25 @@ function PreviewCell({ column }: { column: TableColumn }) {
       return <input type="date" disabled className={`${inputClass} py-1`} />;
     case 'Select':
       return (
-        <select disabled className={`${inputClass} py-1`} aria-label={`${column.label || 'Column'} value`}>
-          <option>Select…</option>
+        <select
+          disabled
+          className={`${inputClass} py-1`}
+          aria-label={t('templates.formPreview.columnValueLabel', { column: column.label || untitledColumn })}
+        >
+          <option>{t('templates.formPreview.selectPlaceholder')}</option>
           {readColumnOptions(column.configJson).map((o, i) => (
             <option key={i}>{o.label?.trim() || o.value}</option>
           ))}
         </select>
       );
     default:
-      return <input type="text" disabled className={`${inputClass} py-1`} aria-label={`${column.label || 'Column'} value`} />;
+      return (
+        <input
+          type="text"
+          disabled
+          className={`${inputClass} py-1`}
+          aria-label={t('templates.formPreview.columnValueLabel', { column: column.label || untitledColumn })}
+        />
+      );
   }
 }

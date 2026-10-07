@@ -420,7 +420,7 @@ public class TemplateAuthoringService : ITemplateAuthoringService
 
         if (sections.Count == 0)
         {
-            errors.Add("Add at least one section before publishing.");
+            errors.Add(_localizer["Templates.AddAtLeastOneSection"]);
             return errors;
         }
 
@@ -428,15 +428,18 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         {
             if (section.Fields.Count == 0)
             {
-                errors.Add($"Section '{section.Title}' must have at least one field.");
+                errors.Add(_localizer["Templates.SectionMustHaveField", section.Title]);
                 continue;
             }
 
             foreach (var field in section.Fields)
             {
+                // TemplateFieldConfigValidator stays English-only (platform-internal structural
+                // validation, asserted verbatim by many existing unit tests) — only the field-label
+                // wrapper around it is localized.
                 var configError = TemplateFieldConfigValidator.Validate(field.FieldType, field.ConfigJson);
                 if (configError != null)
-                    errors.Add($"Field '{field.Label}': {configError}");
+                    errors.Add(_localizer["Templates.FieldError", field.Label, configError]);
             }
         }
 

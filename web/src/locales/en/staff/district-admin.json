@@ -1,0 +1,264 @@
+{
+  "schoolsPage": {
+    "title": "Schools",
+    "addSchool": "Add school",
+    "columns": {
+      "school": "School",
+      "state": "State",
+      "students": "Students",
+      "staff": "Staff"
+    },
+    "rowActions": {
+      "edit": "Edit",
+      "deactivate": "Deactivate"
+    },
+    "emptyTitle": "No schools yet",
+    "emptyDescription": "Add your first school using the Add school button to start building out your district.",
+    "addModalTitle": "Add a school",
+    "editModalTitle": "Edit school",
+    "editSubmit": "Save changes",
+    "deactivateDialogTitle": "Deactivate school",
+    "deactivateMessage": "Deactivate {{name}}? Staff and students will lose access to it.",
+    "deactivateConfirmLabel": "Deactivate school",
+    "toasts": {
+      "created": "School created",
+      "updated": "School updated",
+      "deactivated": "School deactivated"
+    },
+    "errors": {
+      "addFailed": "Failed to add school",
+      "updateFailed": "Failed to update school",
+      "generic": "An error occurred",
+      "noSchoolSelected": "No school selected",
+      "cannotDeactivate": "This school cannot be deactivated right now"
+    }
+  },
+  "schoolForm": {
+    "nameLabel": "School name *",
+    "stateLabel": "State",
+    "statePlaceholder": "e.g. OH",
+    "saving": "Saving...",
+    "cancel": "Cancel",
+    "errors": {
+      "nameRequired": "School name is required",
+      "invalidState": "Enter a 2-letter state code, or leave it blank",
+      "generic": "Something went wrong"
+    }
+  },
+  "familyDraftSharing": {
+    "title": "Family draft sharing",
+    "description": "When enabled, staff can share a draft IEP or ETR with a student's family for review before it's finalized.",
+    "ariaLabel": "Family draft sharing",
+    "enabledToast": "Family draft sharing enabled",
+    "disabledToast": "Family draft sharing disabled",
+    "errorGeneric": "Could not update this setting."
+  },
+  "complianceBoard": {
+    "title": "Compliance",
+    "subtitle": "Overdue and upcoming procedural deadlines, with the evidence behind them.",
+    "loadError": "Could not load the compliance board",
+    "tryAgain": "Try again"
+  },
+  "complianceFilters": {
+    "dueWithinGroupLabel": "Due within",
+    "daysOption_one": "{{count}} day",
+    "daysOption_other": "{{count}} days"
+  },
+  "complianceTiles": {
+    "overdueAnnual": "Overdue annual reviews",
+    "overdueReeval": "Overdue reevaluations",
+    "due30": "Due within 30 days",
+    "due60": "Due within 60 days",
+    "unknownDates": "Unknown dates",
+    "noLead": "No case manager",
+    "dueInRange": "Due in selected range",
+    "denominator_one": "of {{count}} active student",
+    "denominator_other": "of {{count}} active students"
+  },
+  "complianceSchoolTable": {
+    "tableLabel": "Compliance by school",
+    "chartTitle": "Deadline buckets by school",
+    "emptyTitle": "No schools in scope",
+    "emptyDescription": "Add a school to see compliance data.",
+    "columns": {
+      "school": "School",
+      "activeStudents": "Active students",
+      "overdueAnnual": "Overdue annual",
+      "overdueReeval": "Overdue reeval",
+      "due30": "Due 30d",
+      "due60": "Due 60d",
+      "dueInRange": "Due in range",
+      "unknownDates": "Unknown dates",
+      "noLead": "No case manager"
+    },
+    "chartSegments": {
+      "overdueAnnual": "Overdue annual",
+      "overdueReeval": "Overdue reeval",
+      "due30": "Due 30 days",
+      "due60": "Due 60 days",
+      "unknownDates": "Unknown dates"
+    }
+  },
+  "adoptionEngagement": {
+    "loading": "Loading adoption data…",
+    "tryAgain": "Try again",
+    "staffActive": "Staff active (14 days)",
+    "draftsStarted": "Drafts started",
+    "draftsFinalized": "Drafts finalized",
+    "familiesLinked": "Families linked",
+    "ofStaffTotal_one": "of {{count}} staff · {{rule}}",
+    "ofStaffTotal_other": "of {{count}} staff · {{rule}}",
+    "lastDays_one": "Last {{count}} day",
+    "lastDays_other": "Last {{count}} days",
+    "ofActiveStudents_one": "of {{count}} active student",
+    "ofActiveStudents_other": "of {{count}} active students",
+    "chartTitle": "Active staff by school",
+    "errors": {
+      "adoption": "Could not load adoption data",
+      "engagement": "Could not load engagement data",
+      "combined": "Could not load this data"
+    }
+  },
+  "dashboard": {
+    "loading": "Loading dashboard…",
+    "errorTitle": "Couldn't load the dashboard",
+    "errorBody": "Something went wrong loading your district overview.",
+    "retry": "Try again",
+    "schoolsTile": {
+      "title": "Schools",
+      "empty": "No schools yet — add a school to see its student counts here.",
+      "manageLink": "Manage schools",
+      "studentCount_one": "{{count}} student",
+      "studentCount_other": "{{count}} students"
+    },
+    "staffTile": {
+      "title": "Staff",
+      "active": "Active",
+      "invited": "Invited",
+      "deactivated": "Deactivated",
+      "manageLink": "Manage staff"
+    },
+    "invitesTile": {
+      "title": "Invites",
+      "empty": "No invites need attention.",
+      "manageLink": "Manage invites",
+      "expiredBadge": "Expired",
+      "districtWide": "District-wide",
+      "expiredOn": "Expired on",
+      "expires": "Expires"
+    },
+    "attentionTile": {
+      "title": "Needs attention",
+      "emptyAll": "Once students are added, any student missing a case manager or a linked parent will appear here.",
+      "noCaseManagerTitle": "No case manager",
+      "noCaseManagerEmpty": "All students have a case manager.",
+      "noParentTitle": "No linked parent",
+      "noParentEmpty": "All students have a linked parent.",
+      "invitePending": "Invite pending",
+      "notInvited": "Not invited",
+      "viewAll": "View all ({{count}})"
+    },
+    "overview": {
+      "title": "District snapshot",
+      "state": "State",
+      "activeSchools": "Active schools",
+      "activeStaff": "Active staff",
+      "manageSchools": "Manage schools"
+    }
+  },
+  "setupChecklist": {
+    "title": "Finish setting up",
+    "subtitle": "A couple of steps left to get your district ready.",
+    "schoolItem": "Create your first school",
+    "staffItem": "Invite your first staff member",
+    "start": "Start"
+  },
+  "setupWizard": {
+    "pageTitle": "Set up your district",
+    "stepLabels": {
+      "welcome": "Welcome",
+      "createSchool": "Create school",
+      "inviteStaff": "Invite staff",
+      "done": "Done"
+    },
+    "stepOf": "Step {{current}} of {{total}}",
+    "welcome": {
+      "heading": "Welcome",
+      "headingWithDistrict": "Welcome, {{district}}",
+      "body": "Let's get your district set up. In the next couple of steps you'll create your first school and invite a staff member. You can skip any step and finish later from your dashboard.",
+      "start": "Start setup",
+      "skip": "Skip for now"
+    },
+    "school": {
+      "heading": "Create your first school",
+      "body": "Staff and students belong to a school. Add one now to start inviting your team.",
+      "createdTitle": "{{name}} created",
+      "createdBody": "Your first school is ready. Next, invite a staff member.",
+      "addSchool": "Add school",
+      "continue": "Continue",
+      "skip": "Skip for now",
+      "errorFailed": "Failed to add school",
+      "errorGeneric": "An error occurred"
+    },
+    "staff": {
+      "heading": "Invite your first staff member",
+      "body": "Send an invite so a school admin or teacher can join your district. They'll get a link to set up their own account.",
+      "continue": "Continue",
+      "doneInviting": "Done inviting",
+      "skip": "Skip for now",
+      "errorFailed": "Failed to send invite",
+      "errorGeneric": "An error occurred"
+    },
+    "done": {
+      "heading": "You're all set",
+      "bodyWithSchool": "{{name}} is ready. You can manage schools, invite staff, and add students any time from your dashboard.",
+      "bodyWithoutSchool": "You can create schools, invite staff, and add students any time from your dashboard.",
+      "finish": "Go to dashboard"
+    }
+  },
+  "auditLog": {
+    "pageTitle": "Activity log",
+    "subtitle": "Who accessed which student records, and when.",
+    "accessRestrictedTitle": "Access restricted",
+    "accessRestrictedBody": "The activity log is available to district and school administrators only.",
+    "loadingActivity": "Loading activity…",
+    "couldNotLoadTitle": "Couldn't load activity",
+    "couldNotLoadBody": "Something went wrong loading the activity log.",
+    "tryAgain": "Try again",
+    "emptyFilteredTitle": "No matching activity",
+    "emptyFilteredDescription": "No records were accessed under these filters. Try widening the date range or clearing a filter.",
+    "emptyTitle": "No activity yet",
+    "emptyDescription": "Once staff start opening student records, their access will show up here.",
+    "loadMore": "Load more",
+    "loadingMore": "Loading…",
+    "with": "with",
+    "filters": {
+      "staffLabel": "Staff member",
+      "allStaff": "All staff",
+      "deactivatedSuffix": " (deactivated)",
+      "actionLabel": "Action",
+      "allActions": "All actions",
+      "fromLabel": "From",
+      "toLabel": "To"
+    },
+    "actionLabels": {
+      "View": "Viewed",
+      "Edit": "Edited",
+      "Share": "Shared",
+      "Export": "Exported",
+      "Finalize": "Finalized"
+    },
+    "actionSentences": {
+      "View": "<actor>{{actorName}}</actor> viewed <resource>{{resourceName}}</resource>",
+      "View_withRecipient": "<actor>{{actorName}}</actor> viewed <resource>{{resourceName}}</resource> with <recipient>{{recipientName}}</recipient>",
+      "Edit": "<actor>{{actorName}}</actor> edited <resource>{{resourceName}}</resource>",
+      "Edit_withRecipient": "<actor>{{actorName}}</actor> edited <resource>{{resourceName}}</resource> with <recipient>{{recipientName}}</recipient>",
+      "Share": "<actor>{{actorName}}</actor> shared <resource>{{resourceName}}</resource>",
+      "Share_withRecipient": "<actor>{{actorName}}</actor> shared <resource>{{resourceName}}</resource> with <recipient>{{recipientName}}</recipient>",
+      "Export": "<actor>{{actorName}}</actor> exported <resource>{{resourceName}}</resource>",
+      "Export_withRecipient": "<actor>{{actorName}}</actor> exported <resource>{{resourceName}}</resource> with <recipient>{{recipientName}}</recipient>",
+      "Finalize": "<actor>{{actorName}}</actor> finalized <resource>{{resourceName}}</resource>",
+      "Finalize_withRecipient": "<actor>{{actorName}}</actor> finalized <resource>{{resourceName}}</resource> with <recipient>{{recipientName}}</recipient>"
+    }
+  }
+}

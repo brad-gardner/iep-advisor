@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -12,38 +13,46 @@ namespace IepAssistant.Services.Implementations;
 /// all callers to platform <c>Admin</c>; this service assumes that gate and focuses on validation,
 /// state-code normalization, uniqueness, and the create/list operations. Auditing follows the
 /// IAuditableEntity convention (CreatedById stamped from the acting admin).
+///
+/// Multilingual plan (2026-10-06) phase 6: every failure here is <see cref="ServiceErrorKind.Validation"/>
+/// (none of this service's PRE-existing English messages contained "permission" or "not found", so
+/// <see cref="AdminTemplatesController"/>'s heuristic always produced 400 for all of them) and every
+/// message is localized — see
+/// <see cref="IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure"/>.
 /// </summary>
 public class DocumentTemplateService : IDocumentTemplateService
 {
     private readonly ApplicationDbContext _context;
     private readonly IAuditLogger _audit;
     private readonly ILogger<DocumentTemplateService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public DocumentTemplateService(ApplicationDbContext context, IAuditLogger audit, ILogger<DocumentTemplateService> logger)
+    public DocumentTemplateService(ApplicationDbContext context, IAuditLogger audit, ILogger<DocumentTemplateService> logger, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _audit = audit;
         _logger = logger;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<DocumentTemplateModel>> CreateTemplateAsync(
         int userId, string? stateCode, int documentTypeId, string name, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(name))
-            return ServiceResult<DocumentTemplateModel>.FailureResult("Template name is required.");
+            return ServiceResult<DocumentTemplateModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DocumentTemplate.NameRequired"]);
 
         var (normalizedState, stateError) = NormalizeStateCode(stateCode);
         if (stateError != null)
-            return ServiceResult<DocumentTemplateModel>.FailureResult(stateError);
+            return ServiceResult<DocumentTemplateModel>.FailureResult(ServiceErrorKind.Validation, stateError);
 
         // The document type must exist AND be active before a template can target it.
         var documentType = await _context.DocumentTypes
             .AsNoTracking()
             .FirstOrDefaultAsync(dt => dt.Id == documentTypeId, ct);
         if (documentType == null)
-            return ServiceResult<DocumentTemplateModel>.FailureResult("The selected document type does not exist.");
+            return ServiceResult<DocumentTemplateModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DocumentTemplate.DocumentTypeNotExist"]);
         if (!documentType.IsActive)
-            return ServiceResult<DocumentTemplateModel>.FailureResult("The selected document type is not active.");
+            return ServiceResult<DocumentTemplateModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DocumentTemplate.DocumentTypeNotActive"]);
 
         // Friendly uniqueness pre-check (the unique index is the DB backstop). Compared against the
         // normalized state so "oh" and "OH" collide as intended.
@@ -52,9 +61,8 @@ public class DocumentTemplateService : IDocumentTemplateService
             .AnyAsync(t => t.StateCode == normalizedState && t.DocumentTypeId == documentTypeId, ct);
         if (duplicate)
         {
-            var scope = normalizedState ?? "the default";
-            return ServiceResult<DocumentTemplateModel>.FailureResult(
-                $"A template for {documentType.DisplayName} in {scope} already exists.");
+            return ServiceResult<DocumentTemplateModel>.FailureResult(ServiceErrorKind.Validation,
+                AlreadyExistsMessage(normalizedState, documentType.DisplayName));
         }
 
         var now = DateTime.UtcNow;
@@ -88,9 +96,8 @@ public class DocumentTemplateService : IDocumentTemplateService
             // Backstop for the (StateCode, DocumentTypeId) unique index: two concurrent creates can
             // both pass the AnyAsync pre-check, so translate the index violation into the same
             // friendly error rather than letting it surface as a 500.
-            var scope = normalizedState ?? "the default";
-            return ServiceResult<DocumentTemplateModel>.FailureResult(
-                $"A template for {documentType.DisplayName} in {scope} already exists.");
+            return ServiceResult<DocumentTemplateModel>.FailureResult(ServiceErrorKind.Validation,
+                AlreadyExistsMessage(normalizedState, documentType.DisplayName));
         }
 
         // Audit template creation (its empty Draft v1) in the tamper-evident authoring trail (G-e.4).
@@ -140,17 +147,27 @@ public class DocumentTemplateService : IDocumentTemplateService
     /// Normalizes a state code to 2-letter uppercase; null/blank becomes null (the default template).
     /// Returns a friendly error message when a non-blank value is not a 2-letter code.
     /// </summary>
-    private static (string? Normalized, string? Error) NormalizeStateCode(string? stateCode)
+    private (string? Normalized, string? Error) NormalizeStateCode(string? stateCode)
     {
         if (string.IsNullOrWhiteSpace(stateCode))
             return (null, null);
 
         var trimmed = stateCode.Trim();
         if (trimmed.Length != 2 || !trimmed.All(char.IsLetter))
-            return (null, "State code must be a 2-letter code (e.g. OH), or left blank for the default template.");
+            return (null, _localizer["DocumentTemplate.StateCodeInvalid"]);
 
         return (trimmed.ToUpperInvariant(), null);
     }
+
+    /// <summary>
+    /// The default-scope case gets its own sentence key (<c>DocumentTemplate.AlreadyExistsDefault</c>)
+    /// rather than interpolating a "the default" phrase into the state-scoped sentence
+    /// (<c>DocumentTemplate.AlreadyExists</c>) — the merged form translated awkwardly into Spanish.
+    /// </summary>
+    private LocalizedString AlreadyExistsMessage(string? normalizedState, string documentTypeDisplayName)
+        => normalizedState == null
+            ? _localizer["DocumentTemplate.AlreadyExistsDefault", documentTypeDisplayName]
+            : _localizer["DocumentTemplate.AlreadyExists", documentTypeDisplayName, normalizedState];
 
     private static DocumentTemplateModel MapTemplate(DocumentTemplate t, DocumentType documentType)
     {

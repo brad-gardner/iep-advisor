@@ -14,6 +14,11 @@ using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
+/// <summary>
+/// Multilingual plan (2026-10-06) phase 6 (todos/249): <see cref="ServiceErrorKind"/> added to every
+/// failure for consistency with later-phase services, even though <c>AuthController</c> maps every one
+/// of these to a fixed status today (not via <c>MapServiceFailure</c>) — see todos/249.
+/// </summary>
 public class AuthService : IAuthService
 {
     private readonly IConfiguration _configuration;
@@ -99,10 +104,10 @@ public class AuthService : IAuthService
                 && (c.ExpiresAt == null || c.ExpiresAt > DateTime.UtcNow), cancellationToken);
 
         if (inviteCode == null)
-            return ServiceResult.FailureResult(_localizer["Auth.InvalidOrExpiredInviteCode"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Auth.InvalidOrExpiredInviteCode"]);
 
         if (await _userRepository.EmailExistsAsync(model.Email, cancellationToken))
-            return ServiceResult.FailureResult(_localizer["Auth.EmailAlreadyRegistered"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Conflict, _localizer["Auth.EmailAlreadyRegistered"]);
 
         var user = new User
         {
@@ -216,7 +221,7 @@ public class AuthService : IAuthService
     {
         var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
         if (user == null)
-            return ServiceResult.FailureResult(_localizer["Auth.UserNotFound"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Auth.UserNotFound"]);
 
         // null/omitted leaves the stored preference unchanged; anything non-null that isn't a supported
         // code (case-insensitive) is a validation failure — checked before any field is mutated so a bad
@@ -226,7 +231,7 @@ public class AuthService : IAuthService
         {
             normalizedLanguage = SupportedLanguages.Normalize(model.PreferredLanguage);
             if (normalizedLanguage == null)
-                return ServiceResult.FailureResult(_localizer["Auth.UnsupportedPreferredLanguage"]);
+                return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Auth.UnsupportedPreferredLanguage"]);
         }
 
         if (model.FirstName != null)
@@ -258,7 +263,7 @@ public class AuthService : IAuthService
     {
         var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
         if (user == null)
-            return ServiceResult.FailureResult(_localizer["Auth.UserNotFound"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Auth.UserNotFound"]);
 
         user.OnboardingCompletedAt = DateTime.UtcNow;
         _userRepository.Update(user);

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,24 +36,6 @@ const OUTCOME_BADGE: Record<ImportRowOutcome, 'success' | 'info' | 'neutral' | '
   Error: 'error',
 };
 
-const columns: TableColumn<ImportRow>[] = [
-  { key: 'row', header: 'Row', align: 'right', cell: (r) => r.rowNumber, className: 'w-16' },
-  {
-    key: 'outcome',
-    header: 'Outcome',
-    cell: (r) => <Badge variant={OUTCOME_BADGE[r.outcome]}>{r.outcome}</Badge>,
-  },
-  { key: 'key', header: 'Key', cell: (r) => r.key },
-  { key: 'name', header: 'Name', cell: (r) => r.displayName || '—' },
-  { key: 'message', header: 'Message', cell: (r) => r.message || '—' },
-  {
-    key: 'changes',
-    header: 'Changes',
-    hideBelow: 'md',
-    cell: (r) => (r.changes.length > 0 ? r.changes.join('; ') : '—'),
-  },
-];
-
 // Step 3: what the commit would do, row by row. Commit is confirmed in a
 // dialog; with error rows present only the valid rows are imported.
 export function PreviewStep({
@@ -62,6 +45,24 @@ export function PreviewStep({
   onConfirmingChange,
   headingRef,
 }: PreviewStepProps) {
+  const { t } = useTranslation('roster-import');
+  const columns: TableColumn<ImportRow>[] = [
+    { key: 'row', header: t('previewStep.columns.row'), align: 'right', cell: (r) => r.rowNumber, className: 'w-16' },
+    {
+      key: 'outcome',
+      header: t('previewStep.columns.outcome'),
+      cell: (r) => <Badge variant={OUTCOME_BADGE[r.outcome]}>{t(`previewStep.outcomes.${r.outcome}`)}</Badge>,
+    },
+    { key: 'key', header: t('previewStep.columns.key'), cell: (r) => r.key },
+    { key: 'name', header: t('previewStep.columns.name'), cell: (r) => r.displayName || '—' },
+    { key: 'message', header: t('previewStep.columns.message'), cell: (r) => r.message || '—' },
+    {
+      key: 'changes',
+      header: t('previewStep.columns.changes'),
+      hideBelow: 'md',
+      cell: (r) => (r.changes.length > 0 ? r.changes.join('; ') : '—'),
+    },
+  ];
   const { counts } = preview;
   const hasErrors = counts.error > 0;
   const validCount = counts.total - counts.error;
@@ -109,11 +110,11 @@ export function PreviewStep({
         closeConfirm();
         onCommitted(response.data);
       } else {
-        setCommitError(response.message || 'The import could not be committed');
+        setCommitError(response.message || t('previewStep.commitFailed'));
       }
     } catch (err) {
       // e.g. "Fix the errors or choose to import valid rows only." (400).
-      setCommitError(apiErrorMessage(err, 'The import could not be committed'));
+      setCommitError(apiErrorMessage(err, t('previewStep.commitFailed')));
     } finally {
       setIsCommitting(false);
     }
@@ -126,7 +127,7 @@ export function PreviewStep({
       const { blob, fileName } = await downloadImportErrors(preview.batchId);
       downloadBlob(blob, fileName);
     } catch {
-      setDownloadError('Could not download the error report');
+      setDownloadError(t('previewStep.downloadErrorReportFailed'));
     } finally {
       setIsDownloadingErrors(false);
     }
@@ -142,10 +143,10 @@ export function PreviewStep({
               tabIndex={-1}
               className="font-serif text-lg text-brand-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
             >
-              Preview
+              {t('previewStep.heading')}
             </h2>
             <p className="text-sm text-brand-slate-600" data-testid="import-preview-file">
-              {preview.fileName} · {counts.total} {counts.total === 1 ? 'row' : 'rows'}
+              {t('previewStep.fileSummary', { fileName: preview.fileName, count: counts.total })}
             </p>
             <ImportCountsBadges counts={counts} />
           </div>
@@ -158,7 +159,7 @@ export function PreviewStep({
               data-testid="import-download-errors"
             >
               <Download className="mr-1.5 h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-              Download error report
+              {t('previewStep.downloadErrorReport')}
             </Button>
           )}
         </div>
@@ -171,24 +172,20 @@ export function PreviewStep({
 
         {hasErrors && (
           <div className="mt-4">
-            <Notice
-              variant="warning"
-              title={`${counts.error} ${counts.error === 1 ? 'row has' : 'rows have'} errors`}
-            >
-              Error rows are skipped. Fix them in the workbook and upload again, or import the{' '}
-              {validCount} valid {validCount === 1 ? 'row' : 'rows'} now.
+            <Notice variant="warning" title={t('previewStep.rowsHaveErrors', { count: counts.error })}>
+              {t('previewStep.errorRowsNotice', { count: validCount })}
             </Notice>
           </div>
         )}
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Button variant="ghost" onClick={onStartOver} data-testid="import-preview-start-over">
-            Start over
+            {t('previewStep.startOver')}
           </Button>
           <Button onClick={openConfirm} disabled={nothingToImport} data-testid="import-preview-commit">
             {hasErrors
-              ? `Import ${validCount} valid ${validCount === 1 ? 'row' : 'rows'} only`
-              : `Import ${validCount} ${validCount === 1 ? 'row' : 'rows'}`}
+              ? t('previewStep.importValidOnly', { count: validCount })
+              : t('previewStep.importAll', { count: validCount })}
           </Button>
         </div>
       </Card>
@@ -202,30 +199,30 @@ export function PreviewStep({
             className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
             data-testid="import-preview-errors-only"
           />
-          Errors only
+          {t('previewStep.errorsOnly')}
         </label>
         <p className="text-xs text-brand-slate-500" data-testid="import-preview-row-count">
           {errorsOnly
-            ? `${visibleRows.length} error ${visibleRows.length === 1 ? 'row' : 'rows'}`
-            : `${visibleRows.length} ${visibleRows.length === 1 ? 'row' : 'rows'}`}
+            ? t('previewStep.rowCountErrorsOnly', { count: visibleRows.length })
+            : t('previewStep.rowCount', { count: visibleRows.length })}
         </p>
       </div>
 
       <Table
-        label="Preview rows"
+        label={t('previewStep.tableLabel')}
         data-testid="import-preview-rows"
         columns={columns}
         rows={pageRows}
         rowKey={(r) => r.rowNumber}
         empty={
           <p className="text-center text-sm text-brand-slate-500" data-testid="import-preview-no-rows">
-            {errorsOnly ? 'No rows have errors.' : 'The workbook has no data rows.'}
+            {errorsOnly ? t('previewStep.noErrorRows') : t('previewStep.noDataRows')}
           </p>
         }
       />
 
       <Pagination
-        label="Preview rows pagination"
+        label={t('previewStep.paginationLabel')}
         page={page}
         pageSize={PREVIEW_PAGE_SIZE}
         total={visibleRows.length}
@@ -235,13 +232,18 @@ export function PreviewStep({
 
       <ConfirmDialog
         open={isConfirming}
-        title="Commit import"
+        title={t('previewStep.commitDialogTitle')}
         message={
           hasErrors
-            ? `Import ${validCount} valid ${validCount === 1 ? 'row' : 'rows'} and skip ${counts.error} with errors? This writes ${counts.new} new and updates ${counts.updated}.`
-            : `Import ${validCount} ${validCount === 1 ? 'row' : 'rows'}? This writes ${counts.new} new and updates ${counts.updated}.`
+            ? t('previewStep.commitMessageWithErrors', {
+                count: validCount,
+                errorCount: counts.error,
+                newCount: counts.new,
+                updatedCount: counts.updated,
+              })
+            : t('previewStep.commitMessage', { count: validCount, newCount: counts.new, updatedCount: counts.updated })
         }
-        confirmLabel={hasErrors ? 'Import valid rows only' : 'Import rows'}
+        confirmLabel={hasErrors ? t('previewStep.confirmValidOnly') : t('previewStep.confirmAll')}
         confirmVariant="primary"
         loading={isCommitting}
         error={commitError}

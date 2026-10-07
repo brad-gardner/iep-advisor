@@ -102,7 +102,7 @@ describe('AboutMyChildCard failure handling', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.queryByTestId('contribution-1')).not.toBeInTheDocument());
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
   });
 
   it('survives a rejected share toggle and blocks overlapping toggles', async () => {
