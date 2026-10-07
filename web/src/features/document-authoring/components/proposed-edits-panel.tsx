@@ -4,9 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { buildFieldLocationLookup } from '@/features/draft-sharing/lib/field-lookup';
-import { MEETING_DECISION_OUTCOME_LABELS } from '@/features/meetings/types';
 import type { MeetingDecisionOutcome, ProposedEditDto } from '@/features/meetings/types';
 import { formatDate } from '@/lib/format-date';
+import { meetingDecisionOutcomeLabel } from '@/lib/meeting-labels';
 import { useProposedEdits } from '../hooks/use-proposed-edits';
 import { jumpToFieldWhenVisible } from '../lib/section-dom';
 import { fieldElementId } from './field-renderers/types';
@@ -31,7 +31,10 @@ interface ProposedEditsPanelProps {
  * applied" only records that a human already made the change by hand.
  */
 export function ProposedEditsPanel({ instanceId, templateVersion }: ProposedEditsPanelProps) {
-  const { t } = useTranslation('document-authoring');
+  // `meetings-staff` alongside `document-authoring`: `meetingDecisionOutcomeLabel`
+  // below is backed by that staff-only namespace, and this hook call is what
+  // makes a language switch re-render this panel once its Spanish loads.
+  const { t } = useTranslation(['document-authoring', 'meetings-staff']);
   const { edits, isLoading, error, retry, markApplied, markingId } = useProposedEdits(instanceId);
   const fieldLookup = useMemo(() => buildFieldLocationLookup(templateVersion), [templateVersion]);
 
@@ -87,7 +90,7 @@ export function ProposedEditsPanel({ instanceId, templateVersion }: ProposedEdit
                     )}
                     <p className="text-sm text-brand-slate-800">{edit.text}</p>
                   </div>
-                  <Badge variant={OUTCOME_VARIANT[edit.outcome]}>{MEETING_DECISION_OUTCOME_LABELS[edit.outcome]}</Badge>
+                  <Badge variant={OUTCOME_VARIANT[edit.outcome]}>{meetingDecisionOutcomeLabel(edit.outcome)}</Badge>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   {edit.targetFieldKey && fieldLookup.has(edit.targetFieldKey) && (

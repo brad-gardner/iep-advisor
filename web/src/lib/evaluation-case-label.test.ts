@@ -6,8 +6,7 @@ import { eligibilityOutcomeLabel, evaluationCaseKindLabel, evaluationCaseStatusL
 // side-effect import, exactly as the real lazy route chunk
 // (`app/lazy-routes/staff-routes.tsx`) registers it before any page that
 // uses it can render.
-import '@/features/evaluation/staff-locales';
-
+import '@/app/lazy-routes/staff-locales';
 describe('evaluationCaseKindLabel', () => {
   afterEach(async () => {
     await i18n.changeLanguage('en');

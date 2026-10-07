@@ -7,10 +7,10 @@ import {
   ROW_ID_KEY,
   ROW_OBJECTIVES_KEY,
   ROW_OWNER_USER_ID_KEY,
-  rowBlockItemLabel,
   type ColumnSemantic,
 } from '@/features/admin/templates/document-semantics';
 import type { TemplateFieldDto, TemplateVersionDetailDto } from '../types';
+import { rowBlockItemNoun } from './row-block-item-label';
 import { readCarriedFrom } from './table-rows';
 
 export type CompletenessSeverity = 'required' | 'advisory';
@@ -155,19 +155,13 @@ export function computeCompleteness(
               : semantic === 'accommodations'
                 ? col('accommodation')
                 : col('transitionServices');
-        const itemLabel = rowBlockItemLabel(semantic);
+        const itemLabel = rowBlockItemNoun(semantic);
         tableRows.forEach((row, i) => {
           const label = rowLabel(row, primaryKey, i);
           if (isBlank(row[ROW_OWNER_USER_ID_KEY])) {
             items.push({
               key: `owner-${row[ROW_ID_KEY] ?? i}`,
               severity: 'advisory',
-              // `itemLabel` (`rowBlockItemLabel`, admin/templates) is not yet
-              // translated — that module is outside this phase's assigned
-              // scope (features/admin), so this sentence mixes an English
-              // item-type word into otherwise-translated text until admin/
-              // templates converts it. See docs/i18n/README.md's precedent
-              // for a mixed-language phrase during phased rollout.
               message: i18n.t('document-authoring:completeness.itemNoOwner', { item: itemLabel, label }),
               fieldKey: field.fieldKey,
               fieldId: field.id,

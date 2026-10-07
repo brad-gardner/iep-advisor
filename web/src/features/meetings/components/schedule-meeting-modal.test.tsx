@@ -5,7 +5,12 @@ import { ToastProvider } from '@/components/ui/toast';
 import { apiRejection } from '@/test/axios-rejection';
 import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import { makeMeeting, makeParticipant } from '../test/fixtures';
-
+// `educator` is a staff-only namespace (plan phase 5) — `ParticipantsField`
+// (rendered inside `ScheduleMeetingModal`) names it in its own
+// `useTranslation` call (for `teamRoleLabel`), so its English must be
+// registered here the same way the real staff route chunk does. See
+// `docs/i18n/README.md`'s "Staff and admin namespaces".
+import '@/app/lazy-routes/staff-locales';
 const meetingsApi = vi.hoisted(() => ({
   createMeeting: vi.fn(),
   updateMeeting: vi.fn(),
@@ -24,8 +29,6 @@ import { ScheduleMeetingModal } from './schedule-meeting-modal';
 // by this side-effect import, exactly as the real lazy route chunk
 // (`app/lazy-routes/staff-routes.tsx`) registers it before the educator
 // calendar/student detail pages that host this modal can render.
-import '../staff-locales';
-
 const defaults = [
   { userId: 7, displayName: 'Casey Manager', email: 'casey@district.org', teamRole: 'CaseManager' as const, isFamily: false, isStudent: false },
   { userId: 41, displayName: 'Pat Parent', email: 'parent@example.com', teamRole: 'Other' as const, isFamily: true, isStudent: false },

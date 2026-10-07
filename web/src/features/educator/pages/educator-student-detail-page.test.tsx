@@ -11,9 +11,13 @@ import { makeStudent } from "../test/fixtures";
 // (`app/lazy-routes/staff-routes.tsx`) registers it before the page can
 // render. Without this, `useTranslation('educator')` inside the page would
 // try (and, correctly, fail loudly) to fetch it from the Spanish-only
-// backend for English.
-import "../staff-locales";
-
+// backend for English. `evaluation`, `obligations` and `family-contact` are
+// all staff-only too, and needed here because this page renders the real
+// (unmocked) `EvaluationCard` and `FamilyContactCard`, which name them in
+// their own `useTranslation` calls (for `evaluationCaseStatusLabel`/etc.,
+// `obligationKindLabel`/`ObligationStatusChip`, and
+// `familyContactMethodLabel`/`familyContactOutcomeLabel`).
+import '@/app/lazy-routes/staff-locales';
 const useStudentRecordMock = vi.fn();
 vi.mock("../hooks/use-student-record", () => ({
   useStudentRecord: () => useStudentRecordMock(),
@@ -137,7 +141,7 @@ describe("EducatorStudentDetailPage", () => {
 
   // Proves the staff/admin namespace split end to end (plan phase 5), the
   // same way `educator-students-page.test.tsx` does: `educator`'s English is
-  // registered above via the `staff-locales` side-effect import, and its
+  // registered above via the `@/app/lazy-routes/staff-locales` side-effect import, and its
   // Spanish still lazy-loads like any other namespace — `renderInSpanish`
   // needs the extra `ns: 'educator'` (`docs/i18n/README.md`'s "Namespace
   // coverage" / test conventions).
@@ -164,7 +168,7 @@ describe("EducatorStudentDetailPage", () => {
             </Routes>
           </MemoryRouter>
         </ToastProvider>,
-        { ns: 'educator' }
+        { ns: ['educator', 'evaluation', 'obligations', 'family-contact'] }
       );
 
       expect(screen.getByRole("heading", { level: 1, name: "Ada Lovelace" })).toBeInTheDocument();

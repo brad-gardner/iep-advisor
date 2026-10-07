@@ -2,12 +2,14 @@ import '@testing-library/jest-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import type { TemplateFieldDto } from '@/features/admin/templates/types';
-// `document-authoring` is a staff-only namespace (plan phase 5) — see
-// `../../../staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff
-// and admin namespaces". This component renders directly here (not through
-// the lazy route), so its English must be registered the same way the real
-// route chunk does.
-import '../../../staff-locales';
+// `document-authoring` and `educator` are both staff-only namespaces (plan
+// phase 5) — see `@/app/lazy-routes/staff-locales`'s doc comment and
+// `docs/i18n/README.md`'s "Staff and admin namespaces". This component
+// renders directly here (not through the lazy route), so their English must
+// be registered the same way the real route chunk does. `educator` is
+// needed because `ReadGoals`/`resolveOwnerDisplay` now name it (for
+// `teamRoleLabel`).
+import '@/app/lazy-routes/staff-locales';
 import { ReadGoals } from './read-goals';
 import { DocumentEditorContext, type DocumentEditorContextValue } from '../../../hooks/document-editor-context';
 import type { StudentTeamCache } from '../../../hooks/use-student-team';

@@ -229,7 +229,7 @@ public sealed class MeetingBriefServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAsync_NoBriefGenerated_Fails()
+    public async Task GetAsync_NoBriefGenerated_Fails_WithNotFoundErrorKind_AndMapsTo404()
     {
         var districtId = _db.District();
         var schoolId = _db.School(districtId, "S");
@@ -240,7 +240,14 @@ public sealed class MeetingBriefServiceTests : IDisposable
 
         using var ctx = _db.Context();
         var result = await CreateService(ctx).GetAsync(userId, meetingId);
+
         Assert.False(result.Success);
+        // Multilingual plan phase 5 review fix P2-2: NotFound (404), a deliberate change from the
+        // pre-existing (buggy) 400 — see MeetingBriefService.GetAsync's comment at this call site.
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<Microsoft.AspNetCore.Mvc.NotFoundObjectResult>(action);
     }
 
     // ----------------------------------------------------------------- Multilingual plan phase 5
@@ -307,6 +314,9 @@ public sealed class MeetingBriefServiceTests : IDisposable
             Assert.True(result.Success, result.Message);
             Assert.Equal("es", result.Data!.GeneratedLanguage);
             Assert.Contains("RESPONSE LANGUAGE: Respond in Spanish", claude.LastRequest!.SystemPrompt);
+            // Multilingual plan phase 5 review fix P3-3: the disclaimer is localized at generate time,
+            // in the SAME resolved language as the rest of the brief — never the hardcoded English text.
+            Assert.Equal("Resumen informativo: las decisiones del equipo se toman durante la reunión.", result.Data.Disclaimer);
         }
 
         using (var readCtx = _db.Context())
@@ -314,6 +324,7 @@ public sealed class MeetingBriefServiceTests : IDisposable
             var cached = await CreateService(readCtx).GetAsync(userId, meetingId);
             Assert.True(cached.Success, cached.Message);
             Assert.Equal("es", cached.Data!.GeneratedLanguage);
+            Assert.Equal("Resumen informativo: las decisiones del equipo se toman durante la reunión.", cached.Data.Disclaimer);
         }
 
         using (var _lang = IepAssistant.Services.Localization.CultureScope.For("en"))
@@ -323,6 +334,7 @@ public sealed class MeetingBriefServiceTests : IDisposable
             Assert.True(result.Success, result.Message);
             Assert.Equal("en", result.Data!.GeneratedLanguage);
             Assert.DoesNotContain("RESPONSE LANGUAGE", claude.LastRequest!.SystemPrompt);
+            Assert.Equal("Advisory summary — the team's decisions are made in the meeting.", result.Data.Disclaimer);
         }
     }
 

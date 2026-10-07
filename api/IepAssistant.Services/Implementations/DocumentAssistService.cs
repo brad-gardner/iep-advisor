@@ -24,12 +24,18 @@ namespace IepAssistant.Services.Implementations;
 ///
 /// <para>Multilingual plan (2026-10-06) phase 5: every failure <c>DocumentAssistController</c> maps to
 /// a status carries an explicit <see cref="ServiceErrorKind"/>, and every message is localized
-/// (<c>Messages.resx</c>/<c>.es.resx</c>). The Claude system prompt gets <see cref="ResponseLanguage.SystemLine"/>
-/// for the requester's UI culture (<see cref="CultureInfo.CurrentUICulture"/>, set by
-/// <c>RequestLocalization</c> from the signed-in user's saved preference) — the suggestion is inserted
-/// directly into the district's document content by the staff member who requested it, in the language
-/// THEY chose, so it is never persisted with its own language/generatedLanguage field the way an
-/// AnalysisRun or MeetingBrief is.</para>
+/// (<c>Messages.resx</c>/<c>.es.resx</c>).</para>
+///
+/// <para><b>Phase 5 review fix P2-7 (coordinator decision) — language split between the two surfaces
+/// this service exposes:</b> <see cref="AssistAsync"/>'s suggestion (goal / section / service-line /
+/// generic-row) is INSERTED DIRECTLY INTO A DOCUMENT FIELD if accepted, and the document is a district
+/// legal record in its own fixed language — so <see cref="CompleteAssistAsync"/> never appends
+/// <see cref="ResponseLanguage.SystemLine"/>; it always comes back in English regardless of the
+/// requester's UI culture. <see cref="ChatAsync"/>'s reply is never inserted into the document — it is
+/// only ever shown to the requesting staff member — so it keeps appending
+/// <see cref="ResponseLanguage.SystemLine"/> for <see cref="CultureInfo.CurrentUICulture"/> (set by
+/// <c>RequestLocalization</c> from the signed-in user's saved preference), same as before. Neither path
+/// persists its own language/generatedLanguage field the way an AnalysisRun or MeetingBrief does.</para>
 /// </summary>
 public sealed class DocumentAssistService : IDocumentAssistService
 {
@@ -462,13 +468,14 @@ public sealed class DocumentAssistService : IDocumentAssistService
 
     private async Task<ServiceResult<AssistResultModel>> CompleteAssistAsync(string systemPrompt, string userText, int instanceId, CancellationToken ct)
     {
-        // Multilingual plan phase 5: the suggestion is inserted directly into the district's document
-        // content by the staff member who requested it, so it must come back in THEIR chosen UI
-        // language (RequestLocalization has already set CurrentUICulture from their saved preference by
-        // the time this controller action runs) — never a separately recorded "generated language" the
-        // way a persisted AnalysisRun/MeetingBrief needs, since this text is never shown to anyone but
-        // the requester before they accept or discard it into the document.
-        systemPrompt += ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture);
+        // Multilingual plan phase 5 review fix P2-7 (coordinator decision, superseding the phase 5
+        // reasoning this comment used to carry): the suggestion returned here (goal / section /
+        // service-line / generic-row) is INSERTED DIRECTLY INTO A DOCUMENT FIELD if the staff member
+        // accepts it, and the document is a district legal record in the document's own language —
+        // never the staff member's UI language, which would insert mixed-language content into an
+        // otherwise-English (or otherwise-Spanish) document. So, unlike ChatAsync below, this path does
+        // NOT append ResponseLanguage.SystemLine; the suggestion always comes back in English regardless
+        // of CultureInfo.CurrentUICulture.
 
         string? suggestion;
         try

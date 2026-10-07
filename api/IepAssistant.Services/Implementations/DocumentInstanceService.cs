@@ -500,7 +500,10 @@ public class DocumentInstanceService : IDocumentInstanceService
                 if (!Guid.TryParse(cell.Name, out var columnKey) || !columns.TryGetValue(columnKey, out var columnType))
                     continue;
 
-                var (node, error) = CoerceScalar(columnType, cell.Value, $"{field.Label} column", localizer);
+                // Multilingual plan phase 5 review fix P3-4: the "column" suffix is UI chrome, not
+                // district-authored content (field.Label itself stays untranslated — see the class doc
+                // comment), so it is localized via Documents.TableColumnLabel rather than hardcoded English.
+                var (node, error) = CoerceScalar(columnType, cell.Value, localizer["Documents.TableColumnLabel", field.Label], localizer);
                 if (error != null)
                     return (null, error);
 

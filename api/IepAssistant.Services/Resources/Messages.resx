@@ -471,6 +471,9 @@
   <data name="Documents.InvalidTableRow" xml:space="preserve">
     <value>'{0}' has an invalid table row.</value>
   </data>
+  <data name="Documents.TableColumnLabel" xml:space="preserve">
+    <value>{0} column</value>
+  </data>
   <data name="Documents.OwnerNotActiveTeamMember" xml:space="preserve">
     <value>The owner selected for a row in '{0}' is not an active member of the student's team, so it was not saved.</value>
   </data>
@@ -1259,6 +1262,9 @@
   </data>
   <data name="MeetingBrief.SourceDraft" xml:space="preserve">
     <value>{0} (draft)</value>
+  </data>
+  <data name="MeetingBrief.Disclaimer" xml:space="preserve">
+    <value>Advisory summary — the team's decisions are made in the meeting.</value>
   </data>
   <data name="MeetingBrief.Checklist.RequiredParticipantsLabel" xml:space="preserve">
     <value>Required participants present</value>

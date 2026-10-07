@@ -305,7 +305,16 @@ public class EvaluationCaseService : IEvaluationCaseService
 
         var result = await _documentInstanceService.CreateAsync(schoolStudentId, iepTypeId, userId, ct);
         if (!result.Success)
-            return ServiceResult<int>.FailureResult(result.ErrorKind, result.Message ?? _localizer["EvaluationCases.CouldNotCreateIepDraft"]);
+        {
+            // Multilingual plan phase 5 review fix P2-1: CreateIepFromEtrAsync's "no document template"
+            // failure has always surfaced as 400 (main's pre-existing status for this route — it never
+            // documented a 422). DocumentInstanceService.CreateAsync's own caller (DocumentInstanceController)
+            // DOES want 422 for the same underlying TemplateResolutionService failure, but re-wrapping that
+            // Unprocessable kind here unchanged would silently flip THIS route's status. Only Unprocessable
+            // is remapped — every other kind (Forbidden, NotFound, etc.) passes through unchanged.
+            var kind = result.ErrorKind == ServiceErrorKind.Unprocessable ? ServiceErrorKind.Validation : result.ErrorKind;
+            return ServiceResult<int>.FailureResult(kind, result.Message ?? _localizer["EvaluationCases.CouldNotCreateIepDraft"]);
+        }
 
         return ServiceResult<int>.SuccessResult(result.Data!.Id);
     }

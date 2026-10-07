@@ -8,8 +8,7 @@ import { documentMeetingTypeLabel, meetingDecisionOutcomeLabel, meetingStatusLab
 // uses `meetingDecisionOutcomeLabel` can render. `meetingTypeLabel`/
 // `meetingStatusLabel` need no such import — they're `common:`-namespaced,
 // and `common` is eager everywhere.
-import '@/features/meetings/staff-locales';
-
+import '@/app/lazy-routes/staff-locales';
 describe('meetingTypeLabel', () => {
   afterEach(async () => {
     await i18n.changeLanguage('en');

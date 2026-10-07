@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { TEAM_ROLE_LABELS } from '@/features/educator/types';
+import { teamRoleLabel } from '@/features/educator/lib/student-enum-labels';
 import type { ParticipantRow } from '../hooks/use-meeting-participant-pool';
 
 interface ParticipantsFieldProps {
@@ -26,7 +26,10 @@ function ParticipantRowItem({
   onRequiredChange: (isRequired: boolean) => void;
   onRemove?: () => void;
 }) {
-  const { t } = useTranslation('meetings-staff');
+  // `educator` alongside `meetings-staff`: `teamRoleLabel` below is backed
+  // by that staff-only namespace, and this hook call is what makes a
+  // language switch re-render this row once its Spanish loads.
+  const { t } = useTranslation(['meetings-staff', 'educator']);
   const checkboxId = `participant-${row.key}`;
   return (
     <div className="flex items-center justify-between gap-3 py-1.5" data-testid={`participant-row-${row.key}`}>
@@ -42,7 +45,7 @@ function ParticipantRowItem({
         <label htmlFor={checkboxId} className="min-w-0 truncate text-sm text-brand-slate-800">
           {row.displayName}
           <span className="ml-1.5 text-xs text-brand-slate-500">
-            {row.kind === 'team' ? TEAM_ROLE_LABELS[row.teamRole] : t(`participantsField.kind.${row.kind}`)}
+            {row.kind === 'team' ? teamRoleLabel(row.teamRole) : t(`participantsField.kind.${row.kind}`)}
           </span>
         </label>
       </div>

@@ -1,19 +1,20 @@
 import { useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ToastProvider } from '@/components/ui/toast';
+import i18n from '@/lib/i18n';
 import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import type { AutosaveStatus } from '@/hooks/use-autosave';
 import type { DocumentInstance, SaveResult } from '../hooks/use-document-instance';
 import type { AuthoredDocumentVersionSummaryDto, DocumentInstanceDetailDto, DocumentValuePatch } from '../types';
 // `document-authoring` is a staff-only namespace (plan phase 5) — see
-// `../staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
+// `@/app/lazy-routes/staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
 // admin namespaces". This component renders directly here (not through the
 // lazy route), so its English must be registered the same way the real
 // route chunk does.
-import '../staff-locales';
+import '@/app/lazy-routes/staff-locales';
 import { DocumentEditor } from './document-editor';
 
 // Every API this page's descendants touch on mount, stubbed to inert/empty
@@ -446,5 +447,28 @@ describe('DocumentEditor', () => {
     expect(screen.getByRole('heading', { name: 'Finalizar' })).toBeInTheDocument();
     expect(screen.getByText('Evidencia')).toBeInTheDocument();
     expect(screen.getByText('Preguntar al asistente')).toBeInTheDocument();
+  });
+
+  it('re-translates completeness messages when the language switches while mounted, without a template/values change', async () => {
+    const user = userEvent.setup();
+    // PROFILE_FIELD is required (see `makeDetail`) — leaving it blank
+    // produces a "required" completeness item whose `message` is built via
+    // `i18n.t(...)` inside `completeness.ts`, memoized in `document-editor.tsx`
+    // by `computeCompleteness`'s own `useMemo`.
+    render(<Harness initialValues={{ [PROFILE_FIELD]: '', [PRESENT_FIELD]: 'filled' }} />);
+
+    await user.click(await screen.findByTestId('completeness-show-items'));
+    expect(screen.getByTestId('completeness-item-req-profile-field')).toHaveTextContent('Profile is required');
+
+    // Switch language in place — `detail.templateVersion`/`detail.values`
+    // never change, so only `i18n.resolvedLanguage` in the memo's dependency
+    // array (document-editor.tsx) can make this recompute.
+    await act(async () => {
+      await i18n.changeLanguage('es');
+    });
+
+    expect(screen.getByTestId('completeness-item-req-profile-field')).toHaveTextContent('Profile es obligatorio');
+
+    await resetTestLanguage();
   });
 });

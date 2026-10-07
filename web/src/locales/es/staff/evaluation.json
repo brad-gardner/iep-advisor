@@ -78,10 +78,10 @@
   "startEvaluationForm": {
     "noCaseYet": "Aún no hay un caso de evaluación abierto para este estudiante.",
     "kindLabel": "Tipo *",
-    "referralDateLabel": "Fecha de referencia *",
-    "referralSourceLabel": "Fuente de la referencia",
+    "referralDateLabel": "Fecha de remisión *",
+    "referralSourceLabel": "Origen de la remisión",
     "submitButton": "Iniciar evaluación",
-    "referralDateRequired": "La fecha de referencia es obligatoria.",
+    "referralDateRequired": "La fecha de remisión es obligatoria.",
     "startFailed": "No se pudo iniciar la evaluación."
   },
   "addAssignmentForm": {

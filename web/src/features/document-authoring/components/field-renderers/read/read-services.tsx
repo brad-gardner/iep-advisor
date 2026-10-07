@@ -25,7 +25,11 @@ function asText(v: unknown): string | undefined {
  * directly in that row's inline editor).
  */
 export function ReadServices({ field, value, onEditRow }: ReadFieldRendererProps) {
-  const { t } = useTranslation('document-authoring');
+  // `educator` alongside `document-authoring`: `resolveOwnerDisplay` below
+  // renders a `teamRoleLabel` (`educator:teamRole.*`, staff-only) — this
+  // hook call is what makes a language switch re-render once that
+  // namespace's Spanish loads.
+  const { t } = useTranslation(['document-authoring', 'educator']);
   const config = parseConfig(field.fieldType, field.configJson);
   const columns = config.kind === 'Table' ? config.table.columns : [];
   const serviceTypeCol = columns.find((c) => c.semantic === 'serviceType') ?? columns.find((c) => c.type === 'Text');

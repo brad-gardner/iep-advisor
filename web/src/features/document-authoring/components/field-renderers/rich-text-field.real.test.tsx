@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import type { TemplateFieldDto } from '@/features/admin/templates/types';
 // `document-authoring` is a staff-only namespace (plan phase 5) — see
-// `../../staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
+// `@/app/lazy-routes/staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
 // admin namespaces". This component renders directly here (not through the
 // lazy route), so its English must be registered the same way the real
 // route chunk does.
-import '../../staff-locales';
+import '@/app/lazy-routes/staff-locales';
 import { RichTextField } from './rich-text-field';
 import { ToastProvider } from '@/components/ui/toast';
 import { DocumentFlushContext } from '../../hooks/flush-registry-context';

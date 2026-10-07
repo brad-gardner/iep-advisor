@@ -17,7 +17,11 @@ import type { ReadFieldRendererProps } from './types';
  * template doesn't tag a category column at all.
  */
 export function ReadAccommodations({ field, value }: ReadFieldRendererProps) {
-  const { t } = useTranslation(['document-authoring', 'common']);
+  // `educator` alongside `document-authoring`/`common`: `resolveOwnerDisplay`
+  // below renders a `teamRoleLabel` (`educator:teamRole.*`, staff-only) —
+  // this hook call is what makes a language switch re-render once that
+  // namespace's Spanish loads.
+  const { t } = useTranslation(['document-authoring', 'common', 'educator']);
   const config = parseConfig(field.fieldType, field.configJson);
   const columns = config.kind === 'Table' ? config.table.columns : [];
   const categoryCol = columns.find((c) => c.semantic === 'category');

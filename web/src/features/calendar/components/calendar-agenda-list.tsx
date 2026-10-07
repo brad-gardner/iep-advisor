@@ -4,10 +4,10 @@ import { CalendarClock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatMeetingWhen } from '@/features/meetings/lib/meeting-time';
-import { MEETING_TYPE_LABELS } from '@/features/meetings/types';
 import { ObligationStatusChip } from '@/features/obligations/components/obligation-status-chip';
-import { OBLIGATION_KIND_LABELS } from '@/features/obligations/types';
 import { formatDate } from '@/lib/format-date';
+import { meetingTypeLabel } from '@/lib/meeting-labels';
+import { obligationKindLabel } from '@/lib/obligation-label';
 import type { CalendarItemDto } from '../types';
 import type { MeetingDto } from '@/features/meetings/types';
 
@@ -18,12 +18,12 @@ interface CalendarAgendaListProps {
 
 /** Chronological list of the visible range's meetings and obligations —
  * meetings open the meeting drawer, obligations link to the student.
- * `MEETING_TYPE_LABELS`/`OBLIGATION_KIND_LABELS` are `features/meetings`'/
- * `features/obligations`' own English label maps — out of this phase's
- * scope, so they stay untranslated here until those features' own phase
- * converts them (`docs/i18n/README.md`'s "mixed-language page" precedent). */
+ * `meetingTypeLabel` (`common:meetingType.*`, always eager) and
+ * `obligationKindLabel` (`obligations:kind.*`, staff-only — hence this
+ * component's own `useTranslation` below also naming `obligations`, so a
+ * language switch re-renders once that namespace's Spanish loads). */
 export function CalendarAgendaList({ items, onSelectMeeting }: CalendarAgendaListProps) {
-  const { t } = useTranslation('calendar');
+  const { t } = useTranslation(['calendar', 'obligations']);
   const sorted = [...items].sort((a, b) => a.date.localeCompare(b.date));
 
   if (sorted.length === 0) {
@@ -52,7 +52,7 @@ export function CalendarAgendaList({ items, onSelectMeeting }: CalendarAgendaLis
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-brand-slate-800">
-                    {meeting.title || MEETING_TYPE_LABELS[meeting.type]}
+                    {meeting.title || meetingTypeLabel(meeting.type)}
                   </p>
                   <p className="text-xs text-brand-slate-500">
                     {meeting.studentName} · {formatMeetingWhen(meeting.startsAtUtc, meeting.durationMinutes)}
@@ -75,7 +75,7 @@ export function CalendarAgendaList({ items, onSelectMeeting }: CalendarAgendaLis
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-brand-slate-800">
-                    {OBLIGATION_KIND_LABELS[obligation.kind]} — {obligation.studentName}
+                    {obligationKindLabel(obligation.kind)} — {obligation.studentName}
                   </p>
                   <p className="text-xs text-brand-slate-500">
                     {t('agenda.due', { date: formatDate(obligation.dueDate) })}

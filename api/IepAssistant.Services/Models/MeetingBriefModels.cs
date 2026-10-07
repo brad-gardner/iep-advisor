@@ -66,7 +66,12 @@ public class MeetingBriefModel
     public List<OfflineFamilyInputModel> OfflineInput { get; set; } = new();
     public List<FamilyContactAttemptModel> ContactAttempts { get; set; } = new();
 
-    public string Disclaimer { get; set; } = "Advisory summary — the team's decisions are made in the meeting.";
+    /// <summary>Multilingual plan (2026-10-06) phase 5 review fix P3-3: set explicitly by
+    /// <c>MeetingBriefService.GenerateAsync</c> from <c>MeetingBrief.Disclaimer</c> (en/es), in the
+    /// SAME generated language captured on <see cref="GeneratedLanguage"/> — never hardcoded English
+    /// here, since this model is also rehydrated (via <c>GetAsync</c>'s deserialize) for a brief that
+    /// may have been generated in Spanish. Empty only for the (deserialize-failure) fallback model.</summary>
+    public string Disclaimer { get; set; } = string.Empty;
 
     /// <summary>The requester's language ("en"/"es") when this brief was generated — multilingual plan
     /// (2026-10-06) phase 5, mirrors <c>MeetingBrief.Language</c>. Null means English (including every

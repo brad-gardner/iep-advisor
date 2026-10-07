@@ -34,7 +34,11 @@ export function ReadTable(props: ReadFieldRendererProps) {
 }
 
 function ReadTableGeneric({ field, value, semantic }: ReadFieldRendererProps & { semantic: FieldSemantic | undefined }) {
-  const { t } = useTranslation('document-authoring');
+  // `educator` alongside `document-authoring`: `resolveOwnerDisplay` below
+  // renders a `teamRoleLabel` (`educator:teamRole.*`, staff-only) — this
+  // hook call is what makes a language switch re-render once that
+  // namespace's Spanish loads.
+  const { t } = useTranslation(['document-authoring', 'educator']);
   const config = parseConfig(field.fieldType, field.configJson);
   const columns = config.kind === 'Table' ? config.table.columns : [];
   const rows = coerceRows(value);

@@ -6,7 +6,12 @@ import { ToastProvider } from '@/components/ui/toast';
 import { apiRejection } from '@/test/axios-rejection';
 import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import { makeMeeting, makeParticipant } from '../test/fixtures';
-
+// `educator` is a staff-only namespace (plan phase 5) — `ParticipantList`
+// (rendered inside `MeetingDrawer`) names it in its own `useTranslation`
+// call (for `teamRoleLabel`), so its English must be registered here the
+// same way the real staff route chunk does. See `docs/i18n/README.md`'s
+// "Staff and admin namespaces".
+import '@/app/lazy-routes/staff-locales';
 const meetingsApi = vi.hoisted(() => ({
   rsvpToMeeting: vi.fn(),
   cancelMeeting: vi.fn(),
@@ -38,8 +43,6 @@ import { MeetingDrawer } from './meeting-drawer';
 // by this side-effect import, exactly as the real lazy route chunk
 // (`app/lazy-routes/staff-routes.tsx`) registers it before the educator
 // calendar/student detail pages that host this drawer can render.
-import '../staff-locales';
-
 function renderDrawer(meeting = makeMeeting(), onUpdated = vi.fn()) {
   const onClose = vi.fn();
   render(

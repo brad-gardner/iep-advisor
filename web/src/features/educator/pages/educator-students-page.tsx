@@ -33,7 +33,7 @@ import {
 
 export function EducatorStudentsPage() {
   // `educator` is a staff-only namespace (plan phase 5): its English is NOT
-  // in the main chunk — it's registered by `features/educator/staff-locales`,
+  // in the main chunk — it's registered by `@/app/lazy-routes/staff-locales`,
   // imported at the top of this page's lazy route chunk
   // (`app/lazy-routes/staff-routes.tsx`) — and its Spanish still lazy-loads
   // like any other namespace. Converted fully in plan phase 5 (this page was

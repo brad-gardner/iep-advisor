@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { formatMeetingWhen } from '@/features/meetings/lib/meeting-time';
-import { MEETING_STATUS_LABELS } from '@/features/meetings/types';
 import type { MeetingStatus } from '@/features/meetings/types';
+import { meetingStatusLabel } from '@/lib/meeting-labels';
 import { EmptyHint } from './empty-hint';
 import { HomeSection } from './home-section';
 import { WorkItemRow } from './work-item-row';
@@ -53,7 +53,7 @@ export function ThisWeekSection({
               meta={
                 <>
                   <Badge variant={statusBadgeVariant[meeting.status]}>
-                    {MEETING_STATUS_LABELS[meeting.status]}
+                    {meetingStatusLabel(meeting.status)}
                   </Badge>
                   {showBriefNote && (
                     <Badge variant="neutral" title={t('thisWeek.briefComingSoonTitle')}>

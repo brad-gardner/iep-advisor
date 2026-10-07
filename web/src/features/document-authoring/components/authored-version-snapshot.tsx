@@ -30,8 +30,8 @@ interface AuthoredVersionSnapshotProps {
 // Shared by the educator authored-version pages and the parent shared-draft
 // review page (see `FieldValueDisplay`, exported for a custom per-field layout).
 // Translated via the EAGER `document-authoring-shared` namespace (not the
-// staff-only `document-authoring` one) — see this feature's
-// `staff-locales.ts` doc comment on why: a parent route (the shared-draft
+// staff-only `document-authoring` one) — see `docs/i18n/README.md`'s
+// "Staff and admin namespaces" on why: a parent route (the shared-draft
 // review page, the parent authored-version viewer) renders this component
 // too, and must never depend on the staff-only lazy chunk for it.
 export function AuthoredVersionSnapshot({ templateVersion, values }: AuthoredVersionSnapshotProps) {

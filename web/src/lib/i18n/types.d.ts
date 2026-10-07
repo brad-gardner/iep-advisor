@@ -54,7 +54,8 @@ import type EnSubscription from '@/locales/en/subscription.json';
 // Staff/admin namespaces (phase 5): their English JSON lives under
 // `locales/en/staff/` instead of `locales/en/`, so it's excluded from
 // `index.ts`'s eager `enModules` glob and never enters the main chunk — see
-// `registerEnglishNamespace` there and `features/educator/staff-locales.ts`.
+// `registerEnglishNamespace` there and `app/lazy-routes/staff-locales.ts`
+// (the one shared module that registers every one of these at runtime).
 // The TYPE import below is exactly as cost-free as every import above
 // (erased by `tsc`); only the RUNTIME path differs for these namespaces.
 import type EnDocumentAuthoring from '@/locales/en/staff/document-authoring.json';

@@ -348,8 +348,11 @@ public sealed class IepAssistServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task AssistGoal_UnderSpanishCulture_AppendsResponseLanguageLine_AbsentUnderEnglish()
+    public async Task AssistGoal_InsertableSuggestion_StaysEnglish_ByteIdenticalPromptUnderSpanishAndEnglish()
     {
+        // Multilingual plan phase 5 review fix P2-7 (coordinator decision): a suggestion AssistGoalAsync
+        // returns is inserted directly into a draft field, so it must stay in English (the draft's
+        // language) regardless of the staff member's UI culture — unlike ChatAsync below.
         var s = SeedSchoolWithStudent("lang-es");
         var draftId = CreateDraft(s);
         var goalId = AddGoal(draftId, "Read 80 words per minute");
@@ -359,13 +362,40 @@ public sealed class IepAssistServiceTests : IDisposable
             using var ctx = CreateContext();
             var result = await CreateService(ctx).AssistGoalAsync(s.CollaboratorUserId, draftId, goalId, AssistKind.Rewrite);
             Assert.True(result.Success, result.Message);
-            Assert.Contains("RESPONSE LANGUAGE: Respond in Spanish", _claude.LastRequest!.SystemPrompt);
+            Assert.DoesNotContain("RESPONSE LANGUAGE", _claude.LastRequest!.SystemPrompt);
         }
 
         using (var _lang = CultureScope.For("en"))
         {
             using var ctx = CreateContext();
             var result = await CreateService(ctx).AssistGoalAsync(s.CollaboratorUserId, draftId, goalId, AssistKind.Rewrite);
+            Assert.True(result.Success, result.Message);
+            Assert.DoesNotContain("RESPONSE LANGUAGE", _claude.LastRequest!.SystemPrompt);
+        }
+    }
+
+    [Fact]
+    public async Task Chat_UnderSpanishCulture_AppendsResponseLanguageLine_AbsentUnderEnglish()
+    {
+        // Contrast with AssistGoal above: a chat reply is never inserted into the draft, so it DOES
+        // follow the staff member's UI language.
+        var s = SeedSchoolWithStudent("chat-lang-es");
+        var draftId = CreateDraft(s);
+
+        using (var _lang = CultureScope.For("es"))
+        {
+            using var ctx = CreateContext();
+            var result = await CreateService(ctx).ChatAsync(s.CollaboratorUserId, draftId,
+                new List<ChatMessage> { new() { Role = "user", Content = "How do I word this goal?" } });
+            Assert.True(result.Success, result.Message);
+            Assert.Contains("RESPONSE LANGUAGE: Respond in Spanish", _claude.LastRequest!.SystemPrompt);
+        }
+
+        using (var _lang = CultureScope.For("en"))
+        {
+            using var ctx = CreateContext();
+            var result = await CreateService(ctx).ChatAsync(s.CollaboratorUserId, draftId,
+                new List<ChatMessage> { new() { Role = "user", Content = "How do I word this goal?" } });
             Assert.True(result.Success, result.Message);
             Assert.DoesNotContain("RESPONSE LANGUAGE", _claude.LastRequest!.SystemPrompt);
         }

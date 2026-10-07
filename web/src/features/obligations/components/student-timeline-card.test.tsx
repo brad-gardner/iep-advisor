@@ -14,8 +14,7 @@ import { StudentTimelineCard } from './student-timeline-card';
 // by this side-effect import, exactly as the real lazy route chunk
 // (`app/lazy-routes/staff-routes.tsx`) registers it before the page that
 // hosts this card (the educator student detail page) can render.
-import '../staff-locales';
-
+import '@/app/lazy-routes/staff-locales';
 const obligations: ObligationDto[] = [
   {
     kind: 'AnnualReview',

@@ -7,14 +7,13 @@ import type { FamilyContactMethod, FamilyContactOutcome } from '@/features/famil
 // bodies; callers re-render on language change through their own
 // `useTranslation`. `family-contact` is a staff-only namespace (plan phase
 // 5 — see `docs/i18n/README.md`'s "Staff and admin namespaces"); every
-// in-scope caller is reached only from the educator student detail page.
-//
-// `features/meeting-brief/pages/meeting-brief-page.tsx` still imports the
-// English-only `FAMILY_CONTACT_METHOD_LABELS`/`FAMILY_CONTACT_OUTCOME_LABELS`
-// maps directly (`@/features/family-contact/types`) — that feature converts
-// in a later phase, so those maps stay in place (not removed) until that
-// caller has moved to this helper. A lookup miss falls back to the raw
-// value via `defaultValue`.
+// caller is reached only from a staff page (the educator student detail
+// page, or `features/meeting-brief/pages/meeting-brief-page.tsx`, which
+// names `family-contact` in its own `useTranslation` call) — the old
+// `FAMILY_CONTACT_METHOD_LABELS`/`FAMILY_CONTACT_OUTCOME_LABELS` English
+// maps (`@/features/family-contact/types`) were removed outright once that
+// page moved to this helper. A lookup miss falls back to the raw value via
+// `defaultValue`.
 export function familyContactMethodLabel(method: FamilyContactMethod): string {
   return i18n.t(`family-contact:method.${method}`, { defaultValue: method });
 }

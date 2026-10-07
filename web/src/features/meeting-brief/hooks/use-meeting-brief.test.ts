@@ -6,8 +6,7 @@ import type { MeetingBriefDto } from '../types';
 // this side-effect import, exactly as the page's real lazy route chunk
 // (`app/lazy-routes/staff-routes.tsx`) registers it. The hook calls
 // `useTranslation('meeting-brief')`, so even this hook-only test needs it.
-import '../staff-locales';
-
+import '@/app/lazy-routes/staff-locales';
 const briefApi = vi.hoisted(() => ({ getBrief: vi.fn(), generateBrief: vi.fn() }));
 vi.mock('../api/meeting-brief-api', () => briefApi);
 

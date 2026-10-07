@@ -18,13 +18,20 @@ interface AuthoredPdfDownloadProps {
 // authored version. Polls while Pending via useAuthoredPdfStatus. Rendered →
 // download link; Error → message (+ Retry if allowed); Pending → generating hint.
 // Mirrors iep-versions/download-pdf-button for the authored-document surface.
+//
+// Translated via the EAGER `document-authoring-shared` namespace, not the
+// staff-only `document-authoring` one: this component renders on the parent
+// route `ParentAuthoredVersionPage` too (not just staff pages), and a parent
+// route must never depend on the staff-only lazy chunk — see
+// `AuthoredVersionSnapshot`'s doc comment and `docs/i18n/README.md`'s "Staff
+// and admin namespaces" section for the full reasoning.
 export function AuthoredPdfDownload({
   versionId,
   initialStatus,
   canRetry = false,
   compact = false,
 }: AuthoredPdfDownloadProps) {
-  const { t } = useTranslation('document-authoring');
+  const { t } = useTranslation('document-authoring-shared');
   const { status, errorMessage, isLoading, timedOut, retry, isRetrying, refresh } =
     useAuthoredPdfStatus(versionId, initialStatus);
   const [isDownloading, setIsDownloading] = useState(false);

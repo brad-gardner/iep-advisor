@@ -76,7 +76,13 @@ public class MeetingBriefService : IMeetingBriefService
 
         var row = await _context.MeetingBriefs.AsNoTracking().FirstOrDefaultAsync(b => b.MeetingId == meetingId, ct);
         if (row == null)
-            return ServiceResult<MeetingBriefModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingBrief.NoBriefYet"]);
+            // Multilingual plan phase 5 review fix P2-2: NotFound (404), not Validation (400) — this is
+            // a deliberate status change. "Nothing generated yet, POST .../brief to generate it" was
+            // always meant to be a 404 (IMeetingBriefService.GetAsync's own doc comment already says
+            // "mapped to 404"), so the web client's empty/Generate state can key off a real 404. The
+            // pre-existing 400 was a bug introduced when this failure was given an explicit ErrorKind,
+            // not an intentional contract to preserve.
+            return ServiceResult<MeetingBriefModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["MeetingBrief.NoBriefYet"]);
 
         var model = Deserialize(row.BriefJson) ?? new MeetingBriefModel { MeetingId = meetingId, GeneratedAt = row.GeneratedAt };
         model.GeneratedLanguage = row.Language;
@@ -168,6 +174,10 @@ public class MeetingBriefService : IMeetingBriefService
             OpenFamilyResponses = openResponses,
             OfflineInput = offlineInput,
             ContactAttempts = contactAttempts,
+            // Multilingual plan phase 5 review fix P3-3: localized from Messages.resx/.es.resx in the
+            // SAME resolved `language` captured on GeneratedLanguage below — CurrentUICulture is already
+            // that language here (see the class doc comment), so this call resolves to the matching text.
+            Disclaimer = _localizer["MeetingBrief.Disclaimer"],
             GeneratedLanguage = language
         };
 

@@ -59,7 +59,7 @@ interface DocumentEditorProps {
  * `reloadKey`) so stale local values can't overwrite fresher server state.
  */
 export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
-  const { t } = useTranslation('document-authoring');
+  const { t, i18n } = useTranslation('document-authoring');
   const { saveStatus, conflict, reloadKey, readOnly, saveValues, reload, getSaveState } = instance;
   const sections = useMemo(
     () => [...detail.templateVersion.sections].sort((a, b) => a.displayOrder - b.displayOrder),
@@ -114,9 +114,17 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
 
   // Completeness is derived from the last server-normalized values (updated on
   // every successful save), so it tracks what is actually persisted.
+  // `computeCompleteness` builds each item's `message` via `i18n.t(...)`
+  // directly (`completeness.ts`), not through this component's own `t` — so
+  // without `i18n.resolvedLanguage` in the dependency array, switching
+  // languages re-renders this component (via `useTranslation`'s own
+  // subscription) but the memo stays stale, showing the PREVIOUS language's
+  // completeness messages until something else (template version or values)
+  // happens to change too.
   const completeness = useMemo(
     () => computeCompleteness(detail.templateVersion, detail.values),
-    [detail.templateVersion, detail.values]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `i18n.resolvedLanguage` isn't read inside the computation itself, only by `computeCompleteness`'s own `i18n.t(...)` calls; it's a deliberate invalidation trigger, not a data dependency the rule can see
+    [detail.templateVersion, detail.values, i18n.resolvedLanguage]
   );
   const itemsBySection = useMemo(() => {
     const map = new Map<number, CompletenessItem[]>();

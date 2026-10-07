@@ -166,20 +166,6 @@
     "finalizedHeading": "Finalizado",
     "finalizedAgo": "finalizado {{time}}"
   },
-  "authoredPdfDownload": {
-    "checking": "Verificando el PDF…",
-    "preparing": "Preparando…",
-    "download": "Descargar PDF",
-    "downloadError": "No se pudo preparar la descarga. Inténtelo de nuevo.",
-    "pdfFailed": "Error en el PDF",
-    "retry": "Reintentar",
-    "retrying": "Reintentando…",
-    "generateErrorTitle": "No se pudo generar el PDF",
-    "generateErrorFallback": "La generación del PDF falló.",
-    "stillGenerating": "Todavía se está generando; vuelva a verificar en breve.",
-    "generating": "Generando PDF…",
-    "checkAgain": "Verificar de nuevo"
-  },
   "authoredVersionDetailPage": {
     "loading": "Cargando versión…",
     "unavailableTitle": "Versión no disponible",
@@ -334,10 +320,25 @@
     "carriedFromNotReviewed": "Trasladado de {{label}} · aún no revisado",
     "priorVersion": "versión anterior",
     "keepAsIs": "Mantener como está",
-    "removeAriaLabel": "Eliminar {{item}} {{number}}",
-    "addItem": "Agregar {{item}}",
     "aiHelpAvailableAfterSave": "La ayuda de IA estará disponible una vez que esta fila se haya guardado.",
-    "retirementReasonError": "No se pudo registrar el motivo de la baja."
+    "retirementReasonError": "No se pudo registrar el motivo de la baja.",
+    "itemNoun": {
+      "goal": "Meta",
+      "service": "Servicio",
+      "accommodation": "Adaptación",
+      "transitionItem": "Elemento de transición",
+      "row": "Fila"
+    },
+    "addGoal": "Agregar meta",
+    "addService": "Agregar servicio",
+    "addAccommodation": "Agregar adaptación",
+    "addTransitionItem": "Agregar elemento de transición",
+    "addRow": "Agregar fila",
+    "removeGoal": "Eliminar meta {{number}}",
+    "removeService": "Eliminar servicio {{number}}",
+    "removeAccommodation": "Eliminar adaptación {{number}}",
+    "removeTransitionItem": "Eliminar elemento de transición {{number}}",
+    "removeRow": "Eliminar fila {{number}}"
   },
   "goalsBlock": {
     "fallbackHeading": "Metas",

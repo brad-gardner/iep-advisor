@@ -34,7 +34,11 @@ interface EvaluationCardProps {
  *  an existing case renders its timeline, consent capture, due-date override,
  *  evaluator assignments, and the determine/close/create-IEP actions. */
 export function EvaluationCard({ studentId }: EvaluationCardProps) {
-  const { t } = useTranslation(['evaluation', 'common']);
+  // `obligations` alongside `evaluation`/`common`: `obligationKindLabel`
+  // below is backed by that staff-only namespace, and `ObligationStatusChip`
+  // now subscribes to it itself too — this hook call is what makes a
+  // language switch re-render this card once its Spanish loads.
+  const { t } = useTranslation(['evaluation', 'common', 'obligations']);
   const { evaluation, isLoading, error, retry, applyUpdate } = useEvaluationCase(studentId);
   const navigate = useNavigate();
   const [dueDateDialogOpen, setDueDateDialogOpen] = useState(false);

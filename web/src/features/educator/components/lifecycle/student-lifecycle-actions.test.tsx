@@ -8,7 +8,7 @@ import { makeStudent } from '../../test/fixtures';
 // (`app/lazy-routes/staff-routes.tsx`) registers it. This test renders
 // `StudentLifecycleActions` directly, bypassing the page that would
 // otherwise do so.
-import '../../staff-locales';
+import '@/app/lazy-routes/staff-locales';
 import { StudentLifecycleActions } from './student-lifecycle-actions';
 
 const schools = [

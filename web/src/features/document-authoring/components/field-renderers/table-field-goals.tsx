@@ -71,7 +71,11 @@ export function GoalsBlock({
   flush,
   cellTarget,
 }: GoalsBlockProps) {
-  const { t } = useTranslation('document-authoring');
+  // `educator` alongside `document-authoring`: `resolveOwnerDisplay` below
+  // (via `GoalReadCard`'s `owner` prop) renders a `teamRoleLabel`
+  // (`educator:teamRole.*`, staff-only) — this hook call is what makes a
+  // language switch re-render once that namespace's Spanish loads.
+  const { t } = useTranslation(['document-authoring', 'educator']);
   const labelId = `${fieldElementId(field.id)}-label`;
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(() => initialFocusRowKey ?? null);
 
@@ -300,7 +304,7 @@ function GoalEditor({
   return (
     <li
       className="rounded-card border-2 border-brand-teal-400 bg-white shadow-sm"
-      aria-label={`Editing goal ${index + 1}`}
+      aria-label={t('goalsBlock.editingGoal', { number: index + 1 })}
       data-testid={`field-${field.fieldKey}-row-${index}`}
     >
       <div className="flex flex-wrap items-center gap-3 border-b border-brand-slate-100 px-5 py-3">

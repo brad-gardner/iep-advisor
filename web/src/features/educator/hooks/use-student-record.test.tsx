@@ -8,8 +8,7 @@ import { makeStudent } from '../test/fixtures';
 // side-effect import, exactly as the real lazy route chunk
 // (`app/lazy-routes/staff-routes.tsx`) registers it. `useStudentRecord`
 // calls `useTranslation('educator')`, so even this hook-only test needs it.
-import '../staff-locales';
-
+import '@/app/lazy-routes/staff-locales';
 const api = vi.hoisted(() => ({
   getStudent: vi.fn(),
   updateStudent: vi.fn(),

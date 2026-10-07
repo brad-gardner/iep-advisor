@@ -1125,6 +1125,28 @@ public sealed class DocumentInstanceServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveValues_TableColumnTypeMismatch_UnderSpanishCulture_LocalizesColumnSuffix()
+    {
+        // Multilingual plan phase 5 review fix P3-4: the "column" suffix CoerceTable appends to the
+        // field's (untranslated, district-authored) Label is itself UI chrome and must be localized —
+        // via Documents.TableColumnLabel — rather than the hardcoded English "{0} column".
+        var s = SeedSchoolWithStudent("col-type-mismatch-es");
+        var keys = SeedGoalsTemplate();
+        var instanceId = await CreateInstanceAsync(s);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var patch = Patch($$"""
+        { "{{keys.GoalsFieldKey}}": [ { "{{keys.GoalTextCol}}": 123 } ] }
+        """);
+        var result = await CreateService(ctx).SaveValuesAsync(instanceId, patch, null, s.CollaboratorUserId);
+
+        Assert.False(result.Success);
+        Assert.Equal("'columna Goals' debe ser texto.", result.Message);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+    }
+
+    [Fact]
     public async Task Get_UnknownInstance_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
     {
         var s = SeedSchoolWithStudent("get-unknown-es");

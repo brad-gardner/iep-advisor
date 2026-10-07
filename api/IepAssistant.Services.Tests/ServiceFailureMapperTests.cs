@@ -152,6 +152,39 @@ public sealed class ServiceFailureMapperTests
         Assert.IsType<BadRequestObjectResult>(action);
     }
 
+    // --- Multilingual plan (2026-10-06) phase 5 review fixes P2-1/P2-2: two more status-parity sites,
+    // pinned the same way as the phase 3 fixes above.
+
+    [Fact]
+    public void Validation_MapsTo400_CreateIepFromEtrNoTemplateMessage()
+    {
+        // EvaluationCaseService.CreateIepFromEtrAsync's "no document template" failure re-wraps
+        // DocumentInstanceService.CreateAsync's Unprocessable (422) as Validation (400) — main's
+        // pre-existing status for this route, which simply re-propagating the inner kind would have
+        // silently changed to 422.
+        var result = ServiceResult.FailureResult(ServiceErrorKind.Validation,
+            "No document template is available for this document type yet. Ask an administrator to publish one.");
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
+    [Fact]
+    public void NotFound_MapsTo404_MeetingBriefNoBriefYetMessage()
+    {
+        // MeetingBriefService.GetAsync's "no brief generated yet" failure is NotFound (404) — a
+        // deliberate change from the pre-existing (buggy) 400, matching IMeetingBriefService.GetAsync's
+        // own doc comment ("mapped to 404") so the web client's Generate-brief empty state can key off
+        // a real 404.
+        var result = ServiceResult.FailureResult(ServiceErrorKind.NotFound,
+            "No brief has been generated for this meeting yet.");
+
+        var action = new TestController().MapServiceFailure(result);
+
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
     [Fact]
     public void NullMessage_UsesFallbackMessage()
     {

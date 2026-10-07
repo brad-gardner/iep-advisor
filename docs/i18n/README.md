@@ -177,6 +177,20 @@ special-education terminology), see [`glossary-es.md`](./glossary-es.md).
   (`sharing:role.*`) covers the child-access share role (`owner`/`viewer`/
   `collaborator`) — written as a `switch` over literal keys rather than a
   dynamic one.
+- **Where a display-label helper (or any small i18n helper) lives:** a
+  helper with exactly one feature's callers lives in that feature's own
+  `features/<feature>/lib/` (e.g. `features/sharing/lib/role-label.ts`,
+  `features/educator/lib/student-enum-labels.ts`,
+  `features/document-authoring/lib/owner-display.ts`); a helper with
+  callers across more than one feature lives in the shared `web/src/lib/`
+  instead (e.g. `grade-level-label.ts`, `invite-status-label.ts`,
+  `meeting-labels.ts`, `obligation-label.ts`, `family-contact-label.ts`,
+  `evaluation-case-label.ts` — each backs at least one namespace/feature
+  other than the one it's named after). Moving a helper from
+  `features/<f>/lib` to `web/src/lib` (or the reverse) the moment a second
+  feature needs it is a one-file rename, not a design decision to agonize
+  over — but a brand-new helper should start in the narrower location
+  unless it's already known to be cross-feature.
 - **DB-authored content stays English, with a note**: `features/knowledge-base`
   converts page chrome (search, category tabs, the disclaimer) but not an
   article's own `title`/`content`/`tags`/`state` (district/DB content, like
@@ -227,36 +241,36 @@ the same way as every other namespace.
 - **Where the files live:** `web/src/locales/en/staff/<ns>.json` and
   `web/src/locales/es/staff/<ns>.json` (both languages under `staff/`, even
   though only English's location actually matters for eagerness — see
-  below). `educator` (`features/educator/pages/educator-students-page.tsx`'s
-  caseload empty-state text) is the one namespace wired this way so far —
-  the worked example, not a converted feature; the rest of that page (and
-  everything else in `features/educator`, `features/district-admin`,
-  `features/staff-invites`, `features/roster-import`,
-  `features/document-authoring`, `features/calendar`, `features/meeting-brief`,
-  `features/evaluation`, `features/obligations`, `features/family-contact`,
-  `features/contributions`, `features/exports`, `features/admin`) still
-  converts in a later phase.
+  below). `educator`, `evaluation`, `family-contact`, `meeting-brief`,
+  `meetings-staff`, `obligations` and `document-authoring` are wired this
+  way so far; `features/district-admin`, `features/staff-invites`,
+  `features/roster-import`, `features/calendar`, `features/contributions`,
+  `features/exports` and `features/admin` still convert in a later phase.
 - **Why ENGLISH needs a different mechanism:** `lib/i18n/index.ts`'s eager
   `enModules` glob (`/src/locales/en/*.json`) matches only DIRECT children of
   `locales/en/` — `locales/en/staff/educator.json` never matches it, so it
   never enters `resources`/the main chunk, automatically, just by living
   under `staff/`. Nothing needs to exclude it; the directory choice IS the
   exclusion.
-- **How English actually loads, then:** the namespace's own feature folder
-  has a small `<feature>/staff-locales.ts` that statically imports its
-  `en/staff/<ns>.json` and calls `registerEnglishNamespace(ns, json)`
+- **How English actually loads, then:** one shared module,
+  `web/src/app/lazy-routes/staff-locales.ts`, eagerly globs EVERY
+  `locales/en/staff/*.json` file (`import.meta.glob('/src/locales/en/staff/*.json',
+  { eager: true })`) and calls `registerEnglishNamespace(ns, json)`
   (`lib/i18n/index.ts` — `i18next.addResourceBundle('en', ns, json, true,
-  true)`) at module top level. That file is imported, for its side effect
-  only, at the top of the namespace's lazy ROUTE-CHUNK barrel
-  (`web/src/app/lazy-routes/staff-routes.tsx` imports
-  `features/educator/staff-locales`) — so the namespace's English registers
-  the instant the chunk's JS evaluates, strictly before any page component
-  from that chunk can render (ES module evaluation order), and the main
-  chunk never pays for it. See `features/educator/staff-locales.ts`'s own
-  doc comment for the full reasoning, and `lib/i18n/index.ts`'s
-  `registerEnglishNamespace` doc comment for why a `language !== 'es'`
-  request ever reaching the Spanish-only backend throws loudly instead of
-  silently serving the wrong language.
+  true)`) once per file, keyed by its filename, at module top level. That
+  one module is imported, for its side effect only, at the top of all THREE
+  lazy area barrels (`staff-routes.tsx`, `district-admin-routes.tsx`,
+  `platform-admin-routes.tsx`) — so every staff namespace's English
+  registers the instant whichever area's chunk JS evaluates, strictly
+  before any page component from that chunk can render (ES module
+  evaluation order), and the main chunk never pays for any of it (the glob
+  being "eager" only means eager WITHIN that already-lazy chunk — see
+  "Staff namespaces across areas" below and `staff-locales.ts`'s own doc
+  comment for the full reasoning). A brand-new staff namespace needs no new
+  line here — dropping its `en/staff/<ns>.json` file on disk is enough; see
+  `lib/i18n/index.ts`'s `registerEnglishNamespace` doc comment for why a
+  `language !== 'es'` request ever reaching the Spanish-only backend throws
+  loudly instead of silently serving the wrong language.
 - **Spanish is unchanged in spirit:** `index.ts`'s `esLoaders` globs
   `/src/locales/es/**/*.json` (recursive — covers `es/staff/*.json` too) and
   keys its loader map by NAMESPACE NAME (the filename, regardless of
@@ -285,22 +299,35 @@ the same way as every other namespace.
   `esLoaders`/`enModules`-adjacent typing key by namespace NAME alone, not
   by directory, so `locales/en/staff/home.json` would collide with the
   existing parent `home` namespace. Pick a name no existing namespace (staff
-  or parent) already uses.
+  or parent) already uses. **Convention for a new eager/staff PAIR covering
+  the same feature:** name the eager one `<feature>` and the staff one
+  `<feature>-staff` — e.g. `features/meetings` ships both the eager
+  `meetings` namespace (the parent-facing RSVP page) and the staff-only
+  `meetings-staff` one (everything else in that feature), never two
+  unrelated-looking names. Only add the `-staff` suffix when an eager
+  namespace of the plain name already exists or is expected; a feature with
+  no eager surface at all (e.g. `educator`, `obligations`) just uses its own
+  plain name for the staff namespace.
 - **Tests:**
   - `locale-parity.test.ts` globs `locales/{en,es}/**/*.json` (recursive),
     so a staff namespace's en/es parity is checked exactly like every other
     namespace's.
-  - `features/educator/staff-locales.test.ts` is the guard: it asserts
-    `i18n.hasResourceBundle('en', 'educator')` is `false` before importing
-    `./staff-locales`, and `true` after — proving the namespace truly isn't
-    loaded until its chunk's registration runs.
+  - `app/lazy-routes/staff-locales.test.ts` is the guard, parametrized over
+    every namespace it discovers under `locales/en/staff/*.json` (so a new
+    one is covered automatically): it asserts
+    `i18n.hasResourceBundle('en', ns)` is `false` before importing
+    `./staff-locales`, and `true` after, for each one — proving every staff
+    namespace truly isn't loaded until the shared registration module runs.
   - A component test that renders a staff-namespace page DIRECTLY (not
-    through the lazy route) must import that feature's `staff-locales.ts`
-    for its side effect first, the same way the real route chunk does — see
-    `features/educator/pages/educator-students-page.test.tsx`'s top import.
-    Skipping this makes `useTranslation('<staff ns>')` try to load English
-    from the Spanish-only backend, which now throws loudly rather than
-    silently misrendering.
+    through the lazy route) must import `@/app/lazy-routes/staff-locales`
+    for its side effect first, the same way a real lazy route chunk does —
+    see `features/educator/pages/educator-students-page.test.tsx`'s top
+    import. Skipping this makes `useTranslation('<staff ns>')` try to load
+    English from the Spanish-only backend, which now throws loudly rather
+    than silently misrendering. Importing this one shared module covers
+    EVERY staff namespace at once, so a test whose component depends on
+    more than one (e.g. a page that renders both `document-authoring` and
+    `educator`) needs only this single import, not one per namespace.
   - `renderInSpanish` needs the staff namespace named explicitly via its
     `ns` option (it's not in `featureNamespaces`, which only lists the
     eager/parent namespaces) — e.g. `renderInSpanish(<Page />, { ns:
@@ -319,24 +346,18 @@ follow):**
    as any namespace — glossary, `{{placeholders}}`, parity test).
 2. Add `import type En<Ns> from '@/locales/en/staff/<ns>.json';` to
    `lib/i18n/types.d.ts` and list `<ns>: typeof En<Ns>;` in `EnResources`.
-3. Create (or extend) `<feature>/staff-locales.ts`:
-   ```ts
-   import { registerEnglishNamespace } from '@/lib/i18n';
-   import en<Ns> from '@/locales/en/staff/<ns>.json';
-
-   registerEnglishNamespace('<ns>', en<Ns>);
-   ```
-4. Import that file, for its side effect, at the top of the area's lazy
-   route barrel (`app/lazy-routes/staff-routes.tsx`,
-   `district-admin-routes.tsx`, or `platform-admin-routes.tsx` — whichever
-   one re-exports the page(s) that use `<ns>`).
-5. In the page/component, `useTranslation('<ns>')` (or `useTranslation(['<ns>',
+3. Nothing else to wire up — `app/lazy-routes/staff-locales.ts` discovers
+   every `locales/en/staff/*.json` file (including this new one)
+   automatically via its own `import.meta.glob`, and all three lazy area
+   barrels already import that one shared module. Skip straight to using
+   the namespace.
+4. In the page/component, `useTranslation('<ns>')` (or `useTranslation(['<ns>',
    'common'])` to also reach `common:`) exactly as any other namespace.
-6. In that component's OWN tests, import `<feature>/staff-locales` (side
-   effect) before rendering; for a Spanish test, also pass `ns: '<ns>'` to
-   `renderInSpanish`.
-7. Run `npx vitest run src/lib/i18n/locale-parity.test.ts` as usual.
-8. If the page itself isn't already a lazy route chunk under one of the
+5. In that component's OWN tests, import `@/app/lazy-routes/staff-locales`
+   (side effect) before rendering; for a Spanish test, also pass `ns: '<ns>'`
+   to `renderInSpanish`.
+6. Run `npx vitest run src/lib/i18n/locale-parity.test.ts` as usual.
+7. If the page itself isn't already a lazy route chunk under one of the
    three area barrels, make it one (`React.lazy` + the barrel re-export +
    a `<Suspense fallback={...}>` around its `<Route element={...}>` — see
    `app/routes.tsx`'s `/educator/*`/`/admin/*` routes for the pattern).
@@ -543,7 +564,7 @@ prerequisite for marketing Spanish, not for shipping it.
 
 ## Staff namespaces across areas
 
-`app/lazy-routes/staff-locales.ts` registers every staff/admin English namespace. All three lazy area chunks (staff, district-admin, platform-admin) import it, because shared staff components render across areas. A new staff namespace is added there, not in an individual barrel. Tests that render staff pages import it directly.
+`app/lazy-routes/staff-locales.ts` registers every staff/admin English namespace it finds under `locales/en/staff/*.json` (one eager `import.meta.glob`, not a hand-written import per namespace). All three lazy area chunks (staff, district-admin, platform-admin) import this one shared module, because shared staff components render across areas. A new staff namespace needs nothing added here or to an individual barrel — dropping its `en/staff/<ns>.json` file on disk is enough; the glob picks it up. Tests that render staff pages import this module directly.
 
 ## Server-side AI language (Phase 3)
 

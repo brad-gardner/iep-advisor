@@ -4,9 +4,9 @@ import { Table, type TableColumn } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { CalendarCheck2 } from 'lucide-react';
 import { ObligationStatusChip } from '@/features/obligations/components/obligation-status-chip';
-import { OBLIGATION_KIND_LABELS } from '@/features/obligations/types';
 import { formatDate } from '@/lib/format-date';
 import i18n from '@/lib/i18n';
+import { obligationKindLabel } from '@/lib/obligation-label';
 import { HomeSection } from './home-section';
 import type { CaseManagerRowDto } from '../types';
 
@@ -41,7 +41,7 @@ const columns: TableColumn<CaseManagerRowDto>[] = [
     get header() {
       return i18n.t('home:overdueTable.columnType');
     },
-    cell: (row) => OBLIGATION_KIND_LABELS[row.kind],
+    cell: (row) => obligationKindLabel(row.kind),
   },
   {
     key: 'dueDate',
@@ -72,7 +72,11 @@ interface OverdueByCaseManagerTableProps {
  * staff scorecard. Capped at 50 rows server-side; the compliance board has
  * the full, filterable list. */
 export function OverdueByCaseManagerTable({ rows, total }: OverdueByCaseManagerTableProps) {
-  const { t } = useTranslation('home');
+  // `obligations` alongside `home`: the `kind` column's cell calls the
+  // staff-only `obligationKindLabel` helper (`obligations:kind.*`), and this
+  // hook call is what makes a language switch re-render the table once that
+  // namespace's Spanish loads.
+  const { t } = useTranslation(['home', 'obligations']);
   const truncated = total != null && total > rows.length;
   return (
     <HomeSection title={t('overdueTable.title')} data-testid="home-overdue-by-case-manager">

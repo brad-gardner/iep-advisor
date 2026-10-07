@@ -344,6 +344,27 @@ public sealed class EvaluationCaseServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateIepFromEtrAsync_NoTemplate_RemapsUnprocessableToValidation_AndMapsTo400()
+    {
+        var s = Seed(nameof(CreateIepFromEtrAsync_NoTemplate_RemapsUnprocessableToValidation_AndMapsTo400));
+        // No DocumentTemplate/Version seeded for the IEP document type, so TemplateResolutionService
+        // blocks with Unprocessable (422) via DocumentInstanceService.CreateAsync.
+        using var ctx = CreateContext();
+
+        var result = await CreateService(ctx).CreateIepFromEtrAsync(s.LeadUserId, s.StudentId);
+
+        Assert.False(result.Success);
+        Assert.Contains("No document template is available", result.Message);
+        // Multilingual plan phase 5 review fix P2-1: re-wrapped as Validation (400), main's pre-existing
+        // status for this route — NOT the inner Unprocessable (422) DocumentInstanceController uses for
+        // the same underlying failure.
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
+    [Fact]
     public async Task ReceiveConsent_ChecksTheDocumentBytes_AndStoresABareFileName()
     {
         var s = Seed(nameof(ReceiveConsent_ChecksTheDocumentBytes_AndStoresABareFileName));

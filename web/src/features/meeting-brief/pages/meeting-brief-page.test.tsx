@@ -5,13 +5,15 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { apiRejection } from '@/test/axios-rejection';
 import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import type { MeetingBriefDto } from '../types';
-// `meeting-brief` is a staff-only namespace (plan phase 5) — its English
-// isn't bundled in `resources` (see `lib/i18n/index.ts`), only registered by
-// this side-effect import, exactly as the page's real lazy route chunk
-// (`app/lazy-routes/staff-routes.tsx`) registers it before the page can
-// render.
-import '../staff-locales';
-
+// `meeting-brief` and `family-contact` are both staff-only namespaces (plan
+// phase 5) — their English isn't bundled in `resources` (see
+// `lib/i18n/index.ts`), only registered by these side-effect imports,
+// exactly as the page's real lazy route chunk
+// (`app/lazy-routes/staff-routes.tsx`) registers them before the page can
+// render. `family-contact` is needed because this page now names it in its
+// own `useTranslation` call (for `familyContactMethodLabel`/
+// `familyContactOutcomeLabel`).
+import '@/app/lazy-routes/staff-locales';
 const briefApi = vi.hoisted(() => ({
   getBrief: vi.fn(),
   generateBrief: vi.fn(),
@@ -161,7 +163,7 @@ describe('MeetingBriefPage', () => {
 
   // Proves the staff/admin namespace split end to end (plan phase 5), the
   // same way `educator-students-page.test.tsx` does: `meeting-brief`'s
-  // English is registered above via the `staff-locales` side-effect import,
+  // English is registered above via the `@/app/lazy-routes/staff-locales` side-effect import,
   // and its Spanish still lazy-loads like any other namespace —
   // `renderInSpanish` needs the extra `ns: 'meeting-brief'` (`docs/i18n/
   // README.md`'s "Namespace coverage" / test conventions).

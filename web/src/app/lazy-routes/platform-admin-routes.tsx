@@ -7,9 +7,12 @@
 // than the main one.
 //
 // No namespace is staff/admin-split here yet (none of these pages have
-// converted to i18n at all, let alone to a staff namespace) — a future
-// phase's worker adds its own `<feature>/staff-locales.ts` (the same
-// pattern as `features/educator/staff-locales.ts`) and imports it here.
+// converted to i18n at all, let alone to a staff namespace) — this import
+// is still needed anyway, since shared staff components used across areas
+// already use staff namespaces. A future phase converting one of THIS
+// barrel's own pages needs no new import here either — see
+// `./staff-locales.ts` and `docs/i18n/README.md`'s "Staff and admin
+// namespaces".
 import './staff-locales';
 
 export { AdminRouteGuard } from '@/features/admin/components/admin-route-guard';

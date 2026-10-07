@@ -157,19 +157,10 @@ export const TEAM_ROLES = [
   'Other',
 ] as const;
 export type TeamRole = (typeof TEAM_ROLES)[number];
-export const TEAM_ROLE_LABELS: Record<TeamRole, string> = {
-  CaseManager: 'Case manager',
-  InterventionSpecialist: 'Intervention specialist',
-  GeneralEducationTeacher: 'General education teacher',
-  SpeechLanguagePathologist: 'Speech-language pathologist',
-  OccupationalTherapist: 'Occupational therapist',
-  PhysicalTherapist: 'Physical therapist',
-  SchoolPsychologist: 'School psychologist',
-  Counselor: 'Counselor',
-  LeaRepresentative: 'LEA representative',
-  Interpreter: 'Interpreter',
-  Other: 'Other',
-};
+// Display label: `@/features/educator/lib/student-enum-labels.ts`'s
+// `teamRoleLabel` (`educator:teamRole.*`, staff-only — i18n plan phase 5).
+// Every caller now uses the helper, so the old `TEAM_ROLE_LABELS` English
+// map was removed outright.
 
 // Per-student access roles (mirrors AccessRole on the backend), serialized as
 // their string name in the grant/list DTOs.

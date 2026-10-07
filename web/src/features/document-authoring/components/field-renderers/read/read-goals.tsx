@@ -23,7 +23,11 @@ import type { ReadFieldRendererProps } from './types';
  * directly in that goal's focused editor, instead of the generic Edit.
  */
 export function ReadGoals({ field, value, onEditRow }: ReadFieldRendererProps) {
-  const { t } = useTranslation('document-authoring');
+  // `educator` alongside `document-authoring`: `resolveOwnerDisplay` below
+  // renders a `teamRoleLabel` (`educator:teamRole.*`, staff-only) — this
+  // hook call is what makes a language switch re-render once that
+  // namespace's Spanish loads.
+  const { t } = useTranslation(['document-authoring', 'educator']);
   const config = parseConfig(field.fieldType, field.configJson);
   const columns = config.kind === 'Table' ? config.table.columns : [];
   const domainCol = columns.find((c) => c.semantic === 'domain');

@@ -7,9 +7,9 @@ import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Spinner } from '@/components/ui/spinner';
 import { ResponseCard } from '@/features/draft-sharing/components/response-card';
-import { FAMILY_CONTACT_METHOD_LABELS, FAMILY_CONTACT_OUTCOME_LABELS } from '@/features/family-contact/types';
 import { ChangeSummaryChips } from '@/features/shared-drafts/components/change-summary-chips';
 import { usePageTitle } from '@/hooks/use-page-title';
+import { familyContactMethodLabel, familyContactOutcomeLabel } from '@/lib/family-contact-label';
 import { formatDate } from '@/lib/format-date';
 import { GeneratedLanguageNotice } from '@/lib/i18n/generated-language-notice';
 import { BriefChecklist } from '../components/brief-checklist';
@@ -23,15 +23,16 @@ import { useMeetingBrief } from '../hooks/use-meeting-brief';
  * Advisory only — never a substitute for the team's own decisions.
  *
  * `meeting-brief` is a staff-only namespace (plan phase 5): its English is
- * registered by `features/meeting-brief/staff-locales`, imported at the top
+ * registered by `@/app/lazy-routes/staff-locales`, imported at the top
  * of this page's lazy route chunk (`app/lazy-routes/staff-routes.tsx`) — see
- * `docs/i18n/README.md`'s "Staff and admin namespaces". `FAMILY_CONTACT_*_LABELS`
- * (`features/family-contact/types`) are that feature's own English label
- * maps — out of this phase's scope, so they stay untranslated until that
- * feature's own phase converts them.
+ * `docs/i18n/README.md`'s "Staff and admin namespaces". Contact
+ * attempts/offline input render via `@/lib/family-contact-label`'s
+ * `familyContactMethodLabel`/`familyContactOutcomeLabel`, backed by the
+ * staff-only `family-contact` namespace — hence naming it below too, so a
+ * language switch re-renders this page once that namespace's Spanish loads.
  */
 export function MeetingBriefPage() {
-  const { t } = useTranslation(['meeting-brief', 'common']);
+  const { t } = useTranslation(['meeting-brief', 'common', 'family-contact']);
   const { meetingId: meetingIdParam } = useParams<{ meetingId: string }>();
   const meetingId = Number(meetingIdParam);
   usePageTitle(t('page.title'));
@@ -161,7 +162,7 @@ export function MeetingBriefPage() {
                 <ul className="divide-y divide-brand-slate-100" data-testid="brief-contact-attempts">
                   {brief.contactAttempts.map((a) => (
                     <li key={a.id} className="py-2 text-sm text-brand-slate-700">
-                      {FAMILY_CONTACT_METHOD_LABELS[a.method]} · {FAMILY_CONTACT_OUTCOME_LABELS[a.outcome]} ·{' '}
+                      {familyContactMethodLabel(a.method)} · {familyContactOutcomeLabel(a.outcome)} ·{' '}
                       {formatDate(a.attemptedAt)}
                     </li>
                   ))}
@@ -181,7 +182,7 @@ export function MeetingBriefPage() {
                   {brief.offlineInput.map((i) => (
                     <li key={i.id} className="py-2 text-sm">
                       <p className="text-brand-slate-700">
-                        {FAMILY_CONTACT_METHOD_LABELS[i.method]} · {formatDate(i.receivedAt)}
+                        {familyContactMethodLabel(i.method)} · {formatDate(i.receivedAt)}
                       </p>
                       <p className="text-xs text-brand-slate-500">{i.summary}</p>
                     </li>

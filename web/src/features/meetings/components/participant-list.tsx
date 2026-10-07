@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { TEAM_ROLE_LABELS } from '@/features/educator/types';
+import { teamRoleLabel } from '@/features/educator/lib/student-enum-labels';
 import { inviteStatusLabel } from '@/lib/invite-status-label';
 import type { AttendanceEntry, InviteStatus, MeetingParticipantDto } from '../types';
 
@@ -24,7 +24,10 @@ interface ParticipantListProps {
 /** Read-only roster: name, functional role, and RSVP status; optionally an
  * attendance capture control (checkbox + excusal note) per row. */
 export function ParticipantList({ participants, attendance }: ParticipantListProps) {
-  const { t } = useTranslation('meetings-staff');
+  // `educator` alongside `meetings-staff`: `teamRoleLabel` below is backed
+  // by that staff-only namespace, and this hook call is what makes a
+  // language switch re-render this list once its Spanish loads.
+  const { t } = useTranslation(['meetings-staff', 'educator']);
   return (
     <ul className="divide-y divide-brand-slate-100" data-testid="meeting-participant-list">
       {participants.map((p) => {
@@ -35,7 +38,7 @@ export function ParticipantList({ participants, attendance }: ParticipantListPro
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-brand-slate-800">{p.displayName}</p>
                 <p className="text-xs text-brand-slate-500">
-                  {TEAM_ROLE_LABELS[p.teamRole]}
+                  {teamRoleLabel(p.teamRole)}
                   {p.isRequired ? '' : t('participantList.optionalSuffix')}
                   {p.isFamily ? t('participantList.familySuffix') : ''}
                   {p.isStudent ? t('participantList.studentSuffix') : ''}

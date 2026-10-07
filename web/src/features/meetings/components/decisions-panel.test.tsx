@@ -24,8 +24,7 @@ import { DecisionsPanel } from './decisions-panel';
 // (`app/lazy-routes/staff-routes.tsx`) registers it before the page that
 // hosts this panel (the meeting drawer, on the educator calendar/student
 // detail pages) can render.
-import '../staff-locales';
-
+import '@/app/lazy-routes/staff-locales';
 function makeDecision(overrides: Partial<MeetingDecisionDto> = {}): MeetingDecisionDto {
   return {
     id: 1,

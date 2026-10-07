@@ -4,12 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import type { CompletenessSummary } from '../lib/completeness';
 // `document-authoring` is a staff-only namespace (plan phase 5) — see
-// `../staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
+// `@/app/lazy-routes/staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
 // admin namespaces". This component renders directly here (not through the
 // lazy route), so its English must be registered the same way the real
 // route chunk does.
-import '../staff-locales';
-
+import '@/app/lazy-routes/staff-locales';
 const sectionDom = vi.hoisted(() => ({ jumpToField: vi.fn() }));
 vi.mock('../lib/section-dom', () => sectionDom);
 

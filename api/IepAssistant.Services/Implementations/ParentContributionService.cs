@@ -7,13 +7,18 @@ using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
-/// <summary>Multilingual plan (2026-10-06) phase 5: every failure a controller maps to a status carries
-/// an explicit <see cref="ServiceErrorKind"/>, and every message is localized (<c>Messages.resx</c>/
-/// <c>.es.resx</c>). <c>ParentContributionsController</c> maps status per endpoint rather than through
-/// the shared mapper, so the SAME "Child profile not found." text intentionally carries a different kind
-/// at each call site below: <see cref="GetForChildAsync"/>'s controller route always 404s, while
-/// <see cref="CreateAsync"/>'s route always 400s on any failure (pre-existing, pinned by tests) — the
-/// kind lives on the <see cref="ServiceResult"/> instance, not derived from the shared message text.</summary>
+/// <summary>Multilingual plan (2026-10-06) phase 5 (review fix P3-6 corrected this comment): every
+/// failure a controller maps to a status carries an explicit <see cref="ServiceErrorKind"/>, and every
+/// message is localized (<c>Messages.resx</c>/<c>.es.resx</c>). <c>ParentContributionsController</c>
+/// maps EVERY endpoint through the shared
+/// <see cref="IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure"/>, so the
+/// SAME "Child profile not found." text intentionally carries a different <see cref="ServiceErrorKind"/>
+/// at each call site below, to match the controller's PRE-EXISTING per-endpoint status choices:
+/// <see cref="GetForChildAsync"/> sets <see cref="ServiceErrorKind.NotFound"/> (its route always 404s),
+/// while <see cref="CreateAsync"/> sets <see cref="ServiceErrorKind.Validation"/> (its route always
+/// 400s on any failure, pre-existing, pinned by tests) — the kind lives on the
+/// <see cref="ServiceResult"/> instance and is exactly what <c>MapServiceFailure</c> switches on, never
+/// derived from the shared message text.</summary>
 public class ParentContributionService : IParentContributionService
 {
     private const int MaxPerChild = 30;

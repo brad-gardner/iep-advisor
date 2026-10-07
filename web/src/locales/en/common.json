@@ -57,7 +57,8 @@
     "notSet": "Not set",
     "currentValueSuffix": "{{value}} (current value)",
     "tryAgain": "Try again",
-    "genericError": "Something went wrong. Please try again."
+    "genericError": "Something went wrong. Please try again.",
+    "reload": "Reload"
   },
   "toast": {
     "dismiss": "Dismiss notification"

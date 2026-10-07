@@ -14,8 +14,7 @@ import { makeProfile, makeStudent } from '../test/fixtures';
 // render. Without this, `useTranslation('educator')` inside the page would
 // try (and, correctly, fail loudly) to fetch it from the Spanish-only
 // backend for English.
-import '../staff-locales';
-
+import '@/app/lazy-routes/staff-locales';
 const useEducatorProfileMock = vi.fn();
 vi.mock('../hooks/use-educator-profile', () => ({
   useEducatorProfile: () => useEducatorProfileMock(),
@@ -392,7 +391,7 @@ describe('EducatorStudentsPage', () => {
 
   // Proves the staff/admin namespace split end to end (plan phase 5): the
   // `educator` namespace's English is registered above via the
-  // `staff-locales` side-effect import (mirroring the real lazy route
+  // `@/app/lazy-routes/staff-locales` side-effect import (mirroring the real lazy route
   // chunk), and its Spanish still lazy-loads like any other namespace — so
   // `renderInSpanish` needs the extra `ns: 'educator'` (`docs/i18n/
   // README.md`'s "Namespace coverage" / test conventions).

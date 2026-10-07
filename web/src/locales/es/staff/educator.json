@@ -189,12 +189,12 @@
     "revoke": "Revocar"
   },
   "exitStudent": {
-    "modalTitle": "Egresar estudiante",
+    "modalTitle": "Registrar egreso del estudiante",
     "description": "{{name}} se marcará como egresado y se ocultará de la lista activa. Los documentos, los enlaces familiares y el equipo del IEP se conservan, y el estudiante puede reactivarse más adelante.",
-    "errorDefault": "No se pudo egresar al estudiante",
+    "errorDefault": "No se pudo registrar el egreso del estudiante",
     "reasonLabel": "Motivo *",
     "dateLabel": "Fecha de egreso",
-    "submit": "Egresar estudiante"
+    "submit": "Registrar egreso del estudiante"
   },
   "transferStudent": {
     "modalTitle": "Trasladar estudiante",

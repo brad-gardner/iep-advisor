@@ -84,7 +84,11 @@ export function ServicesBlock({
   flush,
   cellTarget,
 }: ServicesBlockProps) {
-  const { t } = useTranslation('document-authoring');
+  // `educator` alongside `document-authoring`: `resolveOwnerDisplay` below
+  // renders a `teamRoleLabel` (`educator:teamRole.*`, staff-only) — this
+  // hook call is what makes a language switch re-render once that
+  // namespace's Spanish loads.
+  const { t } = useTranslation(['document-authoring', 'educator']);
   const labelId = `${fieldElementId(field.id)}-label`;
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(() => initialFocusRowKey ?? null);
 

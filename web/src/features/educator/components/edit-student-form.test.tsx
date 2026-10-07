@@ -7,7 +7,7 @@ import { makeStudent } from '../test/fixtures';
 // side-effect import, exactly as the real lazy route chunk
 // (`app/lazy-routes/staff-routes.tsx`) registers it. This test renders
 // `EditStudentForm` directly, bypassing the page that would otherwise do so.
-import '../staff-locales';
+import '@/app/lazy-routes/staff-locales';
 import { EditStudentForm } from './edit-student-form';
 
 describe('EditStudentForm', () => {

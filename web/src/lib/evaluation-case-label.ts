@@ -9,8 +9,8 @@ import type { EligibilityOutcome, EvaluationCaseKind, EvaluationCaseStatus } fro
 // phase 5 — see `docs/i18n/README.md`'s "Staff and admin namespaces"); every
 // current and foreseeable caller is a staff-only component reached from the
 // educator student detail page, so its English is always registered
-// (`features/evaluation/staff-locales.ts`) before any of these can be
-// called. A lookup miss falls back to the raw value via `defaultValue`,
+// (`app/lazy-routes/staff-locales.ts`) before any of these can be called.
+// A lookup miss falls back to the raw value via `defaultValue`,
 // matching `meetingTypeLabel`'s reasoning: these are typed enums, but the
 // value ultimately comes from stored/server data.
 export function evaluationCaseKindLabel(kind: EvaluationCaseKind): string {

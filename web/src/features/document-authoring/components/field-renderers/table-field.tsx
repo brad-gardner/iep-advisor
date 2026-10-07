@@ -20,9 +20,9 @@ import {
   ROW_BLOCK_SEMANTICS,
   ROW_CONFIRMED_KEY,
   ROW_OBJECTIVES_KEY,
-  rowBlockItemLabel,
 } from '@/features/admin/templates/document-semantics';
 import type { AssistKind } from '../../api/assist-types';
+import { addRowItemLabel, removeRowItemLabel, rowBlockItemNoun } from '../../lib/row-block-item-label';
 import { FieldAssistBar } from './field-assist-bar';
 import { TeamMemberSelect } from '../team-member-select';
 import {
@@ -216,7 +216,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
     id: `${field.fieldKey}:${rowKey}:${col.columnKey}`,
     label: () => {
       const index = rowsRef.current.findIndex((r) => r.key === rowKey);
-      return `${rowBlockItemLabel(blockSemantic)} ${index + 1} — ${col.label || 'field'}`;
+      return `${rowBlockItemNoun(blockSemantic)} ${index + 1} — ${col.label || t('tableField.column')}`;
     },
     apply: (text: string) => {
       if (disabledRef.current) return;
@@ -355,7 +355,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
                 >
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <span className="flex min-w-0 flex-wrap items-center gap-2 text-[13px] font-medium text-brand-slate-500">
-                      {rowBlockItemLabel(blockSemantic)} {rowIndex + 1}
+                      {rowBlockItemNoun(blockSemantic)} {rowIndex + 1}
                       {carried && (
                         <span
                           className={
@@ -401,10 +401,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
                           const primaryValue = primaryColumn ? row.cells[primaryColumn.columnKey] : undefined;
                           requestRemoveRow(row.key, typeof primaryValue === 'string' ? primaryValue : '');
                         }}
-                        aria-label={t('rowBlock.removeAriaLabel', {
-                          item: rowBlockItemLabel(blockSemantic).toLowerCase(),
-                          number: rowIndex + 1,
-                        })}
+                        aria-label={removeRowItemLabel(blockSemantic, rowIndex + 1)}
                         data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
                       >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -497,7 +494,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
             data-testid={`field-${field.fieldKey}-add`}
           >
             <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-            {t('rowBlock.addItem', { item: rowBlockItemLabel(blockSemantic).toLowerCase() })}
+            {addRowItemLabel(blockSemantic)}
           </Button>
         </div>
       </div>

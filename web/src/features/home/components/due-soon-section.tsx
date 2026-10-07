@@ -1,16 +1,19 @@
 import { useTranslation } from 'react-i18next';
 import { ObligationStatusChip } from '@/features/obligations/components/obligation-status-chip';
-import { OBLIGATION_KIND_ICONS, OBLIGATION_KIND_LABELS } from '@/features/obligations/types';
+import { OBLIGATION_KIND_ICONS } from '@/features/obligations/types';
 import type { ObligationDto } from '@/features/obligations/types';
 import { formatDate } from '@/lib/format-date';
+import { obligationKindLabel } from '@/lib/obligation-label';
 import { ListSection } from './list-section';
 import { WorkItemRow } from './work-item-row';
 
 /** Due-soon/overdue procedural deadlines where the viewer is lead (staff
  * variants only — admins get the board instead). Unknown dates render via the
- * shared `ObligationStatusChip`'s "Unknown" state, never as healthy. */
+ * shared `ObligationStatusChip`'s "Unknown" state, never as healthy.
+ * `obligationKindLabel` is backed by the staff-only `obligations` namespace,
+ * hence `obligations` alongside `home` below. */
 export function DueSoonSection({ obligations }: { obligations: ObligationDto[] }) {
-  const { t } = useTranslation('home');
+  const { t } = useTranslation(['home', 'obligations']);
   return (
     <ListSection
       title={t('dueSoon.title')}
@@ -25,7 +28,7 @@ export function DueSoonSection({ obligations }: { obligations: ObligationDto[] }
       renderRow={(o) => (
         <WorkItemRow
           title={o.studentName}
-          subtitle={`${OBLIGATION_KIND_LABELS[o.kind]} · ${formatDate(o.dueDate)}`}
+          subtitle={`${obligationKindLabel(o.kind)} · ${formatDate(o.dueDate)}`}
           subtitleIcon={OBLIGATION_KIND_ICONS[o.kind]}
           href={`/educator/students/${o.schoolStudentId}`}
           data-testid={`home-due-soon-${o.schoolStudentId}-${o.kind}`}

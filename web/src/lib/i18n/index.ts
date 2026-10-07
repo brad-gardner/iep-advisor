@@ -3,6 +3,7 @@ import { initReactI18next } from 'react-i18next';
 import resourcesToBackend from 'i18next-resources-to-backend';
 import * as Sentry from '@sentry/react';
 import { detectInitialLanguage, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from './detect';
+import type { EnResources } from './types';
 
 export const defaultNS = 'common';
 
@@ -171,17 +172,25 @@ i18next.on('failedLoading', (lng, ns, msg) => {
 // A staff/admin namespace's English (`locales/en/staff/<ns>.json`) is
 // deliberately NOT part of `enModules`/`resources` above — that glob only
 // matches direct children of `locales/en/`, not `locales/en/staff/*` — so it
-// never enters the main chunk. Instead, the namespace's own lazy route chunk
-// statically imports its `en/staff/<ns>.json` file (so THAT import, not this
-// one, is what makes Vite split it into the chunk) and calls this at module
-// top level, before the chunk's page component can render. `deep: true,
-// overwrite: true` matches a normal `addResourceBundle` full-replace of the
-// namespace — there is never a partial/merge case here, since a namespace is
-// only ever registered once, by its own chunk.
+// never enters the main chunk. Instead, `app/lazy-routes/staff-locales.ts`
+// (one shared module, imported by all three lazy area route barrels) globs
+// every `en/staff/<ns>.json` file (so THAT import, not this one, is what
+// makes Vite split them into those already-lazy chunks) and calls this once
+// per file, at module top level, before any of those chunks' page
+// components can render. `deep: true, overwrite: true` matches a normal
+// `addResourceBundle` full-replace of the namespace — there is never a
+// partial/merge case here, since a namespace is only ever registered once.
 //
 // See `docs/i18n/README.md` ("Staff and admin namespaces") and
-// `features/educator/staff-locales.ts` for the worked example.
-export function registerEnglishNamespace(ns: string, resource: Record<string, unknown>): void {
+// `app/lazy-routes/staff-locales.ts` for the full mechanism.
+//
+// Generic over `EnResources` (`types.d.ts`) rather than `(ns: string,
+// resource: Record<string, unknown>)` so a call site is checked against the
+// SAME strict per-namespace shape `useTranslation(ns)` is — passing
+// `evaluation.json`'s content for `ns: 'educator'`, or a namespace name
+// `EnResources` doesn't know about, is now a `tsc` error at the call site
+// instead of only surfacing later as a confusing runtime translation bug.
+export function registerEnglishNamespace<K extends keyof EnResources>(ns: K, resource: EnResources[K]): void {
   i18next.addResourceBundle('en', ns, resource, true, true);
 }
 

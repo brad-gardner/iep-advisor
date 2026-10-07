@@ -12,8 +12,7 @@ import { makeMember } from '../../test/fixtures';
 // side-effect import, exactly as the real lazy route chunk
 // (`app/lazy-routes/staff-routes.tsx`) registers it. This test renders
 // `StudentTeamPanel` directly, bypassing the page that would otherwise do so.
-import '../../staff-locales';
-
+import '@/app/lazy-routes/staff-locales';
 const api = vi.hoisted(() => ({
   getTeam: vi.fn(),
   getEligibleTeamStaff: vi.fn(),

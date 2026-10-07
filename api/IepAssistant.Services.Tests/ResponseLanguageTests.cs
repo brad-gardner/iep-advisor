@@ -76,6 +76,18 @@ public class ResponseLanguageTests
     }
 
     [Fact]
+    public void SystemLine_Spanish_IsAudienceNeutral()
+    {
+        // Phase 5 review fix P3-8: this ONE instruction is shared by every Spanish-preferring requester
+        // (staff and parents alike), so it must not bake in a "family" or "US" audience assumption.
+        var line = ResponseLanguage.SystemLine(CultureInfo.GetCultureInfo("es"));
+
+        Assert.DoesNotContain("family", line, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(" US ", line);
+        Assert.Contains("neutral Latin American Spanish", line);
+    }
+
+    [Fact]
     public void SystemLine_NeverInterpolatesArguments_SameCultureAlwaysProducesIdenticalText()
     {
         // The whole point of a fixed instruction: two independent calls for the same culture produce

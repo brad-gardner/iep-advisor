@@ -7,12 +7,15 @@
 // phase-5 "one chunk per area is fine" — `docs/plans/
 // 2026-10-06-001-feat-multilingual-english-spanish-plan.md`).
 //
-// The side-effect import below registers the `educator` namespace's English
-// (`registerEnglishNamespace` in `lib/i18n/index.ts`) as this module
+// The side-effect import below registers every staff/admin namespace's
+// English (`registerEnglishNamespace` in `lib/i18n/index.ts`, via one glob
+// over `locales/en/staff/*.json` — see `./staff-locales.ts` and
+// `docs/i18n/README.md`'s "Staff and admin namespaces") as this module
 // evaluates — i.e. before any page re-exported here can render — so English
 // never flashes a raw `ns:key` and never has to be fetched. A later worker
-// adding a staff namespace to one of these pages (or a new staff page) adds
-// its own `<feature>/staff-locales.ts` the same way and imports it here.
+// adding a staff namespace to one of these pages (or a new staff page)
+// needs no new import here — dropping the namespace's `en/staff/<ns>.json`
+// file on disk is enough.
 
 import './staff-locales';
 

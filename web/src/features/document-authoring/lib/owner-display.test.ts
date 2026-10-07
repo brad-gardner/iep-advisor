@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 // `document-authoring` is a staff-only namespace (plan phase 5) — see
-// `../staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
+// `@/app/lazy-routes/staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
 // admin namespaces". `resolveOwnerDisplay` below calls `i18n.t` for this
 // namespace directly (not via a component), so it must be registered here
-// too, the same way the real route chunk does.
-import '../staff-locales';
+// too, the same way the real route chunk does. `educator` is also
+// staff-only and needed because `resolveOwnerDisplay` now renders a found
+// member's role via `teamRoleLabel` (`educator:teamRole.*`).
+import '@/app/lazy-routes/staff-locales';
 import { resolveOwnerDisplay } from './owner-display';
 import type { StudentTeamCache } from '../hooks/use-student-team';
 

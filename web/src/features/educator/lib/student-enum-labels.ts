@@ -3,8 +3,8 @@ import type { AccessRole, AttentionFilter, ExitReason, StudentStatus, TeamRole }
 
 // Human-facing, translated labels for the staff-only enum maps in
 // `features/educator/types.ts` (`STUDENT_STATUS_LABELS`, `EXIT_REASON_LABELS`,
-// `TEAM_ROLE_LABELS`, `ATTENTION_FILTER_LABELS`, and the `AccessRole` string
-// union) — via `educator:studentStatus.*` / `exitReason.*` / `teamRole.*` /
+// `ATTENTION_FILTER_LABELS`, and the `AccessRole` string union) — via
+// `educator:studentStatus.*` / `exitReason.*` / `teamRole.*` /
 // `attentionFilter.*` / `accessRole.*` (all keyed by the raw enum value,
 // which IS the stored/API value for every one of these — see
 // `docs/i18n/README.md`'s "Display-label helpers follow `orgRoleLabel`'s
@@ -12,8 +12,9 @@ import type { AccessRole, AttentionFilter, ExitReason, StudentStatus, TeamRole }
 // so they work from both render bodies and plain builder functions
 // (`roster-columns.tsx`, `team-columns.tsx`) that have no hook of their own;
 // the `educator` namespace's English is guaranteed already registered by
-// the time any of these run, since every caller lives behind the staff
-// lazy-route chunk that registers it (`features/educator/staff-locales.ts`).
+// the time any of these run, since every caller lives behind a staff
+// lazy-route chunk, and all three import `@/app/lazy-routes/staff-locales`,
+// which registers every staff namespace (including this one).
 // Every value in each union has a translation, so there's no legacy/unknown
 // fallback to pass — an unrecognized value is a `tsc` error at the call
 // site, same as `inviteStatusLabel`.

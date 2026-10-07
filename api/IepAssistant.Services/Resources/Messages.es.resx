@@ -433,7 +433,7 @@
     <value>Este documento fue modificado por otra persona. Vuelva a cargarlo e inténtelo de nuevo.</value>
   </data>
   <data name="Documents.SharedDraftBlocksDelete" xml:space="preserve">
-    <value>Este documento se ha compartido con la familia y no se puede eliminar. Retire el recurso compartido primero.</value>
+    <value>Este documento se ha compartido con la familia y no se puede eliminar. Deje de compartirlo primero.</value>
   </data>
   <data name="Documents.TooLargeToSave" xml:space="preserve">
     <value>Este documento es demasiado grande para guardarse. Reduzca su contenido.</value>
@@ -464,6 +464,9 @@
   </data>
   <data name="Documents.InvalidTableRow" xml:space="preserve">
     <value>'{0}' tiene una fila de tabla no válida.</value>
+  </data>
+  <data name="Documents.TableColumnLabel" xml:space="preserve">
+    <value>columna {0}</value>
   </data>
   <data name="Documents.OwnerNotActiveTeamMember" xml:space="preserve">
     <value>La persona responsable seleccionada para una fila en '{0}' no es un miembro activo del equipo del estudiante, por lo que no se guardó.</value>
@@ -868,16 +871,16 @@
     <value>No tiene permiso para editar a este estudiante.</value>
   </data>
   <data name="Educator.AlreadyExited" xml:space="preserve">
-    <value>El estudiante ya fue dado de baja.</value>
+    <value>El estudiante ya egresó.</value>
   </data>
   <data name="Educator.NoPermissionChangeStatus" xml:space="preserve">
     <value>No tiene permiso para cambiar el estado de este estudiante.</value>
   </data>
   <data name="Educator.NoPermissionTransferStudents" xml:space="preserve">
-    <value>No tiene permiso para transferir estudiantes.</value>
+    <value>No tiene permiso para trasladar estudiantes.</value>
   </data>
   <data name="Educator.NoPermissionTransferThisStudent" xml:space="preserve">
-    <value>No tiene permiso para transferir a este estudiante.</value>
+    <value>No tiene permiso para trasladar a este estudiante.</value>
   </data>
   <data name="Educator.AlreadyAtSchool" xml:space="preserve">
     <value>El estudiante ya está en esa escuela.</value>
@@ -1247,6 +1250,9 @@
   </data>
   <data name="MeetingBrief.SourceDraft" xml:space="preserve">
     <value>{0} (borrador)</value>
+  </data>
+  <data name="MeetingBrief.Disclaimer" xml:space="preserve">
+    <value>Resumen informativo: las decisiones del equipo se toman durante la reunión.</value>
   </data>
   <data name="MeetingBrief.Checklist.RequiredParticipantsLabel" xml:space="preserve">
     <value>Participantes obligatorios presentes</value>

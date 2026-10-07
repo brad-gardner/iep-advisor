@@ -166,20 +166,6 @@
     "finalizedHeading": "Finalized",
     "finalizedAgo": "finalized {{time}}"
   },
-  "authoredPdfDownload": {
-    "checking": "Checking PDF…",
-    "preparing": "Preparing…",
-    "download": "Download PDF",
-    "downloadError": "Couldn’t prepare the download. Please try again.",
-    "pdfFailed": "PDF failed",
-    "retry": "Retry",
-    "retrying": "Retrying…",
-    "generateErrorTitle": "PDF could not be generated",
-    "generateErrorFallback": "The PDF render failed.",
-    "stillGenerating": "Still generating — check again shortly.",
-    "generating": "Generating PDF…",
-    "checkAgain": "Check again"
-  },
   "authoredVersionDetailPage": {
     "loading": "Loading version…",
     "unavailableTitle": "Version unavailable",
@@ -334,10 +320,25 @@
     "carriedFromNotReviewed": "Carried from {{label}} · not yet reviewed",
     "priorVersion": "prior version",
     "keepAsIs": "Keep as-is",
-    "removeAriaLabel": "Remove {{item}} {{number}}",
-    "addItem": "Add {{item}}",
     "aiHelpAvailableAfterSave": "AI help is available once this row has saved.",
-    "retirementReasonError": "Could not record the retirement reason."
+    "retirementReasonError": "Could not record the retirement reason.",
+    "itemNoun": {
+      "goal": "Goal",
+      "service": "Service",
+      "accommodation": "Accommodation",
+      "transitionItem": "Transition item",
+      "row": "Row"
+    },
+    "addGoal": "Add goal",
+    "addService": "Add service",
+    "addAccommodation": "Add accommodation",
+    "addTransitionItem": "Add transition item",
+    "addRow": "Add row",
+    "removeGoal": "Remove goal {{number}}",
+    "removeService": "Remove service {{number}}",
+    "removeAccommodation": "Remove accommodation {{number}}",
+    "removeTransitionItem": "Remove transition item {{number}}",
+    "removeRow": "Remove row {{number}}"
   },
   "goalsBlock": {
     "fallbackHeading": "Goals",

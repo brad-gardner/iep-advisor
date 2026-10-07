@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
-import { TEAM_ROLE_LABELS } from '@/features/educator/types';
 import { teamMemberName } from '@/features/educator/components/team/team-eligibility';
+import { teamRoleLabel } from '@/features/educator/lib/student-enum-labels';
 import type { StudentTeamCache } from '../hooks/use-student-team';
 
 interface TeamMemberSelectProps {
@@ -43,7 +43,10 @@ export function TeamMemberSelect({
   'data-testid': testId,
   'aria-label': ariaLabel,
 }: TeamMemberSelectProps) {
-  const { t } = useTranslation('document-authoring');
+  // `educator` alongside `document-authoring`: `teamRoleLabel` below is
+  // backed by that staff-only namespace, and this hook call is what makes a
+  // language switch re-render this select once its Spanish loads.
+  const { t } = useTranslation(['document-authoring', 'educator']);
   const isError = team?.isError ?? false;
   const members = team?.members ?? [];
   const active = [...members]
@@ -79,7 +82,7 @@ export function TeamMemberSelect({
         {!isError &&
           active.map((m) => (
             <option key={m.userId} value={m.userId}>
-              {teamMemberName(m)} — {TEAM_ROLE_LABELS[m.teamRole]}
+              {teamMemberName(m)} — {teamRoleLabel(m.teamRole)}
             </option>
           ))}
       </select>

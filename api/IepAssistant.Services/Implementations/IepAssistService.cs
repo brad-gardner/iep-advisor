@@ -21,11 +21,16 @@ namespace IepAssistant.Services.Implementations;
 ///
 /// <para>Multilingual plan (2026-10-06) phase 5: every failure <c>IepAssistController</c> maps to a
 /// status carries an explicit <see cref="ServiceErrorKind"/>, and every message is localized
-/// (<c>Messages.resx</c>/<c>.es.resx</c>). The Claude system prompt gets
-/// <see cref="ResponseLanguage.SystemLine"/> for the requester's UI culture — same reasoning as
-/// <c>DocumentAssistService</c> (the legacy draft-assist equivalent): the suggestion/reply goes straight
-/// to the requesting staff member in their chosen language, never persisted with its own
-/// generatedLanguage field.</para>
+/// (<c>Messages.resx</c>/<c>.es.resx</c>).</para>
+///
+/// <para><b>Phase 5 review fix P2-7 (coordinator decision) — language split, mirroring
+/// <c>DocumentAssistService</c>:</b> <see cref="AssistGoalAsync"/>/<see cref="AssistSectionAsync"/>/
+/// <see cref="AssistServiceLineAsync"/> insert their suggestion DIRECTLY INTO A DRAFT FIELD if accepted,
+/// and the draft is a district legal record in its own fixed language, so <see cref="CompleteAssistAsync"/>
+/// never appends <see cref="ResponseLanguage.SystemLine"/> — always English, regardless of the
+/// requester's UI culture. <see cref="ChatAsync"/>'s reply is never inserted into the draft, so it keeps
+/// appending <see cref="ResponseLanguage.SystemLine"/> for the requester's UI culture, same as before.
+/// Neither path persists its own generatedLanguage field.</para>
 /// </summary>
 public class IepAssistService : IIepAssistService
 {
@@ -178,9 +183,14 @@ public class IepAssistService : IIepAssistService
 
     private async Task<ServiceResult<AssistResultModel>> CompleteAssistAsync(string systemPrompt, string userText, CancellationToken ct)
     {
-        // Multilingual plan phase 5: same reasoning as the chat path — the suggestion goes straight to
-        // the requesting staff member, in their chosen UI language.
-        systemPrompt += ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture);
+        // Multilingual plan phase 5 review fix P2-7 (coordinator decision, superseding the phase 5
+        // reasoning this comment used to carry — "same reasoning as the chat path"): this suggestion
+        // (goal / section / service-line) is INSERTED DIRECTLY INTO A DRAFT FIELD if the staff member
+        // accepts it, and the draft is a district legal record in its own fixed language — never the
+        // staff member's UI language, which would insert mixed-language content into an otherwise
+        // single-language draft. So, unlike ChatAsync below, this path does NOT append
+        // ResponseLanguage.SystemLine; the suggestion always comes back in English regardless of
+        // CultureInfo.CurrentUICulture.
 
         string? suggestion;
         try
