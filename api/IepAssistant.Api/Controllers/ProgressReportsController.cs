@@ -104,7 +104,7 @@ public class ProgressReportsController : ControllerBase
         // Kick off analysis in the background as soon as the file is attached.
         await _analysisQueue.EnqueueAsync(result.Data!.Id, cancellationToken);
 
-        return Ok(ApiResponse<ProgressReportDto>.SuccessResponse(MapToDto(result.Data!), _localizer["DocumentsApi.FileAttached"]));
+        return Ok(ApiResponse<ProgressReportDto>.SuccessResponse(MapToDto(result.Data!), _localizer["ProgressReportsApi.FileAttached"]));
     }
 
     [HttpPut("api/progress-reports/{id}")]

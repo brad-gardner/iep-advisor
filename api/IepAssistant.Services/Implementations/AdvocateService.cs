@@ -319,7 +319,7 @@ public class AdvocateService : IAdvocateService
         var toolset = new AdvocateToolset(_context, _access, _knowledgeBase, _comparison, thread.ChildProfileId, userId, stateCode, _logger);
         // In-request call: RequestLocalization has already set CurrentUICulture from the signed-in
         // parent's saved preference or Accept-Language by the time this controller action runs.
-        var language = SupportedLanguages.Normalize(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
+        var language = SupportedLanguages.Normalize(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName) ?? SupportedLanguages.English;
         var request = new ClaudeToolRequest
         {
             SystemPrompt = AdvocatePrompts.System + ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture),

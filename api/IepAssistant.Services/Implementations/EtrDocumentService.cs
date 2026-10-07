@@ -131,7 +131,7 @@ public class EtrDocumentService : IEtrDocumentService
         _documentRepository.Update(document);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult(_localizer["Documents.MetadataUpdatedSuccessfully"]);
+        return ServiceResult.SuccessResult(_localizer["EtrDocumentsApi.MetadataUpdated"]);
     }
 
     public async Task<ServiceResult<EtrDocumentModel>> AttachFileAsync(int id, int userId, string fileName, Stream fileStream, long fileSize, CancellationToken cancellationToken = default)

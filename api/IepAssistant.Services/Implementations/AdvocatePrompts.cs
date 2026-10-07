@@ -10,30 +10,17 @@ namespace IepAssistant.Services.Implementations;
 /// (<see cref="Localization.ResponseLanguage.SystemLine"/> is appended separately by the caller, never
 /// baked into this constant, for exactly that reason — see <see cref="AdvocateService"/>).
 ///
-/// <para><b>Multilingual plan (2026-10-06) phase 3:</b> <see cref="Disclaimer"/>/<see cref="UnavailableMessage"/>/
-/// <see cref="UsageCapMessage"/> below stay as English constants — they are used ONLY as unreachable
-/// last-resort <c>??</c> fallbacks in <c>AdvocateController</c> (every real code path already supplies a
-/// non-null value). The actual, localized text <see cref="AdvocateService"/> and <c>AdvocateController</c>
-/// show to a user comes from <c>IStringLocalizer&lt;Ai&gt;</c> (<c>Resources/Ai.resx</c>/<c>Ai.es.resx</c>,
-/// keys <c>Advocate.Disclaimer</c>/<c>Advocate.UnavailableMessage</c>/<c>Advocate.UsageCapMessage</c>) —
-/// the English resx value is byte-identical to the constant below. <see cref="ToolLabel"/> likewise takes
-/// an <see cref="IStringLocalizer{Ai}"/> now, since the activity label streamed to the parent while a tool
-/// runs must follow their language too.</para>
+/// <para><b>Multilingual plan (2026-10-06) phase 3 review fix:</b> the disclaimer, unavailable-error and
+/// usage-cap text <see cref="AdvocateService"/> and <c>AdvocateController</c> show to a user comes
+/// entirely from <c>IStringLocalizer&lt;Ai&gt;</c> (<c>Resources/Ai.resx</c>/<c>Ai.es.resx</c>, keys
+/// <c>Advocate.Disclaimer</c>/<c>Advocate.UnavailableMessage</c>/<c>Advocate.UsageCapMessage</c>) — there
+/// is no English-constant fallback for any of them; every real code path already supplies the localized
+/// value, so a fallback here would be dead code hiding a real bug if it were ever reached.
+/// <see cref="ToolLabel"/> likewise takes an <see cref="IStringLocalizer{Ai}"/>, since the activity label
+/// streamed to the parent while a tool runs must follow their language too.</para>
 /// </summary>
 public static class AdvocatePrompts
 {
-    public const string Disclaimer =
-        "The Virtual Advocate gives general information to help you understand your child's plan and your " +
-        "options. It is not legal advice. For decisions with legal consequences, confirm with a licensed " +
-        "special-education advocate or attorney.";
-
-    /// <summary>Canned text for an <c>unavailable</c> error event. Never derived from an API response.</summary>
-    public const string UnavailableMessage =
-        "The advocate could not answer right now. Your question was saved — please try again in a moment.";
-
-    public const string UsageCapMessage =
-        "You have used all of this year's advocate messages. Upgrade your subscription to keep the conversation going.";
-
     public const string System =
         "You are the Virtual Advocate: a calm, experienced special-education advocate talking with a parent " +
         "about ONE child. The parent is not a lawyer or a teacher. You are on their side, and you are honest " +

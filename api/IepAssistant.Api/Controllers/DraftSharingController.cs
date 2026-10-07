@@ -50,7 +50,7 @@ public class DraftSharingController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Share(int id, [FromBody] ShareDraftRequest? request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _sharing.ShareAsync(User.GetUserId(), id, request?.Message, ct);
         if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
@@ -117,7 +117,7 @@ public class DraftSharingController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Resolve(int id, [FromBody] ResolveResponseRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _responses.ResolveAsync(User.GetUserId(), id, new ResolveDraftResponseModel
         {

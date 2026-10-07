@@ -151,9 +151,10 @@ public class DraftExplanationService : IDraftExplanationService
         model.GeneratedAt = entity.GeneratedAt;
         model.Disclaimer = string.IsNullOrWhiteSpace(model.Disclaimer) ? _localizer["Draft.Disclaimer"].Value : model.Disclaimer;
         // Never trust a value serialized into the JSON blob for this — entity.Language is the
-        // authoritative source, consistent with RevisionId/GeneratedAt above. Null means English,
-        // including every explanation cached before this column existed.
-        model.GeneratedLanguage = entity.Language ?? SupportedLanguages.English;
+        // authoritative source, consistent with RevisionId/GeneratedAt above. Carried straight through
+        // (never defaulted to English here): null means English, including every explanation cached
+        // before this column existed, and that interpretation belongs to the client, not this model.
+        model.GeneratedLanguage = entity.Language;
         return model;
     }
 

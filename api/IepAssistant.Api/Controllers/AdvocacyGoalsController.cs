@@ -39,7 +39,7 @@ public class AdvocacyGoalsController : ControllerBase
     public async Task<IActionResult> Create(int childId, [FromBody] CreateAdvocacyGoalRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var userId = User.GetUserId();
         var model = new CreateAdvocacyGoalModel
@@ -99,7 +99,7 @@ public class AdvocacyGoalsController : ControllerBase
     public async Task<IActionResult> Reorder(int childId, [FromBody] ReorderAdvocacyGoalsRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var userId = User.GetUserId();
         var items = request.Items.Select(i => new ReorderAdvocacyGoalItem { Id = i.Id, DisplayOrder = i.DisplayOrder }).ToList();

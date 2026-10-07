@@ -295,14 +295,11 @@
   <data name="MeetingPrep.InvalidItemIndex" xml:space="preserve">
     <value>Índice de elemento no válido</value>
   </data>
-  <data name="MeetingPrep.InvalidRequest" xml:space="preserve">
-    <value>Solicitud no válida</value>
-  </data>
   <data name="MeetingPrep.InvalidSection" xml:space="preserve">
     <value>Sección no válida</value>
   </data>
-  <data name="MeetingPrep.ItemUpdated" xml:space="preserve">
-    <value>Elemento actualizado</value>
+  <data name="MeetingPrep.ItemChecked" xml:space="preserve">
+    <value>Elemento marcado</value>
   </data>
   <data name="MeetingPrep.SectionHasNoItems" xml:space="preserve">
     <value>La sección no tiene elementos</value>

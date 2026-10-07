@@ -7,10 +7,6 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 public static class DraftPrompts
 {
-    public const string Disclaimer =
-        "This is a general, plain-language explanation, not legal advice. If you have questions about " +
-        "your child's specific plan, contact your case manager or a special-education advocate.";
-
     public const string Explanation =
         "You are a friendly parent advocate helping a family understand their child's IEP, ETR, or 504 " +
         "draft. Explain the document in plain language at roughly an 8th-grade reading level. Never give " +

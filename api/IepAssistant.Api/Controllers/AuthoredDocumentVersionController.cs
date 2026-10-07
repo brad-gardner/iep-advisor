@@ -165,7 +165,7 @@ public class AuthoredDocumentVersionController : ControllerBase
     public async Task<IActionResult> Amend(int versionId, [FromBody] AmendDocumentVersionRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _service.AmendAsync(versionId, User.GetUserId(), new IepAssistant.Services.Models.AmendDocumentVersionModel
         {

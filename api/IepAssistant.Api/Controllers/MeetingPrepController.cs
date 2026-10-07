@@ -18,12 +18,21 @@ public class MeetingPrepController : ControllerBase
     private readonly IMeetingPrepService _meetingPrepService;
     private readonly MeetingPrepQueue _queue;
     private readonly IStringLocalizer<Ai> _localizer;
+    // The one generic ModelState-guard key (Api.InvalidRequest) lives in Messages.resx, alongside every
+    // other Phase 3 controller's — not duplicated into Ai.resx just for this controller (multilingual
+    // plan 2026-10-06 phase 3 review fix, replacing the since-removed MeetingPrep.InvalidRequest).
+    private readonly IStringLocalizer<Messages> _messagesLocalizer;
 
-    public MeetingPrepController(IMeetingPrepService meetingPrepService, MeetingPrepQueue queue, IStringLocalizer<Ai> localizer)
+    public MeetingPrepController(
+        IMeetingPrepService meetingPrepService,
+        MeetingPrepQueue queue,
+        IStringLocalizer<Ai> localizer,
+        IStringLocalizer<Messages> messagesLocalizer)
     {
         _meetingPrepService = meetingPrepService;
         _queue = queue;
         _localizer = localizer;
+        _messagesLocalizer = messagesLocalizer;
     }
 
     [HttpPost("api/children/{childId}/meeting-prep")]
@@ -110,7 +119,7 @@ public class MeetingPrepController : ControllerBase
     public async Task<IActionResult> CheckItem(int id, [FromBody] CheckItemDto dto, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error(_localizer["MeetingPrep.InvalidRequest"]));
+            return BadRequest(ApiResponse<object>.Error(_messagesLocalizer["Api.InvalidRequest"]));
 
         var userId = User.GetUserId();
         var request = new CheckItemRequest

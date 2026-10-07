@@ -102,13 +102,13 @@ public class DraftQuestionService : IDraftQuestionService
         catch (ClaudeApiException ex)
         {
             _logger.LogError(ex, "Draft question for revision {RevisionId} failed with {Kind}", revisionId, ex.Kind);
-            return ServiceResult<DraftAnswerModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["DraftQuestion.UnavailableMessage"]);
+            return ServiceResult<DraftAnswerModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DraftQuestion.UnavailableMessage"]);
         }
 
         if (string.IsNullOrWhiteSpace(reply))
         {
             _logger.LogWarning("Draft question: Claude returned no content for revision {RevisionId}.", revisionId);
-            return ServiceResult<DraftAnswerModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["DraftQuestion.UnavailableMessage"]);
+            return ServiceResult<DraftAnswerModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DraftQuestion.UnavailableMessage"]);
         }
 
         var (answer, citations) = ParseAnswer(reply, rendered);

@@ -466,7 +466,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         accessor.set(JsonSerializer.Serialize(items, CamelCaseOptions));
 
         await _context.SaveChangesAsync(ct);
-        return ServiceResult.SuccessResult(_localizer["MeetingPrep.ItemUpdated"]);
+        return ServiceResult.SuccessResult(_localizer["MeetingPrep.ItemChecked"]);
     }
 
     public async Task<ServiceResult> DeleteAsync(int id, int userId, CancellationToken ct = default)

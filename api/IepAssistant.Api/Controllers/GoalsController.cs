@@ -66,7 +66,7 @@ public class GoalsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AddObservation(int goalRecordId, [FromBody] CreateGoalObservationRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _goals.AddObservationAsync(User.GetUserId(), goalRecordId, new CreateGoalObservationModel
         {
@@ -88,7 +88,7 @@ public class GoalsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateStatus(int goalRecordId, [FromBody] UpdateGoalStatusRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _goals.UpdateStatusAsync(User.GetUserId(), goalRecordId, new UpdateGoalStatusModel
         {
@@ -106,7 +106,7 @@ public class GoalsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RecordRetirement(int instanceId, [FromBody] CreateGoalRetirementRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _goals.RecordRetirementAsync(User.GetUserId(), instanceId, new CreateGoalRetirementModel
         {

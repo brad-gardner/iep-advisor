@@ -42,7 +42,7 @@ public class MeetingsController : ControllerBase
     public async Task<IActionResult> Create(int studentId, [FromBody] CreateMeetingRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _meetingService.CreateAsync(User.GetUserId(), studentId, new CreateMeetingModel
         {
@@ -113,7 +113,7 @@ public class MeetingsController : ControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] UpdateMeetingRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _meetingService.UpdateAsync(User.GetUserId(), id, new UpdateMeetingModel
         {
@@ -156,7 +156,7 @@ public class MeetingsController : ControllerBase
     public async Task<IActionResult> SetStatus(int id, [FromBody] SetMeetingStatusRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid || request.Status == null)
-            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _meetingService.SetStatusAsync(User.GetUserId(), id, request.Status.Value, ct);
         if (!result.Success)
@@ -173,7 +173,7 @@ public class MeetingsController : ControllerBase
     public async Task<IActionResult> RecordAttendance(int id, [FromBody] AttendanceRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var items = request.Attendance.Select(a => new AttendanceItemModel
         {
@@ -197,7 +197,7 @@ public class MeetingsController : ControllerBase
     public async Task<IActionResult> Rsvp(int id, [FromBody] RsvpRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid || request.Status == null)
-            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _meetingService.RsvpAsync(User.GetUserId(), id, request.Status.Value, ct);
         if (!result.Success)
@@ -253,7 +253,7 @@ public class MeetingsController : ControllerBase
     public async Task<IActionResult> UpdateSummary(int id, [FromBody] UpdateMeetingSummaryRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _summaryService.UpdateAsync(User.GetUserId(), id, request.Body, ct);
         if (!result.Success)
@@ -335,7 +335,7 @@ public class MeetingsController : ControllerBase
     public async Task<IActionResult> RsvpByToken([FromBody] TokenRsvpRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid || request.Status == null)
-            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _meetingService.RsvpByTokenAsync(request.Token, request.Status.Value, ct);
         if (!result.Success)

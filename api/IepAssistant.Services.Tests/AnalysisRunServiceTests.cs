@@ -314,6 +314,64 @@ public class AnalysisRunServiceTests
         Assert.Equal(5, context.AnalysisRuns.Count());
         Assert.Equal(5, context.UsageRecords.Count(u =>
             u.UserId == _fixture.OwnerUserId && u.ChildProfileId == _fixture.ChildId && u.OperationType == "analysis"));
+        // Validation (400), not Conflict (409): matches main's status for this message (multilingual
+        // plan 2026-10-06 phase 3 review fix — localizing "Analysis limit reached" must not silently
+        // change its HTTP status).
+        Assert.Equal(ServiceErrorKind.Validation, sixth.ErrorKind);
+    }
+
+    [Fact]
+    public async Task CreateRunAsync_ChildNotFound_ReturnsValidationErrorKind()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        using var context = _fixture.CreateContext();
+
+        // An inactive (soft-deleted) child profile: access is granted (so the earlier permission check
+        // passes), but the active-child lookup does not find it — isolating the "child not found"
+        // branch specifically, rather than the earlier permission branch.
+        var inactiveChild = new ChildProfile { UserId = _fixture.OwnerUserId, FirstName = "Gone", IsActive = false };
+        context.ChildProfiles.Add(inactiveChild);
+        context.SaveChanges();
+        context.ChildAccesses.Add(new ChildAccess
+        {
+            ChildProfileId = inactiveChild.Id,
+            UserId = _fixture.OwnerUserId,
+            Role = AccessRole.Owner,
+            IsActive = true,
+            AcceptedAt = DateTime.UtcNow
+        });
+        context.SaveChanges();
+
+        var service = BuildService(context, new FakeClaudeClient(null));
+
+        var result = await service.CreateRunAsync(
+            inactiveChild.Id, _fixture.OwnerUserId,
+            new List<AnalysisRunSourceRef> { new(AnalysisSourceType.IepDocument, 1) },
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        // Validation (400), not NotFound (404): matches main's status for this message (multilingual
+        // plan 2026-10-06 phase 3 review fix).
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+    }
+
+    [Fact]
+    public async Task GetRunsAsync_UserWithoutAccess_ReturnsValidationErrorKind()
+    {
+        using var _fixture = new AnalysisRunTestFixture();
+        using var context = _fixture.CreateContext();
+        var service = BuildService(context, new FakeClaudeClient(null));
+
+        var stranger = new User { Email = "stranger@example.com", PasswordHash = "x", FirstName = "S", LastName = "T" };
+        context.Users.Add(stranger);
+        context.SaveChanges();
+
+        var result = await service.GetRunsAsync(_fixture.ChildId, stranger.Id, CancellationToken.None);
+
+        Assert.False(result.Success);
+        // Validation (400), not Forbidden (403): matches main's status for this message (multilingual
+        // plan 2026-10-06 phase 3 review fix).
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
     }
 
     [Fact]

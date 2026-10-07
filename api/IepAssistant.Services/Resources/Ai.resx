@@ -295,14 +295,13 @@
   <data name="MeetingPrep.InvalidItemIndex" xml:space="preserve">
     <value>Invalid item index</value>
   </data>
-  <data name="MeetingPrep.InvalidRequest" xml:space="preserve">
-    <value>Invalid request</value>
-  </data>
   <data name="MeetingPrep.InvalidSection" xml:space="preserve">
     <value>Invalid section</value>
   </data>
-  <data name="MeetingPrep.ItemUpdated" xml:space="preserve">
-    <value>Item updated</value>
+  <!-- Restores the exact pre-localization English text (multilingual plan 2026-10-06 phase 3
+       review fix) — the CheckItem action's own result, not a generic "updated". -->
+  <data name="MeetingPrep.ItemChecked" xml:space="preserve">
+    <value>Item checked</value>
   </data>
   <data name="MeetingPrep.SectionHasNoItems" xml:space="preserve">
     <value>Section has no items</value>

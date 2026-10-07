@@ -396,6 +396,19 @@
   <data name="Api.RequestFailed" xml:space="preserve">
     <value>Request failed</value>
   </data>
+  <!-- One generic ModelState-guard key for every Phase 3 controller (multilingual plan 2026-10-06
+       phase 3 review fix): replaces controllers borrowing AuthApi.InvalidRequest (an Auth-owned key)
+       or MeetingPrep.InvalidRequest, and the bare English literals in AnalysisRunController and
+       StudentWorkspaceController. -->
+  <data name="Api.InvalidRequest" xml:space="preserve">
+    <value>Invalid request</value>
+  </data>
+  <data name="StudentWorkspaceApi.InvalidEntryKind" xml:space="preserve">
+    <value>Invalid entry kind.</value>
+  </data>
+  <data name="StudentWorkspaceApi.EntryDeleted" xml:space="preserve">
+    <value>Entry deleted.</value>
+  </data>
   <data name="Documents.NotFound" xml:space="preserve">
     <value>Document not found.</value>
   </data>
@@ -407,9 +420,6 @@
   </data>
   <data name="Documents.FileAttachedSuccessfully" xml:space="preserve">
     <value>File attached successfully.</value>
-  </data>
-  <data name="Documents.MetadataUpdatedSuccessfully" xml:space="preserve">
-    <value>Metadata updated successfully.</value>
   </data>
   <data name="Documents.DeletedSuccessfully" xml:space="preserve">
     <value>Document deleted successfully.</value>
@@ -498,6 +508,15 @@
   <data name="EtrDocumentsApi.Created" xml:space="preserve">
     <value>ETR created successfully</value>
   </data>
+  <!-- Dedicated keys (not the shared Documents.MetadataUpdatedSuccessfully) — restores the exact
+       pre-localization English text (no trailing period) for the IEP/ETR UpdateMetadata actions
+       (multilingual plan 2026-10-06 phase 3 review fix). -->
+  <data name="IepDocumentsApi.MetadataUpdated" xml:space="preserve">
+    <value>Metadata updated successfully</value>
+  </data>
+  <data name="EtrDocumentsApi.MetadataUpdated" xml:space="preserve">
+    <value>Metadata updated successfully</value>
+  </data>
   <data name="ProgressReports.NotFound" xml:space="preserve">
     <value>Progress report not found.</value>
   </data>
@@ -524,6 +543,12 @@
   </data>
   <data name="ProgressReportsApi.MetadataUpdated" xml:space="preserve">
     <value>Metadata updated</value>
+  </data>
+  <!-- Dedicated key (not the generic, differently-worded DocumentsApi.FileAttached) — restores the
+       exact pre-localization English text for the ProgressReports AttachFile action (multilingual
+       plan 2026-10-06 phase 3 review fix). -->
+  <data name="ProgressReportsApi.FileAttached" xml:space="preserve">
+    <value>File attached</value>
   </data>
   <data name="ProgressReportsApi.AnalysisNotFound" xml:space="preserve">
     <value>Analysis not found</value>

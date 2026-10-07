@@ -97,14 +97,28 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
         }
 
         // This runs in ProgressReportAnalysisWorker, outside any request — see the class doc comment for
-        // why the language comes from the owning parent's saved preference rather than a captured
-        // request culture.
+        // why the language comes from a saved account preference rather than a captured request
+        // culture. Prefers the UPLOADER's (report.CreatedById) own preference — they are the one who
+        // chose to upload this file and the most likely reader of the resulting analysis — falling back
+        // to the owning parent's preference, then English, when either is unset/invalid/missing.
+        string? uploaderLanguage = null;
+        if (report.CreatedById.HasValue)
+        {
+            uploaderLanguage = await _context.Users.AsNoTracking()
+                .Where(u => u.Id == report.CreatedById.Value)
+                .Select(u => u.PreferredLanguage)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
         var ownerLanguage = await _context.ChildProfiles.AsNoTracking()
             .Where(c => c.Id == report.ChildProfileId)
             .Select(c => c.User!.PreferredLanguage)
             .FirstOrDefaultAsync(cancellationToken);
-        using var _ = CultureScope.For(ownerLanguage);
-        var language = SupportedLanguages.Normalize(ownerLanguage) ?? SupportedLanguages.English;
+
+        var language = SupportedLanguages.Normalize(uploaderLanguage)
+            ?? SupportedLanguages.Normalize(ownerLanguage)
+            ?? SupportedLanguages.English;
+        using var _ = CultureScope.For(language);
 
         if (string.IsNullOrEmpty(report.BlobUri))
         {
@@ -121,6 +135,9 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
 
         analysis.Status = "analyzing";
         analysis.ErrorMessage = null;
+        // Set before every branch below (error rows included), not only on success — an error row must
+        // still record which language its (localized) ErrorMessage was written in.
+        analysis.Language = language;
         report.Status = "processing";
         _reportRepository.Update(report);
         await _context.SaveChangesAsync(cancellationToken);
@@ -196,7 +213,6 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
             }
 
             analysis.Status = "completed";
-            analysis.Language = language;
             report.Status = "parsed";
             _reportRepository.Update(report);
             await _context.SaveChangesAsync(cancellationToken);
@@ -269,13 +285,44 @@ public class ProgressReportAnalysisService : IProgressReportAnalysisService
 
         try
         {
-            return JsonSerializer.Deserialize<ProgressReportAnalysisResponse>(responseText, CaseInsensitiveOptions);
+            var parsed = JsonSerializer.Deserialize<ProgressReportAnalysisResponse>(responseText, CaseInsensitiveOptions);
+            if (parsed != null)
+                NormalizeEnums(parsed);
+            return parsed;
         }
         catch (JsonException ex)
         {
             var head = responseText[..Math.Min(500, responseText.Length)];
             _logger.LogError(ex, "Failed to parse progress report analysis JSON. HEAD: {Head}", head);
             return null;
+        }
+    }
+
+    // Enum-like string fields (progress rating, evidence quality, severity, category, alignment
+    // status) are normalized right after a successful parse: ResponseLanguage's instruction tells a
+    // Spanish-responding model to keep these in English, but that is an instruction, not a guarantee —
+    // see AiEnumNormalization's doc comment for the "unknown -> more severe/conservative" fallback rule.
+    internal static void NormalizeEnums(ProgressReportAnalysisResponse response)
+    {
+        response.GoalProgressFindings ??= [];
+        foreach (var finding in response.GoalProgressFindings)
+        {
+            finding.ProgressRating = AiEnumNormalization.NormalizeProgressRating(finding.ProgressRating);
+            finding.EvidenceQuality = AiEnumNormalization.NormalizeEvidenceQuality(finding.EvidenceQuality);
+        }
+
+        response.RedFlags ??= [];
+        foreach (var flag in response.RedFlags)
+        {
+            flag.Severity = AiEnumNormalization.NormalizeHighMediumLowSeverity(flag.Severity);
+            flag.Category = AiEnumNormalization.NormalizeRedFlagCategory(flag.Category);
+        }
+
+        if (response.AdvocacyGapAnalysis != null)
+        {
+            response.AdvocacyGapAnalysis.GoalAlignments ??= [];
+            foreach (var alignment in response.AdvocacyGapAnalysis.GoalAlignments)
+                alignment.AlignmentStatus = AiEnumNormalization.NormalizeAlignmentStatus(alignment.AlignmentStatus);
         }
     }
 

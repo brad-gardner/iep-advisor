@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Api.DTOs.AnalysisRuns;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -17,13 +19,16 @@ public class AnalysisRunController : ControllerBase
 {
     private readonly IAnalysisRunService _analysisRunService;
     private readonly AnalysisRunQueue _queue;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public AnalysisRunController(
         IAnalysisRunService analysisRunService,
-        AnalysisRunQueue queue)
+        AnalysisRunQueue queue,
+        IStringLocalizer<Messages> localizer)
     {
         _analysisRunService = analysisRunService;
         _queue = queue;
+        _localizer = localizer;
     }
 
     [HttpPost("api/children/{childId}/analysis-runs")]
@@ -35,7 +40,7 @@ public class AnalysisRunController : ControllerBase
     public async Task<IActionResult> Create(int childId, [FromBody] CreateAnalysisRunRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var sources = new List<AnalysisRunSourceRef>();
         foreach (var s in request.Sources)

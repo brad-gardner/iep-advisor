@@ -277,5 +277,34 @@ public sealed class DraftExplanationServiceTests : IDisposable
         Assert.DoesNotContain("RESPONSE LANGUAGE", _claude.LastRequest!.SystemPrompt, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task GetOrGenerate_CachedExplanationPredatesLanguageColumn_GeneratedLanguageStaysNull_NeverDefaultedToEnglish()
+    {
+        // A legacy cached row (Language never set) must surface GeneratedLanguage == null straight
+        // through — never silently defaulted to "en" at the model layer (multilingual plan 2026-10-06
+        // phase 3 review fix). Null-vs-English is the CLIENT's interpretation to make, matching every
+        // other GeneratedLanguage-bearing model (AnalysisRunModel, ParentDraftNoteModel, …).
+        var s = Seed("lang-legacy");
+        using (var ctx = CreateContext())
+        {
+            ctx.Set<SharedDraftExplanation>().Add(new SharedDraftExplanation
+            {
+                SharedDraftRevisionId = s.RevisionId,
+                ExplanationJson = """{"sections":[{"sectionId":"1","title":"Goals","explanation":"What your child will work on."}],"items":[]}""",
+                GeneratedAt = DateTime.UtcNow,
+                Language = null,
+                CreatedById = s.ParentId,
+                UpdatedById = s.ParentId
+            });
+            ctx.SaveChanges();
+        }
+
+        using var ctx2 = CreateContext();
+        var result = await CreateService(ctx2).GetOrGenerateAsync(s.ParentId, s.RevisionId, default);
+
+        Assert.True(result.Success, result.Message);
+        Assert.Null(result.Data!.GeneratedLanguage);
+    }
+
     public void Dispose() => _connection.Dispose();
 }

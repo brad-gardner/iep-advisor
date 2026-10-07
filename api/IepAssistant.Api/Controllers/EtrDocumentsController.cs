@@ -79,7 +79,7 @@ public class EtrDocumentsController : ControllerBase
     public async Task<IActionResult> Create(int childId, [FromBody] CreateEtrRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var userId = User.GetUserId();
         var model = new CreateEtrDocumentModel
@@ -166,7 +166,7 @@ public class EtrDocumentsController : ControllerBase
         if (!result.Success)
             return this.MapServiceFailure(result, _localizer["DocumentsApi.UpdateFailed"]);
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["Documents.MetadataUpdatedSuccessfully"]));
+        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["EtrDocumentsApi.MetadataUpdated"]));
     }
 
     [HttpGet("api/etrs/{id}/download")]

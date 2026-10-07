@@ -17,6 +17,15 @@ namespace IepAssistant.Services.Implementations;
 /// <c>summary</c>. One row per meeting — <see cref="GenerateAsync"/> replaces the cached
 /// <see cref="MeetingBrief"/> row in place, mirroring <see cref="MeetingSummaryService"/>'s single-row
 /// shape. Entirely advisory: never writes to the draft, never auto-applies anything.
+///
+/// <para><b>Multilingual plan (2026-10-06) phase 3:</b> this brief is STAFF-facing only (the LEA rep
+/// preparing to run the meeting) — contrast <see cref="MeetingSummaryService"/>, whose summary goes to the
+/// family. It is deliberately excluded from response-language for now: <see cref="ComposeSummaryAsync"/>'s
+/// Claude call never appends <c>ResponseLanguage.SystemLine</c>, so the AI-drafted <c>summary</c> is always
+/// English regardless of the requesting staff member's preferred language, and <see cref="MeetingBrief"/>
+/// has no <c>Language</c> column. Phase 5 (student and school staff) is where staff-facing AI output gets
+/// localized; this is the one Phase-3 AI surface intentionally left for that phase rather than converted
+/// here.</para>
 /// </summary>
 public class MeetingBriefService : IMeetingBriefService
 {
@@ -176,6 +185,9 @@ public class MeetingBriefService : IMeetingBriefService
         string? reply;
         try
         {
+            // Deliberately NO + ResponseLanguage.SystemLine(...) here — see the class doc comment. This
+            // brief is staff-facing only; staff-facing AI output is Phase 5's scope, not Phase 3's, so the
+            // summary stays English regardless of the requesting staff member's preferred language.
             reply = await _claude.CompleteAsync(new ClaudeCompletionRequest
             {
                 SystemPrompt = DraftPrompts.MeetingBrief,

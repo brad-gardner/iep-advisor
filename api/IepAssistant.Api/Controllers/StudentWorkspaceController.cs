@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.StudentWorkspace;
 using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -20,10 +22,12 @@ namespace IepAssistant.Api.Controllers;
 public class StudentWorkspaceController : ControllerBase
 {
     private readonly IStudentWorkspaceService _service;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public StudentWorkspaceController(IStudentWorkspaceService service)
+    public StudentWorkspaceController(IStudentWorkspaceService service, IStringLocalizer<Messages> localizer)
     {
         _service = service;
+        _localizer = localizer;
     }
 
     // ---------------------------------------------------------------- Student: my workspace
@@ -48,9 +52,9 @@ public class StudentWorkspaceController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> AddEntry([FromBody] CreateWorkspaceEntryRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
         if (!TryParseKind(request.EntryKind, out var kind))
-            return BadRequest(ApiResponse<object>.Error("Invalid entry kind."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["StudentWorkspaceApi.InvalidEntryKind"]));
 
         var result = await _service.AddEntryAsync(User.GetUserId(), kind, request.Content, request.IsShareable, ct);
         if (!result.Success) return MapFailure(result);
@@ -67,7 +71,7 @@ public class StudentWorkspaceController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateEntry(int id, [FromBody] UpdateWorkspaceEntryRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _service.UpdateEntryAsync(User.GetUserId(), id, request.Content, request.IsShareable, ct);
         if (!result.Success) return MapFailure(result);
@@ -87,7 +91,7 @@ public class StudentWorkspaceController : ControllerBase
         var result = await _service.DeleteEntryAsync(User.GetUserId(), id, ct);
         if (!result.Success) return MapFailure(result);
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "Entry deleted."));
+        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["StudentWorkspaceApi.EntryDeleted"]));
     }
 
     // ---------------------------------------------------------------- Student: AI interview (suggest only)
@@ -99,7 +103,7 @@ public class StudentWorkspaceController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> Interview([FromBody] StudentInterviewRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _service.InterviewSuggestAsync(User.GetUserId(), request.Prompt, ct);
         if (!result.Success) return MapFailure(result);

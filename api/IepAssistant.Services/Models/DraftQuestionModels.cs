@@ -25,9 +25,10 @@ public class DraftAnswerModel
     public DateTime AnsweredAt { get; set; }
     public string Disclaimer { get; set; } = string.Empty;
 
-    /// <summary>"en" | "es" — the language this answer was generated in (multilingual plan 2026-10-06
-    /// phase 3).</summary>
-    public string GeneratedLanguage { get; set; } = string.Empty;
+    /// <summary>"en" | "es" | null — the language this answer was generated in (multilingual plan
+    /// 2026-10-06 phase 3); always set (never null) for a freshly-answered question, matching the sibling
+    /// <see cref="ParentDraftNoteModel.GeneratedLanguage"/>'s nullable contract for a later read.</summary>
+    public string? GeneratedLanguage { get; set; }
 }
 
 /// <summary>A parent's own private note (question + answer). Never exposed to staff.</summary>

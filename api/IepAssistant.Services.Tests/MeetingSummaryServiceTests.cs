@@ -164,12 +164,17 @@ public sealed class MeetingSummaryServiceTests : IDisposable
             Assert.Contains(notifications.Calls, c => c.Kind == NotificationKind.MeetingSummarySent && c.UserIds.Contains(s.ParentId));
 
             // Sending again, or editing/re-drafting after Send, is rejected.
+            // Validation (400), not Conflict (409): matches main's status for "already been sent"
+            // (multilingual plan 2026-10-06 phase 3 review fix).
             var sentAgain = await service.SendAsync(s.TeacherId, s.MeetingId, default);
             Assert.False(sentAgain.Success);
+            Assert.Equal(ServiceErrorKind.Validation, sentAgain.ErrorKind);
             var editAfterSend = await service.UpdateAsync(s.TeacherId, s.MeetingId, "Too late", default);
             Assert.False(editAfterSend.Success);
+            Assert.Equal(ServiceErrorKind.Validation, editAfterSend.ErrorKind);
             var draftAfterSend = await service.DraftAsync(s.TeacherId, s.MeetingId, default);
             Assert.False(draftAfterSend.Success);
+            Assert.Equal(ServiceErrorKind.Validation, draftAfterSend.ErrorKind);
         }
     }
 
@@ -181,6 +186,9 @@ public sealed class MeetingSummaryServiceTests : IDisposable
         var (service, _) = CreateService(ctx);
         var result = await service.SendAsync(s.TeacherId, s.MeetingId, default);
         Assert.False(result.Success);
+        // Validation (400), not Conflict (409): matches main's status for "No draft summary exists yet"
+        // (multilingual plan 2026-10-06 phase 3 review fix).
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
     }
 
     [Fact]
@@ -223,23 +231,54 @@ public sealed class MeetingSummaryServiceTests : IDisposable
 
     // ------------------------------------------------------------------ multilingual plan phase 3
 
+    // The summary is family-facing, so it must follow the FAMILY's saved preference — never the drafting
+    // staff member's own ambient request culture (multilingual plan 2026-10-06 phase 3 review fix).
+
     [Fact]
-    public async Task Draft_UnderSpanishCulture_AppendsResponseLanguageLine_AndPersistsSpanish()
+    public async Task Draft_FamilyParticipantPrefersSpanish_GeneratesSpanish_RegardlessOfStaffCulture()
     {
         var s = Seed("lang-es", MeetingStatus.Held);
-        using var ctx = CreateContext();
-        var (service, _) = CreateService(ctx);
+        using (var ctx = CreateContext())
+        {
+            var parent = ctx.Users.Single(u => u.Id == s.ParentId);
+            parent.PreferredLanguage = "es";
+            ctx.SaveChanges();
+        }
 
-        ServiceResult<FamilyMeetingSummaryModel> result;
-        using (IepAssistant.Services.Localization.CultureScope.For("es"))
-            result = await service.DraftAsync(s.TeacherId, s.MeetingId, default);
+        using var ctx2 = CreateContext();
+        var (service, _) = CreateService(ctx2);
+
+        // The staff member's own ambient culture is left at the default (English) here — the family's
+        // saved preference, not the requester's, must still drive the generated language.
+        var result = await service.DraftAsync(s.TeacherId, s.MeetingId, default);
 
         Assert.True(result.Success, result.Message);
         Assert.Equal("es", result.Data!.GeneratedLanguage);
         Assert.Contains("Spanish", _claude.LastRequest!.SystemPrompt);
 
-        var entity = ctx.MeetingSummaries.Single(m => m.MeetingId == s.MeetingId);
+        var entity = ctx2.MeetingSummaries.Single(m => m.MeetingId == s.MeetingId);
         Assert.Equal("es", entity.Language);
+    }
+
+    [Fact]
+    public async Task Draft_StaffPrefersSpanishButNoFamilyParticipantDoes_GeneratesEnglish()
+    {
+        var s = Seed("lang-staff-es", MeetingStatus.Held);
+        using var ctx = CreateContext();
+        var (service, _) = CreateService(ctx);
+
+        ServiceResult<FamilyMeetingSummaryModel> result;
+        // The DRAFTING STAFF member's ambient culture is Spanish, but the family participant (seeded with
+        // no PreferredLanguage) is not — the summary must still come back in English.
+        using (IepAssistant.Services.Localization.CultureScope.For("es"))
+            result = await service.DraftAsync(s.TeacherId, s.MeetingId, default);
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal("en", result.Data!.GeneratedLanguage);
+        Assert.DoesNotContain("RESPONSE LANGUAGE", _claude.LastRequest!.SystemPrompt, StringComparison.OrdinalIgnoreCase);
+
+        var entity = ctx.MeetingSummaries.Single(m => m.MeetingId == s.MeetingId);
+        Assert.Equal("en", entity.Language);
     }
 
     [Fact]

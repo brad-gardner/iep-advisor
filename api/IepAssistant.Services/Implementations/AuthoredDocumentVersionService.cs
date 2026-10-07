@@ -119,8 +119,10 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             if (!tree.Success)
             {
                 await transaction.RollbackAsync(ct);
+                // Propagate the inner failure's ErrorKind rather than the bare-message overload (which
+                // defaults to None) — multilingual plan 2026-10-06 phase 3 review fix.
                 return ServiceResult<AuthoredDocumentVersionSummaryModel>.FailureResult(
-                    tree.Message ?? _localizer["AuthoredDocuments.TemplateVersionLoadFailed"].Value);
+                    tree.ErrorKind, tree.Message ?? _localizer["AuthoredDocuments.TemplateVersionLoadFailed"].Value);
             }
 
             var errors = ValidateAgainstSchema(tree.Data!, instance.ValuesJson);
@@ -370,8 +372,10 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         // Reuse the Phase 2 tree builder for the pinned version's section/field schema.
         var tree = await _authoring.GetVersionAsync(version.DocumentTemplateVersionId, ct);
         if (!tree.Success)
+            // Propagate the inner failure's ErrorKind rather than the bare-message overload (which
+            // defaults to None) — multilingual plan 2026-10-06 phase 3 review fix.
             return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(
-                tree.Message ?? _localizer["AuthoredDocuments.TemplateVersionLoadFailed"].Value);
+                tree.ErrorKind, tree.Message ?? _localizer["AuthoredDocuments.TemplateVersionLoadFailed"].Value);
 
         var valuesJson = version.ValuesJson;
         if (!isStaffAccess)

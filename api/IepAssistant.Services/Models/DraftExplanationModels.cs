@@ -27,8 +27,11 @@ public class DraftExplanationModel
     public List<ExplanationItemModel> Items { get; set; } = new();
     public string Disclaimer { get; set; } = string.Empty;
 
-    /// <summary>"en" | "es" — the language this explanation was generated in (multilingual plan
-    /// 2026-10-06 phase 3). Set from the persisted <see cref="Domain.Entities.SharedDraftExplanation.Language"/>
-    /// on every read, never from this model's own serialized JSON.</summary>
-    public string GeneratedLanguage { get; set; } = string.Empty;
+    /// <summary>"en" | "es" | null — the language this explanation was generated in (multilingual plan
+    /// 2026-10-06 phase 3); null means English, including every explanation cached before this column
+    /// existed. Set from the persisted <see cref="Domain.Entities.SharedDraftExplanation.Language"/> on
+    /// every read, never from this model's own serialized JSON, and carried straight through — never
+    /// defaulted to English here (phase 3 review fix; that decision belongs to the client, the same as
+    /// every other GeneratedLanguage-bearing model).</summary>
+    public string? GeneratedLanguage { get; set; }
 }

@@ -8,9 +8,7 @@ using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.Extensions;
 using IepAssistant.Api.Streaming;
 using IepAssistant.Services;
-using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
-using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Api.Controllers;
@@ -176,10 +174,20 @@ public class AdvocateController : ControllerBase
             Citations = (evt.Citations ?? new List<AdvocateCitation>()).Select(MapCitation).ToList(),
             Suggestions = (evt.Suggestions ?? new List<AdvocateSuggestion>()).Select(MapSuggestion).ToList(),
             Truncated = evt.Truncated,
-            Disclaimer = evt.Disclaimer ?? AdvocatePrompts.Disclaimer,
-            GeneratedLanguage = evt.GeneratedLanguage ?? SupportedLanguages.English
+            // evt.Disclaimer is always set by AdvocateService on a Done event — this is a defensive
+            // fallback for the DTO's non-nullable string, not a real "no disclaimer" case (multilingual
+            // plan 2026-10-06 phase 3 review fix: dropped the unreachable ?? AdvocatePrompts.Disclaimer
+            // fallback — the actual localized text always comes from evt.Disclaimer itself).
+            Disclaimer = evt.Disclaimer ?? string.Empty,
+            // Carried straight through — no ?? English defaulting at the DTO layer (multilingual plan
+            // 2026-10-06 phase 3 review fix, for consistency with every other GeneratedLanguage-bearing
+            // model/DTO, where null is a meaningful "unknown/legacy" value the CLIENT interprets as
+            // English, not something the server collapses away).
+            GeneratedLanguage = evt.GeneratedLanguage
         }, ct),
-        AdvocateStreamEventKind.Error => SseWriter.WriteEventAsync(body, "error", new AdvocateErrorFrame { Code = evt.Code ?? AdvocateErrorCodes.Unavailable, Message = evt.Message ?? AdvocatePrompts.UnavailableMessage }, ct),
+        // evt.Message is always set by AdvocateService on an Error event — same defensive-only fallback
+        // as Disclaimer above; dropped the unreachable ?? AdvocatePrompts.UnavailableMessage fallback.
+        AdvocateStreamEventKind.Error => SseWriter.WriteEventAsync(body, "error", new AdvocateErrorFrame { Code = evt.Code ?? AdvocateErrorCodes.Unavailable, Message = evt.Message ?? string.Empty }, ct),
         _ => Task.CompletedTask
     };
 

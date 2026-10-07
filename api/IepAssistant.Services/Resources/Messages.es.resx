@@ -396,6 +396,15 @@
   <data name="Api.RequestFailed" xml:space="preserve">
     <value>No se pudo completar la solicitud</value>
   </data>
+  <data name="Api.InvalidRequest" xml:space="preserve">
+    <value>Solicitud no válida</value>
+  </data>
+  <data name="StudentWorkspaceApi.InvalidEntryKind" xml:space="preserve">
+    <value>Tipo de entrada no válido.</value>
+  </data>
+  <data name="StudentWorkspaceApi.EntryDeleted" xml:space="preserve">
+    <value>Entrada eliminada.</value>
+  </data>
   <data name="Documents.NotFound" xml:space="preserve">
     <value>Documento no encontrado.</value>
   </data>
@@ -407,9 +416,6 @@
   </data>
   <data name="Documents.FileAttachedSuccessfully" xml:space="preserve">
     <value>Archivo adjuntado correctamente.</value>
-  </data>
-  <data name="Documents.MetadataUpdatedSuccessfully" xml:space="preserve">
-    <value>Metadatos actualizados correctamente.</value>
   </data>
   <data name="Documents.DeletedSuccessfully" xml:space="preserve">
     <value>Documento eliminado correctamente.</value>
@@ -498,6 +504,12 @@
   <data name="EtrDocumentsApi.Created" xml:space="preserve">
     <value>ETR creado correctamente</value>
   </data>
+  <data name="IepDocumentsApi.MetadataUpdated" xml:space="preserve">
+    <value>Metadatos actualizados correctamente</value>
+  </data>
+  <data name="EtrDocumentsApi.MetadataUpdated" xml:space="preserve">
+    <value>Metadatos actualizados correctamente</value>
+  </data>
   <data name="ProgressReports.NotFound" xml:space="preserve">
     <value>Informe de progreso no encontrado.</value>
   </data>
@@ -525,6 +537,9 @@
   <data name="ProgressReportsApi.MetadataUpdated" xml:space="preserve">
     <value>Metadatos actualizados</value>
   </data>
+  <data name="ProgressReportsApi.FileAttached" xml:space="preserve">
+    <value>Archivo adjuntado</value>
+  </data>
   <data name="ProgressReportsApi.AnalysisNotFound" xml:space="preserve">
     <value>Análisis no encontrado</value>
   </data>
@@ -550,19 +565,19 @@
     <value>Categoría no válida. Debe ser: academic, behavioral, services o placement.</value>
   </data>
   <data name="AdvocacyGoals.MaxGoalsReached" xml:space="preserve">
-    <value>Máximo de 10 metas de defensa por hijo. Considere consolidar las metas para un mejor análisis.</value>
+    <value>Máximo de 10 metas para el IEP por hijo. Considere consolidar las metas para un mejor análisis.</value>
   </data>
   <data name="AdvocacyGoals.CreatedSuccessfully" xml:space="preserve">
-    <value>Meta de defensa creada correctamente.</value>
+    <value>Meta para el IEP creada correctamente.</value>
   </data>
   <data name="AdvocacyGoals.NotFound" xml:space="preserve">
-    <value>Meta de defensa no encontrada.</value>
+    <value>Meta para el IEP no encontrada.</value>
   </data>
   <data name="AdvocacyGoals.UpdatedSuccessfully" xml:space="preserve">
-    <value>Meta de defensa actualizada correctamente.</value>
+    <value>Meta para el IEP actualizada correctamente.</value>
   </data>
   <data name="AdvocacyGoals.DeletedSuccessfully" xml:space="preserve">
-    <value>Meta de defensa eliminada correctamente.</value>
+    <value>Meta para el IEP eliminada correctamente.</value>
   </data>
   <data name="AdvocacyGoals.ReorderedSuccessfully" xml:space="preserve">
     <value>Metas reordenadas correctamente.</value>
@@ -571,13 +586,13 @@
     <value>Error al reordenar</value>
   </data>
   <data name="AdvocacyGoalsApi.Created" xml:space="preserve">
-    <value>Meta de defensa creada correctamente</value>
+    <value>Meta para el IEP creada correctamente</value>
   </data>
   <data name="AdvocacyGoalsApi.Updated" xml:space="preserve">
-    <value>Meta de defensa actualizada correctamente</value>
+    <value>Meta para el IEP actualizada correctamente</value>
   </data>
   <data name="AdvocacyGoalsApi.Deleted" xml:space="preserve">
-    <value>Meta de defensa eliminada correctamente</value>
+    <value>Meta para el IEP eliminada correctamente</value>
   </data>
   <data name="AdvocacyGoalsApi.Reordered" xml:space="preserve">
     <value>Metas reordenadas correctamente</value>

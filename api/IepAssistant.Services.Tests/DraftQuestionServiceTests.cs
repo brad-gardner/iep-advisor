@@ -258,6 +258,10 @@ public sealed class DraftQuestionServiceTests : IDisposable
         _claude.CannedResponse = null; // empty Claude response path (LogWarning)
         var empty = await service.AskAsync(s.ParentId, s.RevisionId, new AskDraftQuestionModel { Question = question }, default);
         Assert.False(empty.Success);
+        // Validation (400), not Unavailable (503): matches main's status for this message (multilingual
+        // plan 2026-10-06 phase 3 review fix — localizing "could not be answered right now" must not
+        // silently change its HTTP status).
+        Assert.Equal(ServiceErrorKind.Validation, empty.ErrorKind);
 
         Assert.True(capturing.EventCount > 0, "Expected at least one log event to actually check.");
         Assert.False(capturing.ContainsText(question), "The parent's question must never reach a log line.");

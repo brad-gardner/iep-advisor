@@ -41,7 +41,10 @@ public static class ResponseLanguage
         "concepts, matching the app's Spanish glossary: \"annual goal\" -> \"meta anual\"; " +
         "\"accommodations\" -> \"adaptaciones\"; \"related services\" -> \"servicios relacionados\"; " +
         "\"present levels\" -> \"niveles actuales de desempeño\"; \"due process\" -> \"debido proceso\"; " +
-        "\"IEP team\" -> \"equipo del IEP\".";
+        "\"IEP team\" -> \"equipo del IEP\". Write ONLY the human-readable prose in Spanish: every JSON " +
+        "key, every enumerated/status/severity/rating value, every bracketed id (e.g. [Goal ID: n]), and " +
+        "every section title or tag that this prompt specifies stays exactly as given — in its original " +
+        "English or original specified form — and is never translated.";
 
     /// <summary>
     /// "" for English (and for any culture that is not Spanish) so byte-stable, cacheable prompts are

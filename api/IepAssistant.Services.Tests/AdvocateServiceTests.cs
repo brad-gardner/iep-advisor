@@ -684,7 +684,7 @@ public sealed class AdvocateServiceTests : IDisposable
         Assert.Equal(("kb", kbId, "Prior written notice"), (citation.Kind, citation.Id, citation.Label));
         Assert.Equal(2, done.Suggestions!.Count);
         Assert.False(done.Truncated);
-        Assert.Equal(AdvocatePrompts.Disclaimer, done.Disclaimer);
+        Assert.Equal(TestSupport.TestLocalizers.Ai()["Advocate.Disclaimer"].Value, done.Disclaimer);
 
         var snapshot = Snapshot(threadId);
         Assert.Collection(snapshot.Messages,
@@ -902,7 +902,7 @@ public sealed class AdvocateServiceTests : IDisposable
 
         Assert.Equal(new[] { AdvocateStreamEventKind.Delta, AdvocateStreamEventKind.Error }, events.Select(e => e.Kind));
         Assert.Equal(AdvocateErrorCodes.Unavailable, events[1].Code);
-        Assert.Equal(AdvocatePrompts.UnavailableMessage, events[1].Message);
+        Assert.Equal(TestSupport.TestLocalizers.Ai()["Advocate.UnavailableMessage"].Value, events[1].Message);
         var snapshot = Snapshot(threadId);
         var only = Assert.Single(snapshot.Messages);
         Assert.Equal(AdvocateMessageRole.User, only.Role);

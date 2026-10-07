@@ -69,7 +69,7 @@ public class SharedDraftsController : ControllerBase
     public async Task<IActionResult> GetExplanations(int rev, CancellationToken ct)
     {
         var result = await _explanations.GetOrGenerateAsync(User.GetUserId(), rev, ct);
-        if (!result.Success) return MapExplanationFailure(result);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<DraftExplanationDto>.SuccessResponse(DraftSharingMappers.MapExplanation(result.Data!)));
     }
 
@@ -80,7 +80,7 @@ public class SharedDraftsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Ask(int rev, [FromBody] AskQuestionRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _questions.AskAsync(User.GetUserId(), rev, new AskDraftQuestionModel
         {
@@ -120,7 +120,7 @@ public class SharedDraftsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> CreateResponse(int rev, [FromBody] CreateResponseRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _responses.CreateAsync(User.GetUserId(), rev, new CreateDraftResponseModel
         {
@@ -155,16 +155,5 @@ public class SharedDraftsController : ControllerBase
         var result = await _sharing.AcknowledgeAsync(User.GetUserId(), rev, ct);
         if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<SharedDraftRevisionDto>.SuccessResponse(DraftSharingMappers.MapRevision(result.Data!)));
-    }
-
-    // Multilingual plan Phase 3: IDraftExplanationService (AI-owned, out of scope here) is not yet
-    // converted to ServiceErrorKind, so its "temporarily unavailable" case keeps its own English-only
-    // text match ahead of the shared kind-based mapper — consistent with MapServiceFailure's own
-    // ErrorKind.None fallback for any service not yet converted.
-    private IActionResult MapExplanationFailure(ServiceResult result)
-    {
-        if (result.Message != null && result.Message.Contains("temporarily unavailable", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse<object>.Error(result.Message));
-        return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
     }
 }

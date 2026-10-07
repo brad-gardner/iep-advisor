@@ -69,7 +69,7 @@ public class IepDocumentsController : ControllerBase
     public async Task<IActionResult> Create(int childId, [FromBody] CreateIepRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var userId = User.GetUserId();
         var model = new CreateIepDocumentModel
@@ -151,7 +151,7 @@ public class IepDocumentsController : ControllerBase
         if (!result.Success)
             return this.MapServiceFailure(result, _localizer["DocumentsApi.UpdateFailed"]);
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["Documents.MetadataUpdatedSuccessfully"]));
+        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["IepDocumentsApi.MetadataUpdated"]));
     }
 
     [HttpGet("api/ieps/{id}/download")]

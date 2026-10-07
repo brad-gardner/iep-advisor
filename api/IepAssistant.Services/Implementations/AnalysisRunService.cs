@@ -75,7 +75,10 @@ public class AnalysisRunService : IAnalysisRunService
         var child = await _context.ChildProfiles
             .FirstOrDefaultAsync(c => c.Id == childId && c.IsActive, ct);
         if (child == null)
-            return ServiceResult<AnalysisRunModel>.NotFound(_localizer["AnalysisRun.ChildNotFound"]);
+            // Validation (400), not NotFound (404): matches main's status for this message (multilingual
+            // plan 2026-10-06 phase 3 review fix — localizing this message must not silently change its
+            // HTTP status).
+            return ServiceResult<AnalysisRunModel>.FailureResult(ServiceErrorKind.Validation, _localizer["AnalysisRun.ChildNotFound"]);
 
         // Billable user is the child profile owner.
         var ownerUserId = child.UserId;
@@ -108,7 +111,9 @@ public class AnalysisRunService : IAnalysisRunService
         // which is correct under concurrent runs on the same child.
         var reservedUsageId = await _subscriptionService.TryReserveUsageAsync(ownerUserId, childId, AnalysisOperation, AnalysisLimitPerChild, ct);
         if (reservedUsageId == null)
-            return ServiceResult<AnalysisRunModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["AnalysisRun.AnalysisLimitReached"]);
+            // Validation (400), not Conflict (409): matches main's status for this message (multilingual
+            // plan 2026-10-06 phase 3 review fix).
+            return ServiceResult<AnalysisRunModel>.FailureResult(ServiceErrorKind.Validation, _localizer["AnalysisRun.AnalysisLimitReached"]);
 
         // Build snapshots for each source. Reservation is already taken, so on any
         // terminal failure below we must refund it.
@@ -635,7 +640,9 @@ public class AnalysisRunService : IAnalysisRunService
     {
         var role = await _accessService.GetRoleAsync(childId, userId, ct);
         if (role == null)
-            return ServiceResult<List<AnalysisRunModel>>.Forbidden(_localizer["AnalysisRun.NoAccessToChild"]);
+            // Validation (400), not Forbidden (403): matches main's status for this message (multilingual
+            // plan 2026-10-06 phase 3 review fix).
+            return ServiceResult<List<AnalysisRunModel>>.FailureResult(ServiceErrorKind.Validation, _localizer["AnalysisRun.NoAccessToChild"]);
 
         // Projected, not Include(r => r.Sources): the list view never needs SourceContentSnapshot (the
         // full extracted document text) and never needed Sections either — just metadata per run.
@@ -1435,7 +1442,12 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
     // down with it. Called immediately after a successful parse, once, so nothing downstream has to
     // defend against this again.
 
-    private static void NormalizeNulls(SourceAnalysisResponse response)
+    // Enum-like string fields (severity/rating/alignment status) are normalized in the same pass, right
+    // alongside the null-list defense above: a Spanish-responding model can still slip a Spanish word
+    // into one of these fields despite ResponseLanguage's instruction to keep them in English — see
+    // AiEnumNormalization's doc comment for the "unknown -> more severe/conservative" fallback rule.
+
+    internal static void NormalizeNulls(SourceAnalysisResponse response)
     {
         response.Sections ??= [];
         foreach (var section in response.Sections)
@@ -1446,6 +1458,8 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
             NormalizeNulls(goal);
 
         response.OverallRedFlags ??= [];
+        foreach (var flag in response.OverallRedFlags)
+            NormalizeSeverity(flag);
 
         if (response.EtrCompleteness != null)
             NormalizeNulls(response.EtrCompleteness);
@@ -1457,9 +1471,11 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
             NormalizeNulls(response.AdvocacyGapAnalysis);
     }
 
-    private static void NormalizeNulls(AnalysisRunSynthesisResponse response)
+    internal static void NormalizeNulls(AnalysisRunSynthesisResponse response)
     {
         response.OverallRedFlags ??= [];
+        foreach (var flag in response.OverallRedFlags)
+            NormalizeSeverity(flag);
 
         if (response.CrossDocSynthesis != null)
         {
@@ -1475,26 +1491,45 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
     {
         section.KeyPoints ??= [];
         section.RedFlags ??= [];
+        foreach (var flag in section.RedFlags)
+            NormalizeSeverity(flag);
         section.LegalReferences ??= [];
         // Model-returned, never trusted — see AnalysisRunSectionKinds.Sanitize's doc comment (shared
         // with AnalysisRunBackfillService so both callers apply the exact same rule).
         section.SectionKind = AnalysisRunSectionKinds.Sanitize(section.SectionKind);
     }
 
+    private static void NormalizeSeverity(RedFlag flag) =>
+        flag.Severity = AiEnumNormalization.NormalizeRedYellowSeverity(flag.Severity);
+
     private static void NormalizeNulls(GoalAnalysisResult goal)
     {
         goal.Strengths ??= [];
         goal.Concerns ??= [];
         goal.SuggestedImprovements ??= [];
+
+        goal.OverallRating = AiEnumNormalization.NormalizeGreenYellowRedRating(goal.OverallRating);
+        NormalizeRating(goal.SmartAnalysis.Specific);
+        NormalizeRating(goal.SmartAnalysis.Measurable);
+        NormalizeRating(goal.SmartAnalysis.Achievable);
+        NormalizeRating(goal.SmartAnalysis.Relevant);
+        NormalizeRating(goal.SmartAnalysis.TimeBound);
     }
+
+    private static void NormalizeRating(SmartCriterion criterion) =>
+        criterion.Rating = AiEnumNormalization.NormalizeGreenYellowRedRating(criterion.Rating);
 
     private static void NormalizeNulls(EtrCompletenessSectionPayload payload)
     {
         payload.EvaluatedDomains ??= [];
         foreach (var domain in payload.EvaluatedDomains)
+        {
             domain.ToolsUsed ??= [];
+            domain.AdequacyRating = AiEnumNormalization.NormalizeAdequacyRating(domain.AdequacyRating);
+        }
 
         payload.MissingDomains ??= [];
+        payload.OverallCompletenessRating = AiEnumNormalization.NormalizeCompletenessRating(payload.OverallCompletenessRating);
     }
 
     private static void NormalizeNulls(EtrEligibilitySectionPayload payload)
@@ -1508,7 +1543,10 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
     {
         gap.GoalAlignments ??= [];
         foreach (var alignment in gap.GoalAlignments)
+        {
             alignment.AlignedIepGoals ??= [];
+            alignment.AlignmentStatus = AiEnumNormalization.NormalizeAlignmentStatus(alignment.AlignmentStatus);
+        }
     }
 
     /// <summary>

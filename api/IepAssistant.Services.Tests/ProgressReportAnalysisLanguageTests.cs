@@ -60,13 +60,29 @@ public sealed class ProgressReportAnalysisLanguageTests : IDisposable
         }
     }
 
-    private ProgressReportAnalysisService BuildService(ApplicationDbContext ctx, IClaudeClient claude) => new(
+    /// <summary>Always returns an empty stream, forcing <c>AnalyzeAsync</c>'s "download failed" error
+    /// branch — used to prove <see cref="ProgressReportAnalysis.Language"/> is set before that branch,
+    /// not only on the success path.</summary>
+    private sealed class EmptyDownloadBlobStorage : IBlobStorageService
+    {
+        public Task<string> UploadAsync(string blobPath, Stream content, string contentType, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<Stream> DownloadAsync(string blobPath, CancellationToken cancellationToken = default)
+            => Task.FromResult<Stream>(new MemoryStream());
+
+        public Task DeleteAsync(string blobPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<string> GetDownloadUrlAsync(string blobPath, TimeSpan? expiry = null) => Task.FromResult($"https://fake.blob/{blobPath}");
+    }
+
+    private ProgressReportAnalysisService BuildService(ApplicationDbContext ctx, IClaudeClient claude, IBlobStorageService? blobStorage = null) => new(
         new ProgressReportRepository(ctx),
         new ProgressReportAnalysisRepository(ctx),
         null!,
         new ParentAdvocacyGoalRepository(ctx),
         new AccessService(ctx),
-        new FakeBlobStorage(),
+        blobStorage ?? new FakeBlobStorage(),
         ctx,
         claude,
         TestSupport.TestLocalizers.Ai(),
@@ -88,6 +104,37 @@ public sealed class ProgressReportAnalysisLanguageTests : IDisposable
         ctx.SaveChanges();
 
         var report = new ProgressReport { IepDocumentId = iep.Id, ChildProfileId = child.Id, BlobUri = "reports/1.pdf", Status = "uploaded" };
+        ctx.ProgressReports.Add(report);
+        ctx.SaveChanges();
+        return report.Id;
+    }
+
+    /// <summary>Seeds a report with an uploader (<see cref="ProgressReport.CreatedById"/>) DISTINCT from
+    /// the owning child's parent, so the two language signals can be set independently.</summary>
+    private int SeedProgressReportWithUploader(string? ownerLanguage, string? uploaderLanguage)
+    {
+        using var ctx = CreateContext();
+        var owner = new User { Email = $"{Guid.NewGuid()}@example.com", PasswordHash = "x", FirstName = "O", LastName = "Owner", Role = UserRole.Parent, PreferredLanguage = ownerLanguage };
+        var uploader = new User { Email = $"{Guid.NewGuid()}@example.com", PasswordHash = "x", FirstName = "U", LastName = "Uploader", Role = UserRole.Parent, PreferredLanguage = uploaderLanguage };
+        ctx.Users.AddRange(owner, uploader);
+        ctx.SaveChanges();
+
+        var child = new ChildProfile { UserId = owner.Id, FirstName = "Kid" };
+        ctx.ChildProfiles.Add(child);
+        ctx.SaveChanges();
+
+        var iep = new IepDocument { ChildProfileId = child.Id, Status = "parsed" };
+        ctx.IepDocuments.Add(iep);
+        ctx.SaveChanges();
+
+        var report = new ProgressReport
+        {
+            IepDocumentId = iep.Id,
+            ChildProfileId = child.Id,
+            BlobUri = "reports/1.pdf",
+            Status = "uploaded",
+            CreatedById = uploader.Id
+        };
         ctx.ProgressReports.Add(report);
         ctx.SaveChanges();
         return report.Id;
@@ -124,6 +171,66 @@ public sealed class ProgressReportAnalysisLanguageTests : IDisposable
 
         var analysis = ctx.Set<ProgressReportAnalysis>().Single(a => a.ProgressReportId == reportId);
         Assert.Equal("en", analysis.Language);
+    }
+
+    // ------------------------------------------------------------------ phase 3 review fix: uploader's
+    // own preference wins over the owning parent's, and Language is recorded even on an error row.
+
+    [Fact]
+    public async Task AnalyzeAsync_UploaderPrefersSpanish_OwnerHasNoPreference_UsesUploaderLanguage()
+    {
+        var reportId = SeedProgressReportWithUploader(ownerLanguage: null, uploaderLanguage: "es");
+        var claude = new CapturingClaudeClient();
+
+        using var ctx = CreateContext();
+        await BuildService(ctx, claude).AnalyzeAsync(reportId, CancellationToken.None);
+
+        Assert.Contains("Spanish", claude.LastRequest!.SystemPrompt);
+        var analysis = ctx.Set<ProgressReportAnalysis>().Single(a => a.ProgressReportId == reportId);
+        Assert.Equal("es", analysis.Language);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_UploaderHasNoPreference_FallsBackToOwnerLanguage()
+    {
+        var reportId = SeedProgressReportWithUploader(ownerLanguage: "es", uploaderLanguage: null);
+        var claude = new CapturingClaudeClient();
+
+        using var ctx = CreateContext();
+        await BuildService(ctx, claude).AnalyzeAsync(reportId, CancellationToken.None);
+
+        Assert.Contains("Spanish", claude.LastRequest!.SystemPrompt);
+        var analysis = ctx.Set<ProgressReportAnalysis>().Single(a => a.ProgressReportId == reportId);
+        Assert.Equal("es", analysis.Language);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_UploaderAndOwnerBothUnset_FallsBackToEnglish()
+    {
+        var reportId = SeedProgressReportWithUploader(ownerLanguage: null, uploaderLanguage: null);
+        var claude = new CapturingClaudeClient();
+
+        using var ctx = CreateContext();
+        await BuildService(ctx, claude).AnalyzeAsync(reportId, CancellationToken.None);
+
+        var analysis = ctx.Set<ProgressReportAnalysis>().Single(a => a.ProgressReportId == reportId);
+        Assert.Equal("en", analysis.Language);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_DownloadFails_StillRecordsLanguageOnTheErrorRow()
+    {
+        var reportId = SeedProgressReportWithUploader(ownerLanguage: null, uploaderLanguage: "es");
+        var claude = new CapturingClaudeClient();
+
+        using var ctx = CreateContext();
+        await BuildService(ctx, claude, new EmptyDownloadBlobStorage()).AnalyzeAsync(reportId, CancellationToken.None);
+
+        var analysis = ctx.Set<ProgressReportAnalysis>().Single(a => a.ProgressReportId == reportId);
+        Assert.Equal("error", analysis.Status);
+        // Language is set BEFORE branching, so even this error row (never reaching the success branch
+        // that used to be the only place Language was assigned) records the resolved language.
+        Assert.Equal("es", analysis.Language);
     }
 
     public void Dispose() => _connection.Dispose();

@@ -63,7 +63,7 @@ public class MeetingSummaryService : IMeetingSummaryService
 
         var existing = await _context.MeetingSummaries.FirstOrDefaultAsync(s => s.MeetingId == meetingId, ct);
         if (existing != null && existing.Status == MeetingSummaryStatus.Sent)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["MeetingSummary.AlreadySent"]);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingSummary.AlreadySent"]);
 
         var source = await ResolveSourceAsync(meeting, ct);
         var resolvedResponses = await LoadResolvedResponsesAsync(meeting.SchoolStudentId, ct);
@@ -87,13 +87,17 @@ public class MeetingSummaryService : IMeetingSummaryService
         userText.AppendLine();
         userText.AppendLine("Write the family-facing summary now.");
 
-        // In-request call: RequestLocalization has already set CurrentUICulture from the drafting
-        // staff member's saved preference/Accept-Language.
-        var language = SupportedLanguages.Normalize(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName) ?? SupportedLanguages.English;
+        // The summary is family-facing, so it is drafted in the FAMILY's language, never the drafting
+        // staff member's ambient request culture: any parent/guardian participant preferring Spanish
+        // makes the whole summary Spanish (multilingual plan 2026-10-06 phase 3 review fix). CultureScope
+        // applies it only for the duration of the Claude call below; the method's own localized
+        // responses (ServiceResult messages) are unaffected and stay in the staff requester's language.
+        var language = await ResolveFamilyLanguageAsync(meetingId, ct);
 
         string? reply;
         try
         {
+            using var _ = CultureScope.For(language);
             reply = await _claude.CompleteAsync(new ClaudeCompletionRequest
             {
                 SystemPrompt = DraftPrompts.MeetingSummary + ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture),
@@ -104,13 +108,13 @@ public class MeetingSummaryService : IMeetingSummaryService
         catch (ClaudeApiException ex)
         {
             _logger.LogError(ex, "Meeting summary draft for meeting {MeetingId} failed with {Kind}", meetingId, ex.Kind);
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["MeetingSummary.UnavailableMessage"]);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingSummary.UnavailableMessage"]);
         }
 
         if (string.IsNullOrWhiteSpace(reply))
         {
             _logger.LogWarning("Meeting summary: Claude returned no content for meeting {MeetingId}.", meetingId);
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["MeetingSummary.UnavailableMessage"]);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingSummary.UnavailableMessage"]);
         }
 
         var now = DateTime.UtcNow;
@@ -184,9 +188,9 @@ public class MeetingSummaryService : IMeetingSummaryService
 
         var entity = await _context.MeetingSummaries.FirstOrDefaultAsync(s => s.MeetingId == meetingId, ct);
         if (entity == null)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["MeetingSummary.NoDraftExists"]);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingSummary.NoDraftExists"]);
         if (entity.Status == MeetingSummaryStatus.Sent)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["MeetingSummary.AlreadySent"]);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingSummary.AlreadySent"]);
 
         entity.Body = trimmed;
         entity.EditedAt = DateTime.UtcNow;
@@ -208,9 +212,9 @@ public class MeetingSummaryService : IMeetingSummaryService
 
         var entity = await _context.MeetingSummaries.FirstOrDefaultAsync(s => s.MeetingId == meetingId, ct);
         if (entity == null || string.IsNullOrWhiteSpace(entity.Body))
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["MeetingSummary.NoDraftExists"]);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingSummary.NoDraftExists"]);
         if (entity.Status == MeetingSummaryStatus.Sent)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["MeetingSummary.AlreadySent"]);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingSummary.AlreadySent"]);
 
         var now = DateTime.UtcNow;
         entity.Status = MeetingSummaryStatus.Sent;
@@ -296,6 +300,24 @@ public class MeetingSummaryService : IMeetingSummaryService
             sb.AppendLine(line);
         }
         sb.AppendLine("</responses>");
+    }
+
+    /// <summary>
+    /// "es" when ANY parent/guardian participant (<see cref="MeetingParticipant.IsFamily"/>, excluding
+    /// the student themself) on this meeting prefers Spanish; "en" otherwise, including when the meeting
+    /// has no family participant with a saved preference yet. Fetches the raw column and normalizes it
+    /// client-side (<see cref="SupportedLanguages.Normalize"/> is not translatable to SQL) rather than
+    /// filtering in the query, so a stale/hand-edited PreferredLanguage value can never throw.
+    /// </summary>
+    private async Task<string> ResolveFamilyLanguageAsync(int meetingId, CancellationToken ct)
+    {
+        var familyPreferredLanguages = await _context.MeetingParticipants.AsNoTracking()
+            .Where(p => p.MeetingId == meetingId && p.IsFamily && p.UserId != null)
+            .Select(p => p.User!.PreferredLanguage)
+            .ToListAsync(ct);
+
+        var anySpanish = familyPreferredLanguages.Any(l => SupportedLanguages.Normalize(l) == SupportedLanguages.Spanish);
+        return anySpanish ? SupportedLanguages.Spanish : SupportedLanguages.English;
     }
 
     // ---------------------------------------------------------------- Notifications

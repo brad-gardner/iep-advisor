@@ -152,7 +152,7 @@ public class IepDocumentService : IIepDocumentService
         _documentRepository.Update(document);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult(_localizer["Documents.MetadataUpdatedSuccessfully"]);
+        return ServiceResult.SuccessResult(_localizer["IepDocumentsApi.MetadataUpdated"]);
     }
 
     public async Task<ServiceResult<IepDocumentModel>> UploadAsync(int childProfileId, int userId, string fileName, Stream fileStream, long fileSize, CancellationToken cancellationToken = default)

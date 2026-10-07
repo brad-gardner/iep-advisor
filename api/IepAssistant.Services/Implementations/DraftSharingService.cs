@@ -300,7 +300,11 @@ public class DraftSharingService : IDraftSharingService
 
         var tree = await _authoring.GetVersionAsync(row.DocumentTemplateVersionId, ct);
         if (!tree.Success)
-            return ServiceResult<SharedDraftRevisionDetailModel>.FailureResult(tree.Message ?? _localizer["AuthoredDocuments.TemplateVersionLoadFailed"].Value);
+            // Propagate the inner failure's ErrorKind rather than the bare-message overload (which
+            // defaults to None) — multilingual plan 2026-10-06 phase 3 review fix: a re-wrap that drops
+            // ErrorKind silently falls back to the English-substring heuristic at the controller.
+            return ServiceResult<SharedDraftRevisionDetailModel>.FailureResult(
+                tree.ErrorKind, tree.Message ?? _localizer["AuthoredDocuments.TemplateVersionLoadFailed"].Value);
 
         // Role-only owners, never names (design "Resolved Questions" #1): the frozen row's raw
         // `_ownerUserId` must never reach a family-facing response.
