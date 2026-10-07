@@ -3,12 +3,17 @@ import { apiErrorMessage } from '@/lib/api-error';
 import { getAdoption, getEngagement } from '../api/district-api';
 import type { AdoptionDto, EngagementDto } from '../types';
 
+/** A server-provided message is already resolved text and is shown as-is; the
+ * generic case is translated by the caller at render time (it has the
+ * current `t`) — see the module doc comment below. */
+export type AdoptionEngagementLoadError = { kind: 'server'; message: string } | { kind: 'generic' } | null;
+
 interface Loaded {
   key: string;
   adoption: AdoptionDto | null;
-  adoptionError: string | null;
+  adoptionError: AdoptionEngagementLoadError;
   engagement: EngagementDto | null;
-  engagementError: string | null;
+  engagementError: AdoptionEngagementLoadError;
 }
 
 interface UseAdoptionEngagementResult {
@@ -16,35 +21,44 @@ interface UseAdoptionEngagementResult {
   engagement: EngagementDto | null;
   isLoading: boolean;
   /** Set only when BOTH pieces failed (nothing at all to render). */
-  error: string | null;
+  error: AdoptionEngagementLoadError;
   /** Per-piece failures, so a caller can still render whichever DTO
    * succeeded alongside a small inline notice for the one that didn't. */
-  adoptionError: string | null;
-  engagementError: string | null;
+  adoptionError: AdoptionEngagementLoadError;
+  engagementError: AdoptionEngagementLoadError;
   retry: () => void;
 }
 
-async function loadAdoption(schoolId: number | null): Promise<{ data: AdoptionDto | null; error: string | null }> {
+// A server-provided message is already resolved text and is shown as-is; a
+// missing one resolves to the `{ kind: 'generic' }` flag (translated at
+// render time by the caller, which has the current `t`) rather than a
+// pre-translated string baked in here — same reasoning as `useHome`'s
+// `HomeLoadError` (see `docs/i18n/README.md`: an effect that fetches on
+// mount never has `t` in its dependency array).
+interface LoadResult<T> {
+  data: T | null;
+  error: AdoptionEngagementLoadError;
+}
+
+async function loadAdoption(schoolId: number | null): Promise<LoadResult<AdoptionDto>> {
   try {
     const res = await getAdoption({ schoolId: schoolId ?? undefined });
-    return res.success && res.data
-      ? { data: res.data, error: null }
-      : { data: null, error: res.message || 'Could not load adoption data' };
+    if (res.success && res.data) return { data: res.data, error: null };
+    return { data: null, error: res.message ? { kind: 'server', message: res.message } : { kind: 'generic' } };
   } catch (err) {
-    return { data: null, error: apiErrorMessage(err, 'Could not load adoption data') };
+    const serverMessage = apiErrorMessage(err, '');
+    return { data: null, error: serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' } };
   }
 }
 
-async function loadEngagement(
-  schoolId: number | null
-): Promise<{ data: EngagementDto | null; error: string | null }> {
+async function loadEngagement(schoolId: number | null): Promise<LoadResult<EngagementDto>> {
   try {
     const res = await getEngagement({ schoolId: schoolId ?? undefined });
-    return res.success && res.data
-      ? { data: res.data, error: null }
-      : { data: null, error: res.message || 'Could not load engagement data' };
+    if (res.success && res.data) return { data: res.data, error: null };
+    return { data: null, error: res.message ? { kind: 'server', message: res.message } : { kind: 'generic' } };
   } catch (err) {
-    return { data: null, error: apiErrorMessage(err, 'Could not load engagement data') };
+    const serverMessage = apiErrorMessage(err, '');
+    return { data: null, error: serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' } };
   }
 }
 

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { DashboardNoParentStudent, DashboardStudent } from '../types';
@@ -35,6 +36,7 @@ function AttentionSection<T extends DashboardStudent>({
   viewAllTo,
   renderStatus,
 }: AttentionSectionProps<T>) {
+  const { t } = useTranslation('district-admin');
   return (
     <section data-testid={testId}>
       <h3 className="text-sm font-medium text-brand-slate-800 mb-2">{title}</h3>
@@ -67,7 +69,7 @@ function AttentionSection<T extends DashboardStudent>({
               className="text-sm text-brand-teal-600 hover:underline"
               data-testid={`${testId}-view-all`}
             >
-              View all ({students.length})
+              {t('dashboard.attentionTile.viewAll', { count: students.length })}
             </Link>
           </div>
         </>
@@ -84,38 +86,38 @@ export function DashboardAttentionTile({
   studentsWithoutParent,
   hasStudents,
 }: DashboardAttentionTileProps) {
+  const { t } = useTranslation('district-admin');
   return (
     <Card data-testid="dashboard-attention-tile">
-      <h2 className="font-serif text-xl mb-4">Needs attention</h2>
+      <h2 className="font-serif text-xl mb-4">{t('dashboard.attentionTile.title')}</h2>
 
       {!hasStudents ? (
         <p
           className="text-sm text-brand-slate-500"
           data-testid="dashboard-attention-tile-empty"
         >
-          Once students are added, any student missing a case manager or a
-          linked parent will appear here.
+          {t('dashboard.attentionTile.emptyAll')}
         </p>
       ) : (
         <div className="space-y-5">
           <AttentionSection
-            title="No case manager"
+            title={t('dashboard.attentionTile.noCaseManagerTitle')}
             testId="dashboard-attention-no-staff"
             students={studentsWithoutStaff}
-            emptyMessage="All students have a case manager."
+            emptyMessage={t('dashboard.attentionTile.noCaseManagerEmpty')}
             viewAllTo="/educator/students?attention=no-staff"
           />
           <AttentionSection
-            title="No linked parent"
+            title={t('dashboard.attentionTile.noParentTitle')}
             testId="dashboard-attention-no-parent"
             students={studentsWithoutParent}
-            emptyMessage="All students have a linked parent."
+            emptyMessage={t('dashboard.attentionTile.noParentEmpty')}
             viewAllTo="/educator/students?attention=no-parent"
             renderStatus={(student) =>
               student.parentInvitePending ? (
-                <Badge variant="warning">Invite pending</Badge>
+                <Badge variant="warning">{t('dashboard.attentionTile.invitePending')}</Badge>
               ) : (
-                <Badge variant="neutral">Not invited</Badge>
+                <Badge variant="neutral">{t('dashboard.attentionTile.notInvited')}</Badge>
               )
             }
           />

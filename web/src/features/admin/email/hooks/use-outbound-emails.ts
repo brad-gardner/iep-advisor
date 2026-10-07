@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { apiErrorMessage } from '@/lib/api-error';
 import { getOutboundEmailStatus, listOutboundEmails } from '../api/email-admin-api';
 import { IN_FLIGHT_EMAIL_STATUSES } from '../types';
@@ -21,10 +22,16 @@ interface UseOutboundEmailsResult {
  *  filter: changing it restarts the effect (a fresh load, its own generation
  *  counter, and its own poll). */
 export function useOutboundEmails(status: OutboundEmailStatusFilter): UseOutboundEmailsResult {
+  const { t } = useTranslation('admin');
   const [emails, setEmails] = useState<OutboundEmailDto[]>([]);
   const [emailStatus, setEmailStatus] = useState<OutboundEmailStatusDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // A server-provided message is already resolved text and shown as-is; an
+  // EMPTY string means "no server message" — a flag, not yet translated, so
+  // a language switch after a failed load shows the new language
+  // immediately (see `docs/i18n/README.md`'s note on never putting `t` in a
+  // mount-effect's dependency array).
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const emailsRef = useRef<OutboundEmailDto[]>([]);
   const queuedRef = useRef(0);
   const reloadRef = useRef<() => void>(() => {});
@@ -58,16 +65,16 @@ export function useOutboundEmails(status: OutboundEmailStatusFilter): UseOutboun
         if (listRes.success && listRes.data) {
           emailsRef.current = listRes.data;
           setEmails(listRes.data);
-          setError(null);
+          setLoadErrorMessage(null);
         } else {
-          setError(listRes.message ?? 'Could not load outbound emails.');
+          setLoadErrorMessage(listRes.message ?? '');
         }
         if (statusRes.success && statusRes.data) {
           queuedRef.current = statusRes.data.queued + statusRes.data.sending;
           setEmailStatus(statusRes.data);
         }
       } catch (err) {
-        if (active && mine === generation) setError(apiErrorMessage(err, 'Could not load outbound emails.'));
+        if (active && mine === generation) setLoadErrorMessage(apiErrorMessage(err, ''));
       } finally {
         if (active && mine === generation) setIsLoading(false);
       }
@@ -88,7 +95,10 @@ export function useOutboundEmails(status: OutboundEmailStatusFilter): UseOutboun
       active = false;
       clearInterval(interval);
     };
+    // `t` deliberately excluded — see the `loadErrorMessage` comment above.
   }, [status]);
+
+  const error = loadErrorMessage === null ? null : loadErrorMessage || t('email.loadFailed');
 
   return {
     emails,

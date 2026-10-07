@@ -4,6 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ToastProvider } from '@/components/ui/toast';
 import { apiRejection } from '@/test/axios-rejection';
+// `roster-import` is a staff-only namespace (plan phase 6) — this page
+// renders behind the lazy district-admin route chunk in the real app, which
+// registers its English as a side effect of importing `staff-locales`; this
+// test renders the page directly, so it imports the same module itself.
+import '@/app/lazy-routes/staff-locales';
 import { ORG_ROLE, type EducatorProfile } from '@/features/educator/types';
 import type { ImportBatch, ImportPreview, ImportResult, ImportRow } from '../types';
 

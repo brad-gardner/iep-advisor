@@ -58,7 +58,7 @@ jobs:
           npm run lint -- --format json --output-file eslint-report.json || true
           node -e "
             const fs = require('fs');
-            const baseline = 36;
+            const baseline = 35;
             const report = JSON.parse(fs.readFileSync('eslint-report.json', 'utf8'));
             const errorCount = report.reduce((sum, file) => sum + file.errorCount, 0);
             console.log('ESLint errors:', errorCount, '(baseline: ' + baseline + ')');

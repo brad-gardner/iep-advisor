@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 
 interface InviteUrlFieldProps {
@@ -9,6 +10,7 @@ interface InviteUrlFieldProps {
 // is on. Renders a read-only copyable link so a tester can hand it to the
 // invitee without an email round-trip.
 export function InviteUrlField({ url }: InviteUrlFieldProps) {
+  const { t } = useTranslation('staff-invites');
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -23,13 +25,13 @@ export function InviteUrlField({ url }: InviteUrlFieldProps) {
 
   return (
     <div className="mt-2 space-y-1">
-      <p className="text-xs text-brand-slate-500">Invite link (testing)</p>
+      <p className="text-xs text-brand-slate-500">{t('inviteUrlField.label')}</p>
       <div className="flex items-center gap-2">
         <input
           type="text"
           readOnly
           value={url}
-          aria-label="Invite link"
+          aria-label={t('inviteUrlField.ariaLabel')}
           onFocus={(e) => e.target.select()}
           className="w-full px-3 py-2 bg-brand-slate-50 rounded-input text-brand-slate-600 text-xs border border-brand-slate-200"
           data-testid="staff-invite-url"
@@ -39,7 +41,7 @@ export function InviteUrlField({ url }: InviteUrlFieldProps) {
           onClick={handleCopy}
           data-testid="staff-invite-url-copy"
         >
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? t('inviteUrlField.copied') : t('inviteUrlField.copy')}
         </Button>
       </div>
     </div>

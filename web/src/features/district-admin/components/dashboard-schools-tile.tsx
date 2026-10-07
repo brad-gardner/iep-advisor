@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import type { DashboardSchool } from '../types';
 
@@ -9,16 +10,17 @@ interface DashboardSchoolsTileProps {
 // Per-school active student counts. Presentational: the composing container
 // (DistrictDashboardTiles) owns the single dashboard fetch.
 export function DashboardSchoolsTile({ schools }: DashboardSchoolsTileProps) {
+  const { t } = useTranslation('district-admin');
   return (
     <Card data-testid="dashboard-schools-tile">
-      <h2 className="font-serif text-xl mb-4">Schools</h2>
+      <h2 className="font-serif text-xl mb-4">{t('dashboard.schoolsTile.title')}</h2>
 
       {schools.length === 0 ? (
         <p
           className="text-sm text-brand-slate-500"
           data-testid="dashboard-schools-tile-empty"
         >
-          No schools yet — add a school to see its student counts here.
+          {t('dashboard.schoolsTile.empty')}
         </p>
       ) : (
         <ul className="space-y-2 text-sm">
@@ -30,8 +32,7 @@ export function DashboardSchoolsTile({ schools }: DashboardSchoolsTileProps) {
             >
               <span className="text-brand-slate-800">{school.name}</span>
               <span className="text-brand-slate-500">
-                {school.activeStudentCount}{' '}
-                {school.activeStudentCount === 1 ? 'student' : 'students'}
+                {t('dashboard.schoolsTile.studentCount', { count: school.activeStudentCount })}
               </span>
             </li>
           ))}
@@ -44,7 +45,7 @@ export function DashboardSchoolsTile({ schools }: DashboardSchoolsTileProps) {
           className="text-sm text-brand-teal-600 hover:underline"
           data-testid="dashboard-schools-tile-link"
         >
-          Manage schools
+          {t('dashboard.schoolsTile.manageLink')}
         </Link>
       </div>
     </Card>

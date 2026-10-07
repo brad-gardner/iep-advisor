@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Input, Select } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
@@ -20,21 +22,27 @@ interface InviteFormProps {
   ) => Promise<{ success: boolean; error?: string; invite?: StaffInvite }>;
 }
 
-// School-bound roles either admin tier may invite.
-const SCHOOL_ROLES: { id: number; label: string }[] = [
-  { id: ORG_ROLE.SchoolAdmin, label: 'School Admin' },
-  { id: ORG_ROLE.Teacher, label: 'Teacher' },
-  { id: ORG_ROLE.RelatedServiceProvider, label: 'Related service provider' },
-  { id: ORG_ROLE.GeneralEducator, label: 'General educator' },
-];
+// School-bound roles either admin tier may invite. These are this form's OWN
+// invitable-role labels (what a district admin picks when sending an
+// invite), a distinct voice from `orgRoleLabel`'s `common:orgRole.*` (which
+// labels an EXISTING member/invite's role elsewhere) — see `inviteForm.roles.*`.
+function schoolRoles(t: TFunction<'staff-invites'>): { id: number; label: string }[] {
+  return [
+    { id: ORG_ROLE.SchoolAdmin, label: t('inviteForm.roles.schoolAdmin') },
+    { id: ORG_ROLE.Teacher, label: t('inviteForm.roles.teacher') },
+    { id: ORG_ROLE.RelatedServiceProvider, label: t('inviteForm.roles.relatedServiceProvider') },
+    { id: ORG_ROLE.GeneralEducator, label: t('inviteForm.roles.generalEducator') },
+  ];
+}
 
 // Roles a caller may invite. DistrictAdmin can also invite DistrictAdmins;
 // SchoolAdmin is limited to the school-bound roles.
-function invitableRoles(callerOrgRoleId: number): { id: number; label: string }[] {
+function invitableRoles(callerOrgRoleId: number, t: TFunction<'staff-invites'>): { id: number; label: string }[] {
+  const roles = schoolRoles(t);
   if (callerOrgRoleId === ORG_ROLE.DistrictAdmin) {
-    return [{ id: ORG_ROLE.DistrictAdmin, label: 'District Admin' }, ...SCHOOL_ROLES];
+    return [{ id: ORG_ROLE.DistrictAdmin, label: t('inviteForm.roles.districtAdmin') }, ...roles];
   }
-  return SCHOOL_ROLES;
+  return roles;
 }
 
 export function InviteForm({
@@ -43,7 +51,8 @@ export function InviteForm({
   schools,
   onSubmit,
 }: InviteFormProps) {
-  const roles = invitableRoles(callerOrgRoleId);
+  const { t } = useTranslation('staff-invites');
+  const roles = invitableRoles(callerOrgRoleId, t);
   const isCallerDistrictAdmin = callerOrgRoleId === ORG_ROLE.DistrictAdmin;
 
   const [email, setEmail] = useState('');
@@ -73,7 +82,7 @@ export function InviteForm({
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setError('Email is required');
+      setError(t('inviteForm.errors.emailRequired'));
       return;
     }
 
@@ -81,7 +90,7 @@ export function InviteForm({
     if (schoolPickerVisible) {
       const source = schoolPickerLocked ? String(callerSchoolId ?? '') : schoolId;
       if (!source) {
-        setError('Select a school for this invite');
+        setError(t('inviteForm.errors.selectSchool'));
         return;
       }
       resolvedSchoolId = Number(source);
@@ -99,7 +108,7 @@ export function InviteForm({
       setCreatedUrl(result.invite?.inviteUrl ?? null);
       setEmail('');
     } else {
-      setError(result.error ?? 'Could not send the invite');
+      setError(result.error ?? t('inviteForm.errors.couldNotSend'));
     }
     setIsSubmitting(false);
   };
@@ -108,13 +117,12 @@ export function InviteForm({
   if (needsSchools) {
     return (
       <div className="space-y-4" data-testid="district-staff-invite-needs-school">
-        <Notice variant="info" title="Add a school first">
-          Staff are assigned to a school. Create your first school, then invite
-          school admins and teachers.
+        <Notice variant="info" title={t('inviteForm.needsSchoolTitle')}>
+          {t('inviteForm.needsSchoolBody')}
         </Notice>
         <Link to="/educator/admin/schools">
           <Button data-testid="district-staff-invite-create-school-link">
-            Go to Schools
+            {t('inviteForm.goToSchools')}
           </Button>
         </Link>
       </div>
@@ -125,24 +133,24 @@ export function InviteForm({
     <form onSubmit={handleSubmit} className="space-y-4" data-testid="district-staff-invite-form">
       {error && <Notice variant="error" title={error} />}
       {successEmail && (
-        <Notice variant="success" title={`Invite sent to ${successEmail}`} />
+        <Notice variant="success" title={t('inviteForm.inviteSent', { email: successEmail })} />
       )}
 
       <Input
         id="district-staff-invite-email"
-        label="Work email *"
+        label={t('inviteForm.emailLabel')}
         type="email"
         required
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         maxLength={256}
-        placeholder="name@district.org"
+        placeholder={t('inviteForm.emailPlaceholder')}
         data-testid="district-staff-invite-email"
       />
 
       <Select
         id="district-staff-invite-role"
-        label="Role *"
+        label={t('inviteForm.roleLabel')}
         value={orgRoleId}
         onChange={(e) => setOrgRoleId(Number(e.target.value))}
         data-testid="district-staff-invite-role"
@@ -157,13 +165,13 @@ export function InviteForm({
       {schoolPickerVisible && (
         <Select
           id="district-staff-invite-school"
-          label="School *"
+          label={t('inviteForm.schoolLabel')}
           value={schoolPickerLocked ? String(callerSchoolId ?? '') : schoolId}
           onChange={(e) => setSchoolId(e.target.value)}
           disabled={schoolPickerLocked}
           data-testid="district-staff-invite-school"
         >
-          <option value="">Select a school</option>
+          <option value="">{t('inviteForm.selectSchool')}</option>
           {schools.map((school) => (
             <option key={school.id} value={school.id}>
               {school.name}
@@ -177,7 +185,7 @@ export function InviteForm({
         disabled={isSubmitting}
         data-testid="district-staff-invite-submit"
       >
-        {isSubmitting ? 'Sending...' : 'Send invite'}
+        {isSubmitting ? t('inviteForm.sending') : t('inviteForm.submit')}
       </Button>
 
       {createdUrl && <InviteUrlField url={createdUrl} />}

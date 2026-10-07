@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Notice } from '@/components/ui/notice';
@@ -9,6 +10,7 @@ import { useToast } from '@/components/ui/toast';
 import type { MenuItem } from '@/components/ui/menu';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { apiErrorMessage } from '@/lib/api-error';
+import { getActiveLanguage } from '@/lib/i18n/format';
 import { cancelOutboundEmail, resendOutboundEmail } from '../api/email-admin-api';
 import { useOutboundEmails } from '../hooks/use-outbound-emails';
 import type { OutboundEmailDto, OutboundEmailStatus, OutboundEmailStatusFilter } from '../types';
@@ -29,6 +31,13 @@ function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+/** Full date+time (not just date), formatted in the active i18next language
+ *  — same local-helper shape as `AdminAuditPage`'s own `formatDateTime`;
+ *  `lib/format-date.ts`'s `formatDate` only covers a date, not a timestamp. */
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString(getActiveLanguage());
+}
+
 interface ConfirmTarget {
   email: OutboundEmailDto;
   action: 'resend' | 'cancel';
@@ -38,7 +47,8 @@ interface ConfirmTarget {
  *  failures visible and resendable, in-flight ones cancellable (pilot-gates
  *  plan, phase 1, decision 2). Polls while any row is Queued/Sending. */
 export function AdminEmailPage() {
-  usePageTitle('Outbound email');
+  const { t } = useTranslation(['admin', 'common']);
+  usePageTitle(t('email.pageTitle'));
   const [filter, setFilter] = useState<OutboundEmailStatusFilter>('Failed');
   const { emails, status, isLoading, error, reload } = useOutboundEmails(filter);
   const { show: showToast } = useToast();
@@ -57,43 +67,48 @@ export function AdminEmailPage() {
     const { email, action } = confirmTarget;
     setIsSubmitting(true);
     setConfirmError(null);
+    const actionFailedFallback =
+      action === 'resend' ? t('email.resendFailedFallback') : t('email.cancelFailedFallback');
     try {
       const res = action === 'resend' ? await resendOutboundEmail(email.id) : await cancelOutboundEmail(email.id);
       if (res.success) {
         showToast({
-          message: action === 'resend' ? `Email to ${email.toEmail} re-queued` : `Email to ${email.toEmail} cancelled`,
+          message:
+            action === 'resend'
+              ? t('email.resentToast', { email: email.toEmail })
+              : t('email.cancelledToast', { email: email.toEmail }),
           variant: 'success',
         });
         setConfirmTarget(null);
         reload();
       } else {
-        setConfirmError(res.message ?? `Could not ${action} this email.`);
+        setConfirmError(res.message ?? actionFailedFallback);
       }
     } catch (err) {
-      setConfirmError(apiErrorMessage(err, `Could not ${action} this email.`));
+      setConfirmError(apiErrorMessage(err, actionFailedFallback));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const columns: TableColumn<OutboundEmailDto>[] = [
-    { key: 'to', header: 'To', cell: (e) => e.toEmail, sortValue: (e) => e.toEmail },
-    { key: 'subject', header: 'Subject', cell: (e) => e.subject, hideBelow: 'md' },
-    { key: 'kind', header: 'Kind', cell: (e) => e.kind, hideBelow: 'lg' },
+    { key: 'to', header: t('email.column.to'), cell: (e) => e.toEmail, sortValue: (e) => e.toEmail },
+    { key: 'subject', header: t('email.column.subject'), cell: (e) => e.subject, hideBelow: 'md' },
+    { key: 'kind', header: t('email.column.kind'), cell: (e) => e.kind, hideBelow: 'lg' },
     {
       key: 'status',
-      header: 'Status',
+      header: t('common.column.status'),
       cell: (e) => (
         <Badge variant={STATUS_VARIANT[e.status]} data-testid={`email-status-${e.id}`}>
-          {e.status}
+          {t(`email.status.${e.status}`)}
         </Badge>
       ),
       sortValue: (e) => e.status,
     },
-    { key: 'attempts', header: 'Attempts', align: 'right', cell: (e) => e.attempts, hideBelow: 'lg' },
+    { key: 'attempts', header: t('email.column.attempts'), align: 'right', cell: (e) => e.attempts, hideBelow: 'lg' },
     {
       key: 'lastError',
-      header: 'Last error',
+      header: t('email.column.lastError'),
       cell: (e) =>
         e.lastError ? (
           <span title={e.lastError} className="text-brand-danger-700">
@@ -105,14 +120,14 @@ export function AdminEmailPage() {
     },
     {
       key: 'when',
-      header: 'Next attempt / sent',
+      header: t('email.column.when'),
       align: 'right',
       cell: (e) =>
         e.sentAt
-          ? `Sent ${new Date(e.sentAt).toLocaleString()}`
+          ? t('email.sentAt', { when: formatDateTime(e.sentAt) })
           : e.status === 'Cancelled'
             ? '—'
-            : `Next: ${new Date(e.nextAttemptAt).toLocaleString()}`,
+            : t('email.nextAttempt', { when: formatDateTime(e.nextAttemptAt) }),
       sortValue: (e) => e.sentAt ?? e.nextAttemptAt,
     },
   ];
@@ -121,14 +136,14 @@ export function AdminEmailPage() {
     const actions: MenuItem[] = [];
     if (email.status === 'Failed' || email.status === 'Cancelled') {
       actions.push({
-        label: 'Resend',
+        label: t('email.resend'),
         onSelect: () => setConfirmTarget({ email, action: 'resend' }),
         'data-testid': `email-resend-${email.id}`,
       });
     }
     if (email.status === 'Queued') {
       actions.push({
-        label: 'Cancel',
+        label: t('email.cancel'),
         variant: 'danger',
         onSelect: () => setConfirmTarget({ email, action: 'cancel' }),
         'data-testid': `email-cancel-${email.id}`,
@@ -138,23 +153,29 @@ export function AdminEmailPage() {
   };
 
   return (
-    <PageLayout title="Outbound email" subtitle="Every email the app has queued, sent, or failed to send.">
+    <PageLayout title={t('email.pageTitle')} subtitle={t('email.subtitle')}>
       {status && !status.configured && (
         <div role="alert">
-          <Notice variant="warning" title="Email delivery is not configured" data-testid="email-unconfigured-banner">
-            No email will be delivered until Azure Communication Services is configured for this environment.
+          <Notice variant="warning" title={t('email.unconfiguredTitle')} data-testid="email-unconfigured-banner">
+            {t('email.unconfiguredMessage')}
           </Notice>
         </div>
       )}
       {status?.configured && (
         <p className="text-sm text-brand-slate-500" data-testid="email-status-summary">
-          {status.queued} queued · {status.sending} sending · {status.failed} failed
-          {status.lastSentAt ? ` · last sent ${new Date(status.lastSentAt).toLocaleString()}` : ''}
+          {status.lastSentAt
+            ? t('email.statusSummaryLastSent', {
+                queued: status.queued,
+                sending: status.sending,
+                failed: status.failed,
+                when: formatDateTime(status.lastSentAt),
+              })
+            : t('email.statusSummary', { queued: status.queued, sending: status.sending, failed: status.failed })}
         </p>
       )}
 
       <Select
-        label="Status"
+        label={t('email.statusFilterLabel')}
         value={filter}
         onChange={(e) => setFilter(e.target.value as OutboundEmailStatusFilter)}
         data-testid="email-status-filter"
@@ -162,7 +183,7 @@ export function AdminEmailPage() {
       >
         {FILTER_OPTIONS.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {t(`email.filter.${option}`)}
           </option>
         ))}
       </Select>
@@ -174,7 +195,7 @@ export function AdminEmailPage() {
       )}
 
       <Table
-        label="Outbound emails"
+        label={t('email.tableLabel')}
         data-testid="outbound-emails-table"
         columns={columns}
         rows={emails}
@@ -183,19 +204,19 @@ export function AdminEmailPage() {
         rowActionLabel={(e) => e.toEmail}
         loading={isLoading}
         defaultSort={{ key: 'when', direction: 'desc' }}
-        empty={<p className="text-center text-sm text-brand-slate-500">No emails match this filter.</p>}
+        empty={<p className="text-center text-sm text-brand-slate-500">{t('email.noneMatch')}</p>}
       />
 
       <ConfirmDialog
         open={confirmTarget !== null}
-        title={confirmTarget?.action === 'resend' ? 'Resend email' : 'Cancel email'}
+        title={confirmTarget?.action === 'resend' ? t('email.resendConfirmTitle') : t('email.cancelConfirmTitle')}
         message={
           confirmTarget?.action === 'resend'
-            ? `Re-queue this email to ${confirmTarget.email.toEmail} for immediate delivery?`
-            : `Cancel this queued email to ${confirmTarget?.email.toEmail}? It will never be sent.`
+            ? t('email.resendConfirmMessage', { email: confirmTarget.email.toEmail })
+            : t('email.cancelConfirmMessage', { email: confirmTarget?.email.toEmail })
         }
-        confirmLabel={confirmTarget?.action === 'resend' ? 'Resend' : 'Cancel email'}
-        cancelLabel="Keep as is"
+        confirmLabel={confirmTarget?.action === 'resend' ? t('email.resend') : t('email.cancelConfirmTitle')}
+        cancelLabel={t('email.keepAsIs')}
         confirmVariant={confirmTarget?.action === 'resend' ? 'primary' : 'danger'}
         loading={isSubmitting}
         error={confirmError}

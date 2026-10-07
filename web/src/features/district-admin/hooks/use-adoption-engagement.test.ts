@@ -57,7 +57,7 @@ describe('useAdoptionEngagement', () => {
 
     expect(result.current.adoption).toEqual(adoptionDto);
     expect(result.current.engagement).toBeNull();
-    expect(result.current.engagementError).toBe('Engagement is down');
+    expect(result.current.engagementError).toEqual({ kind: 'server', message: 'Engagement is down' });
     // Not a joint failure — the caller can still render the adoption tiles.
     expect(result.current.error).toBeNull();
   });
@@ -71,7 +71,7 @@ describe('useAdoptionEngagement', () => {
 
     expect(result.current.engagement).toEqual(engagementDto);
     expect(result.current.adoption).toBeNull();
-    expect(result.current.adoptionError).toBe('Adoption is down');
+    expect(result.current.adoptionError).toEqual({ kind: 'server', message: 'Adoption is down' });
     expect(result.current.error).toBeNull();
   });
 
@@ -84,6 +84,6 @@ describe('useAdoptionEngagement', () => {
 
     expect(result.current.adoption).toBeNull();
     expect(result.current.engagement).toBeNull();
-    expect(result.current.error).toBe('Adoption is down');
+    expect(result.current.error).toEqual({ kind: 'server', message: 'Adoption is down' });
   });
 });

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ORG_ROLE } from '@/features/educator/types';
 import { createStaffInvite } from '@/features/staff-invites/api/staff-invites-api';
@@ -18,6 +19,7 @@ interface SetupStaffStepProps {
 // surfaces the copyable invite URL itself). The wizard caller is always a
 // DistrictAdmin. Skippable.
 export function SetupStaffStep({ schools, onNext, onSkip }: SetupStaffStepProps) {
+  const { t } = useTranslation('district-admin');
   const [invited, setInvited] = useState(false);
 
   const handleInvite = async (data: CreateStaffInviteRequest) => {
@@ -27,9 +29,9 @@ export function SetupStaffStep({ schools, onNext, onSkip }: SetupStaffStepProps)
         setInvited(true);
         return { success: true, invite: response.data };
       }
-      return { success: false, error: response.message || 'Failed to send invite' };
+      return { success: false, error: response.message || t('setupWizard.staff.errorFailed') };
     } catch {
-      return { success: false, error: 'An error occurred' };
+      return { success: false, error: t('setupWizard.staff.errorGeneric') };
     }
   };
 
@@ -37,11 +39,10 @@ export function SetupStaffStep({ schools, onNext, onSkip }: SetupStaffStepProps)
     <div className="space-y-6" data-testid="district-setup-staff">
       <div className="space-y-2">
         <h2 className="font-serif text-2xl text-brand-slate-800">
-          Invite your first staff member
+          {t('setupWizard.staff.heading')}
         </h2>
         <p className="text-sm text-brand-slate-500 leading-relaxed">
-          Send an invite so a school admin or teacher can join your district.
-          They'll get a link to set up their own account.
+          {t('setupWizard.staff.body')}
         </p>
       </div>
 
@@ -54,10 +55,10 @@ export function SetupStaffStep({ schools, onNext, onSkip }: SetupStaffStepProps)
 
       <div className="flex gap-2">
         <Button onClick={onNext} data-testid="district-setup-next-2">
-          {invited ? 'Continue' : 'Done inviting'}
+          {invited ? t('setupWizard.staff.continue') : t('setupWizard.staff.doneInviting')}
         </Button>
         <Button variant="ghost" onClick={onSkip} data-testid="district-setup-skip-2">
-          Skip for now
+          {t('setupWizard.staff.skip')}
         </Button>
       </div>
     </div>

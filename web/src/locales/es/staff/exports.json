@@ -1,0 +1,35 @@
+{
+  "page": {
+    "title": "Exportaciones",
+    "breadcrumb": "Exportaciones",
+    "requestExport": "Solicitar exportación del distrito",
+    "requestExportFailed": "No se pudo solicitar la exportación.",
+    "couldNotLoadTitle": "No se pudieron cargar los trabajos de exportación",
+    "tryAgain": "Intentar de nuevo",
+    "couldNotPrepareDownload": "No se pudo preparar la descarga.",
+    "columns": {
+      "requested": "Solicitado",
+      "requestedBy": "{{date}} por {{name}}",
+      "scope": "Alcance",
+      "scopeStudentFallback": "Estudiante",
+      "scopeDistrict": "Distrito",
+      "status": "Estado",
+      "size": "Tamaño",
+      "counts": "Estudiantes / archivos",
+      "download": "Descargar"
+    },
+    "tableLabel": "Trabajos de exportación",
+    "status": {
+      "Queued": "En cola",
+      "Running": "En curso",
+      "Completed": "Completado",
+      "Failed": "Fallido"
+    }
+  },
+  "recordButton": {
+    "label": "Exportar expediente",
+    "requestedToast": "Exportación solicitada",
+    "requestFailed": "No se pudo solicitar la exportación.",
+    "viewExports": "Ver exportaciones"
+  }
+}

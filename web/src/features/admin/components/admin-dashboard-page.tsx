@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Users,
   FileText,
@@ -16,16 +17,25 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageLayout } from '@/components/ui/page-layout';
 import { usePageTitle } from '@/hooks/use-page-title';
+import { formatDate } from '@/lib/format-date';
+import { disabilityCategoryLabel } from '@/lib/disability-category-label';
+import i18n from '@/lib/i18n';
 import { getDashboardStats, getRecentUsers } from '../api/admin-api';
 import type { AdminDashboardStats, AdminUser } from '@/types/api';
 import type { LucideIcon } from 'lucide-react';
 
 export function AdminDashboardPage() {
-  usePageTitle('Admin Dashboard');
+  const { t } = useTranslation(['admin', 'common']);
+  usePageTitle(t('dashboard.pageTitle'));
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [recentUsers, setRecentUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // A flag, not the translated string — translated at render, below, so a
+  // language switch after a failed load shows the new language immediately
+  // rather than a stale snapshot (same pattern as `useChildren`/
+  // `AdminNotificationFailuresPage` — see `docs/i18n/README.md`'s note on
+  // never putting `t` in a mount-effect's dependency array).
+  const [hasError, setHasError] = useState(false);
   // Bumped by the retry button to re-run the fetch effect. The effect body is an
   // inline async IIFE that only setStates after an await, keeping it effect-safe.
   const [reloadKey, setReloadKey] = useState(0);
@@ -38,9 +48,9 @@ export function AdminDashboardPage() {
         if (!active) return;
         setStats(s);
         setRecentUsers(u);
-        setError(null);
+        setHasError(false);
       } catch {
-        if (active) setError('Failed to load dashboard stats.');
+        if (active) setHasError(true);
       } finally {
         if (active) setIsLoading(false);
       }
@@ -48,59 +58,62 @@ export function AdminDashboardPage() {
     return () => {
       active = false;
     };
+    // `t` deliberately excluded — see the comment on `hasError` above.
   }, [reloadKey]);
+
+  const error = hasError ? t('dashboard.loadFailed') : null;
 
   const retry = () => {
     setIsLoading(true);
-    setError(null);
+    setHasError(false);
     setReloadKey((k) => k + 1);
   };
 
   if (isLoading) {
     return (
       <div className="flex justify-center py-20">
-        <Spinner label="Loading dashboard…" />
+        <Spinner label={t('dashboard.loading')} />
       </div>
     );
   }
 
   if (error || !stats) {
     return (
-      <Notice variant="error" title={error ?? 'Unknown error'}>
+      <Notice variant="error" title={error ?? t('dashboard.unknownError')}>
         <Button variant="secondary" size="sm" onClick={retry} className="mt-3">
-          Retry
+          {t('common:ui.tryAgain')}
         </Button>
       </Notice>
     );
   }
 
   return (
-    <PageLayout title="Admin Dashboard" data-testid="admin-dashboard">
+    <PageLayout title={t('dashboard.pageTitle')} data-testid="admin-dashboard">
       {/* Top row - Key metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={Users}
-          label="Total Users"
+          label={t('dashboard.stat.totalUsers')}
           value={stats.totalUsers}
           delta={stats.newUsersLast7Days}
           color="teal"
         />
         <StatCard
           icon={Users}
-          label="Active Children"
+          label={t('dashboard.stat.activeChildren')}
           value={stats.totalChildren}
           color="teal"
         />
         <StatCard
           icon={FileText}
-          label="IEP Documents"
+          label={t('dashboard.stat.iepDocuments')}
           value={stats.totalDocuments}
           delta={stats.newDocumentsLast7Days}
           color="teal"
         />
         <StatCard
           icon={Brain}
-          label="AI Analyses"
+          label={t('dashboard.stat.aiAnalyses')}
           value={stats.totalAnalyses}
           delta={stats.analysesLast7Days}
           color="teal"
@@ -110,30 +123,34 @@ export function AdminDashboardPage() {
       {/* Second row - Status breakdowns */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <StatusBreakdownCard
-          title="Document Status"
+          title={t('dashboard.status.documentStatus')}
           icon={FileText}
           items={[
-            { label: 'Created', value: stats.documentsCreated, color: 'bg-brand-slate-300' },
-            { label: 'Parsed', value: stats.documentsParsed, color: 'bg-brand-teal-500' },
-            { label: 'Error', value: stats.documentsError, color: 'bg-brand-danger-500' },
+            { label: t('dashboard.documentItem.created'), value: stats.documentsCreated, color: 'bg-brand-slate-300' },
+            { label: t('dashboard.documentItem.parsed'), value: stats.documentsParsed, color: 'bg-brand-teal-500' },
+            { label: t('dashboard.documentItem.error'), value: stats.documentsError, color: 'bg-brand-danger-500' },
           ]}
           total={stats.totalDocuments}
         />
         <StatusBreakdownCard
-          title="Analysis Status"
+          title={t('dashboard.status.analysisStatus')}
           icon={Brain}
           items={[
-            { label: 'Completed', value: stats.analysesCompleted, color: 'bg-brand-teal-500' },
-            { label: 'Pending', value: stats.totalAnalyses - stats.analysesCompleted - stats.analysesError, color: 'bg-brand-amber-400' },
-            { label: 'Error', value: stats.analysesError, color: 'bg-brand-danger-500' },
+            { label: t('dashboard.analysisItem.completed'), value: stats.analysesCompleted, color: 'bg-brand-teal-500' },
+            {
+              label: t('dashboard.analysisItem.pending'),
+              value: stats.totalAnalyses - stats.analysesCompleted - stats.analysesError,
+              color: 'bg-brand-amber-400',
+            },
+            { label: t('dashboard.analysisItem.error'), value: stats.analysesError, color: 'bg-brand-danger-500' },
           ]}
           total={stats.totalAnalyses}
         />
         <StatusBreakdownCard
-          title="Subscription Status"
+          title={t('dashboard.status.subscriptionStatus')}
           icon={Shield}
           items={Object.entries(stats.usersBySubscriptionStatus).map(([label, value]) => ({
-            label: label.charAt(0).toUpperCase() + label.slice(1),
+            label: subscriptionStatusLabel(label),
             value,
             color: label === 'active' ? 'bg-brand-teal-500' : label === 'none' ? 'bg-brand-slate-300' : 'bg-brand-amber-400',
           }))}
@@ -144,12 +161,15 @@ export function AdminDashboardPage() {
       {/* Third row - Breakdowns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <BreakdownCard
-          title="Children by Disability Category"
+          title={t('dashboard.breakdown.childrenByDisability')}
           data={stats.childrenByDisabilityCategory}
+          labelFor={disabilityCategoryLabel}
+          emptyLabel={t('dashboard.breakdown.noDataYet')}
         />
         <BreakdownCard
-          title="Goals by Category"
+          title={t('dashboard.breakdown.goalsByCategory')}
           data={stats.goalsByCategory}
+          emptyLabel={t('dashboard.breakdown.noDataYet')}
         />
       </div>
 
@@ -162,15 +182,44 @@ export function AdminDashboardPage() {
           <BetaCodesCard total={stats.totalBetaCodes} redeemed={stats.redeemedBetaCodes} />
           <QuickStatsCard
             items={[
-              { icon: Target, label: 'Advocacy Goals', value: stats.totalGoals },
-              { icon: ClipboardCheck, label: 'Meeting Checklists', value: stats.totalChecklists },
-              { icon: TrendingUp, label: 'Total AI Usage', value: stats.totalAnalysisUsage + stats.totalMeetingPrepUsage },
+              { icon: Target, label: t('dashboard.quickStats.advocacyGoals'), value: stats.totalGoals },
+              { icon: ClipboardCheck, label: t('dashboard.quickStats.meetingChecklists'), value: stats.totalChecklists },
+              {
+                icon: TrendingUp,
+                label: t('dashboard.quickStats.totalAiUsage'),
+                value: stats.totalAnalysisUsage + stats.totalMeetingPrepUsage,
+              },
             ]}
           />
         </div>
       </div>
     </PageLayout>
   );
+}
+
+/** The known `usersBySubscriptionStatus` keys the backend sends
+ *  (`SubscriptionStatus.status`'s documented values), translated via a plain
+ *  `i18n.t` call (same shape as `disabilityCategoryLabel` — callable outside
+ *  a hook, with its own namespace reference rather than threading the
+ *  component's `t` through, which would lose that `t`'s strict key typing
+ *  anyway). Any other value falls back to the original capitalize-first-letter
+ *  treatment so an unrecognized future status still renders something
+ *  reasonable rather than a raw key. */
+function subscriptionStatusLabel(raw: string): string {
+  switch (raw) {
+    case 'none':
+      return i18n.t('admin:dashboard.subscriptionStatusValue.none');
+    case 'active':
+      return i18n.t('admin:dashboard.subscriptionStatusValue.active');
+    case 'past_due':
+      return i18n.t('admin:dashboard.subscriptionStatusValue.pastDue');
+    case 'canceled':
+      return i18n.t('admin:dashboard.subscriptionStatusValue.canceled');
+    case 'expired':
+      return i18n.t('admin:dashboard.subscriptionStatusValue.expired');
+    default:
+      return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
 }
 
 /* ---------- Stat Card ---------- */
@@ -184,6 +233,7 @@ interface StatCardProps {
 }
 
 function StatCard({ icon: Icon, label, value, delta }: StatCardProps) {
+  const { t } = useTranslation('admin');
   return (
     <Card data-testid={`admin-stat-${label.toLowerCase().replace(/\s+/g, '-')}`}>
       <div className="flex items-start justify-between">
@@ -191,7 +241,7 @@ function StatCard({ icon: Icon, label, value, delta }: StatCardProps) {
           <Icon size={20} strokeWidth={1.8} className="text-brand-teal-500" />
         </div>
         {delta !== undefined && delta > 0 && (
-          <Badge variant="success">+{delta} this week</Badge>
+          <Badge variant="success">{t('dashboard.deltaThisWeek', { delta })}</Badge>
         )}
       </div>
       <p className="mt-4 text-3xl font-semibold text-brand-slate-800">{value.toLocaleString()}</p>
@@ -258,6 +308,12 @@ function StatusBreakdownCard({ title, icon: Icon, items, total }: StatusBreakdow
 interface BreakdownCardProps {
   title: string;
   data: Record<string, number>;
+  emptyLabel: string;
+  /** Translates a raw breakdown key to a display label. Defaults to the
+   *  original "replace underscores, capitalize" treatment for data with no
+   *  known translation (e.g. `goalsByCategory`, whose keys aren't a closed,
+   *  reliably-mappable vocabulary the way IDEA disability categories are). */
+  labelFor?: (raw: string) => string;
 }
 
 const barColors = [
@@ -269,7 +325,11 @@ const barColors = [
   'bg-brand-teal-200',
 ];
 
-function BreakdownCard({ title, data }: BreakdownCardProps) {
+function defaultBreakdownLabel(raw: string): string {
+  return raw.replace(/_/g, ' ');
+}
+
+function BreakdownCard({ title, data, emptyLabel, labelFor = defaultBreakdownLabel }: BreakdownCardProps) {
   const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
   const max = entries.length > 0 ? entries[0][1] : 1;
 
@@ -277,13 +337,13 @@ function BreakdownCard({ title, data }: BreakdownCardProps) {
     <Card>
       <h3 className="text-sm font-medium text-brand-slate-700 mb-4">{title}</h3>
       {entries.length === 0 ? (
-        <p className="text-xs text-brand-slate-500">No data yet.</p>
+        <p className="text-xs text-brand-slate-500">{emptyLabel}</p>
       ) : (
         <div className="space-y-3">
           {entries.map(([label, value], i) => (
             <div key={label}>
               <div className="flex justify-between text-xs mb-1">
-                <span className="text-brand-slate-600 capitalize">{label.replace(/_/g, ' ')}</span>
+                <span className="text-brand-slate-600 capitalize">{labelFor(label)}</span>
                 <span className="font-medium text-brand-slate-700">{value}</span>
               </div>
               <div className="h-2 rounded-full bg-brand-slate-100 overflow-hidden">
@@ -307,20 +367,21 @@ interface RecentUsersTableProps {
 }
 
 function RecentUsersTable({ users }: RecentUsersTableProps) {
+  const { t } = useTranslation('admin');
   return (
     <Card data-testid="admin-recent-users">
-      <h3 className="text-sm font-medium text-brand-slate-700 mb-4">Recent Users</h3>
+      <h3 className="text-sm font-medium text-brand-slate-700 mb-4">{t('dashboard.recentUsers.title')}</h3>
       {users.length === 0 ? (
-        <EmptyState icon={Users} title="No users yet" />
+        <EmptyState icon={Users} title={t('dashboard.recentUsers.emptyTitle')} />
       ) : (
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-brand-slate-100">
-              <th className="text-left pb-2 text-xs font-medium text-brand-slate-500">Name</th>
-              <th className="text-left pb-2 text-xs font-medium text-brand-slate-500">Email</th>
-              <th className="text-left pb-2 text-xs font-medium text-brand-slate-500">Joined</th>
-              <th className="text-left pb-2 text-xs font-medium text-brand-slate-500">Status</th>
+              <th className="text-left pb-2 text-xs font-medium text-brand-slate-500">{t('common.column.name')}</th>
+              <th className="text-left pb-2 text-xs font-medium text-brand-slate-500">{t('common.column.email')}</th>
+              <th className="text-left pb-2 text-xs font-medium text-brand-slate-500">{t('common.column.joined')}</th>
+              <th className="text-left pb-2 text-xs font-medium text-brand-slate-500">{t('common.column.status')}</th>
             </tr>
           </thead>
           <tbody>
@@ -328,12 +389,10 @@ function RecentUsersTable({ users }: RecentUsersTableProps) {
               <tr key={u.id} className="border-b border-brand-slate-50 last:border-0">
                 <td className="py-2.5 text-brand-slate-700">{u.firstName} {u.lastName}</td>
                 <td className="py-2.5 text-brand-slate-500">{u.email}</td>
-                <td className="py-2.5 text-brand-slate-500">
-                  {new Date(u.createdAt).toLocaleDateString()}
-                </td>
+                <td className="py-2.5 text-brand-slate-500">{formatDate(u.createdAt)}</td>
                 <td className="py-2.5">
                   <Badge variant={u.isActive ? 'success' : 'error'}>
-                    {u.isActive ? 'Active' : 'Inactive'}
+                    {u.isActive ? t('common.status.active') : t('common.status.inactive')}
                   </Badge>
                 </td>
               </tr>
@@ -354,13 +413,14 @@ interface BetaCodesCardProps {
 }
 
 function BetaCodesCard({ total, redeemed }: BetaCodesCardProps) {
+  const { t } = useTranslation('admin');
   const pct = total > 0 ? (redeemed / total) * 100 : 0;
   return (
     <Card>
-      <h3 className="text-sm font-medium text-brand-slate-700 mb-3">Beta Codes</h3>
+      <h3 className="text-sm font-medium text-brand-slate-700 mb-3">{t('dashboard.betaCodes.title')}</h3>
       <div className="flex justify-between text-xs text-brand-slate-500 mb-2">
-        <span>{redeemed} redeemed</span>
-        <span>{total} total</span>
+        <span>{t('dashboard.betaCodes.redeemed', { count: redeemed })}</span>
+        <span>{t('dashboard.betaCodes.total', { count: total })}</span>
       </div>
       <div className="h-2.5 rounded-full bg-brand-slate-100 overflow-hidden">
         <div
@@ -385,9 +445,10 @@ interface QuickStatsCardProps {
 }
 
 function QuickStatsCard({ items }: QuickStatsCardProps) {
+  const { t } = useTranslation('admin');
   return (
     <Card>
-      <h3 className="text-sm font-medium text-brand-slate-700 mb-3">Quick Stats</h3>
+      <h3 className="text-sm font-medium text-brand-slate-700 mb-3">{t('dashboard.quickStats.title')}</h3>
       <div className="space-y-3">
         {items.map(({ icon: Icon, label, value }) => (
           <div key={label} className="flex items-center justify-between">

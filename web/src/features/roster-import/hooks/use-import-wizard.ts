@@ -6,7 +6,18 @@ export type WizardStep = 'template' | 'upload' | 'preview' | 'result';
 // Ordinal positions for the progress indicator. "Commit" (index 3) is the
 // confirm dialog over the preview step, so it is surfaced by the page while the
 // dialog is open rather than being a step the wizard can rest on.
-export const WIZARD_STEP_LABELS = ['Template', 'Upload', 'Preview', 'Commit', 'Result'];
+//
+// Translation keys, not display text (multilingual plan phase 6) — the page
+// resolves each one via `t('wizard.' + key)` at render time, so the label
+// re-renders on a language switch instead of being baked in here at module
+// load (see `docs/i18n/README.md`'s "Display-label helpers" shape).
+export const WIZARD_STEP_LABEL_KEYS = [
+  'wizard.stepTemplate',
+  'wizard.stepUpload',
+  'wizard.stepPreview',
+  'wizard.stepCommit',
+  'wizard.stepResult',
+] as const;
 export const WIZARD_STEP_INDEX: Record<WizardStep, number> = {
   template: 0,
   upload: 1,

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Search, Users, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -10,13 +11,15 @@ import { PageLayout } from "@/components/ui/page-layout";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { formatDate } from "@/lib/format-date";
 import { useUsers } from "../hooks/use-users";
 import { inviteBetaUser } from "../api/admin-api";
 
 type AdminUser = ReturnType<typeof useUsers>["users"][number];
 
 export function AdminUsersPage() {
-  usePageTitle("User Management");
+  const { t } = useTranslation(['admin', 'common']);
+  usePageTitle(t('users.pageTitle'));
   const { users, isLoading, error, reload } = useUsers();
   const { show: showToast } = useToast();
   const [search, setSearch] = useState("");
@@ -28,18 +31,18 @@ export function AdminUsersPage() {
   const handleInvite = async () => {
     const trimmed = inviteEmail.trim();
     if (!trimmed || !trimmed.includes("@")) {
-      setInviteError("Please enter a valid email address");
+      setInviteError(t('users.inviteModal.invalidEmail'));
       return;
     }
     setIsInviting(true);
     setInviteError(null);
     try {
       await inviteBetaUser(trimmed);
-      showToast({ message: `Invite sent to ${trimmed}`, variant: "success" });
+      showToast({ message: t('users.inviteModal.sentToast', { email: trimmed }), variant: "success" });
       setInviteEmail("");
       setShowInvite(false);
     } catch {
-      setInviteError("Failed to send invite");
+      setInviteError(t('users.inviteModal.sendFailed'));
     } finally {
       setIsInviting(false);
     }
@@ -57,20 +60,20 @@ export function AdminUsersPage() {
   const columns: TableColumn<AdminUser>[] = [
     {
       key: "name",
-      header: "Name",
+      header: t('common.column.name'),
       cell: (u) => `${u.firstName} ${u.lastName}`.trim(),
       sortValue: (u) => `${u.firstName} ${u.lastName}`.toLowerCase(),
     },
     {
       key: "email",
-      header: "Email",
+      header: t('common.column.email'),
       hideBelow: "md",
       cell: (u) => u.email,
       sortValue: (u) => u.email,
     },
     {
       key: "role",
-      header: "Role",
+      header: t('users.column.role'),
       cell: (u) => (
         <Badge variant={u.role === "Admin" ? "success" : "neutral"}>
           {u.role}
@@ -80,28 +83,28 @@ export function AdminUsersPage() {
     },
     {
       key: "status",
-      header: "Status",
+      header: t('common.column.status'),
       cell: (u) => (
         <Badge variant={u.isActive ? "success" : "error"}>
-          {u.isActive ? "Active" : "Inactive"}
+          {u.isActive ? t('common.status.active') : t('common.status.inactive')}
         </Badge>
       ),
       sortValue: (u) => (u.isActive ? 0 : 1),
     },
     {
       key: "created",
-      header: "Joined",
+      header: t('common.column.joined'),
       align: "right",
       hideBelow: "lg",
-      cell: (u) => new Date(u.createdAt).toLocaleDateString(),
+      cell: (u) => formatDate(u.createdAt),
       sortValue: (u) => u.createdAt,
     },
   ];
 
   return (
     <PageLayout
-      title="User Management"
-      subtitle={`${filtered.length} user${filtered.length !== 1 ? "s" : ""}`}
+      title={t('users.pageTitle')}
+      subtitle={t('users.subtitle', { count: filtered.length })}
       actions={
         <Button
           onClick={() => setShowInvite(true)}
@@ -113,7 +116,7 @@ export function AdminUsersPage() {
             className="mr-1.5"
             aria-hidden="true"
           />
-          Invite Beta User
+          {t('users.inviteButton')}
         </Button>
       }
     >
@@ -124,7 +127,7 @@ export function AdminUsersPage() {
           className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-slate-400"
         />
         <Input
-          placeholder="Search by name or email..."
+          placeholder={t('users.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9"
@@ -140,13 +143,13 @@ export function AdminUsersPage() {
             onClick={reload}
             className="mt-3"
           >
-            Retry
+            {t('common:ui.tryAgain')}
           </Button>
         </Notice>
       )}
 
       <Table
-        label="Users"
+        label={t('users.tableLabel')}
         data-testid="admin-users-table"
         columns={columns}
         rows={filtered}
@@ -154,25 +157,22 @@ export function AdminUsersPage() {
         rowHref={(u) => `/admin/users/${u.id}`}
         loading={isLoading}
         defaultSort={{ key: "name", direction: "asc" }}
-        empty={<EmptyState icon={Users} title="No users found." />}
+        empty={<EmptyState icon={Users} title={t('users.emptyTitle')} />}
       />
 
       <Modal
         open={showInvite}
         onClose={() => setShowInvite(false)}
-        title="Invite Beta User"
+        title={t('users.inviteModal.title')}
         data-testid="admin-invite-modal"
       >
         <div className="space-y-3">
-          <p className="text-sm text-brand-slate-500">
-            Enter their email. They'll receive a signup link with a beta code
-            that auto-fills on the registration page.
-          </p>
+          <p className="text-sm text-brand-slate-500">{t('users.inviteModal.description')}</p>
           {inviteError && <Notice variant="error" title={inviteError} />}
           <Input
-            placeholder="email@example.com"
+            placeholder={t('users.inviteModal.emailPlaceholder')}
             type="email"
-            label="Email"
+            label={t('users.inviteModal.emailLabel')}
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
             data-testid="admin-invite-email"
@@ -184,7 +184,7 @@ export function AdminUsersPage() {
               disabled={!inviteEmail}
               data-testid="admin-send-invite"
             >
-              Send Invite
+              {t('users.inviteModal.submit')}
             </Button>
           </div>
         </div>

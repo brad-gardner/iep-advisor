@@ -3,7 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
-import { useAdoptionEngagement } from '@/features/district-admin/hooks/use-adoption-engagement';
+import {
+  useAdoptionEngagement,
+  type AdoptionEngagementLoadError,
+} from '@/features/district-admin/hooks/use-adoption-engagement';
 import { HomeSection } from './home-section';
 import { StatTile } from './stat-tile';
 
@@ -19,6 +22,12 @@ export function AdoptionEngagementTeaser() {
   const { t } = useTranslation(['home', 'common']);
   const { adoption, engagement, adoptionError, engagementError, isLoading, error, retry } =
     useAdoptionEngagement(null);
+
+  // The hook stores a FLAG (server message or generic), not pre-translated
+  // text, so a language switch after a failed load shows the new language
+  // immediately — see `use-adoption-engagement.ts`'s module doc comment.
+  const errorText = (loadError: AdoptionEngagementLoadError): string | null =>
+    loadError ? (loadError.kind === 'server' ? loadError.message : t('common:ui.genericError')) : null;
 
   return (
     <HomeSection
@@ -40,7 +49,7 @@ export function AdoptionEngagementTeaser() {
 
       {!isLoading && error && (
         <div role="alert">
-          <Notice variant="error" title={error}>
+          <Notice variant="error" title={errorText(error) ?? ''}>
             <Button
               size="sm"
               variant="secondary"
@@ -55,7 +64,7 @@ export function AdoptionEngagementTeaser() {
 
       {!isLoading && !error && (adoptionError || engagementError) && (
         <div role="alert" className="mb-3">
-          <Notice variant="error" title={adoptionError ?? engagementError ?? ''}>
+          <Notice variant="error" title={errorText(adoptionError) ?? errorText(engagementError) ?? ''}>
             <Button
               size="sm"
               variant="secondary"

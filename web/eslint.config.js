@@ -32,8 +32,6 @@ export default defineConfig([
       'src/components/layouts/**/*.{ts,tsx}',
       'src/components/ui/**/*.{ts,tsx}',
       'src/lib/i18n/**/*.{ts,tsx}',
-      'src/features/staff-invites/pages/staff-accept-invite-page.tsx',
-      'src/features/staff-invites/components/accept-invite-form.tsx',
       'src/features/student/components/student-accept-invite-page.tsx',
       'src/features/children/**/*.{ts,tsx}',
       'src/features/home/**/*.{ts,tsx}',
@@ -80,6 +78,12 @@ export default defineConfig([
       'src/lib/family-contact-label.ts',
       'src/lib/contribution-label.ts',
       'src/app/lazy-routes/**/*.{ts,tsx}',
+      // Phase 6 — district and platform admin.
+      'src/features/district-admin/**/*.{ts,tsx}',
+      'src/features/staff-invites/**/*.{ts,tsx}',
+      'src/features/roster-import/**/*.{ts,tsx}',
+      'src/features/exports/**/*.{ts,tsx}',
+      'src/features/admin/**/*.{ts,tsx}',
     ],
     ignores: [
       '**/*.test.{ts,tsx}',

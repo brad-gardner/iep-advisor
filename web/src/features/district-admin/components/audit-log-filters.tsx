@@ -1,19 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input, Select } from '@/components/ui/input';
 import { getStaffList } from '@/features/staff-invites/api/staff-invites-api';
 import type { StaffMember } from '@/features/staff-invites/types';
 import { AUDIT_ACTIONS } from '../types';
 import type { AuditAction, AuditLogFilters as AuditLogFiltersValue } from '../types';
-
-// Past-tense labels matching how the audit rows read ("Jane viewed …"), so the
-// filter's voice is consistent with the results it produces.
-const ACTION_LABELS: Record<AuditAction, string> = {
-  View: 'Viewed',
-  Edit: 'Edited',
-  Share: 'Shared',
-  Export: 'Exported',
-  Finalize: 'Finalized',
-};
 
 interface AuditLogFiltersProps {
   onChange: (filters: AuditLogFiltersValue) => void;
@@ -62,6 +53,7 @@ function assemble(fields: FilterFields): AuditLogFiltersValue {
 // history), an action dropdown, and a local-day date range. Emits an assembled,
 // UTC-normalized filter object on every change.
 export function AuditLogFilters({ onChange }: AuditLogFiltersProps) {
+  const { t } = useTranslation('district-admin');
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [fields, setFields] = useState<FilterFields>(EMPTY_FIELDS);
 
@@ -94,38 +86,38 @@ export function AuditLogFilters({ onChange }: AuditLogFiltersProps) {
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Select
         id="audit-log-staff-filter"
-        label="Staff member"
+        label={t('auditLog.filters.staffLabel')}
         value={fields.staffUserId}
         onChange={(e) => update({ staffUserId: e.target.value })}
         data-testid="audit-log-staff-filter"
       >
-        <option value="">All staff</option>
+        <option value="">{t('auditLog.filters.allStaff')}</option>
         {staff.map((member) => (
           <option key={member.staffProfileId} value={member.userId}>
             {member.firstName} {member.lastName}
-            {member.isActive ? '' : ' (deactivated)'}
+            {member.isActive ? '' : t('auditLog.filters.deactivatedSuffix')}
           </option>
         ))}
       </Select>
 
       <Select
         id="audit-log-action-filter"
-        label="Action"
+        label={t('auditLog.filters.actionLabel')}
         value={fields.action}
         onChange={(e) => update({ action: e.target.value })}
         data-testid="audit-log-action-filter"
       >
-        <option value="">All actions</option>
+        <option value="">{t('auditLog.filters.allActions')}</option>
         {AUDIT_ACTIONS.map((action) => (
           <option key={action} value={action}>
-            {ACTION_LABELS[action]}
+            {t(`auditLog.actionLabels.${action}`)}
           </option>
         ))}
       </Select>
 
       <Input
         id="audit-log-from-filter"
-        label="From"
+        label={t('auditLog.filters.fromLabel')}
         type="date"
         value={fields.from}
         onChange={(e) => update({ from: e.target.value })}
@@ -134,7 +126,7 @@ export function AuditLogFilters({ onChange }: AuditLogFiltersProps) {
 
       <Input
         id="audit-log-to-filter"
-        label="To"
+        label={t('auditLog.filters.toLabel')}
         type="date"
         value={fields.to}
         onChange={(e) => update({ to: e.target.value })}

@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+// `exports` is a staff-only namespace (plan phase 6) — this page renders
+// behind the lazy district-admin route chunk in the real app, which
+// registers its English as a side effect of importing `staff-locales`; this
+// test renders the page directly, so it imports the same module itself.
+import '@/app/lazy-routes/staff-locales';
 import type { ExportJobDto } from '../types';
 
 const exportsApi = vi.hoisted(() => ({

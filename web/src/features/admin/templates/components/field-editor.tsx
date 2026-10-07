@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
@@ -9,15 +10,16 @@ import {
   defaultConfig,
   parseConfig,
   serializeConfig,
-  validateConfig,
   type FieldConfig,
 } from '../template-config';
+import { validateConfig } from '../lib/validate-config';
 import type { TemplateBuilder } from '../hooks/use-template-builder';
 import { AutosaveIndicator } from './autosave-indicator';
 import { SelectOptionsEditor } from './config-editors/select-options-editor';
 import { TableColumnsEditor } from './config-editors/table-columns-editor';
 import { DateConfigEditor, TextConfigEditor } from './config-editors/scalar-config-editors';
-import { FIELD_SEMANTICS, FIELD_SEMANTIC_LABELS, isFieldSemantic } from '../document-semantics';
+import { FIELD_SEMANTICS, isFieldSemantic } from '../document-semantics';
+import { fieldSemanticLabel, fieldTypeLabel } from '../lib/semantic-labels';
 
 const FIELD_TYPES: FieldType[] = ['Text', 'RichText', 'Date', 'Select', 'Checkbox', 'Table'];
 
@@ -46,6 +48,7 @@ export function FieldEditor({
   onMoveUp,
   onMoveDown,
 }: FieldEditorProps) {
+  const { t } = useTranslation('admin');
   const [label, setLabel] = useState(field.label);
   const [fieldType, setFieldType] = useState<FieldType>(field.fieldType);
   const [required, setRequired] = useState(field.required);
@@ -62,7 +65,7 @@ export function FieldEditor({
       required,
       configJson: serializeConfig(config),
     });
-    if (!result.ok) throw new Error(result.message ?? 'Save failed');
+    if (!result.ok) throw new Error(result.message ?? t('templates.fieldEditor.saveFailed'));
   });
 
   const scheduleIfValid = (cfg: FieldConfig) => {
@@ -98,7 +101,7 @@ export function FieldEditor({
     const result = await builder.deleteField(field.id);
     setDeleting(false);
     if (result.ok) setConfirmDelete(false);
-    else setDeleteError(result.message ?? 'Failed to delete field.');
+    else setDeleteError(result.message ?? t('templates.fieldEditor.deleteFailed'));
   };
 
   const configError = validateConfig(config);
@@ -115,7 +118,7 @@ export function FieldEditor({
               size="sm"
               onClick={onMoveUp}
               disabled={!canMoveUp || builder.isMutating}
-              aria-label="Move field up"
+              aria-label={t('templates.fieldEditor.moveUp')}
               data-testid={`field-${field.id}-move-up`}
             >
               <ChevronUp size={14} strokeWidth={1.8} aria-hidden="true" />
@@ -126,7 +129,7 @@ export function FieldEditor({
               size="sm"
               onClick={onMoveDown}
               disabled={!canMoveDown || builder.isMutating}
-              aria-label="Move field down"
+              aria-label={t('templates.fieldEditor.moveDown')}
               data-testid={`field-${field.id}-move-down`}
             >
               <ChevronDown size={14} strokeWidth={1.8} aria-hidden="true" />
@@ -136,7 +139,7 @@ export function FieldEditor({
               variant="danger"
               size="sm"
               onClick={() => setConfirmDelete(true)}
-              aria-label="Delete field"
+              aria-label={t('templates.fieldEditor.delete')}
               data-testid={`field-${field.id}-delete`}
             >
               <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" />
@@ -147,7 +150,7 @@ export function FieldEditor({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Input
-          label="Field label"
+          label={t('templates.fieldEditor.labelLabel')}
           id={`field-${field.id}-label`}
           value={label}
           onChange={(e) => handleLabel(e.target.value)}
@@ -155,16 +158,16 @@ export function FieldEditor({
           data-testid={`field-${field.id}-label`}
         />
         <Select
-          label="Field type"
+          label={t('templates.fieldEditor.typeLabel')}
           id={`field-${field.id}-type`}
           value={fieldType}
           onChange={(e) => handleType(e.target.value as FieldType)}
           disabled={readOnly}
           data-testid={`field-${field.id}-type`}
         >
-          {FIELD_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
+          {FIELD_TYPES.map((ft) => (
+            <option key={ft} value={ft}>
+              {fieldTypeLabel(ft)}
             </option>
           ))}
         </Select>
@@ -172,7 +175,7 @@ export function FieldEditor({
 
       <div className="mt-3 max-w-[22rem]">
         <Select
-          label="Semantic (what this field means)"
+          label={t('templates.fieldEditor.semanticLabel')}
           id={`field-${field.id}-semantic`}
           value={config.semantic ?? ''}
           onChange={(e) =>
@@ -184,16 +187,14 @@ export function FieldEditor({
           disabled={readOnly}
           data-testid={`field-${field.id}-semantic`}
         >
-          <option value="">— none —</option>
+          <option value="">{t('common.noneOption')}</option>
           {FIELD_SEMANTICS.map((s) => (
             <option key={s} value={s}>
-              {FIELD_SEMANTIC_LABELS[s]}
+              {fieldSemanticLabel(s)}
             </option>
           ))}
         </Select>
-        <p className="mt-1 text-xs text-brand-slate-500">
-          Lets AI help, prefill and PDF layout recognise this field in any template.
-        </p>
+        <p className="mt-1 text-xs text-brand-slate-500">{t('templates.fieldEditor.semanticHelp')}</p>
       </div>
 
       <label className="mt-3 flex items-center gap-2 text-[13px] font-medium text-brand-slate-600">
@@ -205,7 +206,7 @@ export function FieldEditor({
           className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-500"
           data-testid={`field-${field.id}-required`}
         />
-        Required
+        {t('common.required')}
       </label>
 
       {/* Type-specific config sub-editor. */}
@@ -247,21 +248,23 @@ export function FieldEditor({
           />
         )}
         {(config.kind === 'RichText' || config.kind === 'Checkbox') && (
-          <p className="text-xs text-brand-slate-500">This field type has no extra configuration.</p>
+          <p className="text-xs text-brand-slate-500">{t('templates.fieldEditor.noExtraConfig')}</p>
         )}
       </div>
 
       {configError && !readOnly && (
         <p className="mt-2 text-xs text-brand-danger-700" role="alert" data-testid={`field-${field.id}-config-error`}>
-          {configError} Changes won&rsquo;t be saved until this is fixed.
+          {configError} {t('templates.fieldEditor.configErrorSuffix')}
         </p>
       )}
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Delete field"
-        message={`Delete "${label.trim() || 'this field'}"? This cannot be undone.`}
-        confirmLabel="Delete field"
+        title={t('templates.fieldEditor.deleteConfirmTitle')}
+        message={t('templates.fieldEditor.deleteConfirmMessage', {
+          label: label.trim() || t('templates.fieldEditor.untitled'),
+        })}
+        confirmLabel={t('templates.fieldEditor.deleteConfirmLabel')}
         loading={deleting}
         error={deleteError}
         onConfirm={handleDelete}

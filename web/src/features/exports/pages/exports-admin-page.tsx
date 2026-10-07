@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
@@ -9,7 +10,6 @@ import { apiErrorMessage } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
 import { getExportDownloadUrl } from '../api/exports-api';
 import { useDistrictExports } from '../hooks/use-district-exports';
-import { EXPORT_JOB_STATUS_LABELS } from '../types';
 import type { ExportJobDto, ExportJobStatus } from '../types';
 
 const STATUS_VARIANT: Record<ExportJobStatus, 'neutral' | 'warning' | 'success' | 'error'> = {
@@ -30,10 +30,17 @@ function formatFileSize(bytes: number | null): string {
  *  and track every export job (district- and student-scoped) to completion
  *  (plan 7, decision 8). Polls while any job is still in flight. */
 export function ExportsAdminPage() {
-  usePageTitle('Exports');
+  const { t } = useTranslation('exports');
+  usePageTitle(t('page.title'));
   const { jobs, isLoading, error, retry, requestExport, isRequesting, requestError } = useDistrictExports();
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  // The hook stores a FLAG (server message or generic), not pre-translated
+  // text, so a language switch after a failed load shows the new language
+  // immediately — see `use-district-exports.ts`'s module doc comment.
+  const errorText = (loadError: typeof error, genericFallback: string): string | null =>
+    loadError ? (loadError.kind === 'server' ? loadError.message : genericFallback) : null;
 
   const handleDownload = async (jobId: number) => {
     setDownloadingId(jobId);
@@ -43,10 +50,10 @@ export function ExportsAdminPage() {
       if (res.success && res.data?.url) {
         window.open(res.data.url, '_blank', 'noopener,noreferrer');
       } else {
-        setDownloadError(res.message ?? 'Could not prepare the download.');
+        setDownloadError(res.message ?? t('page.couldNotPrepareDownload'));
       }
     } catch (err) {
-      setDownloadError(apiErrorMessage(err, 'Could not prepare the download.'));
+      setDownloadError(apiErrorMessage(err, t('page.couldNotPrepareDownload')));
     } finally {
       setDownloadingId(null);
     }
@@ -55,7 +62,7 @@ export function ExportsAdminPage() {
   const columns: TableColumn<ExportJobDto>[] = [
     {
       key: 'requested',
-      header: 'Requested',
+      header: t('page.columns.requested'),
       cell: (j) => (
         <span>
           {formatDate(j.requestedAt)}
@@ -66,17 +73,17 @@ export function ExportsAdminPage() {
     },
     {
       key: 'scope',
-      header: 'Scope',
-      cell: (j) => (j.scope === 'Student' ? j.studentName ?? 'Student' : 'District'),
+      header: t('page.columns.scope'),
+      cell: (j) => (j.scope === 'Student' ? j.studentName ?? t('page.columns.scopeStudentFallback') : t('page.columns.scopeDistrict')),
       hideBelow: 'md',
     },
     {
       key: 'status',
-      header: 'Status',
+      header: t('page.columns.status'),
       cell: (j) => (
         <div>
           <Badge variant={STATUS_VARIANT[j.status]} data-testid={`export-status-${j.id}`}>
-            {EXPORT_JOB_STATUS_LABELS[j.status]}
+            {t(`page.status.${j.status}`)}
           </Badge>
           {j.status === 'Failed' && j.error && (
             <p className="mt-1 text-xs text-brand-danger-700" data-testid={`export-error-${j.id}`}>
@@ -88,14 +95,14 @@ export function ExportsAdminPage() {
     },
     {
       key: 'size',
-      header: 'Size',
+      header: t('page.columns.size'),
       cell: (j) => formatFileSize(j.sizeBytes),
       align: 'right',
       hideBelow: 'md',
     },
     {
       key: 'counts',
-      header: 'Students / files',
+      header: t('page.columns.counts'),
       cell: (j) => `${j.studentCount} / ${j.fileCount}`,
       align: 'right',
       hideBelow: 'lg',
@@ -112,7 +119,7 @@ export function ExportsAdminPage() {
             loading={downloadingId === j.id}
             data-testid={`export-download-${j.id}`}
           >
-            Download
+            {t('page.columns.download')}
           </Button>
         ) : null,
       align: 'right',
@@ -121,17 +128,17 @@ export function ExportsAdminPage() {
 
   return (
     <PageLayout
-      title="Exports"
-      breadcrumb={[{ label: 'Exports' }]}
+      title={t('page.title')}
+      breadcrumb={[{ label: t('page.breadcrumb') }]}
       actions={
         <Button onClick={requestExport} loading={isRequesting} data-testid="request-district-export">
-          Request district export
+          {t('page.requestExport')}
         </Button>
       }
     >
       {requestError && (
         <div role="alert" className="mb-4">
-          <Notice variant="error" title={requestError} />
+          <Notice variant="error" title={errorText(requestError, t('page.requestExportFailed')) ?? ''} />
         </div>
       )}
       {downloadError && (
@@ -141,17 +148,17 @@ export function ExportsAdminPage() {
       )}
 
       {error ? (
-        <Notice variant="error" title="Could not load export jobs">
-          {error}
+        <Notice variant="error" title={t('page.couldNotLoadTitle')}>
+          {errorText(error, t('page.couldNotLoadTitle'))}
           <div>
             <Button size="sm" variant="secondary" className="mt-2" onClick={retry} data-testid="exports-retry">
-              Try again
+              {t('page.tryAgain')}
             </Button>
           </div>
         </Notice>
       ) : (
         <Table
-          label="Export jobs"
+          label={t('page.tableLabel')}
           columns={columns}
           rows={jobs}
           rowKey={(j) => j.id}

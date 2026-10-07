@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { reloadEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
@@ -23,6 +24,7 @@ export function SetupSchoolStep({
   onNext,
   onSkip,
 }: SetupSchoolStepProps) {
+  const { t } = useTranslation('district-admin');
   const handleCreate = async (data: SaveSchoolRequest) => {
     try {
       const response = await createSchool(data);
@@ -32,9 +34,9 @@ export function SetupSchoolStep({
         void reloadEducatorProfile();
         return { success: true };
       }
-      return { success: false, error: response.message || 'Failed to add school' };
+      return { success: false, error: response.message || t('setupWizard.school.errorFailed') };
     } catch {
-      return { success: false, error: 'An error occurred' };
+      return { success: false, error: t('setupWizard.school.errorGeneric') };
     }
   };
 
@@ -42,24 +44,23 @@ export function SetupSchoolStep({
     <div className="space-y-6" data-testid="district-setup-school">
       <div className="space-y-2">
         <h2 className="font-serif text-2xl text-brand-slate-800">
-          Create your first school
+          {t('setupWizard.school.heading')}
         </h2>
         <p className="text-sm text-brand-slate-500 leading-relaxed">
-          Staff and students belong to a school. Add one now to start inviting
-          your team.
+          {t('setupWizard.school.body')}
         </p>
       </div>
 
       {createdSchool ? (
         <div data-testid="district-setup-school-created">
-          <Notice variant="success" title={`${createdSchool.name} created`}>
-            Your first school is ready. Next, invite a staff member.
+          <Notice variant="success" title={t('setupWizard.school.createdTitle', { name: createdSchool.name })}>
+            {t('setupWizard.school.createdBody')}
           </Notice>
         </div>
       ) : (
         <SchoolForm
           mode="create"
-          submitLabel="Add school"
+          submitLabel={t('setupWizard.school.addSchool')}
           onSubmit={handleCreate}
           testIdPrefix="district-setup-school"
         />
@@ -71,10 +72,10 @@ export function SetupSchoolStep({
           disabled={!createdSchool}
           data-testid="district-setup-next-1"
         >
-          Continue
+          {t('setupWizard.school.continue')}
         </Button>
         <Button variant="ghost" onClick={onSkip} data-testid="district-setup-skip-1">
-          Skip for now
+          {t('setupWizard.school.skip')}
         </Button>
       </div>
     </div>

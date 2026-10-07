@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Plus, Pencil, Ban, School } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -20,7 +21,8 @@ import { SchoolForm } from "../components/school-form";
 import type { DistrictSchool, SaveSchoolRequest } from "../types";
 
 export function DistrictSchoolsPage() {
-  usePageTitle("Schools");
+  const { t } = useTranslation('district-admin');
+  usePageTitle(t('schoolsPage.title'));
   const { show: showToast } = useToast();
   const [schools, setSchools] = useState<DistrictSchool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,34 +55,34 @@ export function DistrictSchoolsPage() {
         // School counts in the district overview are now stale.
         void reloadEducatorProfile();
         setIsAddOpen(false);
-        showToast({ message: "School created", variant: "success" });
+        showToast({ message: t('schoolsPage.toasts.created'), variant: "success" });
         return { success: true };
       }
       return {
         success: false,
-        error: response.message || "Failed to add school",
+        error: response.message || t('schoolsPage.errors.addFailed'),
       };
     } catch {
-      return { success: false, error: "An error occurred" };
+      return { success: false, error: t('schoolsPage.errors.generic') };
     }
   };
 
   const handleUpdate = async (data: SaveSchoolRequest) => {
-    if (!editing) return { success: false, error: "No school selected" };
+    if (!editing) return { success: false, error: t('schoolsPage.errors.noSchoolSelected') };
     try {
       const response = await updateSchool(editing.id, data);
       if (response.success) {
         await reload();
         setEditing(null);
-        showToast({ message: "School updated", variant: "success" });
+        showToast({ message: t('schoolsPage.toasts.updated'), variant: "success" });
         return { success: true };
       }
       return {
         success: false,
-        error: response.message || "Failed to update school",
+        error: response.message || t('schoolsPage.errors.updateFailed'),
       };
     } catch {
-      return { success: false, error: "An error occurred" };
+      return { success: false, error: t('schoolsPage.errors.generic') };
     }
   };
 
@@ -94,16 +96,16 @@ export function DistrictSchoolsPage() {
         await reload();
         void reloadEducatorProfile();
         setDeactivating(null);
-        showToast({ message: "School deactivated", variant: "success" });
+        showToast({ message: t('schoolsPage.toasts.deactivated'), variant: "success" });
       } else {
         // The backend returns an explicit message when a school still has
         // active students or staff — surface it verbatim, inside the dialog.
         setDeactivateError(
-          response.message || "This school cannot be deactivated right now",
+          response.message || t('schoolsPage.errors.cannotDeactivate'),
         );
       }
     } catch {
-      setDeactivateError("An error occurred");
+      setDeactivateError(t('schoolsPage.errors.generic'));
     } finally {
       setIsDeactivating(false);
     }
@@ -112,7 +114,7 @@ export function DistrictSchoolsPage() {
   const columns: TableColumn<DistrictSchool>[] = [
     {
       key: "name",
-      header: "School",
+      header: t('schoolsPage.columns.school'),
       cell: (s) => (
         <span className="font-medium text-brand-slate-800">{s.name}</span>
       ),
@@ -120,21 +122,21 @@ export function DistrictSchoolsPage() {
     },
     {
       key: "state",
-      header: "State",
+      header: t('schoolsPage.columns.state'),
       hideBelow: "md",
       cell: (s) => s.stateCode || "—",
       sortValue: (s) => s.stateCode || "",
     },
     {
       key: "students",
-      header: "Students",
+      header: t('schoolsPage.columns.students'),
       align: "right",
       cell: (s) => s.activeStudentCount,
       sortValue: (s) => s.activeStudentCount,
     },
     {
       key: "staff",
-      header: "Staff",
+      header: t('schoolsPage.columns.staff'),
       align: "right",
       hideBelow: "md",
       cell: (s) => s.activeStaffCount,
@@ -144,7 +146,7 @@ export function DistrictSchoolsPage() {
 
   return (
     <PageLayout
-      title="Schools"
+      title={t('schoolsPage.title')}
       data-testid="district-schools-page"
       actions={
         <Button
@@ -152,7 +154,7 @@ export function DistrictSchoolsPage() {
           data-testid="district-schools-add"
         >
           <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-          Add school
+          {t('schoolsPage.addSchool')}
         </Button>
       }
     >
@@ -161,7 +163,7 @@ export function DistrictSchoolsPage() {
       </div>
 
       <Table
-        label="Schools"
+        label={t('schoolsPage.title')}
         data-testid="district-schools-table"
         columns={columns}
         rows={schools}
@@ -171,13 +173,13 @@ export function DistrictSchoolsPage() {
         rowActionLabel={(s) => s.name}
         rowActions={(s) => [
           {
-            label: "Edit",
+            label: t('schoolsPage.rowActions.edit'),
             icon: <Pencil className="h-3.5 w-3.5" strokeWidth={1.8} />,
             onSelect: () => setEditing(s),
             "data-testid": `district-school-edit-${s.id}`,
           },
           {
-            label: "Deactivate",
+            label: t('schoolsPage.rowActions.deactivate'),
             icon: <Ban className="h-3.5 w-3.5" strokeWidth={1.8} />,
             variant: "danger",
             onSelect: () => {
@@ -191,8 +193,8 @@ export function DistrictSchoolsPage() {
           <EmptyState
             data-testid="district-schools-empty"
             icon={School}
-            title="No schools yet"
-            description="Add your first school using the Add school button to start building out your district."
+            title={t('schoolsPage.emptyTitle')}
+            description={t('schoolsPage.emptyDescription')}
           />
         }
       />
@@ -200,12 +202,12 @@ export function DistrictSchoolsPage() {
       <Modal
         open={isAddOpen}
         onClose={() => setIsAddOpen(false)}
-        title="Add a school"
+        title={t('schoolsPage.addModalTitle')}
         data-testid="district-schools-add-modal"
       >
         <SchoolForm
           mode="create"
-          submitLabel="Add school"
+          submitLabel={t('schoolsPage.addSchool')}
           onSubmit={handleCreate}
           onCancel={() => setIsAddOpen(false)}
           testIdPrefix="district-schools-create"
@@ -215,7 +217,7 @@ export function DistrictSchoolsPage() {
       <Modal
         open={editing !== null}
         onClose={() => setEditing(null)}
-        title="Edit school"
+        title={t('schoolsPage.editModalTitle')}
         data-testid="district-schools-edit-modal"
       >
         {editing && (
@@ -223,7 +225,7 @@ export function DistrictSchoolsPage() {
             mode="edit"
             initialName={editing.name}
             initialStateCode={editing.stateCode ?? ""}
-            submitLabel="Save changes"
+            submitLabel={t('schoolsPage.editSubmit')}
             onSubmit={handleUpdate}
             onCancel={() => setEditing(null)}
             testIdPrefix={`district-school-edit-form-${editing.id}`}
@@ -233,13 +235,13 @@ export function DistrictSchoolsPage() {
 
       <ConfirmDialog
         open={deactivating !== null}
-        title="Deactivate school"
+        title={t('schoolsPage.deactivateDialogTitle')}
         message={
           deactivating
-            ? `Deactivate ${deactivating.name}? Staff and students will lose access to it.`
+            ? t('schoolsPage.deactivateMessage', { name: deactivating.name })
             : ""
         }
-        confirmLabel="Deactivate school"
+        confirmLabel={t('schoolsPage.deactivateConfirmLabel')}
         loading={isDeactivating}
         error={deactivateError}
         onConfirm={confirmDeactivate}

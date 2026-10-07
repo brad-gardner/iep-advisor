@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { SchoolFilter } from '@/features/educator/components/school-filter';
 import { COMPLIANCE_RANGE_PRESETS, type ComplianceRangeDays } from '../lib/date-range';
@@ -21,6 +22,7 @@ export function ComplianceFilters({
   rangeDays,
   onRangeChange,
 }: ComplianceFiltersProps) {
+  const { t } = useTranslation('district-admin');
   return (
     <div className="flex flex-wrap items-end gap-4" data-testid="compliance-filters">
       {schools && (
@@ -33,7 +35,7 @@ export function ComplianceFilters({
         </div>
       )}
 
-      <div role="group" aria-label="Due within" className="flex gap-2">
+      <div role="group" aria-label={t('complianceFilters.dueWithinGroupLabel')} className="flex gap-2">
         {COMPLIANCE_RANGE_PRESETS.map((days) => (
           <Button
             key={days}
@@ -44,7 +46,7 @@ export function ComplianceFilters({
             onClick={() => onRangeChange(days)}
             data-testid={`compliance-filter-range-${days}`}
           >
-            {days} days
+            {t('complianceFilters.daysOption', { count: days })}
           </Button>
         ))}
       </div>

@@ -1,0 +1,259 @@
+{
+  "schoolsPage": {
+    "title": "Escuelas",
+    "addSchool": "Agregar escuela",
+    "columns": {
+      "school": "Escuela",
+      "state": "Estado",
+      "students": "Estudiantes",
+      "staff": "Personal"
+    },
+    "rowActions": {
+      "edit": "Editar",
+      "deactivate": "Desactivar"
+    },
+    "emptyTitle": "Aún no hay escuelas",
+    "emptyDescription": "Agregue su primera escuela con el botón Agregar escuela para empezar a construir su distrito.",
+    "addModalTitle": "Agregar una escuela",
+    "editModalTitle": "Editar escuela",
+    "editSubmit": "Guardar cambios",
+    "deactivateDialogTitle": "Desactivar escuela",
+    "deactivateMessage": "¿Desactivar {{name}}? El personal y los estudiantes perderán acceso a ella.",
+    "deactivateConfirmLabel": "Desactivar escuela",
+    "toasts": {
+      "created": "Escuela creada",
+      "updated": "Escuela actualizada",
+      "deactivated": "Escuela desactivada"
+    },
+    "errors": {
+      "addFailed": "No se pudo agregar la escuela",
+      "updateFailed": "No se pudo actualizar la escuela",
+      "generic": "Ocurrió un error",
+      "noSchoolSelected": "No se seleccionó ninguna escuela",
+      "cannotDeactivate": "Esta escuela no se puede desactivar en este momento"
+    }
+  },
+  "schoolForm": {
+    "nameLabel": "Nombre de la escuela *",
+    "stateLabel": "Estado",
+    "statePlaceholder": "p. ej., OH",
+    "saving": "Guardando...",
+    "cancel": "Cancelar",
+    "errors": {
+      "nameRequired": "El nombre de la escuela es obligatorio",
+      "invalidState": "Ingrese un código de estado de 2 letras o déjelo en blanco",
+      "generic": "Algo salió mal"
+    }
+  },
+  "familyDraftSharing": {
+    "title": "Compartir borradores con la familia",
+    "description": "Cuando está habilitado, el personal puede compartir un borrador de IEP o ETR con la familia de un estudiante para su revisión antes de finalizarlo.",
+    "ariaLabel": "Compartir borradores con la familia",
+    "enabledToast": "Se habilitó compartir borradores con la familia",
+    "disabledToast": "Se deshabilitó compartir borradores con la familia",
+    "errorGeneric": "No se pudo actualizar esta configuración."
+  },
+  "complianceBoard": {
+    "title": "Cumplimiento",
+    "subtitle": "Plazos procesales vencidos y próximos, con la evidencia que los respalda.",
+    "loadError": "No se pudo cargar el tablero de cumplimiento",
+    "tryAgain": "Intentar de nuevo"
+  },
+  "complianceFilters": {
+    "dueWithinGroupLabel": "Vence dentro de",
+    "daysOption_one": "{{count}} día",
+    "daysOption_other": "{{count}} días"
+  },
+  "complianceTiles": {
+    "overdueAnnual": "Revisiones anuales vencidas",
+    "overdueReeval": "Reevaluaciones vencidas",
+    "due30": "Vence dentro de 30 días",
+    "due60": "Vence dentro de 60 días",
+    "unknownDates": "Fechas desconocidas",
+    "noLead": "Sin administrador de caso",
+    "dueInRange": "Vence en el rango seleccionado",
+    "denominator_one": "de {{count}} estudiante activo",
+    "denominator_other": "de {{count}} estudiantes activos"
+  },
+  "complianceSchoolTable": {
+    "tableLabel": "Cumplimiento por escuela",
+    "chartTitle": "Plazos por escuela",
+    "emptyTitle": "No hay escuelas en el alcance",
+    "emptyDescription": "Agregue una escuela para ver los datos de cumplimiento.",
+    "columns": {
+      "school": "Escuela",
+      "activeStudents": "Estudiantes activos",
+      "overdueAnnual": "Anual vencida",
+      "overdueReeval": "Reeval. vencida",
+      "due30": "Vence 30d",
+      "due60": "Vence 60d",
+      "dueInRange": "Vence en rango",
+      "unknownDates": "Fechas desconocidas",
+      "noLead": "Sin administrador de caso"
+    },
+    "chartSegments": {
+      "overdueAnnual": "Anual vencida",
+      "overdueReeval": "Reeval. vencida",
+      "due30": "Vence en 30 días",
+      "due60": "Vence en 60 días",
+      "unknownDates": "Fechas desconocidas"
+    }
+  },
+  "adoptionEngagement": {
+    "loading": "Cargando datos de adopción…",
+    "tryAgain": "Intentar de nuevo",
+    "staffActive": "Personal activo (14 días)",
+    "draftsStarted": "Borradores iniciados",
+    "draftsFinalized": "Borradores finalizados",
+    "familiesLinked": "Familias vinculadas",
+    "ofStaffTotal_one": "de {{count}} miembro del personal · {{rule}}",
+    "ofStaffTotal_other": "de {{count}} miembros del personal · {{rule}}",
+    "lastDays_one": "Último {{count}} día",
+    "lastDays_other": "Últimos {{count}} días",
+    "ofActiveStudents_one": "de {{count}} estudiante activo",
+    "ofActiveStudents_other": "de {{count}} estudiantes activos",
+    "chartTitle": "Personal activo por escuela",
+    "errors": {
+      "adoption": "No se pudieron cargar los datos de adopción",
+      "engagement": "No se pudieron cargar los datos de participación",
+      "combined": "No se pudieron cargar estos datos"
+    }
+  },
+  "dashboard": {
+    "loading": "Cargando panel…",
+    "errorTitle": "No se pudo cargar el panel",
+    "errorBody": "Algo salió mal al cargar la información general de su distrito.",
+    "retry": "Intentar de nuevo",
+    "schoolsTile": {
+      "title": "Escuelas",
+      "empty": "Aún no hay escuelas: agregue una escuela para ver aquí el número de estudiantes.",
+      "manageLink": "Administrar escuelas",
+      "studentCount_one": "{{count}} estudiante",
+      "studentCount_other": "{{count}} estudiantes"
+    },
+    "staffTile": {
+      "title": "Personal",
+      "active": "Activo",
+      "invited": "Invitado",
+      "deactivated": "Desactivado",
+      "manageLink": "Administrar personal"
+    },
+    "invitesTile": {
+      "title": "Invitaciones",
+      "empty": "No hay invitaciones que requieran atención.",
+      "manageLink": "Administrar invitaciones",
+      "expiredBadge": "Vencida",
+      "districtWide": "A nivel distrital",
+      "expiredOn": "Venció el",
+      "expires": "Vence"
+    },
+    "attentionTile": {
+      "title": "Necesita atención",
+      "emptyAll": "Una vez que se agreguen estudiantes, aquí aparecerá cualquier estudiante sin administrador de caso o sin un padre vinculado.",
+      "noCaseManagerTitle": "Sin administrador de caso",
+      "noCaseManagerEmpty": "Todos los estudiantes tienen un administrador de caso.",
+      "noParentTitle": "Sin padre vinculado",
+      "noParentEmpty": "Todos los estudiantes tienen un padre vinculado.",
+      "invitePending": "Invitación pendiente",
+      "notInvited": "No invitado",
+      "viewAll": "Ver todos ({{count}})"
+    },
+    "overview": {
+      "title": "Resumen del distrito",
+      "state": "Estado",
+      "activeSchools": "Escuelas activas",
+      "activeStaff": "Personal activo",
+      "manageSchools": "Administrar escuelas"
+    }
+  },
+  "setupChecklist": {
+    "title": "Termine de configurar",
+    "subtitle": "Quedan algunos pasos para dejar listo su distrito.",
+    "schoolItem": "Cree su primera escuela",
+    "staffItem": "Invite a su primer miembro del personal",
+    "start": "Comenzar"
+  },
+  "setupWizard": {
+    "pageTitle": "Configure su distrito",
+    "stepLabels": {
+      "welcome": "Bienvenida",
+      "createSchool": "Crear escuela",
+      "inviteStaff": "Invitar personal",
+      "done": "Listo"
+    },
+    "stepOf": "Paso {{current}} de {{total}}",
+    "welcome": {
+      "heading": "Bienvenido",
+      "headingWithDistrict": "Bienvenido, {{district}}",
+      "body": "Configuremos su distrito. En los próximos pasos creará su primera escuela e invitará a un miembro del personal. Puede omitir cualquier paso y terminarlo más tarde desde su panel.",
+      "start": "Comenzar configuración",
+      "skip": "Omitir por ahora"
+    },
+    "school": {
+      "heading": "Cree su primera escuela",
+      "body": "El personal y los estudiantes pertenecen a una escuela. Agregue una ahora para empezar a invitar a su equipo.",
+      "createdTitle": "{{name}} creada",
+      "createdBody": "Su primera escuela está lista. A continuación, invite a un miembro del personal.",
+      "addSchool": "Agregar escuela",
+      "continue": "Continuar",
+      "skip": "Omitir por ahora",
+      "errorFailed": "No se pudo agregar la escuela",
+      "errorGeneric": "Ocurrió un error"
+    },
+    "staff": {
+      "heading": "Invite a su primer miembro del personal",
+      "body": "Envíe una invitación para que un administrador escolar o maestro se una a su distrito. Recibirán un enlace para configurar su propia cuenta.",
+      "continue": "Continuar",
+      "doneInviting": "Invitación completa",
+      "skip": "Omitir por ahora",
+      "errorFailed": "No se pudo enviar la invitación",
+      "errorGeneric": "Ocurrió un error"
+    },
+    "done": {
+      "heading": "Todo listo",
+      "bodyWithSchool": "{{name}} está lista. Puede administrar escuelas, invitar personal y agregar estudiantes en cualquier momento desde su panel.",
+      "bodyWithoutSchool": "Puede crear escuelas, invitar personal y agregar estudiantes en cualquier momento desde su panel.",
+      "finish": "Ir al panel"
+    }
+  },
+  "auditLog": {
+    "pageTitle": "Registro de actividad",
+    "subtitle": "Quién accedió a qué expedientes de estudiantes, y cuándo.",
+    "accessRestrictedTitle": "Acceso restringido",
+    "accessRestrictedBody": "El registro de actividad está disponible solo para administradores de distrito y de escuela.",
+    "loadingActivity": "Cargando actividad…",
+    "couldNotLoadTitle": "No se pudo cargar la actividad",
+    "couldNotLoadBody": "Algo salió mal al cargar el registro de actividad.",
+    "tryAgain": "Intentar de nuevo",
+    "emptyFilteredTitle": "Sin actividad coincidente",
+    "emptyFilteredDescription": "No se accedió a ningún expediente con estos filtros. Intente ampliar el rango de fechas o borrar un filtro.",
+    "emptyTitle": "Aún no hay actividad",
+    "emptyDescription": "Una vez que el personal comience a abrir expedientes de estudiantes, su acceso aparecerá aquí.",
+    "loadMore": "Cargar más",
+    "loadingMore": "Cargando…",
+    "with": "con",
+    "filters": {
+      "staffLabel": "Miembro del personal",
+      "allStaff": "Todo el personal",
+      "deactivatedSuffix": " (desactivado)",
+      "actionLabel": "Acción",
+      "allActions": "Todas las acciones",
+      "fromLabel": "Desde",
+      "toLabel": "Hasta"
+    },
+    "actionLabels": {
+      "View": "Visto",
+      "Edit": "Editado",
+      "Share": "Compartido",
+      "Export": "Exportado",
+      "Finalize": "Finalizado"
+    },
+    "actionVerbs": {
+      "View": "vio",
+      "Edit": "editó",
+      "Share": "compartió",
+      "Export": "exportó",
+      "Finalize": "finalizó"
+    }
+  }
+}

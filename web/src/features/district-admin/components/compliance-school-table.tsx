@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Table, type TableColumn } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { School } from 'lucide-react';
@@ -33,15 +35,15 @@ function drillColumn(key: DrillColumnKey, header: string, drill: Record<string, 
   };
 }
 
-function toStackedRows(rows: ComplianceSchoolRowDto[]): StackedBarRow[] {
+function toStackedRows(rows: ComplianceSchoolRowDto[], t: TFunction<'district-admin'>): StackedBarRow[] {
   return rows.map((row) => ({
     label: row.schoolName,
     segments: [
-      { key: 'overdueAnnual', label: 'Overdue annual', value: row.overdueAnnual },
-      { key: 'overdueReeval', label: 'Overdue reeval', value: row.overdueReeval },
-      { key: 'due30', label: 'Due 30 days', value: row.due30 },
-      { key: 'due60', label: 'Due 60 days', value: row.due60 },
-      { key: 'unknownDates', label: 'Unknown dates', value: row.unknownDates },
+      { key: 'overdueAnnual', label: t('complianceSchoolTable.chartSegments.overdueAnnual'), value: row.overdueAnnual },
+      { key: 'overdueReeval', label: t('complianceSchoolTable.chartSegments.overdueReeval'), value: row.overdueReeval },
+      { key: 'due30', label: t('complianceSchoolTable.chartSegments.due30'), value: row.due30 },
+      { key: 'due60', label: t('complianceSchoolTable.chartSegments.due60'), value: row.due60 },
+      { key: 'unknownDates', label: t('complianceSchoolTable.chartSegments.unknownDates'), value: row.unknownDates },
     ],
   }));
 }
@@ -55,47 +57,52 @@ export function ComplianceSchoolTable({
   rows: ComplianceSchoolRowDto[];
   drill: Record<string, string>;
 }) {
+  const { t } = useTranslation('district-admin');
   const columns: TableColumn<ComplianceSchoolRowDto>[] = [
     {
       key: 'school',
-      header: 'School',
+      header: t('complianceSchoolTable.columns.school'),
       cell: (row) => row.schoolName,
       sortValue: (row) => row.schoolName,
     },
     {
       key: 'activeStudents',
-      header: 'Active students',
+      header: t('complianceSchoolTable.columns.activeStudents'),
       align: 'right',
       cell: (row) => row.activeStudents,
       sortValue: (row) => row.activeStudents,
     },
-    drillColumn('overdueAnnual', 'Overdue annual', drill),
-    drillColumn('overdueReeval', 'Overdue reeval', drill),
-    drillColumn('due30', 'Due 30d', drill),
-    drillColumn('due60', 'Due 60d', drill),
-    drillColumn('dueInRange', 'Due in range', drill),
-    drillColumn('unknownDates', 'Unknown dates', drill),
-    drillColumn('noLead', 'No case manager', drill),
+    drillColumn('overdueAnnual', t('complianceSchoolTable.columns.overdueAnnual'), drill),
+    drillColumn('overdueReeval', t('complianceSchoolTable.columns.overdueReeval'), drill),
+    drillColumn('due30', t('complianceSchoolTable.columns.due30'), drill),
+    drillColumn('due60', t('complianceSchoolTable.columns.due60'), drill),
+    drillColumn('dueInRange', t('complianceSchoolTable.columns.dueInRange'), drill),
+    drillColumn('unknownDates', t('complianceSchoolTable.columns.unknownDates'), drill),
+    drillColumn('noLead', t('complianceSchoolTable.columns.noLead'), drill),
   ];
 
   return (
     <div className="space-y-4" data-testid="compliance-school-section">
       {rows.length > 1 && (
         <StackedBarChart
-          title="Deadline buckets by school"
-          rows={toStackedRows(rows)}
+          title={t('complianceSchoolTable.chartTitle')}
+          rows={toStackedRows(rows, t)}
           data-testid="compliance-school-chart"
         />
       )}
       <Table
-        label="Compliance by school"
+        label={t('complianceSchoolTable.tableLabel')}
         data-testid="compliance-school-table"
         columns={columns}
         rows={rows}
         rowKey={(row) => row.schoolId}
         defaultSort={{ key: 'school', direction: 'asc' }}
         empty={
-          <EmptyState icon={School} title="No schools in scope" description="Add a school to see compliance data." />
+          <EmptyState
+            icon={School}
+            title={t('complianceSchoolTable.emptyTitle')}
+            description={t('complianceSchoolTable.emptyDescription')}
+          />
         }
       />
     </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { useToast } from '@/components/ui/toast';
@@ -11,6 +12,7 @@ import { getDistrict, updateDistrict } from '../api/district-api';
  * Self-contained (fetches its own current value), matching `DistrictOverviewCard`.
  */
 export function FamilyDraftSharingToggle() {
+  const { t } = useTranslation('district-admin');
   const { show: showToast } = useToast();
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -40,14 +42,14 @@ export function FamilyDraftSharingToggle() {
       if (res.success && res.data) {
         setEnabled(res.data.familyDraftSharingEnabled);
         showToast({
-          message: next ? 'Family draft sharing enabled' : 'Family draft sharing disabled',
+          message: next ? t('familyDraftSharing.enabledToast') : t('familyDraftSharing.disabledToast'),
           variant: 'success',
         });
       } else {
-        setError(res.message ?? 'Could not update this setting.');
+        setError(res.message ?? t('familyDraftSharing.errorGeneric'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not update this setting.'));
+      setError(apiErrorMessage(err, t('familyDraftSharing.errorGeneric')));
     } finally {
       setIsSaving(false);
     }
@@ -59,17 +61,16 @@ export function FamilyDraftSharingToggle() {
     <Card data-testid="family-sharing-toggle-card">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="font-serif text-base text-brand-slate-800">Family draft sharing</h2>
+          <h2 className="font-serif text-base text-brand-slate-800">{t('familyDraftSharing.title')}</h2>
           <p className="mt-1 max-w-prose text-sm text-brand-slate-500">
-            When enabled, staff can share a draft IEP or ETR with a student's family for review before it's
-            finalized.
+            {t('familyDraftSharing.description')}
           </p>
         </div>
         <button
           type="button"
           role="switch"
           aria-checked={enabled}
-          aria-label="Family draft sharing"
+          aria-label={t('familyDraftSharing.ariaLabel')}
           onClick={handleToggle}
           disabled={isSaving}
           data-testid="family-sharing-toggle"

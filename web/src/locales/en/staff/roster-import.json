@@ -1,0 +1,139 @@
+{
+  "page": {
+    "title": "Import",
+    "subtitle": "Add or update many records at once from an Excel workbook.",
+    "notAvailableTitle": "Not available",
+    "notAvailableDescription": "Importing is available to district and school administrators only.",
+    "backToStudents": "Back to students",
+    "importCommittedToast": "Import committed"
+  },
+  "wizard": {
+    "stepTemplate": "Template",
+    "stepUpload": "Upload",
+    "stepPreview": "Preview",
+    "stepCommit": "Commit",
+    "stepResult": "Result"
+  },
+  "kindToggle": {
+    "legend": "What to import",
+    "students": "Students",
+    "staff": "Staff"
+  },
+  "templateStep": {
+    "heading": "Download the template",
+    "intro": "Fill in the <sheetName>{{sheet}}</sheetName> sheet — one row per {{noun}}. The <values>Values</values> sheet lists the allowed entries, including your district's schools.",
+    "nounStudent": "student",
+    "nounStaff": "staff member",
+    "columnsLabel": "Columns: {{columns}}",
+    "studentNote": "Rows are matched on StudentId. Blank cells keep the current value; type <code>CLEAR</code> to clear one. Missing rows never exit anyone.",
+    "downloadTemplate": "Download template",
+    "continueToUpload": "Continue to upload",
+    "downloadError": "Could not download the template. Try again."
+  },
+  "uploadStep": {
+    "heading": "Upload your workbook",
+    "description": ".xlsx only, up to 5 MB and 5,000 rows. Formulas and macros are never run.",
+    "fileLabel": "Workbook (.xlsx)",
+    "back": "Back",
+    "previewChanges": "Preview changes",
+    "chooseFile": "Choose a workbook to upload",
+    "couldNotRead": "The workbook could not be read"
+  },
+  "previewStep": {
+    "heading": "Preview",
+    "fileSummary_one": "{{fileName}} · {{count}} row",
+    "fileSummary_other": "{{fileName}} · {{count}} rows",
+    "downloadErrorReport": "Download error report",
+    "downloadErrorReportFailed": "Could not download the error report",
+    "rowsHaveErrors_one": "{{count}} row has errors",
+    "rowsHaveErrors_other": "{{count}} rows have errors",
+    "errorRowsNotice_one": "Error rows are skipped. Fix them in the workbook and upload again, or import the {{count}} valid row now.",
+    "errorRowsNotice_other": "Error rows are skipped. Fix them in the workbook and upload again, or import the {{count}} valid rows now.",
+    "startOver": "Start over",
+    "importValidOnly_one": "Import {{count}} valid row only",
+    "importValidOnly_other": "Import {{count}} valid rows only",
+    "importAll_one": "Import {{count}} row",
+    "importAll_other": "Import {{count}} rows",
+    "errorsOnly": "Errors only",
+    "rowCountErrorsOnly_one": "{{count}} error row",
+    "rowCountErrorsOnly_other": "{{count}} error rows",
+    "rowCount_one": "{{count}} row",
+    "rowCount_other": "{{count}} rows",
+    "columns": {
+      "row": "Row",
+      "outcome": "Outcome",
+      "key": "Key",
+      "name": "Name",
+      "message": "Message",
+      "changes": "Changes"
+    },
+    "tableLabel": "Preview rows",
+    "noErrorRows": "No rows have errors.",
+    "noDataRows": "The workbook has no data rows.",
+    "paginationLabel": "Preview rows pagination",
+    "commitDialogTitle": "Commit import",
+    "commitMessageWithErrors_one": "Import {{count}} valid row and skip {{errorCount}} with errors? This writes {{newCount}} new and updates {{updatedCount}}.",
+    "commitMessageWithErrors_other": "Import {{count}} valid rows and skip {{errorCount}} with errors? This writes {{newCount}} new and updates {{updatedCount}}.",
+    "commitMessage_one": "Import {{count}} row? This writes {{newCount}} new and updates {{updatedCount}}.",
+    "commitMessage_other": "Import {{count}} rows? This writes {{newCount}} new and updates {{updatedCount}}.",
+    "confirmValidOnly": "Import valid rows only",
+    "confirmAll": "Import rows",
+    "commitFailed": "The import could not be committed",
+    "outcomes": {
+      "New": "New",
+      "Updated": "Updated",
+      "Unchanged": "Unchanged",
+      "Error": "Error"
+    }
+  },
+  "resultStep": {
+    "heading": "Import complete",
+    "rowsWritten_one": "{{count}} row written",
+    "rowsWritten_other": "{{count}} rows written",
+    "summary": "{{newCount}} new, {{updatedCount}} updated, {{unchangedCount}} unchanged.",
+    "summarySkipped": "{{newCount}} new, {{updatedCount}} updated, {{unchangedCount}} unchanged, {{skippedCount}} skipped.",
+    "importAnother": "Import another file",
+    "viewStaff": "View staff",
+    "viewStudents": "View students"
+  },
+  "countsBadges": {
+    "ariaLabel": "Import summary",
+    "new_one": "{{count}} new",
+    "new_other": "{{count}} new",
+    "updated_one": "{{count}} updated",
+    "updated_other": "{{count}} updated",
+    "unchanged": "{{count}} unchanged",
+    "errors_one": "{{count}} error",
+    "errors_other": "{{count}} errors"
+  },
+  "history": {
+    "heading": "Previous imports",
+    "tableLabel": "Previous imports",
+    "columns": {
+      "file": "File",
+      "kind": "Kind",
+      "status": "Status",
+      "rows": "Rows",
+      "date": "Date",
+      "by": "By"
+    },
+    "emptyTitle": "No imports yet",
+    "emptyDescription": "Committed and previewed workbooks will be listed here.",
+    "status": {
+      "Committed": "Committed",
+      "Previewed": "Previewed",
+      "Committing": "Committing",
+      "Discarded": "Discarded"
+    },
+    "kind": {
+      "Students": "Students",
+      "Staff": "Staff"
+    }
+  },
+  "file": {
+    "onlyXlsx": "Only .xlsx workbooks are accepted",
+    "tooLarge": "File is larger than 5 MB",
+    "countsSummary_one": "{{newCount}} new · {{updatedCount}} updated · {{errorCount}} error",
+    "countsSummary_other": "{{newCount}} new · {{updatedCount}} updated · {{errorCount}} errors"
+  }
+}

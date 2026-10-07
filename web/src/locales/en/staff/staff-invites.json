@@ -1,0 +1,86 @@
+{
+  "districtStaffPage": {
+    "title": "Staff",
+    "importStaff": "Import staff",
+    "inviteStaff": "Invite staff",
+    "pendingInvitesHeading": "Pending invites",
+    "staffHeading": "Staff",
+    "columns": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "expires": "Expires"
+    },
+    "statusActive": "Active",
+    "statusInactive": "Inactive",
+    "expiredBadge": "Expired",
+    "districtWide": "District-wide",
+    "pendingEmptyTitle": "No pending invites",
+    "pendingEmptyDescription": "Invited staff appear here until they accept.",
+    "staffEmptyTitle": "No staff yet",
+    "staffEmptyDescription": "Invite school admins and teachers to get started.",
+    "resend": "Resend",
+    "revoke": "Revoke",
+    "deactivate": "Deactivate",
+    "reactivate": "Reactivate",
+    "inviteModalTitle": "Invite a staff member",
+    "resendUrlModalTitle": "Invite link",
+    "deactivateDialogTitle": "Deactivate staff member",
+    "deactivateMessage": "Deactivate {{name}}? They will lose access until reactivated.",
+    "deactivateConfirmLabel": "Deactivate",
+    "revokeDialogTitle": "Revoke invite",
+    "revokeMessage": "Revoke the invite sent to {{email}}?",
+    "revokeConfirmLabel": "Revoke invite",
+    "toasts": {
+      "inviteSent": "Invite sent to {{email}}",
+      "inviteResent": "Invite resent to {{email}}",
+      "inviteRevoked": "Invite revoked",
+      "staffDeactivated": "Staff member deactivated",
+      "staffReactivated": "Staff member reactivated"
+    },
+    "errors": {
+      "sendFailed": "Failed to send invite",
+      "resendFailed": "Failed to resend invite",
+      "revokeFailed": "Failed to revoke invite",
+      "deactivateFailed": "This staff member cannot be deactivated right now",
+      "reactivateFailed": "Failed to reactivate",
+      "generic": "An error occurred"
+    }
+  },
+  "inviteForm": {
+    "emailLabel": "Work email *",
+    "emailPlaceholder": "name@district.org",
+    "roleLabel": "Role *",
+    "schoolLabel": "School *",
+    "selectSchool": "Select a school",
+    "submit": "Send invite",
+    "sending": "Sending...",
+    "inviteSent": "Invite sent to {{email}}",
+    "needsSchoolTitle": "Add a school first",
+    "needsSchoolBody": "Staff are assigned to a school. Create your first school, then invite school admins and teachers.",
+    "goToSchools": "Go to Schools",
+    "errors": {
+      "emailRequired": "Email is required",
+      "selectSchool": "Select a school for this invite",
+      "couldNotSend": "Could not send the invite"
+    },
+    "roles": {
+      "districtAdmin": "District Admin",
+      "schoolAdmin": "School Admin",
+      "teacher": "Teacher",
+      "relatedServiceProvider": "Related service provider",
+      "generalEducator": "General educator"
+    }
+  },
+  "inviteUrlField": {
+    "label": "Invite link (testing)",
+    "ariaLabel": "Invite link",
+    "copy": "Copy",
+    "copied": "Copied"
+  },
+  "deactivateSolelyOwnedNotice": {
+    "title_one": "{{count}} student was only accessible to this staff member — reassign them from their student pages",
+    "title_other": "{{count}} students were only accessible to this staff member — reassign them from their student pages",
+    "dismiss": "Dismiss"
+  }
+}

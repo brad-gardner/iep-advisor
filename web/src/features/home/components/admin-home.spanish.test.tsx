@@ -26,6 +26,12 @@ vi.mock('./adoption-engagement-teaser', () => ({
 
 import { AdminHome } from './admin-home';
 
+// `ComplianceSummaryBlock` (rendered for the DistrictAdmin variant) calls
+// `complianceTileLabel`, which resolves through the staff-only
+// `district-admin` namespace (multilingual plan phase 6) — not part of
+// `renderInSpanish`'s default `featureNamespaces` preload (those are the
+// eager/parent namespaces only), so it's named explicitly here the same way
+// `educator-students-page.test.tsx` does for its own staff namespace.
 function renderAdmin(overrides: Parameters<typeof makeStaffHome>[0], isDistrict: boolean) {
   return renderInSpanish(
     <MemoryRouter>
@@ -34,7 +40,8 @@ function renderAdmin(overrides: Parameters<typeof makeStaffHome>[0], isDistrict:
         isDistrict={isDistrict}
         generatedAt="2026-09-16T00:00:00.000Z"
       />
-    </MemoryRouter>
+    </MemoryRouter>,
+    { ns: 'district-admin' }
   );
 }
 

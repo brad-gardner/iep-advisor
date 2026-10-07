@@ -1,0 +1,86 @@
+{
+  "districtStaffPage": {
+    "title": "Personal",
+    "importStaff": "Importar personal",
+    "inviteStaff": "Invitar personal",
+    "pendingInvitesHeading": "Invitaciones pendientes",
+    "staffHeading": "Personal",
+    "columns": {
+      "name": "Nombre",
+      "email": "Correo electrónico",
+      "role": "Función",
+      "expires": "Vence"
+    },
+    "statusActive": "Activo",
+    "statusInactive": "Inactivo",
+    "expiredBadge": "Vencida",
+    "districtWide": "A nivel distrital",
+    "pendingEmptyTitle": "No hay invitaciones pendientes",
+    "pendingEmptyDescription": "El personal invitado aparece aquí hasta que acepte.",
+    "staffEmptyTitle": "Aún no hay personal",
+    "staffEmptyDescription": "Invite a administradores escolares y maestros para comenzar.",
+    "resend": "Reenviar",
+    "revoke": "Revocar",
+    "deactivate": "Desactivar",
+    "reactivate": "Reactivar",
+    "inviteModalTitle": "Invitar a un miembro del personal",
+    "resendUrlModalTitle": "Enlace de invitación",
+    "deactivateDialogTitle": "Desactivar miembro del personal",
+    "deactivateMessage": "¿Desactivar a {{name}}? Perderá el acceso hasta que se reactive.",
+    "deactivateConfirmLabel": "Desactivar",
+    "revokeDialogTitle": "Revocar invitación",
+    "revokeMessage": "¿Revocar la invitación enviada a {{email}}?",
+    "revokeConfirmLabel": "Revocar invitación",
+    "toasts": {
+      "inviteSent": "Invitación enviada a {{email}}",
+      "inviteResent": "Invitación reenviada a {{email}}",
+      "inviteRevoked": "Invitación revocada",
+      "staffDeactivated": "Miembro del personal desactivado",
+      "staffReactivated": "Miembro del personal reactivado"
+    },
+    "errors": {
+      "sendFailed": "No se pudo enviar la invitación",
+      "resendFailed": "No se pudo reenviar la invitación",
+      "revokeFailed": "No se pudo revocar la invitación",
+      "deactivateFailed": "Este miembro del personal no se puede desactivar en este momento",
+      "reactivateFailed": "No se pudo reactivar",
+      "generic": "Ocurrió un error"
+    }
+  },
+  "inviteForm": {
+    "emailLabel": "Correo electrónico laboral *",
+    "emailPlaceholder": "nombre@distrito.org",
+    "roleLabel": "Función *",
+    "schoolLabel": "Escuela *",
+    "selectSchool": "Seleccione una escuela",
+    "submit": "Enviar invitación",
+    "sending": "Enviando...",
+    "inviteSent": "Invitación enviada a {{email}}",
+    "needsSchoolTitle": "Agregue una escuela primero",
+    "needsSchoolBody": "El personal se asigna a una escuela. Cree su primera escuela y luego invite a administradores escolares y maestros.",
+    "goToSchools": "Ir a Escuelas",
+    "errors": {
+      "emailRequired": "El correo electrónico es obligatorio",
+      "selectSchool": "Seleccione una escuela para esta invitación",
+      "couldNotSend": "No se pudo enviar la invitación"
+    },
+    "roles": {
+      "districtAdmin": "Administrador del distrito",
+      "schoolAdmin": "Administrador escolar",
+      "teacher": "Maestro",
+      "relatedServiceProvider": "Proveedor de servicios relacionados",
+      "generalEducator": "Maestro de educación general"
+    }
+  },
+  "inviteUrlField": {
+    "label": "Enlace de invitación (prueba)",
+    "ariaLabel": "Enlace de invitación",
+    "copy": "Copiar",
+    "copied": "Copiado"
+  },
+  "deactivateSolelyOwnedNotice": {
+    "title_one": "{{count}} estudiante solo era accesible para este miembro del personal: reasígnelo desde su página de estudiante",
+    "title_other": "{{count}} estudiantes solo eran accesibles para este miembro del personal: reasígnelos desde sus páginas de estudiante",
+    "dismiss": "Descartar"
+  }
+}

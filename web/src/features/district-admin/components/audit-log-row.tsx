@@ -1,14 +1,15 @@
-import type { AuditLogEntry } from '../types';
+import { useTranslation } from 'react-i18next';
+import { AUDIT_ACTIONS } from '../types';
+import type { AuditAction, AuditLogEntry } from '../types';
 
-// Human-readable past-tense verb per action. Falls back to a lowercased raw
-// action string so an unrecognized/newer action still renders a sensible row.
-const ACTION_VERBS: Record<string, string> = {
-  View: 'viewed',
-  Edit: 'edited',
-  Share: 'shared',
-  Export: 'exported',
-  Finalize: 'finalized',
-};
+// A type-guarded membership check (rather than a plain `Set.has`) so the
+// `t()` call below gets a narrowed `AuditAction`, not the DTO's loose
+// `string` — a template-literal key built from `string` can't be checked
+// against the strict per-namespace key union (see `docs/i18n/README.md`'s
+// "Typed keys").
+function isAuditAction(action: string): action is AuditAction {
+  return (AUDIT_ACTIONS as readonly string[]).includes(action);
+}
 
 interface AuditLogRowProps {
   entry: AuditLogEntry;
@@ -18,7 +19,12 @@ interface AuditLogRowProps {
 // The display fields already carry server-side fallbacks ("Former staff member",
 // "Deleted draft #123"), so they render verbatim.
 export function AuditLogRow({ entry }: AuditLogRowProps) {
-  const verb = ACTION_VERBS[entry.action] ?? entry.action.toLowerCase();
+  const { t } = useTranslation('district-admin');
+  // Falls back to a lowercased raw action string so an unrecognized/newer
+  // action still renders a sensible row rather than a raw translation key.
+  const verb = isAuditAction(entry.action)
+    ? t(`auditLog.actionVerbs.${entry.action}`)
+    : entry.action.toLowerCase();
 
   return (
     <div
@@ -31,7 +37,7 @@ export function AuditLogRow({ entry }: AuditLogRowProps) {
         {entry.recipientName && (
           <>
             {' '}
-            with{' '}
+            {t('auditLog.with')}{' '}
             <span className="font-medium text-brand-slate-800">{entry.recipientName}</span>
           </>
         )}

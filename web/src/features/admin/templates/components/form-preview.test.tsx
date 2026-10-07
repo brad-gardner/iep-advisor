@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
+// `admin` is a staff-only namespace (plan phase 6) — its English isn't
+// bundled in `resources` (see `lib/i18n/index.ts`), only registered by this
+// side-effect import, exactly as the page's real lazy route chunk
+// (`app/lazy-routes/platform-admin-routes.tsx`) registers it before the page
+// can render. See `docs/i18n/README.md`'s "Staff and admin namespaces".
+import '@/app/lazy-routes/staff-locales';
 import { FormPreview } from './form-preview';
 import type { TemplateSectionDto } from '../types';
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Logo } from '@/components/ui/logo';
 import { ProgressDots } from '@/components/ui/progress-dots';
 import { Spinner } from '@/components/ui/spinner';
@@ -12,15 +13,21 @@ import { SetupStaffStep } from '../components/setup/setup-staff-step';
 import { SetupDoneStep } from '../components/setup/setup-done-step';
 import type { DistrictSchool } from '../types';
 
-const STEP_LABELS = ['Welcome', 'Create school', 'Invite staff', 'Done'];
-const TOTAL_STEPS = STEP_LABELS.length;
+const TOTAL_STEPS = 4;
 const DONE_STEP = TOTAL_STEPS - 1;
 
 // First-run wizard for a new DistrictAdmin. Only meaningful for DistrictAdmins;
 // other staff are redirected to the dashboard. Every step is skippable — the
 // dashboard checklist nudges anything left undone.
 export function DistrictSetupWizard() {
-  usePageTitle('Set up your district');
+  const { t } = useTranslation('district-admin');
+  const stepLabels = [
+    t('setupWizard.stepLabels.welcome'),
+    t('setupWizard.stepLabels.createSchool'),
+    t('setupWizard.stepLabels.inviteStaff'),
+    t('setupWizard.stepLabels.done'),
+  ];
+  usePageTitle(t('setupWizard.pageTitle'));
   const { profile, isLoading } = useEducatorProfile();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
@@ -60,11 +67,11 @@ export function DistrictSetupWizard() {
         <ProgressDots
           current={step}
           total={TOTAL_STEPS}
-          labels={STEP_LABELS}
+          labels={stepLabels}
           testId="district-setup-progress"
         />
         <p className="text-xs text-brand-slate-500" aria-live="polite">
-          Step {step + 1} of {TOTAL_STEPS}
+          {t('setupWizard.stepOf', { current: step + 1, total: TOTAL_STEPS })}
         </p>
       </div>
 

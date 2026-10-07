@@ -6,14 +6,21 @@ import type { ExportJobDto } from '../types';
 
 const POLL_INTERVAL_MS = 10_000;
 
+/** A server-provided message is already resolved text and is shown as-is;
+ * the generic case is translated by the caller at render time (it has the
+ * current `t`) — same reasoning as `useHome`'s `HomeLoadError` (see
+ * `docs/i18n/README.md`: an effect that fetches on mount never has `t` in
+ * its dependency array). */
+export type ExportsLoadError = { kind: 'server'; message: string } | { kind: 'generic' } | null;
+
 interface UseDistrictExportsResult {
   jobs: ExportJobDto[];
   isLoading: boolean;
-  error: string | null;
+  error: ExportsLoadError;
   retry: () => void;
   requestExport: () => Promise<void>;
   isRequesting: boolean;
-  requestError: string | null;
+  requestError: ExportsLoadError;
 }
 
 /** District export jobs (district- and student-scoped): loads once, then
@@ -29,9 +36,9 @@ interface UseDistrictExportsResult {
 export function useDistrictExports(): UseDistrictExportsResult {
   const [jobs, setJobs] = useState<ExportJobDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ExportsLoadError>(null);
   const [isRequesting, setIsRequesting] = useState(false);
-  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<ExportsLoadError>(null);
   const jobsRef = useRef<ExportJobDto[]>([]);
   const reloadRef = useRef<() => void>(() => {});
 
@@ -51,10 +58,13 @@ export function useDistrictExports(): UseDistrictExportsResult {
           setJobs(res.data);
           setError(null);
         } else {
-          setError(res.message ?? 'Could not load export jobs.');
+          setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
         }
       } catch (err) {
-        if (active && mine === generation) setError(apiErrorMessage(err, 'Could not load export jobs.'));
+        if (active && mine === generation) {
+          const serverMessage = apiErrorMessage(err, '');
+          setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+        }
       } finally {
         if (active && mine === generation) setIsLoading(false);
       }
@@ -83,10 +93,11 @@ export function useDistrictExports(): UseDistrictExportsResult {
       if (res.success) {
         reloadRef.current();
       } else {
-        setRequestError(res.message ?? 'Could not request the export.');
+        setRequestError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
       }
     } catch (err) {
-      setRequestError(apiErrorMessage(err, 'Could not request the export.'));
+      const serverMessage = apiErrorMessage(err, '');
+      setRequestError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
     } finally {
       setIsRequesting(false);
     }

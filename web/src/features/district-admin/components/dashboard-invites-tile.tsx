@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { orgRoleLabel } from '@/lib/org-role-label';
@@ -22,16 +23,17 @@ function formatExpiry(iso: string): string {
 // Invites needing attention (pending + expired, expired flagged). Presentational:
 // the composing container owns the single dashboard fetch.
 export function DashboardInvitesTile({ invites }: DashboardInvitesTileProps) {
+  const { t } = useTranslation('district-admin');
   return (
     <Card data-testid="dashboard-invites-tile">
-      <h2 className="font-serif text-xl mb-4">Invites</h2>
+      <h2 className="font-serif text-xl mb-4">{t('dashboard.invitesTile.title')}</h2>
 
       {invites.length === 0 ? (
         <p
           className="text-sm text-brand-slate-500"
           data-testid="dashboard-invites-tile-empty"
         >
-          No invites need attention.
+          {t('dashboard.invitesTile.empty')}
         </p>
       ) : (
         <ul className="space-y-3 text-sm">
@@ -43,13 +45,14 @@ export function DashboardInvitesTile({ invites }: DashboardInvitesTileProps) {
                   <span className="text-brand-slate-800 font-medium">
                     {invite.email}
                   </span>
-                  {isExpired && <Badge variant="error">Expired</Badge>}
+                  {isExpired && <Badge variant="error">{t('dashboard.invitesTile.expiredBadge')}</Badge>}
                 </div>
                 <p className="text-xs text-brand-slate-500">
                   {orgRoleLabel(invite.orgRoleName)}
-                  {invite.schoolName ? ` · ${invite.schoolName}` : ' · District-wide'}
+                  {invite.schoolName ? ` · ${invite.schoolName}` : ` · ${t('dashboard.invitesTile.districtWide')}`}
                   {' · '}
-                  {isExpired ? 'Expired on' : 'Expires'} {formatExpiry(invite.inviteExpiresAt)}
+                  {isExpired ? t('dashboard.invitesTile.expiredOn') : t('dashboard.invitesTile.expires')}{' '}
+                  {formatExpiry(invite.inviteExpiresAt)}
                 </p>
               </li>
             );
@@ -63,7 +66,7 @@ export function DashboardInvitesTile({ invites }: DashboardInvitesTileProps) {
           className="text-sm text-brand-teal-600 hover:underline"
           data-testid="dashboard-invites-tile-link"
         >
-          Manage invites
+          {t('dashboard.invitesTile.manageLink')}
         </Link>
       </div>
     </Card>

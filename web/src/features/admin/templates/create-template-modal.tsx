@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
@@ -15,6 +16,7 @@ interface CreateTemplateModalProps {
 }
 
 export function CreateTemplateModal({ open, onClose, onCreate }: CreateTemplateModalProps) {
+  const { t } = useTranslation(['admin', 'common']);
   const {
     documentTypes,
     isLoading: typesLoading,
@@ -46,15 +48,15 @@ export function CreateTemplateModal({ open, onClose, onCreate }: CreateTemplateM
   const handleSubmit = async () => {
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setFormError('Please enter a template name.');
+      setFormError(t('templates.createModal.errorNameRequired'));
       return;
     }
     if (!documentTypeId) {
-      setFormError('Please select a document type.');
+      setFormError(t('templates.createModal.errorDocTypeRequired'));
       return;
     }
     if (!isDefault && !stateCode) {
-      setFormError('Please select a state, or mark this template as the default.');
+      setFormError(t('templates.createModal.errorStateRequired'));
       return;
     }
 
@@ -70,7 +72,7 @@ export function CreateTemplateModal({ open, onClose, onCreate }: CreateTemplateM
     if (result.success) {
       handleClose();
     } else {
-      setFormError(result.message ?? 'Failed to create template.');
+      setFormError(result.message ?? t('templates.createModal.errorCreateFailed'));
     }
   };
 
@@ -78,12 +80,12 @@ export function CreateTemplateModal({ open, onClose, onCreate }: CreateTemplateM
     <Modal
       open={open}
       onClose={handleClose} preventClose={isSubmitting}
-      title="Create Template"
+      title={t('templates.createModal.title')}
       data-testid="create-template-modal"
       footer={
         <>
           <Button variant="secondary" onClick={handleClose} data-testid="create-template-cancel">
-            Cancel
+            {t('templates.createModal.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -91,7 +93,7 @@ export function CreateTemplateModal({ open, onClose, onCreate }: CreateTemplateM
             disabled={typesLoading || activeTypes.length === 0}
             data-testid="create-template-submit"
           >
-            Create Template
+            {t('templates.createModal.submit')}
           </Button>
         </>
       }
@@ -101,32 +103,32 @@ export function CreateTemplateModal({ open, onClose, onCreate }: CreateTemplateM
         {typesError && (
           <Notice variant="error" title={typesError}>
             <Button variant="secondary" size="sm" onClick={reloadTypes} className="mt-3">
-              Retry
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         )}
 
         <Input
-          label="Template name"
-          placeholder="e.g. Ohio IEP"
+          label={t('templates.createModal.nameLabel')}
+          placeholder={t('templates.createModal.namePlaceholder')}
           value={name}
           onChange={(e) => setName(e.target.value)}
           data-testid="create-template-name"
         />
 
         <Select
-          label="Document type"
+          label={t('templates.createModal.docTypeLabel')}
           value={documentTypeId}
           onChange={(e) => setDocumentTypeId(e.target.value)}
           disabled={typesLoading}
           data-testid="create-template-doc-type"
         >
           <option value="">
-            {typesLoading ? 'Loading…' : 'Select a document type…'}
+            {typesLoading ? t('templates.createModal.docTypeLoading') : t('templates.createModal.docTypePlaceholder')}
           </option>
-          {activeTypes.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.displayName}
+          {activeTypes.map((docType) => (
+            <option key={docType.id} value={docType.id}>
+              {docType.displayName}
             </option>
           ))}
         </Select>
@@ -144,7 +146,7 @@ export function CreateTemplateModal({ open, onClose, onCreate }: CreateTemplateM
             htmlFor="template-is-default"
             className="text-[13px] font-medium text-brand-slate-600"
           >
-            Default template (applies to all states)
+            {t('templates.createModal.isDefaultLabel')}
           </label>
         </div>
 
@@ -154,7 +156,7 @@ export function CreateTemplateModal({ open, onClose, onCreate }: CreateTemplateM
               htmlFor="template-state"
               className="mb-1 block text-[13px] font-medium text-brand-slate-600"
             >
-              State
+              {t('templates.createModal.stateLabel')}
             </label>
             <StateSelector
               id="template-state"

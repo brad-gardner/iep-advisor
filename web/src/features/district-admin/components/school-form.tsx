@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
@@ -30,6 +31,7 @@ export function SchoolForm({
   onCancel,
   testIdPrefix,
 }: SchoolFormProps) {
+  const { t } = useTranslation('district-admin');
   const [name, setName] = useState(initialName);
   const [stateCode, setStateCode] = useState(initialStateCode);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,14 +40,14 @@ export function SchoolForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setError('School name is required');
+      setError(t('schoolForm.errors.nameRequired'));
       return;
     }
     // Server requires a 2-letter code when present; treat a partial entry as
     // "no state" rather than sending an invalid 1-char value.
     const trimmedState = stateCode.trim();
     if (trimmedState.length === 1) {
-      setError('Enter a 2-letter state code, or leave it blank');
+      setError(t('schoolForm.errors.invalidState'));
       return;
     }
 
@@ -63,7 +65,7 @@ export function SchoolForm({
         setStateCode('');
       }
     } else {
-      setError(result.error ?? 'Something went wrong');
+      setError(result.error ?? t('schoolForm.errors.generic'));
     }
     setIsSubmitting(false);
   };
@@ -78,7 +80,7 @@ export function SchoolForm({
 
       <Input
         id={`${testIdPrefix}-name`}
-        label="School name *"
+        label={t('schoolForm.nameLabel')}
         required
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -88,8 +90,8 @@ export function SchoolForm({
 
       <Input
         id={`${testIdPrefix}-state`}
-        label="State"
-        placeholder="e.g. OH"
+        label={t('schoolForm.stateLabel')}
+        placeholder={t('schoolForm.statePlaceholder')}
         value={stateCode}
         onChange={(e) => setStateCode(normalizeState(e.target.value))}
         maxLength={2}
@@ -104,7 +106,7 @@ export function SchoolForm({
           disabled={isSubmitting}
           data-testid={`${testIdPrefix}-submit`}
         >
-          {isSubmitting ? 'Saving...' : submitLabel}
+          {isSubmitting ? t('schoolForm.saving') : submitLabel}
         </Button>
         {onCancel && (
           <Button
@@ -114,7 +116,7 @@ export function SchoolForm({
             disabled={isSubmitting}
             data-testid={`${testIdPrefix}-cancel`}
           >
-            Cancel
+            {t('schoolForm.cancel')}
           </Button>
         )}
       </div>

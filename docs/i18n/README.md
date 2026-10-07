@@ -495,6 +495,11 @@ prerequisite for marketing Spanish, not for shipping it.
 | `family-contact (staff)` | Phase 5 | Draft — needs native review |
 | `meetings-staff (staff)` | Phase 5 | Draft — needs native review |
 | `contributions` | Phase 5 | Draft — needs native review |
+| `district-admin (staff)` | Phase 6 | Draft — needs native review |
+| `staff-invites (staff)` | Phase 6 | Draft — needs native review |
+| `roster-import (staff)` | Phase 6 | Draft — needs native review |
+| `exports (staff)` | Phase 6 | Draft — needs native review |
+| `admin (staff)` | Phase 6 | Draft — needs native review |
 | `educator` (staff — `locales/{en,es}/staff/educator.json`, lazy-route-registered English; see "Staff and admin namespaces" above) | Phase 5 (foundation example — one string; the rest of `features/educator` converts later) | Draft — needs native review |
 
 ## Tests
