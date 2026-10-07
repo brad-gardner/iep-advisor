@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
@@ -19,7 +20,8 @@ import { calendarItemLocalDateIso } from '../lib/calendar-item-date';
 import type { CalendarItemDto } from '../types';
 
 export function EducatorCalendarPage() {
-  usePageTitle('Calendar');
+  const { t } = useTranslation(['calendar', 'common']);
+  usePageTitle(t('page.title'));
   const { monthLabel, days, rangeFromIso, rangeToIso, goToPreviousMonth, goToNextMonth, goToToday } =
     useCalendarRange();
   const [items, setItems] = useState<CalendarItemDto[] | null>(null);
@@ -46,15 +48,18 @@ export function EducatorCalendarPage() {
           setItems(response.data);
           setError(null);
         } else {
-          setError(response.message ?? 'Could not load the calendar');
+          setError(response.message ?? t('page.couldNotLoad'));
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load the calendar'));
+        if (active) setError(apiErrorMessage(err, t('page.couldNotLoad')));
       }
     })();
     return () => {
       active = false;
     };
+    // `t` omitted deliberately (see `docs/i18n/README.md`'s "An effect that
+    // fetches on mount never has `t` in its dependency array").
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeFromIso, rangeToIso, refreshToken]);
 
   // A day selected in one month can't exist in another — clear it whenever
@@ -78,10 +83,10 @@ export function EducatorCalendarPage() {
 
   return (
     <PageLayout
-      title="Calendar"
+      title={t('page.title')}
       actions={
         <Button onClick={() => setPickerOpen(true)} data-testid="calendar-schedule-meeting">
-          Schedule meeting
+          {t('page.scheduleMeeting')}
         </Button>
       }
     >
@@ -91,10 +96,10 @@ export function EducatorCalendarPage() {
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => setRefreshToken((t) => t + 1)}
+              onClick={() => setRefreshToken((n) => n + 1)}
               data-testid="calendar-retry"
             >
-              Try again
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
@@ -107,19 +112,19 @@ export function EducatorCalendarPage() {
             variant="ghost"
             size="sm"
             onClick={goToPreviousMonth}
-            aria-label="Previous month"
+            aria-label={t('page.previousMonth')}
             data-testid="calendar-prev-month"
           >
             <ChevronLeft className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
           </Button>
           <Button variant="ghost" size="sm" onClick={goToToday} data-testid="calendar-today">
-            Today
+            {t('page.today')}
           </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={goToNextMonth}
-            aria-label="Next month"
+            aria-label={t('page.nextMonth')}
             data-testid="calendar-next-month"
           >
             <ChevronRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
@@ -140,7 +145,7 @@ export function EducatorCalendarPage() {
 
       <div>
         <h3 className="mb-2 text-sm font-medium text-brand-slate-800">
-          {selectedIso ? 'Selected day' : 'This month'}
+          {selectedIso ? t('page.selectedDay') : t('page.thisMonth')}
         </h3>
         {items === null ? (
           <div className="space-y-2">

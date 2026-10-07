@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -78,6 +79,7 @@ export function StudentTeamPanel({
   onMembersChange,
   family,
 }: StudentTeamPanelProps) {
+  const { t } = useTranslation('educator');
   const { show: showToast } = useToast();
   const [members, setMembers] = useState<StudentTeamMember[] | null>(null);
   const [directory, setDirectory] = useState<StaffDirectory>({ staff: null, failed: false });
@@ -97,9 +99,15 @@ export function StudentTeamPanel({
 
   const reload = useCallback(async () => {
     const mine = ++teamSeq.current;
-    const result = await safe(() => getTeam(studentId), 'Could not load the team');
+    const result = await safe(() => getTeam(studentId), t('team.loadFailed'));
     if (mine !== teamSeq.current) return;
     setMembers(result.success && result.data ? result.data : []);
+    // `t` is intentionally omitted: it only resolves the English fallback
+    // passed to `safe()` for a *failed* GET, and refetching the team just
+    // because the viewer switched languages would be wasteful (and racy with
+    // the staleness guard above) — see `docs/i18n/README.md`'s "An effect
+    // that fetches on mount never has `t` in its dependency array".
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentId]);
 
   // A transfer deactivates off-school members server-side, so the list is
@@ -122,7 +130,7 @@ export function StudentTeamPanel({
     (async () => {
       const result = await safe(
         () => getEligibleTeamStaff(studentId),
-        'Staff directory unavailable'
+        t('team.directoryUnavailable')
       );
       if (!active) return;
       setDirectory(
@@ -134,6 +142,8 @@ export function StudentTeamPanel({
     return () => {
       active = false;
     };
+    // `t` omitted deliberately — same reasoning as `reload` above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManage, studentId, studentSchoolId, directoryVersion]);
 
   const afterChange = (message: string) => {
@@ -144,13 +154,13 @@ export function StudentTeamPanel({
   const handleAdd = async (data: AddTeamMemberRequest) => {
     const result = await safe(
       () => addTeamMember(studentId, data),
-      'Could not add this team member'
+      t('team.addMemberFailed')
     );
     if (result.success && result.data) {
       const dto = result.data;
       setMembers((prev) => adopt(prev, dto));
       setDirectoryVersion((v) => v + 1);
-      afterChange('Team member added');
+      afterChange(t('team.memberAdded'));
     }
     return { success: result.success, error: result.error };
   };
@@ -159,14 +169,14 @@ export function StudentTeamPanel({
     setPendingRoles((prev) => new Map(prev).set(member.id, teamRole));
     const result = await safe(
       () => updateTeamMember(studentId, member.id, { teamRole }),
-      'Could not update the role'
+      t('team.roleUpdateFailed')
     );
     if (result.success && result.data) {
       const dto = result.data;
       setMembers((prev) => adopt(prev, dto));
-      afterChange('Team role updated');
+      afterChange(t('team.roleUpdated'));
     } else {
-      showToast({ message: result.error ?? 'Could not update the role', variant: 'error' });
+      showToast({ message: result.error ?? t('team.roleUpdateFailed'), variant: 'error' });
     }
     setPendingRoles((prev) => {
       const next = new Map(prev);
@@ -178,14 +188,14 @@ export function StudentTeamPanel({
   const handleMakeLead = async (member: StudentTeamMember) => {
     const result = await safe(
       () => setTeamLead(studentId, member.id),
-      'Could not change the lead'
+      t('team.leadChangeFailed')
     );
     if (result.success && result.data) {
       const dto = result.data;
       setMembers((prev) => adopt(prev, dto));
-      afterChange(`${teamMemberName(member)} is now the lead case manager`);
+      afterChange(t('team.nowLead', { name: teamMemberName(member) }));
     } else {
-      showToast({ message: result.error ?? 'Could not change the lead', variant: 'error' });
+      showToast({ message: result.error ?? t('team.leadChangeFailed'), variant: 'error' });
     }
   };
 
@@ -196,16 +206,16 @@ export function StudentTeamPanel({
     setRemoveError(null);
     const result = await safe(
       () => removeTeamMember(studentId, target.id),
-      'Could not remove this member'
+      t('team.memberRemoveFailed')
     );
     if (result.success) {
       setRemoving(null);
       setMembers((prev) => (prev ?? []).filter((m) => m.id !== target.id));
       setDirectoryVersion((v) => v + 1);
-      afterChange('Team member removed');
+      afterChange(t('team.memberRemoved'));
     } else {
       // e.g. "Choose a new lead case manager first." — stays in the dialog.
-      setRemoveError(result.error ?? 'Could not remove this member');
+      setRemoveError(result.error ?? t('team.memberRemoveFailed'));
     }
     setIsRemoving(false);
   };
@@ -223,11 +233,11 @@ export function StudentTeamPanel({
       <div className="space-y-3">
         {lead === null && members !== null && members.length > 0 && (
           <p className="text-sm text-brand-amber-600" data-testid="team-no-lead">
-            No lead case manager yet — choose "Make lead" on a member.
+            {t('team.noLead')}
           </p>
         )}
         <Table
-          label="IEP team"
+          label={t('team.tableLabel')}
           data-testid="student-team-list"
           columns={columns}
           rows={members ?? []}
@@ -251,11 +261,9 @@ export function StudentTeamPanel({
             <EmptyState
               data-testid="student-team-empty"
               icon={Users}
-              title="No team yet"
+              title={t('team.emptyTitle')}
               description={
-                canManage
-                  ? 'Add the case manager and the staff who work with this student.'
-                  : 'An administrator can build this student’s IEP team.'
+                canManage ? t('team.emptyDescriptionCanManage') : t('team.emptyDescriptionReadOnly')
               }
             />
           }
@@ -263,7 +271,7 @@ export function StudentTeamPanel({
 
         {canManage && (
           <div className="border-t border-brand-slate-100 pt-4">
-            <h3 className="mb-3 text-sm font-medium text-brand-slate-800">Add member</h3>
+            <h3 className="mb-3 text-sm font-medium text-brand-slate-800">{t('team.addMemberHeading')}</h3>
             <AddTeamMemberForm
               directory={directory}
               studentSchoolId={studentSchoolId}
@@ -282,13 +290,9 @@ export function StudentTeamPanel({
 
       <ConfirmDialog
         open={removing !== null}
-        title="Remove team member"
-        message={
-          removing
-            ? `Remove ${teamMemberName(removing)} from this student's team? Their access to the student is revoked.`
-            : ''
-        }
-        confirmLabel="Remove member"
+        title={t('team.removeDialogTitle')}
+        message={removing ? t('team.removeDialogMessage', { name: teamMemberName(removing) }) : ''}
+        confirmLabel={t('team.removeConfirmLabel')}
         loading={isRemoving}
         error={removeError}
         onConfirm={confirmRemove}

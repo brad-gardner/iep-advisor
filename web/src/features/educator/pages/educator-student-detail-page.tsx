@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { apiErrorMessage } from "@/lib/api-error";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ import { FamilyContactCard } from "@/features/family-contact/components/family-c
 import { ExportRecordButton } from "@/features/exports/components/export-record-button";
 
 export function EducatorStudentDetailPage() {
+  const { t } = useTranslation('educator');
   const { studentId: studentIdParam } = useParams<{ studentId: string }>();
   const studentId = Number(studentIdParam);
   const record = useStudentRecord(studentId);
@@ -39,7 +41,7 @@ export function EducatorStudentDetailPage() {
   // OS taskbar/Alt-Tab previews, and screen-share tab pickers, all reachable
   // by a bystander who never authenticated to the app. The full name stays in
   // the in-page heading only (see `PageLayout title={studentName}` below).
-  usePageTitle("Student record");
+  usePageTitle(t('studentDetailPage.pageTitle'));
 
   const [schools, setSchools] = useState<DistrictSchool[]>([]);
   const [isInviteStudentOpen, setIsInviteStudentOpen] = useState(false);
@@ -76,14 +78,14 @@ export function EducatorStudentDetailPage() {
       if (response.success) setIsInviteStudentOpen(false);
       return { success: response.success, message: response.message };
     } catch (err) {
-      return { success: false, message: apiErrorMessage(err, "An error occurred sending the invitation") };
+      return { success: false, message: apiErrorMessage(err, t('studentDetailPage.inviteError')) };
     }
   };
 
   if (record.isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading student…" />
+        <Spinner label={t('studentDetailPage.loadingStudent')} />
       </div>
     );
   }
@@ -91,11 +93,11 @@ export function EducatorStudentDetailPage() {
   if (!student) {
     return (
       <EmptyState
-        title="Student not found"
-        description="This student may have been removed, or you may not have access to their record."
+        title={t('studentDetailPage.notFoundTitle')}
+        description={t('studentDetailPage.notFoundDescription')}
         action={
           <Link to="/educator/students">
-            <Button variant="secondary">Back to students</Button>
+            <Button variant="secondary">{t('studentDetailPage.backToStudents')}</Button>
           </Link>
         }
       />
@@ -103,13 +105,13 @@ export function EducatorStudentDetailPage() {
   }
 
   const studentName =
-    `${student.firstName} ${student.lastName ?? ""}`.trim() || "Student";
+    `${student.firstName} ${student.lastName ?? ""}`.trim() || t('studentDetailPage.studentFallbackName');
 
   return (
     <PageLayout
       title={studentName}
       breadcrumb={[
-        { label: "Students", to: "/educator/students" },
+        { label: t('studentDetailPage.breadcrumbStudents'), to: "/educator/students" },
         { label: studentName },
       ]}
       actions={
@@ -139,7 +141,7 @@ export function EducatorStudentDetailPage() {
             <FamilyContactCard studentId={studentId} />
 
             <section className="space-y-3">
-              <h2 className="font-serif text-lg">IEP team</h2>
+              <h2 className="font-serif text-lg">{t('team.heading')}</h2>
               <StudentTeamPanel
                 studentId={studentId}
                 studentSchoolId={student.schoolId}
@@ -165,20 +167,19 @@ export function EducatorStudentDetailPage() {
             />
 
             <Card>
-              <h2 className="mb-2 font-serif text-base text-brand-slate-800">Export record</h2>
-              <p className="mb-3 text-sm text-brand-slate-600">
-                Build a ZIP of this student's finalized documents, signed artifacts, goals, meetings and
-                contact history.
-              </p>
+              <h2 className="mb-2 font-serif text-base text-brand-slate-800">
+                {t('studentDetailPage.exportHeading')}
+              </h2>
+              <p className="mb-3 text-sm text-brand-slate-600">{t('studentDetailPage.exportDescription')}</p>
               <ExportRecordButton studentId={studentId} />
             </Card>
 
             <Card>
               <h2 className="mb-2 font-serif text-base text-brand-slate-800">
-                Student account
+                {t('studentDetailPage.accountHeading')}
               </h2>
               <p className="mb-3 text-sm text-brand-slate-600">
-                Invite {student.firstName} to take part in their IEP process.
+                {t('studentDetailPage.accountDescription', { name: student.firstName })}
               </p>
               <Button
                 variant="secondary"
@@ -186,7 +187,7 @@ export function EducatorStudentDetailPage() {
                 onClick={() => setIsInviteStudentOpen(true)}
                 data-testid="invite-student-open"
               >
-                Invite student
+                {t('studentDetailPage.inviteStudent')}
               </Button>
             </Card>
           </>
@@ -207,13 +208,13 @@ export function EducatorStudentDetailPage() {
       <Modal
         open={isInviteStudentOpen}
         onClose={() => setIsInviteStudentOpen(false)}
-        title="Invite student"
+        title={t('studentDetailPage.inviteStudentModalTitle')}
         data-testid="invite-student-modal"
       >
         <InviteStudentForm
           embedded
           onInvite={handleInviteStudent}
-          description={`Invite ${student.firstName} to activate their own account and take part in their IEP process.`}
+          description={t('studentDetailPage.inviteStudentDescription', { name: student.firstName })}
         />
       </Modal>
     </PageLayout>

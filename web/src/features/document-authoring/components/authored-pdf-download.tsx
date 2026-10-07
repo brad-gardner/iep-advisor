@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { getAuthoredPdfDownloadUrl } from '../api/documents-api';
@@ -23,6 +24,7 @@ export function AuthoredPdfDownload({
   canRetry = false,
   compact = false,
 }: AuthoredPdfDownloadProps) {
+  const { t } = useTranslation('document-authoring');
   const { status, errorMessage, isLoading, timedOut, retry, isRetrying, refresh } =
     useAuthoredPdfStatus(versionId, initialStatus);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -50,7 +52,7 @@ export function AuthoredPdfDownload({
   if (isLoading && status === null) {
     return (
       <span className="text-sm text-brand-slate-500" role="status" aria-live="polite">
-        Checking PDF…
+        {t('authoredPdfDownload.checking')}
       </span>
     );
   }
@@ -65,11 +67,11 @@ export function AuthoredPdfDownload({
           disabled={isDownloading}
           data-testid={`download-authored-pdf-${versionId}`}
         >
-          {isDownloading ? 'Preparing…' : 'Download PDF'}
+          {isDownloading ? t('authoredPdfDownload.preparing') : t('authoredPdfDownload.download')}
         </Button>
         {downloadError && (
           <span className="text-sm text-brand-danger-700" role="status" aria-live="polite">
-            Couldn’t prepare the download. Please try again.
+            {t('authoredPdfDownload.downloadError')}
           </span>
         )}
       </div>
@@ -80,7 +82,7 @@ export function AuthoredPdfDownload({
     if (compact) {
       return (
         <div className="flex items-center gap-2" role="status" aria-live="polite">
-          <span className="text-sm text-brand-danger-700">PDF failed</span>
+          <span className="text-sm text-brand-danger-700">{t('authoredPdfDownload.pdfFailed')}</span>
           {canRetry && (
             <Button
               variant="secondary"
@@ -89,7 +91,7 @@ export function AuthoredPdfDownload({
               disabled={isRetrying}
               data-testid={`retry-authored-pdf-${versionId}`}
             >
-              {isRetrying ? 'Retrying…' : 'Retry'}
+              {isRetrying ? t('authoredPdfDownload.retrying') : t('authoredPdfDownload.retry')}
             </Button>
           )}
         </div>
@@ -97,8 +99,8 @@ export function AuthoredPdfDownload({
     }
     return (
       <div className="space-y-2">
-        <Notice variant="error" title="PDF could not be generated">
-          {errorMessage || 'The PDF render failed.'}
+        <Notice variant="error" title={t('authoredPdfDownload.generateErrorTitle')}>
+          {errorMessage || t('authoredPdfDownload.generateErrorFallback')}
         </Notice>
         {canRetry && (
           <Button
@@ -107,7 +109,7 @@ export function AuthoredPdfDownload({
             disabled={isRetrying}
             data-testid={`retry-authored-pdf-${versionId}`}
           >
-            {isRetrying ? 'Retrying…' : 'Retry'}
+            {isRetrying ? t('authoredPdfDownload.retrying') : t('authoredPdfDownload.retry')}
           </Button>
         )}
       </div>
@@ -124,7 +126,7 @@ export function AuthoredPdfDownload({
       data-testid={`authored-pdf-generating-${versionId}`}
     >
       <span className="text-sm text-brand-slate-500">
-        {timedOut ? 'Still generating — check again shortly.' : 'Generating PDF…'}
+        {timedOut ? t('authoredPdfDownload.stillGenerating') : t('authoredPdfDownload.generating')}
       </span>
       {timedOut && (
         <Button
@@ -133,7 +135,7 @@ export function AuthoredPdfDownload({
           onClick={() => void refresh()}
           data-testid={`check-authored-pdf-${versionId}`}
         >
-          Check again
+          {t('authoredPdfDownload.checkAgain')}
         </Button>
       )}
     </div>

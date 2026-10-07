@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Select } from '@/components/ui/input';
 import { useAutosave } from '@/hooks/use-autosave';
 import { parseConfig } from '@/features/admin/templates/template-config';
@@ -8,6 +9,7 @@ import { fieldElementId, type FieldRendererProps } from './types';
 
 /** Single-select dropdown populated from the field's config options. */
 export function SelectField({ field, value, disabled, onSave }: FieldRendererProps) {
+  const { t } = useTranslation('document-authoring');
   const config = parseConfig(field.fieldType, field.configJson);
   const options = config.kind === 'Select' ? config.select.options : [];
   const id = fieldElementId(field.id);
@@ -35,7 +37,7 @@ export function SelectField({ field, value, disabled, onSave }: FieldRendererPro
         onChange={(e) => handleChange(e.target.value)}
         data-testid={`field-${field.fieldKey}`}
       >
-        <option value="">Select…</option>
+        <option value="">{t('selectField.placeholder')}</option>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label?.trim() || o.value}

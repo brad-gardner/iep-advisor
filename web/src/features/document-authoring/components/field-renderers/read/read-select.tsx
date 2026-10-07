@@ -1,11 +1,13 @@
+import { useTranslation } from 'react-i18next';
 import { parseConfig } from '@/features/admin/templates/template-config';
 import { isBlank } from '../../../lib/completeness';
 import { fieldElementId } from '../types';
-import { NOT_SET_LABEL, type ReadFieldRendererProps } from './types';
+import type { ReadFieldRendererProps } from './types';
 
 /** Read view for a Select field: the chosen option's label (falling back to
  *  its raw value if the option was since removed from the config). */
 export function ReadSelect({ field, value, hideLabel }: ReadFieldRendererProps) {
+  const { t } = useTranslation(['document-authoring', 'common']);
   const config = parseConfig(field.fieldType, field.configJson);
   const options = config.kind === 'Select' ? config.select.options : [];
   const str = typeof value === 'string' ? value : '';
@@ -13,9 +15,9 @@ export function ReadSelect({ field, value, hideLabel }: ReadFieldRendererProps) 
 
   return (
     <div id={fieldElementId(field.id)} data-testid={`read-field-${field.fieldKey}`}>
-      {!hideLabel && <h3 className="text-[13px] font-medium text-brand-slate-500">{field.label || 'Untitled field'}</h3>}
+      {!hideLabel && <h3 className="text-[13px] font-medium text-brand-slate-500">{field.label || t('readShared.untitledField')}</h3>}
       <p className={isBlank(str) ? 'mt-0.5 text-[15px] italic text-brand-slate-500' : 'mt-0.5 text-[15px] text-brand-slate-700'}>
-        {isBlank(str) ? NOT_SET_LABEL : label}
+        {isBlank(str) ? t('common:ui.notSet') : label}
       </p>
     </div>
   );

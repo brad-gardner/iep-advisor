@@ -8,6 +8,8 @@
 // phase's worker adds its own `<feature>/staff-locales.ts` (the same
 // pattern as `features/educator/staff-locales.ts`) and imports it here, the
 // same way `staff-routes.tsx` imports its own.
+import './staff-locales';
+
 export { DistrictSchoolsPage } from '@/features/district-admin/pages/district-schools-page';
 export { ComplianceBoardPage } from '@/features/district-admin/pages/compliance-board-page';
 export { DistrictAuditLogPage } from '@/features/district-admin/pages/district-audit-log-page';

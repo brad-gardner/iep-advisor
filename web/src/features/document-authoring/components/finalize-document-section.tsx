@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import { Button } from '@/components/ui/button';
@@ -7,6 +9,7 @@ import { Notice } from '@/components/ui/notice';
 import { useToast } from '@/components/ui/toast';
 import type { ApiResponse } from '@/types/api';
 import { finalizeDocument, listAuthoredVersions } from '../api/documents-api';
+import { documentStatusLabel } from '../lib/document-status-label';
 import type {
   AuthoredDocumentVersionSummaryDto,
   DocumentInstanceStatus,
@@ -33,12 +36,12 @@ interface FinalizeDocumentSectionProps {
   onFinalized?: (version: AuthoredDocumentVersionSummaryDto) => void;
 }
 
-function mapFinalizeError(status: number | undefined, message?: string): string {
-  if (status === 403) return "You don't have permission to finalize this document.";
-  if (status === 404) return 'This document no longer exists.';
+function mapFinalizeError(t: TFunction<'document-authoring'>, status: number | undefined, message?: string): string {
+  if (status === 403) return t('finalizeSection.errorForbidden');
+  if (status === 404) return t('finalizeSection.errorNotFound');
   // 409 → state conflict (e.g. already finalizing). Prefer the server message.
-  if (status === 409) return message || 'This document is already being finalized.';
-  return message || 'Could not finalize the document. Please try again.';
+  if (status === 409) return message || t('finalizeSection.errorConflict');
+  return message || t('finalizeSection.errorGeneric');
 }
 
 // Owns the educator finalize flow for one document instance: open the confirm
@@ -55,6 +58,7 @@ export function FinalizeDocumentSection({
   getSaveState,
   onFinalized,
 }: FinalizeDocumentSectionProps) {
+  const { t } = useTranslation('document-authoring');
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,13 +116,11 @@ export function FinalizeDocumentSection({
       // when the latest edit failed to persist or a concurrent change latched.
       const saveState = getSaveState?.();
       if (saveState?.conflict) {
-        setError(
-          'This document changed elsewhere. Reload to get the latest values before finalizing.'
-        );
+        setError(t('finalizeSection.conflictError'));
         return;
       }
       if (!canProceed || saveState?.hasError || saveState?.pending) {
-        setError('Your most recent edits could not be saved. Please retry them before finalizing.');
+        setError(t('finalizeSection.unsavedError'));
         return;
       }
       const res = await finalizeDocument(instanceId);
@@ -126,13 +128,13 @@ export function FinalizeDocumentSection({
         const version = res.data;
         setFinalized(version);
         setIsOpen(false);
-        show({ message: `Finalized v${version.versionNumber}`, variant: 'success' });
+        show({ message: t('finalizeSection.finalizedToast', { number: version.versionNumber }), variant: 'success' });
         setNextVersionNumber(version.versionNumber + 1);
         onFinalized?.(version);
       } else {
         // A non-throwing failure envelope (rare) — surface message/errors.
         setValidationErrors(res.errors ?? []);
-        setError(res.errors?.length ? null : res.message ?? 'Could not finalize the document.');
+        setError(res.errors?.length ? null : res.message ?? t('finalizeSection.errorGenericNoRetryHint'));
       }
     } catch (err) {
       if (err instanceof AxiosError) {
@@ -142,10 +144,10 @@ export function FinalizeDocumentSection({
         if (httpStatus === 422 && body?.errors?.length) {
           setValidationErrors(body.errors);
         } else {
-          setError(mapFinalizeError(httpStatus, body?.message));
+          setError(mapFinalizeError(t, httpStatus, body?.message));
         }
       } else {
-        setError('Could not finalize the document. Please try again.');
+        setError(t('finalizeSection.errorGeneric'));
       }
     } finally {
       setIsSubmitting(false);
@@ -157,7 +159,7 @@ export function FinalizeDocumentSection({
       <Modal
         open={isOpen}
         onClose={closeDialog} preventClose={isSubmitting}
-        title={`Finalize this ${documentTypeDisplayName}`}
+        title={t('finalizeSection.dialogTitle', { documentType: documentTypeDisplayName })}
         size="md"
         data-testid="finalize-document-dialog"
       >
@@ -173,14 +175,14 @@ export function FinalizeDocumentSection({
       </Modal>
 
       {finalized && (
-        <Notice variant="success" title={`Finalized v${finalized.versionNumber}`}>
-          An immutable version was created and the PDF is generating.{' '}
+        <Notice variant="success" title={t('finalizeSection.finalizedNoticeTitle', { number: finalized.versionNumber })}>
+          {t('finalizeSection.finalizedNoticeBody')}{' '}
           <Link
             to={`/educator/students/${studentId}/authored-versions/${finalized.id}`}
             className="text-brand-teal-500 hover:underline"
             data-testid="view-finalized-version"
           >
-            View version
+            {t('finalizeSection.viewVersion')}
           </Link>
           .{' '}
           <button
@@ -189,7 +191,7 @@ export function FinalizeDocumentSection({
             className="text-brand-slate-500 hover:underline"
             data-testid="dismiss-finalized"
           >
-            Dismiss
+            {t('finalizeSection.dismiss')}
           </button>
         </Notice>
       )}
@@ -200,11 +202,11 @@ export function FinalizeDocumentSection({
         disabled={!canFinalize}
         data-testid="finalize-button"
       >
-        Finalize
+        {t('finalizeSection.finalizeButton')}
       </Button>
       {!canFinalize && (
         <p className="text-sm text-brand-slate-500">
-          This document is {status.toLowerCase()} and cannot be finalized right now.
+          {t('finalizeSection.cannotFinalizeNow', { status: documentStatusLabel(status).toLowerCase() })}
         </p>
       )}
     </div>

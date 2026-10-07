@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import { getActiveLanguage } from '@/lib/i18n/format';
 
 export interface CalendarDay {
   /** Local midnight for this cell. */
@@ -42,31 +43,33 @@ function isSameDay(a: Date, b: Date): boolean {
 export function useCalendarRange(initialDate: Date = new Date()): UseCalendarRangeResult {
   const [anchor, setAnchor] = useState(() => startOfMonth(initialDate));
 
-  const { monthLabel, days, rangeFromIso, rangeToIso } = useMemo(() => {
-    const monthStart = startOfMonth(anchor);
-    const gridStart = new Date(monthStart);
-    gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+  // Not memoized: cheap (42 date cells), and `monthLabel` must reflect the
+  // active i18next language on every render — a `useMemo` keyed on `anchor`
+  // alone would keep a stale-language `monthLabel` across a language switch
+  // (react-i18next's `useTranslation` elsewhere is what triggers a host
+  // component's re-render on switch; this hook just needs to not cache
+  // around that). See `roster-columns.tsx`/`team-columns.tsx` for the same
+  // "recompute every render" convention with translated builder output.
+  const monthStart = startOfMonth(anchor);
+  const gridStart = new Date(monthStart);
+  gridStart.setDate(gridStart.getDate() - gridStart.getDay());
 
-    const today = new Date();
-    const cells: CalendarDay[] = [];
-    for (let i = 0; i < 42; i += 1) {
-      const date = new Date(gridStart);
-      date.setDate(gridStart.getDate() + i);
-      cells.push({
-        date,
-        iso: toIsoDate(date),
-        inCurrentMonth: date.getMonth() === monthStart.getMonth(),
-        isToday: isSameDay(date, today),
-      });
-    }
+  const today = new Date();
+  const days: CalendarDay[] = [];
+  for (let i = 0; i < 42; i += 1) {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + i);
+    days.push({
+      date,
+      iso: toIsoDate(date),
+      inCurrentMonth: date.getMonth() === monthStart.getMonth(),
+      isToday: isSameDay(date, today),
+    });
+  }
 
-    return {
-      monthLabel: monthStart.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
-      days: cells,
-      rangeFromIso: cells[0].iso,
-      rangeToIso: cells[cells.length - 1].iso,
-    };
-  }, [anchor]);
+  const monthLabel = monthStart.toLocaleDateString(getActiveLanguage(), { month: 'long', year: 'numeric' });
+  const rangeFromIso = days[0].iso;
+  const rangeToIso = days[days.length - 1].iso;
 
   return {
     monthLabel,

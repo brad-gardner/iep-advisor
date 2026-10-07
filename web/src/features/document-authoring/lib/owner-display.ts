@@ -1,3 +1,4 @@
+import i18n from '@/lib/i18n';
 import { TEAM_ROLE_LABELS } from '@/features/educator/types';
 import { teamMemberName } from '@/features/educator/components/team/team-eligibility';
 import type { StudentTeamCache } from '../hooks/use-student-team';
@@ -27,15 +28,17 @@ export function resolveOwnerDisplay(
   team: StudentTeamCache | undefined
 ): OwnerDisplay | null {
   if (ownerUserId == null) return null;
-  if (!team || team.isLoading) return { label: 'Loading…', former: false, loading: true, error: false };
+  if (!team || team.isLoading)
+    return { label: i18n.t('document-authoring:ownerDisplay.loading'), former: false, loading: true, error: false };
   // A failed fetch leaves `members` empty, which would otherwise read as "no
   // longer an active member" — an unrelated claim this id's owner status was
   // never actually checked against.
-  if (team.isError) return { label: 'Owner unavailable', former: false, loading: false, error: true };
+  if (team.isError)
+    return { label: i18n.t('document-authoring:ownerDisplay.ownerUnavailable'), former: false, loading: false, error: true };
 
   const member = team.members.find((m) => m.userId === ownerUserId && m.isActive);
   if (member) {
     return { label: `${teamMemberName(member)} — ${TEAM_ROLE_LABELS[member.teamRole]}`, former: false, loading: false, error: false };
   }
-  return { label: 'Former team member', former: true, loading: false, error: false };
+  return { label: i18n.t('document-authoring:ownerDisplay.formerTeamMember'), former: true, loading: false, error: false };
 }

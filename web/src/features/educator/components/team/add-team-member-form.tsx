@@ -1,15 +1,12 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { orgRoleLabel } from '@/lib/org-role-label';
-import {
-  ACCESS_ROLES,
-  TEAM_ROLES,
-  TEAM_ROLE_LABELS,
-  defaultAccessRoleForTeamRole,
-} from '../../types';
+import { accessRoleLabel, teamRoleLabel } from '../../lib/student-enum-labels';
+import { ACCESS_ROLES, TEAM_ROLES, defaultAccessRoleForTeamRole } from '../../types';
 import type { AccessRole, AddTeamMemberRequest, EligibleStaff, TeamRole } from '../../types';
 import { eligibleTeamStaff } from './team-eligibility';
 
@@ -41,6 +38,7 @@ export function AddTeamMemberForm({
   memberProfileIds,
   onAdd,
 }: AddTeamMemberFormProps) {
+  const { t } = useTranslation('educator');
   const [search, setSearch] = useState('');
   const [staffProfileId, setStaffProfileId] = useState('');
   const [teamRole, setTeamRole] = useState<TeamRole>('InterventionSpecialist');
@@ -68,7 +66,7 @@ export function AddTeamMemberForm({
     e.preventDefault();
     setError(null);
     if (!selectedId) {
-      setError('Select a staff member to add');
+      setError(t('team.addForm.selectStaffRequired'));
       return;
     }
     setIsSubmitting(true);
@@ -82,15 +80,15 @@ export function AddTeamMemberForm({
       setStaffProfileId('');
       setAccessRole('');
     } else {
-      setError(result.error ?? 'Could not add this team member');
+      setError(result.error ?? t('team.addForm.addFailed'));
     }
     setIsSubmitting(false);
   };
 
   if (directory.failed) {
     return (
-      <Notice variant="error" title="Staff directory unavailable" data-testid="team-add-unavailable">
-        The list of staff who can join this team could not be loaded. Reload the page to try again.
+      <Notice variant="error" title={t('team.addForm.directoryUnavailableTitle')} data-testid="team-add-unavailable">
+        {t('team.addForm.directoryUnavailableBody')}
       </Notice>
     );
   }
@@ -107,7 +105,7 @@ export function AddTeamMemberForm({
   if (eligible.length === 0) {
     return (
       <p className="text-sm text-brand-slate-500" data-testid="team-add-empty">
-        Everyone eligible at this school is already on the team.
+        {t('team.addForm.allEligibleAdded')}
       </p>
     );
   }
@@ -124,21 +122,23 @@ export function AddTeamMemberForm({
         <Input
           id="team-add-search"
           type="search"
-          label="Find staff"
-          placeholder="Name or email"
+          label={t('team.addForm.findStaffLabel')}
+          placeholder={t('team.addForm.findStaffPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           data-testid="team-add-search"
         />
         <Select
           id="team-add-staff"
-          label="Staff member *"
+          label={t('team.addForm.staffMemberLabel')}
           value={selectedId}
           onChange={(e) => setStaffProfileId(e.target.value)}
           data-testid="team-add-staff"
         >
           <option value="">
-            {candidates.length === 0 ? 'No matches' : `Select (${candidates.length})`}
+            {candidates.length === 0
+              ? t('team.addForm.noMatches')
+              : t('team.addForm.selectCount', { count: candidates.length })}
           </option>
           {candidates.map((m) => (
             <option key={m.staffProfileId} value={m.staffProfileId}>
@@ -152,35 +152,37 @@ export function AddTeamMemberForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <Select
           id="team-add-role"
-          label="Team role *"
+          label={t('team.addForm.teamRoleLabel')}
           value={teamRole}
           onChange={(e) => setTeamRole(e.target.value as TeamRole)}
           data-testid="team-add-role"
         >
           {TEAM_ROLES.map((role) => (
             <option key={role} value={role}>
-              {TEAM_ROLE_LABELS[role]}
+              {teamRoleLabel(role)}
             </option>
           ))}
         </Select>
         <Select
           id="team-add-permission"
-          label="Permission"
+          label={t('team.addForm.permissionLabel')}
           value={accessRole}
           onChange={(e) => setAccessRole(e.target.value as '' | AccessRole)}
           data-testid="team-add-permission"
         >
-          <option value="">Default for role ({defaultAccessRoleForTeamRole(teamRole)})</option>
+          <option value="">
+            {t('team.addForm.defaultForRole', { role: accessRoleLabel(defaultAccessRoleForTeamRole(teamRole)) })}
+          </option>
           {ACCESS_ROLES.map((role) => (
             <option key={role} value={role}>
-              {role}
+              {accessRoleLabel(role)}
             </option>
           ))}
         </Select>
       </div>
 
       <Button type="submit" loading={isSubmitting} data-testid="team-add-submit">
-        Add member
+        {t('team.addForm.submit')}
       </Button>
     </form>
   );

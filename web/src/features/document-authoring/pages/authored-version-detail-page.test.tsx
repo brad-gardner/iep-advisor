@@ -3,6 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { AuthoredDocumentVersionDetailDto, AuthoredDocumentVersionSummaryDto } from '../types';
+// `document-authoring` is a staff-only namespace (plan phase 5) — see
+// `../staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
+// admin namespaces". This page renders directly here (not through the lazy
+// route), so its English must be registered the same way the real route
+// chunk does.
+import '../staff-locales';
 
 const documentsApi = vi.hoisted(() => ({
   getAuthoredVersion: vi.fn(),

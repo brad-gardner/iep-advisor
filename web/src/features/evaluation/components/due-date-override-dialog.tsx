@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
@@ -21,6 +22,7 @@ const REASON_MAX_LENGTH = 1000;
 
 /** Override the computed determination due date; a reason is required. */
 export function DueDateOverrideDialog({ open, studentId, evaluation, onClose, onChanged }: DueDateOverrideDialogProps) {
+  const { t } = useTranslation(['evaluation', 'common']);
   const [dueDate, setDueDate] = useState(() => toDateInputValue(evaluation.determinationDueDate));
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,10 +42,10 @@ export function DueDateOverrideDialog({ open, studentId, evaluation, onClose, on
         setReason('');
         onClose();
       } else {
-        setError(res.message ?? 'Could not update the due date.');
+        setError(res.message ?? t('dueDateOverrideDialog.saveFailed'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not update the due date.'));
+      setError(apiErrorMessage(err, t('dueDateOverrideDialog.saveFailed')));
     } finally {
       setIsSubmitting(false);
     }
@@ -54,13 +56,13 @@ export function DueDateOverrideDialog({ open, studentId, evaluation, onClose, on
       open={open}
       onClose={onClose}
       preventClose={isSubmitting}
-      title="Override determination due date"
+      title={t('dueDateOverrideDialog.title')}
       size="sm"
       data-testid="due-date-override-dialog"
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
-            Cancel
+            {t('common:ui.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -68,7 +70,7 @@ export function DueDateOverrideDialog({ open, studentId, evaluation, onClose, on
             disabled={!canSubmit}
             data-testid="due-date-override-submit"
           >
-            Save
+            {t('dueDateOverrideDialog.saveButton')}
           </Button>
         </>
       }
@@ -80,7 +82,7 @@ export function DueDateOverrideDialog({ open, studentId, evaluation, onClose, on
           </div>
         )}
         <Input
-          label="New due date *"
+          label={t('dueDateOverrideDialog.newDueDateLabel')}
           type="date"
           required
           value={dueDate}
@@ -88,7 +90,7 @@ export function DueDateOverrideDialog({ open, studentId, evaluation, onClose, on
           data-testid="due-date-override-date"
         />
         <RichTextEditor
-          label="Reason *"
+          label={t('dueDateOverrideDialog.reasonLabel')}
           value={reason}
           onChange={setReason}
           minRows={3}

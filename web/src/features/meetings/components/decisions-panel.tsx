@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -7,10 +8,10 @@ import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
+import { meetingDecisionOutcomeLabel } from '@/lib/meeting-labels';
 import { deleteDecision } from '../api/meeting-decisions-api';
 import { useDecisionTargets } from '../hooks/use-decision-targets';
 import { useMeetingDecisions } from '../hooks/use-meeting-decisions';
-import { MEETING_DECISION_OUTCOME_LABELS } from '../types';
 import type { MeetingDecisionDto, MeetingDecisionOutcome } from '../types';
 import { DecisionForm } from './decision-form';
 import { EditDecisionDialog } from './edit-decision-dialog';
@@ -31,6 +32,7 @@ interface DecisionsPanelProps {
  *  decision 3). Never applies a decision to the draft itself — that happens
  *  later, by a human, from the editor's "Proposed edits from meetings" panel. */
 export function DecisionsPanel({ meetingId, documentInstanceId, canManage }: DecisionsPanelProps) {
+  const { t } = useTranslation(['meetings-staff', 'common']);
   const { decisions, isLoading, error, retry, addDecision, updateDecision, removeDecision } =
     useMeetingDecisions(meetingId);
   const targetOptions = useDecisionTargets(documentInstanceId);
@@ -49,7 +51,7 @@ export function DecisionsPanel({ meetingId, documentInstanceId, canManage }: Dec
       removeDecision(deleting.id);
       setDeleting(null);
     } catch (err) {
-      setDeleteError(apiErrorMessage(err, 'Could not delete this decision.'));
+      setDeleteError(apiErrorMessage(err, t('decisionsPanel.deleteFailed')));
     } finally {
       setIsDeleting(false);
     }
@@ -58,10 +60,10 @@ export function DecisionsPanel({ meetingId, documentInstanceId, canManage }: Dec
   return (
     <div data-testid="decisions-panel">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium text-brand-slate-800">Decisions</h3>
+        <h3 className="text-sm font-medium text-brand-slate-800">{t('decisionsPanel.heading')}</h3>
         {canManage && !adding && (
           <Button size="sm" variant="secondary" onClick={() => setAdding(true)} data-testid="decision-add-open">
-            Add decision
+            {t('decisionsPanel.addButton')}
           </Button>
         )}
       </div>
@@ -84,7 +86,7 @@ export function DecisionsPanel({ meetingId, documentInstanceId, canManage }: Dec
         <div role="alert">
           <Notice variant="error" title={error}>
             <Button size="sm" variant="secondary" className="mt-2" onClick={retry} data-testid="decisions-retry">
-              Try again
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
@@ -98,7 +100,7 @@ export function DecisionsPanel({ meetingId, documentInstanceId, canManage }: Dec
 
       {!error && !isLoading && decisions.length === 0 && (
         <p className="text-sm text-brand-slate-500" data-testid="decisions-empty">
-          No decisions recorded yet.
+          {t('decisionsPanel.emptyHint')}
         </p>
       )}
 
@@ -115,12 +117,12 @@ export function DecisionsPanel({ meetingId, documentInstanceId, canManage }: Dec
                   {d.targetLabel && <p className="text-xs font-medium text-brand-slate-500">{d.targetLabel}</p>}
                   <Markdown content={d.text} className="text-sm text-brand-slate-800" />
                   <p className="mt-1 text-xs text-brand-slate-500">
-                    {d.recordedByName ?? 'Staff'} · {formatDate(d.createdAt)}
-                    {d.appliedAt ? ' · Applied to draft' : ''}
+                    {d.recordedByName ?? t('decisionsPanel.defaultRecordedBy')} · {formatDate(d.createdAt)}
+                    {d.appliedAt ? t('decisionsPanel.appliedToDraftSuffix') : ''}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={OUTCOME_VARIANT[d.outcome]}>{MEETING_DECISION_OUTCOME_LABELS[d.outcome]}</Badge>
+                  <Badge variant={OUTCOME_VARIANT[d.outcome]}>{meetingDecisionOutcomeLabel(d.outcome)}</Badge>
                   {canManage && (
                     <>
                       <Button
@@ -129,7 +131,7 @@ export function DecisionsPanel({ meetingId, documentInstanceId, canManage }: Dec
                         onClick={() => setEditing(d)}
                         data-testid={`decision-edit-${d.id}`}
                       >
-                        Edit
+                        {t('decisionsPanel.editButton')}
                       </Button>
                       <Button
                         size="sm"
@@ -140,7 +142,7 @@ export function DecisionsPanel({ meetingId, documentInstanceId, canManage }: Dec
                         }}
                         data-testid={`decision-delete-${d.id}`}
                       >
-                        Delete
+                        {t('decisionsPanel.deleteButton')}
                       </Button>
                     </>
                   )}
@@ -155,9 +157,9 @@ export function DecisionsPanel({ meetingId, documentInstanceId, canManage }: Dec
 
       <ConfirmDialog
         open={deleting !== null}
-        title="Delete decision"
-        message="This permanently removes this recorded decision. This cannot be undone."
-        confirmLabel="Delete decision"
+        title={t('decisionsPanel.deleteDialogTitle')}
+        message={t('decisionsPanel.deleteDialogMessage')}
+        confirmLabel={t('decisionsPanel.deleteDialogConfirm')}
         loading={isDeleting}
         error={deleteError}
         onConfirm={handleDelete}

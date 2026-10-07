@@ -1,0 +1,21 @@
+{
+  "card": {
+    "heading": "Timeline",
+    "editDatesButton": "Edit dates",
+    "loadFailed": "Could not load the timeline"
+  },
+  "status": {
+    "Upcoming": "Upcoming",
+    "DueSoon": "Due soon",
+    "Overdue": "Overdue",
+    "Unknown": "Unknown"
+  },
+  "kind": {
+    "AnnualReview": "Annual review",
+    "Reevaluation": "Reevaluation",
+    "EtrDue": "ETR",
+    "GoalObservationStale": "Goal progress overdue",
+    "EvaluationDetermination": "Evaluation determination",
+    "EvaluatorSubmission": "Evaluator submission"
+  }
+}

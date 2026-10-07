@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Drawer } from '@/components/ui/drawer';
 import type { SchoolStudent, UpdateSchoolStudentRequest } from '../types';
 import { EditStudentForm } from './edit-student-form';
@@ -13,8 +14,15 @@ interface EditStudentDrawerProps {
 // Drawer unmounts its children when closed, so the form re-seeds from the
 // latest `student` on every open.
 export function EditStudentDrawer({ open, student, onClose, onSubmit }: EditStudentDrawerProps) {
+  const { t } = useTranslation('educator');
   return (
-    <Drawer open={open} onClose={onClose} title="Edit student" size="lg" data-testid="edit-student-drawer">
+    <Drawer
+      open={open}
+      onClose={onClose}
+      title={t('editStudentForm.drawerTitle')}
+      size="lg"
+      data-testid="edit-student-drawer"
+    >
       <EditStudentForm student={student} onSubmit={onSubmit} onCancel={onClose} />
     </Drawer>
   );

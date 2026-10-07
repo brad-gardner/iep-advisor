@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 
@@ -5,10 +6,11 @@ import { Notice } from '@/components/ui/notice';
 // deactivated. Their JWT is also invalidated server-side on the next request;
 // this is the in-app state while the current page is still mounted.
 export function DeactivatedAccessNotice() {
+  const { t } = useTranslation('educator');
   return (
     <Card className="max-w-lg" data-testid="educator-deactivated-notice">
-      <Notice variant="warning" title="Your access has been deactivated">
-        Contact your administrator if you believe this is a mistake.
+      <Notice variant="warning" title={t('deactivatedNotice.title')}>
+        {t('deactivatedNotice.body')}
       </Notice>
     </Card>
   );

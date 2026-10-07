@@ -2,6 +2,12 @@ import '@testing-library/jest-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+// `document-authoring` is a staff-only namespace (plan phase 5) — see
+// `../staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
+// admin namespaces". This component renders directly here (not through the
+// lazy route), so its English must be registered the same way the real
+// route chunk does.
+import '../staff-locales';
 import { TeamMemberSelect } from './team-member-select';
 import type { StudentTeamCache } from '../hooks/use-student-team';
 

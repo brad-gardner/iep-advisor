@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { UserRoundCheck } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import type { StudentShareableEntries } from '../../hooks/use-student-shareable-entries';
@@ -21,6 +22,7 @@ export function PullFromStudentButton({
   onPick,
   testIdPrefix,
 }: PullFromStudentButtonProps) {
+  const { t } = useTranslation('document-authoring');
   const { show } = useToast();
   const { entries, isLoading, isError, ensureLoaded } = source;
   const [open, setOpen] = useState(false);
@@ -57,7 +59,7 @@ export function PullFromStudentButton({
   const handlePick = (content: string) => {
     onPick(content);
     setOpen(false);
-    show({ message: 'Pulled from student', variant: 'success' });
+    show({ message: t('pullFromStudent.pulledToast'), variant: 'success' });
   };
 
   return (
@@ -72,7 +74,7 @@ export function PullFromStudentButton({
         data-testid={`${testIdPrefix}-button`}
       >
         <UserRoundCheck className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
-        Pull from student
+        {t('pullFromStudent.button')}
       </button>
       {open && (
         <StudentEntryPicker

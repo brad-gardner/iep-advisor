@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import type { AssistCitation } from '../../api/assist-types';
 
@@ -25,6 +26,7 @@ export function AssistSuggestionPanel({
   onDismiss,
   testIdPrefix,
 }: AssistSuggestionPanelProps) {
+  const { t } = useTranslation('document-authoring');
   return (
     <div
       className="mt-2 rounded-card border border-brand-teal-100 bg-brand-teal-50 p-3"
@@ -35,7 +37,7 @@ export function AssistSuggestionPanel({
           className="mb-2 rounded-input border border-brand-amber-200 bg-brand-amber-50 px-2 py-1 text-[12px] text-brand-amber-700"
           data-testid={`${testIdPrefix}-missing-baseline`}
         >
-          No baseline on record for this goal — add a current measurement or ask the provider before relying on a number.
+          {t('assistSuggestionPanel.missingBaseline')}
         </p>
       )}
       <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-brand-slate-700">{suggestion}</p>
@@ -46,7 +48,7 @@ export function AssistSuggestionPanel({
       )}
       <div className="mt-2 text-[12px] text-brand-slate-500" data-testid={`${testIdPrefix}-citations`}>
         {citations.length === 0 ? (
-          <span>Not grounded in evidence on record.</span>
+          <span>{t('assistSuggestionPanel.notGrounded')}</span>
         ) : (
           <ul className="space-y-1">
             {citations.map((c) => (
@@ -64,11 +66,11 @@ export function AssistSuggestionPanel({
       <div className="mt-3 flex items-center justify-end gap-2">
         {onAccept && (
           <Button variant="primary" className="px-3 py-1.5" onClick={onAccept} data-testid={`${testIdPrefix}-accept`}>
-            Accept
+            {t('assistSuggestionPanel.accept')}
           </Button>
         )}
         <Button variant="ghost" className="px-3 py-1.5" onClick={onDismiss} data-testid={`${testIdPrefix}-dismiss`}>
-          Dismiss
+          {t('assistSuggestionPanel.dismiss')}
         </Button>
       </div>
     </div>

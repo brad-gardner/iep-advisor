@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
-import { EXIT_REASONS, EXIT_REASON_LABELS } from '../../types';
+import { exitReasonLabel } from '../../lib/student-enum-labels';
+import { EXIT_REASONS } from '../../types';
 import type { ExitReason, ExitStudentRequest } from '../../types';
 
 interface ExitStudentModalProps {
@@ -16,14 +18,22 @@ interface ExitStudentModalProps {
 // Exit needs a reason (and optional date), so it is a small form in a Modal
 // rather than a bare ConfirmDialog. Children remount per open → fresh state.
 export function ExitStudentModal({ open, studentName, onClose, onSubmit }: ExitStudentModalProps) {
+  const { t } = useTranslation('educator');
   return (
-    <Modal open={open} onClose={onClose} title="Exit student" size="sm" data-testid="exit-student-modal">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t('exitStudent.modalTitle')}
+      size="sm"
+      data-testid="exit-student-modal"
+    >
       <ExitStudentForm studentName={studentName} onClose={onClose} onSubmit={onSubmit} />
     </Modal>
   );
 }
 
 function ExitStudentForm({ studentName, onClose, onSubmit }: Omit<ExitStudentModalProps, 'open'>) {
+  const { t } = useTranslation(['educator', 'common']);
   const [exitReason, setExitReason] = useState<ExitReason>('Graduated');
   const [exitedAt, setExitedAt] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,15 +44,14 @@ function ExitStudentForm({ studentName, onClose, onSubmit }: Omit<ExitStudentMod
     setError(null);
     setIsSubmitting(true);
     const result = await onSubmit({ exitReason, exitedAt: exitedAt || undefined });
-    if (!result.success) setError(result.error ?? 'Could not exit the student');
+    if (!result.success) setError(result.error ?? t('educator:exitStudent.errorDefault'));
     setIsSubmitting(false);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" data-testid="exit-student-form">
       <p className="text-sm text-brand-slate-600">
-        {studentName} will be marked as exited and hidden from the active roster. Documents,
-        family links and the IEP team are kept, and the student can be reactivated later.
+        {t('educator:exitStudent.description', { name: studentName })}
       </p>
       {error && (
         <div role="alert">
@@ -52,21 +61,21 @@ function ExitStudentForm({ studentName, onClose, onSubmit }: Omit<ExitStudentMod
 
       <Select
         id="exit-student-reason"
-        label="Reason *"
+        label={t('educator:exitStudent.reasonLabel')}
         value={exitReason}
         onChange={(e) => setExitReason(e.target.value as ExitReason)}
         data-testid="exit-student-reason"
       >
         {EXIT_REASONS.map((reason) => (
           <option key={reason} value={reason}>
-            {EXIT_REASON_LABELS[reason]}
+            {exitReasonLabel(reason)}
           </option>
         ))}
       </Select>
 
       <Input
         id="exit-student-date"
-        label="Exit date"
+        label={t('educator:exitStudent.dateLabel')}
         type="date"
         value={exitedAt}
         onChange={(e) => setExitedAt(e.target.value)}
@@ -75,10 +84,10 @@ function ExitStudentForm({ studentName, onClose, onSubmit }: Omit<ExitStudentMod
 
       <div className="flex items-center justify-end gap-2">
         <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
-          Cancel
+          {t('common:ui.cancel')}
         </Button>
         <Button type="submit" variant="danger" loading={isSubmitting} data-testid="exit-student-submit">
-          Exit student
+          {t('educator:exitStudent.submit')}
         </Button>
       </div>
     </form>

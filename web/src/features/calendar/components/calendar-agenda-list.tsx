@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { CalendarClock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -16,16 +17,21 @@ interface CalendarAgendaListProps {
 }
 
 /** Chronological list of the visible range's meetings and obligations —
- * meetings open the meeting drawer, obligations link to the student. */
+ * meetings open the meeting drawer, obligations link to the student.
+ * `MEETING_TYPE_LABELS`/`OBLIGATION_KIND_LABELS` are `features/meetings`'/
+ * `features/obligations`' own English label maps — out of this phase's
+ * scope, so they stay untranslated here until those features' own phase
+ * converts them (`docs/i18n/README.md`'s "mixed-language page" precedent). */
 export function CalendarAgendaList({ items, onSelectMeeting }: CalendarAgendaListProps) {
+  const { t } = useTranslation('calendar');
   const sorted = [...items].sort((a, b) => a.date.localeCompare(b.date));
 
   if (sorted.length === 0) {
     return (
       <EmptyState
         icon={CalendarClock}
-        title="Nothing on the calendar"
-        description="Meetings and upcoming deadlines in this range will show up here."
+        title={t('agenda.emptyTitle')}
+        description={t('agenda.emptyDescription')}
         data-testid="calendar-agenda-empty"
       />
     );
@@ -52,7 +58,7 @@ export function CalendarAgendaList({ items, onSelectMeeting }: CalendarAgendaLis
                     {meeting.studentName} · {formatMeetingWhen(meeting.startsAtUtc, meeting.durationMinutes)}
                   </p>
                 </div>
-                <Badge variant="neutral">Meeting</Badge>
+                <Badge variant="neutral">{t('agenda.meetingBadge')}</Badge>
               </button>
             </li>
           );
@@ -71,7 +77,9 @@ export function CalendarAgendaList({ items, onSelectMeeting }: CalendarAgendaLis
                   <p className="truncate text-sm font-medium text-brand-slate-800">
                     {OBLIGATION_KIND_LABELS[obligation.kind]} — {obligation.studentName}
                   </p>
-                  <p className="text-xs text-brand-slate-500">Due {formatDate(obligation.dueDate)}</p>
+                  <p className="text-xs text-brand-slate-500">
+                    {t('agenda.due', { date: formatDate(obligation.dueDate) })}
+                  </p>
                 </div>
                 <ObligationStatusChip status={obligation.status} />
               </Link>

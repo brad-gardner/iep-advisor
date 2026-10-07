@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Modal } from '@/components/ui/modal';
@@ -14,6 +15,7 @@ import { StudentLinksList } from './student-links-list';
 // the invite entry point and the revoke confirmation. Self-contained so the
 // page stays a thin composition.
 export function FamilyLinksSection({ studentId }: { studentId: number }) {
+  const { t } = useTranslation('educator');
   const { show: showToast } = useToast();
   const [links, setLinks] = useState<ChildLink[]>([]);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -52,12 +54,12 @@ export function FamilyLinksSection({ studentId }: { studentId: number }) {
       if (response.success) {
         await reloadLinks();
         setIsInviteOpen(false);
-        showToast({ message: 'Parent invited', variant: 'success' });
+        showToast({ message: t('familyLinks.inviteSuccess'), variant: 'success' });
         return { success: true, message: response.message };
       }
       return { success: false, message: response.message };
     } catch (err) {
-      return { success: false, message: apiErrorMessage(err, 'An error occurred sending the invitation') };
+      return { success: false, message: apiErrorMessage(err, t('familyLinks.inviteError')) };
     }
   };
 
@@ -70,17 +72,15 @@ export function FamilyLinksSection({ studentId }: { studentId: number }) {
       const response = await revokeStudentLink(studentId, revokeTarget.id);
       if (response.success) {
         // Surface the forward-only note from the server (revoke is not retroactive).
-        setRevokeNote(
-          response.message || 'Link revoked. This does not remove access already granted.'
-        );
+        setRevokeNote(response.message || t('familyLinks.linkRevokedDefault'));
         await reloadLinks();
         setRevokeTarget(null);
       } else {
-        setRevokeError(response.message || 'Could not revoke this link');
+        setRevokeError(response.message || t('familyLinks.revokeError'));
       }
     } catch (err) {
       // Stays in the dialog so the user can retry or cancel.
-      setRevokeError(apiErrorMessage(err, 'Could not revoke this link'));
+      setRevokeError(apiErrorMessage(err, t('familyLinks.revokeError')));
     } finally {
       setRevokingId(null);
     }
@@ -89,18 +89,18 @@ export function FamilyLinksSection({ studentId }: { studentId: number }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-medium text-brand-slate-800">Family</h3>
+        <h3 className="text-sm font-medium text-brand-slate-800">{t('familyLinks.heading')}</h3>
         <Button
           variant="secondary"
           size="sm"
           onClick={() => setIsInviteOpen(true)}
           data-testid="invite-parent-open"
         >
-          Invite parent
+          {t('familyLinks.invite')}
         </Button>
       </div>
       {revokeNote && (
-        <Notice variant="info" title="Link revoked">
+        <Notice variant="info" title={t('familyLinks.linkRevokedTitle')}>
           {revokeNote}
         </Notice>
       )}
@@ -109,7 +109,7 @@ export function FamilyLinksSection({ studentId }: { studentId: number }) {
       <Modal
         open={isInviteOpen}
         onClose={() => setIsInviteOpen(false)}
-        title="Invite a parent"
+        title={t('familyLinks.inviteModalTitle')}
         data-testid="invite-parent-modal"
       >
         <InviteParentForm embedded onInvite={handleInvite} />
@@ -117,9 +117,9 @@ export function FamilyLinksSection({ studentId }: { studentId: number }) {
 
       <ConfirmDialog
         open={revokeTarget !== null}
-        title="Revoke parent link"
-        message="This cannot be undone. The parent keeps any data already shared with them."
-        confirmLabel="Revoke link"
+        title={t('familyLinks.revokeDialogTitle')}
+        message={t('familyLinks.revokeDialogMessage')}
+        confirmLabel={t('familyLinks.revokeConfirmLabel')}
         loading={revokingId !== null}
         error={revokeError}
         onConfirm={confirmRevoke}

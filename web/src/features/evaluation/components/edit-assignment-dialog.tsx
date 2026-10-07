@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
@@ -20,6 +21,7 @@ const NOTES_MAX_LENGTH = 2000;
 
 /** Edit an evaluator assignment's due date and notes. */
 export function EditAssignmentDialog({ studentId, assignment, onClose, onChanged }: EditAssignmentDialogProps) {
+  const { t } = useTranslation(['evaluation', 'common']);
   const [dueDate, setDueDate] = useState(() => toDateInputValue(assignment.dueDate));
   const [notes, setNotes] = useState(assignment.notes ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,10 +41,10 @@ export function EditAssignmentDialog({ studentId, assignment, onClose, onChanged
         onChanged(res.data);
         onClose();
       } else {
-        setError(res.message ?? 'Could not update the assignment.');
+        setError(res.message ?? t('editAssignmentDialog.saveFailed'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not update the assignment.'));
+      setError(apiErrorMessage(err, t('editAssignmentDialog.saveFailed')));
     } finally {
       setIsSubmitting(false);
     }
@@ -53,13 +55,13 @@ export function EditAssignmentDialog({ studentId, assignment, onClose, onChanged
       open
       onClose={onClose}
       preventClose={isSubmitting}
-      title={`Edit assignment — ${assignment.domain}`}
+      title={t('editAssignmentDialog.title', { domain: assignment.domain })}
       size="sm"
       data-testid="edit-assignment-dialog"
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
-            Cancel
+            {t('common:ui.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -67,7 +69,7 @@ export function EditAssignmentDialog({ studentId, assignment, onClose, onChanged
             disabled={isMarkdownOverLimit(notes, NOTES_MAX_LENGTH)}
             data-testid="edit-assignment-submit"
           >
-            Save
+            {t('editAssignmentDialog.saveButton')}
           </Button>
         </>
       }
@@ -79,14 +81,14 @@ export function EditAssignmentDialog({ studentId, assignment, onClose, onChanged
           </div>
         )}
         <Input
-          label="Due date"
+          label={t('editAssignmentDialog.dueDateLabel')}
           type="date"
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
           data-testid="edit-assignment-due-date"
         />
         <RichTextEditor
-          label="Notes"
+          label={t('editAssignmentDialog.notesLabel')}
           value={notes}
           onChange={setNotes}
           minRows={3}

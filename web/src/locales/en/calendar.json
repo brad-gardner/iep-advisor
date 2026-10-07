@@ -1,0 +1,46 @@
+{
+  "page": {
+    "title": "Calendar",
+    "scheduleMeeting": "Schedule meeting",
+    "couldNotLoad": "Could not load the calendar",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "today": "Today",
+    "selectedDay": "Selected day",
+    "thisMonth": "This month"
+  },
+  "agenda": {
+    "emptyTitle": "Nothing on the calendar",
+    "emptyDescription": "Meetings and upcoming deadlines in this range will show up here.",
+    "meetingBadge": "Meeting",
+    "due": "Due {{date}}"
+  },
+  "monthGrid": {
+    "ariaLabel": "Calendar month",
+    "today": "today",
+    "itemCount_one": "{{count}} item",
+    "itemCount_other": "{{count}} items"
+  },
+  "studentPicker": {
+    "title": "Schedule meeting",
+    "findStudentLabel": "Find a student",
+    "placeholder": "Name or student ID",
+    "searching": "Searching…",
+    "noResults": "No students found."
+  },
+  "subscriptionCard": {
+    "title": "Calendar subscription",
+    "description": "Subscribe from Google Calendar, Outlook, or Apple Calendar to see your meetings and deadlines.",
+    "loadFailed": "Could not load your calendar link",
+    "copySuccess": "Calendar link copied",
+    "copyFailed": "Could not copy the link",
+    "regenerateSuccess": "Calendar link regenerated",
+    "regenerateFailed": "Could not regenerate the link",
+    "feedUrlLabel": "Feed URL",
+    "copy": "Copy",
+    "regenerate": "Regenerate",
+    "regenerateDialogTitle": "Regenerate calendar link",
+    "regenerateDialogMessage": "Anyone using the old link will stop receiving updates. This cannot be undone.",
+    "regenerateConfirmLabel": "Regenerate link"
+  }
+}

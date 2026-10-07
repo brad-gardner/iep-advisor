@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BookOpenCheck, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ import { CompletenessStrip } from './completeness-strip';
 import { ProposedEditsPanel } from './proposed-edits-panel';
 import { SectionCard } from './section-card';
 import { SectionNavigator } from './section-navigator';
+import { documentStatusLabel } from '../lib/document-status-label';
 
 const IDLE_FLUSH_MS = 5000;
 
@@ -57,6 +59,7 @@ interface DocumentEditorProps {
  * `reloadKey`) so stale local values can't overwrite fresher server state.
  */
 export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
+  const { t } = useTranslation('document-authoring');
   const { saveStatus, conflict, reloadKey, readOnly, saveValues, reload, getSaveState } = instance;
   const sections = useMemo(
     () => [...detail.templateVersion.sections].sort((a, b) => a.displayOrder - b.displayOrder),
@@ -198,7 +201,7 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <h1 className="font-serif text-2xl text-brand-slate-800">{detail.documentTypeDisplayName}</h1>
-              <Badge variant={statusVariant[detail.status]}>{detail.status}</Badge>
+              <Badge variant={statusVariant[detail.status]}>{documentStatusLabel(detail.status)}</Badge>
             </div>
             <div className="flex items-center gap-3">
               <AutosaveIndicator status={saveStatus} />
@@ -214,7 +217,7 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
                 data-testid="document-evidence-open"
               >
                 <BookOpenCheck className="mr-1 h-4 w-4" aria-hidden="true" />
-                Evidence
+                {t('editor.evidence')}
               </Button>
               <Button
                 variant="secondary"
@@ -224,7 +227,7 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
                 data-testid="document-chat-open"
               >
                 <MessageSquare className="mr-1 h-4 w-4" aria-hidden="true" />
-                {chatOpen ? 'Hide assistant' : 'Ask the assistant'}
+                {chatOpen ? t('editor.hideAssistant') : t('editor.askAssistant')}
               </Button>
             </div>
           </div>
@@ -232,9 +235,14 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
           <SharedBanner key={shareVersion} instanceId={detail.id} />
 
           {detail.amendsVersionId != null && (
-            <Notice variant="info" title={`Amendment of v${detail.amendsVersionNumber ?? detail.amendsVersionId}`}>
+            <Notice
+              variant="info"
+              title={t('editor.amendmentOf', { number: detail.amendsVersionNumber ?? detail.amendsVersionId })}
+            >
               <Markdown content={detail.amendmentReason ?? ''} />
-              {detail.effectiveDate && <p className="mt-1">Effective {formatDate(detail.effectiveDate)}</p>}
+              {detail.effectiveDate && (
+                <p className="mt-1">{t('editor.effective', { date: formatDate(detail.effectiveDate) })}</p>
+              )}
             </Notice>
           )}
 
@@ -244,14 +252,11 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
 
           {conflict && (
             <div role="alert">
-              <Notice variant="warning" title="This document changed elsewhere">
+              <Notice variant="warning" title={t('editor.changedElsewhereTitle')}>
                 <div className="space-y-2">
-                  <p>
-                    Your last edit could not be saved because a newer version exists. Reload to get the
-                    latest values before continuing — unsaved local changes will be discarded.
-                  </p>
+                  <p>{t('editor.changedElsewhereBody')}</p>
                   <Button variant="secondary" size="sm" onClick={reload} data-testid="document-reload">
-                    Reload document
+                    {t('editor.reloadDocument')}
                   </Button>
                 </div>
               </Notice>
@@ -259,8 +264,8 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
           )}
 
           {readOnly && !conflict && (
-            <Notice variant="info" title="This document is read-only">
-              It is currently {detail.status.toLowerCase()} and cannot be edited.
+            <Notice variant="info" title={t('editor.readOnlyTitle')}>
+              {t('editor.readOnlyBody', { status: documentStatusLabel(detail.status).toLowerCase() })}
             </Notice>
           )}
 
@@ -269,8 +274,8 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
 
             <div className="min-w-0 space-y-6">
               {sections.length === 0 ? (
-                <Notice variant="info" title="This template has no sections">
-                  There is nothing to fill in yet.
+                <Notice variant="info" title={t('editor.noSectionsTitle')}>
+                  {t('editor.noSectionsBody')}
                 </Notice>
               ) : (
                 sections.map((section) => (
@@ -290,10 +295,8 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
               )}
 
               <Card>
-                <h2 className="mb-2 font-serif text-lg text-brand-slate-800">Finalize</h2>
-                <p className="mb-4 text-sm text-brand-slate-600">
-                  Snapshot this draft into an immutable version and generate its PDF.
-                </p>
+                <h2 className="mb-2 font-serif text-lg text-brand-slate-800">{t('editor.finalizeHeading')}</h2>
+                <p className="mb-4 text-sm text-brand-slate-600">{t('editor.finalizeBody')}</p>
                 <FinalizeDocumentSection
                   instanceId={detail.id}
                   studentId={detail.schoolStudentId}
@@ -315,7 +318,7 @@ export function DocumentEditor({ detail, instance }: DocumentEditorProps) {
           activeField={readOnly || conflict ? null : activeField}
         />
 
-        <Drawer open={chatOpen} onClose={() => setChatOpen(false)} title="Assistant">
+        <Drawer open={chatOpen} onClose={() => setChatOpen(false)} title={t('editor.assistantDrawerTitle')}>
           <div className="h-[70vh]">
             <ChatPanel chat={chat} />
           </div>

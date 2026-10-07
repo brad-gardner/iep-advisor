@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 
@@ -26,20 +27,19 @@ export function FinalizeDocumentDialog({
   onConfirm,
   onCancel,
 }: FinalizeDocumentDialogProps) {
-  const versionLabel = nextVersionNumber ? `v${nextVersionNumber}` : 'a new version';
+  const { t } = useTranslation('document-authoring');
+  const versionLabel = nextVersionNumber ? `v${nextVersionNumber}` : t('finalizeDialog.nextVersionFallback');
   const hasValidationErrors = validationErrors.length > 0;
 
   return (
     <div>
       <p className="mb-3 text-sm text-brand-slate-600">
-        This creates an immutable {versionLabel} of this {documentTypeDisplayName} and
-        generates its PDF. The draft stays editable — finalizing again creates the next
-        version.
+        {t('finalizeDialog.body', { version: versionLabel, documentType: documentTypeDisplayName })}
       </p>
 
       {hasValidationErrors && (
         <div className="mb-3" role="alert">
-          <Notice variant="error" title="Fix these before finalizing:">
+          <Notice variant="error" title={t('finalizeDialog.fixBeforeFinalizing')}>
             <ul className="ml-4 list-disc space-y-1" data-testid="finalize-validation-errors">
               {validationErrors.map((msg, i) => (
                 <li key={`${i}-${msg}`}>{msg}</li>
@@ -57,7 +57,7 @@ export function FinalizeDocumentDialog({
 
       <div className="flex justify-end gap-2 pt-1">
         <Button variant="ghost" type="button" onClick={onCancel} disabled={isSubmitting}>
-          Cancel
+          {t('finalizeDialog.cancel')}
         </Button>
         <Button
           type="button"
@@ -65,7 +65,7 @@ export function FinalizeDocumentDialog({
           onClick={onConfirm}
           data-testid="finalize-confirm"
         >
-          Finalize
+          {t('finalizeDialog.confirm')}
         </Button>
       </div>
     </div>

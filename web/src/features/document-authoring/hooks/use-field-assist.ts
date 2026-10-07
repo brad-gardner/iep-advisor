@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import i18n from '@/lib/i18n';
 import type { ApiResponse } from '@/types/api';
 import type { AssistCitation, AssistKind, AssistResponse } from '../api/assist-types';
 import { friendlyAssistError } from '../lib/assist-errors';
@@ -49,7 +50,7 @@ export function useFieldAssist(
             setMissingBaseline(res.data.missingBaseline === true);
             setStatus('suggested');
           } else {
-            setErrorMessage(res.message || 'AI help is unavailable right now.');
+            setErrorMessage(res.message || i18n.t('document-authoring:assistErrors.unavailableNow'));
             setStatus('error');
           }
         })

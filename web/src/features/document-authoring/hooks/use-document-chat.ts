@@ -3,11 +3,15 @@ import { chat } from '../api/document-assist-api';
 import type { ChatMessage } from '../api/assist-types';
 import { friendlyAssistError } from '../lib/assist-errors';
 
+/** A server-provided (or already-translated `friendlyAssistError`) message is
+ *  resolved text; the generic case is translated at render time by the caller. */
+export type UseDocumentChatError = { kind: 'server'; message: string } | { kind: 'generic' };
+
 export interface UseDocumentChatResult {
   messages: ChatMessage[];
   isSending: boolean;
   // A transient error line shown beneath the thread (not added to messages).
-  error: string | null;
+  error: UseDocumentChatError | null;
   send: (text: string) => void;
 }
 
@@ -17,7 +21,7 @@ export interface UseDocumentChatResult {
 export function useDocumentChat(instanceId: number): UseDocumentChatResult {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UseDocumentChatError | null>(null);
 
   // The ref is written synchronously with every change (never via an effect),
   // so a send issued right after a reply lands always sees the full thread.
@@ -46,12 +50,13 @@ export function useDocumentChat(instanceId: number): UseDocumentChatResult {
             const { reply } = res.data;
             commitMessages([...messagesRef.current, { role: 'assistant', content: reply }]);
           } else {
-            setError(res.message || 'The assistant could not respond. Please try again.');
+            setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
           }
         })
         .catch((err: unknown) => {
           // On error we append nothing — the user's message stays so they can retry.
-          setError(friendlyAssistError(err));
+          // `friendlyAssistError` already returns resolved (translated) text.
+          setError({ kind: 'server', message: friendlyAssistError(err) });
         })
         .finally(() => {
           sendingRef.current = false;

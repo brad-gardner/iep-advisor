@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,9 +10,9 @@ import { Notice } from '@/components/ui/notice';
 import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
+import { contributionKindLabel } from '@/lib/contribution-label';
 import {
   CONTRIBUTION_KINDS,
-  CONTRIBUTION_KIND_LABELS,
   createContribution,
   deleteContribution,
   listContributions,
@@ -29,6 +30,12 @@ interface AboutMyChildCardProps {
 
 const NOTE_TEXT_MAX_LENGTH = 2000;
 
+// A server-provided message is already resolved text and is shown as-is;
+// the generic fallback is translated at RENDER time (below), not stored
+// pre-translated here, so the mount effect never needs `t` in its
+// dependency array (same idiom as `useHome`/`MeetingRsvpPage`'s `LoadError`).
+type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
+
 /**
  * The family's "about my child at home" notes. Each note is private until the
  * parent flips "Visible to the school team" — and the label sits on the note
@@ -36,10 +43,11 @@ const NOTE_TEXT_MAX_LENGTH = 2000;
  * see. Shared notes reach the case manager's evidence and AI context.
  */
 export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCardProps) {
+  const { t } = useTranslation(['contributions', 'common']);
   const { show } = useToast();
   const [items, setItems] = useState<ParentContributionDto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [adding, setAdding] = useState(false);
   const [kind, setKind] = useState<ParentContributionKind>('Strength');
   const [text, setText] = useState('');
@@ -57,10 +65,10 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
       .then((res) => {
         if (!active) return;
         if (res.success && res.data) setItems(res.data);
-        else setError(res.message ?? 'Could not load notes.');
+        else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
       })
       .catch(() => {
-        if (active) setError('Could not load notes.');
+        if (active) setError({ kind: 'generic' });
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -68,7 +76,11 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
     return () => {
       active = false;
     };
+    // `t` deliberately excluded (see `use-home.ts`): re-running this fetch on
+    // a plain language switch would be wasteful.
   }, [childId]);
+
+  const displayError = error ? (error.kind === 'server' ? error.message : t('card.loadErrorTitle')) : null;
 
   const submit = async () => {
     if (!text.trim() || isMarkdownOverLimit(text, NOTE_TEXT_MAX_LENGTH)) return;
@@ -80,12 +92,15 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
         setText('');
         setShared(false);
         setAdding(false);
-        show({ message: shared ? 'Saved and shared with the school team' : 'Saved (private)', variant: 'success' });
+        show({
+          message: shared ? t('addForm.savedSharedToast') : t('addForm.savedPrivateToast'),
+          variant: 'success',
+        });
       } else {
-        show({ message: res.message ?? 'Could not save', variant: 'error' });
+        show({ message: res.message ?? t('addForm.saveFailedToast'), variant: 'error' });
       }
     } catch {
-      show({ message: 'Could not save', variant: 'error' });
+      show({ message: t('addForm.saveFailedToast'), variant: 'error' });
     } finally {
       setSaving(false);
     }
@@ -98,12 +113,15 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
       const res = await updateContribution(item.id, { kind: item.kind, text: item.text, isShared: !item.isShared });
       if (res.success && res.data) {
         setItems((cur) => cur.map((c) => (c.id === item.id ? res.data! : c)));
-        show({ message: res.data.isShared ? 'Now visible to the school team' : 'Now private', variant: 'success' });
+        show({
+          message: res.data.isShared ? t('item.nowVisibleToast') : t('item.nowPrivateToast'),
+          variant: 'success',
+        });
       } else {
-        show({ message: res.message ?? 'Could not update', variant: 'error' });
+        show({ message: res.message ?? t('item.updateFailedToast'), variant: 'error' });
       }
     } catch {
-      show({ message: 'Could not update', variant: 'error' });
+      show({ message: t('item.updateFailedToast'), variant: 'error' });
     } finally {
       setTogglingId(null);
     }
@@ -121,10 +139,10 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
         setItems((cur) => cur.filter((c) => c.id !== confirmDelete.id));
         setConfirmDelete(null);
       } else {
-        setDeleteError(res.message ?? 'Could not delete this note.');
+        setDeleteError(res.message ?? t('deleteDialog.deleteFailed'));
       }
     } catch {
-      setDeleteError('Could not delete this note.');
+      setDeleteError(t('deleteDialog.deleteFailed'));
     } finally {
       setDeleting(false);
     }
@@ -135,43 +153,40 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
   return (
     <Card data-testid="about-my-child-card">
       <div className="mb-1 flex items-center justify-between gap-3">
-        <h2 className="font-serif">About {childName} at home</h2>
+        <h2 className="font-serif">{t('card.heading', { name: childName })}</h2>
         {canEdit && !adding && (
           <Button variant="secondary" size="sm" onClick={() => setAdding(true)} data-testid="contribution-add">
             <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-            Add a note
+            {t('card.addNoteButton')}
           </Button>
         )}
       </div>
-      <p className="mb-4 text-sm text-brand-slate-500">
-        Strengths, concerns, what works. Notes are private unless you choose to share one with the school team —
-        shared notes help the team (and its AI suggestions) see your child the way you do.
-      </p>
+      <p className="mb-4 text-sm text-brand-slate-500">{t('card.description')}</p>
 
       {loading && (
-        <div className="space-y-2" role="status" aria-label="Loading notes">
+        <div className="space-y-2" role="status" aria-label={t('card.loadingAriaLabel')}>
           <Skeleton className="h-5 w-3/4" />
-          <span className="sr-only">Loading…</span>
+          <span className="sr-only">{t('common:ui.loading')}</span>
         </div>
       )}
-      {error && (
-        <Notice variant="error" title="Could not load notes">
-          {error}
+      {displayError && (
+        <Notice variant="error" title={t('card.loadErrorTitle')}>
+          {displayError}
         </Notice>
       )}
 
       {adding && (
         <div className="mb-4 space-y-3 rounded-card border border-brand-slate-200 bg-brand-slate-50 p-4" data-testid="contribution-form">
-          <Select label="This is" id="contribution-kind" value={kind} onChange={(e) => setKind(e.target.value as ParentContributionKind)}>
+          <Select label={t('addForm.kindLabel')} id="contribution-kind" value={kind} onChange={(e) => setKind(e.target.value as ParentContributionKind)}>
             {CONTRIBUTION_KINDS.map((k) => (
               <option key={k} value={k}>
-                {CONTRIBUTION_KIND_LABELS[k]}
+                {contributionKindLabel(k)}
               </option>
             ))}
           </Select>
           <RichTextEditor
             id="contribution-text"
-            label="Note"
+            label={t('addForm.noteLabel')}
             minRows={3}
             value={text}
             onChange={setText}
@@ -185,11 +200,11 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
               className="h-4 w-4 rounded border-brand-slate-300 text-brand-teal-500 focus:ring-brand-teal-500"
               data-testid="contribution-share"
             />
-            Visible to the school team
+            {t('addForm.sharedLabel')}
           </label>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>
-              Cancel
+              {t('common:ui.cancel')}
             </Button>
             <Button
               size="sm"
@@ -198,15 +213,15 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
               onClick={() => void submit()}
               data-testid="contribution-save"
             >
-              Save
+              {t('addForm.saveButton')}
             </Button>
           </div>
         </div>
       )}
 
-      {!loading && !error && items.length === 0 && !adding && (
+      {!loading && !displayError && items.length === 0 && !adding && (
         <p className="text-sm text-brand-slate-500" data-testid="contributions-empty">
-          No notes yet.
+          {t('card.noNotesYet')}
         </p>
       )}
 
@@ -215,7 +230,7 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
           <li key={item.id} className="flex items-start justify-between gap-3 py-3" data-testid={`contribution-${item.id}`}>
             <div className="min-w-0">
               <div className="mb-0.5 flex flex-wrap items-center gap-2 text-[11px]">
-                <span className="font-medium uppercase tracking-wide text-brand-teal-600">{CONTRIBUTION_KIND_LABELS[item.kind]}</span>
+                <span className="font-medium uppercase tracking-wide text-brand-teal-600">{contributionKindLabel(item.kind)}</span>
                 <span
                   className={
                     item.isShared
@@ -225,7 +240,7 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
                   data-testid={`contribution-${item.id}-visibility`}
                 >
                   {item.isShared ? <Eye className="h-3 w-3" aria-hidden="true" /> : <EyeOff className="h-3 w-3" aria-hidden="true" />}
-                  {item.isShared ? 'Visible to the school team' : 'Private to your family'}
+                  {item.isShared ? t('item.visibleBadge') : t('item.privateBadge')}
                 </span>
               </div>
               <Markdown content={item.text} data-testid={`contribution-${item.id}-text`} />
@@ -237,16 +252,19 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
                   size="sm"
                   loading={togglingId === item.id}
                   disabled={togglingId !== null && togglingId !== item.id}
-                  aria-label={`${item.isShared ? 'Make private' : 'Share'}: ${excerpt(item.text)}`}
+                  aria-label={t('item.toggleAriaLabel', {
+                    action: item.isShared ? t('item.makePrivateAction') : t('item.shareAction'),
+                    excerpt: excerpt(item.text),
+                  })}
                   onClick={() => void toggleShared(item)}
                   data-testid={`contribution-${item.id}-toggle`}
                 >
-                  {item.isShared ? 'Make private' : 'Share'}
+                  {item.isShared ? t('item.makePrivateAction') : t('item.shareAction')}
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  aria-label={`Delete note: ${excerpt(item.text)}`}
+                  aria-label={t('item.deleteAriaLabel', { excerpt: excerpt(item.text) })}
                   onClick={() => {
                     setDeleteError(null);
                     setConfirmDelete(item);
@@ -263,9 +281,9 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
 
       <ConfirmDialog
         open={confirmDelete !== null}
-        title="Delete note"
-        message="Delete this note? If it was shared, the school team will no longer see it."
-        confirmLabel="Delete"
+        title={t('deleteDialog.title')}
+        message={t('deleteDialog.message')}
+        confirmLabel={t('deleteDialog.confirmLabel')}
         loading={deleting}
         error={deleteError}
         onConfirm={() => void remove()}

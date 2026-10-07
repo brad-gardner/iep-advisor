@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
@@ -17,8 +18,15 @@ interface TransferStudentModalProps {
 
 // DistrictAdmin-only move between schools in the district.
 export function TransferStudentModal({ open, onClose, ...rest }: TransferStudentModalProps) {
+  const { t } = useTranslation('educator');
   return (
-    <Modal open={open} onClose={onClose} title="Transfer student" size="sm" data-testid="transfer-student-modal">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t('transferStudent.modalTitle')}
+      size="sm"
+      data-testid="transfer-student-modal"
+    >
       <TransferStudentForm onClose={onClose} {...rest} />
     </Modal>
   );
@@ -31,6 +39,7 @@ function TransferStudentForm({
   onClose,
   onSubmit,
 }: Omit<TransferStudentModalProps, 'open'>) {
+  const { t } = useTranslation(['educator', 'common']);
   const [schoolId, setSchoolId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,20 +49,19 @@ function TransferStudentForm({
     e.preventDefault();
     setError(null);
     if (!schoolId) {
-      setError('Select the school to transfer to');
+      setError(t('educator:transferStudent.selectSchoolRequired'));
       return;
     }
     setIsSubmitting(true);
     const result = await onSubmit({ newSchoolId: Number(schoolId) });
-    if (!result.success) setError(result.error ?? 'Could not transfer the student');
+    if (!result.success) setError(result.error ?? t('educator:transferStudent.errorDefault'));
     setIsSubmitting(false);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" data-testid="transfer-student-form">
       <p className="text-sm text-brand-slate-600">
-        {studentName}&apos;s documents, family links and team come along. Team members based at
-        another school (other than related service providers) are removed from the team.
+        {t('educator:transferStudent.description', { name: studentName })}
       </p>
       {error && (
         <div role="alert">
@@ -63,12 +71,12 @@ function TransferStudentForm({
 
       <Select
         id="transfer-student-school"
-        label="New school *"
+        label={t('educator:transferStudent.newSchoolLabel')}
         value={schoolId}
         onChange={(e) => setSchoolId(e.target.value)}
         data-testid="transfer-student-school"
       >
-        <option value="">Select a school</option>
+        <option value="">{t('educator:transferStudent.selectSchool')}</option>
         {targets.map((school) => (
           <option key={school.id} value={school.id}>
             {school.name}
@@ -78,10 +86,10 @@ function TransferStudentForm({
 
       <div className="flex items-center justify-end gap-2">
         <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
-          Cancel
+          {t('common:ui.cancel')}
         </Button>
         <Button type="submit" loading={isSubmitting} data-testid="transfer-student-submit">
-          Transfer
+          {t('educator:transferStudent.submit')}
         </Button>
       </div>
     </form>

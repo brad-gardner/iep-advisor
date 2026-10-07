@@ -27,9 +27,12 @@ import type EnAdvocacyGoals from '@/locales/en/advocacy-goals.json';
 import type EnAdvocate from '@/locales/en/advocate.json';
 import type EnAnalysis from '@/locales/en/analysis.json';
 import type EnAuth from '@/locales/en/auth.json';
+import type EnCalendar from '@/locales/en/calendar.json';
 import type EnChildLinks from '@/locales/en/child-links.json';
 import type EnChildren from '@/locales/en/children.json';
 import type EnCommon from '@/locales/en/common.json';
+import type EnContributions from '@/locales/en/contributions.json';
+import type EnDocumentAuthoringShared from '@/locales/en/document-authoring-shared.json';
 import type EnDraftSharing from '@/locales/en/draft-sharing.json';
 import type EnEtrDocuments from '@/locales/en/etr-documents.json';
 import type EnGoals from '@/locales/en/goals.json';
@@ -54,19 +57,31 @@ import type EnSubscription from '@/locales/en/subscription.json';
 // `registerEnglishNamespace` there and `features/educator/staff-locales.ts`.
 // The TYPE import below is exactly as cost-free as every import above
 // (erased by `tsc`); only the RUNTIME path differs for these namespaces.
+import type EnDocumentAuthoring from '@/locales/en/staff/document-authoring.json';
 import type EnEducator from '@/locales/en/staff/educator.json';
+import type EnEvaluation from '@/locales/en/staff/evaluation.json';
+import type EnFamilyContact from '@/locales/en/staff/family-contact.json';
+import type EnMeetingBrief from '@/locales/en/staff/meeting-brief.json';
+import type EnMeetingsStaff from '@/locales/en/staff/meetings-staff.json';
+import type EnObligations from '@/locales/en/staff/obligations.json';
 
 export interface EnResources {
   'advocacy-goals': typeof EnAdvocacyGoals;
   advocate: typeof EnAdvocate;
   analysis: typeof EnAnalysis;
   auth: typeof EnAuth;
+  calendar: typeof EnCalendar;
   'child-links': typeof EnChildLinks;
   children: typeof EnChildren;
   common: typeof EnCommon;
+  contributions: typeof EnContributions;
+  'document-authoring': typeof EnDocumentAuthoring;
+  'document-authoring-shared': typeof EnDocumentAuthoringShared;
   'draft-sharing': typeof EnDraftSharing;
   educator: typeof EnEducator;
   'etr-documents': typeof EnEtrDocuments;
+  evaluation: typeof EnEvaluation;
+  'family-contact': typeof EnFamilyContact;
   goals: typeof EnGoals;
   home: typeof EnHome;
   'iep-comparison': typeof EnIepComparison;
@@ -74,9 +89,12 @@ export interface EnResources {
   'iep-versions': typeof EnIepVersions;
   journal: typeof EnJournal;
   'knowledge-base': typeof EnKnowledgeBase;
+  'meeting-brief': typeof EnMeetingBrief;
   'meeting-prep': typeof EnMeetingPrep;
   meetings: typeof EnMeetings;
+  'meetings-staff': typeof EnMeetingsStaff;
   notifications: typeof EnNotifications;
+  obligations: typeof EnObligations;
   onboarding: typeof EnOnboarding;
   'progress-reports': typeof EnProgressReports;
   'shared-drafts': typeof EnSharedDrafts;

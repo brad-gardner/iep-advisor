@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { apiErrorMessage } from '@/lib/api-error';
 import { getEvaluationCase } from '../api/evaluation-api';
 import type { EvaluationCaseDto } from '../types';
+
+// A server-provided message is already resolved text and is shown as-is;
+// the generic fallback is translated at RENDER time (below), not stored
+// pre-translated here, so the mount effect never needs `t` in its
+// dependency array (same idiom as `useHome`/`MeetingRsvpPage`'s `LoadError`).
+type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 interface UseEvaluationCaseResult {
   evaluation: EvaluationCaseDto | null;
@@ -17,9 +24,10 @@ interface UseEvaluationCaseResult {
 /** A student's evaluation case (open, else most recent closed, else none)
  *  for the "Evaluation" card on the educator student page. */
 export function useEvaluationCase(studentId: number): UseEvaluationCaseResult {
+  const { t } = useTranslation('evaluation');
   const [evaluation, setEvaluation] = useState<EvaluationCaseDto | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
@@ -33,10 +41,12 @@ export function useEvaluationCase(studentId: number): UseEvaluationCaseResult {
           setEvaluation(res.data ?? null);
           setError(null);
         } else {
-          setError(res.message ?? 'Could not load the evaluation case.');
+          setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load the evaluation case.'));
+        if (!active) return;
+        const serverMessage = apiErrorMessage(err, '');
+        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
       } finally {
         if (active) setHasLoaded(true);
       }
@@ -44,6 +54,10 @@ export function useEvaluationCase(studentId: number): UseEvaluationCaseResult {
     return () => {
       active = false;
     };
+    // `t` deliberately excluded (see `use-home.ts`): re-running this fetch on
+    // a plain language switch would be wasteful. The generic fallback is
+    // translated below, at render, from `error`'s stored KIND rather than a
+    // snapshot string.
   }, [studentId, retryToken]);
 
   const applyUpdate = useCallback((updated: EvaluationCaseDto) => {
@@ -53,10 +67,10 @@ export function useEvaluationCase(studentId: number): UseEvaluationCaseResult {
   return {
     evaluation,
     isLoading: !hasLoaded && error === null,
-    error,
+    error: error ? (error.kind === 'server' ? error.message : t('card.loadFailed')) : null,
     retry: () => {
       setHasLoaded(false);
-      setRetryToken((t) => t + 1);
+      setRetryToken((n) => n + 1);
     },
     applyUpdate,
   };

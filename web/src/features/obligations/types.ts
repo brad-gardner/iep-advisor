@@ -34,12 +34,15 @@ export const OBLIGATION_KIND_ICONS: Partial<Record<ObligationKind, LucideIcon>> 
 
 export const OBLIGATION_STATUSES = ['Upcoming', 'DueSoon', 'Overdue', 'Unknown'] as const;
 export type ObligationStatus = (typeof OBLIGATION_STATUSES)[number];
-export const OBLIGATION_STATUS_LABELS: Record<ObligationStatus, string> = {
-  Upcoming: 'Upcoming',
-  DueSoon: 'Due soon',
-  Overdue: 'Overdue',
-  Unknown: 'Unknown',
-};
+// Display label moved to `@/lib/obligation-label.ts` (`obligationStatusLabel`,
+// translated via the staff-only `obligations` namespace — i18n plan phase
+// 5). `OBLIGATION_STATUS_LABELS`'s only caller (`obligation-status-chip.tsx`)
+// now uses that helper, so the old map was removed outright.
+//
+// `OBLIGATION_KIND_LABELS` below still has callers outside this phase's
+// scope (`features/home`, `features/calendar`) and stays in place until
+// those convert — see `@/lib/obligation-label.ts`'s `obligationKindLabel`
+// doc comment.
 
 export interface ObligationDto {
   kind: ObligationKind;

@@ -63,4 +63,10 @@ export interface MeetingBriefDto {
   offlineInput: OfflineFamilyInputDto[];
   contactAttempts: FamilyContactAttemptDto[];
   disclaimer: string;
+  // Set by an API worker concurrently adding `generatedLanguage` to the
+  // meeting brief response (plan phase 5). Optional/nullable the same way
+  // every other AI-artifact DTO's `generatedLanguage` is (`analysis/types.ts`,
+  // `progress-reports/types.ts`, `shared-drafts/types.ts`) — null means
+  // English (`docs/i18n/README.md`'s "Server-side AI language").
+  generatedLanguage?: 'en' | 'es' | null;
 }

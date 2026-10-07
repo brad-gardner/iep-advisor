@@ -1,0 +1,21 @@
+{
+  "card": {
+    "heading": "Cronología",
+    "editDatesButton": "Editar fechas",
+    "loadFailed": "No se pudo cargar la cronología"
+  },
+  "status": {
+    "Upcoming": "Próxima",
+    "DueSoon": "Próxima a vencer",
+    "Overdue": "Vencida",
+    "Unknown": "Desconocido"
+  },
+  "kind": {
+    "AnnualReview": "Revisión anual",
+    "Reevaluation": "Reevaluación",
+    "EtrDue": "ETR",
+    "GoalObservationStale": "Progreso de meta vencido",
+    "EvaluationDetermination": "Determinación de evaluación",
+    "EvaluatorSubmission": "Envío del evaluador"
+  }
+}

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Markdown } from '@/components/ui/markdown';
@@ -20,6 +21,7 @@ import { usePageTitle } from '@/hooks/use-page-title';
 // signature status + amendment chain, signed-artifact upload/list, and an
 // "Amend" action — plus a download-with-status (retry allowed for educators).
 export function AuthoredVersionDetailPage() {
+  const { t } = useTranslation('document-authoring');
   const { studentId: studentIdParam, versionId: versionIdParam } = useParams<{
     studentId: string;
     versionId: string;
@@ -37,7 +39,7 @@ export function AuthoredVersionDetailPage() {
     for (const v of siblingVersions) map.set(v.id, v.versionNumber);
     return map;
   }, [siblingVersions]);
-  usePageTitle(version ? `${version.documentTypeDisplayName} v${version.versionNumber}` : 'Document version');
+  usePageTitle(version ? `${version.documentTypeDisplayName} v${version.versionNumber}` : t('authoredVersionDetailPage.titleFallback'));
 
   const [amendOpen, setAmendOpen] = useState(false);
 
@@ -46,7 +48,7 @@ export function AuthoredVersionDetailPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading version…" />
+        <Spinner label={t('authoredVersionDetailPage.loading')} />
       </div>
     );
   }
@@ -54,11 +56,11 @@ export function AuthoredVersionDetailPage() {
   if (error || !version) {
     return (
       <PageLayout
-        title="Version unavailable"
-        breadcrumb={[{ label: 'Documents', to: backTo }]}
+        title={t('authoredVersionDetailPage.unavailableTitle')}
+        breadcrumb={[{ label: t('authoredVersionDetailPage.breadcrumbDocuments'), to: backTo }]}
       >
-        <Notice variant="error" title="Could not load this version">
-          {error ? (error.kind === 'server' ? error.message : 'This version is unavailable.') : 'This version is unavailable.'}
+        <Notice variant="error" title={t('authoredVersionDetailPage.loadErrorTitle')}>
+          {error ? (error.kind === 'server' ? error.message : t('authoredVersionDetailPage.unavailableBody')) : t('authoredVersionDetailPage.unavailableBody')}
         </Notice>
       </PageLayout>
     );
@@ -67,9 +69,9 @@ export function AuthoredVersionDetailPage() {
   return (
     <PageLayout
       title={`${version.documentTypeDisplayName} v${version.versionNumber}`}
-      subtitle={`Finalized ${formatDate(version.finalizedAt)}`}
+      subtitle={t('authoredVersionDetailPage.finalized', { date: formatDate(version.finalizedAt) })}
       breadcrumb={[
-        { label: 'Documents', to: backTo },
+        { label: t('authoredVersionDetailPage.breadcrumbDocuments'), to: backTo },
         { label: `v${version.versionNumber}` },
       ]}
       actions={
@@ -80,7 +82,7 @@ export function AuthoredVersionDetailPage() {
             canRetry
           />
           <Button variant="secondary" size="sm" onClick={() => setAmendOpen(true)} data-testid="amend-open">
-            Amend
+            {t('authoredVersionDetailPage.amend')}
           </Button>
         </div>
       }
@@ -99,9 +101,11 @@ export function AuthoredVersionDetailPage() {
 
       {version.amendmentReason && (
         <div className="mb-4">
-          <Notice variant="info" title="Amendment reason">
+          <Notice variant="info" title={t('authoredVersionDetailPage.amendmentReasonTitle')}>
             <Markdown content={version.amendmentReason} />
-            {version.effectiveDate && <p className="mt-1">Effective {formatDate(version.effectiveDate)}</p>}
+            {version.effectiveDate && (
+              <p className="mt-1">{t('authoredVersionDetailPage.effective', { date: formatDate(version.effectiveDate) })}</p>
+            )}
           </Notice>
         </div>
       )}

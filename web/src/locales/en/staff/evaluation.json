@@ -1,0 +1,114 @@
+{
+  "card": {
+    "heading": "Evaluation",
+    "determinationDue": "Determination due {{date}}",
+    "overrideDueDateButton": "Override due date",
+    "evaluatorsHeading": "Evaluators",
+    "determineButton": "Determine",
+    "closeButton": "Close",
+    "createIepButton": "Create IEP from ETR",
+    "closeFailed": "Could not close the case.",
+    "createIepFailed": "Could not create the IEP.",
+    "loadFailed": "Could not load the evaluation case."
+  },
+  "consentSection": {
+    "heading": "Consent",
+    "requestButton": "Request consent",
+    "consentRequestedOn": "Consent requested {{date}}.",
+    "receivedDateLabel": "Consent received *",
+    "fileLabel": "Consent document (optional PDF)",
+    "recordReceivedButton": "Record consent received",
+    "consentReceivedOn": "Consent received {{date}}.",
+    "downloadButton": "Download {{name}}",
+    "defaultFileName": "consent document",
+    "receivedDateRequired": "Received date is required.",
+    "requestFailed": "Could not request consent.",
+    "recordFailed": "Could not record consent.",
+    "downloadFailed": "Could not prepare the download."
+  },
+  "determineDialog": {
+    "title": "Determine eligibility",
+    "submitButton": "Record determination",
+    "outcomeLabel": "Outcome *",
+    "dateLabel": "Determination date *",
+    "etrVersionLabel": "ETR version (optional)",
+    "noneOption": "None",
+    "etrVersionOption": "ETR v{{version}}",
+    "rationaleLabel": "Rationale *",
+    "saveFailed": "Could not record the determination."
+  },
+  "dueDateOverrideDialog": {
+    "title": "Override determination due date",
+    "newDueDateLabel": "New due date *",
+    "reasonLabel": "Reason *",
+    "saveButton": "Save",
+    "saveFailed": "Could not update the due date."
+  },
+  "editAssignmentDialog": {
+    "title": "Edit assignment — {{domain}}",
+    "dueDateLabel": "Due date",
+    "notesLabel": "Notes",
+    "saveButton": "Save",
+    "saveFailed": "Could not update the assignment."
+  },
+  "evaluatorAssignmentsTable": {
+    "label": "Evaluator assignments",
+    "domainHeader": "Domain",
+    "evaluatorHeader": "Evaluator",
+    "dueDateHeader": "Due date",
+    "statusHeader": "Status",
+    "submittedOn": "Submitted {{date}}",
+    "overdue": "Overdue",
+    "pending": "Pending",
+    "notesHeader": "Notes",
+    "marking": "Marking…",
+    "markSubmitted": "Mark submitted",
+    "editAction": "Edit",
+    "removeAction": "Remove",
+    "rowActionLabel": "{{domain}} evaluator",
+    "emptyTitle": "No evaluators assigned yet",
+    "removeDialogTitle": "Remove evaluator assignment",
+    "removeDialogMessage": "Remove {{name}} from {{domain}}?",
+    "removeDialogConfirm": "Remove",
+    "defaultEvaluatorName": "this evaluator",
+    "defaultDomain": "this domain",
+    "markSubmittedFailed": "Could not mark this assignment submitted.",
+    "removeFailed": "Could not remove this assignment."
+  },
+  "startEvaluationForm": {
+    "noCaseYet": "No evaluation case is open for this student yet.",
+    "kindLabel": "Kind *",
+    "referralDateLabel": "Referral date *",
+    "referralSourceLabel": "Referral source",
+    "submitButton": "Start evaluation",
+    "referralDateRequired": "Referral date is required.",
+    "startFailed": "Could not start the evaluation."
+  },
+  "addAssignmentForm": {
+    "evaluatorLabel": "Evaluator *",
+    "loadingOption": "Loading…",
+    "selectOption": "Select…",
+    "domainLabel": "Domain *",
+    "domainPlaceholder": "e.g. Speech-language",
+    "dueDateLabel": "Due date",
+    "addButton": "Add evaluator",
+    "selectStaffAndDomain": "Select a staff member and enter a domain.",
+    "addFailed": "Could not add the assignment."
+  },
+  "caseKind": {
+    "Initial": "Initial evaluation",
+    "Reevaluation": "Reevaluation"
+  },
+  "caseStatus": {
+    "Open": "Open",
+    "ConsentPending": "Consent pending",
+    "InProgress": "In progress",
+    "Determined": "Determined",
+    "Closed": "Closed"
+  },
+  "eligibilityOutcome": {
+    "Eligible": "Eligible",
+    "NotEligible": "Not eligible",
+    "Withdrawn": "Withdrawn"
+  }
+}

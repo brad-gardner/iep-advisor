@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import { AuthoredVersionSnapshot } from './authored-version-snapshot';
 import type { TemplateVersionDetailDto } from '@/features/admin/templates/types';
 
@@ -43,6 +44,18 @@ function templateVersion(): TemplateVersionDetailDto {
 }
 
 describe('AuthoredVersionSnapshot', () => {
+  afterEach(() => resetTestLanguage());
+
+  it('renders chrome in Spanish, from the eager document-authoring-shared namespace', async () => {
+    await renderInSpanish(
+      <AuthoredVersionSnapshot
+        templateVersion={{ ...templateVersion(), sections: [] }}
+        values={{}}
+      />
+    );
+    expect(screen.getByText('Esta plantilla no tiene secciones.')).toBeInTheDocument();
+  });
+
   it('renders a frozen RichText value as formatted markdown', () => {
     render(
       <AuthoredVersionSnapshot

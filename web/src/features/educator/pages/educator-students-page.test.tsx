@@ -423,4 +423,23 @@ describe('EducatorStudentsPage', () => {
       )
     ).toBeInTheDocument();
   });
+
+  it('renders the roster chrome (title, actions, columns) in Spanish', async () => {
+    await renderInSpanish(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/educator/students']}>
+          <Routes>
+            <Route path="/educator/students" element={<EducatorStudentsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>,
+      { ns: 'educator' }
+    );
+
+    expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Estudiantes', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Agregar estudiante' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Estado' })).toBeInTheDocument();
+    expect(screen.getByTestId('student-status-Exited')).toHaveTextContent('Egresado');
+  });
 });

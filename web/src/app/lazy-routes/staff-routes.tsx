@@ -13,7 +13,8 @@
 // never flashes a raw `ns:key` and never has to be fetched. A later worker
 // adding a staff namespace to one of these pages (or a new staff page) adds
 // its own `<feature>/staff-locales.ts` the same way and imports it here.
-import '@/features/educator/staff-locales';
+
+import './staff-locales';
 
 export { StaffHomePage } from '@/features/home/pages/staff-home-page';
 export { EducatorStudentsPage } from '@/features/educator/pages/educator-students-page';

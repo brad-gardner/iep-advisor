@@ -1,17 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TEAM_ROLE_LABELS } from '@/features/educator/types';
 import type { ParticipantRow } from '../hooks/use-meeting-participant-pool';
-
-const KIND_LABEL: Record<ParticipantRow['kind'], string> = {
-  team: 'IEP team',
-  eligible: 'Other staff',
-  family: 'Family',
-  student: 'Student',
-  external: 'External guest',
-};
 
 interface ParticipantsFieldProps {
   rows: ParticipantRow[];
@@ -33,6 +26,7 @@ function ParticipantRowItem({
   onRequiredChange: (isRequired: boolean) => void;
   onRemove?: () => void;
 }) {
+  const { t } = useTranslation('meetings-staff');
   const checkboxId = `participant-${row.key}`;
   return (
     <div className="flex items-center justify-between gap-3 py-1.5" data-testid={`participant-row-${row.key}`}>
@@ -48,7 +42,7 @@ function ParticipantRowItem({
         <label htmlFor={checkboxId} className="min-w-0 truncate text-sm text-brand-slate-800">
           {row.displayName}
           <span className="ml-1.5 text-xs text-brand-slate-500">
-            {row.kind === 'team' ? TEAM_ROLE_LABELS[row.teamRole] : KIND_LABEL[row.kind]}
+            {row.kind === 'team' ? TEAM_ROLE_LABELS[row.teamRole] : t(`participantsField.kind.${row.kind}`)}
           </span>
         </label>
       </div>
@@ -62,11 +56,11 @@ function ParticipantRowItem({
             className="h-3.5 w-3.5 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
             data-testid={`participant-required-${row.key}`}
           />
-          Required
+          {t('participantsField.requiredLabel')}
         </label>
         {onRemove && (
           <Button variant="ghost" size="sm" onClick={onRemove} data-testid={`participant-remove-${row.key}`}>
-            Remove
+            {t('participantsField.removeButton')}
           </Button>
         )}
       </div>
@@ -92,6 +86,7 @@ export function ParticipantsField({
   onAddExternal,
   onRemoveExternal,
 }: ParticipantsFieldProps) {
+  const { t } = useTranslation('meetings-staff');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const trimmedEmail = email.trim();
@@ -114,7 +109,7 @@ export function ParticipantsField({
 
   return (
     <div className="space-y-3">
-      <span className="block text-[13px] font-medium text-brand-slate-600">Participants</span>
+      <span className="block text-[13px] font-medium text-brand-slate-600">{t('participantsField.heading')}</span>
       <div className="rounded-input border border-brand-slate-200 divide-y divide-brand-slate-100 px-3">
         {pool.map((row) => (
           <ParticipantRowItem
@@ -134,32 +129,32 @@ export function ParticipantsField({
           />
         ))}
         {pool.length === 0 && external.length === 0 && (
-          <p className="py-3 text-sm text-brand-slate-500">No participants yet.</p>
+          <p className="py-3 text-sm text-brand-slate-500">{t('participantsField.noParticipantsYet')}</p>
         )}
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
         <Input
           id="external-participant-name"
-          label="External participant name"
+          label={t('participantsField.externalNameLabel')}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Optional"
+          placeholder={t('participantsField.namePlaceholder')}
         />
         <div className="flex-1">
           <Input
             id="external-participant-email"
-            label="Email"
+            label={t('participantsField.emailLabel')}
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@example.com"
+            placeholder={t('participantsField.emailPlaceholder')}
             aria-invalid={emailInvalid || undefined}
             aria-describedby={emailInvalid ? emailErrorId : undefined}
           />
           {emailInvalid && (
             <p id={emailErrorId} className="mt-1 text-xs text-brand-danger-600">
-              Enter a valid email address
+              {t('participantsField.invalidEmail')}
             </p>
           )}
         </div>
@@ -172,7 +167,7 @@ export function ParticipantsField({
           data-testid="add-external-participant"
         >
           <UserPlus className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
-          Add
+          {t('participantsField.addButton')}
         </Button>
       </div>
     </div>

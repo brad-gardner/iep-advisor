@@ -1,6 +1,6 @@
 import { AlertTriangle, CalendarCheck2, CalendarClock, HelpCircle, type LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { OBLIGATION_STATUS_LABELS } from '../types';
+import { obligationStatusLabel } from '@/lib/obligation-label';
 import type { ObligationStatus } from '../types';
 
 const config: Record<ObligationStatus, { variant: 'success' | 'warning' | 'error' | 'neutral'; Icon: LucideIcon }> = {
@@ -16,7 +16,7 @@ export function ObligationStatusChip({ status }: { status: ObligationStatus }) {
   return (
     <Badge variant={variant} className="inline-flex items-center gap-1" data-testid={`obligation-status-${status}`}>
       <Icon className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
-      {OBLIGATION_STATUS_LABELS[status]}
+      {obligationStatusLabel(status)}
     </Badge>
   );
 }

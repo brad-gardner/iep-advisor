@@ -1,9 +1,11 @@
+import '@/app/lazy-routes/staff-locales';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ToastProvider } from '@/components/ui/toast';
 import { makeMeeting } from '@/features/meetings/test/fixtures';
+import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import type { CalendarItemDto } from '../types';
 
 const calendarApi = vi.hoisted(() => ({ listCalendarItems: vi.fn() }));
@@ -255,5 +257,30 @@ describe('EducatorCalendarPage', () => {
 
     await user.click(screen.getByTestId('calendar-next-month'));
     await waitFor(() => expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('This month'));
+  });
+
+  // `calendar` is a normal EAGER namespace (not staff-only), deliberately —
+  // see `calendar-subscription-card.tsx`'s doc comment — so this test needs
+  // no extra `staff-locales`-style side-effect import; `renderInSpanish`
+  // works exactly as it does for a parent/shell page.
+  describe('in Spanish', () => {
+    afterEach(() => resetTestLanguage());
+
+    it('renders the page chrome and weekday headers in Spanish', async () => {
+      await renderInSpanish(
+        <ToastProvider>
+          <MemoryRouter>
+            <EducatorCalendarPage />
+          </MemoryRouter>
+        </ToastProvider>
+      );
+
+      expect(await screen.findByText('IEP check-in')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Calendario', level: 1 })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Programar reunión' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Hoy' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Este mes', level: 3 })).toBeInTheDocument();
+      expect(screen.getAllByText('dom').length).toBeGreaterThan(0);
+    });
   });
 });

@@ -18,10 +18,18 @@ describe('staff namespace registration (educator)', () => {
     await import('./staff-locales');
 
     expect(i18n.hasResourceBundle('en', 'educator')).toBe(true);
-    expect(i18n.getResourceBundle('en', 'educator')).toEqual({
+    // Spot-checks rather than an exact-equality snapshot of the whole
+    // namespace — `educator` now covers the full students/team/lifecycle UI
+    // (plan phase 5), not just the original worked-example key, and a full
+    // snapshot here would just duplicate (and drift from) the JSON file.
+    expect(i18n.getResourceBundle('en', 'educator')).toMatchObject({
       studentsPage: {
         caseloadEmptyState:
           "No students on your caseload yet — your school admin can add you to a student's IEP team, or create one.",
+        title: 'Students',
+      },
+      team: {
+        heading: 'IEP team',
       },
     });
   });

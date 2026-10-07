@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
@@ -28,11 +29,12 @@ export function AssignCaseManagerModal({
   onClose,
   onAssign,
 }: AssignCaseManagerModalProps) {
+  const { t } = useTranslation('educator');
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Assign case manager"
+      title={t('assignCaseManager.title')}
       data-testid="roster-assign-case-manager-modal"
     >
       {/* Remounts per open so the picker/errors reset with the dialog. */}
@@ -45,6 +47,7 @@ function AssignCaseManagerForm({
   studentCount,
   onAssign,
 }: Pick<AssignCaseManagerModalProps, 'studentCount' | 'onAssign'>) {
+  const { t } = useTranslation('educator');
   const [staff, setStaff] = useState<StaffMember[] | null>(null);
   const [userId, setUserId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,21 +72,19 @@ function AssignCaseManagerForm({
     e.preventDefault();
     setError(null);
     if (!userId) {
-      setError('Select a staff member');
+      setError(t('assignCaseManager.selectStaffRequired'));
       return;
     }
     setIsSubmitting(true);
     const result = await onAssign(Number(userId));
-    if (!result.success) setError(result.error ?? 'Could not assign the case manager');
+    if (!result.success) setError(result.error ?? t('studentsPage.assignCaseManagerFailed'));
     setIsSubmitting(false);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" data-testid="roster-assign-case-manager-form">
       <p className="text-sm text-brand-slate-600">
-        The chosen staff member becomes the lead case manager for{' '}
-        {studentCount === 1 ? 'this student' : `these ${studentCount} students`}. Any
-        current lead stays on the team without the lead role.
+        {t('assignCaseManager.description', { count: studentCount })}
       </p>
 
       {error && (
@@ -94,13 +95,15 @@ function AssignCaseManagerForm({
 
       <Select
         id="roster-assign-case-manager-staff"
-        label="Case manager *"
+        label={t('assignCaseManager.caseManagerLabel')}
         value={userId}
         onChange={(e) => setUserId(e.target.value)}
         disabled={staff === null}
         data-testid="roster-assign-case-manager-staff"
       >
-        <option value="">{staff === null ? 'Loading staff…' : 'Select a staff member'}</option>
+        <option value="">
+          {staff === null ? t('assignCaseManager.loadingStaff') : t('assignCaseManager.selectStaff')}
+        </option>
         {staff?.map((member) => (
           <option key={member.staffProfileId} value={member.userId}>
             {`${member.firstName} ${member.lastName}`.trim() || member.email} ·{' '}
@@ -116,7 +119,7 @@ function AssignCaseManagerForm({
         className="w-full"
         data-testid="roster-assign-case-manager-submit"
       >
-        Assign case manager
+        {t('assignCaseManager.submit')}
       </Button>
     </form>
   );

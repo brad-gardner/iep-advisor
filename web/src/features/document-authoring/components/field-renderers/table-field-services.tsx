@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Plus } from 'lucide-react';
 import type { TemplateFieldDto } from '@/features/admin/templates/types';
 import type { TableColumn } from '@/features/admin/templates/template-config';
@@ -82,6 +84,7 @@ export function ServicesBlock({
   flush,
   cellTarget,
 }: ServicesBlockProps) {
+  const { t } = useTranslation('document-authoring');
   const labelId = `${fieldElementId(field.id)}-label`;
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(() => initialFocusRowKey ?? null);
 
@@ -116,7 +119,7 @@ export function ServicesBlock({
     <div id={fieldElementId(field.id)} tabIndex={-1} role="group" aria-labelledby={labelId} data-testid={`field-${field.fieldKey}`}>
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <h3 id={labelId} className="text-[13px] font-medium text-brand-slate-600">
-          {field.label || 'Services'}
+          {field.label || t('servicesBlock.fallbackHeading')}
           {field.required && (
             <span className="ml-1 text-brand-danger-700" aria-hidden="true">
               *
@@ -125,9 +128,9 @@ export function ServicesBlock({
         </h3>
         {rows.length > 0 && (
           <span className="text-xs text-brand-slate-500">
-            {rows.length} service{rows.length === 1 ? '' : 's'} · {totals.totalMinutesPerWeek} min/week
-            {totals.excludedCount > 0 &&
-              ` (${totals.excludedCount} not counted — frequency/duration unclear)`}
+            {t('servicesBlock.serviceCount', { count: rows.length })} ·{' '}
+            {t('servicesBlock.minutesPerWeek', { minutes: totals.totalMinutesPerWeek })}
+            {totals.excludedCount > 0 && t('servicesBlock.excludedNote', { count: totals.excludedCount })}
           </span>
         )}
         <Button
@@ -139,35 +142,35 @@ export function ServicesBlock({
           data-testid={`field-${field.fieldKey}-add`}
         >
           <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-          Add service
+          {t('servicesBlock.addService')}
         </Button>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-brand-slate-500">No services yet. Add one to get started.</p>
+        <p className="text-sm text-brand-slate-500">{t('servicesBlock.noServicesYet')}</p>
       ) : (
         <div className="overflow-x-auto rounded-card border border-brand-slate-200">
           <table className="w-full border-collapse text-sm">
-            <caption className="sr-only">{field.label || 'Services'}</caption>
+            <caption className="sr-only">{field.label || t('servicesBlock.fallbackHeading')}</caption>
             <thead>
               <tr className="bg-brand-slate-50">
                 <th scope="col" className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600">
-                  Service
+                  {t('servicesBlock.columnService')}
                 </th>
                 <th scope="col" className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600">
-                  Frequency
+                  {t('servicesBlock.columnFrequency')}
                 </th>
                 <th scope="col" className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600">
-                  Setting
+                  {t('servicesBlock.columnSetting')}
                 </th>
                 <th scope="col" className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600">
-                  Dates
+                  {t('servicesBlock.columnDates')}
                 </th>
                 <th scope="col" className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600">
-                  Owner
+                  {t('servicesBlock.columnOwner')}
                 </th>
                 <th scope="col" className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600">
-                  <span className="sr-only">Row actions</span>
+                  <span className="sr-only">{t('servicesBlock.rowActions')}</span>
                 </th>
               </tr>
             </thead>
@@ -285,6 +288,7 @@ function ServiceEditorRow({
   cellTarget: CellTarget;
   onDone: () => void;
 }) {
+  const { t } = useTranslation('document-authoring');
   const editorCtx = useDocumentEditorContext();
   const bodyRef = useRef<HTMLDivElement>(null);
   const persistedId = rowId(row);
@@ -331,7 +335,7 @@ function ServiceEditorRow({
     return (
       <div key={col.columnKey} className={multiline ? 'md:col-span-3' : undefined}>
         <label htmlFor={cellId} className="mb-1 block text-sm font-medium text-brand-slate-700">
-          {col.label || 'Field'}
+          {col.label || t('goalsBlock.fieldFallback')}
           {col.required && (
             <span className="ml-1 text-brand-danger-700" aria-hidden="true">
               *
@@ -355,7 +359,10 @@ function ServiceEditorRow({
   };
 
   const serviceLabel = serviceTypeCol ? row.cells[serviceTypeCol.columnKey] : undefined;
-  const heading = typeof serviceLabel === 'string' && serviceLabel.trim() ? serviceLabel : `Service ${index + 1}`;
+  const heading =
+    typeof serviceLabel === 'string' && serviceLabel.trim()
+      ? serviceLabel
+      : t('servicesBlock.serviceFallback', { number: index + 1 });
   const rowKinds: AssistKind[] = ['Rewrite', 'Improve'];
 
   return (
@@ -363,10 +370,10 @@ function ServiceEditorRow({
       <td colSpan={6} className="p-0">
         <div
           className="m-2 rounded-card border-2 border-brand-teal-400 bg-white p-4 shadow-sm"
-          aria-label={`Editing service ${index + 1}`}
+          aria-label={t('servicesBlock.editingServiceAriaLabel', { number: index + 1 })}
         >
           <div className="flex flex-wrap items-center gap-3 border-b border-brand-slate-100 pb-3">
-            <h3 className="font-serif text-lg text-brand-slate-800">Editing: {heading}</h3>
+            <h3 className="font-serif text-lg text-brand-slate-800">{t('servicesBlock.editingService', { service: heading })}</h3>
             <AutosaveIndicator status={saveStatus} />
             {carried && !reviewed && !disabled && (
               <Button
@@ -375,7 +382,7 @@ function ServiceEditorRow({
                 onClick={() => onKeepRow(row.key)}
                 data-testid={`field-${field.fieldKey}-row-${index}-keep`}
               >
-                Keep as-is
+                {t('servicesBlock.keepAsIs')}
               </Button>
             )}
             <div className="ml-auto flex items-center gap-3 text-sm">
@@ -386,10 +393,10 @@ function ServiceEditorRow({
                 onClick={() => onRemoveRow(row.key)}
                 data-testid={`field-${field.fieldKey}-remove-${index}`}
               >
-                Remove
+                {t('servicesBlock.remove')}
               </button>
               <Button size="sm" onClick={onDone} data-testid={`field-${field.fieldKey}-row-${index}-done`}>
-                Done
+                {t('servicesBlock.done')}
               </Button>
             </div>
           </div>
@@ -399,7 +406,7 @@ function ServiceEditorRow({
             {providerRoleCol && renderColumn(providerRoleCol)}
             <div>
               <label className="mb-1 block text-sm font-medium text-brand-slate-700" htmlFor={`field-${field.fieldKey}-owner-${index}`}>
-                Owner
+                {t('servicesBlock.owner')}
               </label>
               <TeamMemberSelect
                 id={`field-${field.fieldKey}-owner-${index}`}
@@ -415,7 +422,7 @@ function ServiceEditorRow({
             {frequencyCol && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-brand-slate-700" htmlFor={`field-${field.fieldKey}-cell-${index}-${frequencyCol.columnKey}`}>
-                  Frequency
+                  {t('servicesBlock.frequencyLabel')}
                 </label>
                 <FrequencyField
                   id={`field-${field.fieldKey}-cell-${index}-${frequencyCol.columnKey}`}
@@ -425,6 +432,7 @@ function ServiceEditorRow({
                   onImmediateChange={(text) => updateCell(frequencyCol.columnKey, text, true)}
                   onBlur={() => void flush()}
                   testId={`field-${field.fieldKey}-cell-${index}-${frequencyCol.columnKey}`}
+                  t={t}
                 />
               </div>
             )}
@@ -432,7 +440,7 @@ function ServiceEditorRow({
             {durationCol && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-brand-slate-700" htmlFor={`field-${field.fieldKey}-cell-${index}-${durationCol.columnKey}`}>
-                  Minutes per session
+                  {t('servicesBlock.minutesPerSessionLabel')}
                 </label>
                 <DurationField
                   id={`field-${field.fieldKey}-cell-${index}-${durationCol.columnKey}`}
@@ -442,6 +450,7 @@ function ServiceEditorRow({
                   onImmediateChange={(text) => updateCell(durationCol.columnKey, text, true)}
                   onBlur={() => void flush()}
                   testId={`field-${field.fieldKey}-cell-${index}-${durationCol.columnKey}`}
+                  t={t}
                 />
               </div>
             )}
@@ -449,7 +458,7 @@ function ServiceEditorRow({
             {locationCol && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-brand-slate-700" htmlFor={`field-${field.fieldKey}-cell-${index}-${locationCol.columnKey}`}>
-                  Setting
+                  {t('servicesBlock.settingLabel')}
                 </label>
                 <SettingField
                   id={`field-${field.fieldKey}-cell-${index}-${locationCol.columnKey}`}
@@ -460,6 +469,7 @@ function ServiceEditorRow({
                   disabled={disabled}
                   onChange={(cell) => updateCell(locationCol.columnKey, cell, locationCol.type === 'Select')}
                   onBlur={() => void flush()}
+                  t={t}
                 />
               </div>
             )}
@@ -484,7 +494,7 @@ function ServiceEditorRow({
               testIdPrefix={`field-${field.fieldKey}-row-${index}`}
             />
           ) : (
-            !disabled && <p className="mt-2 text-xs text-brand-slate-500">AI help is available once this service has saved.</p>
+            !disabled && <p className="mt-2 text-xs text-brand-slate-500">{t('servicesBlock.aiHelpAvailableAfterSave')}</p>
           )}
         </div>
       </td>
@@ -507,6 +517,7 @@ function FrequencyField({
   onImmediateChange,
   onBlur,
   testId,
+  t,
 }: {
   id: string;
   value: string;
@@ -515,6 +526,7 @@ function FrequencyField({
   onImmediateChange: (text: string) => void;
   onBlur: () => void;
   testId: string;
+  t: TFunction<'document-authoring'>;
 }) {
   const initialParsed = parseFrequency(value);
   const [mode, setMode] = useState<'structured' | 'free'>(() => (value.trim() === '' || initialParsed ? 'structured' : 'free'));
@@ -550,7 +562,7 @@ function FrequencyField({
             }}
             data-testid={`${testId}-switch-structured`}
           >
-            Switch to structured entry
+            {t('servicesBlock.switchToStructured')}
           </button>
         )}
       </div>
@@ -588,7 +600,7 @@ function FrequencyField({
         ×
       </span>
       <select
-        aria-label="Frequency period"
+        aria-label={t('servicesBlock.frequencyPeriodAriaLabel')}
         value={period}
         disabled={disabled}
         onChange={(e) => {
@@ -600,9 +612,9 @@ function FrequencyField({
         className={cn(cellInputClass, 'flex-1')}
         data-testid={`${testId}-period`}
       >
-        <option value="week">per week</option>
-        <option value="month">per month</option>
-        <option value="day">per day</option>
+        <option value="week">{t('servicesBlock.perWeek')}</option>
+        <option value="month">{t('servicesBlock.perMonth')}</option>
+        <option value="day">{t('servicesBlock.perDay')}</option>
       </select>
     </div>
   );
@@ -619,6 +631,7 @@ function DurationField({
   onImmediateChange,
   onBlur,
   testId,
+  t,
 }: {
   id: string;
   value: string;
@@ -627,6 +640,7 @@ function DurationField({
   onImmediateChange: (text: string) => void;
   onBlur: () => void;
   testId: string;
+  t: TFunction<'document-authoring'>;
 }) {
   const initialParsed = parseDurationMinutes(value);
   const [mode, setMode] = useState<'structured' | 'free'>(() => (value.trim() === '' || initialParsed != null ? 'structured' : 'free'));
@@ -657,7 +671,7 @@ function DurationField({
             }}
             data-testid={`${testId}-switch-structured`}
           >
-            Switch to structured entry
+            {t('servicesBlock.switchToStructured')}
           </button>
         )}
       </div>
@@ -690,13 +704,6 @@ function DurationField({
   );
 }
 
-const SETTING_SUGGESTIONS = [
-  'General education classroom',
-  'Special education setting',
-  'Related services room',
-  'Home',
-];
-
 /** Setting/location: the template's own Select options when the column is a
  *  Select, else a free-text input offering the common settings via a
  *  `<datalist>` (plan 2026-10-02-002, Phase 4). */
@@ -709,6 +716,7 @@ function SettingField({
   disabled,
   onChange,
   onBlur,
+  t,
 }: {
   id: string;
   column: TableColumn;
@@ -718,7 +726,14 @@ function SettingField({
   disabled?: boolean;
   onChange: (cell: TableCellValue) => void;
   onBlur: () => void;
+  t: TFunction<'document-authoring'>;
 }) {
+  const settingSuggestions = [
+    t('servicesBlock.settingSuggestion1'),
+    t('servicesBlock.settingSuggestion2'),
+    t('servicesBlock.settingSuggestion3'),
+    t('servicesBlock.settingSuggestion4'),
+  ];
   if (column.type === 'Select') {
     return (
       <TableCell
@@ -750,7 +765,7 @@ function SettingField({
         data-testid={`field-${fieldKey}-cell-${rowIndex}-${column.columnKey}`}
       />
       <datalist id={listId}>
-        {SETTING_SUGGESTIONS.map((s) => (
+        {settingSuggestions.map((s) => (
           <option key={s} value={s} />
         ))}
       </datalist>

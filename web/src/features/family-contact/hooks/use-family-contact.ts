@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { apiErrorMessage } from '@/lib/api-error';
 import { getContactAttempts, getOfflineInput } from '../api/family-contact-api';
 import type { FamilyContactAttemptDto, OfflineFamilyInputDto } from '../types';
+
+// A server-provided message is already resolved text and is shown as-is;
+// the generic fallback is translated at RENDER time (below), not stored
+// pre-translated here, so the mount effect never needs `t` in its
+// dependency array (same idiom as `useHome`/`MeetingRsvpPage`'s `LoadError`).
+type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 interface UseFamilyContactResult {
   attempts: FamilyContactAttemptDto[];
@@ -16,10 +23,11 @@ interface UseFamilyContactResult {
 /** A student's offline family-contact history for the "Family contact" card
  *  (plan 7, decision 7): contact attempts and offline input, newest first. */
 export function useFamilyContact(studentId: number): UseFamilyContactResult {
+  const { t } = useTranslation('family-contact');
   const [attempts, setAttempts] = useState<FamilyContactAttemptDto[]>([]);
   const [offlineInput, setOfflineInput] = useState<OfflineFamilyInputDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
@@ -37,10 +45,13 @@ export function useFamilyContact(studentId: number): UseFamilyContactResult {
           setOfflineInput(inputRes.data);
           setError(null);
         } else {
-          setError(attemptsRes.message ?? inputRes.message ?? 'Could not load family contact history.');
+          const message = attemptsRes.message ?? inputRes.message;
+          setError(message ? { kind: 'server', message } : { kind: 'generic' });
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load family contact history.'));
+        if (!active) return;
+        const serverMessage = apiErrorMessage(err, '');
+        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
       } finally {
         if (active) setIsLoading(false);
       }
@@ -48,6 +59,8 @@ export function useFamilyContact(studentId: number): UseFamilyContactResult {
     return () => {
       active = false;
     };
+    // `t` deliberately excluded (see `use-home.ts`): re-running this fetch on
+    // a plain language switch would be wasteful.
   }, [studentId, retryToken]);
 
   const addAttempt = useCallback((attempt: FamilyContactAttemptDto) => {
@@ -61,14 +74,14 @@ export function useFamilyContact(studentId: number): UseFamilyContactResult {
   const retry = useCallback(() => {
     setIsLoading(true);
     setError(null);
-    setRetryToken((t) => t + 1);
+    setRetryToken((n) => n + 1);
   }, []);
 
   return {
     attempts,
     offlineInput,
     isLoading,
-    error,
+    error: error ? (error.kind === 'server' ? error.message : t('card.loadFailed')) : null,
     retry,
     addAttempt,
     addOfflineInput,

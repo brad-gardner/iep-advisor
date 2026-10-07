@@ -1,9 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ToastProvider } from "@/components/ui/toast";
+import { renderInSpanish, resetTestLanguage } from "@/test/i18n-test-utils";
 import { ORG_ROLE, type EducatorProfile } from "../types";
 import { makeStudent } from "../test/fixtures";
+// `educator` is a staff-only namespace (plan phase 5) — its English isn't
+// bundled in `resources` (see `lib/i18n/index.ts`), only registered by this
+// side-effect import, exactly as the page's real lazy route chunk
+// (`app/lazy-routes/staff-routes.tsx`) registers it before the page can
+// render. Without this, `useTranslation('educator')` inside the page would
+// try (and, correctly, fail loudly) to fetch it from the Spanish-only
+// backend for English.
+import "../staff-locales";
 
 const useStudentRecordMock = vi.fn();
 vi.mock("../hooks/use-student-record", () => ({
@@ -124,5 +133,44 @@ describe("EducatorStudentDetailPage", () => {
     renderPage();
 
     expect(document.title).toBe("Student record · IEP Advisor");
+  });
+
+  // Proves the staff/admin namespace split end to end (plan phase 5), the
+  // same way `educator-students-page.test.tsx` does: `educator`'s English is
+  // registered above via the `staff-locales` side-effect import, and its
+  // Spanish still lazy-loads like any other namespace — `renderInSpanish`
+  // needs the extra `ns: 'educator'` (`docs/i18n/README.md`'s "Namespace
+  // coverage" / test conventions).
+  describe("in Spanish", () => {
+    afterEach(() => resetTestLanguage());
+
+    it("renders the heading and sidebar actions in Spanish", async () => {
+      useStudentRecordMock.mockReturnValue({
+        student: makeStudent({ firstName: "Ada", lastName: "Lovelace" }),
+        isLoading: false,
+        reload: vi.fn(),
+        update: vi.fn(),
+        exit: vi.fn(),
+        reactivate: vi.fn(),
+        archive: vi.fn(),
+        transfer: vi.fn(),
+      });
+
+      await renderInSpanish(
+        <ToastProvider>
+          <MemoryRouter initialEntries={["/educator/students/10"]}>
+            <Routes>
+              <Route path="/educator/students/:studentId" element={<EducatorStudentDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>,
+        { ns: 'educator' }
+      );
+
+      expect(screen.getByRole("heading", { level: 1, name: "Ada Lovelace" })).toBeInTheDocument();
+      expect(screen.getByText("Equipo del IEP")).toBeInTheDocument();
+      expect(screen.getByText("Exportar registro")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Invitar estudiante" })).toBeInTheDocument();
+    });
   });
 });

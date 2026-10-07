@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { useAutosave } from '@/hooks/use-autosave';
 import { parseConfig } from '@/features/admin/templates/template-config';
@@ -10,6 +11,7 @@ import { appendText, useDocumentEditorContext } from '../../hooks/document-edito
 
 /** Single-line Text field. Honors the config `maxLength`. */
 export function TextField({ field, value, disabled, onSave }: FieldRendererProps) {
+  const { t } = useTranslation('document-authoring');
   const config = parseConfig(field.fieldType, field.configJson);
   const maxLength = config.kind === 'Text' ? config.text.maxLength : undefined;
   const id = fieldElementId(field.id);
@@ -57,7 +59,7 @@ export function TextField({ field, value, disabled, onSave }: FieldRendererProps
         onFocus={() =>
           editor?.setActiveField({
             id: field.fieldKey,
-            label: () => field.label || 'this field',
+            label: () => field.label || t('fieldLabel.thisField'),
             apply: (text) => {
               if (disabledRef.current) return;
               applyText(appendText(localRef.current, text, ' '));

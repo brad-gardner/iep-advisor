@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
@@ -16,6 +17,7 @@ interface AddAssignmentFormProps {
 /** Assign an evaluator: staff picker (the student's eligible team staff),
  *  domain, optional due date. */
 export function AddAssignmentForm({ studentId, onAdded }: AddAssignmentFormProps) {
+  const { t } = useTranslation('evaluation');
   const [staff, setStaff] = useState<EligibleStaff[] | null>(null);
   const [userId, setUserId] = useState('');
   const [domain, setDomain] = useState('');
@@ -40,7 +42,7 @@ export function AddAssignmentForm({ studentId, onAdded }: AddAssignmentFormProps
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId || !domain.trim()) {
-      setError('Select a staff member and enter a domain.');
+      setError(t('addAssignmentForm.selectStaffAndDomain'));
       return;
     }
     setIsSubmitting(true);
@@ -57,10 +59,10 @@ export function AddAssignmentForm({ studentId, onAdded }: AddAssignmentFormProps
         setDomain('');
         setDueDate('');
       } else {
-        setError(res.message ?? 'Could not add the assignment.');
+        setError(res.message ?? t('addAssignmentForm.addFailed'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not add the assignment.'));
+      setError(apiErrorMessage(err, t('addAssignmentForm.addFailed')));
     } finally {
       setIsSubmitting(false);
     }
@@ -75,13 +77,13 @@ export function AddAssignmentForm({ studentId, onAdded }: AddAssignmentFormProps
       )}
       <div className="grid gap-3 sm:grid-cols-3">
         <Select
-          label="Evaluator *"
+          label={t('addAssignmentForm.evaluatorLabel')}
           value={userId}
           onChange={(e) => setUserId(e.target.value)}
           disabled={staff === null}
           data-testid="add-assignment-staff"
         >
-          <option value="">{staff === null ? 'Loading…' : 'Select…'}</option>
+          <option value="">{staff === null ? t('addAssignmentForm.loadingOption') : t('addAssignmentForm.selectOption')}</option>
           {(staff ?? []).map((s) => (
             <option key={s.userId} value={s.userId}>
               {`${s.firstName} ${s.lastName}`.trim() || s.email}
@@ -89,15 +91,15 @@ export function AddAssignmentForm({ studentId, onAdded }: AddAssignmentFormProps
           ))}
         </Select>
         <Input
-          label="Domain *"
-          placeholder="e.g. Speech-language"
+          label={t('addAssignmentForm.domainLabel')}
+          placeholder={t('addAssignmentForm.domainPlaceholder')}
           maxLength={100}
           value={domain}
           onChange={(e) => setDomain(e.target.value)}
           data-testid="add-assignment-domain"
         />
         <Input
-          label="Due date"
+          label={t('addAssignmentForm.dueDateLabel')}
           type="date"
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
@@ -105,7 +107,7 @@ export function AddAssignmentForm({ studentId, onAdded }: AddAssignmentFormProps
         />
       </div>
       <Button type="submit" size="sm" loading={isSubmitting} data-testid="add-assignment-submit">
-        Add evaluator
+        {t('addAssignmentForm.addButton')}
       </Button>
     </form>
   );

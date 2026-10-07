@@ -2,6 +2,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { makeStudent } from '../../test/fixtures';
+// `educator` is a staff-only namespace (plan phase 5) — its English isn't
+// bundled in `resources` (see `lib/i18n/index.ts`), only registered by this
+// side-effect import, exactly as the real lazy route chunk
+// (`app/lazy-routes/staff-routes.tsx`) registers it. This test renders
+// `StudentLifecycleActions` directly, bypassing the page that would
+// otherwise do so.
+import '../../staff-locales';
 import { StudentLifecycleActions } from './student-lifecycle-actions';
 
 const schools = [

@@ -1,3 +1,4 @@
+import i18n from '@/lib/i18n';
 import { parseConfig } from '@/features/admin/templates/template-config';
 import {
   OWNER_ELIGIBLE_SEMANTICS,
@@ -62,7 +63,7 @@ function rowLabel(row: Row, primaryKey: string | undefined, index: number): stri
     const t = text.trim();
     return `"${t.length > 40 ? `${t.slice(0, 40)}…` : t}"`;
   }
-  return `row ${index + 1}`;
+  return i18n.t('document-authoring:completeness.rowFallback', { number: index + 1 });
 }
 
 /**
@@ -91,7 +92,9 @@ export function computeCompleteness(
         items.push({
           key: `req-${field.fieldKey}`,
           severity: 'required',
-          message: `${field.label || 'Untitled field'} is required`,
+          message: i18n.t('document-authoring:completeness.fieldRequired', {
+            label: field.label || i18n.t('document-authoring:completeness.untitledField'),
+          }),
           fieldKey: field.fieldKey,
           fieldId: field.id,
           sectionId: section.id,
@@ -110,7 +113,10 @@ export function computeCompleteness(
         items.push({
           key: `stale-${field.fieldKey}`,
           severity: 'advisory',
-          message: `${stale} carried-forward ${stale === 1 ? 'row' : 'rows'} in ${field.label || 'this table'} not yet reviewed`,
+          message: i18n.t('document-authoring:completeness.staleRows', {
+            count: stale,
+            table: field.label || i18n.t('document-authoring:completeness.untitledTable'),
+          }),
           fieldKey: field.fieldKey,
           fieldId: field.id,
           sectionId: section.id,
@@ -118,21 +124,21 @@ export function computeCompleteness(
       }
       if (semantic === 'goals') {
         if (tableRows.length === 0) {
-          items.push({ key: `goals-none-${field.fieldKey}`, severity: 'advisory', message: 'No annual goals yet', fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
+          items.push({ key: `goals-none-${field.fieldKey}`, severity: 'advisory', message: i18n.t('document-authoring:completeness.noGoalsYet'), fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
         }
         tableRows.forEach((row, i) => {
           const label = rowLabel(row, col('goalText'), i);
-          if (cellBlank(row, col('goalText'))) items.push({ key: `g-text-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Goal ${label} has no goal text`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
-          if (cellBlank(row, col('baseline'))) items.push({ key: `g-base-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Goal ${label} has no baseline`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
-          if (cellBlank(row, col('measurementMethod'))) items.push({ key: `g-meas-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Goal ${label} has no measurement method`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
-          if (cellBlank(row, col('targetCriteria'))) items.push({ key: `g-target-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Goal ${label} has no target criteria`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
+          if (cellBlank(row, col('goalText'))) items.push({ key: `g-text-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: i18n.t('document-authoring:completeness.goalNoText', { label }), fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
+          if (cellBlank(row, col('baseline'))) items.push({ key: `g-base-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: i18n.t('document-authoring:completeness.goalNoBaseline', { label }), fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
+          if (cellBlank(row, col('measurementMethod'))) items.push({ key: `g-meas-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: i18n.t('document-authoring:completeness.goalNoMeasurement', { label }), fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
+          if (cellBlank(row, col('targetCriteria'))) items.push({ key: `g-target-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: i18n.t('document-authoring:completeness.goalNoTarget', { label }), fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
         });
       } else if (semantic === 'services') {
         tableRows.forEach((row, i) => {
           const label = rowLabel(row, col('serviceType'), i);
-          if (cellBlank(row, col('frequency'))) items.push({ key: `s-freq-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Service ${label} has no frequency`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
-          if (cellBlank(row, col('duration'))) items.push({ key: `s-dur-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Service ${label} has no duration`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
-          if (cellBlank(row, col('providerRole'))) items.push({ key: `s-prov-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: `Service ${label} has no provider role`, fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
+          if (cellBlank(row, col('frequency'))) items.push({ key: `s-freq-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: i18n.t('document-authoring:completeness.serviceNoFrequency', { label }), fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
+          if (cellBlank(row, col('duration'))) items.push({ key: `s-dur-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: i18n.t('document-authoring:completeness.serviceNoDuration', { label }), fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
+          if (cellBlank(row, col('providerRole'))) items.push({ key: `s-prov-${row[ROW_ID_KEY] ?? i}`, severity: 'advisory', message: i18n.t('document-authoring:completeness.serviceNoProviderRole', { label }), fieldKey: field.fieldKey, fieldId: field.id, sectionId: section.id });
         });
       }
 
@@ -156,7 +162,13 @@ export function computeCompleteness(
             items.push({
               key: `owner-${row[ROW_ID_KEY] ?? i}`,
               severity: 'advisory',
-              message: `${itemLabel} ${label} has no owner`,
+              // `itemLabel` (`rowBlockItemLabel`, admin/templates) is not yet
+              // translated — that module is outside this phase's assigned
+              // scope (features/admin), so this sentence mixes an English
+              // item-type word into otherwise-translated text until admin/
+              // templates converts it. See docs/i18n/README.md's precedent
+              // for a mixed-language phrase during phased rollout.
+              message: i18n.t('document-authoring:completeness.itemNoOwner', { item: itemLabel, label }),
               fieldKey: field.fieldKey,
               fieldId: field.id,
               sectionId: section.id,
@@ -166,7 +178,7 @@ export function computeCompleteness(
             items.push({
               key: `objectives-${row[ROW_ID_KEY] ?? i}`,
               severity: 'advisory',
-              message: `Goal ${label} has no objectives`,
+              message: i18n.t('document-authoring:completeness.goalNoObjectives', { label }),
               fieldKey: field.fieldKey,
               fieldId: field.id,
               sectionId: section.id,

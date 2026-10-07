@@ -455,6 +455,16 @@ prerequisite for marketing Spanish, not for shipping it.
 | `draft-sharing` | Phase 3 | Draft — needs native review |
 | `meetings` | Phase 3 | Draft — needs native review |
 | `student` | Phase 3 | Draft — needs native review |
+| `educator (staff)` | Phase 5 | Draft — needs native review |
+| `calendar` | Phase 5 | Draft — needs native review |
+| `meeting-brief (staff)` | Phase 5 | Draft — needs native review |
+| `document-authoring (staff)` | Phase 5 | Draft — needs native review |
+| `document-authoring-shared` | Phase 5 | Draft — needs native review |
+| `evaluation (staff)` | Phase 5 | Draft — needs native review |
+| `obligations (staff)` | Phase 5 | Draft — needs native review |
+| `family-contact (staff)` | Phase 5 | Draft — needs native review |
+| `meetings-staff (staff)` | Phase 5 | Draft — needs native review |
+| `contributions` | Phase 5 | Draft — needs native review |
 | `educator` (staff — `locales/{en,es}/staff/educator.json`, lazy-route-registered English; see "Staff and admin namespaces" above) | Phase 5 (foundation example — one string; the rest of `features/educator` converts later) | Draft — needs native review |
 
 ## Tests
@@ -530,6 +540,10 @@ prerequisite for marketing Spanish, not for shipping it.
   namespace, not just the one a hand-written regex happened to name.
 - **`<html lang>` follows the active language:** `src/lib/i18n/index.test.ts`
   asserts `document.documentElement.lang` updates on `changeLanguage`.
+
+## Staff namespaces across areas
+
+`app/lazy-routes/staff-locales.ts` registers every staff/admin English namespace. All three lazy area chunks (staff, district-admin, platform-admin) import it, because shared staff components render across areas. A new staff namespace is added there, not in an individual barrel. Tests that render staff pages import it directly.
 
 ## Server-side AI language (Phase 3)
 

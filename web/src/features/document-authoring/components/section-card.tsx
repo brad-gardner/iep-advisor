@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -86,6 +87,7 @@ export function SectionCard({
   items,
   registerFailureStatus,
 }: SectionCardProps) {
+  const { t } = useTranslation('document-authoring');
   const fields = useMemo(() => [...section.fields].sort((a, b) => a.displayOrder - b.displayOrder), [section.fields]);
   const isEmpty = useMemo(() => fields.every((f) => isBlank(values[f.fieldKey])), [fields, values]);
 
@@ -441,9 +443,9 @@ export function SectionCard({
           onClose();
         }
       } else if (result.conflict) {
-        setDiscardError('This document changed elsewhere. Reload to continue.');
+        setDiscardError(t('sectionCard.discardReloadError'));
       } else {
-        setDiscardError(result.message || 'Could not discard changes. Please try again.');
+        setDiscardError(result.message || t('sectionCard.discardGenericError'));
       }
     } finally {
       setRestoring(false);
@@ -452,15 +454,15 @@ export function SectionCard({
 
   const badge = isOpen ? (
     <Badge variant="success" data-testid={`section-${section.id}-status`}>
-      Editing
+      {t('sectionCard.editingBadge')}
     </Badge>
   ) : required > 0 ? (
     <Badge variant="error" data-testid={`section-${section.id}-status`}>
-      {required} required item{required === 1 ? '' : 's'}
+      {t('sectionCard.requiredItemCount', { count: required })}
     </Badge>
   ) : advisory > 0 ? (
     <Badge variant="warning" data-testid={`section-${section.id}-status`}>
-      {advisory} item{advisory === 1 ? '' : 's'} to review
+      {t('sectionCard.itemsToReviewCount', { count: advisory })}
     </Badge>
   ) : null;
 
@@ -475,7 +477,7 @@ export function SectionCard({
       data-testid={`section-${section.id}`}
     >
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <h2 className="font-serif text-lg text-brand-slate-800">{section.title || 'Untitled section'}</h2>
+        <h2 className="font-serif text-lg text-brand-slate-800">{section.title || t('sectionCard.untitledSection')}</h2>
         {badge}
         {!isOpen ? (
           <Button
@@ -487,7 +489,7 @@ export function SectionCard({
             onClick={openSection}
             data-testid={`section-${section.id}-edit`}
           >
-            Edit
+            {t('sectionCard.edit')}
           </Button>
         ) : confirmingDiscard ? (
           <div className="ml-auto flex flex-wrap items-center gap-3 text-sm">
@@ -496,7 +498,7 @@ export function SectionCard({
                 both fire, which is noisy and (worse) ambiguous to tests and
                 screen readers about which one is the actual news. */}
             <span className="text-brand-slate-700" role={discardError ? undefined : 'alert'}>
-              Discard the changes saved since you started editing?
+              {t('sectionCard.discardConfirmPrompt')}
             </span>
             <button
               ref={keepEditingRef}
@@ -509,7 +511,7 @@ export function SectionCard({
               }}
               data-testid={`section-${section.id}-discard-cancel`}
             >
-              Keep editing
+              {t('sectionCard.keepEditing')}
             </button>
             <Button
               variant="danger"
@@ -518,7 +520,7 @@ export function SectionCard({
               onClick={() => void confirmDiscard()}
               data-testid={`section-${section.id}-discard-confirm`}
             >
-              Discard changes
+              {t('sectionCard.discardChanges')}
             </Button>
           </div>
         ) : (
@@ -531,10 +533,10 @@ export function SectionCard({
               onClick={() => void handleDiscardClick()}
               data-testid={`section-${section.id}-discard`}
             >
-              Discard changes
+              {t('sectionCard.discardChanges')}
             </button>
             <Button size="sm" onClick={() => void handleDone()} data-testid={`section-${section.id}-done`}>
-              Done
+              {t('sectionCard.done')}
             </Button>
           </div>
         )}
@@ -555,7 +557,7 @@ export function SectionCard({
       {isOpen && !confirmingDiscard && failedFields.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-3 text-sm text-brand-danger-700" role="alert">
           <span>
-            Couldn&apos;t save {failedFields.map((f) => f.label).join(', ')} — check your connection and try again
+            {t('sectionCard.couldNotSaveFields', { fields: failedFields.map((f) => f.label).join(', ') })}
           </span>
           <Button
             variant="secondary"
@@ -564,14 +566,14 @@ export function SectionCard({
             onClick={() => void handleRetryFailedSaves()}
             data-testid={`section-${section.id}-retry`}
           >
-            {retrying ? 'Retrying…' : 'Retry'}
+            {retrying ? t('sectionCard.retrying') : t('sectionCard.retry')}
           </Button>
         </div>
       )}
 
       {isOpen ? (
         fields.length === 0 ? (
-          <p className="text-sm text-brand-slate-500">No fields.</p>
+          <p className="text-sm text-brand-slate-500">{t('sectionCard.noFields')}</p>
         ) : (
           <div ref={fieldsBodyRef} className="space-y-4">
             <DocumentFlushContext.Provider value={sectionFlushRegistry}>
@@ -590,7 +592,7 @@ export function SectionCard({
         )
       ) : isEmpty ? (
         <p className="text-sm text-brand-slate-500">
-          Not started.{' '}
+          {t('sectionCard.notStarted')}{' '}
           <button
             type="button"
             className="text-brand-teal-600 hover:underline"
@@ -598,11 +600,11 @@ export function SectionCard({
             onClick={openSection}
             data-testid={`section-${section.id}-start-editing`}
           >
-            Start editing
+            {t('sectionCard.startEditing')}
           </button>
         </p>
       ) : fields.length === 0 ? (
-        <p className="text-sm text-brand-slate-500">No fields.</p>
+        <p className="text-sm text-brand-slate-500">{t('sectionCard.noFields')}</p>
       ) : (
         <div className="space-y-4">
           {fields.map((field) => (

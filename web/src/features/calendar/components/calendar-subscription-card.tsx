@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -8,9 +9,19 @@ import { useToast } from '@/components/ui/toast';
 import { apiErrorMessage } from '@/lib/api-error';
 import { getCalendarFeed, regenerateCalendarFeed } from '../api/calendar-api';
 
-/** Profile page card: the viewer's personal ICS feed URL, with copy and a
- * confirmed regenerate (which revokes the old link). */
+/**
+ * Profile page card: the viewer's personal ICS feed URL, with copy and a
+ * confirmed regenerate (which revokes the old link). Reachable by every
+ * audience (parent, staff, admin) via the shared `features/auth` Profile
+ * page, NOT staff-only — so, unlike the rest of `features/calendar`, the
+ * `calendar` namespace stays a normal EAGER namespace
+ * (`locales/en/calendar.json`, not `locales/en/staff/`): this card's English
+ * must be present before any staff route chunk could register it. See
+ * `docs/i18n/README.md`'s "Staff and admin namespaces" for the rule this is
+ * the deliberate exception to.
+ */
 export function CalendarSubscriptionCard() {
+  const { t } = useTranslation(['calendar', 'common']);
   const { show: showToast } = useToast();
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,24 +41,28 @@ export function CalendarSubscriptionCard() {
           setUrl(response.data.url);
           setError(null);
         } else {
-          setError(response.message ?? 'Could not load your calendar link');
+          setError(response.message ?? t('subscriptionCard.loadFailed'));
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load your calendar link'));
+        if (active) setError(apiErrorMessage(err, t('subscriptionCard.loadFailed')));
       }
     })();
     return () => {
       active = false;
     };
+    // `t` omitted deliberately (see `docs/i18n/README.md`'s "An effect that
+    // fetches on mount never has `t` in its dependency array") — only
+    // `retryToken` should re-run this fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryToken]);
 
   const handleCopy = async () => {
     if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
-      showToast({ message: 'Calendar link copied', variant: 'success' });
+      showToast({ message: t('subscriptionCard.copySuccess'), variant: 'success' });
     } catch {
-      showToast({ message: 'Could not copy the link', variant: 'error' });
+      showToast({ message: t('subscriptionCard.copyFailed'), variant: 'error' });
     }
   };
 
@@ -59,12 +74,12 @@ export function CalendarSubscriptionCard() {
       if (response.success && response.data) {
         setUrl(response.data.url);
         setConfirmOpen(false);
-        showToast({ message: 'Calendar link regenerated', variant: 'success' });
+        showToast({ message: t('subscriptionCard.regenerateSuccess'), variant: 'success' });
       } else {
-        setRegenerateError(response.message ?? 'Could not regenerate the link');
+        setRegenerateError(response.message ?? t('subscriptionCard.regenerateFailed'));
       }
     } catch (err) {
-      setRegenerateError(apiErrorMessage(err, 'Could not regenerate the link'));
+      setRegenerateError(apiErrorMessage(err, t('subscriptionCard.regenerateFailed')));
     } finally {
       setRegenerating(false);
     }
@@ -72,16 +87,16 @@ export function CalendarSubscriptionCard() {
 
   return (
     <Card className="max-w-lg" data-testid="calendar-subscription-card">
-      <h2 className="mb-2 text-lg font-serif font-semibold text-brand-slate-800">Calendar subscription</h2>
-      <p className="mb-3 text-sm text-brand-slate-500">
-        Subscribe from Google Calendar, Outlook, or Apple Calendar to see your meetings and deadlines.
-      </p>
+      <h2 className="mb-2 text-lg font-serif font-semibold text-brand-slate-800">
+        {t('subscriptionCard.title')}
+      </h2>
+      <p className="mb-3 text-sm text-brand-slate-500">{t('subscriptionCard.description')}</p>
 
       {error && (
         <div role="alert">
           <Notice variant="error" title={error}>
-            <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
-              Try again
+            <Button size="sm" variant="secondary" onClick={() => setRetryToken((n) => n + 1)}>
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
@@ -91,15 +106,15 @@ export function CalendarSubscriptionCard() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <Input
             id="calendar-feed-url"
-            label="Feed URL"
-            value={url ?? 'Loading…'}
+            label={t('subscriptionCard.feedUrlLabel')}
+            value={url ?? t('common:ui.loading')}
             readOnly
             data-testid="calendar-feed-url"
             className="flex-1"
           />
           <div className="flex shrink-0 gap-2">
             <Button variant="secondary" onClick={handleCopy} disabled={!url} data-testid="calendar-feed-copy">
-              Copy
+              {t('subscriptionCard.copy')}
             </Button>
             <Button
               variant="ghost"
@@ -107,7 +122,7 @@ export function CalendarSubscriptionCard() {
               disabled={!url}
               data-testid="calendar-feed-regenerate-open"
             >
-              Regenerate
+              {t('subscriptionCard.regenerate')}
             </Button>
           </div>
         </div>
@@ -115,9 +130,9 @@ export function CalendarSubscriptionCard() {
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Regenerate calendar link"
-        message="Anyone using the old link will stop receiving updates. This cannot be undone."
-        confirmLabel="Regenerate link"
+        title={t('subscriptionCard.regenerateDialogTitle')}
+        message={t('subscriptionCard.regenerateDialogMessage')}
+        confirmLabel={t('subscriptionCard.regenerateConfirmLabel')}
         confirmVariant="danger"
         loading={regenerating}
         error={regenerateError}

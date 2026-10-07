@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -12,17 +13,13 @@ import {
   listSignedArtifacts,
   uploadSignedArtifact,
 } from '../api/documents-api';
+import { signatureStatusLabel } from '../lib/signature-status-label';
 import {
   MAX_SIGNED_ARTIFACT_BYTES,
   UPLOADABLE_SIGNATURE_STATUSES,
   type SignedArtifactDto,
   type UploadableSignatureStatus,
 } from '../types';
-
-const STATUS_LABELS: Record<UploadableSignatureStatus, string> = {
-  PartiallySigned: 'Partially signed',
-  Signed: 'Signed',
-};
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -46,9 +43,13 @@ interface SignedArtifactsPanelProps {
  * externally-signed copy.
  */
 export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsPanelProps) {
+  const { t } = useTranslation('document-authoring');
   const [artifacts, setArtifacts] = useState<SignedArtifactDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // A server message is already resolved text; the generic case is
+  // translated at render time below — so the mount-fetch effect never needs
+  // `t` in its dependency array (a language switch must not re-trigger it).
+  const [loadError, setLoadError] = useState<{ kind: 'server'; message: string } | { kind: 'generic' } | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [signerSummary, setSignerSummary] = useState('');
@@ -67,9 +68,12 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
         const res = await listSignedArtifacts(versionId);
         if (!active) return;
         if (res.success && res.data) setArtifacts(res.data);
-        else setLoadError(res.message ?? 'Could not load signed artifacts.');
+        else setLoadError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
       } catch (err) {
-        if (active) setLoadError(apiErrorMessage(err, 'Could not load signed artifacts.'));
+        if (active) {
+          const message = apiErrorMessage(err, '');
+          setLoadError(message ? { kind: 'server', message } : { kind: 'generic' });
+        }
       } finally {
         if (active) setIsLoading(false);
       }
@@ -84,12 +88,12 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
     setFileError(null);
     if (picked && picked.type !== 'application/pdf') {
       setFile(null);
-      setFileError('Only a PDF file can be attached.');
+      setFileError(t('signedArtifactsPanel.pdfOnlyError'));
       return;
     }
     if (picked && picked.size > MAX_SIGNED_ARTIFACT_BYTES) {
       setFile(null);
-      setFileError('The file must be 20 MB or smaller.');
+      setFileError(t('signedArtifactsPanel.tooLargeError'));
       return;
     }
     setFile(picked);
@@ -98,7 +102,7 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!file) {
-      setFileError('Choose a PDF file to attach.');
+      setFileError(t('signedArtifactsPanel.chooseFileError'));
       return;
     }
     setIsUploading(true);
@@ -112,10 +116,10 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
         setSignerSummary('');
         if (fileInputRef.current) fileInputRef.current.value = '';
       } else {
-        setUploadError(res.message ?? 'Could not attach the signed PDF.');
+        setUploadError(res.message ?? t('signedArtifactsPanel.uploadGenericError'));
       }
     } catch (err) {
-      setUploadError(apiErrorMessage(err, 'Could not attach the signed PDF.'));
+      setUploadError(apiErrorMessage(err, t('signedArtifactsPanel.uploadGenericError')));
     } finally {
       setIsUploading(false);
     }
@@ -129,10 +133,10 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
       if (res.success && res.data?.url) {
         window.open(res.data.url, '_blank', 'noopener,noreferrer');
       } else {
-        setDownloadError(res.message ?? 'Could not prepare the download.');
+        setDownloadError(res.message ?? t('signedArtifactsPanel.downloadGenericError'));
       }
     } catch (err) {
-      setDownloadError(apiErrorMessage(err, 'Could not prepare the download.'));
+      setDownloadError(apiErrorMessage(err, t('signedArtifactsPanel.downloadGenericError')));
     } finally {
       setDownloadingId(null);
     }
@@ -140,7 +144,7 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
 
   return (
     <Card data-testid="signed-artifacts-panel">
-      <h2 className="mb-3 font-serif text-lg text-brand-slate-800">Signed artifacts</h2>
+      <h2 className="mb-3 font-serif text-lg text-brand-slate-800">{t('signedArtifactsPanel.heading')}</h2>
 
       <form onSubmit={handleSubmit} className="mb-5 space-y-3" data-testid="signed-artifact-upload-form">
         {(fileError || uploadError) && (
@@ -150,7 +154,7 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
         )}
         <div>
           <label htmlFor="signed-artifact-file" className="mb-1 block text-[13px] font-medium text-brand-slate-600">
-            Signed PDF (up to 20 MB)
+            {t('signedArtifactsPanel.fileLabel')}
           </label>
           <input
             ref={fileInputRef}
@@ -165,34 +169,37 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Input
-            label="Signer summary (optional)"
+            label={t('signedArtifactsPanel.signerSummaryLabel')}
             value={signerSummary}
             onChange={(e) => setSignerSummary(e.target.value)}
             maxLength={500}
-            placeholder="e.g. Parent and LEA rep signed"
+            placeholder={t('signedArtifactsPanel.signerSummaryPlaceholder')}
             data-testid="signed-artifact-signer-summary"
           />
           <Select
-            label="Status *"
+            label={t('signedArtifactsPanel.statusLabel')}
             value={status}
             onChange={(e) => setStatus(e.target.value as UploadableSignatureStatus)}
             data-testid="signed-artifact-status"
           >
             {UPLOADABLE_SIGNATURE_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {STATUS_LABELS[s]}
+                {signatureStatusLabel(s)}
               </option>
             ))}
           </Select>
         </div>
         <Button type="submit" size="sm" loading={isUploading} data-testid="signed-artifact-submit">
-          Attach signed PDF
+          {t('signedArtifactsPanel.attachButton')}
         </Button>
       </form>
 
       {loadError && (
         <div role="alert">
-          <Notice variant="error" title={loadError} />
+          <Notice
+            variant="error"
+            title={loadError.kind === 'server' ? loadError.message : t('signedArtifactsPanel.loadError')}
+          />
         </div>
       )}
 
@@ -204,7 +211,7 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
 
       {!loadError && !isLoading && artifacts.length === 0 && (
         <p className="text-sm text-brand-slate-500" data-testid="signed-artifacts-empty">
-          No signed copies attached yet.
+          {t('signedArtifactsPanel.emptyState')}
         </p>
       )}
 
@@ -221,13 +228,13 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
               <div>
                 <p className="text-sm font-medium text-brand-slate-800">{a.fileName}</p>
                 <p className="text-xs text-brand-slate-500">
-                  {formatFileSize(a.sizeBytes)} · Uploaded {formatDate(a.uploadedAt)}
-                  {a.uploadedByName ? ` by ${a.uploadedByName}` : ''}
+                  {formatFileSize(a.sizeBytes)} · {t('signedArtifactsPanel.uploaded', { date: formatDate(a.uploadedAt) })}
+                  {a.uploadedByName ? t('signedArtifactsPanel.uploadedBy', { name: a.uploadedByName }) : ''}
                   {a.signerSummary ? ` · ${a.signerSummary}` : ''}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="neutral">{a.contentType === 'application/pdf' ? 'PDF' : a.contentType}</Badge>
+                <Badge variant="neutral">{a.contentType === 'application/pdf' ? t('signedArtifactsPanel.contentTypePdf') : a.contentType}</Badge>
                 <Button
                   variant="secondary"
                   size="sm"
@@ -235,7 +242,7 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
                   loading={downloadingId === a.id}
                   data-testid={`signed-artifact-download-${a.id}`}
                 >
-                  Download
+                  {t('signedArtifactsPanel.download')}
                 </Button>
               </div>
             </li>

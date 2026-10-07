@@ -1,12 +1,19 @@
 import { useRef, useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ToastProvider } from '@/components/ui/toast';
+import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import type { AutosaveStatus } from '@/hooks/use-autosave';
 import type { DocumentInstance, SaveResult } from '../hooks/use-document-instance';
 import type { AuthoredDocumentVersionSummaryDto, DocumentInstanceDetailDto, DocumentValuePatch } from '../types';
+// `document-authoring` is a staff-only namespace (plan phase 5) — see
+// `../staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
+// admin namespaces". This component renders directly here (not through the
+// lazy route), so its English must be registered the same way the real
+// route chunk does.
+import '../staff-locales';
 import { DocumentEditor } from './document-editor';
 
 // Every API this page's descendants touch on mount, stubbed to inert/empty
@@ -426,5 +433,18 @@ describe('DocumentEditor', () => {
     await user.click(screen.getByTestId('finalize-confirm'));
 
     await waitFor(() => expect(documentsApi.finalizeDocument).toHaveBeenCalled());
+  });
+
+  afterEach(() => resetTestLanguage());
+
+  it('renders the page frame in Spanish', async () => {
+    await renderInSpanish(<Harness initialValues={{ [PROFILE_FIELD]: 'Jordan', [PRESENT_FIELD]: '' }} />, {
+      ns: 'document-authoring',
+    });
+
+    expect(screen.getByText('Borrador')).toBeInTheDocument(); // the status badge, Draft → Borrador
+    expect(screen.getByRole('heading', { name: 'Finalizar' })).toBeInTheDocument();
+    expect(screen.getByText('Evidencia')).toBeInTheDocument();
+    expect(screen.getByText('Preguntar al asistente')).toBeInTheDocument();
   });
 });

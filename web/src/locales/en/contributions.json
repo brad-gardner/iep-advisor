@@ -1,0 +1,43 @@
+{
+  "card": {
+    "heading": "About {{name}} at home",
+    "addNoteButton": "Add a note",
+    "description": "Strengths, concerns, what works. Notes are private unless you choose to share one with the school team — shared notes help the team (and its AI suggestions) see your child the way you do.",
+    "loadingAriaLabel": "Loading notes",
+    "loadErrorTitle": "Could not load notes",
+    "noNotesYet": "No notes yet."
+  },
+  "addForm": {
+    "kindLabel": "This is",
+    "noteLabel": "Note",
+    "sharedLabel": "Visible to the school team",
+    "saveButton": "Save",
+    "savedSharedToast": "Saved and shared with the school team",
+    "savedPrivateToast": "Saved (private)",
+    "saveFailedToast": "Could not save"
+  },
+  "item": {
+    "visibleBadge": "Visible to the school team",
+    "privateBadge": "Private to your family",
+    "makePrivateAction": "Make private",
+    "shareAction": "Share",
+    "toggleAriaLabel": "{{action}}: {{excerpt}}",
+    "deleteAriaLabel": "Delete note: {{excerpt}}",
+    "nowVisibleToast": "Now visible to the school team",
+    "nowPrivateToast": "Now private",
+    "updateFailedToast": "Could not update"
+  },
+  "deleteDialog": {
+    "title": "Delete note",
+    "message": "Delete this note? If it was shared, the school team will no longer see it.",
+    "confirmLabel": "Delete",
+    "deleteFailed": "Could not delete this note."
+  },
+  "kind": {
+    "Strength": "A strength",
+    "Concern": "A concern",
+    "WorksAtHome": "What works at home",
+    "Priority": "A priority for this year",
+    "Other": "Something else"
+  }
+}

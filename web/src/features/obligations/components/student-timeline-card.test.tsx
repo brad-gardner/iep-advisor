@@ -1,13 +1,20 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { apiRejection } from '@/test/axios-rejection';
+import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import type { ObligationDto } from '../types';
 
 const obligationsApi = vi.hoisted(() => ({ listStudentObligations: vi.fn() }));
 vi.mock('../api/obligations-api', () => obligationsApi);
 
 import { StudentTimelineCard } from './student-timeline-card';
+// `obligations` is a staff-only namespace (plan phase 5) — its English
+// isn't bundled in `resources` (see `lib/i18n/index.ts`), only registered
+// by this side-effect import, exactly as the real lazy route chunk
+// (`app/lazy-routes/staff-routes.tsx`) registers it before the page that
+// hosts this card (the educator student detail page) can render.
+import '../staff-locales';
 
 const obligations: ObligationDto[] = [
   {
@@ -53,6 +60,8 @@ describe('StudentTimelineCard', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => resetTestLanguage());
+
   it('renders a status chip (icon + text) per obligation kind', async () => {
     obligationsApi.listStudentObligations.mockResolvedValue({ success: true, data: obligations });
     render(<StudentTimelineCard studentId={10} onEditDates={vi.fn()} />);
@@ -85,5 +94,16 @@ describe('StudentTimelineCard', () => {
     obligationsApi.listStudentObligations.mockRejectedValue(apiRejection('Could not compute obligations'));
     render(<StudentTimelineCard studentId={10} onEditDates={vi.fn()} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not compute obligations');
+  });
+
+  it('renders the heading and status/kind labels in Spanish', async () => {
+    obligationsApi.listStudentObligations.mockResolvedValue({ success: true, data: obligations });
+
+    await renderInSpanish(<StudentTimelineCard studentId={10} onEditDates={vi.fn()} />, { ns: 'obligations' });
+
+    expect(await screen.findByText('Cronología')).toBeInTheDocument();
+    expect(screen.getByTestId('timeline-row-AnnualReview')).toHaveTextContent('Próxima a vencer');
+    expect(screen.getByTestId('timeline-row-Reevaluation')).toHaveTextContent('Vencida');
+    expect(screen.getByText('Editar fechas')).toBeInTheDocument();
   });
 });

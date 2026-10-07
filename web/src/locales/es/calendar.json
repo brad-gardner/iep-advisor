@@ -1,0 +1,46 @@
+{
+  "page": {
+    "title": "Calendario",
+    "scheduleMeeting": "Programar reunión",
+    "couldNotLoad": "No se pudo cargar el calendario",
+    "previousMonth": "Mes anterior",
+    "nextMonth": "Mes siguiente",
+    "today": "Hoy",
+    "selectedDay": "Día seleccionado",
+    "thisMonth": "Este mes"
+  },
+  "agenda": {
+    "emptyTitle": "No hay nada en el calendario",
+    "emptyDescription": "Las reuniones y los próximos plazos de este rango aparecerán aquí.",
+    "meetingBadge": "Reunión",
+    "due": "Vence el {{date}}"
+  },
+  "monthGrid": {
+    "ariaLabel": "Mes del calendario",
+    "today": "hoy",
+    "itemCount_one": "{{count}} elemento",
+    "itemCount_other": "{{count}} elementos"
+  },
+  "studentPicker": {
+    "title": "Programar reunión",
+    "findStudentLabel": "Buscar un estudiante",
+    "placeholder": "Nombre o identificación del estudiante",
+    "searching": "Buscando…",
+    "noResults": "No se encontraron estudiantes."
+  },
+  "subscriptionCard": {
+    "title": "Suscripción al calendario",
+    "description": "Suscríbase desde Google Calendar, Outlook o Apple Calendar para ver sus reuniones y plazos.",
+    "loadFailed": "No se pudo cargar su enlace de calendario",
+    "copySuccess": "Enlace de calendario copiado",
+    "copyFailed": "No se pudo copiar el enlace",
+    "regenerateSuccess": "Enlace de calendario regenerado",
+    "regenerateFailed": "No se pudo regenerar el enlace",
+    "feedUrlLabel": "URL del feed",
+    "copy": "Copiar",
+    "regenerate": "Regenerar",
+    "regenerateDialogTitle": "Regenerar enlace de calendario",
+    "regenerateDialogMessage": "Cualquier persona que use el enlace anterior dejará de recibir actualizaciones. Esto no se puede deshacer.",
+    "regenerateConfirmLabel": "Regenerar enlace"
+  }
+}

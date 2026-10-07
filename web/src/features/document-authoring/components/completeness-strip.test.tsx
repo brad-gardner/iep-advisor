@@ -1,7 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import type { CompletenessSummary } from '../lib/completeness';
+// `document-authoring` is a staff-only namespace (plan phase 5) — see
+// `../staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
+// admin namespaces". This component renders directly here (not through the
+// lazy route), so its English must be registered the same way the real
+// route chunk does.
+import '../staff-locales';
 
 const sectionDom = vi.hoisted(() => ({ jumpToField: vi.fn() }));
 vi.mock('../lib/section-dom', () => sectionDom);
@@ -71,5 +78,13 @@ describe('CompletenessStrip', () => {
   it('omits the updating indicator when nothing is saving', () => {
     render(<CompletenessStrip summary={summary()} updating={false} />);
     expect(screen.queryByTestId('completeness-updating')).not.toBeInTheDocument();
+  });
+
+  afterEach(() => resetTestLanguage());
+
+  it('renders in Spanish', async () => {
+    await renderInSpanish(<CompletenessStrip summary={summary()} updating={false} />, { ns: 'document-authoring' });
+    expect(screen.getByRole('heading', { name: 'Completitud' })).toBeInTheDocument();
+    expect(screen.getByText('Sin elementos marcados')).toBeInTheDocument();
   });
 });

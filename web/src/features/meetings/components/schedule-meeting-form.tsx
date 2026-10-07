@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api-error';
+import { meetingTypeLabel } from '@/lib/meeting-labels';
 import { createMeeting, updateMeeting } from '../api/meetings-api';
 import {
   useMeetingParticipantPool,
@@ -21,7 +23,6 @@ import {
   DEFAULT_MEETING_DURATION_MINUTES,
   MAX_MEETING_DURATION_MINUTES,
   MEETING_TYPES,
-  MEETING_TYPE_LABELS,
   MIN_MEETING_DURATION_MINUTES,
 } from '../types';
 import type { MeetingDto, MeetingType, ParticipantInput } from '../types';
@@ -51,6 +52,7 @@ export function ScheduleMeetingForm({
   onCancel,
   onSubmittingChange,
 }: ScheduleMeetingFormProps) {
+  const { t } = useTranslation(['meetings-staff', 'common']);
   const { rows: pool, failed: poolFailed } = useMeetingParticipantPool(studentId);
   const [rows, setRows] = useState<ParticipantRow[] | null>(null);
 
@@ -118,11 +120,11 @@ export function ScheduleMeetingForm({
       // form directly without going through the (disabled) button, so this
       // guards against ever sending an explicit `participants: []` that the
       // server would take literally instead of computing its own defaults.
-      setError('The participant list is still loading — try again in a moment.');
+      setError(t('scheduleForm.participantsLoading'));
       return;
     }
     if (!date || !time) {
-      setError('Choose a date and time for the meeting');
+      setError(t('scheduleForm.dateTimeRequired'));
       return;
     }
     setSubmitting(true);
@@ -146,10 +148,10 @@ export function ScheduleMeetingForm({
       if (response.success && response.data) {
         onSaved(response.data);
       } else {
-        setError(response.message ?? 'Could not save the meeting');
+        setError(response.message ?? t('scheduleForm.saveFailed'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not save the meeting'));
+      setError(apiErrorMessage(err, t('scheduleForm.saveFailed')));
     } finally {
       setSubmitting(false);
     }
@@ -165,36 +167,36 @@ export function ScheduleMeetingForm({
 
       <Select
         id="meeting-type"
-        label="Meeting type"
+        label={t('scheduleForm.meetingTypeLabel')}
         value={type}
         onChange={(e) => setType(e.target.value as MeetingType)}
       >
-        {MEETING_TYPES.map((t) => (
-          <option key={t} value={t}>
-            {MEETING_TYPE_LABELS[t]}
+        {MEETING_TYPES.map((mt) => (
+          <option key={mt} value={mt}>
+            {meetingTypeLabel(mt)}
           </option>
         ))}
       </Select>
 
       <Input
         id="meeting-title"
-        label="Title"
+        label={t('scheduleForm.titleLabel')}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Optional"
+        placeholder={t('scheduleForm.titlePlaceholder')}
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input
           id="meeting-date"
-          label="Date"
+          label={t('scheduleForm.dateLabel')}
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
         />
         <Input
           id="meeting-time"
-          label="Time"
+          label={t('scheduleForm.timeLabel')}
           type="time"
           value={time}
           onChange={(e) => setTime(e.target.value)}
@@ -204,7 +206,7 @@ export function ScheduleMeetingForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Select
           id="meeting-timezone"
-          label="Time zone"
+          label={t('scheduleForm.timeZoneLabel')}
           value={timeZoneId}
           onChange={(e) => setTimeZoneId(e.target.value)}
         >
@@ -216,7 +218,7 @@ export function ScheduleMeetingForm({
         </Select>
         <Input
           id="meeting-duration"
-          label="Duration (minutes)"
+          label={t('scheduleForm.durationLabel')}
           type="number"
           min={MIN_MEETING_DURATION_MINUTES}
           max={MAX_MEETING_DURATION_MINUTES}
@@ -228,31 +230,31 @@ export function ScheduleMeetingForm({
 
       <Input
         id="meeting-location"
-        label="Location"
+        label={t('scheduleForm.locationLabel')}
         value={location}
         onChange={(e) => setLocation(e.target.value)}
-        placeholder="Optional"
+        placeholder={t('scheduleForm.locationPlaceholder')}
       />
       <Input
         id="meeting-video-url"
-        label="Video call URL"
+        label={t('scheduleForm.videoUrlLabel')}
         type="url"
         value={videoUrl}
         onChange={(e) => setVideoUrl(e.target.value)}
-        placeholder="Optional"
+        placeholder={t('scheduleForm.videoUrlPlaceholder')}
       />
       <RichTextEditor
         id="meeting-notes"
-        label="Notes"
+        label={t('scheduleForm.notesLabel')}
         value={notes}
         onChange={setNotes}
         minRows={3}
-        placeholder="Optional"
+        placeholder={t('scheduleForm.notesPlaceholder')}
       />
 
       {poolFailed && (
-        <Notice variant="warning" title="Could not load the participant directory">
-          You can still add participants manually below.
+        <Notice variant="warning" title={t('scheduleForm.poolFailedTitle')}>
+          {t('scheduleForm.poolFailedBody')}
         </Notice>
       )}
       {rows === null ? (
@@ -272,7 +274,7 @@ export function ScheduleMeetingForm({
 
       <div className="flex items-center justify-end gap-2 pt-2">
         <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>
-          Cancel
+          {t('common:ui.cancel')}
         </Button>
         <Button
           type="submit"
@@ -280,7 +282,7 @@ export function ScheduleMeetingForm({
           disabled={rows === null}
           data-testid="schedule-meeting-submit"
         >
-          {meeting ? 'Save changes' : 'Schedule meeting'}
+          {meeting ? t('scheduleForm.saveChangesButton') : t('scheduleForm.saveButton')}
         </Button>
       </div>
     </form>

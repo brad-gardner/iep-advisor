@@ -1,5 +1,5 @@
 import i18n from './i18n';
-import type { MeetingStatus, MeetingType } from '@/features/meetings/types';
+import type { MeetingDecisionOutcome, MeetingStatus, MeetingType } from '@/features/meetings/types';
 
 // Translated meeting type / status labels (`common:meetingType.*`,
 // `common:meetingStatus.*`). Same shape as `inviteStatusLabel`: plain functions
@@ -39,4 +39,19 @@ const DOCUMENT_MEETING_TYPE_TO_MEETING_TYPE: Record<string, MeetingType> = {
 export function documentMeetingTypeLabel(value: string): string {
   const meetingType = DOCUMENT_MEETING_TYPE_TO_MEETING_TYPE[value];
   return meetingType ? meetingTypeLabel(meetingType) : value;
+}
+
+// `meetings-staff:decisionOutcome.*` (plan phase 5) — unlike
+// `meetingTypeLabel`/`meetingStatusLabel` above, a decision outcome is
+// staff-only (parents never see "Agreed"/"Disagreed"/"Deferred"), so its
+// translation lives in the staff-only `meetings-staff` namespace rather
+// than `common`. Every current and foreseeable caller (this feature's own
+// decision-form/edit-decision-dialog/decisions-panel, plus
+// `features/document-authoring/components/proposed-edits-panel.tsx` once
+// its own phase converts it) renders only from a page inside the shared
+// `staff-routes.tsx` chunk, which registers this namespace's English
+// before any of those pages can render — see
+// `features/meetings/staff-locales.ts`.
+export function meetingDecisionOutcomeLabel(outcome: MeetingDecisionOutcome): string {
+  return i18n.t(`meetings-staff:decisionOutcome.${outcome}`, { defaultValue: outcome });
 }

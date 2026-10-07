@@ -34,8 +34,5 @@ export interface ChatResponse {
   reply: string;
 }
 
-export const ASSIST_KIND_LABELS: Record<AssistKind, string> = {
-  Rewrite: 'Rewrite',
-  Improve: 'Improve',
-  SuggestMeasurement: 'Suggest measurement',
-};
+// Display label: `lib/assist-kind-label.ts`'s `assistKindLabel` (translated;
+// this type's values themselves stay the English wire values).

@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge';
-import { SIGNATURE_STATUS_LABELS } from '../types';
+import { signatureStatusLabel } from '../lib/signature-status-label';
 import type { SignatureStatus } from '../types';
 
 const VARIANT: Record<SignatureStatus, 'warning' | 'info' | 'success'> = {
@@ -17,7 +17,7 @@ interface SignatureStatusBadgeProps {
 export function SignatureStatusBadge({ status, 'data-testid': testId }: SignatureStatusBadgeProps) {
   return (
     <Badge variant={VARIANT[status]} data-testid={testId}>
-      {SIGNATURE_STATUS_LABELS[status]}
+      {signatureStatusLabel(status)}
     </Badge>
   );
 }

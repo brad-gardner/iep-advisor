@@ -1,14 +1,21 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiErrorMessage } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
+import { obligationKindLabel } from '@/lib/obligation-label';
 import { listStudentObligations } from '../api/obligations-api';
-import { OBLIGATION_KIND_LABELS } from '../types';
 import type { ObligationDto } from '../types';
 import { ObligationStatusChip } from './obligation-status-chip';
+
+// A server-provided message is already resolved text and is shown as-is;
+// the generic fallback is translated at RENDER time (below), not stored
+// pre-translated here, so the mount effect never needs `t` in its
+// dependency array (same idiom as `useHome`/`MeetingRsvpPage`'s `LoadError`).
+type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 interface StudentTimelineCardProps {
   studentId: number;
@@ -20,8 +27,9 @@ interface StudentTimelineCardProps {
 /** Procedural deadlines (annual review, reevaluation, ETR) computed from the
  * student's dates, with status chips and a link to edit those dates. */
 export function StudentTimelineCard({ studentId, onEditDates }: StudentTimelineCardProps) {
+  const { t } = useTranslation(['obligations', 'common']);
   const [obligations, setObligations] = useState<ObligationDto[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   // Bumped by the "Try again" button to re-run the load effect below.
   const [retryToken, setRetryToken] = useState(0);
 
@@ -35,46 +43,52 @@ export function StudentTimelineCard({ studentId, onEditDates }: StudentTimelineC
           setObligations(response.data);
           setError(null);
         } else {
-          setError(response.message ?? 'Could not load the timeline');
+          setError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load the timeline'));
+        if (!active) return;
+        const serverMessage = apiErrorMessage(err, '');
+        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
       }
     })();
     return () => {
       active = false;
     };
+    // `t` deliberately excluded (see `use-home.ts`): re-running this fetch on
+    // a plain language switch would be wasteful.
   }, [studentId, retryToken]);
+
+  const displayError = error ? (error.kind === 'server' ? error.message : t('obligations:card.loadFailed')) : null;
 
   return (
     <Card data-testid="student-timeline-card">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="font-serif text-base text-brand-slate-800">Timeline</h2>
+        <h2 className="font-serif text-base text-brand-slate-800">{t('obligations:card.heading')}</h2>
         {onEditDates && (
           <Button variant="ghost" size="sm" onClick={onEditDates} data-testid="timeline-edit-dates">
-            Edit dates
+            {t('obligations:card.editDatesButton')}
           </Button>
         )}
       </div>
 
-      {error && (
+      {displayError && (
         <div role="alert">
-          <Notice variant="error" title={error}>
-            <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
-              Try again
+          <Notice variant="error" title={displayError}>
+            <Button size="sm" variant="secondary" onClick={() => setRetryToken((n) => n + 1)}>
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
       )}
 
-      {!error && obligations === null && (
+      {!displayError && obligations === null && (
         <div className="space-y-2">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
         </div>
       )}
 
-      {!error && obligations !== null && (
+      {!displayError && obligations !== null && (
         <dl className="space-y-3 text-sm" data-testid="student-timeline-list">
           {obligations.map((o, i) => (
             // Plan 7 kinds (goal-observation, evaluator submission) can produce
@@ -86,7 +100,7 @@ export function StudentTimelineCard({ studentId, onEditDates }: StudentTimelineC
               data-testid={`timeline-row-${o.kind}`}
             >
               <div>
-                <dt className="text-brand-slate-500">{OBLIGATION_KIND_LABELS[o.kind]}</dt>
+                <dt className="text-brand-slate-500">{obligationKindLabel(o.kind)}</dt>
                 <dd className="text-brand-slate-800">
                   {formatDate(o.dueDate)}
                   <span className="ml-1 text-xs text-brand-slate-500">{o.sourceLabel}</span>

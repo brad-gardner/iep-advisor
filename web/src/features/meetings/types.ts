@@ -16,6 +16,20 @@ export const MEETING_TYPES = [
   'Other',
 ] as const;
 export type MeetingType = (typeof MEETING_TYPES)[number];
+// `MEETING_TYPE_LABELS`/`MEETING_STATUS_LABELS` below, and
+// `INVITE_STATUS_LABELS`/`MEETING_DECISION_OUTCOME_LABELS` further down,
+// each have a translated replacement now (`@/lib/meeting-labels.ts`'s
+// `meetingTypeLabel`/`meetingStatusLabel`/`meetingDecisionOutcomeLabel`,
+// and `@/lib/invite-status-label.ts`'s `inviteStatusLabel` — i18n plan
+// phase 5). Every caller within this phase's scope
+// (`features/meetings`'s own staff components) now uses the helper
+// instead. These maps stay in place because callers outside this phase's
+// scope still import them directly: `features/home/components/
+// this-week-section.tsx` (`MEETING_STATUS_LABELS`), `features/calendar/
+// components/calendar-agenda-list.tsx` (`MEETING_TYPE_LABELS`), and
+// `features/document-authoring/components/proposed-edits-panel.tsx`
+// (`MEETING_DECISION_OUTCOME_LABELS`) — remove each map only once every
+// caller across the codebase has moved to the matching helper.
 export const MEETING_TYPE_LABELS: Record<MeetingType, string> = {
   AnnualReview: 'Annual review',
   InitialIep: 'Initial IEP',

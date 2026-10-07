@@ -75,6 +75,18 @@ Every Spanish string in the app, emails, PDFs and AI instructions uses these ter
 | due process (hearing) | debido proceso (audiencia de debido proceso) |
 | advocacy goals (parent priorities) | metas para el IEP |
 | advocate (a person) | defensor / defensora |
+| goal/service owner (responsible staff) | responsable |
+| completeness (document strip) | completitud |
+| carried from (previous document) | trasladado de |
+| setting (service location) | entorno |
+| intervention specialist | especialista en intervención |
+| speech-language pathologist | patólogo del habla y el lenguaje |
+| occupational therapist / physical therapist | terapeuta ocupacional / fisioterapeuta |
+| school psychologist / counselor | psicólogo escolar / consejero |
+| LEA representative / interpreter | representante de la LEA / intérprete |
+| student status: active / exited / archived | activo / egresado / archivado |
+| exit reason: graduated / transferred / withdrawn / declassified | graduado / trasladado / retirado / desclasificado |
+| home language | idioma del hogar |
 | grade (level) | grado |
 | Pre-K / Kindergarten | prekínder / kínder |
 | 1st grade … 12th grade | 1.er grado … 12.º grado |
@@ -86,6 +98,11 @@ Every Spanish string in the app, emails, PDFs and AI instructions uses these ter
 | obligation status: upcoming | Próxima |
 | obligation status: due soon | Próxima a vencer |
 | obligation status: overdue | Vencida |
+| meeting brief (AI-generated prep document) | resumen de la reunión (short button label: "Resumen") |
+| meeting decision | decisión |
+| decision outcome: agreed | acordado |
+| decision outcome: disagreed | en desacuerdo |
+| decision outcome: deferred | diferido |
 
 ## IDEA disability categories
 

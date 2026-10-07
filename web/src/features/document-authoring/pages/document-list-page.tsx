@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FileText, Plus } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,7 @@ import { useAuthoredVersions } from '../hooks/use-authored-versions';
 import { NewDocumentModal } from '../components/new-document-modal';
 import { AuthoredPdfDownload } from '../components/authored-pdf-download';
 import { SignatureStatusBadge } from '../components/signature-status-badge';
+import { documentStatusLabel } from '../lib/document-status-label';
 import type {
   AuthoredDocumentVersionSummaryDto,
   DocumentInstanceStatus,
@@ -30,7 +32,8 @@ const statusVariant: Record<DocumentInstanceStatus, 'neutral' | 'warning' | 'suc
 };
 
 export function DocumentListPage() {
-  usePageTitle('Documents');
+  const { t } = useTranslation('document-authoring');
+  usePageTitle(t('list.title'));
   const { studentId: studentIdParam } = useParams<{ studentId: string }>();
   const studentId = Number(studentIdParam);
   const navigate = useNavigate();
@@ -58,12 +61,12 @@ export function DocumentListPage() {
       if (res.success) {
         removeDocument(deleteTarget.id);
         setDeleteTarget(null);
-        show({ message: 'Document deleted', variant: 'success' });
+        show({ message: t('list.documentDeletedToast'), variant: 'success' });
       } else {
-        setDeleteError(res.message ?? 'Could not delete the document.');
+        setDeleteError(res.message ?? t('list.deleteGenericError'));
       }
     } catch {
-      setDeleteError('Could not delete the document.');
+      setDeleteError(t('list.deleteGenericError'));
     } finally {
       setDeleting(false);
     }
@@ -72,33 +75,33 @@ export function DocumentListPage() {
   const newButton = (testId: string) => (
     <Button onClick={() => setIsNewOpen(true)} data-testid={testId}>
       <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-      New document
+      {t('list.newDocument')}
     </Button>
   );
 
   const columns: TableColumn<DocumentInstanceSummaryDto>[] = [
     {
       key: 'type',
-      header: 'Document',
+      header: t('list.columnDocument'),
       cell: (d) => d.documentTypeDisplayName,
       sortValue: (d) => d.documentTypeDisplayName,
     },
     {
       key: 'status',
-      header: 'Status',
-      cell: (d) => <Badge variant={statusVariant[d.status]}>{d.status}</Badge>,
+      header: t('list.columnStatus'),
+      cell: (d) => <Badge variant={statusVariant[d.status]}>{documentStatusLabel(d.status)}</Badge>,
       sortValue: (d) => d.status,
     },
     {
       key: 'version',
-      header: 'Template v',
+      header: t('list.columnTemplateVersion'),
       cell: (d) => `v${d.templateVersionNumber}`,
       align: 'right',
       hideBelow: 'md',
     },
     {
       key: 'edited',
-      header: 'Last edited',
+      header: t('list.columnLastEdited'),
       cell: (d) => (d.lastEditedAt ? relativeTime(d.lastEditedAt) : '—'),
       sortValue: (d) => d.lastEditedAt ?? '',
       hideBelow: 'md',
@@ -108,29 +111,31 @@ export function DocumentListPage() {
   const versionColumns: TableColumn<AuthoredDocumentVersionSummaryDto>[] = [
     {
       key: 'type',
-      header: 'Document',
+      header: t('list.columnDocument'),
       cell: (v) => v.documentTypeDisplayName,
       sortValue: (v) => v.documentTypeDisplayName,
     },
     {
       key: 'version',
-      header: 'Version',
+      header: t('list.columnVersion'),
       cell: (v) => `v${v.versionNumber}`,
       align: 'right',
     },
     {
       key: 'finalized',
-      header: 'Finalized',
+      header: t('list.columnFinalized'),
       cell: (v) => relativeTime(v.finalizedAt),
       sortValue: (v) => v.finalizedAt,
       hideBelow: 'md',
     },
     {
       key: 'amendment',
-      header: 'Amendment',
+      header: t('list.columnAmendment'),
       cell: (v) =>
         v.amendsVersionId != null ? (
-          <span className="text-xs text-brand-slate-500">Amends v{v.amendsVersionNumber ?? v.amendsVersionId}</span>
+          <span className="text-xs text-brand-slate-500">
+            {t('list.amendsVersion', { number: v.amendsVersionNumber ?? v.amendsVersionId })}
+          </span>
         ) : (
           '—'
         ),
@@ -138,12 +143,12 @@ export function DocumentListPage() {
     },
     {
       key: 'signature',
-      header: 'Signature',
+      header: t('list.columnSignature'),
       cell: (v) => <SignatureStatusBadge status={v.signatureStatus} data-testid={`version-signature-${v.id}`} />,
     },
     {
       key: 'pdf',
-      header: 'PDF',
+      header: t('list.columnPdf'),
       cell: (v) => (
         <AuthoredPdfDownload
           versionId={v.id}
@@ -158,30 +163,30 @@ export function DocumentListPage() {
 
   return (
     <PageLayout
-      title="Documents"
+      title={t('list.title')}
       breadcrumb={[
-        { label: 'Student', to: `/educator/students/${studentId}` },
-        { label: 'Documents' },
+        { label: t('list.breadcrumbStudent'), to: `/educator/students/${studentId}` },
+        { label: t('list.breadcrumbDocuments') },
       ]}
       actions={newButton('new-document')}
     >
       {error && (
-        <Notice variant="error" title="Could not load documents">
-          {error}
+        <Notice variant="error" title={t('list.loadErrorTitle')}>
+          {error.kind === 'server' ? error.message : t('list.loadErrorGeneric')}
         </Notice>
       )}
 
       {!error && !isLoading && documents.length === 0 ? (
         <EmptyState
           icon={FileText}
-          title="No documents yet"
-          description="Create an IEP, ETR, or other document from a template for this student."
+          title={t('list.noDocumentsTitle')}
+          description={t('list.noDocumentsDescription')}
           action={newButton('new-document-empty')}
           data-testid="empty-hint"
         />
       ) : (
         <Table
-          label="Student documents"
+          label={t('list.breadcrumbDocuments')}
           columns={columns}
           rows={documents}
           rowKey={(d) => d.id}
@@ -189,7 +194,7 @@ export function DocumentListPage() {
           rowHref={(d) => `/educator/documents/${d.id}`}
           rowActions={(d) => [
             {
-              label: 'Delete',
+              label: t('list.deleteAction'),
               variant: 'danger',
               onSelect: () => {
                 setDeleteError(null);
@@ -203,15 +208,15 @@ export function DocumentListPage() {
       )}
 
       {versionsError ? (
-        <Notice variant="error" title="Could not load finalized versions">
-          {versionsError}
+        <Notice variant="error" title={t('list.finalizedVersionsLoadErrorTitle')}>
+          {versionsError.kind === 'server' ? versionsError.message : t('list.finalizedVersionsLoadErrorGeneric')}
         </Notice>
       ) : (
         (versionsLoading || versions.length > 0) && (
           <div className="mt-8">
-            <h2 className="mb-3 font-serif text-lg text-brand-slate-800">Finalized versions</h2>
+            <h2 className="mb-3 font-serif text-lg text-brand-slate-800">{t('list.finalizedVersionsHeading')}</h2>
             <Table
-              label="Finalized document versions"
+              label={t('list.finalizedVersionsHeading')}
               columns={versionColumns}
               rows={versions}
               rowKey={(v) => v.id}
@@ -229,16 +234,18 @@ export function DocumentListPage() {
         onClose={() => setIsNewOpen(false)}
         onCreated={(id) => {
           setIsNewOpen(false);
-          show({ message: 'Document created', variant: 'success' });
+          show({ message: t('list.documentCreatedToast'), variant: 'success' });
           openEditor(id);
         }}
       />
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title="Delete document"
-        message={`This permanently deletes this ${deleteTarget?.documentTypeDisplayName ?? 'document'} draft. This cannot be undone.`}
-        confirmLabel="Delete document"
+        title={t('list.deleteDialogTitle')}
+        message={t('list.deleteDialogMessage', {
+          documentType: deleteTarget?.documentTypeDisplayName ?? t('list.documentFallback'),
+        })}
+        confirmLabel={t('list.deleteDialogConfirm')}
         loading={deleting}
         error={deleteError}
         onConfirm={confirmDelete}

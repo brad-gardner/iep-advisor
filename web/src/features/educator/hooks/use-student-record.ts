@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/toast';
 import { apiErrorMessage } from '@/lib/api-error';
 import {
@@ -34,6 +35,7 @@ interface UseStudentRecordResult {
 // comes back as `{ success: false, error }` for the calling form/dialog to
 // render inline.
 export function useStudentRecord(studentId: number): UseStudentRecordResult {
+  const { t } = useTranslation('educator');
   const { show: showToast } = useToast();
   const [student, setStudent] = useState<SchoolStudent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -91,14 +93,30 @@ export function useStudentRecord(studentId: number): UseStudentRecordResult {
     isLoading,
     reload,
     update: (data) =>
-      run(() => updateStudent(studentId, data), 'Student updated', 'Could not save the student'),
+      run(
+        () => updateStudent(studentId, data),
+        t('studentDetailPage.studentUpdated'),
+        t('editStudentForm.genericError')
+      ),
     exit: (data) =>
-      run(() => exitStudent(studentId, data), 'Student exited', 'Could not exit the student'),
+      run(() => exitStudent(studentId, data), t('studentDetailPage.studentExited'), t('exitStudent.errorDefault')),
     reactivate: () =>
-      run(() => reactivateStudent(studentId), 'Student reactivated', 'Could not reactivate the student'),
+      run(
+        () => reactivateStudent(studentId),
+        t('studentDetailPage.studentReactivated'),
+        t('studentDetailPage.reactivateFailed')
+      ),
     archive: () =>
-      run(() => archiveStudent(studentId), 'Student archived', 'Could not archive the student'),
+      run(
+        () => archiveStudent(studentId),
+        t('studentDetailPage.studentArchived'),
+        t('studentDetailPage.archiveFailed')
+      ),
     transfer: (data) =>
-      run(() => transferStudent(studentId, data), 'Student transferred', 'Could not transfer the student'),
+      run(
+        () => transferStudent(studentId, data),
+        t('studentDetailPage.studentTransferred'),
+        t('transferStudent.errorDefault')
+      ),
   };
 }

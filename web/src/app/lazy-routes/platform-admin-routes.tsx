@@ -10,6 +10,8 @@
 // converted to i18n at all, let alone to a staff namespace) — a future
 // phase's worker adds its own `<feature>/staff-locales.ts` (the same
 // pattern as `features/educator/staff-locales.ts`) and imports it here.
+import './staff-locales';
+
 export { AdminRouteGuard } from '@/features/admin/components/admin-route-guard';
 export { AdminDashboardPage } from '@/features/admin/components/admin-dashboard-page';
 export { AdminUsersPage } from '@/features/admin/components/admin-users-page';

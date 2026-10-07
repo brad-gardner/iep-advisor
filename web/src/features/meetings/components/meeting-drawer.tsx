@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Drawer } from '@/components/ui/drawer';
 import { Badge } from '@/components/ui/badge';
@@ -7,9 +8,10 @@ import { Notice } from '@/components/ui/notice';
 import { useToast } from '@/components/ui/toast';
 import { FamilySummaryPanel } from '@/features/draft-sharing/components/family-summary-panel';
 import { apiErrorMessage } from '@/lib/api-error';
+import { inviteStatusLabel } from '@/lib/invite-status-label';
+import { meetingStatusLabel, meetingTypeLabel } from '@/lib/meeting-labels';
 import { recordAttendance, rsvpToMeeting } from '../api/meetings-api';
 import { formatMeetingWhen, timeZoneLabel } from '../lib/meeting-time';
-import { INVITE_STATUS_LABELS, MEETING_STATUS_LABELS, MEETING_TYPE_LABELS } from '../types';
 import type { AttendanceEntry, InviteStatus, MeetingDto } from '../types';
 import { DecisionsPanel } from './decisions-panel';
 import { MeetingManagerActions } from './meeting-manager-actions';
@@ -60,6 +62,7 @@ function isHttpUrl(value: string): boolean {
 }
 
 export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDrawerProps) {
+  const { t } = useTranslation(['meetings-staff', 'common']);
   const { show: showToast } = useToast();
   const [rsvpSaving, setRsvpSaving] = useState<InviteStatus | null>(null);
   const [rsvpError, setRsvpError] = useState<string | null>(null);
@@ -99,12 +102,12 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
       const response = await rsvpToMeeting(meeting.id, { status });
       if (response.success && response.data) {
         onUpdated(response.data);
-        showToast({ message: 'Response recorded', variant: 'success' });
+        showToast({ message: t('drawer.responseRecordedToast'), variant: 'success' });
       } else {
-        setRsvpError(response.message ?? 'Could not record your response');
+        setRsvpError(response.message ?? t('drawer.rsvpFailed'));
       }
     } catch (err) {
-      setRsvpError(apiErrorMessage(err, 'Could not record your response'));
+      setRsvpError(apiErrorMessage(err, t('drawer.rsvpFailed')));
     } finally {
       setRsvpSaving(null);
     }
@@ -128,12 +131,12 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
       });
       if (response.success && response.data) {
         onUpdated(response.data);
-        showToast({ message: 'Attendance saved', variant: 'success' });
+        showToast({ message: t('drawer.attendanceSavedToast'), variant: 'success' });
       } else {
-        setAttendanceError(response.message ?? 'Could not save attendance');
+        setAttendanceError(response.message ?? t('drawer.attendanceFailed'));
       }
     } catch (err) {
-      setAttendanceError(apiErrorMessage(err, 'Could not save attendance'));
+      setAttendanceError(apiErrorMessage(err, t('drawer.attendanceFailed')));
     } finally {
       setAttendanceSaving(false);
     }
@@ -144,19 +147,19 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
       <Drawer
         open={open && !rescheduling}
         onClose={onClose}
-        title={meeting.title || MEETING_TYPE_LABELS[meeting.type]}
+        title={meeting.title || meetingTypeLabel(meeting.type)}
         size="lg"
         data-testid="meeting-drawer"
       >
         <div className="space-y-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-sm text-brand-slate-600">{MEETING_TYPE_LABELS[meeting.type]}</p>
+              <p className="text-sm text-brand-slate-600">{meetingTypeLabel(meeting.type)}</p>
               <p className="mt-1 text-sm font-medium text-brand-slate-800">
                 {formatMeetingWhen(meeting.startsAtUtc, meeting.durationMinutes)}
               </p>
               <p className="text-xs text-brand-slate-500">
-                Scheduled in {timeZoneLabel(meeting.timeZoneId)}
+                {t('drawer.scheduledInTimeZone', { zone: timeZoneLabel(meeting.timeZoneId) })}
               </p>
               {meeting.location && <p className="mt-1 text-sm text-brand-slate-600">{meeting.location}</p>}
               {meeting.videoUrl && isHttpUrl(meeting.videoUrl) && (
@@ -166,7 +169,7 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
                   rel="noopener noreferrer"
                   className="mt-1 block text-sm text-brand-teal-600 underline"
                 >
-                  Join video call
+                  {t('drawer.joinVideoCall')}
                 </a>
               )}
               <Link
@@ -177,10 +180,10 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
               </Link>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <Badge variant={statusBadgeVariant[meeting.status]}>{MEETING_STATUS_LABELS[meeting.status]}</Badge>
+              <Badge variant={statusBadgeVariant[meeting.status]}>{meetingStatusLabel(meeting.status)}</Badge>
               <Link to={`/educator/meetings/${meeting.id}/brief`} data-testid="meeting-brief-link">
                 <Button size="sm" variant="secondary">
-                  Brief
+                  {t('drawer.briefButton')}
                 </Button>
               </Link>
             </div>
@@ -189,7 +192,7 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
           {meeting.myInviteStatus && meeting.status !== 'Cancelled' && (
             <div className="space-y-2 rounded-card border border-brand-slate-200 p-3">
               <p className="text-sm text-brand-slate-600">
-                Your response: <strong>{INVITE_STATUS_LABELS[meeting.myInviteStatus]}</strong>
+                {t('drawer.yourResponseLabel')} <strong>{inviteStatusLabel(meeting.myInviteStatus)}</strong>
               </p>
               {rsvpError && (
                 <div role="alert">
@@ -204,7 +207,7 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
                   disabled={rsvpSaving !== null}
                   data-testid="meeting-rsvp-accept"
                 >
-                  Accept
+                  {t('common:inviteStatus.action.accept')}
                 </Button>
                 <Button
                   size="sm"
@@ -214,7 +217,7 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
                   disabled={rsvpSaving !== null}
                   data-testid="meeting-rsvp-tentative"
                 >
-                  Tentative
+                  {t('common:inviteStatus.action.tentative')}
                 </Button>
                 <Button
                   size="sm"
@@ -224,14 +227,14 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
                   disabled={rsvpSaving !== null}
                   data-testid="meeting-rsvp-decline"
                 >
-                  Decline
+                  {t('common:inviteStatus.action.decline')}
                 </Button>
               </div>
             </div>
           )}
 
           <div>
-            <h3 className="mb-2 text-sm font-medium text-brand-slate-800">Participants</h3>
+            <h3 className="mb-2 text-sm font-medium text-brand-slate-800">{t('drawer.participantsHeading')}</h3>
             <ParticipantList
               participants={meeting.participants}
               attendance={
@@ -248,7 +251,7 @@ export function MeetingDrawer({ open, meeting, onClose, onUpdated }: MeetingDraw
                   </div>
                 )}
                 <Button size="sm" onClick={handleSaveAttendance} loading={attendanceSaving} data-testid="meeting-save-attendance">
-                  Save attendance
+                  {t('drawer.saveAttendanceButton')}
                 </Button>
               </div>
             )}

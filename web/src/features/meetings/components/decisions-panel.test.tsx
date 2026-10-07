@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import type { MeetingDecisionDto } from '../types';
 
 const decisionsApi = vi.hoisted(() => ({
@@ -17,6 +18,13 @@ const documentsApi = vi.hoisted(() => ({
 vi.mock('@/features/document-authoring/api/documents-api', () => documentsApi);
 
 import { DecisionsPanel } from './decisions-panel';
+// `meetings-staff` is a staff-only namespace (plan phase 5) — its English
+// isn't bundled in `resources` (see `lib/i18n/index.ts`), only registered
+// by this side-effect import, exactly as the real lazy route chunk
+// (`app/lazy-routes/staff-routes.tsx`) registers it before the page that
+// hosts this panel (the meeting drawer, on the educator calendar/student
+// detail pages) can render.
+import '../staff-locales';
 
 function makeDecision(overrides: Partial<MeetingDecisionDto> = {}): MeetingDecisionDto {
   return {
@@ -40,6 +48,8 @@ describe('DecisionsPanel', () => {
     vi.clearAllMocks();
     documentsApi.getDocument.mockResolvedValue({ success: false });
   });
+
+  afterEach(() => resetTestLanguage());
 
   it('shows an empty hint when there are no decisions yet', async () => {
     decisionsApi.getDecisions.mockResolvedValue({ success: true, data: [] });
@@ -111,5 +121,17 @@ describe('DecisionsPanel', () => {
     await screen.findByTestId('decision-1');
     const strong = screen.getByText('increase');
     expect(strong.tagName).toBe('STRONG');
+  });
+
+  it('renders the heading and empty hint in Spanish', async () => {
+    decisionsApi.getDecisions.mockResolvedValue({ success: true, data: [] });
+
+    await renderInSpanish(<DecisionsPanel meetingId={100} documentInstanceId={null} canManage />, {
+      ns: 'meetings-staff',
+    });
+
+    expect(await screen.findByText('Decisiones')).toBeInTheDocument();
+    expect(screen.getByTestId('decisions-empty')).toHaveTextContent('Aún no se han registrado decisiones.');
+    expect(screen.getByText('Agregar decisión')).toBeInTheDocument();
   });
 });

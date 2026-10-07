@@ -1,9 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { apiRejection } from '@/test/axios-rejection';
+import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import type { MeetingBriefDto } from '../types';
+// `meeting-brief` is a staff-only namespace (plan phase 5) — its English
+// isn't bundled in `resources` (see `lib/i18n/index.ts`), only registered by
+// this side-effect import, exactly as the page's real lazy route chunk
+// (`app/lazy-routes/staff-routes.tsx`) registers it before the page can
+// render.
+import '../staff-locales';
 
 const briefApi = vi.hoisted(() => ({
   getBrief: vi.fn(),
@@ -143,5 +150,40 @@ describe('MeetingBriefPage', () => {
 
     await waitFor(() => expect(briefApi.generateBrief).toHaveBeenCalledWith(42));
     expect(await screen.findByTestId('meeting-brief-page')).toBeInTheDocument();
+  });
+
+  it('shows the "Generated in Spanish" notice to an English viewer when the brief was generated in Spanish', async () => {
+    briefApi.getBrief.mockResolvedValue({ success: true, data: makeBrief({ generatedLanguage: 'es' }) });
+    renderPage();
+
+    expect(await screen.findByTestId('generated-language-notice')).toHaveTextContent('Generated in Spanish');
+  });
+
+  // Proves the staff/admin namespace split end to end (plan phase 5), the
+  // same way `educator-students-page.test.tsx` does: `meeting-brief`'s
+  // English is registered above via the `staff-locales` side-effect import,
+  // and its Spanish still lazy-loads like any other namespace —
+  // `renderInSpanish` needs the extra `ns: 'meeting-brief'` (`docs/i18n/
+  // README.md`'s "Namespace coverage" / test conventions).
+  describe('in Spanish', () => {
+    afterEach(() => resetTestLanguage());
+
+    it('renders the heading and section headings in Spanish', async () => {
+      briefApi.getBrief.mockResolvedValue({ success: true, data: makeBrief() });
+
+      await renderInSpanish(
+        <MemoryRouter initialEntries={['/educator/meetings/42/brief']}>
+          <Routes>
+            <Route path="/educator/meetings/:meetingId/brief" element={<MeetingBriefPage />} />
+          </Routes>
+        </MemoryRouter>,
+        { ns: 'meeting-brief' }
+      );
+
+      expect(await screen.findByTestId('meeting-brief-page')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Resumen', level: 2 })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Compromisos de recursos' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Regenerar' })).toBeInTheDocument();
+    });
   });
 });

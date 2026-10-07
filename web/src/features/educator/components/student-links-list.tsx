@@ -1,6 +1,8 @@
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { formatDate } from '@/lib/format-date';
 import type { ChildLink } from '../types';
 
 interface StudentLinksListProps {
@@ -9,16 +11,13 @@ interface StudentLinksListProps {
   onRevoke: (link: ChildLink) => void;
 }
 
-function formatDate(value?: string | null): string | null {
-  if (!value) return null;
-  return new Date(value).toLocaleDateString();
-}
-
 export function StudentLinksList({ links, revokingId, onRevoke }: StudentLinksListProps) {
+  const { t } = useTranslation('educator');
+
   if (links.length === 0) {
     return (
       <p className="text-brand-slate-500 text-sm" data-testid="student-links-empty">
-        No parent links yet.
+        {t('studentLinks.empty')}
       </p>
     );
   }
@@ -26,17 +25,17 @@ export function StudentLinksList({ links, revokingId, onRevoke }: StudentLinksLi
   return (
     <ul className="space-y-2" data-testid="student-links-list">
       {links.map((link) => {
-        const linkedDate = formatDate(link.linkedAt);
-        const createdDate = formatDate(link.createdAt);
+        const linkedDate = link.linkedAt ? formatDate(link.linkedAt) : null;
+        const createdDate = link.createdAt ? formatDate(link.createdAt) : null;
         return (
           <li key={link.id}>
             <Card className="flex justify-between items-start gap-4" data-testid={`student-link-${link.id}`}>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   {link.isAccepted ? (
-                    <Badge variant="success">Linked</Badge>
+                    <Badge variant="success">{t('studentLinks.linkedBadge')}</Badge>
                   ) : (
-                    <Badge variant="warning">Pending</Badge>
+                    <Badge variant="warning">{t('studentLinks.pendingBadge')}</Badge>
                   )}
                   {link.inviteEmail && (
                     <span className="text-sm text-brand-slate-700">{link.inviteEmail}</span>
@@ -44,9 +43,9 @@ export function StudentLinksList({ links, revokingId, onRevoke }: StudentLinksLi
                 </div>
                 <p className="text-xs text-brand-slate-500">
                   {link.isAccepted && linkedDate
-                    ? `Linked ${linkedDate}`
+                    ? t('studentLinks.linked', { date: linkedDate })
                     : createdDate
-                      ? `Invited ${createdDate}`
+                      ? t('studentLinks.invited', { date: createdDate })
                       : null}
                 </p>
               </div>
@@ -57,7 +56,7 @@ export function StudentLinksList({ links, revokingId, onRevoke }: StudentLinksLi
                   disabled={revokingId === link.id}
                   data-testid={`student-link-revoke-${link.id}`}
                 >
-                  {revokingId === link.id ? 'Revoking...' : 'Revoke'}
+                  {revokingId === link.id ? t('studentLinks.revoking') : t('studentLinks.revoke')}
                 </Button>
               )}
             </Card>
