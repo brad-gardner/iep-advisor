@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.ChildLinks;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -14,10 +16,12 @@ namespace IepAssistant.Api.Controllers;
 public class ChildLinkController : ControllerBase
 {
     private readonly IChildLinkService _childLinkService;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public ChildLinkController(IChildLinkService childLinkService)
+    public ChildLinkController(IChildLinkService childLinkService, IStringLocalizer<Messages> localizer)
     {
         _childLinkService = childLinkService;
+        _localizer = localizer;
     }
 
     [HttpGet("preview")]
@@ -26,7 +30,7 @@ public class ChildLinkController : ControllerBase
     public async Task<IActionResult> Preview([FromQuery] string token, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(token))
-            return BadRequest(ApiResponse<object>.Error("Token is required."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["ChildLinksApi.TokenRequired"]));
 
         var result = await _childLinkService.PreviewInviteAsync(User.GetUserId(), token, ct);
 
@@ -56,7 +60,7 @@ public class ChildLinkController : ControllerBase
     public async Task<IActionResult> Accept([FromBody] AcceptChildLinkRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _childLinkService.AcceptInviteAsync(
             User.GetUserId(), request.Token, request.LinkToChildProfileId, ct);
@@ -97,12 +101,18 @@ public class ChildLinkController : ControllerBase
 
     private IActionResult MapFailure<T>(string? message)
     {
-        message ??= "Request failed";
+        message ??= _localizer["Api.RequestFailed"].Value;
 
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
+        // Status routing is keyed off substrings of the (now-localized) message text. The Spanish
+        // translations of every "no permission"/"not found" message in this controller's services
+        // deliberately include "permiso"/"no encontrad" (stem covers both "encontrado"/"encontrada"
+        // grammatical gender) for exactly this reason — see Messages.es.resx (ChildLinks.* area).
+        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("permiso", StringComparison.OrdinalIgnoreCase))
             return StatusCode(403, ApiResponse<object>.Error(message));
 
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
+        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("no encontrad", StringComparison.OrdinalIgnoreCase))
             return NotFound(ApiResponse<object>.Error(message));
 
         // "Invalid or expired", "different email address", etc. -> 400.

@@ -2,6 +2,7 @@ using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using Xunit;
 
 namespace IepAssistant.Services.Tests;
@@ -11,7 +12,7 @@ public sealed class NotificationServiceTests : IDisposable
 {
     private readonly RosterTestDb _db = new();
 
-    private NotificationService CreateService() => new(_db.Context());
+    private NotificationService CreateService() => new(_db.Context(), TestSupport.TestLocalizers.Messages());
 
     [Fact]
     public async Task NotifyAsync_SecondCallSameKeyWithin24h_IsDeduped()
@@ -162,6 +163,39 @@ public sealed class NotificationServiceTests : IDisposable
         var failures = await service.GetFailuresAsync(200);
         Assert.Single(failures.Data!);
         Assert.Equal("boom", failures.Data![0].EmailError);
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 2: Notifications.NotFound renders in the UI culture — English under "en", Spanish under
+    // "es" (and the Spanish text deliberately still contains "no encontrad", relied on by
+    // NotificationsController.MapFailure's 404 routing — see that controller).
+
+    [Fact]
+    public async Task MarkReadAsync_UnknownNotification_UnderEnglishCulture_MessageIsEnglish()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var (userId, _) = _db.Staff("staff-en@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+
+        using var _ = CultureScope.For("en");
+        var result = await CreateService().MarkReadAsync(userId, notificationId: -1);
+
+        Assert.False(result.Success);
+        Assert.Equal("Notification not found.", result.Message);
+    }
+
+    [Fact]
+    public async Task MarkReadAsync_UnknownNotification_UnderSpanishCulture_MessageIsSpanish()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var (userId, _) = _db.Staff("staff-es@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+
+        using var _ = CultureScope.For("es");
+        var result = await CreateService().MarkReadAsync(userId, notificationId: -1);
+
+        Assert.False(result.Success);
+        Assert.Equal("Notificación no encontrada.", result.Message);
     }
 
     public void Dispose() => _db.Dispose();

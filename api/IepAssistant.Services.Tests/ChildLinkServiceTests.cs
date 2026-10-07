@@ -5,6 +5,7 @@ using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -36,7 +37,7 @@ public sealed class ChildLinkServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private static ChildLinkService CreateService(ApplicationDbContext ctx, CapturingEmailService email)
-        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), email, new CapturingAuditLogger(), NullLogger<ChildLinkService>.Instance);
+        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), email, new CapturingAuditLogger(), NullLogger<ChildLinkService>.Instance, TestSupport.TestLocalizers.Messages());
 
     private static EducatorService CreateEducator(ApplicationDbContext ctx)
         => new(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<EducatorService>.Instance);
@@ -485,6 +486,41 @@ public sealed class ChildLinkServiceTests : IDisposable
             Assert.Equal("S9", result.Data.SchoolName);
             Assert.Equal(2, result.Data.ExistingChildren.Count);
         }
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 2: ChildLinks.NoPermissionToInvite renders in the UI culture — English under "en", Spanish
+    // under "es" (and the Spanish text deliberately still contains "permiso", relied on by
+    // ChildLinkController.MapFailure's 403 routing — see that controller).
+
+    [Fact]
+    public async Task Invite_FromEducatorInAnotherSchool_UnderEnglishCulture_MessageIsEnglish()
+    {
+        var (educatorA, studentInA) = await SeedEducatorWithStudent("edEn@x.com", "DistrictEn", "SchoolEn");
+        var educatorB = SeedEducator("edEnB@x.com", "DistrictEnB", "SchoolEnB");
+        var email = new CapturingEmailService();
+
+        using var _ = CultureScope.For("en");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx, email).InviteParentAsync(educatorB, studentInA, "parent@x.com");
+
+        Assert.False(result.Success);
+        Assert.Equal("You do not have permission to invite a parent for this student.", result.Message);
+    }
+
+    [Fact]
+    public async Task Invite_FromEducatorInAnotherSchool_UnderSpanishCulture_MessageIsSpanish()
+    {
+        var (educatorA, studentInA) = await SeedEducatorWithStudent("edEs@x.com", "DistrictEs", "SchoolEs");
+        var educatorB = SeedEducator("edEsB@x.com", "DistrictEsB", "SchoolEsB");
+        var email = new CapturingEmailService();
+
+        using var _ = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx, email).InviteParentAsync(educatorB, studentInA, "parent@x.com");
+
+        Assert.False(result.Success);
+        Assert.Equal("No tiene permiso para invitar a un padre, madre o tutor para este estudiante.", result.Message);
     }
 
     public void Dispose() => _connection.Dispose();

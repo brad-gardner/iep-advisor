@@ -12,7 +12,7 @@ public sealed class MeetingReminderServiceTests : IDisposable
     private readonly RosterTestDb _db = new();
 
     private MeetingReminderService CreateService(Domain.Data.ApplicationDbContext ctx)
-        => new(ctx, new NotificationService(ctx), NullLogger<MeetingReminderService>.Instance);
+        => new(ctx, new NotificationService(ctx, TestSupport.TestLocalizers.Messages()), NullLogger<MeetingReminderService>.Instance);
 
     private (int districtId, int schoolId, int studentId, int userId) SeedMeetingParticipant()
     {

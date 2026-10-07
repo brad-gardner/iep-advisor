@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Stripe;
 using Stripe.Checkout;
@@ -18,17 +19,20 @@ public class SubscriptionService : ISubscriptionService
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _configuration;
     private readonly ILogger<SubscriptionService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     private const int AnalysisLimitPerChild = 5;
 
     public SubscriptionService(
         ApplicationDbContext context,
         IConfiguration configuration,
-        ILogger<SubscriptionService> logger)
+        ILogger<SubscriptionService> logger,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _configuration = configuration;
         _logger = logger;
+        _localizer = localizer;
 
         StripeConfiguration.ApiKey = _configuration["Stripe:SecretKey"];
     }
@@ -316,10 +320,10 @@ public class SubscriptionService : ISubscriptionService
     {
         var user = await _context.Users.FindAsync([userId], ct);
         if (user == null)
-            return ServiceResult.FailureResult("User not found");
+            return ServiceResult.FailureResult(_localizer["AuthApi.UserNotFound"]);
 
         if (user.SubscriptionStatus == "active")
-            return ServiceResult.FailureResult("You already have an active subscription");
+            return ServiceResult.FailureResult(_localizer["Subscription.AlreadyActive"]);
 
         // Atomic redemption: only update if code is valid AND not yet redeemed
         var rowsAffected = await _context.Set<BetaInviteCode>()
@@ -330,7 +334,7 @@ public class SubscriptionService : ISubscriptionService
                 .SetProperty(c => c.RedeemedAt, DateTime.UtcNow), ct);
 
         if (rowsAffected == 0)
-            return ServiceResult.FailureResult("Invalid invite code.");
+            return ServiceResult.FailureResult(_localizer["Subscription.InvalidInviteCode"]);
 
         // Grant subscription
         user.SubscriptionStatus = "active";
@@ -340,13 +344,13 @@ public class SubscriptionService : ISubscriptionService
 
         _logger.LogInformation("User {UserId} redeemed beta code {Code}", userId, code);
 
-        return ServiceResult.SuccessResult("Beta code redeemed successfully. Your subscription is now active.");
+        return ServiceResult.SuccessResult(_localizer["Subscription.BetaCodeRedeemed"]);
     }
 
     public async Task<ServiceResult<List<string>>> GenerateBetaCodesAsync(int count, DateTime? expiresAt, CancellationToken ct = default)
     {
         if (count <= 0 || count > 100)
-            return ServiceResult<List<string>>.FailureResult("Count must be between 1 and 100");
+            return ServiceResult<List<string>>.FailureResult(_localizer["Subscription.CountOutOfRange"]);
 
         var codes = new List<string>();
 

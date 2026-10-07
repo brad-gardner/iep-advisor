@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Repositories;
@@ -17,18 +18,21 @@ public class MfaService : IMfaService
     private readonly ITotpService _totpService;
     private readonly MfaSecretProtector _protector;
     private readonly byte[] _hmacKey;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public MfaService(
         IUserRepository userRepository,
         ApplicationDbContext context,
         ITotpService totpService,
         MfaSecretProtector protector,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IStringLocalizer<Messages> localizer)
     {
         _userRepository = userRepository;
         _context = context;
         _totpService = totpService;
         _protector = protector;
+        _localizer = localizer;
 
         var keyString = configuration["Security:EncryptionKey"]
             ?? throw new InvalidOperationException("Security:EncryptionKey not configured");
@@ -62,14 +66,14 @@ public class MfaService : IMfaService
             ?? throw new InvalidOperationException("User not found");
 
         if (string.IsNullOrEmpty(user.MfaSecret))
-            return ServiceResult<List<string>>.FailureResult("MFA setup has not been initiated.");
+            return ServiceResult<List<string>>.FailureResult(_localizer["Mfa.SetupNotInitiated"]);
 
         if (user.MfaEnabled)
-            return ServiceResult<List<string>>.FailureResult("MFA is already enabled.");
+            return ServiceResult<List<string>>.FailureResult(_localizer["Mfa.AlreadyEnabled"]);
 
         var secret = _protector.Unprotect(user.MfaSecret);
         if (!_totpService.ValidateCode(secret, code))
-            return ServiceResult<List<string>>.FailureResult("Invalid verification code.");
+            return ServiceResult<List<string>>.FailureResult(_localizer["Mfa.InvalidVerificationCode"]);
 
         user.MfaEnabled = true;
         user.LastTotpTimestamp = _totpService.GetTimestamp();
@@ -106,7 +110,7 @@ public class MfaService : IMfaService
         _userRepository.Update(user);
         await _context.SaveChangesAsync(ct);
 
-        return ServiceResult<List<string>>.SuccessResult(plaintextCodes, "MFA enabled successfully.");
+        return ServiceResult<List<string>>.SuccessResult(plaintextCodes, _localizer["Mfa.EnabledSuccessfully"]);
     }
 
     public async Task<bool> ValidateCodeAsync(int userId, string code, CancellationToken ct = default)
@@ -181,22 +185,22 @@ public class MfaService : IMfaService
     {
         var user = await _userRepository.GetByIdAsync(userId, ct);
         if (user == null)
-            return ServiceResult.FailureResult("User not found.");
+            return ServiceResult.FailureResult(_localizer["Auth.UserNotFound"]);
 
         if (!user.MfaEnabled)
-            return ServiceResult.FailureResult("MFA is not enabled.");
+            return ServiceResult.FailureResult(_localizer["Mfa.NotEnabled"]);
 
         // Verify password
         if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
-            return ServiceResult.FailureResult("Invalid password.");
+            return ServiceResult.FailureResult(_localizer["Mfa.InvalidPassword"]);
 
         // Verify TOTP code
         if (string.IsNullOrEmpty(user.MfaSecret))
-            return ServiceResult.FailureResult("MFA secret not found.");
+            return ServiceResult.FailureResult(_localizer["Mfa.SecretNotFound"]);
 
         var secret = _protector.Unprotect(user.MfaSecret);
         if (!_totpService.ValidateCode(secret, totpCode))
-            return ServiceResult.FailureResult("Invalid TOTP code.");
+            return ServiceResult.FailureResult(_localizer["Mfa.InvalidTotpCode"]);
 
         // Disable MFA
         user.MfaEnabled = false;
@@ -215,7 +219,7 @@ public class MfaService : IMfaService
         _userRepository.Update(user);
         await _context.SaveChangesAsync(ct);
 
-        return ServiceResult.SuccessResult("MFA disabled successfully.");
+        return ServiceResult.SuccessResult(_localizer["Mfa.DisabledSuccessfully"]);
     }
 
     private string HmacHash(string input)

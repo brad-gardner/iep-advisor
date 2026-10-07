@@ -7,6 +7,7 @@ using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Repositories;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Tests.TestSupport;
 using Xunit;
 
@@ -57,7 +58,8 @@ public sealed class AccountServiceTests : IDisposable
             protector: null!,
             emailService: email,
             dataProtectionProvider: provider ?? DataProtectionProvider.Create("shared-test-app"),
-            configuration: new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["App:FrontendUrl"] = "https://app.example.com" }).Build());
+            configuration: new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["App:FrontendUrl"] = "https://app.example.com" }).Build(),
+            localizer: TestLocalizers.Messages());
         return (service, email);
     }
 
@@ -372,6 +374,43 @@ public sealed class AccountServiceTests : IDisposable
 
     private static string TokenFor(IDataProtectionProvider provider, int userId, DateTime requestedAt) =>
         provider.CreateProtector(AccountService.DeletionTokenPurpose).Protect($"{userId}|{requestedAt.Ticks}");
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 2, carry-over P3: CancelDeletionAsync's message renders in the UI culture — English under
+    // "en", Spanish under "es". Previously hard-coded English, silently overriding AuthController's
+    // own localized fallback (<c>result.Message ?? _localizer["AuthApi.FailedToCancelDeletion"]</c>).
+
+    [Fact]
+    public async Task CancelDeletion_NoPendingRequest_UnderEnglishCulture_MessageIsEnglish()
+    {
+        int userId;
+        using (var seedCtx = CreateContext())
+            userId = SeedActiveParent(seedCtx, "en-nopending@example.com");
+
+        using var cultureScope = CultureScope.For("en");
+        using var ctx = CreateContext();
+        var (service, _) = CreateService(ctx);
+        var result = await service.CancelDeletionAsync(userId);
+
+        Assert.False(result.Success);
+        Assert.Equal("No pending deletion request", result.Message);
+    }
+
+    [Fact]
+    public async Task CancelDeletion_NoPendingRequest_UnderSpanishCulture_MessageIsSpanish()
+    {
+        int userId;
+        using (var seedCtx = CreateContext())
+            userId = SeedActiveParent(seedCtx, "es-nopending@example.com");
+
+        using var cultureScope = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var (service, _) = CreateService(ctx);
+        var result = await service.CancelDeletionAsync(userId);
+
+        Assert.False(result.Success);
+        Assert.Equal("No hay una solicitud de eliminación pendiente", result.Message);
+    }
 
     public void Dispose() => _connection.Dispose();
 }

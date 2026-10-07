@@ -88,7 +88,8 @@ public class AnalysisRunServiceTests
         var subscriptionService = new SubscriptionService(
             context,
             new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(),
-            NullLogger<SubscriptionService>.Instance);
+            NullLogger<SubscriptionService>.Instance,
+            TestSupport.TestLocalizers.Messages());
         var goalRepo = new ParentAdvocacyGoalRepository(context);
 
         return new AnalysisRunService(

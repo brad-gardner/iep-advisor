@@ -14,7 +14,7 @@ public class UsageLimitAdminExemptionTests
     private const int Limit = 5;
 
     private static SubscriptionService Service(Domain.Data.ApplicationDbContext context) =>
-        new(context, new ConfigurationBuilder().Build(), NullLogger<SubscriptionService>.Instance);
+        new(context, new ConfigurationBuilder().Build(), NullLogger<SubscriptionService>.Instance, TestSupport.TestLocalizers.Messages());
 
     private static void UseUpLimit(AnalysisRunTestFixture fixture, UserRole role)
     {

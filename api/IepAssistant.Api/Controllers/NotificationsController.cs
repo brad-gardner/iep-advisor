@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Notifications;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -15,10 +17,12 @@ namespace IepAssistant.Api.Controllers;
 public class NotificationsController : ControllerBase
 {
     private readonly INotificationService _notificationService;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public NotificationsController(INotificationService notificationService)
+    public NotificationsController(INotificationService notificationService, IStringLocalizer<Messages> localizer)
     {
         _notificationService = notificationService;
+        _localizer = localizer;
     }
 
     [HttpGet]
@@ -72,11 +76,16 @@ public class NotificationsController : ControllerBase
 
     private IActionResult MapFailure(string? message)
     {
-        message ??= "Request failed";
+        message ??= _localizer["Api.RequestFailed"].Value;
 
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
+        // See the matching comment in ChildLinkController.MapFailure: the Spanish translation of
+        // Notifications.NotFound deliberately contains "no encontrad" (stem of "no encontrada") for
+        // exactly this routing check to keep working under Spanish culture.
+        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("permiso", StringComparison.OrdinalIgnoreCase))
             return StatusCode(403, ApiResponse<object>.Error(message));
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
+        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("no encontrad", StringComparison.OrdinalIgnoreCase))
             return NotFound(ApiResponse<object>.Error(message));
 
         return BadRequest(ApiResponse<object>.Error(message));

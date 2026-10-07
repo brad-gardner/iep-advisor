@@ -4,6 +4,7 @@ using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Repositories;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -32,7 +33,7 @@ public sealed class ChildProfileServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private static ChildProfileService CreateService(ApplicationDbContext ctx) =>
-        new(new ChildProfileRepository(ctx), new AccessService(ctx), ctx);
+        new(new ChildProfileRepository(ctx), new AccessService(ctx), ctx, TestSupport.TestLocalizers.Messages());
 
     private (int UserId, int ChildId) SeedChild()
     {
@@ -99,5 +100,36 @@ public sealed class ChildProfileServiceTests : IDisposable
         var child = Reload(childId);
         Assert.Equal("5th", child.GradeLevel);
         Assert.Equal("Other health impairment", child.DisabilityCategory);
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 2: Children.NotFound renders in the UI culture — English under "en", Spanish under "es".
+
+    [Fact]
+    public async Task Update_UnknownChild_UnderEnglishCulture_MessageIsEnglish()
+    {
+        var (userId, childId) = SeedChild();
+
+        using var _ = CultureScope.For("en");
+        ServiceResult result;
+        using (var ctx = CreateContext())
+            result = await CreateService(ctx).UpdateAsync(childId, userId + 999, new UpdateChildProfileModel());
+
+        Assert.False(result.Success);
+        Assert.Equal("Child profile not found.", result.Message);
+    }
+
+    [Fact]
+    public async Task Update_UnknownChild_UnderSpanishCulture_MessageIsSpanish()
+    {
+        var (userId, childId) = SeedChild();
+
+        using var _ = CultureScope.For("es");
+        ServiceResult result;
+        using (var ctx = CreateContext())
+            result = await CreateService(ctx).UpdateAsync(childId, userId + 999, new UpdateChildProfileModel());
+
+        Assert.False(result.Success);
+        Assert.Equal("Perfil del hijo no encontrado.", result.Message);
     }
 }

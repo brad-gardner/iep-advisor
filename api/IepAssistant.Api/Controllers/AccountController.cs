@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Account;
 using IepAssistant.Api.DTOs.Common;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 
 namespace IepAssistant.Api.Controllers;
@@ -19,10 +21,12 @@ namespace IepAssistant.Api.Controllers;
 public class AccountController : ControllerBase
 {
     private readonly IAccountService _accountService;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public AccountController(IAccountService accountService)
+    public AccountController(IAccountService accountService, IStringLocalizer<Messages> localizer)
     {
         _accountService = accountService;
+        _localizer = localizer;
     }
 
     /// <summary>
@@ -37,11 +41,11 @@ public class AccountController : ControllerBase
     public async Task<IActionResult> CancelDeletion([FromBody] CancelDeletionByTokenRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _accountService.CancelDeletionByTokenAsync(request.Token, cancellationToken);
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Unable to cancel deletion"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["AccountApi.UnableToCancelDeletion"].Value));
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }

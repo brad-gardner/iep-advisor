@@ -6,6 +6,7 @@ using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Repositories;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using Xunit;
 
 namespace IepAssistant.Services.Tests;
@@ -51,7 +52,7 @@ public sealed class PasswordResetServiceTests : IDisposable
     }
 
     private PasswordResetService CreateService()
-        => new(new UserRepository(_context), _context, _email, NullLogger<PasswordResetService>.Instance);
+        => new(new UserRepository(_context), _context, _email, NullLogger<PasswordResetService>.Instance, TestSupport.TestLocalizers.Messages());
 
     [Fact]
     public async Task InitiateResetAsync_UserHasPreferredLanguage_PassesItThrough_RegardlessOfAmbientUiCulture()
@@ -108,6 +109,31 @@ public sealed class PasswordResetServiceTests : IDisposable
         {
             CultureInfo.CurrentUICulture = originalUi;
         }
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 2, carry-over P3: ResetPasswordAsync's message renders in the UI culture — English under
+    // "en", Spanish under "es". Previously hard-coded English, silently overriding AuthController's
+    // own localized fallback (<c>result.Message ?? _localizer["AuthApi.PasswordResetFailed"]</c>).
+
+    [Fact]
+    public async Task ResetPasswordAsync_InvalidToken_UnderEnglishCulture_MessageIsEnglish()
+    {
+        using var _ = CultureScope.For("en");
+        var result = await CreateService().ResetPasswordAsync("not-a-real-token", "NewPassword1!");
+
+        Assert.False(result.Success);
+        Assert.Equal("Invalid or expired reset token.", result.Message);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_InvalidToken_UnderSpanishCulture_MessageIsSpanish()
+    {
+        using var _ = CultureScope.For("es");
+        var result = await CreateService().ResetPasswordAsync("not-a-real-token", "NewPassword1!");
+
+        Assert.False(result.Success);
+        Assert.Equal("El token para restablecer la contraseña no es válido o ha vencido.", result.Message);
     }
 
     public void Dispose()

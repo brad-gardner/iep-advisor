@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Stripe;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -14,11 +16,13 @@ public class StripeController : ControllerBase
 {
     private readonly ISubscriptionService _subscriptionService;
     private readonly IConfiguration _config;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public StripeController(ISubscriptionService subscriptionService, IConfiguration config)
+    public StripeController(ISubscriptionService subscriptionService, IConfiguration config, IStringLocalizer<Messages> localizer)
     {
         _subscriptionService = subscriptionService;
         _config = config;
+        _localizer = localizer;
     }
 
     [HttpPost("api/stripe/create-checkout-session")]
@@ -27,13 +31,13 @@ public class StripeController : ControllerBase
     public async Task<IActionResult> CreateCheckoutSession([FromBody] CreateCheckoutRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var frontendUrl = _config["App:FrontendUrl"] ?? "http://localhost:5173";
         if (!request.SuccessUrl.StartsWith(frontendUrl, StringComparison.OrdinalIgnoreCase))
-            return BadRequest(ApiResponse<object>.Error("Invalid redirect URL"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["SubscriptionApi.InvalidRedirectUrl"]));
         if (!request.CancelUrl.StartsWith(frontendUrl, StringComparison.OrdinalIgnoreCase))
-            return BadRequest(ApiResponse<object>.Error("Invalid redirect URL"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["SubscriptionApi.InvalidRedirectUrl"]));
 
         try
         {
@@ -53,11 +57,11 @@ public class StripeController : ControllerBase
     public async Task<IActionResult> CreatePortalSession([FromBody] CreatePortalRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var frontendUrl = _config["App:FrontendUrl"] ?? "http://localhost:5173";
         if (!request.ReturnUrl.StartsWith(frontendUrl, StringComparison.OrdinalIgnoreCase))
-            return BadRequest(ApiResponse<object>.Error("Invalid redirect URL"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["SubscriptionApi.InvalidRedirectUrl"]));
 
         try
         {
@@ -86,13 +90,13 @@ public class StripeController : ControllerBase
     public async Task<IActionResult> RedeemInvite([FromBody] RedeemInviteRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var userId = User.GetUserId();
         var result = await _subscriptionService.RedeemBetaCodeAsync(userId, request.Code, ct);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Failed to redeem invite code"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["SubscriptionApi.FailedToRedeemInviteCode"].Value));
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
@@ -104,14 +108,14 @@ public class StripeController : ControllerBase
     public async Task<IActionResult> GenerateBetaCodes([FromBody] GenerateBetaCodesRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _subscriptionService.GenerateBetaCodesAsync(request.Count, request.ExpiresAt, ct);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Failed to generate codes"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["SubscriptionApi.FailedToGenerateCodes"].Value));
 
-        return Ok(ApiResponse<List<string>>.SuccessResponse(result.Data!, "Beta codes generated"));
+        return Ok(ApiResponse<List<string>>.SuccessResponse(result.Data!, _localizer["SubscriptionApi.BetaCodesGenerated"]));
     }
 
     [HttpGet("api/admin/beta-codes")]
@@ -129,12 +133,12 @@ public class StripeController : ControllerBase
     public async Task<IActionResult> InviteBetaUser([FromBody] InviteBetaUserRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         // Generate 1 beta code
         var result = await _subscriptionService.GenerateBetaCodesAsync(1, null, ct);
         if (!result.Success || result.Data == null || result.Data.Count == 0)
-            return BadRequest(ApiResponse<object>.Error("Failed to generate invite code"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["SubscriptionApi.FailedToGenerateInviteCode"]));
 
         var code = result.Data[0];
 
@@ -142,6 +146,6 @@ public class StripeController : ControllerBase
         var emailService = HttpContext.RequestServices.GetRequiredService<IEmailService>();
         await emailService.SendBetaInviteEmailAsync(request.Email, code, ct);
 
-        return Ok(ApiResponse<object>.SuccessResponse(new { code }, $"Beta invite sent to {request.Email}"));
+        return Ok(ApiResponse<object>.SuccessResponse(new { code }, _localizer["SubscriptionApi.BetaInviteSentTo", request.Email]));
     }
 }
