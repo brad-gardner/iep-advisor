@@ -13,32 +13,34 @@ export function useChildren() {
   // drop `t` from its own dependencies, so a language switch mid-mount never
   // re-triggers a redundant refetch.
   const [hasError, setHasError] = useState(false);
-  // Guards against a slower, superseded call (e.g. unmount, or a fast
-  // `reload()` double-click) applying its result after a newer one already
-  // has — same idiom as `useHome`'s `active` flag.
-  const activeRef = useRef(true);
+  // Counts every load attempt, including unmount, so a slower, superseded
+  // call (e.g. a fast `reload()` double-click, or one still in flight at
+  // unmount) can tell its response arrived after a newer attempt already
+  // claimed the latest slot, and must not apply its own stale result.
+  const reqRef = useRef(0);
 
   const load = useCallback(async () => {
-    activeRef.current = true;
+    reqRef.current += 1;
+    const id = reqRef.current;
     setIsLoading(true);
     setHasError(false);
     try {
       const response = await getChildren();
-      if (!activeRef.current) return;
+      if (id !== reqRef.current) return; // superseded — see reqRef
       if (response.success && response.data) {
         setChildren(response.data);
       }
     } catch {
-      if (activeRef.current) setHasError(true);
+      if (id === reqRef.current) setHasError(true);
     } finally {
-      if (activeRef.current) setIsLoading(false);
+      if (id === reqRef.current) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     load();
     return () => {
-      activeRef.current = false;
+      reqRef.current += 1; // unmount supersedes any still-in-flight load — see reqRef
     };
   }, [load]);
 

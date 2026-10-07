@@ -69,18 +69,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [mfaPendingToken, setMfaPendingToken] = useState<string | null>(null);
 
   // Latest-wins guard for everything that can decide the active language —
-  // an explicit `setLanguage` call, and the background sync below. Bumped by
-  // `setLanguage` the instant it's invoked (before anything async), and
-  // captured by every async flow that might later apply a language
+  // an explicit `setLanguage` call, and the background sync below. Bumped
+  // the instant any of those is settled: by `setLanguage` itself (before
+  // anything async), by `logout` (so a slow PUT/backfill can't resurrect a
+  // signed-in look after sign-out — todos/247), and by `persistSession` (so
+  // a slow `setLanguage` call started while signed out can't write the
+  // pre-login key, or anything else, once someone has since signed in).
+  // Captured by every async flow that might later apply a language
   // (`syncLanguagePreference`'s callers below, each *before* starting the
   // fetch that will eventually call it) so a slower, now-superseded
   // operation can tell it lost the race: if `languageGenerationRef.current`
-  // no longer matches the generation it captured, a newer explicit switch
-  // happened while it was in flight, and it must neither persist its own
-  // (possibly stale) choice nor overwrite the newer one (see the plan's
-  // phase-1 review: language sync races). Call sites below carry only a
-  // one-line reminder of which check this is; this is the single place that
-  // explains why it exists.
+  // no longer matches the generation it captured, a newer bump happened
+  // while it was in flight, and it must neither persist its own (possibly
+  // stale) choice nor overwrite the newer one (see the plan's phase-1
+  // review: language sync races). Call sites below carry only a one-line
+  // reminder of which check this is; this is the single place that explains
+  // why it exists.
   const languageGenerationRef = useRef(0);
 
   // The in-flight backfill PUT started by `syncLanguagePreference` below, if
@@ -170,10 +174,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(JSON.parse(storedUser) as User);
       }
 
-      // Verify with API. Captured before the request starts (see
-      // `languageGenerationRef`'s doc comment) so a switch that happens
-      // while this is in flight is never overwritten by its stale response.
-      const generation = languageGenerationRef.current;
+      // Verify with API.
+      const generation = languageGenerationRef.current; // captured before the request starts — see languageGenerationRef
       const response = await getCurrentUser();
       if (getToken() !== tokenAtStart) {
         // Signed out (or a different session started) while this request
@@ -218,12 +220,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(token);
     setUser(userData);
     setStoredUser(JSON.stringify(userData));
+    const generation = ++languageGenerationRef.current; // supersedes any pre-sign-in setLanguage call — see languageGenerationRef
     // The sign-out carry-over's job (showing the login page in the right
     // language) is done now that someone has actually signed in — clear it
     // so it can't later be mistaken for this or a future visitor's own
     // choice.
     clearLastDisplayLanguage();
-    syncLanguagePreference(userData, languageGenerationRef.current);
+    syncLanguagePreference(userData, generation);
     // The explicit pre-login choice's job is also done: `syncLanguagePreference`
     // above already read it synchronously (before this call returns) if this
     // account had no saved preference yet. Clearing it AFTER that call — never
@@ -330,11 +333,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshUser = async () => {
-    // Same latest-wins capture as `loadUser` — a refresh triggered mid-flow
-    // (e.g. after accepting an invite) must not let its response, once it's
-    // stale, re-decide the language out from under a switch the user made
-    // while it was in flight.
-    const generation = languageGenerationRef.current;
+    const generation = languageGenerationRef.current; // same latest-wins capture as loadUser — see languageGenerationRef
     // Same session-side guard as `loadUser`: if `logout()` runs before this
     // resolves, the token is gone and this response must not resurrect a
     // signed-in-looking user with no token (todos/247).
@@ -353,11 +352,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    // Bump first, before anything else: invalidates any in-flight
-    // `setLanguage` PUT or backfill (`syncLanguagePreference`) so its
-    // response — landing after sign-out — can't `setUser`/`setStoredUser`
-    // and leave the app looking signed-in with no token (todos/247).
-    languageGenerationRef.current++;
+    languageGenerationRef.current++; // bump first, before anything else — see languageGenerationRef (todos/247)
 
     // Keep whatever language was active — it's still correct, it just has
     // nowhere to live once the account's saved preference is gone. Recorded
@@ -379,22 +374,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setLanguage = async (language: SupportedLanguage) => {
-    const generation = ++languageGenerationRef.current;
-    // Captured before anything async below, same reasoning as `loadUser`/
-    // `refreshUser`: if `logout()` runs while the PUT further down is in
-    // flight, the token is gone by the time its response lands, and that
-    // response must never resurrect a signed-in-looking user with no token
-    // (todos/247).
-    const tokenAtStart = getToken();
+    const generation = ++languageGenerationRef.current; // claims this attempt — see languageGenerationRef
     await i18n.changeLanguage(language);
 
     if (languageGenerationRef.current !== generation) {
-      // A newer explicit switch started before this one's `changeLanguage`
-      // resolved (e.g. this call is for a lazily-loaded Spanish chunk that
-      // took longer than a quick follow-up switch back to English). i18next
-      // itself already keeps the *active* language correct in that case —
-      // this just stops the superseded call from also persisting its now-
-      // wrong choice to the account or `localStorage`.
+      // superseded while `changeLanguage` was resolving — see languageGenerationRef
       return { success: true };
     }
 
@@ -424,15 +408,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       const response = await updateProfileApi({ preferredLanguage: language });
       if (languageGenerationRef.current !== generation) {
-        // Superseded while the PUT was in flight — ignore this response so
-        // it can't overwrite a newer switch's state.
-        return { success: true };
-      }
-      if (getToken() !== tokenAtStart) {
-        // Superseded by sign-out instead: `logout()` doesn't bump
-        // `generation`, so the check above alone wouldn't catch this — a
-        // slow response arriving after sign-out must never resurrect a
-        // signed-in-looking user with no token (todos/247).
+        // superseded while the PUT was in flight — see languageGenerationRef
         return { success: true };
       }
       if (response.success && response.data) {

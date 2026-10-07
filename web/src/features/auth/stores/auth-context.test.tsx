@@ -242,6 +242,63 @@ describe('language sync races', () => {
     readSpy.mockRestore();
   });
 
+  it('does not write the pre-login key (or surface an error) when sign-in completes before a delayed Spanish chunk resolves', async () => {
+    const user = userEvent.setup();
+    renderProbe();
+    await screen.findByText('signed-out');
+
+    // Same gating setup as the "switching es then en quickly" test above:
+    // evict any cached Spanish resources so the next `changeLanguage('es')`
+    // goes through the backend and can be held open.
+    const esResources = i18n.store.data.es as { common?: unknown; auth?: unknown } | undefined;
+    if (esResources) {
+      delete esResources.common;
+      delete esResources.auth;
+    }
+
+    const backend = getBackend();
+    const originalRead = backend.read.bind(backend);
+    const releaseEsFns: (() => void)[] = [];
+    const readSpy = vi.spyOn(backend, 'read').mockImplementation((language, namespace, cb) => {
+      if (language === 'es') {
+        const gate = new Promise<void>((resolve) => {
+          releaseEsFns.push(resolve);
+        });
+        void gate.then(() => originalRead(language, namespace, cb));
+        return;
+      }
+      originalRead(language, namespace, cb);
+    });
+
+    // Click Spanish while signed out — its `changeLanguage('es')` is now
+    // gated, still pending.
+    await user.click(screen.getByRole('button', { name: 'switch' }));
+
+    // Sign in before that chunk resolves. `signedInUser`'s preference
+    // already matches the (still-English) active language, so sign-in
+    // itself triggers no language change or PUT of its own — isolating the
+    // superseded `setLanguage('es')` call as the only thing left that could
+    // misbehave once it finally resolves.
+    const signedInUser = makeUser({ preferredLanguage: 'en' });
+    authApi.login.mockResolvedValueOnce({ success: true, data: { token: 'a-jwt', user: signedInUser } });
+    await user.click(screen.getByRole('button', { name: 'login' }));
+    await screen.findByText('en');
+
+    // Now let the gated 'es' chunk load finish. `persistSession` already
+    // bumped `languageGenerationRef` on sign-in, so the superseded
+    // `setLanguage('es')` call must resolve quietly — never writing the
+    // pre-login key (the app is signed in now) and never surfacing an error.
+    await waitFor(() => expect(releaseEsFns.length).toBe(2));
+    releaseEsFns.forEach((release) => release());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(getPreLoginLanguage()).toBeNull();
+    expect(screen.getByTestId('probe-result')).toHaveTextContent('"success":true');
+    expect(authApi.updateProfile).not.toHaveBeenCalled();
+
+    readSpy.mockRestore();
+  });
+
   it('keeps an explicit switch to Spanish when an in-flight /me resolves afterward with a stale English preference', async () => {
     const signedInUser = makeUser({ preferredLanguage: 'en' });
     setToken('a-jwt');

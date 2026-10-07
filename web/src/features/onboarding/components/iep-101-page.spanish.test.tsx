@@ -36,7 +36,7 @@ describe('Iep101Page in Spanish', () => {
       screen.getByText('Metas medibles para el año (deben ser específicas, medibles, alcanzables, relevantes y con plazos definidos)')
     ).toBeInTheDocument();
     expect(screen.getByText('Debido proceso')).toBeInTheDocument();
-    expect(screen.getByText('Una audiencia de debido proceso formal para resolver desacuerdos')).toBeInTheDocument();
+    expect(screen.getByText('Una audiencia formal de debido proceso para resolver desacuerdos')).toBeInTheDocument();
     expect(
       screen.getByText('Usted puede estar en desacuerdo, y existen procesos formales para resolver disputas (mediación, debido proceso)')
     ).toBeInTheDocument();

@@ -4,7 +4,7 @@ import {
   DISABILITY_CATEGORY_LABELS,
   type DisabilityCategory,
 } from '@/features/educator/types';
-import { normalizeDisabilityCategory } from '@/features/children/lib/child-profile-options';
+import { normalizeDisabilityCategory } from './child-profile-normalize';
 
 // Human-facing labels for the canonical `DISABILITY_CATEGORY_OPTIONS` values
 // (`features/children/lib/child-profile-options.ts`) — the readable English

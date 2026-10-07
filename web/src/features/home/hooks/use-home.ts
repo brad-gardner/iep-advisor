@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { apiErrorMessage } from '@/lib/api-error';
+import { useAuth } from '@/features/auth/hooks/use-auth';
 import { getHome } from '../api/home-api';
 import type { HomeDto } from '../types';
 
@@ -28,6 +29,7 @@ type HomeLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
  */
 export function useHome(): UseHomeResult {
   const { t } = useTranslation('home');
+  const { user } = useAuth();
   const [home, setHome] = useState<HomeDto | null>(null);
   const [loadError, setLoadError] = useState<HomeLoadError | null>(null);
   // Bumped by the "Try again" button to re-run the load effect below.
@@ -57,12 +59,19 @@ export function useHome(): UseHomeResult {
     return () => {
       active = false;
     };
-    // `t` deliberately excluded: re-running the fetch on a language switch
-    // would be wasteful and racy (phase 2 review). The generic error text is
-    // translated below, at render, from `loadError`'s stored KIND rather than
-    // a snapshot string, so it already follows the active language with no
-    // refetch needed.
-  }, [retryToken]);
+    // `t` deliberately excluded: re-running the fetch on a plain UI language
+    // switch would be wasteful and racy (phase 2 review). The generic error
+    // text is translated below, at render, from `loadError`'s stored KIND
+    // rather than a snapshot string, so it already follows the active
+    // language with no refetch needed.
+    // `user?.preferredLanguage` deliberately included: some of `/api/home`'s
+    // notices are localized server-side (the plan's `.resx` work), so once
+    // the ACCOUNT's saved preference changes — e.g. right after
+    // `setLanguage`'s PUT lands — a refetch is needed to pick up those
+    // notices in the new language. This only changes when the PUT actually
+    // resolves, so it doesn't reintroduce the refetch-per-switch problem `t`
+    // was excluded for above.
+  }, [retryToken, user?.preferredLanguage]);
 
   return {
     home,

@@ -1,5 +1,5 @@
 import i18n from './i18n';
-import { normalizeGradeLevel } from '@/features/children/lib/child-profile-options';
+import { normalizeGradeLevel } from './child-profile-normalize';
 
 // Human-facing labels for the canonical `GRADE_LEVEL_OPTIONS` values
 // (`features/children/lib/child-profile-options.ts`) — translated via
