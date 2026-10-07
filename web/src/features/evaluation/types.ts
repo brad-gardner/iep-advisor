@@ -5,28 +5,18 @@ import type { ObligationDto } from '@/features/obligations/types';
 
 export const EVALUATION_CASE_KINDS = ['Initial', 'Reevaluation'] as const;
 export type EvaluationCaseKind = (typeof EVALUATION_CASE_KINDS)[number];
-export const EVALUATION_CASE_KIND_LABELS: Record<EvaluationCaseKind, string> = {
-  Initial: 'Initial evaluation',
-  Reevaluation: 'Reevaluation',
-};
 
 export const EVALUATION_CASE_STATUSES = ['Open', 'ConsentPending', 'InProgress', 'Determined', 'Closed'] as const;
 export type EvaluationCaseStatus = (typeof EVALUATION_CASE_STATUSES)[number];
-export const EVALUATION_CASE_STATUS_LABELS: Record<EvaluationCaseStatus, string> = {
-  Open: 'Open',
-  ConsentPending: 'Consent pending',
-  InProgress: 'In progress',
-  Determined: 'Determined',
-  Closed: 'Closed',
-};
 
 export const ELIGIBILITY_OUTCOMES = ['Eligible', 'NotEligible', 'Withdrawn'] as const;
 export type EligibilityOutcome = (typeof ELIGIBILITY_OUTCOMES)[number];
-export const ELIGIBILITY_OUTCOME_LABELS: Record<EligibilityOutcome, string> = {
-  Eligible: 'Eligible',
-  NotEligible: 'Not eligible',
-  Withdrawn: 'Withdrawn',
-};
+// Display labels for all three enums above moved to
+// `@/lib/evaluation-case-label.ts` (`evaluationCaseKindLabel`/
+// `evaluationCaseStatusLabel`/`eligibilityOutcomeLabel`, translated via the
+// staff-only `evaluation` namespace — i18n plan phase 5). Every caller of
+// the old `*_LABELS` maps lived in this feature, so they were removed
+// outright rather than kept alongside the new helpers.
 
 export interface EvaluatorAssignmentDto {
   id: number;

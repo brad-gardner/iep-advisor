@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageSquare, X } from 'lucide-react';
 import type { UseDocumentChatResult } from '../../hooks/use-document-chat';
 import { ChatComposer } from './chat-composer';
@@ -15,6 +16,7 @@ interface ChatPanelProps {
 // Document-scoped assistant thread: a side column on wide screens, hosted in
 // a Drawer on narrow ones.
 export function ChatPanel({ chat, onClose }: ChatPanelProps) {
+  const { t } = useTranslation('document-authoring');
   const { messages, isSending, error, send } = chat;
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -26,20 +28,20 @@ export function ChatPanel({ chat, onClose }: ChatPanelProps) {
   return (
     <aside
       className="flex h-full flex-col rounded-card border border-brand-slate-200 bg-brand-slate-50"
-      aria-label="Document assistant"
+      aria-label={t('chatPanel.ariaLabel')}
       data-testid="chat-panel"
     >
       {onClose && (
         <header className="flex items-center justify-between border-b border-brand-slate-200 px-4 py-3">
           <h2 className="flex items-center gap-2 text-sm font-medium text-brand-slate-700">
             <MessageSquare className="h-4 w-4 text-brand-teal-500" strokeWidth={1.8} aria-hidden="true" />
-            Assistant
+            {t('chatPanel.header')}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="rounded-button p-1 text-brand-slate-400 hover:bg-brand-slate-100 hover:text-brand-slate-600"
-            aria-label="Close assistant"
+            aria-label={t('chatPanel.closeAssistant')}
             data-testid="chat-close"
           >
             <X className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
@@ -56,7 +58,7 @@ export function ChatPanel({ chat, onClose }: ChatPanelProps) {
       >
         {messages.length === 0 && (
           <p className="text-[13px] leading-relaxed text-brand-slate-500" data-testid="chat-empty">
-            Ask about this IEP — e.g. &ldquo;Is this goal measurable?&rdquo;
+            {t('chatPanel.empty')}
           </p>
         )}
         {messages.map((message, index) => (
@@ -64,12 +66,12 @@ export function ChatPanel({ chat, onClose }: ChatPanelProps) {
         ))}
         {isSending && (
           <p className="text-[13px] text-brand-slate-500" data-testid="chat-thinking">
-            Thinking…
+            {t('chatPanel.thinking')}
           </p>
         )}
         {error && (
           <p className="text-[13px] text-brand-danger-700" data-testid="chat-error">
-            {error}
+            {error.kind === 'server' ? error.message : t('chatPanel.genericError')}
           </p>
         )}
       </div>

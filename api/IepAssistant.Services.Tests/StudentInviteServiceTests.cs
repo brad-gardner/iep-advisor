@@ -43,7 +43,7 @@ public sealed class StudentInviteServiceTests : IDisposable
         => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), email, NullLogger<StudentInviteService>.Instance, TestSupport.TestLocalizers.Messages());
 
     private static EducatorService CreateEducator(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<EducatorService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<EducatorService>.Instance, TestSupport.TestLocalizers.Messages());
 
     // ----------------------------------------------------------------- seed helpers
 

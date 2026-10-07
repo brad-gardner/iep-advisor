@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -14,11 +15,12 @@ function parseTab(raw: string | null): DocumentTab {
 }
 
 export function DocumentEditorPage() {
+  const { t } = useTranslation('document-authoring');
   const { instanceId: instanceIdParam } = useParams<{ instanceId: string }>();
   const instanceId = Number(instanceIdParam);
   const instance = useDocumentInstance(instanceId);
   const { detail, isLoading, loadError } = instance;
-  usePageTitle(detail ? detail.documentTypeDisplayName : 'Document');
+  usePageTitle(detail ? detail.documentTypeDisplayName : t('editorPage.titleFallback'));
 
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = parseTab(searchParams.get('tab'));
@@ -32,7 +34,7 @@ export function DocumentEditorPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading document…" />
+        <Spinner label={t('editorPage.loading')} />
       </div>
     );
   }
@@ -40,11 +42,17 @@ export function DocumentEditorPage() {
   if (loadError || !detail) {
     return (
       <EmptyState
-        title="Document not found"
-        description={loadError ?? 'This document may have been removed, or you may not have access.'}
+        title={t('editorPage.notFoundTitle')}
+        description={
+          loadError
+            ? loadError.kind === 'server'
+              ? loadError.message
+              : t('editorPage.loadErrorGeneric')
+            : t('editorPage.notFoundDescription')
+        }
         action={
           <Link to="/educator/students">
-            <Button variant="secondary">Back to students</Button>
+            <Button variant="secondary">{t('editorPage.backToStudents')}</Button>
           </Link>
         }
       />
@@ -58,11 +66,11 @@ export function DocumentEditorPage() {
           to={`/educator/students/${detail.schoolStudentId}/documents`}
           className="text-sm text-brand-teal-600 hover:underline"
         >
-          ← Back to documents
+          {t('editorPage.backToDocuments')}
         </Link>
       </div>
 
-      <div role="tablist" className="flex border-b border-brand-slate-200" aria-label="Document views">
+      <div role="tablist" className="flex border-b border-brand-slate-200" aria-label={t('editorPage.viewsAriaLabel')}>
         <button
           type="button"
           role="tab"
@@ -75,7 +83,7 @@ export function DocumentEditorPage() {
               : 'text-brand-slate-500 hover:text-brand-slate-800'
           }`}
         >
-          Edit
+          {t('editorPage.tabEdit')}
         </button>
         <button
           type="button"
@@ -89,7 +97,7 @@ export function DocumentEditorPage() {
               : 'text-brand-slate-500 hover:text-brand-slate-800'
           }`}
         >
-          Converge
+          {t('editorPage.tabConverge')}
         </button>
       </div>
 

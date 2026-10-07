@@ -57,7 +57,8 @@
     "notSet": "Sin establecer",
     "currentValueSuffix": "{{value}} (valor actual)",
     "tryAgain": "Intentar de nuevo",
-    "genericError": "Algo salió mal. Inténtelo de nuevo."
+    "genericError": "Algo salió mal. Inténtelo de nuevo.",
+    "reload": "Recargar"
   },
   "toast": {
     "dismiss": "Descartar notificación"

@@ -1,8 +1,12 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -18,7 +22,7 @@ public sealed class StudentTeamServiceTests : IDisposable
     private readonly RosterTestDb _db = new();
 
     private static StudentTeamService Service(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), NullLogger<StudentTeamService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), NullLogger<StudentTeamService>.Instance, TestSupport.TestLocalizers.Messages());
 
     private (int District, int SchoolA, int SchoolB, int Admin, int Student) Org()
     {
@@ -265,8 +269,8 @@ public sealed class StudentTeamServiceTests : IDisposable
         var access = new AccessService(ctx);
         var audit = new CapturingAuditLogger();
         var workspace = new StudentWorkspaceService(ctx, access, org, new NoClaudeClient(), TestSupport.TestLocalizers.Ai(), NullLogger<StudentWorkspaceService>.Instance);
-        var contributions = new ParentContributionService(ctx, access, org, audit);
-        var evidence = new StudentEvidenceService(ctx, org, workspace, contributions, audit);
+        var contributions = new ParentContributionService(ctx, access, org, audit, TestSupport.TestLocalizers.Messages());
+        var evidence = new StudentEvidenceService(ctx, org, workspace, contributions, audit, TestSupport.TestLocalizers.Messages());
         var result = await evidence.BuildForStaffAsync(o.Admin, o.Student);
 
         Assert.True(result.Success, result.Message);
@@ -278,6 +282,48 @@ public sealed class StudentTeamServiceTests : IDisposable
     private sealed class NoClaudeClient : Interfaces.IClaudeClient
     {
         public Task<string?> CompleteAsync(ClaudeCompletionRequest request, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5
+
+    private sealed class TestController : ControllerBase
+    {
+    }
+
+    [Fact]
+    public async Task GetTeamAsync_Stranger_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind()
+    {
+        var o = Org();
+        var (stranger, _) = _db.Staff("strangeres@x.com", o.District, o.SchoolA, OrgRoleIds.Teacher);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = _db.Context();
+        var result = await Service(ctx).GetTeamAsync(stranger, o.Student);
+
+        Assert.False(result.Success);
+        Assert.Equal("No tiene permiso para acceder a este estudiante.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddMember_UnknownStaffProfile_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        var o = Org();
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = _db.Context();
+        var result = await Service(ctx).AddMemberAsync(o.Admin, o.Student, new AddTeamMemberModel { StaffProfileId = -1, TeamRole = TeamRole.CaseManager });
+
+        Assert.False(result.Success);
+        Assert.Equal("Miembro del personal no encontrado.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
     }
 
     public void Dispose() => _db.Dispose();

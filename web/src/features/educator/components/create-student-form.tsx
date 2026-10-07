@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ export function CreateStudentForm({
   schools,
   embedded = false,
 }: CreateStudentFormProps) {
+  const { t } = useTranslation('educator');
   const requiresSchool = schools !== undefined;
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -43,7 +45,7 @@ export function CreateStudentForm({
     setError(null);
 
     if (requiresSchool && !schoolId) {
-      setError("Select a school for this student");
+      setError(t('createStudentForm.selectSchoolRequired'));
       return;
     }
 
@@ -68,7 +70,7 @@ export function CreateStudentForm({
       setDisabilityCategory("");
       setSchoolId("");
     } else {
-      setError(result.error ?? "Something went wrong");
+      setError(result.error ?? t('createStudentForm.genericError'));
     }
 
     setIsSubmitting(false);
@@ -88,13 +90,13 @@ export function CreateStudentForm({
 
       {requiresSchool && (
         <Select
-          label="School *"
+          label={t('createStudentForm.schoolLabel')}
           required
           value={schoolId}
           onChange={(e) => setSchoolId(e.target.value)}
           data-testid="educator-student-create-school"
         >
-          <option value="">Select a school</option>
+          <option value="">{t('createStudentForm.selectSchool')}</option>
           {schools!.map((school) => (
             <option key={school.id} value={school.id}>
               {school.name}
@@ -104,7 +106,7 @@ export function CreateStudentForm({
       )}
 
       <Input
-        label="First Name *"
+        label={t('createStudentForm.firstNameLabel')}
         required
         value={firstName}
         onChange={(e) => setFirstName(e.target.value)}
@@ -113,7 +115,7 @@ export function CreateStudentForm({
       />
 
       <Input
-        label="Last Name"
+        label={t('createStudentForm.lastNameLabel')}
         value={lastName}
         onChange={(e) => setLastName(e.target.value)}
         maxLength={100}
@@ -121,8 +123,8 @@ export function CreateStudentForm({
       />
 
       <Input
-        label="Student ID"
-        placeholder="District student ID"
+        label={t('createStudentForm.studentIdLabel')}
+        placeholder={t('createStudentForm.studentIdPlaceholder')}
         value={externalStudentId}
         onChange={(e) => setExternalStudentId(e.target.value)}
         maxLength={64}
@@ -130,7 +132,7 @@ export function CreateStudentForm({
       />
 
       <Input
-        label="Date of birth"
+        label={t('createStudentForm.dobLabel')}
         type="date"
         value={dateOfBirth}
         onChange={(e) => setDateOfBirth(e.target.value)}
@@ -157,7 +159,7 @@ export function CreateStudentForm({
         className="w-full"
         data-testid="create-student-submit"
       >
-        {isSubmitting ? "Adding..." : "Add Student"}
+        {isSubmitting ? t('createStudentForm.submitting') : t('createStudentForm.submit')}
       </Button>
     </form>
   );
@@ -165,7 +167,7 @@ export function CreateStudentForm({
   if (embedded) return form;
   return (
     <Card className="max-w-lg">
-      <h2 className="font-serif text-lg mb-4">Add a student</h2>
+      <h2 className="font-serif text-lg mb-4">{t('studentsPage.addStudentModalTitle')}</h2>
       {form}
     </Card>
   );

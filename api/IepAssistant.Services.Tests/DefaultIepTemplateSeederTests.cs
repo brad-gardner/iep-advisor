@@ -46,7 +46,7 @@ public sealed class DefaultIepTemplateSeederTests : IDisposable
         => new(ctx, NullLogger<DefaultIepTemplateSeeder>.Instance);
 
     private TemplateResolutionService CreateResolution(ApplicationDbContext ctx)
-        => new(ctx, NullLogger<TemplateResolutionService>.Instance);
+        => new(ctx, NullLogger<TemplateResolutionService>.Instance, TestSupport.TestLocalizers.Messages());
 
     private async Task<DefaultIepTemplateSeedResult> SeedOnceAsync()
     {
@@ -255,9 +255,10 @@ public sealed class DefaultIepTemplateSeederTests : IDisposable
             ctx2,
             new OrgAccessService(ctx2),
             CreateResolution(ctx2),
-            new TemplateAuthoringService(ctx2, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance),
+            new TemplateAuthoringService(ctx2, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()),
             new CapturingAuditLogger(),
-            NullLogger<DocumentInstanceService>.Instance);
+            NullLogger<DocumentInstanceService>.Instance,
+            TestSupport.TestLocalizers.Messages());
 
         var result = await service.CreateAsync(scenario.StudentId, IepTypeId, scenario.CollaboratorUserId);
 

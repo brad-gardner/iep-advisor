@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { coerceObjectives, emptyObjective, isKeyedObjective, type KeyedObjective } from '../../lib/objective-rows';
@@ -83,6 +84,7 @@ interface ObjectivesEditorProps {
  * also needed to update the same value.
  */
 export function ObjectivesEditor({ value, disabled, testIdPrefix, onChange, flush }: ObjectivesEditorProps) {
+  const { t } = useTranslation('document-authoring');
   const [objectives, setObjectives] = useState<KeyedObjective[]>(() => coerceObjectives(value));
   const descRefs = useRef(new Map<string, HTMLTextAreaElement>());
   // Scopes the post-mutation focus lookups below to this editor's own DOM, by
@@ -139,7 +141,7 @@ export function ObjectivesEditor({ value, disabled, testIdPrefix, onChange, flus
     // time, since the next one slides up into the removed slot) previously
     // sent the exact same "Objective removed" text twice in a row.
     const remaining = objectives.length - 1;
-    setAnnouncement(`Objective ${index + 1} removed, ${remaining} remaining`);
+    setAnnouncement(t('objectivesEditor.removedAnnouncement', { position: index + 1, remaining }));
     requestAnimationFrame(() => {
       const container = containerRef.current;
       if (!container || index === -1) return;
@@ -162,7 +164,7 @@ export function ObjectivesEditor({ value, disabled, testIdPrefix, onChange, flus
       [next[i], next[t]] = [next[t], next[i]];
       return next;
     }, true);
-    setAnnouncement(`Objective moved to position ${target + 1}`);
+    setAnnouncement(t('objectivesEditor.movedAnnouncement', { position: target + 1 }));
 
     // The arrow the user just pressed may now sit at a list end — its own
     // direction disabled there (same rule the `disabled` props below use) —
@@ -185,8 +187,8 @@ export function ObjectivesEditor({ value, disabled, testIdPrefix, onChange, flus
         {announcement}
       </div>
       <div className="flex items-center">
-        <h4 className="text-sm font-semibold text-brand-slate-700">Short-term objectives / benchmarks</h4>
-        <span className="ml-2 text-xs text-brand-slate-500">ordered</span>
+        <h4 className="text-sm font-semibold text-brand-slate-700">{t('objectivesEditor.heading')}</h4>
+        <span className="ml-2 text-xs text-brand-slate-500">{t('objectivesEditor.ordered')}</span>
         <Button
           variant="ghost"
           size="sm"
@@ -196,11 +198,11 @@ export function ObjectivesEditor({ value, disabled, testIdPrefix, onChange, flus
           data-testid={`${testIdPrefix}-objectives-add`}
         >
           <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-          Add objective
+          {t('objectivesEditor.addObjective')}
         </Button>
       </div>
       {objectives.length === 0 ? (
-        <p className="mt-1 text-sm text-brand-slate-500">No objectives yet.</p>
+        <p className="mt-1 text-sm text-brand-slate-500">{t('objectivesEditor.noObjectivesYet')}</p>
       ) : (
         <ol className="mt-2 space-y-2">
           {objectives.map((o, index) => {
@@ -214,13 +216,13 @@ export function ObjectivesEditor({ value, disabled, testIdPrefix, onChange, flus
                 data-testid={`${testIdPrefix}-objective-${index}`}
               >
                 <div className="flex items-start gap-3">
-                  <div className="flex shrink-0 flex-col gap-0.5 pt-1" role="group" aria-label={`Reorder objective ${index + 1}`}>
+                  <div className="flex shrink-0 flex-col gap-0.5 pt-1" role="group" aria-label={t('objectivesEditor.reorderAriaLabel', { number: index + 1 })}>
                     <button
                       type="button"
                       className="rounded text-brand-slate-400 hover:text-brand-teal-600 disabled:opacity-30"
                       disabled={disabled || index === 0}
                       onClick={() => moveObjective(o.key, -1)}
-                      aria-label={`Move objective ${index + 1} up`}
+                      aria-label={t('objectivesEditor.moveUpAriaLabel', { number: index + 1 })}
                       data-testid={`${testIdPrefix}-objective-${index}-up`}
                     >
                       <ChevronUp className="h-4 w-4" aria-hidden="true" />
@@ -230,7 +232,7 @@ export function ObjectivesEditor({ value, disabled, testIdPrefix, onChange, flus
                       className="rounded text-brand-slate-400 hover:text-brand-teal-600 disabled:opacity-30"
                       disabled={disabled || index === objectives.length - 1}
                       onClick={() => moveObjective(o.key, 1)}
-                      aria-label={`Move objective ${index + 1} down`}
+                      aria-label={t('objectivesEditor.moveDownAriaLabel', { number: index + 1 })}
                       data-testid={`${testIdPrefix}-objective-${index}-down`}
                     >
                       <ChevronDown className="h-4 w-4" aria-hidden="true" />
@@ -238,7 +240,7 @@ export function ObjectivesEditor({ value, disabled, testIdPrefix, onChange, flus
                   </div>
                   <div className="min-w-0 flex-1 space-y-2">
                     <label htmlFor={descId} className="sr-only">
-                      Objective {index + 1} description
+                      {t('objectivesEditor.descriptionSrLabel', { number: index + 1 })}
                     </label>
                     <textarea
                       id={descId}
@@ -259,7 +261,7 @@ export function ObjectivesEditor({ value, disabled, testIdPrefix, onChange, flus
                     />
                     <div className="grid gap-2 sm:grid-cols-2">
                       <label className="block text-xs font-medium text-brand-slate-600" htmlFor={criteriaId}>
-                        Criteria
+                        {t('objectivesEditor.criteriaLabel')}
                         <input
                           id={criteriaId}
                           type="text"
@@ -272,7 +274,7 @@ export function ObjectivesEditor({ value, disabled, testIdPrefix, onChange, flus
                         />
                       </label>
                       <label className="block text-xs font-medium text-brand-slate-600" htmlFor={dateId}>
-                        Target date
+                        {t('objectivesEditor.targetDateLabel')}
                         <input
                           id={dateId}
                           type="text"
@@ -291,7 +293,7 @@ export function ObjectivesEditor({ value, disabled, testIdPrefix, onChange, flus
                     className="shrink-0 text-brand-slate-400 hover:text-brand-danger-700 disabled:opacity-30"
                     disabled={disabled}
                     onClick={() => removeObjective(o.key)}
-                    aria-label={`Remove objective ${index + 1}`}
+                    aria-label={t('objectivesEditor.removeAriaLabel', { number: index + 1 })}
                     data-testid={`${testIdPrefix}-objective-${index}-remove`}
                   >
                     <Trash2 className="h-4 w-4" aria-hidden="true" />

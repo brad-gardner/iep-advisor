@@ -1,0 +1,53 @@
+import i18n from '@/lib/i18n';
+import type { AccessRole, AttentionFilter, ExitReason, StudentStatus, TeamRole } from '../types';
+
+// Human-facing, translated labels for the staff-only enum maps in
+// `features/educator/types.ts` (`STUDENT_STATUS_LABELS`, `EXIT_REASON_LABELS`,
+// `ATTENTION_FILTER_LABELS`, and the `AccessRole` string union) — via
+// `educator:studentStatus.*` / `exitReason.*` / `teamRole.*` /
+// `attentionFilter.*` / `accessRole.*` (all keyed by the raw enum value,
+// which IS the stored/API value for every one of these — see
+// `docs/i18n/README.md`'s "Display-label helpers follow `orgRoleLabel`'s
+// shape"). Plain functions calling `i18n.t` directly (not `useTranslation`)
+// so they work from both render bodies and plain builder functions
+// (`roster-columns.tsx`, `team-columns.tsx`) that have no hook of their own;
+// the `educator` namespace's English is guaranteed already registered by
+// the time any of these run, since every caller lives behind a staff
+// lazy-route chunk, and all three import `@/app/lazy-routes/staff-locales`,
+// which registers every staff namespace (including this one).
+// Every value in each union has a translation, so a typo at the call site
+// is still a `tsc` error — but, same reasoning as `meetingTypeLabel`/
+// `obligationKindLabel`/`evaluationCaseKindLabel` (`lib/meeting-labels.ts`,
+// `lib/obligation-label.ts`, `lib/evaluation-case-label.ts`), each still
+// passes `defaultValue` as a defensive fallback to the raw enum value: a
+// lookup miss here means a context rendered before this namespace's
+// English registered (e.g. a test that doesn't import
+// `@/app/lazy-routes/staff-locales` first), which should show the raw
+// value rather than a raw `educator:*` key.
+
+export function studentStatusLabel(status: StudentStatus): string {
+  return i18n.t(`educator:studentStatus.${status}`, { defaultValue: status });
+}
+
+export function exitReasonLabel(reason: ExitReason): string {
+  return i18n.t(`educator:exitReason.${reason}`, { defaultValue: reason });
+}
+
+export function teamRoleLabel(role: TeamRole): string {
+  return i18n.t(`educator:teamRole.${role}`, { defaultValue: role });
+}
+
+export function accessRoleLabel(role: AccessRole): string {
+  return i18n.t(`educator:accessRole.${role}`, { defaultValue: role });
+}
+
+/**
+ * `AttentionFilter`'s label for the roster's "needs attention" banner.
+ * `DueInRange` normally carries its own caller-chosen `from`/`to` window
+ * (built by the page from `educator:studentsPage.dueBetween`, not this map)
+ * — this entry only covers a `DueInRange` deep link with no date bounds
+ * attached.
+ */
+export function attentionFilterLabel(filter: AttentionFilter): string {
+  return i18n.t(`educator:attentionFilter.${filter}`, { defaultValue: filter });
+}

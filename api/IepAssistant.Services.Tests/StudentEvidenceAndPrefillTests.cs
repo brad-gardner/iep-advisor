@@ -49,13 +49,13 @@ public sealed class StudentEvidenceAndPrefillTests : IDisposable
         var access = new AccessService(ctx);
         var org = new OrgAccessService(ctx);
         var workspace = new StudentWorkspaceService(ctx, access, org, new NoClaude(), TestSupport.TestLocalizers.Ai(), NullLogger<StudentWorkspaceService>.Instance);
-        var contributions = new ParentContributionService(ctx, access, org, _audit);
-        var evidence = new StudentEvidenceService(ctx, org, workspace, contributions, _audit);
+        var contributions = new ParentContributionService(ctx, access, org, _audit, TestSupport.TestLocalizers.Messages());
+        var evidence = new StudentEvidenceService(ctx, org, workspace, contributions, _audit, TestSupport.TestLocalizers.Messages());
         var prefill = new DocumentPrefillService(ctx);
         var instances = new DocumentInstanceService(ctx, org,
-            new TemplateResolutionService(ctx, NullLogger<TemplateResolutionService>.Instance),
-            new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance),
-            new CapturingAuditLogger(), NullLogger<DocumentInstanceService>.Instance, evidence, prefill);
+            new TemplateResolutionService(ctx, NullLogger<TemplateResolutionService>.Instance, TestSupport.TestLocalizers.Messages()),
+            new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()),
+            new CapturingAuditLogger(), NullLogger<DocumentInstanceService>.Instance, TestSupport.TestLocalizers.Messages(), evidence, prefill);
         return (evidence, prefill, contributions, instances);
     }
 

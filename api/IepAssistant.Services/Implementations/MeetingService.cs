@@ -64,29 +64,29 @@ public class MeetingService : IMeetingService
     public async Task<ServiceResult<MeetingModel>> CreateAsync(int userId, int studentId, CreateMeetingModel model, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Collaborator, ct))
-            return ServiceResult<MeetingModel>.FailureResult("You do not have permission to schedule a meeting for this student.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Meetings.NoPermissionToSchedule"]);
 
         var student = await _context.SchoolStudents.AsNoTracking().FirstOrDefaultAsync(s => s.Id == studentId, ct);
         if (student == null)
-            return ServiceResult<MeetingModel>.FailureResult("Student not found.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.StudentNotFound"]);
 
         if (model.StartsAtUtc.Year < MinPlausibleYear)
-            return ServiceResult<MeetingModel>.FailureResult("startsAtUtc is invalid.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.StartsAtInvalid"]);
 
         var timeZoneId = string.IsNullOrWhiteSpace(model.TimeZoneId) ? DefaultTimeZoneId : model.TimeZoneId.Trim();
         if (!IsValidTimeZone(timeZoneId))
-            return ServiceResult<MeetingModel>.FailureResult("Invalid time zone.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.InvalidTimeZone"]);
 
         var duration = model.DurationMinutes ?? DefaultDurationMinutes;
         if (duration < MinDurationMinutes || duration > MaxDurationMinutes)
-            return ServiceResult<MeetingModel>.FailureResult($"Duration must be between {MinDurationMinutes} and {MaxDurationMinutes} minutes.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.DurationRange", MinDurationMinutes, MaxDurationMinutes]);
 
         if (HasControlCharacters(model.Title))
-            return ServiceResult<MeetingModel>.FailureResult("Title contains invalid characters.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.TitleInvalidCharacters"]);
         if (HasControlCharacters(model.Location))
-            return ServiceResult<MeetingModel>.FailureResult("Location contains invalid characters.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.LocationInvalidCharacters"]);
         if (!IsSafeHttpUrl(model.VideoUrl))
-            return ServiceResult<MeetingModel>.FailureResult("Video link must be an http(s) URL.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.VideoLinkInvalid"]);
 
         var title = string.IsNullOrWhiteSpace(model.Title) ? $"{model.Type.ToDisplay()} Meeting" : model.Title.Trim();
 
@@ -119,7 +119,7 @@ public class MeetingService : IMeetingService
         {
             _context.Meetings.Remove(meeting);
             await _context.SaveChangesAsync(ct);
-            return ServiceResult<MeetingModel>.FailureResult(participantError);
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, participantError);
         }
         await _context.SaveChangesAsync(ct);
 
@@ -134,7 +134,7 @@ public class MeetingService : IMeetingService
     public async Task<ServiceResult<List<DefaultParticipantModel>>> GetDefaultParticipantsAsync(int userId, int studentId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Collaborator, ct))
-            return ServiceResult<List<DefaultParticipantModel>>.FailureResult("You do not have permission to schedule meetings for this student.");
+            return ServiceResult<List<DefaultParticipantModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Meetings.NoPermissionToScheduleMeetings"]);
 
         var membership = await LoadMembershipContextAsync(studentId, ct);
         var inputs = await BuildDefaultParticipantInputsAsync(studentId, userId, membership, ct);
@@ -167,7 +167,7 @@ public class MeetingService : IMeetingService
     public async Task<ServiceResult<List<MeetingModel>>> GetForStudentAsync(int userId, int studentId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
-            return ServiceResult<List<MeetingModel>>.FailureResult("You do not have permission to view this student's meetings.");
+            return ServiceResult<List<MeetingModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Meetings.NoPermissionToViewStudentMeetings"]);
 
         var meetings = await _context.Meetings.AsNoTracking()
             .Include(m => m.Participants).ThenInclude(p => p.User)
@@ -242,20 +242,20 @@ public class MeetingService : IMeetingService
     {
         var meeting = await _context.Meetings.FirstOrDefaultAsync(m => m.Id == meetingId, ct);
         if (meeting == null)
-            return ServiceResult<MeetingModel>.FailureResult("Meeting not found.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Meetings.MeetingNotFound"]);
         if (!await CanManageAsync(userId, meeting, ct))
-            return ServiceResult<MeetingModel>.FailureResult("You do not have permission to update this meeting.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Meetings.NoPermissionToUpdate"]);
         if (meeting.Status == MeetingStatus.Cancelled)
-            return ServiceResult<MeetingModel>.FailureResult("Cannot update a cancelled meeting.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.CannotUpdateCancelled"]);
 
         if (model.StartsAtUtc.HasValue && model.StartsAtUtc.Value.Year < MinPlausibleYear)
-            return ServiceResult<MeetingModel>.FailureResult("startsAtUtc is invalid.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.StartsAtInvalid"]);
         if (HasControlCharacters(model.Title))
-            return ServiceResult<MeetingModel>.FailureResult("Title contains invalid characters.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.TitleInvalidCharacters"]);
         if (HasControlCharacters(model.Location))
-            return ServiceResult<MeetingModel>.FailureResult("Location contains invalid characters.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.LocationInvalidCharacters"]);
         if (!IsSafeHttpUrl(model.VideoUrl))
-            return ServiceResult<MeetingModel>.FailureResult("Video link must be an http(s) URL.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.VideoLinkInvalid"]);
 
         var scheduleChanged = false;
 
@@ -267,7 +267,7 @@ public class MeetingService : IMeetingService
         if (model.DurationMinutes.HasValue)
         {
             if (model.DurationMinutes.Value < MinDurationMinutes || model.DurationMinutes.Value > MaxDurationMinutes)
-                return ServiceResult<MeetingModel>.FailureResult($"Duration must be between {MinDurationMinutes} and {MaxDurationMinutes} minutes.");
+                return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.DurationRange", MinDurationMinutes, MaxDurationMinutes]);
             if (model.DurationMinutes.Value != meeting.DurationMinutes) { meeting.DurationMinutes = model.DurationMinutes.Value; scheduleChanged = true; }
         }
         if (model.Location != null)
@@ -287,7 +287,7 @@ public class MeetingService : IMeetingService
         if (!string.IsNullOrWhiteSpace(model.TimeZoneId))
         {
             if (!IsValidTimeZone(model.TimeZoneId))
-                return ServiceResult<MeetingModel>.FailureResult("Invalid time zone.");
+                return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.InvalidTimeZone"]);
             meeting.TimeZoneId = model.TimeZoneId.Trim();
         }
         if (model.DocumentInstanceId.HasValue)
@@ -305,7 +305,7 @@ public class MeetingService : IMeetingService
             var membership = await LoadMembershipContextAsync(meeting.SchoolStudentId, ct);
             var participantError = await ReplaceParticipantsAsync(meeting, model.Participants, membership, meeting.CreatedByUserId, ct);
             if (participantError != null)
-                return ServiceResult<MeetingModel>.FailureResult(participantError);
+                return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, participantError);
             await _context.SaveChangesAsync(ct);
         }
 
@@ -320,9 +320,9 @@ public class MeetingService : IMeetingService
     {
         var meeting = await _context.Meetings.FirstOrDefaultAsync(m => m.Id == meetingId, ct);
         if (meeting == null)
-            return ServiceResult<MeetingModel>.FailureResult("Meeting not found.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Meetings.MeetingNotFound"]);
         if (!await CanManageAsync(userId, meeting, ct))
-            return ServiceResult<MeetingModel>.FailureResult("You do not have permission to cancel this meeting.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Meetings.NoPermissionToCancel"]);
 
         if (meeting.Status != MeetingStatus.Cancelled)
         {
@@ -342,15 +342,15 @@ public class MeetingService : IMeetingService
     public async Task<ServiceResult<MeetingModel>> SetStatusAsync(int userId, int meetingId, MeetingStatus status, CancellationToken ct = default)
     {
         if (status is not (MeetingStatus.Scheduled or MeetingStatus.Held or MeetingStatus.Continued))
-            return ServiceResult<MeetingModel>.FailureResult("Status must be Scheduled, Held, or Continued.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.InvalidStatusValue"]);
 
         var meeting = await _context.Meetings.FirstOrDefaultAsync(m => m.Id == meetingId, ct);
         if (meeting == null)
-            return ServiceResult<MeetingModel>.FailureResult("Meeting not found.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Meetings.MeetingNotFound"]);
         if (!await CanManageAsync(userId, meeting, ct))
-            return ServiceResult<MeetingModel>.FailureResult("You do not have permission to update this meeting.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Meetings.NoPermissionToUpdate"]);
         if (meeting.Status == MeetingStatus.Cancelled)
-            return ServiceResult<MeetingModel>.FailureResult("Cannot change the status of a cancelled meeting.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.CannotChangeStatusCancelled"]);
 
         meeting.Status = status;
         meeting.UpdatedById = userId;
@@ -364,17 +364,17 @@ public class MeetingService : IMeetingService
     {
         var meeting = await _context.Meetings.Include(m => m.Participants).FirstOrDefaultAsync(m => m.Id == meetingId, ct);
         if (meeting == null)
-            return ServiceResult<MeetingModel>.FailureResult("Meeting not found.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Meetings.MeetingNotFound"]);
         if (!await CanManageAsync(userId, meeting, ct))
-            return ServiceResult<MeetingModel>.FailureResult("You do not have permission to update this meeting.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Meetings.NoPermissionToUpdate"]);
         if (meeting.Status is not (MeetingStatus.Held or MeetingStatus.Continued))
-            return ServiceResult<MeetingModel>.FailureResult("Attendance can only be recorded for a held meeting.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Meetings.AttendanceOnlyHeld"]);
 
         foreach (var item in items)
         {
             var participant = meeting.Participants.FirstOrDefault(p => p.Id == item.ParticipantId);
             if (participant == null)
-                return ServiceResult<MeetingModel>.FailureResult("Participant not found on this meeting.");
+                return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Meetings.ParticipantNotFound"]);
 
             participant.Attended = item.Attended;
             participant.UpdatedById = userId;
@@ -583,15 +583,15 @@ public class MeetingService : IMeetingService
         foreach (var input in normalized)
         {
             if (input.UserId == null && string.IsNullOrWhiteSpace(input.ExternalEmail))
-                return "Each participant must have either a user or an external email address.";
+                return _localizer["Meetings.ParticipantUserOrEmailRequired"];
             if (HasControlCharacters(input.ExternalName) || HasControlCharacters(input.ExternalEmail))
-                return "Participant contains invalid characters.";
+                return _localizer["Meetings.ParticipantInvalidCharacters"];
             if (!string.IsNullOrWhiteSpace(input.ExternalEmail) && !IsValidEmail(input.ExternalEmail))
-                return "Participant email address is invalid.";
+                return _localizer["Meetings.ParticipantEmailInvalid"];
         }
         var dupUserIds = normalized.Where(i => i.UserId != null).GroupBy(i => i.UserId!.Value).Where(g => g.Count() > 1);
         if (dupUserIds.Any())
-            return "A participant was listed more than once.";
+            return _localizer["Meetings.ParticipantDuplicate"];
 
         var familyUserIds = membership.FamilyUserIds;
         var studentAccountUserId = membership.StudentAccountUserId;

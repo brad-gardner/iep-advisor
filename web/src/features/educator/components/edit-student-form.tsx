@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
@@ -13,6 +14,7 @@ interface EditStudentFormProps {
 }
 
 export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentFormProps) {
+  const { t } = useTranslation(['educator', 'common']);
   const [fields, setFields] = useState<EditStudentFields>(() => fieldsFrom(student));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,12 +25,12 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
     e.preventDefault();
     setError(null);
     if (!fields.firstName.trim()) {
-      setError('First name is required');
+      setError(t('educator:editStudentForm.firstNameRequired'));
       return;
     }
     setIsSubmitting(true);
     const result = await onSubmit(toUpdateRequest(fields));
-    if (!result.success) setError(result.error ?? 'Could not save the student');
+    if (!result.success) setError(result.error ?? t('educator:editStudentForm.genericError'));
     setIsSubmitting(false);
   };
 
@@ -42,11 +44,11 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
 
       <fieldset className="space-y-4">
         <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-brand-slate-500">
-          Identity
+          {t('educator:editStudentForm.identityLegend')}
         </legend>
         <Input
           id="edit-student-first-name"
-          label="First name *"
+          label={t('educator:editStudentForm.firstNameLabel')}
           required
           maxLength={100}
           value={fields.firstName}
@@ -55,7 +57,7 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
         />
         <Input
           id="edit-student-last-name"
-          label="Last name"
+          label={t('educator:editStudentForm.lastNameLabel')}
           maxLength={100}
           value={fields.lastName}
           onChange={(e) => set({ lastName: e.target.value })}
@@ -63,7 +65,7 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
         />
         <Input
           id="edit-student-external-id"
-          label="Student ID"
+          label={t('educator:editStudentForm.studentIdLabel')}
           maxLength={64}
           value={fields.externalStudentId}
           onChange={(e) => set({ externalStudentId: e.target.value })}
@@ -71,7 +73,7 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
         />
         <Input
           id="edit-student-dob"
-          label="Date of birth"
+          label={t('educator:editStudentForm.dobLabel')}
           type="date"
           value={fields.dateOfBirth}
           onChange={(e) => set({ dateOfBirth: e.target.value })}
@@ -79,7 +81,7 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
         />
         <Input
           id="edit-student-state"
-          label="State"
+          label={t('educator:editStudentForm.stateLabel')}
           maxLength={2}
           placeholder="OH"
           value={fields.stateCode}
@@ -90,7 +92,7 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
 
       <fieldset className="space-y-4">
         <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-brand-slate-500">
-          Placement
+          {t('educator:editStudentForm.placementLegend')}
         </legend>
         <GradeLevelSelect
           id="edit-student-grade"
@@ -106,9 +108,9 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
         />
         <Input
           id="edit-student-home-language"
-          label="Home language"
+          label={t('educator:editStudentForm.homeLanguageLabel')}
           maxLength={32}
-          placeholder="en"
+          placeholder={t('educator:editStudentForm.homeLanguagePlaceholder')}
           value={fields.homeLanguage}
           onChange={(e) => set({ homeLanguage: e.target.value })}
           data-testid="edit-student-home-language"
@@ -117,11 +119,11 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
 
       <fieldset className="space-y-4">
         <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-brand-slate-500">
-          Timeline
+          {t('educator:editStudentForm.timelineLegend')}
         </legend>
         <Input
           id="edit-student-iep-date"
-          label="IEP date"
+          label={t('educator:editStudentForm.iepDateLabel')}
           type="date"
           value={fields.iepDate}
           onChange={(e) => set({ iepDate: e.target.value })}
@@ -129,7 +131,7 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
         />
         <Input
           id="edit-student-annual-review"
-          label="Annual review due"
+          label={t('educator:editStudentForm.annualReviewLabel')}
           type="date"
           value={fields.annualReviewDueDate}
           onChange={(e) => set({ annualReviewDueDate: e.target.value })}
@@ -137,7 +139,7 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
         />
         <Input
           id="edit-student-etr-date"
-          label="ETR date"
+          label={t('educator:editStudentForm.etrDateLabel')}
           type="date"
           value={fields.etrDate}
           onChange={(e) => set({ etrDate: e.target.value })}
@@ -145,7 +147,7 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
         />
         <Input
           id="edit-student-reevaluation"
-          label="Reevaluation due"
+          label={t('educator:editStudentForm.reevaluationLabel')}
           type="date"
           value={fields.reevaluationDueDate}
           onChange={(e) => set({ reevaluationDueDate: e.target.value })}
@@ -155,10 +157,10 @@ export function EditStudentForm({ student, onSubmit, onCancel }: EditStudentForm
 
       <div className="flex items-center justify-end gap-2">
         <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
-          Cancel
+          {t('common:ui.cancel')}
         </Button>
         <Button type="submit" loading={isSubmitting} data-testid="edit-student-submit">
-          Save changes
+          {t('educator:editStudentForm.saveChanges')}
         </Button>
       </div>
     </form>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { useAutosave } from '@/hooks/use-autosave';
 import { useRegisterFlush } from '../../hooks/flush-registry-context';
@@ -16,6 +17,7 @@ import { appendText, useDocumentEditorContext } from '../../hooks/document-edito
  * editable surface is a `role="textbox"` div, not a native labelable control.
  */
 export function RichTextField({ field, value, disabled, onSave }: FieldRendererProps) {
+  const { t } = useTranslation('document-authoring');
   const id = fieldElementId(field.id);
   const [local, setLocal] = useState(typeof value === 'string' ? value : '');
   const editor = useDocumentEditorContext();
@@ -58,7 +60,7 @@ export function RichTextField({ field, value, disabled, onSave }: FieldRendererP
         onFocus={() =>
           editor?.setActiveField({
             id: field.fieldKey,
-            label: () => field.label || 'this field',
+            label: () => field.label || t('fieldLabel.thisField'),
             apply: (text) => {
               if (disabledRef.current) return;
               applyText(appendText(localRef.current, text));
@@ -72,7 +74,7 @@ export function RichTextField({ field, value, disabled, onSave }: FieldRendererP
           minRows={4}
           value={local}
           disabled={disabled}
-          aria-label={field.label || 'this field'}
+          aria-label={field.label || t('fieldLabel.thisField')}
           onChange={handleChange}
           data-testid={`field-${field.fieldKey}`}
         />

@@ -16,14 +16,9 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 public class DraftResponseService : IDraftResponseService
 {
-    // Multilingual plan Phase 3: these three stay English-literal consts, used only by the staff-only
-    // methods below (GetForInstanceAsync, ResolveAsync — out of scope here, deferred to Phase 5).
-    // CreateAsync/GetForParentAsync (parent-reachable) use the localized Documents.Permission /
-    // DraftSharing.RevisionNotFound / DraftResponses.NotActiveRevision resources directly instead.
-    private const string InstanceNotFoundMessage = "Document not found.";
-    private const string PermissionMessage = "You do not have permission to access this document.";
-    private const string ResponseNotFoundMessage = "Response not found.";
-    private const string ResolveRequiresInputMessage = "Provide a reply or mark this resolved in the draft.";
+    // Multilingual plan Phase 5: the staff-only methods (GetForInstanceAsync, ResolveAsync) now use the
+    // localized Documents.Permission / Documents.NotFound / DraftResponses.* resources directly, same as
+    // the parent-reachable CreateAsync/GetForParentAsync.
     private const int MaxTextLength = 2000;
     private const int MaxTargetRowIdLength = 64; // matches the DraftResponses.TargetRowId column
 
@@ -122,9 +117,9 @@ public class DraftResponseService : IDraftResponseService
             .Select(i => (int?)i.SchoolStudentId)
             .FirstOrDefaultAsync(ct);
         if (schoolStudentId == null)
-            return ServiceResult<List<DraftResponseModel>>.FailureResult(InstanceNotFoundMessage);
+            return ServiceResult<List<DraftResponseModel>>.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
         if (!await _orgAccess.CanActOnStudentAsync(userId, schoolStudentId.Value, AccessRole.Viewer, ct))
-            return ServiceResult<List<DraftResponseModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<DraftResponseModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Documents.Permission"]);
 
         var query = _context.DraftResponses.AsNoTracking().Where(r => r.SharedDraftRevision.DocumentInstanceId == instanceId);
         if (status != null)
@@ -138,21 +133,21 @@ public class DraftResponseService : IDraftResponseService
     {
         var staffReply = string.IsNullOrWhiteSpace(model.StaffReply) ? null : model.StaffReply.Trim();
         if (staffReply != null && staffReply.Length > MaxTextLength)
-            return ServiceResult<DraftResponseModel>.FailureResult($"Reply must be {MaxTextLength} characters or fewer.");
+            return ServiceResult<DraftResponseModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DraftResponses.ReplyTooLong", MaxTextLength]);
         var resolvedInDraft = model.ResolvedInDraft ?? false;
         if (staffReply == null && !resolvedInDraft)
-            return ServiceResult<DraftResponseModel>.FailureResult(ResolveRequiresInputMessage);
+            return ServiceResult<DraftResponseModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DraftResponses.ResolveRequiresInput"]);
 
         var response = await _context.DraftResponses.FirstOrDefaultAsync(r => r.Id == responseId, ct);
         if (response == null)
-            return ServiceResult<DraftResponseModel>.FailureResult(ResponseNotFoundMessage);
+            return ServiceResult<DraftResponseModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["DraftResponses.ResponseNotFound"]);
 
         var schoolStudentId = await _context.SharedDraftRevisions.AsNoTracking()
             .Where(r => r.Id == response.SharedDraftRevisionId)
             .Select(r => r.DocumentInstance.SchoolStudentId)
             .FirstOrDefaultAsync(ct);
         if (!await _orgAccess.CanActOnStudentAsync(userId, schoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<DraftResponseModel>.FailureResult(PermissionMessage);
+            return ServiceResult<DraftResponseModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Documents.Permission"]);
 
         response.Status = DraftResponseStatus.Resolved;
         response.StaffReply = staffReply;

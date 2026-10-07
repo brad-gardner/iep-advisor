@@ -403,6 +403,11 @@
   <data name="Api.InvalidRequest" xml:space="preserve">
     <value>Invalid request</value>
   </data>
+  <!-- One generic row-version decode-guard key (multilingual plan 2026-10-06 phase 5): replaces the
+       bare English literal duplicated in DocumentInstanceController and TemplateAuthoringController. -->
+  <data name="Api.InvalidRowVersion" xml:space="preserve">
+    <value>The provided row version is not valid base64.</value>
+  </data>
   <data name="StudentWorkspaceApi.InvalidEntryKind" xml:space="preserve">
     <value>Invalid entry kind.</value>
   </data>
@@ -423,6 +428,54 @@
   </data>
   <data name="Documents.DeletedSuccessfully" xml:space="preserve">
     <value>Document deleted successfully.</value>
+  </data>
+  <data name="Documents.NoLongerEditable" xml:space="preserve">
+    <value>This document can no longer be edited.</value>
+  </data>
+  <data name="Documents.OnlyDraftCanBeDeleted" xml:space="preserve">
+    <value>Only a draft document can be deleted.</value>
+  </data>
+  <data name="Documents.ConcurrencyConflict" xml:space="preserve">
+    <value>This document was changed by someone else. Please reload and try again.</value>
+  </data>
+  <data name="Documents.SharedDraftBlocksDelete" xml:space="preserve">
+    <value>This document has been shared with the family and cannot be deleted. Withdraw the share first.</value>
+  </data>
+  <data name="Documents.TooLargeToSave" xml:space="preserve">
+    <value>This document is too large to save. Please reduce its content.</value>
+  </data>
+  <data name="Documents.PinnedVersionUnavailable" xml:space="preserve">
+    <value>The pinned template version could not be loaded.</value>
+  </data>
+  <data name="Documents.FieldMustBeFormattedText" xml:space="preserve">
+    <value>'{0}' must be formatted text.</value>
+  </data>
+  <data name="Documents.FieldMustBeCheckbox" xml:space="preserve">
+    <value>'{0}' must be a checkbox (true/false).</value>
+  </data>
+  <data name="Documents.FieldMustBeDate" xml:space="preserve">
+    <value>'{0}' must be a date.</value>
+  </data>
+  <data name="Documents.FieldMustBeValidDate" xml:space="preserve">
+    <value>'{0}' must be a valid date.</value>
+  </data>
+  <data name="Documents.FieldMustBeText" xml:space="preserve">
+    <value>'{0}' must be text.</value>
+  </data>
+  <data name="Documents.FieldMustBeSupportedValue" xml:space="preserve">
+    <value>'{0}' must be a supported value.</value>
+  </data>
+  <data name="Documents.FieldMustBeTable" xml:space="preserve">
+    <value>'{0}' must be a table (list of rows).</value>
+  </data>
+  <data name="Documents.InvalidTableRow" xml:space="preserve">
+    <value>'{0}' has an invalid table row.</value>
+  </data>
+  <data name="Documents.TableColumnLabel" xml:space="preserve">
+    <value>{0} column</value>
+  </data>
+  <data name="Documents.OwnerNotActiveTeamMember" xml:space="preserve">
+    <value>The owner selected for a row in '{0}' is not an active member of the student's team, so it was not saved.</value>
   </data>
   <data name="IepDocuments.InvalidMeetingTypeDetailed" xml:space="preserve">
     <value>Invalid meeting type. Must be: initial, annual_review, amendment, or reevaluation.</value>
@@ -795,5 +848,449 @@
   </data>
   <data name="Home.WorkspaceNudge" xml:space="preserve">
     <value>Add your strengths, interests, and goals to your self-advocacy workspace.</value>
+  </data>
+  <data name="Educator.ProfileNotFound" xml:space="preserve">
+    <value>Educator profile not found.</value>
+  </data>
+  <data name="Educator.FirstNameRequired" xml:space="preserve">
+    <value>Student first name is required.</value>
+  </data>
+  <data name="Educator.SchoolRequiredChoose" xml:space="preserve">
+    <value>A school is required. Please choose a school for this student.</value>
+  </data>
+  <data name="Educator.SchoolNotFound" xml:space="preserve">
+    <value>School not found.</value>
+  </data>
+  <data name="Educator.SchoolRequiredToCreate" xml:space="preserve">
+    <value>A school is required to create a student.</value>
+  </data>
+  <data name="Educator.NoPermissionCreateOtherSchool" xml:space="preserve">
+    <value>You do not have permission to create a student in another school.</value>
+  </data>
+  <data name="Educator.DuplicateExternalId" xml:space="preserve">
+    <value>Student ID already in use in this district.</value>
+  </data>
+  <data name="Educator.DateRangeOutOfBounds" xml:space="preserve">
+    <value>The requested date range is out of bounds.</value>
+  </data>
+  <data name="Educator.NoPermissionAccessStudent" xml:space="preserve">
+    <value>You do not have permission to access this student.</value>
+  </data>
+  <data name="Educator.StudentNotFound" xml:space="preserve">
+    <value>Student not found.</value>
+  </data>
+  <data name="Educator.NoPermissionEditStudent" xml:space="preserve">
+    <value>You do not have permission to edit this student.</value>
+  </data>
+  <data name="Educator.AlreadyExited" xml:space="preserve">
+    <value>Student has already been exited.</value>
+  </data>
+  <data name="Educator.NoPermissionChangeStatus" xml:space="preserve">
+    <value>You do not have permission to change this student's status.</value>
+  </data>
+  <data name="Educator.NoPermissionTransferStudents" xml:space="preserve">
+    <value>You do not have permission to transfer students.</value>
+  </data>
+  <data name="Educator.NoPermissionTransferThisStudent" xml:space="preserve">
+    <value>You do not have permission to transfer this student.</value>
+  </data>
+  <data name="Educator.AlreadyAtSchool" xml:space="preserve">
+    <value>The student is already at that school.</value>
+  </data>
+  <data name="Educator.NoPermissionAssignCaseManagers" xml:space="preserve">
+    <value>You do not have permission to assign case managers.</value>
+  </data>
+  <data name="Educator.ChooseAtLeastOneStudent" xml:space="preserve">
+    <value>Choose at least one student.</value>
+  </data>
+  <data name="Educator.ChooseAtMostStudents" xml:space="preserve">
+    <value>Choose at most {0} students at a time.</value>
+  </data>
+  <data name="Educator.NoPermissionManageSelectedStudents" xml:space="preserve">
+    <value>You do not have permission to manage one or more of the selected students.</value>
+  </data>
+  <data name="Educator.NoPermissionAssignStaff" xml:space="preserve">
+    <value>You do not have permission to assign staff to this student.</value>
+  </data>
+  <data name="Educator.NoPermissionManageStaff" xml:space="preserve">
+    <value>You do not have permission to manage staff for this student.</value>
+  </data>
+  <data name="Educator.AccessGrantNotFound" xml:space="preserve">
+    <value>Access grant not found.</value>
+  </data>
+  <data name="Educator.AccessAlreadyRevoked" xml:space="preserve">
+    <value>Access is already revoked.</value>
+  </data>
+  <data name="Educator.AccessRevoked" xml:space="preserve">
+    <value>Access revoked.</value>
+  </data>
+  <data name="Team.StaffMemberNotFound" xml:space="preserve">
+    <value>Staff member not found.</value>
+  </data>
+  <data name="Team.DistrictAdminNoAssignment" xml:space="preserve">
+    <value>A District Admin does not need a per-student assignment.</value>
+  </data>
+  <data name="Team.NotAtSchool" xml:space="preserve">
+    <value>That staff member is not at this student's school.</value>
+  </data>
+  <data name="Team.MemberNotFound" xml:space="preserve">
+    <value>Team member not found.</value>
+  </data>
+  <data name="Team.MemberAlreadyRemoved" xml:space="preserve">
+    <value>Team member already removed.</value>
+  </data>
+  <data name="Team.ChooseNewLeadFirst" xml:space="preserve">
+    <value>Choose a new lead case manager first.</value>
+  </data>
+  <data name="Team.MemberRemoved" xml:space="preserve">
+    <value>Team member removed.</value>
+  </data>
+  <data name="Team.NoPermissionManageTeam" xml:space="preserve">
+    <value>You do not have permission to manage this student's team.</value>
+  </data>
+  <data name="Meetings.NoPermissionToSchedule" xml:space="preserve">
+    <value>You do not have permission to schedule a meeting for this student.</value>
+  </data>
+  <data name="Meetings.StartsAtInvalid" xml:space="preserve">
+    <value>startsAtUtc is invalid.</value>
+  </data>
+  <data name="Meetings.InvalidTimeZone" xml:space="preserve">
+    <value>Invalid time zone.</value>
+  </data>
+  <data name="Meetings.DurationRange" xml:space="preserve">
+    <value>Duration must be between {0} and {1} minutes.</value>
+  </data>
+  <data name="Meetings.TitleInvalidCharacters" xml:space="preserve">
+    <value>Title contains invalid characters.</value>
+  </data>
+  <data name="Meetings.LocationInvalidCharacters" xml:space="preserve">
+    <value>Location contains invalid characters.</value>
+  </data>
+  <data name="Meetings.VideoLinkInvalid" xml:space="preserve">
+    <value>Video link must be an http(s) URL.</value>
+  </data>
+  <data name="Meetings.ParticipantUserOrEmailRequired" xml:space="preserve">
+    <value>Each participant must have either a user or an external email address.</value>
+  </data>
+  <data name="Meetings.ParticipantInvalidCharacters" xml:space="preserve">
+    <value>Participant contains invalid characters.</value>
+  </data>
+  <data name="Meetings.ParticipantEmailInvalid" xml:space="preserve">
+    <value>Participant email address is invalid.</value>
+  </data>
+  <data name="Meetings.ParticipantDuplicate" xml:space="preserve">
+    <value>A participant was listed more than once.</value>
+  </data>
+  <data name="Meetings.NoPermissionToScheduleMeetings" xml:space="preserve">
+    <value>You do not have permission to schedule meetings for this student.</value>
+  </data>
+  <data name="Meetings.NoPermissionToViewStudentMeetings" xml:space="preserve">
+    <value>You do not have permission to view this student's meetings.</value>
+  </data>
+  <data name="Meetings.MeetingNotFound" xml:space="preserve">
+    <value>Meeting not found.</value>
+  </data>
+  <data name="Meetings.NoPermissionToUpdate" xml:space="preserve">
+    <value>You do not have permission to update this meeting.</value>
+  </data>
+  <data name="Meetings.CannotUpdateCancelled" xml:space="preserve">
+    <value>Cannot update a cancelled meeting.</value>
+  </data>
+  <data name="Meetings.NoPermissionToCancel" xml:space="preserve">
+    <value>You do not have permission to cancel this meeting.</value>
+  </data>
+  <data name="Meetings.InvalidStatusValue" xml:space="preserve">
+    <value>Status must be Scheduled, Held, or Continued.</value>
+  </data>
+  <data name="Meetings.CannotChangeStatusCancelled" xml:space="preserve">
+    <value>Cannot change the status of a cancelled meeting.</value>
+  </data>
+  <data name="Meetings.AttendanceOnlyHeld" xml:space="preserve">
+    <value>Attendance can only be recorded for a held meeting.</value>
+  </data>
+  <data name="Meetings.ParticipantNotFound" xml:space="preserve">
+    <value>Participant not found on this meeting.</value>
+  </data>
+  <data name="Templates.NoTemplateAvailable" xml:space="preserve">
+    <value>No document template is available for this document type yet. Ask an administrator to publish one.</value>
+  </data>
+  <data name="Templates.VersionNotFound" xml:space="preserve">
+    <value>Template version not found.</value>
+  </data>
+  <data name="Templates.SectionNotFound" xml:space="preserve">
+    <value>Template section not found.</value>
+  </data>
+  <data name="Templates.FieldNotFound" xml:space="preserve">
+    <value>Template field not found.</value>
+  </data>
+  <data name="Templates.TemplateNotFound" xml:space="preserve">
+    <value>Template not found.</value>
+  </data>
+  <data name="Templates.NotDraft" xml:space="preserve">
+    <value>Only a Draft version can be edited. Create a new draft from the published version first.</value>
+  </data>
+  <data name="Templates.ConcurrencyConflict" xml:space="preserve">
+    <value>This template was changed by someone else. Please reload and try again.</value>
+  </data>
+  <data name="Templates.SectionTitleRequired" xml:space="preserve">
+    <value>Section title is required.</value>
+  </data>
+  <data name="Templates.FieldLabelRequired" xml:space="preserve">
+    <value>Field label is required.</value>
+  </data>
+  <data name="Templates.NoDraftToPublish" xml:space="preserve">
+    <value>This template has no Draft version to publish.</value>
+  </data>
+  <data name="Templates.AlreadyHasDraft" xml:space="preserve">
+    <value>This template already has a Draft version. Publish or discard it before creating another.</value>
+  </data>
+  <data name="Templates.NoPublishedVersionToFork" xml:space="preserve">
+    <value>This template has no published version to base a new draft on.</value>
+  </data>
+  <data name="Templates.SectionOrderInvalid" xml:space="preserve">
+    <value>The section order must list every section exactly once.</value>
+  </data>
+  <data name="Templates.FieldOrderInvalid" xml:space="preserve">
+    <value>The field order must list every field exactly once.</value>
+  </data>
+  <data name="EvaluationCases.Permission" xml:space="preserve">
+    <value>You do not have permission to access this student's evaluation case.</value>
+  </data>
+  <data name="EvaluationCases.AlreadyHasOpenCase" xml:space="preserve">
+    <value>This student already has an open evaluation case.</value>
+  </data>
+  <data name="EvaluationCases.NoOpenCase" xml:space="preserve">
+    <value>This student has no open evaluation case.</value>
+  </data>
+  <data name="EvaluationCases.CaseNoLongerOpen" xml:space="preserve">
+    <value>This evaluation case is no longer open.</value>
+  </data>
+  <data name="EvaluationCases.ConsentMustBePdf" xml:space="preserve">
+    <value>The consent document must be a PDF.</value>
+  </data>
+  <data name="EvaluationCases.ConsentTooLarge" xml:space="preserve">
+    <value>The consent document must be 10 MB or smaller.</value>
+  </data>
+  <data name="EvaluationCases.NoConsentOnFile" xml:space="preserve">
+    <value>No consent document is on file for this case.</value>
+  </data>
+  <data name="EvaluationCases.ReasonRequiredForDueDate" xml:space="preserve">
+    <value>A reason is required to change the determination due date.</value>
+  </data>
+  <data name="EvaluationCases.DomainRequired" xml:space="preserve">
+    <value>Domain is required.</value>
+  </data>
+  <data name="EvaluationCases.EvaluatorNotFound" xml:space="preserve">
+    <value>Evaluator not found.</value>
+  </data>
+  <data name="EvaluationCases.AssignmentNotFound" xml:space="preserve">
+    <value>Evaluator assignment not found.</value>
+  </data>
+  <data name="EvaluationCases.RationaleRequired" xml:space="preserve">
+    <value>A determination rationale is required.</value>
+  </data>
+  <data name="EvaluationCases.IepTypeNotConfigured" xml:space="preserve">
+    <value>The IEP document type is not configured.</value>
+  </data>
+  <data name="EvaluationCases.CouldNotCreateIepDraft" xml:space="preserve">
+    <value>Could not create the IEP draft.</value>
+  </data>
+  <data name="EvaluationCasesApi.InvalidRequestBody" xml:space="preserve">
+    <value>Invalid request body.</value>
+  </data>
+  <data name="EvaluationCasesApi.ReceivedAtRequired" xml:space="preserve">
+    <value>receivedAt is required.</value>
+  </data>
+  <data name="Obligations.NoPermissionViewStudent" xml:space="preserve">
+    <value>You do not have permission to view this student's obligations.</value>
+  </data>
+  <data name="Obligations.NoPermissionViewDistrict" xml:space="preserve">
+    <value>You do not have permission to view district obligations.</value>
+  </data>
+  <data name="Obligations.NoPermissionViewSchool" xml:space="preserve">
+    <value>You do not have permission to view this school's obligations.</value>
+  </data>
+  <data name="FamilyContact.Permission" xml:space="preserve">
+    <value>You do not have permission to access this student.</value>
+  </data>
+  <data name="FamilyContact.SummaryRequired" xml:space="preserve">
+    <value>A summary of the family input is required.</value>
+  </data>
+  <data name="FamilyContact.SummaryTooLong" xml:space="preserve">
+    <value>Summary must be {0} characters or fewer.</value>
+  </data>
+  <data name="Contributions.ChildNotFound" xml:space="preserve">
+    <value>Child profile not found.</value>
+  </data>
+  <data name="Contributions.NotFound" xml:space="preserve">
+    <value>Contribution not found.</value>
+  </data>
+  <data name="Contributions.MaxPerChild" xml:space="preserve">
+    <value>Maximum of {0} notes per child.</value>
+  </data>
+  <data name="Contributions.TextRequired" xml:space="preserve">
+    <value>Text is required.</value>
+  </data>
+  <data name="Contributions.TextTooLong" xml:space="preserve">
+    <value>Text must be {0} characters or fewer.</value>
+  </data>
+  <data name="Contributions.InvalidKind" xml:space="preserve">
+    <value>Invalid kind.</value>
+  </data>
+  <data name="Contributions.NoPermissionViewStudent" xml:space="preserve">
+    <value>You do not have permission to view this student.</value>
+  </data>
+  <data name="Calendar.UserNotFound" xml:space="preserve">
+    <value>User not found.</value>
+  </data>
+  <data name="Calendar.InvalidFeedLink" xml:space="preserve">
+    <value>Invalid calendar feed link.</value>
+  </data>
+  <data name="MeetingDecisions.Permission" xml:space="preserve">
+    <value>You do not have permission to access this meeting.</value>
+  </data>
+  <data name="MeetingDecisions.DecisionNotFound" xml:space="preserve">
+    <value>Decision not found.</value>
+  </data>
+  <data name="MeetingDecisions.NotRecordable" xml:space="preserve">
+    <value>Decisions can only be recorded once the meeting is Held or Continued.</value>
+  </data>
+  <data name="MeetingDecisions.TextRequired" xml:space="preserve">
+    <value>Decision text is required.</value>
+  </data>
+  <data name="MeetingDecisions.TextTooLong" xml:space="preserve">
+    <value>Decision text must be {0} characters or fewer.</value>
+  </data>
+  <data name="MeetingDecisions.TargetRowIdTooLong" xml:space="preserve">
+    <value>Target row id must be {0} characters or fewer.</value>
+  </data>
+  <data name="SignedArtifacts.PdfOnly" xml:space="preserve">
+    <value>The signed artifact must be a PDF.</value>
+  </data>
+  <data name="SignedArtifacts.TooLarge" xml:space="preserve">
+    <value>The signed artifact must be 20 MB or smaller.</value>
+  </data>
+  <data name="SignedArtifacts.VersionNotFound" xml:space="preserve">
+    <value>Document version not found.</value>
+  </data>
+  <data name="SignedArtifacts.Permission" xml:space="preserve">
+    <value>You do not have permission to access this document version.</value>
+  </data>
+  <data name="SignedArtifacts.ArtifactNotFound" xml:space="preserve">
+    <value>Signed artifact not found.</value>
+  </data>
+  <data name="GoalRecords.ValueOrNoteRequired" xml:space="preserve">
+    <value>Enter a value or a note.</value>
+  </data>
+  <data name="GoalRecords.GoalNotFound" xml:space="preserve">
+    <value>Goal not found.</value>
+  </data>
+  <data name="GoalRecords.InvalidStatus" xml:space="preserve">
+    <value>Status must be Active, Met, or NotMet.</value>
+  </data>
+  <data name="GoalRecords.ReasonRequiredForNotMet" xml:space="preserve">
+    <value>A reason is required when marking a goal Not Met.</value>
+  </data>
+  <data name="GoalRecords.ReasonRequiredForRemoval" xml:space="preserve">
+    <value>A reason is required to remove a goal.</value>
+  </data>
+  <data name="DraftResponses.ReplyTooLong" xml:space="preserve">
+    <value>Reply must be {0} characters or fewer.</value>
+  </data>
+  <data name="DraftResponses.ResolveRequiresInput" xml:space="preserve">
+    <value>Provide a reply or mark this resolved in the draft.</value>
+  </data>
+  <data name="DraftResponses.ResponseNotFound" xml:space="preserve">
+    <value>Response not found.</value>
+  </data>
+  <data name="StudentEvidence.Permission" xml:space="preserve">
+    <value>You do not have permission to view this student.</value>
+  </data>
+  <data name="DocumentAssist.FieldNotFound" xml:space="preserve">
+    <value>Field not found on this document's template.</value>
+  </data>
+  <data name="DocumentAssist.RowRequired" xml:space="preserve">
+    <value>A row is required for table assist.</value>
+  </data>
+  <data name="DocumentAssist.RowNotFound" xml:space="preserve">
+    <value>Row not found.</value>
+  </data>
+  <data name="DocumentAssist.AtLeastOneMessageRequired" xml:space="preserve">
+    <value>At least one message is required.</value>
+  </data>
+  <data name="DocumentAssist.Unavailable" xml:space="preserve">
+    <value>AI assist is temporarily unavailable.</value>
+  </data>
+  <data name="DocumentAssistApi.InvalidKind" xml:space="preserve">
+    <value>Invalid kind.</value>
+  </data>
+  <data name="DocumentAssistApi.FieldKeyRequired" xml:space="preserve">
+    <value>fieldKey is required.</value>
+  </data>
+  <data name="IepAssist.Permission" xml:space="preserve">
+    <value>You do not have permission to access this IEP draft.</value>
+  </data>
+  <data name="IepAssist.DraftNotFound" xml:space="preserve">
+    <value>IEP draft not found.</value>
+  </data>
+  <data name="IepAssist.Unavailable" xml:space="preserve">
+    <value>AI assist is temporarily unavailable.</value>
+  </data>
+  <data name="IepAssist.GoalNotFound" xml:space="preserve">
+    <value>Goal not found.</value>
+  </data>
+  <data name="IepAssist.SectionNotFound" xml:space="preserve">
+    <value>Section not found.</value>
+  </data>
+  <data name="IepAssist.ServiceLineNotFound" xml:space="preserve">
+    <value>Service line not found.</value>
+  </data>
+  <data name="IepAssist.AtLeastOneMessageRequired" xml:space="preserve">
+    <value>At least one message is required.</value>
+  </data>
+  <data name="MeetingBrief.NoBriefYet" xml:space="preserve">
+    <value>No brief has been generated for this meeting yet.</value>
+  </data>
+  <data name="MeetingBrief.NoSourceSummary" xml:space="preserve">
+    <value>No draft is linked to this meeting yet, so there is no proposal to summarize.</value>
+  </data>
+  <data name="MeetingBrief.UnavailableSummary" xml:space="preserve">
+    <value>A plain-language summary could not be drafted right now — the deterministic sections below are still accurate.</value>
+  </data>
+  <data name="MeetingBrief.SourceSharedWithFamily" xml:space="preserve">
+    <value>{0} (shared with family)</value>
+  </data>
+  <data name="MeetingBrief.SourceDraft" xml:space="preserve">
+    <value>{0} (draft)</value>
+  </data>
+  <data name="MeetingBrief.Disclaimer" xml:space="preserve">
+    <value>Advisory summary — the team's decisions are made in the meeting.</value>
+  </data>
+  <data name="MeetingBrief.Checklist.RequiredParticipantsLabel" xml:space="preserve">
+    <value>Required participants present</value>
+  </data>
+  <data name="MeetingBrief.Checklist.NoRequiredParticipants" xml:space="preserve">
+    <value>No required participants are listed for this meeting.</value>
+  </data>
+  <data name="MeetingBrief.Checklist.AllAttended" xml:space="preserve">
+    <value>All required participants attended.</value>
+  </data>
+  <data name="MeetingBrief.Checklist.Missing" xml:space="preserve">
+    <value>Missing: {0}</value>
+  </data>
+  <data name="MeetingBrief.Checklist.UnknownParticipant" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="MeetingBrief.Checklist.NoticeTimingLabel" xml:space="preserve">
+    <value>Notice sent at least {0} days before the meeting</value>
+  </data>
+  <data name="MeetingBrief.Checklist.NoNoticeOnRecord" xml:space="preserve">
+    <value>No meeting notice is on record.</value>
+  </data>
+  <data name="MeetingBrief.Checklist.NoticeSentOn" xml:space="preserve">
+    <value>Notice sent {0}.</value>
+  </data>
+  <data name="MeetingBrief.Checklist.FamilyInputLabel" xml:space="preserve">
+    <value>Family input received</value>
   </data>
 </root>

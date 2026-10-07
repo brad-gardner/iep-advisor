@@ -1,12 +1,16 @@
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -78,10 +82,11 @@ public sealed class EvaluationCaseServiceTests : IDisposable
     private IDocumentInstanceService CreateDocumentInstanceService(ApplicationDbContext ctx) => new DocumentInstanceService(
         ctx,
         new OrgAccessService(ctx),
-        new TemplateResolutionService(ctx, NullLogger<TemplateResolutionService>.Instance),
-        new TemplateAuthoringService(ctx, _audit, NullLogger<TemplateAuthoringService>.Instance),
+        new TemplateResolutionService(ctx, NullLogger<TemplateResolutionService>.Instance, TestSupport.TestLocalizers.Messages()),
+        new TemplateAuthoringService(ctx, _audit, NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()),
         _audit,
         NullLogger<DocumentInstanceService>.Instance,
+        TestSupport.TestLocalizers.Messages(),
         new FakeStudentEvidenceService(),
         new DocumentPrefillService(ctx));
 
@@ -92,7 +97,8 @@ public sealed class EvaluationCaseServiceTests : IDisposable
         new NotificationService(ctx, TestSupport.TestLocalizers.Messages()),
         CreateDocumentInstanceService(ctx),
         NullLogger<EvaluationCaseService>.Instance,
-        TestSupport.TestLocalizers.Notifications());
+        TestSupport.TestLocalizers.Notifications(),
+        TestSupport.TestLocalizers.Messages());
 
     private sealed record Scenario(int StudentId, int LeadUserId, int EvaluatorUserId);
 
@@ -338,6 +344,27 @@ public sealed class EvaluationCaseServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateIepFromEtrAsync_NoTemplate_RemapsUnprocessableToValidation_AndMapsTo400()
+    {
+        var s = Seed(nameof(CreateIepFromEtrAsync_NoTemplate_RemapsUnprocessableToValidation_AndMapsTo400));
+        // No DocumentTemplate/Version seeded for the IEP document type, so TemplateResolutionService
+        // blocks with Unprocessable (422) via DocumentInstanceService.CreateAsync.
+        using var ctx = CreateContext();
+
+        var result = await CreateService(ctx).CreateIepFromEtrAsync(s.LeadUserId, s.StudentId);
+
+        Assert.False(result.Success);
+        Assert.Contains("No document template is available", result.Message);
+        // Multilingual plan phase 5 review fix P2-1: re-wrapped as Validation (400), main's pre-existing
+        // status for this route — NOT the inner Unprocessable (422) DocumentInstanceController uses for
+        // the same underlying failure.
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
+    [Fact]
     public async Task ReceiveConsent_ChecksTheDocumentBytes_AndStoresABareFileName()
     {
         var s = Seed(nameof(ReceiveConsent_ChecksTheDocumentBytes_AndStoresABareFileName));
@@ -369,6 +396,54 @@ public sealed class EvaluationCaseServiceTests : IDisposable
         Assert.True(ok.Success, ok.Message);
         Assert.Equal("consent.pdf", ok.Data!.ConsentFileName);
         Assert.True(ok.Data.HasConsentDocument);
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5
+
+    private sealed class TestController : ControllerBase
+    {
+    }
+
+    [Fact]
+    public async Task GetForStudentAsync_Stranger_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind()
+    {
+        var s = Seed(nameof(GetForStudentAsync_Stranger_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind));
+        var strangerUser = new User { Email = "stranger-es@example.com", PasswordHash = "x", FirstName = "No", LastName = "Access", Role = UserRole.Educator };
+        using (var seedCtx = CreateContext())
+        {
+            seedCtx.Users.Add(strangerUser);
+            seedCtx.SaveChanges();
+        }
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).GetForStudentAsync(strangerUser.Id, s.StudentId);
+
+        Assert.False(result.Success);
+        Assert.Equal("No tiene permiso para acceder al caso de evaluación de este estudiante.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task RequestConsentAsync_NoOpenCase_UnderSpanishCulture_MessageIsSpanish_AndMapsTo400ViaErrorKind()
+    {
+        var s = Seed(nameof(RequestConsentAsync_NoOpenCase_UnderSpanishCulture_MessageIsSpanish_AndMapsTo400ViaErrorKind));
+        // No evaluation case created for this student.
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).RequestConsentAsync(s.LeadUserId, s.StudentId, null);
+
+        Assert.False(result.Success);
+        Assert.Equal("Este estudiante no tiene un caso de evaluación abierto.", result.Message);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<BadRequestObjectResult>(action);
     }
 
     public void Dispose() => _connection.Dispose();

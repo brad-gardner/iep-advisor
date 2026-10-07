@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AxiosError } from 'axios';
+import i18n from '@/lib/i18n';
 import type { ApiResponse } from '@/types/api';
 import type { AutosaveStatus } from '@/hooks/use-autosave';
 import { getDocument, saveValues as saveValuesApi } from '../api/documents-api';
 import type { DocumentInstanceDetailDto, DocumentSaveWarningDto, DocumentValuePatch } from '../types';
+
+/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
+export type UseDocumentInstanceLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 export interface SaveResult {
   ok: boolean;
@@ -37,7 +41,7 @@ const SAVED_LINGER_MS = 1500;
 export function useDocumentInstance(instanceId: number) {
   const [detail, setDetail] = useState<DocumentInstanceDetailDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<UseDocumentInstanceLoadError | null>(null);
   const [conflict, setConflict] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [saveStatus, setSaveStatus] = useState<AutosaveStatus>('idle');
@@ -94,9 +98,9 @@ export function useDocumentInstance(instanceId: number) {
         setLoadError(null);
         latchConflict(false);
         if (res.success && res.data) setDetailTree(res.data);
-        else setLoadError(res.message ?? 'Failed to load document.');
+        else setLoadError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
       } catch {
-        if (!cancelled) setLoadError('Failed to load document.');
+        if (!cancelled) setLoadError({ kind: 'generic' });
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -155,7 +159,7 @@ export function useDocumentInstance(instanceId: number) {
       if (mountedRef.current) setSaveStatus('saving');
       const run = chainRef.current.then(async (): Promise<SaveResult> => {
         const current = detailRef.current;
-        if (!current) return { ok: false, message: 'No document loaded.' };
+        if (!current) return { ok: false, message: i18n.t('document-authoring:editor.noDocumentLoaded') };
         // Once a conflict is latched, refuse further saves until reload so we
         // can't overwrite newer server state with stale local values. Read the
         // ref (not closure state) so same-batch queued saves see the latch.
@@ -177,7 +181,7 @@ export function useDocumentInstance(instanceId: number) {
             }
             return { ok: false, errors: body?.errors, message: body?.message };
           }
-          return { ok: false, message: 'Something went wrong.' };
+          return { ok: false, message: i18n.t('common:ui.genericError') };
         }
       });
       chainRef.current = run.catch(() => undefined);

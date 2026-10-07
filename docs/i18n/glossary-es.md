@@ -34,6 +34,7 @@ Every Spanish string in the app, emails, PDFs and AI instructions uses these ter
 | evaluation / reevaluation | evaluación / reevaluación |
 | assessment completeness (ETR) | exhaustividad de la evaluación (not "integridad de las pruebas") |
 | evaluation type: transfer (ETR) | traslado (not "transferencia") |
+| referral (evaluation) | remisión (e.g. "Fecha de remisión", "Origen de la remisión" — not "referencia", which reads as a generic reference, not the special-ed intake sense) |
 | disability category | categoría de discapacidad |
 | case manager | administrador de caso |
 | IEP team | equipo del IEP |
@@ -75,6 +76,18 @@ Every Spanish string in the app, emails, PDFs and AI instructions uses these ter
 | due process (hearing) | debido proceso (audiencia de debido proceso) |
 | advocacy goals (parent priorities) | metas para el IEP |
 | advocate (a person) | defensor / defensora |
+| goal/service owner (responsible staff) | responsable |
+| completeness (document strip) | completitud |
+| carried from (previous document) | trasladado de |
+| setting (service location) | entorno |
+| intervention specialist | especialista en intervención |
+| speech-language pathologist | patólogo del habla y el lenguaje |
+| occupational therapist / physical therapist | terapeuta ocupacional / fisioterapeuta |
+| school psychologist / counselor | psicólogo escolar / consejero |
+| LEA representative / interpreter | representante de la LEA / intérprete |
+| student status: active / exited / archived | activo / egresado / archivado |
+| exit reason: graduated / transferred / withdrawn / declassified | graduado / trasladado / retirado / desclasificado |
+| home language | idioma del hogar |
 | grade (level) | grado |
 | Pre-K / Kindergarten | prekínder / kínder |
 | 1st grade … 12th grade | 1.er grado … 12.º grado |
@@ -86,6 +99,14 @@ Every Spanish string in the app, emails, PDFs and AI instructions uses these ter
 | obligation status: upcoming | Próxima |
 | obligation status: due soon | Próxima a vencer |
 | obligation status: overdue | Vencida |
+| obligation status: unknown | Desconocida (feminine, agreeing with "obligación" — not "Desconocido") |
+| meeting brief (AI-generated prep document) | resumen de la reunión (short button label: "Resumen") |
+| meeting decision | decisión |
+| decision outcome: agreed | acordado |
+| decision outcome: disagreed | en desacuerdo |
+| decision outcome: deferred | diferido |
+| transition item (transition-plan table row) | elemento de transición |
+| row (generic table row, no more specific term applies) | fila |
 
 ## IDEA disability categories
 

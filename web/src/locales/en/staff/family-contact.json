@@ -1,0 +1,43 @@
+{
+  "card": {
+    "heading": "Family contact",
+    "contactAttemptsHeading": "Contact attempts",
+    "logAttemptButton": "Log attempt",
+    "noAttemptsYet": "No contact attempts logged yet.",
+    "offlineInputHeading": "Offline input",
+    "recordInputButton": "Record input",
+    "noInputYet": "No offline input recorded yet.",
+    "loadFailed": "Could not load family contact history."
+  },
+  "logForm": {
+    "methodLabel": "Method *",
+    "outcomeLabel": "Outcome *",
+    "dateLabel": "Date",
+    "noteLabel": "Note (optional)",
+    "submitButton": "Log attempt",
+    "saveFailed": "Could not log this contact attempt."
+  },
+  "offlineForm": {
+    "methodLabel": "Method *",
+    "receivedLabel": "Received",
+    "linkedDraftLabel": "Linked draft (optional)",
+    "noneOption": "None",
+    "summaryLabel": "Summary *",
+    "submitButton": "Record input",
+    "saveFailed": "Could not record this input."
+  },
+  "method": {
+    "Email": "Email",
+    "Phone": "Phone",
+    "Letter": "Letter",
+    "InPerson": "In person",
+    "Portal": "Portal"
+  },
+  "outcome": {
+    "Reached": "Reached",
+    "NoAnswer": "No answer",
+    "LeftMessage": "Left a message",
+    "Declined": "Declined",
+    "Returned": "Call/message returned"
+  }
+}

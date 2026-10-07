@@ -11,13 +11,14 @@ using IepAssistant.Services.Models;
 namespace IepAssistant.Services.Implementations;
 
 /// <summary>Evaluation case lifecycle: referral → consent → clock → determination → ETR handoff
-/// (see <see cref="IEvaluationCaseService"/>, plan 7 decision 1).</summary>
+/// (see <see cref="IEvaluationCaseService"/>, plan 7 decision 1).
+///
+/// <para>Multilingual plan (2026-10-06) phase 5: every failure <c>EvaluationCaseController</c> maps to
+/// a status carries an explicit <see cref="ServiceErrorKind"/>, and every message is localized
+/// (<c>Messages.resx</c>/<c>.es.resx</c>).</para>
+/// </summary>
 public class EvaluationCaseService : IEvaluationCaseService
 {
-    private const string PermissionMessage = "You do not have permission to access this student's evaluation case.";
-    private const string NoOpenCaseMessage = "This student has no open evaluation case.";
-    private const string CaseClosedMessage = "This evaluation case is no longer open.";
-    private const string AssignmentNotFoundMessage = "Evaluator assignment not found.";
     private const long MaxConsentFileBytes = 10 * 1024 * 1024;
 
     private readonly ApplicationDbContext _context;
@@ -27,6 +28,7 @@ public class EvaluationCaseService : IEvaluationCaseService
     private readonly IDocumentInstanceService _documentInstanceService;
     private readonly ILogger<EvaluationCaseService> _logger;
     private readonly IStringLocalizer<Notifications> _notificationsLocalizer;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public EvaluationCaseService(
         ApplicationDbContext context,
@@ -35,7 +37,8 @@ public class EvaluationCaseService : IEvaluationCaseService
         INotificationService notifications,
         IDocumentInstanceService documentInstanceService,
         ILogger<EvaluationCaseService> logger,
-        IStringLocalizer<Notifications> notificationsLocalizer)
+        IStringLocalizer<Notifications> notificationsLocalizer,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
@@ -44,6 +47,7 @@ public class EvaluationCaseService : IEvaluationCaseService
         _documentInstanceService = documentInstanceService;
         _logger = logger;
         _notificationsLocalizer = notificationsLocalizer;
+        _localizer = localizer;
     }
 
     // ---------------------------------------------------------------- Reads
@@ -51,7 +55,7 @@ public class EvaluationCaseService : IEvaluationCaseService
     public async Task<ServiceResult<EvaluationCaseModel>> GetForStudentAsync(int userId, int schoolStudentId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, schoolStudentId, AccessRole.Viewer, ct))
-            return ServiceResult<EvaluationCaseModel>.FailureResult(PermissionMessage);
+            return ServiceResult<EvaluationCaseModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["EvaluationCases.Permission"]);
 
         var kase = await LoadCaseForReadAsync(schoolStudentId, ct);
         if (kase == null)
@@ -65,12 +69,12 @@ public class EvaluationCaseService : IEvaluationCaseService
     public async Task<ServiceResult<EvaluationCaseModel>> CreateAsync(int userId, int schoolStudentId, CreateEvaluationCaseModel model, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, schoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<EvaluationCaseModel>.FailureResult(PermissionMessage);
+            return ServiceResult<EvaluationCaseModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["EvaluationCases.Permission"]);
 
         var hasOpen = await _context.EvaluationCases.AsNoTracking()
             .AnyAsync(c => c.SchoolStudentId == schoolStudentId && c.Status != EvaluationCaseStatus.Closed, ct);
         if (hasOpen)
-            return ServiceResult<EvaluationCaseModel>.FailureResult("This student already has an open evaluation case.");
+            return ServiceResult<EvaluationCaseModel>.FailureResult(ServiceErrorKind.Validation, _localizer["EvaluationCases.AlreadyHasOpenCase"]);
 
         var kase = new EvaluationCase
         {
@@ -92,7 +96,7 @@ public class EvaluationCaseService : IEvaluationCaseService
         catch (DbUpdateException ex) when (IsOneOpenCaseCollision(ex))
         {
             _context.Entry(kase).State = EntityState.Detached;
-            return ServiceResult<EvaluationCaseModel>.FailureResult("This student already has an open evaluation case.");
+            return ServiceResult<EvaluationCaseModel>.FailureResult(ServiceErrorKind.Validation, _localizer["EvaluationCases.AlreadyHasOpenCase"]);
         }
 
         return ServiceResult<EvaluationCaseModel>.SuccessResult(await BuildModelAsync(kase, ct));
@@ -102,8 +106,8 @@ public class EvaluationCaseService : IEvaluationCaseService
 
     public async Task<ServiceResult<EvaluationCaseModel>> RequestConsentAsync(int userId, int schoolStudentId, DateTime? requestedAt, CancellationToken ct = default)
     {
-        var (kase, error) = await LoadOpenCaseForWriteAsync(userId, schoolStudentId, ct);
-        if (error != null) return ServiceResult<EvaluationCaseModel>.FailureResult(error);
+        var (kase, kind, error) = await LoadOpenCaseForWriteAsync(userId, schoolStudentId, ct);
+        if (error != null) return ServiceResult<EvaluationCaseModel>.FailureResult(kind, error);
 
         kase!.ConsentRequestedAt = requestedAt ?? DateTime.UtcNow;
         if (kase.Status == EvaluationCaseStatus.Open)
@@ -116,17 +120,17 @@ public class EvaluationCaseService : IEvaluationCaseService
 
     public async Task<ServiceResult<EvaluationCaseModel>> ReceiveConsentAsync(int userId, int schoolStudentId, ReceiveConsentModel model, CancellationToken ct = default)
     {
-        var (kase, error) = await LoadOpenCaseForWriteAsync(userId, schoolStudentId, ct);
-        if (error != null) return ServiceResult<EvaluationCaseModel>.FailureResult(error);
+        var (kase, kind, error) = await LoadOpenCaseForWriteAsync(userId, schoolStudentId, ct);
+        if (error != null) return ServiceResult<EvaluationCaseModel>.FailureResult(kind, error);
 
         if (model.FileStream != null)
         {
             if (model.ContentType != null && !string.Equals(model.ContentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
-                return ServiceResult<EvaluationCaseModel>.FailureResult("The consent document must be a PDF.");
+                return ServiceResult<EvaluationCaseModel>.FailureResult(ServiceErrorKind.Validation, _localizer["EvaluationCases.ConsentMustBePdf"]);
             if (model.FileStream.CanSeek && model.FileStream.Length > MaxConsentFileBytes)
-                return ServiceResult<EvaluationCaseModel>.FailureResult("The consent document must be 10 MB or smaller.");
+                return ServiceResult<EvaluationCaseModel>.FailureResult(ServiceErrorKind.Validation, _localizer["EvaluationCases.ConsentTooLarge"]);
             if (!await PdfUploadGuard.LooksLikePdfAsync(model.FileStream, ct))
-                return ServiceResult<EvaluationCaseModel>.FailureResult("The consent document must be a PDF.");
+                return ServiceResult<EvaluationCaseModel>.FailureResult(ServiceErrorKind.Validation, _localizer["EvaluationCases.ConsentMustBePdf"]);
 
             var blobPath = $"evaluations/{kase!.Id}/consent.pdf";
             await _blob.UploadAsync(blobPath, model.FileStream, "application/pdf", ct);
@@ -148,11 +152,11 @@ public class EvaluationCaseService : IEvaluationCaseService
     public async Task<ServiceResult<string>> GetConsentDownloadUrlAsync(int userId, int schoolStudentId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, schoolStudentId, AccessRole.Viewer, ct))
-            return ServiceResult<string>.FailureResult(PermissionMessage);
+            return ServiceResult<string>.FailureResult(ServiceErrorKind.Forbidden, _localizer["EvaluationCases.Permission"]);
 
         var kase = await LoadCaseForReadAsync(schoolStudentId, ct);
         if (kase?.ConsentBlobPath == null)
-            return ServiceResult<string>.FailureResult("No consent document is on file for this case.");
+            return ServiceResult<string>.FailureResult(ServiceErrorKind.Validation, _localizer["EvaluationCases.NoConsentOnFile"]);
 
         var url = await _blob.GetDownloadUrlAsync(kase.ConsentBlobPath);
         return ServiceResult<string>.SuccessResult(url);
@@ -161,10 +165,10 @@ public class EvaluationCaseService : IEvaluationCaseService
     public async Task<ServiceResult<EvaluationCaseModel>> OverrideDueDateAsync(int userId, int schoolStudentId, OverrideDueDateModel model, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(model.Reason))
-            return ServiceResult<EvaluationCaseModel>.FailureResult("A reason is required to change the determination due date.");
+            return ServiceResult<EvaluationCaseModel>.FailureResult(ServiceErrorKind.Validation, _localizer["EvaluationCases.ReasonRequiredForDueDate"]);
 
-        var (kase, error) = await LoadOpenCaseForWriteAsync(userId, schoolStudentId, ct);
-        if (error != null) return ServiceResult<EvaluationCaseModel>.FailureResult(error);
+        var (kase, kind, error) = await LoadOpenCaseForWriteAsync(userId, schoolStudentId, ct);
+        if (error != null) return ServiceResult<EvaluationCaseModel>.FailureResult(kind, error);
 
         kase!.DeterminationDueDate = model.DeterminationDueDate.Date;
         kase.DueDateOverrideReason = model.Reason.Trim();
@@ -179,16 +183,16 @@ public class EvaluationCaseService : IEvaluationCaseService
     public async Task<ServiceResult<EvaluatorAssignmentModel>> AddAssignmentAsync(int userId, int schoolStudentId, CreateEvaluatorAssignmentModel model, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(model.Domain))
-            return ServiceResult<EvaluatorAssignmentModel>.FailureResult("Domain is required.");
+            return ServiceResult<EvaluatorAssignmentModel>.FailureResult(ServiceErrorKind.Validation, _localizer["EvaluationCases.DomainRequired"]);
 
-        var (kase, error) = await LoadOpenCaseForWriteAsync(userId, schoolStudentId, ct);
-        if (error != null) return ServiceResult<EvaluatorAssignmentModel>.FailureResult(error);
+        var (kase, kind, error) = await LoadOpenCaseForWriteAsync(userId, schoolStudentId, ct);
+        if (error != null) return ServiceResult<EvaluatorAssignmentModel>.FailureResult(kind, error);
 
         var evaluator = await _context.Users.AsNoTracking().Where(u => u.Id == model.UserId)
             .Select(u => new { u.Id, Name = (u.FirstName + " " + u.LastName).Trim() })
             .FirstOrDefaultAsync(ct);
         if (evaluator == null)
-            return ServiceResult<EvaluatorAssignmentModel>.FailureResult("Evaluator not found.");
+            return ServiceResult<EvaluatorAssignmentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["EvaluationCases.EvaluatorNotFound"]);
 
         var assignment = new EvaluatorAssignment
         {
@@ -212,10 +216,10 @@ public class EvaluationCaseService : IEvaluationCaseService
             .Include(a => a.User)
             .FirstOrDefaultAsync(a => a.Id == assignmentId, ct);
         if (assignment == null)
-            return ServiceResult<EvaluatorAssignmentModel>.FailureResult(AssignmentNotFoundMessage);
+            return ServiceResult<EvaluatorAssignmentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["EvaluationCases.AssignmentNotFound"]);
 
         if (!await _orgAccess.CanActOnStudentAsync(userId, assignment.EvaluationCase.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<EvaluatorAssignmentModel>.FailureResult(PermissionMessage);
+            return ServiceResult<EvaluatorAssignmentModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["EvaluationCases.Permission"]);
 
         if (model.SubmittedAt.HasValue) assignment.SubmittedAt = model.SubmittedAt;
         if (model.Notes != null) assignment.Notes = model.Notes.Trim();
@@ -231,10 +235,10 @@ public class EvaluationCaseService : IEvaluationCaseService
     {
         var assignment = await _context.EvaluatorAssignments.Include(a => a.EvaluationCase).FirstOrDefaultAsync(a => a.Id == assignmentId, ct);
         if (assignment == null)
-            return ServiceResult.FailureResult(AssignmentNotFoundMessage);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["EvaluationCases.AssignmentNotFound"]);
 
         if (!await _orgAccess.CanActOnStudentAsync(userId, assignment.EvaluationCase.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult.FailureResult(PermissionMessage);
+            return ServiceResult.FailureResult(ServiceErrorKind.Forbidden, _localizer["EvaluationCases.Permission"]);
 
         _context.EvaluatorAssignments.Remove(assignment);
         await _context.SaveChangesAsync(ct);
@@ -246,10 +250,10 @@ public class EvaluationCaseService : IEvaluationCaseService
     public async Task<ServiceResult<EvaluationCaseModel>> DetermineAsync(int userId, int schoolStudentId, DetermineEvaluationModel model, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(model.Rationale))
-            return ServiceResult<EvaluationCaseModel>.FailureResult("A determination rationale is required.");
+            return ServiceResult<EvaluationCaseModel>.FailureResult(ServiceErrorKind.Validation, _localizer["EvaluationCases.RationaleRequired"]);
 
-        var (kase, error) = await LoadOpenCaseForWriteAsync(userId, schoolStudentId, ct);
-        if (error != null) return ServiceResult<EvaluationCaseModel>.FailureResult(error);
+        var (kase, kind, error) = await LoadOpenCaseForWriteAsync(userId, schoolStudentId, ct);
+        if (error != null) return ServiceResult<EvaluationCaseModel>.FailureResult(kind, error);
 
         kase!.EligibilityOutcome = model.Outcome;
         kase.DeterminationDate = model.DeterminationDate.Date;
@@ -276,8 +280,8 @@ public class EvaluationCaseService : IEvaluationCaseService
         // Unlike the other write paths, Close is exactly how a Determined (Eligible) case is meant to
         // wrap up (e.g. after the IEP is created) — so it must NOT be blocked by the Determined guard
         // that protects consent/due-date/assignment mutations from happening on an already-decided case.
-        var (kase, error) = await LoadCaseForWriteAsync(userId, schoolStudentId, ct, allowDetermined: true);
-        if (error != null) return ServiceResult<EvaluationCaseModel>.FailureResult(error);
+        var (kase, kind, error) = await LoadCaseForWriteAsync(userId, schoolStudentId, ct, allowDetermined: true);
+        if (error != null) return ServiceResult<EvaluationCaseModel>.FailureResult(kind, error);
 
         kase!.Status = EvaluationCaseStatus.Closed;
         kase.ClosedAt = DateTime.UtcNow;
@@ -292,16 +296,25 @@ public class EvaluationCaseService : IEvaluationCaseService
     public async Task<ServiceResult<int>> CreateIepFromEtrAsync(int userId, int schoolStudentId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, schoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<int>.FailureResult(PermissionMessage);
+            return ServiceResult<int>.FailureResult(ServiceErrorKind.Forbidden, _localizer["EvaluationCases.Permission"]);
 
         var iepTypeId = await _context.DocumentTypes.AsNoTracking()
             .Where(t => t.Key == "IEP").Select(t => t.Id).FirstOrDefaultAsync(ct);
         if (iepTypeId == 0)
-            return ServiceResult<int>.FailureResult("The IEP document type is not configured.");
+            return ServiceResult<int>.FailureResult(ServiceErrorKind.Validation, _localizer["EvaluationCases.IepTypeNotConfigured"]);
 
         var result = await _documentInstanceService.CreateAsync(schoolStudentId, iepTypeId, userId, ct);
         if (!result.Success)
-            return ServiceResult<int>.FailureResult(result.Message ?? "Could not create the IEP draft.");
+        {
+            // Multilingual plan phase 5 review fix P2-1: CreateIepFromEtrAsync's "no document template"
+            // failure has always surfaced as 400 (main's pre-existing status for this route — it never
+            // documented a 422). DocumentInstanceService.CreateAsync's own caller (DocumentInstanceController)
+            // DOES want 422 for the same underlying TemplateResolutionService failure, but re-wrapping that
+            // Unprocessable kind here unchanged would silently flip THIS route's status. Only Unprocessable
+            // is remapped — every other kind (Forbidden, NotFound, etc.) passes through unchanged.
+            var kind = result.ErrorKind == ServiceErrorKind.Unprocessable ? ServiceErrorKind.Validation : result.ErrorKind;
+            return ServiceResult<int>.FailureResult(kind, result.Message ?? _localizer["EvaluationCases.CouldNotCreateIepDraft"]);
+        }
 
         return ServiceResult<int>.SuccessResult(result.Data!.Id);
     }
@@ -380,11 +393,11 @@ public class EvaluationCaseService : IEvaluationCaseService
 
     /// <summary>Loads the student's OPEN case (Status != Closed, and not yet Determined unless
     /// <paramref name="allowDetermined"/>) for a write, after checking Collaborator+ access. Returns
-    /// (null, errorMessage) on any failure.</summary>
-    private async Task<(EvaluationCase? Case, string? Error)> LoadCaseForWriteAsync(int userId, int schoolStudentId, CancellationToken ct, bool allowDetermined)
+    /// (null, None, null) on success, or (null, kind, errorMessage) on any failure.</summary>
+    private async Task<(EvaluationCase? Case, ServiceErrorKind Kind, string? Error)> LoadCaseForWriteAsync(int userId, int schoolStudentId, CancellationToken ct, bool allowDetermined)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, schoolStudentId, AccessRole.Collaborator, ct))
-            return (null, PermissionMessage);
+            return (null, ServiceErrorKind.Forbidden, _localizer["EvaluationCases.Permission"]);
 
         var kase = await _context.EvaluationCases
             .Include(c => c.Assignments).ThenInclude(a => a.User)
@@ -392,15 +405,15 @@ public class EvaluationCaseService : IEvaluationCaseService
             .Where(c => c.SchoolStudentId == schoolStudentId && c.Status != EvaluationCaseStatus.Closed)
             .FirstOrDefaultAsync(ct);
         if (kase == null)
-            return (null, NoOpenCaseMessage);
+            return (null, ServiceErrorKind.Validation, _localizer["EvaluationCases.NoOpenCase"]);
         if (!allowDetermined && kase.Status == EvaluationCaseStatus.Determined)
-            return (null, CaseClosedMessage);
+            return (null, ServiceErrorKind.Validation, _localizer["EvaluationCases.CaseNoLongerOpen"]);
 
-        return (kase, null);
+        return (kase, ServiceErrorKind.None, null);
     }
 
     /// <summary>Convenience overload for every write EXCEPT Close, which must also accept a Determined case.</summary>
-    private Task<(EvaluationCase? Case, string? Error)> LoadOpenCaseForWriteAsync(int userId, int schoolStudentId, CancellationToken ct)
+    private Task<(EvaluationCase? Case, ServiceErrorKind Kind, string? Error)> LoadOpenCaseForWriteAsync(int userId, int schoolStudentId, CancellationToken ct)
         => LoadCaseForWriteAsync(userId, schoolStudentId, ct, allowDetermined: false);
 
     private async Task<EvaluationCaseModel> BuildModelAsync(EvaluationCase kase, CancellationToken ct)

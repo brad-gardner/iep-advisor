@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react';
 import type { TemplateFieldDto } from '@/features/admin/templates/types';
 import type { TableColumn } from '@/features/admin/templates/template-config';
@@ -70,6 +71,11 @@ export function GoalsBlock({
   flush,
   cellTarget,
 }: GoalsBlockProps) {
+  // `educator` alongside `document-authoring`: `resolveOwnerDisplay` below
+  // (via `GoalReadCard`'s `owner` prop) renders a `teamRoleLabel`
+  // (`educator:teamRole.*`, staff-only) — this hook call is what makes a
+  // language switch re-render once that namespace's Spanish loads.
+  const { t } = useTranslation(['document-authoring', 'educator']);
   const labelId = `${fieldElementId(field.id)}-label`;
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(() => initialFocusRowKey ?? null);
 
@@ -90,16 +96,14 @@ export function GoalsBlock({
     <div id={fieldElementId(field.id)} tabIndex={-1} role="group" aria-labelledby={labelId} data-testid={`field-${field.fieldKey}`}>
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <h3 id={labelId} className="text-[13px] font-medium text-brand-slate-600">
-          {field.label || 'Goals'}
+          {field.label || t('goalsBlock.fallbackHeading')}
           {field.required && (
             <span className="ml-1 text-brand-danger-700" aria-hidden="true">
               *
             </span>
           )}
         </h3>
-        <span className="text-xs text-brand-slate-500">
-          {rows.length} goal{rows.length === 1 ? '' : 's'}
-        </span>
+        <span className="text-xs text-brand-slate-500">{t('goalsBlock.goalCount', { count: rows.length })}</span>
         <Button
           variant="secondary"
           size="sm"
@@ -109,12 +113,12 @@ export function GoalsBlock({
           data-testid={`field-${field.fieldKey}-add`}
         >
           <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-          Add goal
+          {t('goalsBlock.addGoal')}
         </Button>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-brand-slate-500">No goals yet. Add one to get started.</p>
+        <p className="text-sm text-brand-slate-500">{t('goalsBlock.noGoalsYet')}</p>
       ) : (
         <ol className="space-y-3">
           {rows.map((row, index) => {
@@ -142,7 +146,7 @@ export function GoalsBlock({
                 key={row.key}
                 row={row}
                 index={index}
-                domainLabel={domainCol ? columnDisplayLabel(row, domainCol, 'No area set') : ''}
+                domainLabel={domainCol ? columnDisplayLabel(row, domainCol, t('goalsBlock.noAreaSet')) : ''}
                 goalText={goalTextCol ? row.cells[goalTextCol.columnKey] : undefined}
                 measurement={measurementCol ? row.cells[measurementCol.columnKey] : undefined}
                 timeframe={timeframeCol ? row.cells[timeframeCol.columnKey] : undefined}
@@ -190,6 +194,7 @@ function GoalEditor({
   cellTarget: CellTarget;
   onDone: () => void;
 }) {
+  const { t } = useTranslation('document-authoring');
   const editorCtx = useDocumentEditorContext();
   const bodyRef = useRef<HTMLDivElement>(null);
   const persistedId = rowId(row);
@@ -270,7 +275,7 @@ function GoalEditor({
     return (
       <div key={col.columnKey}>
         <label htmlFor={cellId} className="mb-1 block text-sm font-medium text-brand-slate-700">
-          {col.label || 'Field'}
+          {col.label || t('goalsBlock.fieldFallback')}
           {col.required && (
             <span className="ml-1 text-brand-danger-700" aria-hidden="true">
               *
@@ -299,14 +304,14 @@ function GoalEditor({
   return (
     <li
       className="rounded-card border-2 border-brand-teal-400 bg-white shadow-sm"
-      aria-label={`Editing goal ${index + 1}`}
+      aria-label={t('goalsBlock.editingGoal', { number: index + 1 })}
       data-testid={`field-${field.fieldKey}-row-${index}`}
     >
       <div className="flex flex-wrap items-center gap-3 border-b border-brand-slate-100 px-5 py-3">
         <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-teal-500 text-sm font-semibold text-white" aria-hidden="true">
           {index + 1}
         </div>
-        <h3 className="font-serif text-lg text-brand-slate-800">Editing goal {index + 1}</h3>
+        <h3 className="font-serif text-lg text-brand-slate-800">{t('goalsBlock.editingGoal', { number: index + 1 })}</h3>
         <AutosaveIndicator status={saveStatus} />
         {carried && !reviewed && !disabled && (
           <Button
@@ -315,7 +320,7 @@ function GoalEditor({
             onClick={() => onKeepRow(row.key)}
             data-testid={`field-${field.fieldKey}-row-${index}-keep`}
           >
-            Keep as-is
+            {t('goalsBlock.keepAsIs')}
           </Button>
         )}
         <div className="ml-auto flex items-center gap-3 text-sm">
@@ -329,10 +334,10 @@ function GoalEditor({
             }}
             data-testid={`field-${field.fieldKey}-remove-${index}`}
           >
-            Remove goal…
+            {t('goalsBlock.removeGoal')}
           </button>
           <Button size="sm" onClick={onDone} data-testid={`field-${field.fieldKey}-row-${index}-done`}>
-            Done
+            {t('goalsBlock.done')}
           </Button>
         </div>
       </div>
@@ -362,7 +367,7 @@ function GoalEditor({
                   testIdPrefix={`field-${field.fieldKey}-row-${index}`}
                 />
               ) : (
-                !disabled && <p className="mt-2 text-xs text-brand-slate-500">AI help is available once this goal has saved.</p>
+                !disabled && <p className="mt-2 text-xs text-brand-slate-500">{t('goalsBlock.aiHelpAvailableAfterSave')}</p>
               )}
             </div>
           )}
@@ -391,9 +396,9 @@ function GoalEditor({
         <aside className="space-y-4">
           <div className="rounded-card border border-brand-slate-200 p-4">
             <label className="text-sm font-semibold text-brand-slate-700" htmlFor={`field-${field.fieldKey}-owner-${index}`}>
-              Owner
+              {t('goalsBlock.owner')}
             </label>
-            <p className="text-xs text-brand-slate-500">Responsible for instruction and progress data</p>
+            <p className="text-xs text-brand-slate-500">{t('goalsBlock.ownerHint')}</p>
             <div className="mt-2">
               <TeamMemberSelect
                 id={`field-${field.fieldKey}-owner-${index}`}
@@ -407,10 +412,8 @@ function GoalEditor({
             </div>
           </div>
           <div className="rounded-card border border-brand-slate-200 p-4 text-sm">
-            <div className="font-semibold text-brand-slate-700">Evidence</div>
-            <p className="mt-1 text-xs text-brand-slate-500">
-              Inserts go into whichever field you last focused above — open Evidence from the toolbar to attach it.
-            </p>
+            <div className="font-semibold text-brand-slate-700">{t('goalsBlock.evidenceHeading')}</div>
+            <p className="mt-1 text-xs text-brand-slate-500">{t('goalsBlock.evidenceHint')}</p>
           </div>
         </aside>
       </div>

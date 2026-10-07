@@ -46,7 +46,7 @@ export default defineConfig([
       // Not a phase-2 feature (meetings converts in phase 3) — only this one
       // component is in scope, because the parent-home "next meeting"/
       // "upcoming meeting" cards (phase 2) render it (phase 2 review).
-      'src/features/meetings/components/rsvp-button-group.tsx',
+      'src/features/meetings/**/*.{ts,tsx}',
       // Phase 3 — parent documents and AI.
       'src/features/iep-documents/**/*.{ts,tsx}',
       'src/features/etr-documents/**/*.{ts,tsx}',
@@ -62,11 +62,24 @@ export default defineConfig([
       'src/features/shared-drafts/**/*.{ts,tsx}',
       'src/features/draft-sharing/**/*.{ts,tsx}',
       'src/features/student/**/*.{ts,tsx}',
-      'src/features/meetings/pages/meeting-rsvp-page.tsx',
-      'src/features/document-authoring/pages/parent-authored-version-page.tsx',
-      'src/lib/section-type-label.ts',
+
+            'src/lib/section-type-label.ts',
       'src/lib/document-status-label.ts',
       'src/lib/meeting-labels.ts',
+      // Phase 5 — staff and school.
+      'src/features/educator/**/*.{ts,tsx}',
+      'src/features/calendar/**/*.{ts,tsx}',
+      'src/features/meeting-brief/**/*.{ts,tsx}',
+      'src/features/document-authoring/**/*.{ts,tsx}',
+      'src/features/evaluation/**/*.{ts,tsx}',
+      'src/features/obligations/**/*.{ts,tsx}',
+      'src/features/family-contact/**/*.{ts,tsx}',
+      'src/features/contributions/**/*.{ts,tsx}',
+      'src/lib/evaluation-case-label.ts',
+      'src/lib/obligation-label.ts',
+      'src/lib/family-contact-label.ts',
+      'src/lib/contribution-label.ts',
+      'src/app/lazy-routes/**/*.{ts,tsx}',
     ],
     ignores: [
       '**/*.test.{ts,tsx}',

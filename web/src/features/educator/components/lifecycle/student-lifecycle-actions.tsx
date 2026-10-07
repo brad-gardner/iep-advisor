@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Archive, ArrowRightLeft, LogOut, RotateCcw } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Menu, type MenuItem } from '@/components/ui/menu';
@@ -29,6 +30,7 @@ export function StudentLifecycleActions({
   onArchive,
   onTransfer,
 }: StudentLifecycleActionsProps) {
+  const { t } = useTranslation('educator');
   const [isExitOpen, setIsExitOpen] = useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [isReactivateOpen, setIsReactivateOpen] = useState(false);
@@ -42,14 +44,14 @@ export function StudentLifecycleActions({
   const items: MenuItem[] = [];
   if (student.status === 'Active') {
     items.push({
-      label: 'Exit…',
+      label: t('lifecycleActions.exit'),
       icon: icon(LogOut),
       onSelect: () => setIsExitOpen(true),
       'data-testid': 'student-action-exit',
     });
   } else {
     items.push({
-      label: 'Reactivate',
+      label: t('lifecycleActions.reactivate'),
       icon: icon(RotateCcw),
       onSelect: () => {
         setDialogError(null);
@@ -60,7 +62,7 @@ export function StudentLifecycleActions({
   }
   if (schools) {
     items.push({
-      label: 'Transfer…',
+      label: t('lifecycleActions.transfer'),
       icon: icon(ArrowRightLeft),
       onSelect: () => setIsTransferOpen(true),
       'data-testid': 'student-action-transfer',
@@ -68,7 +70,7 @@ export function StudentLifecycleActions({
   }
   if (student.status !== 'Archived') {
     items.push({
-      label: 'Archive…',
+      label: t('lifecycleActions.archive'),
       icon: icon(Archive),
       variant: 'danger',
       onSelect: () => {
@@ -84,17 +86,17 @@ export function StudentLifecycleActions({
     setDialogError(null);
     const result = await action();
     if (result.success) close();
-    else setDialogError(result.error ?? 'Something went wrong');
+    else setDialogError(result.error ?? t('lifecycleActions.genericError'));
     setIsBusy(false);
   };
 
   return (
     <>
       <Menu
-        label={`Actions for ${studentName}`}
+        label={t('lifecycleActions.ariaLabel', { name: studentName })}
         items={items}
         triggerClassName="inline-flex items-center rounded-button border-[1.5px] border-brand-slate-200 px-3 py-2 text-[13px] font-medium text-brand-slate-600 hover:bg-brand-slate-50"
-        trigger={<span>Actions</span>}
+        trigger={<span>{t('lifecycleActions.trigger')}</span>}
         data-testid="student-actions-menu"
       />
 
@@ -126,9 +128,9 @@ export function StudentLifecycleActions({
 
       <ConfirmDialog
         open={isArchiveOpen}
-        title="Archive student"
-        message={`Archive ${studentName}? The record and its documents are kept but hidden from rosters and searches unless you filter for archived students.`}
-        confirmLabel="Archive student"
+        title={t('lifecycleActions.archiveDialogTitle')}
+        message={t('lifecycleActions.archiveDialogMessage', { name: studentName })}
+        confirmLabel={t('lifecycleActions.archiveConfirmLabel')}
         loading={isBusy}
         error={dialogError}
         onConfirm={() => runConfirmed(onArchive, () => setIsArchiveOpen(false))}
@@ -138,9 +140,9 @@ export function StudentLifecycleActions({
 
       <ConfirmDialog
         open={isReactivateOpen}
-        title="Reactivate student"
-        message={`Return ${studentName} to the active roster? Exit details are cleared.`}
-        confirmLabel="Reactivate"
+        title={t('lifecycleActions.reactivateDialogTitle')}
+        message={t('lifecycleActions.reactivateDialogMessage', { name: studentName })}
+        confirmLabel={t('lifecycleActions.reactivateConfirmLabel')}
         confirmVariant="primary"
         loading={isBusy}
         error={dialogError}

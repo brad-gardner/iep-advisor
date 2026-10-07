@@ -1,10 +1,17 @@
 import { useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import type { TemplateSectionDto } from '../types';
 import type { CompletenessItem } from '../lib/completeness';
 import type { SaveResult } from '../hooks/use-document-instance';
+// `document-authoring` is a staff-only namespace (plan phase 5) — see
+// `@/app/lazy-routes/staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
+// admin namespaces". This component renders directly here (not through the
+// lazy route), so its English must be registered the same way the real
+// route chunk does.
+import '@/app/lazy-routes/staff-locales';
 import { SectionCard } from './section-card';
 
 const FIELD_A = 'field-a';
@@ -615,5 +622,18 @@ describe('SectionCard — focus on Edit for a card-list field (Goals/Services)',
     // The row's own focused editor claims focus on its own mount — never
     // overridden a tick later by the section's generic "first input" query.
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('textbox', { name: /^Goal\s*\*?$/ })));
+  });
+});
+
+describe('SectionCard — Spanish', () => {
+  afterEach(() => resetTestLanguage());
+
+  it('renders read-mode chrome in Spanish', async () => {
+    await renderInSpanish(<Harness initialValues={{ [FIELD_A]: '', [FIELD_B]: '' }} saveValues={vi.fn()} />, {
+      ns: 'document-authoring',
+    });
+    expect(screen.getByText('Sin comenzar.')).toBeInTheDocument();
+    expect(screen.getByTestId('section-10-start-editing')).toHaveTextContent('Comenzar a editar');
+    expect(screen.getByTestId('section-10-edit')).toHaveTextContent('Editar');
   });
 });

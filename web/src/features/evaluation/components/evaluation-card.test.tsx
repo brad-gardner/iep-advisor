@@ -1,9 +1,19 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ToastProvider } from '@/components/ui/toast';
+import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import type { EvaluationCaseDto } from '../types';
-
+// `evaluation` and `obligations` are both staff-only namespaces (plan phase
+// 5) — their English isn't bundled in `resources` (see `lib/i18n/index.ts`),
+// only registered by these side-effect imports, exactly as the real lazy
+// route chunk (`app/lazy-routes/staff-routes.tsx`) registers them before the
+// page that hosts `EvaluationCard` (the educator student detail page) can
+// render. `obligations` is needed because `EvaluationCard` now names it in
+// its own `useTranslation` call (for `obligationKindLabel`/
+// `ObligationStatusChip`), even on a run where `evaluation.obligation` is
+// null and nothing from it actually renders.
+import '@/app/lazy-routes/staff-locales';
 const evaluationApi = vi.hoisted(() => ({
   getEvaluationCase: vi.fn(),
   createEvaluationCase: vi.fn(),
@@ -78,6 +88,8 @@ describe('EvaluationCard lifecycle', () => {
     educatorApi.getEligibleTeamStaff.mockResolvedValue({ success: true, data: [] });
     documentsApi.listAuthoredVersions.mockResolvedValue({ success: true, data: [] });
   });
+
+  afterEach(() => resetTestLanguage());
 
   it('start → consent → determine → create IEP navigation', async () => {
     // 1. No case yet.
@@ -162,5 +174,31 @@ describe('EvaluationCard lifecycle', () => {
     await screen.findByTestId('evaluation-determination-summary');
     const strong = screen.getByText('under IDEA');
     expect(strong.tagName).toBe('STRONG');
+  });
+
+  // `renderInSpanish` needs the staff namespace named explicitly via `ns`
+  // (it's not in `featureNamespaces`, which only lists the eager/parent
+  // namespaces) — see `docs/i18n/README.md`'s "Staff and admin namespaces".
+  it('renders the heading and status/kind/outcome labels in Spanish', async () => {
+    evaluationApi.getEvaluationCase.mockResolvedValue({
+      success: true,
+      data: baseCase({ status: 'Determined', eligibilityOutcome: 'Eligible', determinationDate: '2026-02-01T00:00:00.000Z' }),
+    });
+
+    await renderInSpanish(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/educator/students/5']}>
+          <Routes>
+            <Route path="/educator/students/:id" element={<EvaluationCard studentId={5} />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>,
+      { ns: ['evaluation', 'obligations'] }
+    );
+
+    expect(await screen.findByText('Evaluación')).toBeInTheDocument();
+    expect(screen.getByText('Determinado')).toBeInTheDocument();
+    expect(screen.getByText('Evaluación inicial')).toBeInTheDocument();
+    expect(screen.getByTestId('evaluation-determination-summary')).toHaveTextContent('Elegible');
   });
 });

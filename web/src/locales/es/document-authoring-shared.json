@@ -1,0 +1,25 @@
+{
+  "noSections": "Esta plantilla no tiene secciones.",
+  "untitledSection": "Sección sin título",
+  "noFields": "Sin campos.",
+  "untitledField": "Campo sin título",
+  "yes": "Sí",
+  "no": "No",
+  "noRows": "Sin filas.",
+  "column": "Columna",
+  "tableField": "Campo de tabla",
+  "authoredPdfDownload": {
+    "checking": "Verificando el PDF…",
+    "preparing": "Preparando…",
+    "download": "Descargar PDF",
+    "downloadError": "No se pudo preparar la descarga. Inténtelo de nuevo.",
+    "pdfFailed": "Error en el PDF",
+    "retry": "Reintentar",
+    "retrying": "Reintentando…",
+    "generateErrorTitle": "No se pudo generar el PDF",
+    "generateErrorFallback": "La generación del PDF falló.",
+    "stillGenerating": "Todavía se está generando; vuelva a verificar en breve.",
+    "generating": "Generando PDF…",
+    "checkAgain": "Verificar de nuevo"
+  }
+}

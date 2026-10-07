@@ -1,10 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '@/components/ui/toast';
 import { apiRejection } from '@/test/axios-rejection';
+import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import { makeMeeting, makeParticipant } from '../test/fixtures';
-
+// `educator` is a staff-only namespace (plan phase 5) — `ParticipantsField`
+// (rendered inside `ScheduleMeetingModal`) names it in its own
+// `useTranslation` call (for `teamRoleLabel`), so its English must be
+// registered here the same way the real staff route chunk does. See
+// `docs/i18n/README.md`'s "Staff and admin namespaces".
+import '@/app/lazy-routes/staff-locales';
 const meetingsApi = vi.hoisted(() => ({
   createMeeting: vi.fn(),
   updateMeeting: vi.fn(),
@@ -18,7 +24,11 @@ const educatorApi = vi.hoisted(() => ({
 vi.mock('@/features/educator/api/educator-api', () => educatorApi);
 
 import { ScheduleMeetingModal } from './schedule-meeting-modal';
-
+// `meetings-staff` is a staff-only namespace (plan phase 5) — its English
+// isn't bundled in `resources` (see `lib/i18n/index.ts`), only registered
+// by this side-effect import, exactly as the real lazy route chunk
+// (`app/lazy-routes/staff-routes.tsx`) registers it before the educator
+// calendar/student detail pages that host this modal can render.
 const defaults = [
   { userId: 7, displayName: 'Casey Manager', email: 'casey@district.org', teamRole: 'CaseManager' as const, isFamily: false, isStudent: false },
   { userId: 41, displayName: 'Pat Parent', email: 'parent@example.com', teamRole: 'Other' as const, isFamily: true, isStudent: false },
@@ -63,6 +73,8 @@ describe('ScheduleMeetingModal', () => {
     meetingsApi.getDefaultParticipants.mockResolvedValue({ success: true, data: defaults });
     educatorApi.getEligibleTeamStaff.mockResolvedValue({ success: true, data: eligible });
   });
+
+  afterEach(() => resetTestLanguage());
 
   it('pre-checks the server defaults (team, family, student) as real users, leaving eligible staff unchecked', async () => {
     renderModal();
@@ -236,5 +248,19 @@ describe('ScheduleMeetingModal', () => {
 
     await user.click(screen.getByTestId('schedule-meeting-submit'));
     await waitFor(() => expect(meetingsApi.updateMeeting).toHaveBeenCalledWith(55, expect.any(Object)));
+  });
+
+  it('renders the modal title and form labels in Spanish', async () => {
+    await renderInSpanish(
+      <ToastProvider>
+        <ScheduleMeetingModal open onClose={vi.fn()} studentId={10} studentName="Ada Lovelace" onSaved={vi.fn()} />
+      </ToastProvider>,
+      { ns: 'meetings-staff' }
+    );
+
+    expect(await screen.findByText('Programar reunión — Ada Lovelace')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tipo de reunión')).toBeInTheDocument();
+    expect(screen.getByLabelText('Fecha')).toBeInTheDocument();
+    expect(screen.getByText('Programar reunión')).toBeInTheDocument();
   });
 });

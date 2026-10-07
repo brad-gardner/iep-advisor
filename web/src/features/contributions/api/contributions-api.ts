@@ -5,13 +5,10 @@ export type ParentContributionKind = 'Strength' | 'Concern' | 'WorksAtHome' | 'P
 
 export const CONTRIBUTION_KINDS: ParentContributionKind[] = ['Strength', 'Concern', 'WorksAtHome', 'Priority', 'Other'];
 
-export const CONTRIBUTION_KIND_LABELS: Record<ParentContributionKind, string> = {
-  Strength: 'A strength',
-  Concern: 'A concern',
-  WorksAtHome: 'What works at home',
-  Priority: 'A priority for this year',
-  Other: 'Something else',
-};
+// Display label moved to `@/lib/contribution-label.ts` (`contributionKindLabel`,
+// translated via the eager `contributions` namespace — i18n plan phase 5).
+// `CONTRIBUTION_KIND_LABELS`'s only caller (`about-my-child-card.tsx`) now
+// uses that helper, so the old map was removed outright.
 
 export interface ParentContributionDto {
   id: number;

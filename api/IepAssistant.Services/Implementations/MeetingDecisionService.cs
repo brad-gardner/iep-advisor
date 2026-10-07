@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
@@ -16,15 +17,13 @@ namespace IepAssistant.Services.Implementations;
 /// modeled <see cref="MeetingStatus"/> enum (plan 4) has no such state, so this service accepts
 /// <see cref="MeetingStatus.Held"/> and <see cref="MeetingStatus.Continued"/> only — the two states that
 /// exist and represent "the meeting is happening or has happened."</para>
+///
+/// <para>Multilingual plan (2026-10-06) phase 5: every failure <c>MeetingDecisionsController</c> maps
+/// to a status carries an explicit <see cref="ServiceErrorKind"/>, and every message is localized
+/// (<c>Messages.resx</c>/<c>.es.resx</c>).</para>
 /// </summary>
 public class MeetingDecisionService : IMeetingDecisionService
 {
-    private const string MeetingNotFoundMessage = "Meeting not found.";
-    private const string DecisionNotFoundMessage = "Decision not found.";
-    private const string InstanceNotFoundMessage = "Document not found.";
-    private const string PermissionMessage = "You do not have permission to access this meeting.";
-    private const string NotRecordableMessage = "Decisions can only be recorded once the meeting is Held or Continued.";
-    private const string TextRequiredMessage = "Decision text is required.";
     private const int MaxTextLength = 2000;
     private const int MaxTargetLabelLength = 500;
     private const int MaxTargetRowIdLength = 64; // matches the MeetingDecisions.TargetRowId column
@@ -32,20 +31,22 @@ public class MeetingDecisionService : IMeetingDecisionService
 
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public MeetingDecisionService(ApplicationDbContext context, IOrgAccessService orgAccess)
+    public MeetingDecisionService(ApplicationDbContext context, IOrgAccessService orgAccess, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<List<MeetingDecisionModel>>> GetForMeetingAsync(int userId, int meetingId, CancellationToken ct = default)
     {
         var meeting = await LoadMeetingHeaderAsync(meetingId, ct);
         if (meeting == null)
-            return ServiceResult<List<MeetingDecisionModel>>.FailureResult(MeetingNotFoundMessage);
+            return ServiceResult<List<MeetingDecisionModel>>.FailureResult(ServiceErrorKind.NotFound, _localizer["Meetings.MeetingNotFound"]);
         if (!await _orgAccess.CanActOnStudentAsync(userId, meeting.SchoolStudentId, AccessRole.Viewer, ct))
-            return ServiceResult<List<MeetingDecisionModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<MeetingDecisionModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["MeetingDecisions.Permission"]);
 
         var rows = await MapQuery(_context.MeetingDecisions.AsNoTracking().Where(d => d.MeetingId == meetingId))
             .OrderByDescending(d => d.CreatedAt)
@@ -57,20 +58,20 @@ public class MeetingDecisionService : IMeetingDecisionService
     public async Task<ServiceResult<MeetingDecisionModel>> CreateAsync(int userId, int meetingId, CreateMeetingDecisionModel model, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(model.Text))
-            return ServiceResult<MeetingDecisionModel>.FailureResult(TextRequiredMessage);
+            return ServiceResult<MeetingDecisionModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingDecisions.TextRequired"]);
         var text = model.Text.Trim();
         if (text.Length > MaxTextLength)
-            return ServiceResult<MeetingDecisionModel>.FailureResult($"Decision text must be {MaxTextLength} characters or fewer.");
+            return ServiceResult<MeetingDecisionModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingDecisions.TextTooLong", MaxTextLength]);
         if (model.TargetRowId is { Length: > MaxTargetRowIdLength })
-            return ServiceResult<MeetingDecisionModel>.FailureResult($"Target row id must be {MaxTargetRowIdLength} characters or fewer.");
+            return ServiceResult<MeetingDecisionModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingDecisions.TargetRowIdTooLong", MaxTargetRowIdLength]);
 
         var meeting = await LoadMeetingHeaderAsync(meetingId, ct);
         if (meeting == null)
-            return ServiceResult<MeetingDecisionModel>.FailureResult(MeetingNotFoundMessage);
+            return ServiceResult<MeetingDecisionModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Meetings.MeetingNotFound"]);
         if (!await _orgAccess.CanActOnStudentAsync(userId, meeting.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<MeetingDecisionModel>.FailureResult(PermissionMessage);
+            return ServiceResult<MeetingDecisionModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["MeetingDecisions.Permission"]);
         if (meeting.Status is not (MeetingStatus.Held or MeetingStatus.Continued))
-            return ServiceResult<MeetingDecisionModel>.FailureResult(NotRecordableMessage);
+            return ServiceResult<MeetingDecisionModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingDecisions.NotRecordable"]);
 
         var targetLabel = string.IsNullOrWhiteSpace(model.TargetLabel) ? null : model.TargetLabel.Trim();
         if (targetLabel != null && targetLabel.Length > MaxTargetLabelLength)
@@ -97,14 +98,14 @@ public class MeetingDecisionService : IMeetingDecisionService
     public async Task<ServiceResult<MeetingDecisionModel>> UpdateAsync(int userId, int decisionId, UpdateMeetingDecisionModel model, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(model.Text))
-            return ServiceResult<MeetingDecisionModel>.FailureResult(TextRequiredMessage);
+            return ServiceResult<MeetingDecisionModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingDecisions.TextRequired"]);
         var text = model.Text.Trim();
         if (text.Length > MaxTextLength)
-            return ServiceResult<MeetingDecisionModel>.FailureResult($"Decision text must be {MaxTextLength} characters or fewer.");
+            return ServiceResult<MeetingDecisionModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingDecisions.TextTooLong", MaxTextLength]);
 
-        var (decision, error) = await LoadForWriteAsync(userId, decisionId, ct);
+        var (decision, kind, error) = await LoadForWriteAsync(userId, decisionId, ct);
         if (error != null)
-            return ServiceResult<MeetingDecisionModel>.FailureResult(error);
+            return ServiceResult<MeetingDecisionModel>.FailureResult(kind, error);
 
         decision!.Text = text;
         decision.Outcome = model.Outcome;
@@ -116,9 +117,9 @@ public class MeetingDecisionService : IMeetingDecisionService
 
     public async Task<ServiceResult> DeleteAsync(int userId, int decisionId, CancellationToken ct = default)
     {
-        var (decision, error) = await LoadForWriteAsync(userId, decisionId, ct);
+        var (decision, kind, error) = await LoadForWriteAsync(userId, decisionId, ct);
         if (error != null)
-            return ServiceResult.FailureResult(error);
+            return ServiceResult.FailureResult(kind, error);
 
         _context.MeetingDecisions.Remove(decision!);
         await _context.SaveChangesAsync(ct);
@@ -132,9 +133,9 @@ public class MeetingDecisionService : IMeetingDecisionService
             .Select(i => (int?)i.SchoolStudentId)
             .FirstOrDefaultAsync(ct);
         if (schoolStudentId == null)
-            return ServiceResult<List<ProposedEditModel>>.FailureResult(InstanceNotFoundMessage);
+            return ServiceResult<List<ProposedEditModel>>.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
         if (!await _orgAccess.CanActOnStudentAsync(userId, schoolStudentId.Value, AccessRole.Viewer, ct))
-            return ServiceResult<List<ProposedEditModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<ProposedEditModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["MeetingDecisions.Permission"]);
 
         var cutoff = DateTime.UtcNow.AddDays(-ProposedEditWindowDays);
         var meetingIds = await _context.Meetings.AsNoTracking()
@@ -167,9 +168,9 @@ public class MeetingDecisionService : IMeetingDecisionService
 
     public async Task<ServiceResult<ProposedEditModel>> MarkAppliedAsync(int userId, int decisionId, CancellationToken ct = default)
     {
-        var (decision, error) = await LoadForWriteAsync(userId, decisionId, ct);
+        var (decision, kind, error) = await LoadForWriteAsync(userId, decisionId, ct);
         if (error != null)
-            return ServiceResult<ProposedEditModel>.FailureResult(error);
+            return ServiceResult<ProposedEditModel>.FailureResult(kind, error);
 
         decision!.AppliedAt = DateTime.UtcNow;
         decision.UpdatedById = userId;
@@ -205,22 +206,22 @@ public class MeetingDecisionService : IMeetingDecisionService
             .Select(m => new MeetingHeader(m.Id, m.SchoolStudentId, m.Status))
             .FirstOrDefaultAsync(ct);
 
-    private async Task<(MeetingDecision? Decision, string? Error)> LoadForWriteAsync(int userId, int decisionId, CancellationToken ct)
+    private async Task<(MeetingDecision? Decision, ServiceErrorKind Kind, string? Error)> LoadForWriteAsync(int userId, int decisionId, CancellationToken ct)
     {
         var decision = await _context.MeetingDecisions.FirstOrDefaultAsync(d => d.Id == decisionId, ct);
         if (decision == null)
-            return (null, DecisionNotFoundMessage);
+            return (null, ServiceErrorKind.NotFound, _localizer["MeetingDecisions.DecisionNotFound"]);
 
         var schoolStudentId = await _context.Meetings.AsNoTracking()
             .Where(m => m.Id == decision.MeetingId)
             .Select(m => (int?)m.SchoolStudentId)
             .FirstOrDefaultAsync(ct);
         if (schoolStudentId == null)
-            return (null, MeetingNotFoundMessage);
+            return (null, ServiceErrorKind.NotFound, _localizer["Meetings.MeetingNotFound"]);
         if (!await _orgAccess.CanActOnStudentAsync(userId, schoolStudentId.Value, AccessRole.Collaborator, ct))
-            return (null, PermissionMessage);
+            return (null, ServiceErrorKind.Forbidden, _localizer["MeetingDecisions.Permission"]);
 
-        return (decision, null);
+        return (decision, ServiceErrorKind.None, null);
     }
 
     private static IQueryable<MeetingDecisionModel> MapQuery(IQueryable<MeetingDecision> query) =>

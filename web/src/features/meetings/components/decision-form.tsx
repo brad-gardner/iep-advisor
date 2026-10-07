@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
 import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
+import { meetingDecisionOutcomeLabel } from '@/lib/meeting-labels';
 import { createDecision } from '../api/meeting-decisions-api';
-import { MEETING_DECISION_OUTCOMES, MEETING_DECISION_OUTCOME_LABELS } from '../types';
+import { MEETING_DECISION_OUTCOMES } from '../types';
 import type { CreateMeetingDecisionRequest, MeetingDecisionDto, MeetingDecisionOutcome } from '../types';
 import type { DecisionTargetOption } from '../lib/decision-targets';
 
@@ -27,6 +29,7 @@ interface DecisionFormProps {
  *  applies to the draft itself — that's a separate, human "Mark applied" step
  *  from the editor's proposed-edits panel. */
 export function DecisionForm({ meetingId, targetOptions, onAdded, onCancel }: DecisionFormProps) {
+  const { t } = useTranslation(['meetings-staff', 'common']);
   const [targetKey, setTargetKey] = useState(NO_TARGET);
   const [customLabel, setCustomLabel] = useState('');
   const [text, setText] = useState('');
@@ -58,10 +61,10 @@ export function DecisionForm({ meetingId, targetOptions, onAdded, onCancel }: De
       if (res.success && res.data) {
         onAdded(res.data);
       } else {
-        setError(res.message ?? 'Could not record this decision.');
+        setError(res.message ?? t('decisionForm.saveFailed'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not record this decision.'));
+      setError(apiErrorMessage(err, t('decisionForm.saveFailed')));
     } finally {
       setIsSubmitting(false);
     }
@@ -76,23 +79,23 @@ export function DecisionForm({ meetingId, targetOptions, onAdded, onCancel }: De
       )}
 
       <Select
-        label="Target (optional)"
+        label={t('decisionForm.targetLabel')}
         value={targetKey}
         onChange={(e) => setTargetKey(e.target.value)}
         data-testid="decision-target-select"
       >
-        <option value={NO_TARGET}>No specific target</option>
+        <option value={NO_TARGET}>{t('decisionForm.noSpecificTarget')}</option>
         {targetOptions.map((o) => (
           <option key={`${o.fieldKey}::${o.rowId}`} value={`${o.fieldKey}::${o.rowId}`}>
             {o.label}
           </option>
         ))}
-        <option value={CUSTOM_TARGET}>Other — type a label</option>
+        <option value={CUSTOM_TARGET}>{t('decisionForm.otherTypeLabel')}</option>
       </Select>
 
       {targetKey === CUSTOM_TARGET && (
         <Input
-          label="Target label *"
+          label={t('decisionForm.targetLabelInputLabel')}
           value={customLabel}
           onChange={(e) => setCustomLabel(e.target.value)}
           maxLength={500}
@@ -101,7 +104,7 @@ export function DecisionForm({ meetingId, targetOptions, onAdded, onCancel }: De
       )}
 
       <RichTextEditor
-        label="Decision *"
+        label={t('decisionForm.decisionLabel')}
         value={text}
         onChange={setText}
         minRows={3}
@@ -111,24 +114,24 @@ export function DecisionForm({ meetingId, targetOptions, onAdded, onCancel }: De
       />
 
       <Select
-        label="Outcome *"
+        label={t('decisionForm.outcomeLabel')}
         value={outcome}
         onChange={(e) => setOutcome(e.target.value as MeetingDecisionOutcome)}
         data-testid="decision-outcome"
       >
         {MEETING_DECISION_OUTCOMES.map((o) => (
           <option key={o} value={o}>
-            {MEETING_DECISION_OUTCOME_LABELS[o]}
+            {meetingDecisionOutcomeLabel(o)}
           </option>
         ))}
       </Select>
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={isSubmitting}>
-          Cancel
+          {t('common:ui.cancel')}
         </Button>
         <Button type="submit" size="sm" loading={isSubmitting} disabled={!canSubmit} data-testid="decision-submit">
-          Save decision
+          {t('decisionForm.saveButton')}
         </Button>
       </div>
     </form>

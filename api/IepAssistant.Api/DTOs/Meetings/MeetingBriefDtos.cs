@@ -45,6 +45,9 @@ public class MeetingBriefDto
     public List<OfflineFamilyInputDto> OfflineInput { get; set; } = new();
     public List<FamilyContactAttemptDto> ContactAttempts { get; set; } = new();
     public string Disclaimer { get; set; } = string.Empty;
+
+    /// <summary>Multilingual plan (2026-10-06) phase 5. Null means English.</summary>
+    public string? GeneratedLanguage { get; set; }
 }
 
 // ---- Decisions ----
@@ -110,7 +113,8 @@ internal static class MeetingBriefMappers
         OpenFamilyResponses = m.OpenFamilyResponses.Select(DraftSharingMappers.MapResponse).ToList(),
         OfflineInput = m.OfflineInput.Select(FamilyContactMappers.MapInput).ToList(),
         ContactAttempts = m.ContactAttempts.Select(FamilyContactMappers.MapAttempt).ToList(),
-        Disclaimer = m.Disclaimer
+        Disclaimer = m.Disclaimer,
+        GeneratedLanguage = m.GeneratedLanguage
     };
 
     public static MeetingDecisionDto MapDecision(MeetingDecisionModel m) => new()

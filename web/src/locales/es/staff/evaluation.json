@@ -1,0 +1,114 @@
+{
+  "card": {
+    "heading": "Evaluación",
+    "determinationDue": "Determinación vence el {{date}}",
+    "overrideDueDateButton": "Modificar fecha límite",
+    "evaluatorsHeading": "Evaluadores",
+    "determineButton": "Determinar",
+    "closeButton": "Cerrar",
+    "createIepButton": "Crear IEP a partir del ETR",
+    "closeFailed": "No se pudo cerrar el caso.",
+    "createIepFailed": "No se pudo crear el IEP.",
+    "loadFailed": "No se pudo cargar el caso de evaluación."
+  },
+  "consentSection": {
+    "heading": "Consentimiento",
+    "requestButton": "Solicitar consentimiento",
+    "consentRequestedOn": "Consentimiento solicitado el {{date}}.",
+    "receivedDateLabel": "Consentimiento recibido *",
+    "fileLabel": "Documento de consentimiento (PDF opcional)",
+    "recordReceivedButton": "Registrar consentimiento recibido",
+    "consentReceivedOn": "Consentimiento recibido el {{date}}.",
+    "downloadButton": "Descargar {{name}}",
+    "defaultFileName": "documento de consentimiento",
+    "receivedDateRequired": "La fecha de recepción es obligatoria.",
+    "requestFailed": "No se pudo solicitar el consentimiento.",
+    "recordFailed": "No se pudo registrar el consentimiento.",
+    "downloadFailed": "No se pudo preparar la descarga."
+  },
+  "determineDialog": {
+    "title": "Determinar elegibilidad",
+    "submitButton": "Registrar determinación",
+    "outcomeLabel": "Resultado *",
+    "dateLabel": "Fecha de determinación *",
+    "etrVersionLabel": "Versión del ETR (opcional)",
+    "noneOption": "Ninguna",
+    "etrVersionOption": "ETR v{{version}}",
+    "rationaleLabel": "Justificación *",
+    "saveFailed": "No se pudo registrar la determinación."
+  },
+  "dueDateOverrideDialog": {
+    "title": "Modificar fecha límite de determinación",
+    "newDueDateLabel": "Nueva fecha límite *",
+    "reasonLabel": "Motivo *",
+    "saveButton": "Guardar",
+    "saveFailed": "No se pudo actualizar la fecha límite."
+  },
+  "editAssignmentDialog": {
+    "title": "Editar asignación — {{domain}}",
+    "dueDateLabel": "Fecha límite",
+    "notesLabel": "Notas",
+    "saveButton": "Guardar",
+    "saveFailed": "No se pudo actualizar la asignación."
+  },
+  "evaluatorAssignmentsTable": {
+    "label": "Asignaciones de evaluadores",
+    "domainHeader": "Dominio",
+    "evaluatorHeader": "Evaluador",
+    "dueDateHeader": "Fecha límite",
+    "statusHeader": "Estado",
+    "submittedOn": "Enviado el {{date}}",
+    "overdue": "Vencido",
+    "pending": "Pendiente",
+    "notesHeader": "Notas",
+    "marking": "Marcando…",
+    "markSubmitted": "Marcar como enviado",
+    "editAction": "Editar",
+    "removeAction": "Quitar",
+    "rowActionLabel": "Evaluador de {{domain}}",
+    "emptyTitle": "Aún no hay evaluadores asignados",
+    "removeDialogTitle": "Quitar asignación de evaluador",
+    "removeDialogMessage": "¿Quitar a {{name}} de {{domain}}?",
+    "removeDialogConfirm": "Quitar",
+    "defaultEvaluatorName": "este evaluador",
+    "defaultDomain": "este dominio",
+    "markSubmittedFailed": "No se pudo marcar esta asignación como enviada.",
+    "removeFailed": "No se pudo quitar esta asignación."
+  },
+  "startEvaluationForm": {
+    "noCaseYet": "Aún no hay un caso de evaluación abierto para este estudiante.",
+    "kindLabel": "Tipo *",
+    "referralDateLabel": "Fecha de remisión *",
+    "referralSourceLabel": "Origen de la remisión",
+    "submitButton": "Iniciar evaluación",
+    "referralDateRequired": "La fecha de remisión es obligatoria.",
+    "startFailed": "No se pudo iniciar la evaluación."
+  },
+  "addAssignmentForm": {
+    "evaluatorLabel": "Evaluador *",
+    "loadingOption": "Cargando…",
+    "selectOption": "Seleccionar…",
+    "domainLabel": "Dominio *",
+    "domainPlaceholder": "p. ej., Habla y lenguaje",
+    "dueDateLabel": "Fecha límite",
+    "addButton": "Agregar evaluador",
+    "selectStaffAndDomain": "Seleccione un miembro del personal e ingrese un dominio.",
+    "addFailed": "No se pudo agregar la asignación."
+  },
+  "caseKind": {
+    "Initial": "Evaluación inicial",
+    "Reevaluation": "Reevaluación"
+  },
+  "caseStatus": {
+    "Open": "Abierto",
+    "ConsentPending": "Consentimiento pendiente",
+    "InProgress": "En progreso",
+    "Determined": "Determinado",
+    "Closed": "Cerrado"
+  },
+  "eligibilityOutcome": {
+    "Eligible": "Elegible",
+    "NotEligible": "No elegible",
+    "Withdrawn": "Retirado"
+  }
+}

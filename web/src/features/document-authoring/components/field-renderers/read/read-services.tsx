@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { parseConfig, type TableColumn } from '@/features/admin/templates/template-config';
 import { ROW_CONFIRMED_KEY } from '@/features/admin/templates/document-semantics';
@@ -24,6 +25,11 @@ function asText(v: unknown): string | undefined {
  * directly in that row's inline editor).
  */
 export function ReadServices({ field, value, onEditRow }: ReadFieldRendererProps) {
+  // `educator` alongside `document-authoring`: `resolveOwnerDisplay` below
+  // renders a `teamRoleLabel` (`educator:teamRole.*`, staff-only) — this
+  // hook call is what makes a language switch re-render once that
+  // namespace's Spanish loads.
+  const { t } = useTranslation(['document-authoring', 'educator']);
   const config = parseConfig(field.fieldType, field.configJson);
   const columns = config.kind === 'Table' ? config.table.columns : [];
   const serviceTypeCol = columns.find((c) => c.semantic === 'serviceType') ?? columns.find((c) => c.type === 'Text');
@@ -46,41 +52,40 @@ export function ReadServices({ field, value, onEditRow }: ReadFieldRendererProps
   return (
     <div id={fieldElementId(field.id)} data-testid={`read-field-${field.fieldKey}`}>
       <div className="flex flex-wrap items-baseline gap-2">
-        <h3 className="text-[13px] font-medium text-brand-slate-500">{field.label || 'Untitled field'}</h3>
+        <h3 className="text-[13px] font-medium text-brand-slate-500">{field.label || t('readShared.untitledField')}</h3>
         {rows.length > 0 && (
           <span className="text-xs text-brand-slate-500" data-testid={`read-field-${field.fieldKey}-total`}>
-            {rows.length} service{rows.length === 1 ? '' : 's'} · {totals.totalMinutesPerWeek} min/week
-            {totals.excludedCount > 0 &&
-              ` (${totals.excludedCount} ${totals.excludedCount === 1 ? 'service' : 'services'} not counted — frequency/duration unclear)`}
+            {t('readServices.serviceCount', { count: rows.length, minutes: totals.totalMinutesPerWeek })}
+            {totals.excludedCount > 0 && t('readServices.excludedNote', { count: totals.excludedCount })}
           </span>
         )}
       </div>
       {rows.length === 0 ? (
-        <p className="mt-0.5 text-[15px] italic text-brand-slate-500">No services yet.</p>
+        <p className="mt-0.5 text-[15px] italic text-brand-slate-500">{t('readServices.noServicesYet')}</p>
       ) : (
         <div className="mt-2 overflow-x-auto rounded-card border border-brand-slate-200">
           <table className="w-full border-collapse text-sm">
-            <caption className="sr-only">{field.label || 'Services'}</caption>
+            <caption className="sr-only">{field.label || t('servicesBlock.fallbackHeading')}</caption>
             <thead>
               <tr className="bg-brand-slate-50">
                 <th scope="col" className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600">
-                  Service
+                  {t('readServices.columnService')}
                 </th>
                 <th scope="col" className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600">
-                  Frequency
+                  {t('readServices.columnFrequency')}
                 </th>
                 <th scope="col" className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600">
-                  Setting
+                  {t('readServices.columnSetting')}
                 </th>
                 <th scope="col" className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600">
-                  Dates
+                  {t('readServices.columnDates')}
                 </th>
                 <th scope="col" className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600">
-                  Owner
+                  {t('readServices.columnOwner')}
                 </th>
                 {onEditRow && (
                   <th scope="col" className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600">
-                    <span className="sr-only">Actions</span>
+                    <span className="sr-only">{t('readServices.actionsSrLabel')}</span>
                   </th>
                 )}
               </tr>
@@ -159,8 +164,9 @@ export function ServiceReadRow({
   testIdPrefix,
   action,
 }: ServiceReadRowProps) {
+  const { t } = useTranslation(['document-authoring', 'common']);
   const prefix = testIdPrefix ?? `read-service-${index}`;
-  const serviceTypeLabel = columnDisplayLabel(row, serviceTypeCol, 'Untitled service');
+  const serviceTypeLabel = columnDisplayLabel(row, serviceTypeCol, t('readServices.untitledServiceFallback'));
   const providerRoleLabel = columnDisplayLabel(row, providerRoleCol, '');
   const scheduleText = formatScheduleSummary(
     frequencyCol ? asText(row.cells[frequencyCol.columnKey]) : undefined,
@@ -187,14 +193,16 @@ export function ServiceReadRow({
             )}
             data-testid={`${prefix}-carried`}
           >
-            Carried from {carried.label ?? 'prior version'}
-            {carried.date ? ` (${formatCarriedDate(carried.date)})` : ''}
-            {!reviewed && ' · needs review'}
+            {t(reviewed ? 'readShared.carriedFrom' : 'readShared.carriedFromNeedsReview', {
+              label: carried.date
+                ? `${carried.label ?? t('readShared.priorVersion')} (${formatCarriedDate(carried.date)})`
+                : carried.label ?? t('readShared.priorVersion'),
+            })}
           </div>
         )}
       </td>
       <td className="px-3 py-2 align-top text-brand-slate-700">
-        {scheduleText || <span className="italic text-brand-slate-500">Not set</span>}
+        {scheduleText || <span className="italic text-brand-slate-500">{t('common:ui.notSet')}</span>}
       </td>
       <td className="px-3 py-2 align-top text-brand-slate-700">{settingLabel || '—'}</td>
       <td className="px-3 py-2 align-top text-brand-slate-700">{dateRange}</td>
@@ -202,7 +210,7 @@ export function ServiceReadRow({
         {owner ? (
           <span className={cn('text-brand-slate-700', owner.former && 'italic')}>{owner.label}</span>
         ) : (
-          <span className="text-xs text-brand-amber-600">No owner</span>
+          <span className="text-xs text-brand-amber-600">{t('readShared.noOwner')}</span>
         )}
       </td>
       {(onEdit || action) && (
@@ -215,10 +223,10 @@ export function ServiceReadRow({
                 variant="secondary"
                 size="sm"
                 onClick={onEdit}
-                aria-label={`Edit ${serviceTypeLabel}`}
+                aria-label={t('readServices.editAriaLabel', { service: serviceTypeLabel })}
                 data-testid={`${prefix}-edit`}
               >
-                Edit
+                {t('readServices.edit')}
               </Button>
             )}
           </div>

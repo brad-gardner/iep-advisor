@@ -1,0 +1,25 @@
+{
+  "noSections": "This template has no sections.",
+  "untitledSection": "Untitled section",
+  "noFields": "No fields.",
+  "untitledField": "Untitled field",
+  "yes": "Yes",
+  "no": "No",
+  "noRows": "No rows.",
+  "column": "Column",
+  "tableField": "Table field",
+  "authoredPdfDownload": {
+    "checking": "Checking PDF…",
+    "preparing": "Preparing…",
+    "download": "Download PDF",
+    "downloadError": "Couldn’t prepare the download. Please try again.",
+    "pdfFailed": "PDF failed",
+    "retry": "Retry",
+    "retrying": "Retrying…",
+    "generateErrorTitle": "PDF could not be generated",
+    "generateErrorFallback": "The PDF render failed.",
+    "stillGenerating": "Still generating — check again shortly.",
+    "generating": "Generating PDF…",
+    "checkAgain": "Check again"
+  }
+}

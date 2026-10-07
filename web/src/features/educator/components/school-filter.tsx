@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Select } from '@/components/ui/input';
 import type { DistrictSchool } from '@/features/district-admin/types';
 
@@ -11,16 +12,17 @@ interface SchoolFilterProps {
 // DistrictAdmin-only roster filter, scoping the (server-searched) roster to a
 // single school (or all).
 export function SchoolFilter({ schools, value, onChange }: SchoolFilterProps) {
+  const { t } = useTranslation('educator');
   return (
     <div>
       <Select
         id="educator-students-school-filter"
-        label="Filter by school"
+        label={t('schoolFilter.label')}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         data-testid="educator-students-school-filter"
       >
-        <option value="">All schools</option>
+        <option value="">{t('schoolFilter.allSchools')}</option>
         {schools.map((school) => (
           <option key={school.id} value={school.id}>
             {school.name}

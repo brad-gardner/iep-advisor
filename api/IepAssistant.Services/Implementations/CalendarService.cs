@@ -19,6 +19,7 @@ public class CalendarService : ICalendarService
     private readonly IOrgAccessService _orgAccess;
     private readonly IIcsBuilder _icsBuilder;
     private readonly IStringLocalizer<Emails> _localizer;
+    private readonly IStringLocalizer<Messages> _messagesLocalizer;
 
     public CalendarService(
         ApplicationDbContext context,
@@ -26,7 +27,8 @@ public class CalendarService : ICalendarService
         IObligationService obligationService,
         IOrgAccessService orgAccess,
         IIcsBuilder icsBuilder,
-        IStringLocalizer<Emails> localizer)
+        IStringLocalizer<Emails> localizer,
+        IStringLocalizer<Messages> messagesLocalizer)
     {
         _context = context;
         _meetingService = meetingService;
@@ -34,6 +36,7 @@ public class CalendarService : ICalendarService
         _orgAccess = orgAccess;
         _icsBuilder = icsBuilder;
         _localizer = localizer;
+        _messagesLocalizer = messagesLocalizer;
     }
 
     public async Task<ServiceResult<List<CalendarItemModel>>> GetMineAsync(int userId, DateTime? from, DateTime? to, CancellationToken ct = default)
@@ -58,7 +61,7 @@ public class CalendarService : ICalendarService
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
         if (user == null)
-            return ServiceResult<CalendarFeedModel>.FailureResult("User not found.");
+            return ServiceResult<CalendarFeedModel>.FailureResult(ServiceErrorKind.NotFound, _messagesLocalizer["Calendar.UserNotFound"]);
 
         if (string.IsNullOrEmpty(user.CalendarFeedToken))
         {
@@ -74,7 +77,7 @@ public class CalendarService : ICalendarService
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
         if (user == null)
-            return ServiceResult<CalendarFeedModel>.FailureResult("User not found.");
+            return ServiceResult<CalendarFeedModel>.FailureResult(ServiceErrorKind.NotFound, _messagesLocalizer["Calendar.UserNotFound"]);
 
         user.CalendarFeedToken = NewToken();
         user.CalendarFeedTokenCreatedAt = DateTime.UtcNow;
@@ -86,11 +89,11 @@ public class CalendarService : ICalendarService
     public async Task<ServiceResult<byte[]>> GetFeedByTokenAsync(string token, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(token))
-            return ServiceResult<byte[]>.FailureResult("Invalid calendar feed link.");
+            return ServiceResult<byte[]>.FailureResult(ServiceErrorKind.NotFound, _messagesLocalizer["Calendar.InvalidFeedLink"]);
 
         var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.CalendarFeedToken == token, ct);
         if (user == null)
-            return ServiceResult<byte[]>.FailureResult("Invalid calendar feed link.");
+            return ServiceResult<byte[]>.FailureResult(ServiceErrorKind.NotFound, _messagesLocalizer["Calendar.InvalidFeedLink"]);
 
         var now = DateTime.UtcNow;
         var meetings = await _context.Meetings.AsNoTracking()
@@ -142,10 +145,10 @@ public class CalendarService : ICalendarService
             .Include(m => m.CreatedByUser)
             .FirstOrDefaultAsync(m => m.Id == meetingId, ct);
         if (meeting == null)
-            return ServiceResult<byte[]>.FailureResult("Meeting not found.");
+            return ServiceResult<byte[]>.FailureResult(ServiceErrorKind.NotFound, _messagesLocalizer["Meetings.MeetingNotFound"]);
 
         if (!await AuthorizeMeetingReadAsync(userId, meeting, ct))
-            return ServiceResult<byte[]>.FailureResult("You do not have permission to view this meeting.");
+            return ServiceResult<byte[]>.FailureResult(ServiceErrorKind.Forbidden, _messagesLocalizer["Meetings.NoPermissionToView"]);
 
         var input = IcsMeetingInputMapper.Map(meeting, _localizer);
         input.VideoLabel = _localizer["Meeting.VideoLabel"].Value;

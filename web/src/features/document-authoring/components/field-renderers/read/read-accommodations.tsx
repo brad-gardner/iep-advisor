@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { parseConfig } from '@/features/admin/templates/template-config';
 import { Markdown } from '@/components/ui/markdown';
 import { cn } from '@/lib/cn';
@@ -11,10 +12,16 @@ import type { ReadFieldRendererProps } from './types';
 /**
  * Read view for the accommodations block: grouped by category (the `category`
  * column semantic), each item showing its accommodation text and owner — plan
- * 2026-10-02-002. Falls back to "Uncategorized" when a row has no category, or
- * when the template doesn't tag a category column at all.
+ * 2026-10-02-002. Falls back to "Uncategorized" (translated,
+ * `group-rows.ts`'s `ungroupedLabel`) when a row has no category, or when the
+ * template doesn't tag a category column at all.
  */
 export function ReadAccommodations({ field, value }: ReadFieldRendererProps) {
+  // `educator` alongside `document-authoring`/`common`: `resolveOwnerDisplay`
+  // below renders a `teamRoleLabel` (`educator:teamRole.*`, staff-only) —
+  // this hook call is what makes a language switch re-render once that
+  // namespace's Spanish loads.
+  const { t } = useTranslation(['document-authoring', 'common', 'educator']);
   const config = parseConfig(field.fieldType, field.configJson);
   const columns = config.kind === 'Table' ? config.table.columns : [];
   const categoryCol = columns.find((c) => c.semantic === 'category');
@@ -25,9 +32,9 @@ export function ReadAccommodations({ field, value }: ReadFieldRendererProps) {
 
   return (
     <div id={fieldElementId(field.id)} data-testid={`read-field-${field.fieldKey}`}>
-      <h3 className="text-[13px] font-medium text-brand-slate-500">{field.label || 'Untitled field'}</h3>
+      <h3 className="text-[13px] font-medium text-brand-slate-500">{field.label || t('readShared.untitledField')}</h3>
       {rows.length === 0 ? (
-        <p className="mt-0.5 text-[15px] italic text-brand-slate-500">No rows yet.</p>
+        <p className="mt-0.5 text-[15px] italic text-brand-slate-500">{t('readShared.noRowsYet')}</p>
       ) : (
         <div className="mt-2 grid gap-6 text-sm md:grid-cols-2" data-testid={`read-field-${field.fieldKey}-groups`}>
           {groups.map((group) => (
@@ -43,7 +50,7 @@ export function ReadAccommodations({ field, value }: ReadFieldRendererProps) {
                         {typeof text === 'string' && text.trim() ? (
                           <Markdown content={text} />
                         ) : (
-                          <span className="italic text-brand-slate-500">Not set</span>
+                          <span className="italic text-brand-slate-500">{t('common:ui.notSet')}</span>
                         )}
                       </div>
                       {owner && (

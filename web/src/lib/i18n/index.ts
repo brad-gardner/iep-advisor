@@ -3,6 +3,12 @@ import { initReactI18next } from 'react-i18next';
 import resourcesToBackend from 'i18next-resources-to-backend';
 import * as Sentry from '@sentry/react';
 import { detectInitialLanguage, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from './detect';
+// `types.d.ts` is not imported here: it augments `i18next`'s own
+// `CustomTypeOptions` (module augmentation), which applies across the whole
+// program once the file is included by `tsconfig.json` (`"include":
+// ["src"]`) — no explicit import needed, and nothing in this file
+// references `EnResources` as a type anymore (see
+// `registerEnglishNamespace`'s doc comment below for why).
 
 export const defaultNS = 'common';
 
@@ -22,6 +28,11 @@ const enModules = import.meta.glob('/src/locales/en/*.json', { eager: true }) as
 
 function namespaceOf(path: string, root: string): string {
   return path.slice(root.length, -'.json'.length);
+}
+
+/** The namespace a locale file stands for: its filename, minus `.json`, regardless of subdirectory (`locales/es/staff/educator.json` → `educator`, same as `locales/en/educator.json` would). */
+function namespaceOfBasename(path: string): string {
+  return path.slice(path.lastIndexOf('/') + 1, -'.json'.length);
 }
 
 // The runtime value, discovered automatically by the glob above — adding a
@@ -50,11 +61,26 @@ export const featureNamespaces = Object.keys(resources.en);
 // `eager: true` yields loader functions, not the modules themselves) — Vite
 // code-splits each namespace into its own chunk, fetched only once a
 // Spanish-reading visitor actually needs it. English never goes through this
-// backend at all now; every `en/*.json` file is already in `resources` above.
-const esLoaders = import.meta.glob('/src/locales/es/*.json') as Record<
+// backend at all now; every parent/shell `en/*.json` file is already in
+// `resources` above, and a staff/admin namespace's English arrives instead
+// via `registerEnglishNamespace` (below), called by that namespace's own
+// route chunk.
+//
+// `**/*.json` (recursive, unlike `enModules`'s single-level `*.json` above)
+// so this one loader map also covers `locales/es/staff/<ns>.json` — a
+// staff/admin namespace's Spanish stays lazy exactly like every other
+// namespace's; only its ENGLISH loading path differs (see
+// `registerEnglishNamespace`). Keyed by NAMESPACE (the filename, regardless
+// of which subdirectory it lives under) rather than by full path, so a
+// staff namespace's directory (`staff/`) is irrelevant to resolving it —
+// the namespace name is what every `useTranslation(ns)` call and
+// `resourcesToBackend` request actually use. This means a staff namespace's
+// name must not collide with a parent/shell one (`docs/i18n/README.md`).
+const esModules = import.meta.glob('/src/locales/es/**/*.json') as Record<
   string,
   () => Promise<{ default: Record<string, unknown> }>
 >;
+const esLoaders = new Map(Object.entries(esModules).map(([path, loader]) => [namespaceOfBasename(path), loader]));
 
 // Exported so callers that need to know initialization has settled (the
 // test setup, chiefly — see `test/setup.ts`) can await it instead of relying
@@ -64,8 +90,20 @@ const esLoaders = import.meta.glob('/src/locales/es/*.json') as Record<
 export const i18nReady = i18next
   .use(
     resourcesToBackend(async (language: string, namespace: string) => {
-      const path = `/src/locales/${language}/${namespace}.json`;
-      const loader = esLoaders[path];
+      // English never reaches this backend — a parent/shell namespace is
+      // always already in `resources` above, and a staff/admin namespace's
+      // English is registered synchronously by its own route chunk (see
+      // `registerEnglishNamespace`) before any component can call
+      // `useTranslation` for it. Reaching here for `en` means that
+      // invariant broke (a component rendered before its chunk's
+      // `staff-locales`-style registration ran) — throw loudly rather than
+      // silently serving the WRONG language's file for the namespace.
+      if (language !== 'es') {
+        throw new Error(
+          `[i18n] unexpected backend request for ${language}/${namespace} — English must be bundled eagerly or registered via registerEnglishNamespace, never fetched`
+        );
+      }
+      const loader = esLoaders.get(namespace);
       if (!loader) {
         throw new Error(`[i18n] no locale file for ${language}/${namespace}`);
       }
@@ -135,5 +173,34 @@ i18next.on('failedLoading', (lng, ns, msg) => {
     void i18next.changeLanguage(DEFAULT_LANGUAGE);
   }
 });
+
+// A staff/admin namespace's English (`locales/en/staff/<ns>.json`) is
+// deliberately NOT part of `enModules`/`resources` above — that glob only
+// matches direct children of `locales/en/`, not `locales/en/staff/*` — so it
+// never enters the main chunk. Instead, `app/lazy-routes/staff-locales.ts`
+// (one shared module, imported by all three lazy area route barrels) globs
+// every `en/staff/<ns>.json` file (so THAT import, not this one, is what
+// makes Vite split them into those already-lazy chunks) and calls this once
+// per file, at module top level, before any of those chunks' page
+// components can render. `deep: true, overwrite: true` matches a normal
+// `addResourceBundle` full-replace of the namespace — there is never a
+// partial/merge case here, since a namespace is only ever registered once.
+//
+// See `docs/i18n/README.md` ("Staff and admin namespaces") and
+// `app/lazy-routes/staff-locales.ts` for the full mechanism.
+//
+// `(ns: string, resource: Record<string, unknown>)`, not generic over
+// `EnResources` — `staff-locales.ts` (this function's only caller) already
+// casts both `ns` (`as keyof EnResources`, derived from a filename at
+// runtime) and `resource` (`as EnResources[typeof ns]`, from an
+// `import.meta.glob` match Vite can't type per-file) before calling in, so
+// a generic signature here checks nothing a plain one wouldn't — the
+// un-narrowed values are cast to fit BEFORE they ever reach this function,
+// not inferred from it. The real per-namespace strictness still comes from
+// `types.d.ts`'s `EnResources` wherever a namespace's keys are actually
+// read (every `useTranslation(ns)` call site).
+export function registerEnglishNamespace(ns: string, resource: Record<string, unknown>): void {
+  i18next.addResourceBundle('en', ns, resource, true, true);
+}
 
 export default i18next;

@@ -1,8 +1,10 @@
 import { ShieldCheck, Star } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/input';
 import { orgRoleLabel } from '@/lib/org-role-label';
-import { TEAM_ROLES, TEAM_ROLE_LABELS } from '../../types';
+import { accessRoleLabel, teamRoleLabel } from '../../lib/student-enum-labels';
+import { TEAM_ROLES } from '../../types';
 import type { StudentTeamMember, TeamRole } from '../../types';
 import { teamMemberName } from './team-eligibility';
 
@@ -12,16 +14,17 @@ export function PermissionBadge({ member }: { member: StudentTeamMember }) {
   return (
     <Badge variant="info" data-testid={`team-permission-${member.id}`}>
       <ShieldCheck className="mr-1 h-3 w-3" strokeWidth={2} aria-hidden="true" />
-      {member.accessRole}
+      {accessRoleLabel(member.accessRole)}
     </Badge>
   );
 }
 
 export function LeadBadge() {
+  const { t } = useTranslation('educator');
   return (
     <Badge variant="success" data-testid="team-lead-badge">
       <Star className="mr-1 h-3 w-3" strokeWidth={2} aria-hidden="true" />
-      Lead case manager
+      {t('team.leadBadge')}
     </Badge>
   );
 }
@@ -54,14 +57,15 @@ interface TeamRoleCellProps {
 // stays enabled (aria-busy) while saving so keyboard focus is not dropped;
 // changes made mid-save are ignored.
 export function TeamRoleCell({ member, canManage, pendingRole, onChange }: TeamRoleCellProps) {
+  const { t } = useTranslation('educator');
   if (!canManage) {
-    return <span data-testid={`team-role-${member.id}`}>{TEAM_ROLE_LABELS[member.teamRole]}</span>;
+    return <span data-testid={`team-role-${member.id}`}>{teamRoleLabel(member.teamRole)}</span>;
   }
   const saving = pendingRole !== undefined;
   return (
     <Select
       id={`team-role-${member.id}`}
-      aria-label={`Team role for ${teamMemberName(member)}`}
+      aria-label={t('team.roleForAria', { name: teamMemberName(member) })}
       value={pendingRole ?? member.teamRole}
       aria-busy={saving || undefined}
       onChange={(e) => {
@@ -72,7 +76,7 @@ export function TeamRoleCell({ member, canManage, pendingRole, onChange }: TeamR
     >
       {TEAM_ROLES.map((role) => (
         <option key={role} value={role}>
-          {TEAM_ROLE_LABELS[role]}
+          {teamRoleLabel(role)}
         </option>
       ))}
     </Select>

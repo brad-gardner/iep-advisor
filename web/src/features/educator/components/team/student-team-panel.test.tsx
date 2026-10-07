@@ -7,7 +7,12 @@ import { apiRejection } from '@/test/axios-rejection';
 import { ORG_ROLE } from '../../types';
 import type { EligibleStaff } from '../../types';
 import { makeMember } from '../../test/fixtures';
-
+// `educator` is a staff-only namespace (plan phase 5) — its English isn't
+// bundled in `resources` (see `lib/i18n/index.ts`), only registered by this
+// side-effect import, exactly as the real lazy route chunk
+// (`app/lazy-routes/staff-routes.tsx`) registers it. This test renders
+// `StudentTeamPanel` directly, bypassing the page that would otherwise do so.
+import '@/app/lazy-routes/staff-locales';
 const api = vi.hoisted(() => ({
   getTeam: vi.fn(),
   getEligibleTeamStaff: vi.fn(),

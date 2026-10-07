@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CheckCircle2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Spinner } from '@/components/ui/spinner';
@@ -20,6 +21,7 @@ interface CompletenessStripProps {
  * finalize will reject; advisory items are coaching and never block.
  */
 export function CompletenessStrip({ summary, updating }: CompletenessStripProps) {
+  const { t } = useTranslation('document-authoring');
   const [itemsOpen, setItemsOpen] = useState(false);
   const required = summary.items.filter((i) => i.severity === 'required');
   const advisory = summary.items.filter((i) => i.severity === 'advisory');
@@ -29,12 +31,12 @@ export function CompletenessStrip({ summary, updating }: CompletenessStripProps)
   return (
     <section
       className="rounded-card border border-brand-slate-200 bg-white"
-      aria-label="Completeness"
+      aria-label={t('completenessStrip.ariaLabel')}
       data-testid="completeness-strip"
     >
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3">
         <div className="flex items-baseline gap-2">
-          <h2 className="font-serif text-lg text-brand-slate-800">Completeness</h2>
+          <h2 className="font-serif text-lg text-brand-slate-800">{t('completenessStrip.heading')}</h2>
           <span className="text-2xl font-semibold text-brand-teal-600" data-testid="completeness-percent">
             {summary.percent}%
           </span>
@@ -45,7 +47,7 @@ export function CompletenessStrip({ summary, updating }: CompletenessStripProps)
               data-testid="completeness-updating"
             >
               <Spinner size="sm" tone="current" className="h-3 w-3" aria-hidden="true" />
-              updating…
+              {t('completenessStrip.updating')}
             </span>
           )}
         </div>
@@ -55,20 +57,20 @@ export function CompletenessStrip({ summary, updating }: CompletenessStripProps)
         {summary.items.length === 0 ? (
           <p className="flex items-center gap-1.5 text-sm text-brand-slate-600">
             <CheckCircle2 className="h-4 w-4 text-brand-teal-500" aria-hidden="true" />
-            Nothing flagged
+            {t('completenessStrip.nothingFlagged')}
           </p>
         ) : (
           <>
             {required.length > 0 && (
               <span className="inline-flex items-center gap-1.5 text-sm text-brand-slate-700">
                 <span className="h-2 w-2 rounded-full bg-brand-danger-500" aria-hidden="true" />
-                {required.length} required
+                {t('completenessStrip.requiredCount', { count: required.length })}
               </span>
             )}
             {advisory.length > 0 && (
               <span className="inline-flex items-center gap-1.5 text-sm text-brand-slate-700">
                 <span className="h-2 w-2 rounded-full bg-brand-amber-400" aria-hidden="true" />
-                {advisory.length} advisory
+                {t('completenessStrip.advisoryCount', { count: advisory.length })}
               </span>
             )}
             <button
@@ -78,7 +80,7 @@ export function CompletenessStrip({ summary, updating }: CompletenessStripProps)
               className="ml-auto inline-flex items-center gap-1 text-sm text-brand-teal-600 hover:underline"
               data-testid="completeness-show-items"
             >
-              Show items
+              {t('completenessStrip.showItems')}
               <ChevronDown className={cn('h-4 w-4 transition-transform', itemsOpen && 'rotate-180')} aria-hidden="true" />
             </button>
           </>
@@ -102,7 +104,7 @@ export function CompletenessStrip({ summary, updating }: CompletenessStripProps)
                 }
                 data-testid={`completeness-item-${item.key}`}
               >
-                {item.severity === 'required' ? 'Required · ' : 'Advisory · '}
+                {item.severity === 'required' ? t('completenessStrip.requiredPrefix') : t('completenessStrip.advisoryPrefix')}
                 {item.message}
               </button>
             </li>

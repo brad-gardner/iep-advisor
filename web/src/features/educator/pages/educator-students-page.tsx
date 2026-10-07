@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { GraduationCap, Plus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -15,12 +16,8 @@ import { assignCaseManagerBulk, createStudent } from "../api/educator-api";
 import { getDistrictSchools } from "@/features/district-admin/api/district-api";
 import type { DistrictSchool } from "@/features/district-admin/types";
 import type { CreateSchoolStudentRequest, StudentSearchParams } from "../types";
-import {
-  ATTENTION_FILTER_LABELS,
-  ORG_ROLE,
-  isAdminOrgRole,
-  isCaseloadOrgRole,
-} from "../types";
+import { ORG_ROLE, isAdminOrgRole, isCaseloadOrgRole } from "../types";
+import { attentionFilterLabel } from "../lib/student-enum-labels";
 import { useEducatorProfile } from "../hooks/use-educator-profile";
 import { useRosterQuery } from "../hooks/use-roster-query";
 import { useStudentSearch } from "../hooks/use-student-search";
@@ -34,11 +31,16 @@ import {
   studentDisplayName,
 } from "../components/roster/roster-columns";
 
-const CASELOAD_EMPTY =
-  "No students on your caseload yet — your school admin can add you to a student's IEP team, or create one.";
-
 export function EducatorStudentsPage() {
-  usePageTitle("Students");
+  // `educator` is a staff-only namespace (plan phase 5): its English is NOT
+  // in the main chunk — it's registered by `@/app/lazy-routes/staff-locales`,
+  // imported at the top of this page's lazy route chunk
+  // (`app/lazy-routes/staff-routes.tsx`) — and its Spanish still lazy-loads
+  // like any other namespace. Converted fully in plan phase 5 (this page was
+  // the staff-namespace worked example in an earlier phase; see
+  // `docs/i18n/README.md`'s "Staff and admin namespaces").
+  const { t } = useTranslation(['educator', 'common']);
+  usePageTitle(t('studentsPage.title'));
   const { show: showToast } = useToast();
   const { profile } = useEducatorProfile();
   const isDistrictAdmin = profile?.orgRoleId === ORG_ROLE.DistrictAdmin;
@@ -52,9 +54,9 @@ export function EducatorStudentsPage() {
   // from the query's `from`/`to` rather than the static lookup table.
   const attentionLabel =
     query.attention === 'DueInRange' && query.from && query.to
-      ? `due between ${query.from} and ${query.to}`
+      ? t('studentsPage.dueBetween', { from: query.from, to: query.to })
       : query.attention
-        ? ATTENTION_FILTER_LABELS[query.attention]
+        ? attentionFilterLabel(query.attention)
         : undefined;
 
   const request = useMemo<StudentSearchParams>(
@@ -104,12 +106,12 @@ export function EducatorStudentsPage() {
       if (response.success) {
         refresh();
         setIsAddOpen(false);
-        showToast({ message: "Student added", variant: "success" });
+        showToast({ message: t('studentsPage.studentAdded'), variant: "success" });
         return { success: true };
       }
-      return { success: false, error: response.message || "Failed to add student" };
+      return { success: false, error: response.message || t('studentsPage.addStudentFailed') };
     } catch (err) {
-      return { success: false, error: apiErrorMessage(err, "Failed to add student") };
+      return { success: false, error: apiErrorMessage(err, t('studentsPage.addStudentFailed')) };
     }
   };
 
@@ -125,31 +127,33 @@ export function EducatorStudentsPage() {
         setIsAssignOpen(false);
         refresh();
         showToast({
-          message: `Case manager assigned to ${updated} ${updated === 1 ? "student" : "students"}`,
+          message: t('studentsPage.caseManagerAssigned', { count: updated }),
           variant: "success",
         });
         return { success: true };
       }
       return {
         success: false,
-        error: response.message || "Could not assign the case manager",
+        error: response.message || t('studentsPage.assignCaseManagerFailed'),
       };
     } catch (err) {
       return {
         success: false,
-        error: apiErrorMessage(err, "Could not assign the case manager"),
+        error: apiErrorMessage(err, t('studentsPage.assignCaseManagerFailed')),
       };
     }
   };
 
-  const columns = useMemo(
-    () => rosterColumns({ showSchool: isDistrictAdmin }),
-    [isDistrictAdmin],
-  );
+  // Not memoized: `rosterColumns` reads the current language through the
+  // plain `i18n.t` singleton (it's a builder function, not a component), so
+  // memoizing on `[isDistrictAdmin]` alone would keep stale-language headers
+  // across a language switch — see `admin-notification-failures-page.tsx` for
+  // the same "recompute every render" convention with translated columns.
+  const columns = rosterColumns({ showSchool: isDistrictAdmin });
 
   return (
     <PageLayout
-      title="Students"
+      title={t('studentsPage.title')}
       data-testid="educator-students-page"
       actions={
         <div className="flex items-center gap-2">
@@ -157,7 +161,7 @@ export function EducatorStudentsPage() {
             <Link to="/educator/admin/imports" data-testid="educator-students-import">
               <Button variant="secondary">
                 <Upload className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-                Import
+                {t('studentsPage.import')}
               </Button>
             </Link>
           )}
@@ -166,7 +170,7 @@ export function EducatorStudentsPage() {
             data-testid="educator-students-add"
           >
             <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-            Add student
+            {t('studentsPage.addStudent')}
           </Button>
         </div>
       }
@@ -187,7 +191,7 @@ export function EducatorStudentsPage() {
           data-testid="attention-filter-indicator"
         >
           <span className="text-brand-amber-600">
-            Showing students with {attentionLabel}
+            {t('studentsPage.showingAttention', { label: attentionLabel })}
           </span>
           <Button
             variant="ghost"
@@ -195,13 +199,13 @@ export function EducatorStudentsPage() {
             onClick={clearAttention}
             data-testid="attention-filter-clear"
           >
-            Clear
+            {t('studentsPage.clear')}
           </Button>
         </div>
       )}
 
       {failed && (
-        <Notice variant="error" title="Couldn't load students">
+        <Notice variant="error" title={t('studentsPage.couldNotLoad')}>
           <Button
             variant="secondary"
             size="sm"
@@ -209,7 +213,7 @@ export function EducatorStudentsPage() {
             onClick={refresh}
             data-testid="educator-students-retry"
           >
-            Try again
+            {t('common:ui.tryAgain')}
           </Button>
         </Notice>
       )}
@@ -219,7 +223,7 @@ export function EducatorStudentsPage() {
           {/* Always mounted so AT announces the very first selection too. */}
           <p className="sr-only" aria-live="polite" data-testid="roster-selection-status">
             {selection.selectedIds.size > 0
-              ? `${selection.selectedIds.size} selected`
+              ? t('studentsPage.selectedCount', { count: selection.selectedIds.size })
               : ""}
           </p>
           <RosterBulkBar
@@ -231,7 +235,7 @@ export function EducatorStudentsPage() {
       )}
 
       <Table
-        label="Students"
+        label={t('studentsPage.title')}
         data-testid="student-list"
         columns={columns}
         rows={page.items}
@@ -253,18 +257,18 @@ export function EducatorStudentsPage() {
           <EmptyState
             data-testid="student-list-empty"
             icon={GraduationCap}
-            title="No students found"
+            title={t('studentsPage.noStudentsFoundTitle')}
             description={
               isCaseload
-                ? CASELOAD_EMPTY
-                : "Adjust the filters, add a student, or import a roster."
+                ? t('studentsPage.caseloadEmptyState')
+                : t('studentsPage.noStudentsFoundDescription')
             }
           />
         }
       />
 
       <Pagination
-        label="Students pagination"
+        label={t('studentsPage.paginationLabel')}
         page={query.page}
         pageSize={query.pageSize}
         total={page.total}
@@ -276,7 +280,7 @@ export function EducatorStudentsPage() {
       <Modal
         open={isAddOpen}
         onClose={() => setIsAddOpen(false)}
-        title="Add a student"
+        title={t('studentsPage.addStudentModalTitle')}
         data-testid="educator-students-add-modal"
       >
         <CreateStudentForm

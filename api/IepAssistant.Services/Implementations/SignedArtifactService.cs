@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
@@ -12,15 +13,13 @@ namespace IepAssistant.Services.Implementations;
 /// Uploading a signed copy moves the (otherwise-immutable) version's
 /// <see cref="AuthoredDocumentVersion.SignatureStatus"/> — the interceptor's one carved-out mutable
 /// column — to the uploader-declared value.
+///
+/// <para>Multilingual plan (2026-10-06) phase 5: every failure <c>AuthoredDocumentVersionController</c>
+/// maps to a status carries an explicit <see cref="ServiceErrorKind"/>, and every message is localized
+/// (<c>Messages.resx</c>/<c>.es.resx</c>).</para>
 /// </summary>
 public class SignedArtifactService : ISignedArtifactService
 {
-    private const string VersionNotFoundMessage = "Document version not found.";
-    private const string ArtifactNotFoundMessage = "Signed artifact not found.";
-    private const string PermissionMessage = "You do not have permission to access this document version.";
-    private const string PdfOnlyMessage = "The signed artifact must be a PDF.";
-    private const string TooLargeMessage = "The signed artifact must be 20 MB or smaller.";
-    private const string InvalidStatusMessage = "signatureStatus must be PartiallySigned or Signed.";
     private const long MaxFileBytes = 20 * 1024 * 1024;
 
     private readonly ApplicationDbContext _context;
@@ -28,38 +27,41 @@ public class SignedArtifactService : ISignedArtifactService
     private readonly IAccessService _accessService;
     private readonly IBlobStorageService _blob;
     private readonly IAuditLogger _audit;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public SignedArtifactService(
         ApplicationDbContext context,
         IOrgAccessService orgAccess,
         IAccessService accessService,
         IBlobStorageService blob,
-        IAuditLogger audit)
+        IAuditLogger audit,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
         _accessService = accessService;
         _blob = blob;
         _audit = audit;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<SignedArtifactModel>> UploadAsync(int userId, int versionId, UploadSignedArtifactModel model, CancellationToken ct = default)
     {
         if (model.SignatureStatus is not (SignatureStatus.PartiallySigned or SignatureStatus.Signed))
-            return ServiceResult<SignedArtifactModel>.FailureResult(InvalidStatusMessage);
+            return ServiceResult<SignedArtifactModel>.FailureResult(ServiceErrorKind.Validation, _localizer["AuthoredDocumentsApi.SignatureStatusInvalid"]);
         if (!string.IsNullOrWhiteSpace(model.ContentType) && !string.Equals(model.ContentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
-            return ServiceResult<SignedArtifactModel>.FailureResult(PdfOnlyMessage);
+            return ServiceResult<SignedArtifactModel>.FailureResult(ServiceErrorKind.Validation, _localizer["SignedArtifacts.PdfOnly"]);
         if (model.SizeBytes > MaxFileBytes)
-            return ServiceResult<SignedArtifactModel>.FailureResult(TooLargeMessage);
+            return ServiceResult<SignedArtifactModel>.FailureResult(ServiceErrorKind.Validation, _localizer["SignedArtifacts.TooLarge"]);
 
         var version = await _context.AuthoredDocumentVersions.FirstOrDefaultAsync(v => v.Id == versionId, ct);
         if (version == null)
-            return ServiceResult<SignedArtifactModel>.FailureResult(VersionNotFoundMessage);
+            return ServiceResult<SignedArtifactModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["SignedArtifacts.VersionNotFound"]);
         if (!await _orgAccess.CanActOnStudentAsync(userId, version.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<SignedArtifactModel>.FailureResult(PermissionMessage);
+            return ServiceResult<SignedArtifactModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["SignedArtifacts.Permission"]);
 
         if (!await PdfUploadGuard.LooksLikePdfAsync(model.FileStream, ct))
-            return ServiceResult<SignedArtifactModel>.FailureResult(PdfOnlyMessage);
+            return ServiceResult<SignedArtifactModel>.FailureResult(ServiceErrorKind.Validation, _localizer["SignedArtifacts.PdfOnly"]);
 
         var fileName = PdfUploadGuard.SafeFileName(model.FileName, "signed.pdf");
         var blobPath = $"signed-artifacts/{versionId}/{Guid.NewGuid():N}.pdf";
@@ -95,9 +97,9 @@ public class SignedArtifactService : ISignedArtifactService
     {
         var header = await LoadVersionHeaderAsync(versionId, ct);
         if (header == null)
-            return ServiceResult<List<SignedArtifactModel>>.FailureResult(VersionNotFoundMessage);
+            return ServiceResult<List<SignedArtifactModel>>.FailureResult(ServiceErrorKind.NotFound, _localizer["SignedArtifacts.VersionNotFound"]);
         if (!await CanReadStudentAsync(userId, header.SchoolStudentId, ct))
-            return ServiceResult<List<SignedArtifactModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<SignedArtifactModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["SignedArtifacts.Permission"]);
 
         var rows = await MapQuery(_context.SignedArtifacts.AsNoTracking().Where(a => a.AuthoredDocumentVersionId == versionId))
             .OrderByDescending(a => a.UploadedAt)
@@ -113,13 +115,13 @@ public class SignedArtifactService : ISignedArtifactService
             .Select(a => new { a.BlobPath, a.AuthoredDocumentVersionId })
             .FirstOrDefaultAsync(ct);
         if (artifact == null)
-            return ServiceResult<string>.FailureResult(ArtifactNotFoundMessage);
+            return ServiceResult<string>.FailureResult(ServiceErrorKind.NotFound, _localizer["SignedArtifacts.ArtifactNotFound"]);
 
         var header = await LoadVersionHeaderAsync(artifact.AuthoredDocumentVersionId, ct);
         if (header == null)
-            return ServiceResult<string>.FailureResult(VersionNotFoundMessage);
+            return ServiceResult<string>.FailureResult(ServiceErrorKind.NotFound, _localizer["SignedArtifacts.VersionNotFound"]);
         if (!await CanReadStudentAsync(userId, header.SchoolStudentId, ct))
-            return ServiceResult<string>.FailureResult(PermissionMessage);
+            return ServiceResult<string>.FailureResult(ServiceErrorKind.Forbidden, _localizer["SignedArtifacts.Permission"]);
 
         var url = await _blob.GetDownloadUrlAsync(artifact.BlobPath);
         _audit.Record(AuditAction.Export, userId, "SignedArtifact", artifactId);

@@ -1,16 +1,23 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Calendar;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Meetings;
 using IepAssistant.Api.DTOs.Obligations;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Api.Controllers;
 
-/// <summary>Staff/parent calendar aggregation + ICS export (plan 4, decision 4).</summary>
+/// <summary>Staff/parent calendar aggregation + ICS export (plan 4, decision 4).
+///
+/// Multilingual plan (2026-10-06) phase 5: failures map via the shared
+/// <see cref="ServiceFailureMapperExtensions.MapServiceFailure"/>, switching on each result's
+/// <see cref="ServiceErrorKind"/> rather than matching (possibly Spanish) message text.
+/// </summary>
 [ApiController]
 [Authorize]
 [Route("api/calendar")]
@@ -19,10 +26,12 @@ public class CalendarController : ControllerBase
     private const string IcsContentType = "text/calendar; charset=utf-8";
 
     private readonly ICalendarService _calendarService;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public CalendarController(ICalendarService calendarService)
+    public CalendarController(ICalendarService calendarService, IStringLocalizer<Messages> localizer)
     {
         _calendarService = calendarService;
+        _localizer = localizer;
     }
 
     [HttpGet("mine")]
@@ -31,7 +40,7 @@ public class CalendarController : ControllerBase
     {
         var result = await _calendarService.GetMineAsync(User.GetUserId(), from, to, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<List<CalendarItemDto>>.SuccessResponse(result.Data!.Select(MapItem).ToList()));
     }
@@ -42,7 +51,7 @@ public class CalendarController : ControllerBase
     {
         var result = await _calendarService.GetOrCreateFeedAsync(User.GetUserId(), ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<CalendarFeedDto>.SuccessResponse(MapFeed(result.Data!)));
     }
@@ -53,7 +62,7 @@ public class CalendarController : ControllerBase
     {
         var result = await _calendarService.RegenerateFeedAsync(User.GetUserId(), ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<CalendarFeedDto>.SuccessResponse(MapFeed(result.Data!)));
     }
@@ -77,7 +86,7 @@ public class CalendarController : ControllerBase
     {
         var result = await _calendarService.GetMeetingIcsAsync(User.GetUserId(), id, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return File(result.Data!, IcsContentType, $"meeting-{id}.ics");
     }
@@ -134,16 +143,4 @@ public class CalendarController : ControllerBase
         MyInviteStatus = m.MyInviteStatus,
         CanManage = m.CanManage
     };
-
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

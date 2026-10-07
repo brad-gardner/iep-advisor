@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Markdown } from '@/components/ui/markdown';
 import { entryKindLabel } from '@/features/student/lib/entry-kinds';
 import type { StudentWorkspaceEntryDto } from '@/features/student/types';
@@ -20,6 +21,7 @@ export function StudentEntryPicker({
   onPick,
   testIdPrefix,
 }: StudentEntryPickerProps) {
+  const { t } = useTranslation('document-authoring');
   // Focus lands on the first option when the list is ready so keyboard users
   // can Tab through entries; Esc/outside-click dismissal lives in the button.
   const listRef = useRef<HTMLDivElement>(null);
@@ -32,25 +34,25 @@ export function StudentEntryPicker({
     <div
       ref={listRef}
       role="listbox"
-      aria-label="Shared student entries"
+      aria-label={t('studentEntryPicker.ariaLabel')}
       className="absolute z-10 mt-1 max-h-80 w-80 overflow-y-auto rounded-card border border-brand-slate-200 bg-white p-1 shadow-lg"
       data-testid={`${testIdPrefix}-picker`}
     >
       {isLoading && (
         <p className="px-3 py-2 text-sm text-brand-slate-500" data-testid={`${testIdPrefix}-loading`}>
-          Loading shared entries…
+          {t('studentEntryPicker.loading')}
         </p>
       )}
 
       {!isLoading && error && (
         <p className="px-3 py-2 text-sm text-brand-danger-700" data-testid={`${testIdPrefix}-error`}>
-          Could not load shared entries.
+          {t('studentEntryPicker.loadError')}
         </p>
       )}
 
       {!isLoading && !error && entries.length === 0 && (
         <p className="px-3 py-2 text-sm italic text-brand-slate-500" data-testid={`${testIdPrefix}-empty`}>
-          No shared entries yet.
+          {t('studentEntryPicker.empty')}
         </p>
       )}
 

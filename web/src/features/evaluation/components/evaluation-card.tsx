@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -7,9 +8,10 @@ import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ObligationStatusChip } from '@/features/obligations/components/obligation-status-chip';
-import { OBLIGATION_KIND_LABELS } from '@/features/obligations/types';
 import { apiErrorMessage } from '@/lib/api-error';
+import { eligibilityOutcomeLabel, evaluationCaseKindLabel, evaluationCaseStatusLabel } from '@/lib/evaluation-case-label';
 import { formatDate } from '@/lib/format-date';
+import { obligationKindLabel } from '@/lib/obligation-label';
 import { closeEvaluation, createIepFromEtr } from '../api/evaluation-api';
 import { useEvaluationCase } from '../hooks/use-evaluation-case';
 import { AddAssignmentForm } from './add-assignment-form';
@@ -19,11 +21,6 @@ import { DueDateOverrideDialog } from './due-date-override-dialog';
 import { EvaluationTimeline } from './evaluation-timeline';
 import { EvaluatorAssignmentsTable } from './evaluator-assignments-table';
 import { StartEvaluationForm } from './start-evaluation-form';
-import {
-  ELIGIBILITY_OUTCOME_LABELS,
-  EVALUATION_CASE_KIND_LABELS,
-  EVALUATION_CASE_STATUS_LABELS,
-} from '../types';
 import type { EvaluationCaseDto, EvaluatorAssignmentDto } from '../types';
 
 const CASE_OPEN_FOR_ACTIONS: EvaluationCaseDto['status'][] = ['Open', 'ConsentPending', 'InProgress'];
@@ -37,6 +34,11 @@ interface EvaluationCardProps {
  *  an existing case renders its timeline, consent capture, due-date override,
  *  evaluator assignments, and the determine/close/create-IEP actions. */
 export function EvaluationCard({ studentId }: EvaluationCardProps) {
+  // `obligations` alongside `evaluation`/`common`: `obligationKindLabel`
+  // below is backed by that staff-only namespace, and `ObligationStatusChip`
+  // now subscribes to it itself too — this hook call is what makes a
+  // language switch re-render this card once its Spanish loads.
+  const { t } = useTranslation(['evaluation', 'common', 'obligations']);
   const { evaluation, isLoading, error, retry, applyUpdate } = useEvaluationCase(studentId);
   const navigate = useNavigate();
   const [dueDateDialogOpen, setDueDateDialogOpen] = useState(false);
@@ -55,9 +57,9 @@ export function EvaluationCard({ studentId }: EvaluationCardProps) {
     try {
       const res = await closeEvaluation(studentId);
       if (res.success && res.data) applyUpdate(res.data);
-      else setActionError(res.message ?? 'Could not close the case.');
+      else setActionError(res.message ?? t('card.closeFailed'));
     } catch (err) {
-      setActionError(apiErrorMessage(err, 'Could not close the case.'));
+      setActionError(apiErrorMessage(err, t('card.closeFailed')));
     } finally {
       setIsClosing(false);
     }
@@ -69,9 +71,9 @@ export function EvaluationCard({ studentId }: EvaluationCardProps) {
     try {
       const res = await createIepFromEtr(studentId);
       if (res.success && res.data) navigate(`/educator/documents/${res.data.instanceId}`);
-      else setActionError(res.message ?? 'Could not create the IEP.');
+      else setActionError(res.message ?? t('card.createIepFailed'));
     } catch (err) {
-      setActionError(apiErrorMessage(err, 'Could not create the IEP.'));
+      setActionError(apiErrorMessage(err, t('card.createIepFailed')));
     } finally {
       setIsCreatingIep(false);
     }
@@ -81,13 +83,13 @@ export function EvaluationCard({ studentId }: EvaluationCardProps) {
 
   return (
     <Card data-testid="evaluation-card">
-      <h2 className="mb-4 font-serif text-lg text-brand-slate-800">Evaluation</h2>
+      <h2 className="mb-4 font-serif text-lg text-brand-slate-800">{t('card.heading')}</h2>
 
       {error && (
         <div role="alert">
           <Notice variant="error" title={error}>
             <Button size="sm" variant="secondary" onClick={retry} data-testid="evaluation-card-retry">
-              Try again
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
@@ -108,15 +110,15 @@ export function EvaluationCard({ studentId }: EvaluationCardProps) {
         <div className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Badge>{EVALUATION_CASE_STATUS_LABELS[evaluation.status]}</Badge>
+              <Badge>{evaluationCaseStatusLabel(evaluation.status)}</Badge>
               <span className="text-sm text-brand-slate-600">
-                {EVALUATION_CASE_KIND_LABELS[evaluation.kind]}
+                {evaluationCaseKindLabel(evaluation.kind)}
               </span>
             </div>
             {evaluation.obligation && (
               <span className="flex items-center gap-2 text-xs text-brand-slate-500" data-testid="evaluation-obligation-chip">
                 <ObligationStatusChip status={evaluation.obligation.status} />
-                {OBLIGATION_KIND_LABELS[evaluation.obligation.kind]} · {formatDate(evaluation.obligation.dueDate)}
+                {obligationKindLabel(evaluation.obligation.kind)} · {formatDate(evaluation.obligation.dueDate)}
               </span>
             )}
           </div>
@@ -134,7 +136,7 @@ export function EvaluationCard({ studentId }: EvaluationCardProps) {
           {isOpenForActions && evaluation.determinationDueDate && (
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
               <span className="text-brand-slate-600">
-                Determination due {formatDate(evaluation.determinationDueDate)}
+                {t('card.determinationDue', { date: formatDate(evaluation.determinationDueDate) })}
                 {evaluation.dueDateOverrideReason ? ` (${evaluation.dueDateOverrideReason})` : ''}
               </span>
               <Button
@@ -143,14 +145,14 @@ export function EvaluationCard({ studentId }: EvaluationCardProps) {
                 onClick={() => setDueDateDialogOpen(true)}
                 data-testid="evaluation-due-date-override-open"
               >
-                Override due date
+                {t('card.overrideDueDateButton')}
               </Button>
             </div>
           )}
 
           {evaluation.status !== 'Closed' && (
             <div className="space-y-3">
-              <h3 className="text-sm font-medium text-brand-slate-600">Evaluators</h3>
+              <h3 className="text-sm font-medium text-brand-slate-600">{t('card.evaluatorsHeading')}</h3>
               <EvaluatorAssignmentsTable
                 studentId={studentId}
                 assignments={evaluation.assignments}
@@ -169,7 +171,7 @@ export function EvaluationCard({ studentId }: EvaluationCardProps) {
           {evaluation.eligibilityOutcome && (
             <div className="rounded-card border border-brand-slate-200 p-3 text-sm" data-testid="evaluation-determination-summary">
               <p className="font-medium text-brand-slate-700">
-                {ELIGIBILITY_OUTCOME_LABELS[evaluation.eligibilityOutcome]}
+                {eligibilityOutcomeLabel(evaluation.eligibilityOutcome)}
                 {evaluation.determinationDate ? ` · ${formatDate(evaluation.determinationDate)}` : ''}
               </p>
               {evaluation.determinationRationale && (
@@ -181,7 +183,7 @@ export function EvaluationCard({ studentId }: EvaluationCardProps) {
           <div className="flex flex-wrap items-center gap-2 border-t border-brand-slate-100 pt-3">
             {isOpenForActions && (
               <Button onClick={() => setDetermineOpen(true)} data-testid="evaluation-determine-open">
-                Determine
+                {t('card.determineButton')}
               </Button>
             )}
             {evaluation.status !== 'Closed' && (
@@ -191,7 +193,7 @@ export function EvaluationCard({ studentId }: EvaluationCardProps) {
                 loading={isClosing}
                 data-testid="evaluation-close"
               >
-                Close
+                {t('card.closeButton')}
               </Button>
             )}
             {evaluation.status === 'Determined' && (
@@ -201,7 +203,7 @@ export function EvaluationCard({ studentId }: EvaluationCardProps) {
                 loading={isCreatingIep}
                 data-testid="evaluation-create-iep"
               >
-                Create IEP from ETR
+                {t('card.createIepButton')}
               </Button>
             )}
           </div>

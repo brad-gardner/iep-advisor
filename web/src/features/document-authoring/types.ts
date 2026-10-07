@@ -111,11 +111,8 @@ export type PdfRenderStatus = 'Pending' | 'Rendered' | 'Error';
 // signed copy has been attached.
 export const SIGNATURE_STATUSES = ['Unsigned', 'PartiallySigned', 'Signed'] as const;
 export type SignatureStatus = (typeof SIGNATURE_STATUSES)[number];
-export const SIGNATURE_STATUS_LABELS: Record<SignatureStatus, string> = {
-  Unsigned: 'Unsigned',
-  PartiallySigned: 'Partially signed',
-  Signed: 'Signed',
-};
+// Display label: `lib/signature-status-label.ts`'s `signatureStatusLabel`
+// (translated; this type's values themselves stay the English wire values).
 
 /** An immutable finalized version of an authored document (summary row). */
 export interface AuthoredDocumentVersionSummaryDto {

@@ -1,7 +1,10 @@
+import i18n from '@/lib/i18n';
 import { readColumnOptions, type TableColumn } from '@/features/admin/templates/template-config';
 import type { KeyedRow } from './table-rows';
 
-export const UNGROUPED_LABEL = 'Uncategorized';
+export function ungroupedLabel(): string {
+  return i18n.t('document-authoring:groupRows.uncategorized');
+}
 
 /**
  * Groups rows by a column's resolved display label — a Select option's label, or
@@ -13,7 +16,7 @@ export const UNGROUPED_LABEL = 'Uncategorized';
 export function groupRowsByColumn(
   rows: KeyedRow[],
   column: TableColumn | undefined,
-  fallbackLabel: string = UNGROUPED_LABEL
+  fallbackLabel: string = ungroupedLabel()
 ): Array<{ label: string; rows: KeyedRow[] }> {
   const labelFor = (row: KeyedRow): string => {
     if (!column) return fallbackLabel;

@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge';
-import { STUDENT_STATUS_LABELS } from '../types';
+import { studentStatusLabel } from '../lib/student-enum-labels';
 import type { StudentStatus } from '../types';
 
 const VARIANT: Record<StudentStatus, 'success' | 'warning' | 'neutral'> = {
@@ -13,7 +13,7 @@ const VARIANT: Record<StudentStatus, 'success' | 'warning' | 'neutral'> = {
 export function StudentStatusBadge({ status }: { status: StudentStatus }) {
   return (
     <Badge variant={VARIANT[status]} data-testid={`student-status-${status}`}>
-      {STUDENT_STATUS_LABELS[status]}
+      {studentStatusLabel(status)}
     </Badge>
   );
 }

@@ -491,7 +491,7 @@ describe('AdvocatePage', () => {
     renderPage();
     const rail = await screen.findByTestId('advocate-thread-list');
     // Rendered in full (not sliced with an ellipsis) — CSS handles any two-line wrapping, not JS truncation.
-    const title = within(rail).getByText(longTitle);
+    const title = await within(rail).findByText(longTitle);
     expect(title.className).not.toMatch(/\btruncate\b/);
     // Two lines, not unbounded: an 8-line title in a 16rem rail would push the rest of the list off.
     expect(title).toHaveClass('line-clamp-2');

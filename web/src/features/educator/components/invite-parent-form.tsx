@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ export function InviteParentForm({
   onInvite,
   embedded = false,
 }: InviteParentFormProps) {
+  const { t } = useTranslation('educator');
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,12 +30,10 @@ export function InviteParentForm({
     const result = await onInvite(email.trim());
 
     if (result.success) {
-      setSuccessMessage(
-        result.message || "Invitation sent. The parent has a pending invite.",
-      );
+      setSuccessMessage(result.message || t('inviteParentForm.successDefault'));
       setEmail("");
     } else {
-      setError(result.message ?? "Failed to send invitation");
+      setError(result.message ?? t('inviteParentForm.errorDefault'));
     }
 
     setIsSubmitting(false);
@@ -47,13 +47,13 @@ export function InviteParentForm({
     >
       {error && <Notice variant="error" title={error} />}
       {successMessage && (
-        <Notice variant="success" title="Invitation sent">
+        <Notice variant="success" title={t('inviteParentForm.successTitle')}>
           {successMessage}
         </Notice>
       )}
 
       <Input
-        label="Parent Email *"
+        label={t('inviteParentForm.emailLabel')}
         type="email"
         required
         value={email}
@@ -68,7 +68,7 @@ export function InviteParentForm({
         className="w-full"
         data-testid="invite-parent-submit"
       >
-        {isSubmitting ? "Sending..." : "Send Invite"}
+        {isSubmitting ? t('inviteParentForm.sending') : t('inviteParentForm.submit')}
       </Button>
     </form>
   );
@@ -76,7 +76,7 @@ export function InviteParentForm({
   if (embedded) return form;
   return (
     <Card className="max-w-lg">
-      <h2 className="font-serif text-lg mb-4">Invite a parent</h2>
+      <h2 className="font-serif text-lg mb-4">{t('familyLinks.inviteModalTitle')}</h2>
       {form}
     </Card>
   );

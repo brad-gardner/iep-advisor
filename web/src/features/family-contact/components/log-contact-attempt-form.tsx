@@ -1,17 +1,14 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
 import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
+import { familyContactMethodLabel, familyContactOutcomeLabel } from '@/lib/family-contact-label';
 import { toDateInputValue } from '@/lib/format-date';
 import { recordContactAttempt } from '../api/family-contact-api';
-import {
-  FAMILY_CONTACT_METHODS,
-  FAMILY_CONTACT_METHOD_LABELS,
-  FAMILY_CONTACT_OUTCOMES,
-  FAMILY_CONTACT_OUTCOME_LABELS,
-} from '../types';
+import { FAMILY_CONTACT_METHODS, FAMILY_CONTACT_OUTCOMES } from '../types';
 import type { FamilyContactAttemptDto, FamilyContactMethod, FamilyContactOutcome } from '../types';
 
 interface LogContactAttemptFormProps {
@@ -25,6 +22,7 @@ const NOTE_MAX_LENGTH = 1000;
 /** Log an attempt to reach the family: method, outcome, date, and an optional
  *  note (plan 7, decision 7). */
 export function LogContactAttemptForm({ studentId, onLogged, onCancel }: LogContactAttemptFormProps) {
+  const { t } = useTranslation(['family-contact', 'common']);
   const [method, setMethod] = useState<FamilyContactMethod>('Phone');
   const [outcome, setOutcome] = useState<FamilyContactOutcome>('Reached');
   const [attemptedAt, setAttemptedAt] = useState(toDateInputValue(new Date().toISOString()));
@@ -46,10 +44,10 @@ export function LogContactAttemptForm({ studentId, onLogged, onCancel }: LogCont
       if (res.success && res.data) {
         onLogged(res.data);
       } else {
-        setError(res.message ?? 'Could not log this contact attempt.');
+        setError(res.message ?? t('logForm.saveFailed'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not log this contact attempt.'));
+      setError(apiErrorMessage(err, t('logForm.saveFailed')));
     } finally {
       setIsSubmitting(false);
     }
@@ -64,31 +62,31 @@ export function LogContactAttemptForm({ studentId, onLogged, onCancel }: LogCont
       )}
       <div className="grid gap-3 sm:grid-cols-3">
         <Select
-          label="Method *"
+          label={t('logForm.methodLabel')}
           value={method}
           onChange={(e) => setMethod(e.target.value as FamilyContactMethod)}
           data-testid="contact-attempt-method"
         >
           {FAMILY_CONTACT_METHODS.map((m) => (
             <option key={m} value={m}>
-              {FAMILY_CONTACT_METHOD_LABELS[m]}
+              {familyContactMethodLabel(m)}
             </option>
           ))}
         </Select>
         <Select
-          label="Outcome *"
+          label={t('logForm.outcomeLabel')}
           value={outcome}
           onChange={(e) => setOutcome(e.target.value as FamilyContactOutcome)}
           data-testid="contact-attempt-outcome"
         >
           {FAMILY_CONTACT_OUTCOMES.map((o) => (
             <option key={o} value={o}>
-              {FAMILY_CONTACT_OUTCOME_LABELS[o]}
+              {familyContactOutcomeLabel(o)}
             </option>
           ))}
         </Select>
         <Input
-          label="Date"
+          label={t('logForm.dateLabel')}
           type="date"
           value={attemptedAt}
           onChange={(e) => setAttemptedAt(e.target.value)}
@@ -96,7 +94,7 @@ export function LogContactAttemptForm({ studentId, onLogged, onCancel }: LogCont
         />
       </div>
       <RichTextEditor
-        label="Note (optional)"
+        label={t('logForm.noteLabel')}
         value={note}
         onChange={setNote}
         minRows={2}
@@ -105,7 +103,7 @@ export function LogContactAttemptForm({ studentId, onLogged, onCancel }: LogCont
       />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={isSubmitting}>
-          Cancel
+          {t('common:ui.cancel')}
         </Button>
         <Button
           type="submit"
@@ -114,7 +112,7 @@ export function LogContactAttemptForm({ studentId, onLogged, onCancel }: LogCont
           disabled={isMarkdownOverLimit(note, NOTE_MAX_LENGTH)}
           data-testid="contact-attempt-submit"
         >
-          Log attempt
+          {t('logForm.submitButton')}
         </Button>
       </div>
     </form>

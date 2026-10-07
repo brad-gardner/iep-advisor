@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CalendarDays } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,12 +9,18 @@ import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, type TableColumn } from '@/components/ui/table';
 import { apiErrorMessage } from '@/lib/api-error';
+import { meetingStatusLabel, meetingTypeLabel } from '@/lib/meeting-labels';
 import { listStudentMeetings } from '../api/meetings-api';
 import { formatMeetingWhen } from '../lib/meeting-time';
-import { MEETING_STATUS_LABELS, MEETING_TYPE_LABELS } from '../types';
 import type { MeetingDto, MeetingStatus } from '../types';
 import { MeetingDrawer } from './meeting-drawer';
 import { ScheduleMeetingModal } from './schedule-meeting-modal';
+
+// A server-provided message is already resolved text and is shown as-is;
+// the generic fallback is translated at RENDER time (below), not stored
+// pre-translated here, so the mount effect never needs `t` in its
+// dependency array (same idiom as `useHome`/`MeetingRsvpPage`'s `LoadError`).
+type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 const statusBadgeVariant: Record<MeetingStatus, 'success' | 'error' | 'warning' | 'neutral'> = {
   Proposed: 'neutral',
@@ -38,8 +45,9 @@ interface StudentMeetingsCardProps {
 /** Upcoming + history meetings for a student, with schedule/view entry
  * points. Mounted on the educator student detail page. */
 export function StudentMeetingsCard({ studentId, studentName }: StudentMeetingsCardProps) {
+  const { t } = useTranslation(['meetings-staff', 'common']);
   const [meetings, setMeetings] = useState<MeetingDto[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [selected, setSelected] = useState<MeetingDto | null>(null);
   // Bumped by the "Try again" button to re-run the load effect below.
@@ -55,16 +63,22 @@ export function StudentMeetingsCard({ studentId, studentName }: StudentMeetingsC
           setMeetings(response.data);
           setError(null);
         } else {
-          setError(response.message ?? 'Could not load meetings');
+          setError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load meetings'));
+        if (!active) return;
+        const serverMessage = apiErrorMessage(err, '');
+        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
       }
     })();
     return () => {
       active = false;
     };
+    // `t` deliberately excluded (see `use-home.ts`): re-running this fetch on
+    // a plain language switch would be wasteful.
   }, [studentId, retryToken]);
+
+  const displayError = error ? (error.kind === 'server' ? error.message : t('studentMeetingsCard.loadFailed')) : null;
 
   const upcoming = (meetings ?? [])
     .filter(isUpcoming)
@@ -76,71 +90,77 @@ export function StudentMeetingsCard({ studentId, studentName }: StudentMeetingsC
   const columns: TableColumn<MeetingDto>[] = [
     {
       key: 'title',
-      header: 'Meeting',
-      cell: (m) => m.title || MEETING_TYPE_LABELS[m.type],
-      sortValue: (m) => m.title || MEETING_TYPE_LABELS[m.type],
+      header: t('studentMeetingsCard.meetingColumnHeader'),
+      cell: (m) => m.title || meetingTypeLabel(m.type),
+      sortValue: (m) => m.title || meetingTypeLabel(m.type),
     },
     {
       key: 'when',
-      header: 'When',
+      header: t('studentMeetingsCard.whenColumnHeader'),
       cell: (m) => formatMeetingWhen(m.startsAtUtc, m.durationMinutes),
       sortValue: (m) => m.startsAtUtc,
     },
     {
       key: 'status',
-      header: 'Status',
-      cell: (m) => <Badge variant={statusBadgeVariant[m.status]}>{MEETING_STATUS_LABELS[m.status]}</Badge>,
+      header: t('studentMeetingsCard.statusColumnHeader'),
+      cell: (m) => <Badge variant={statusBadgeVariant[m.status]}>{meetingStatusLabel(m.status)}</Badge>,
       sortValue: (m) => m.status,
     },
   ];
 
   const rowActions = (meeting: MeetingDto) => [
-    { label: 'View details', onSelect: () => setSelected(meeting), 'data-testid': `meeting-view-${meeting.id}` },
+    {
+      label: t('studentMeetingsCard.viewDetailsAction'),
+      onSelect: () => setSelected(meeting),
+      'data-testid': `meeting-view-${meeting.id}`,
+    },
   ];
 
   return (
     <Card data-testid="student-meetings-card">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="font-serif text-base text-brand-slate-800">Meetings</h2>
+        <h2 className="font-serif text-base text-brand-slate-800">{t('studentMeetingsCard.heading')}</h2>
         <Button variant="secondary" size="sm" onClick={() => setScheduleOpen(true)} data-testid="schedule-meeting-open">
-          Schedule meeting
+          {t('studentMeetingsCard.scheduleButton')}
         </Button>
       </div>
 
-      {error && (
+      {displayError && (
         <div role="alert">
-          <Notice variant="error" title={error}>
-            <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
-              Try again
+          <Notice variant="error" title={displayError}>
+            <Button size="sm" variant="secondary" onClick={() => setRetryToken((n) => n + 1)}>
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
       )}
 
-      {!error && meetings === null && (
+      {!displayError && meetings === null && (
         <div className="space-y-2">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
         </div>
       )}
 
-      {!error && meetings !== null && (
+      {!displayError && meetings !== null && (
         <div className="space-y-6">
           <div>
-            <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-brand-slate-500">Upcoming</h3>
+            <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-brand-slate-500">
+              {t('studentMeetingsCard.upcomingHeading')}
+            </h3>
             <Table
-              label="Upcoming meetings"
+              label={t('studentMeetingsCard.upcomingLabel')}
               columns={columns}
               rows={upcoming}
               rowKey={(m) => m.id}
               rowActions={rowActions}
-              rowActionLabel={(m) => m.title || MEETING_TYPE_LABELS[m.type]}
+              rowActionLabel={(m) => m.title || meetingTypeLabel(m.type)}
               data-testid="student-meetings-upcoming"
               empty={
                 <EmptyState
                   icon={CalendarDays}
-                  title="No upcoming meetings"
-                  description="Schedule an IEP meeting for this student."
+                  title={t('studentMeetingsCard.noUpcomingTitle')}
+                  description={t('studentMeetingsCard.noUpcomingDescription')}
                 />
               }
             />
@@ -148,14 +168,16 @@ export function StudentMeetingsCard({ studentId, studentName }: StudentMeetingsC
 
           {history.length > 0 && (
             <div>
-              <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-brand-slate-500">History</h3>
+              <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-brand-slate-500">
+                {t('studentMeetingsCard.historyHeading')}
+              </h3>
               <Table
-                label="Meeting history"
+                label={t('studentMeetingsCard.historyLabel')}
                 columns={columns}
                 rows={history}
                 rowKey={(m) => m.id}
                 rowActions={rowActions}
-                rowActionLabel={(m) => m.title || MEETING_TYPE_LABELS[m.type]}
+                rowActionLabel={(m) => m.title || meetingTypeLabel(m.type)}
                 data-testid="student-meetings-history"
               />
             </div>

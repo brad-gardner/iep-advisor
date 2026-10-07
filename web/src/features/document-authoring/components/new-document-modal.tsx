@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AxiosError } from 'axios';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
@@ -26,11 +27,12 @@ interface NewDocumentModalProps {
  * hook starts fresh each time (no reset-on-open effect).
  */
 export function NewDocumentModal({ studentId, open, onClose, onCreated }: NewDocumentModalProps) {
+  const { t } = useTranslation('document-authoring');
   // The create request outlives a dismiss gesture, so while it is in flight the dialog cannot be
   // closed — otherwise a "cancelled" create would still land and navigate to the new document.
   const [creating, setCreating] = useState(false);
   return (
-    <Modal open={open} onClose={onClose} preventClose={creating} title="New document" data-testid="new-document-modal">
+    <Modal open={open} onClose={onClose} preventClose={creating} title={t('newDocumentModal.title')} data-testid="new-document-modal">
       {open && (
         <NewDocumentForm studentId={studentId} onClose={onClose} onCreated={onCreated} onCreatingChange={setCreating} />
       )}
@@ -44,6 +46,7 @@ function NewDocumentForm({
   onCreated,
   onCreatingChange,
 }: Omit<NewDocumentModalProps, 'open'> & { onCreatingChange: (creating: boolean) => void }) {
+  const { t } = useTranslation('document-authoring');
   const { types, isLoading, error } = useDocumentTypes();
   const [selectedId, setSelectedId] = useState<number | ''>('');
   const [creating, setCreatingLocal] = useState(false);
@@ -66,14 +69,14 @@ function NewDocumentForm({
         onCreated(res.data.id);
         return;
       }
-      setCreateError(res.message ?? 'Could not create the document.');
+      setCreateError(res.message ?? t('newDocumentModal.createGenericError'));
     } catch (err) {
       if (err instanceof AxiosError) {
         const body = err.response?.data as ApiResponse<unknown> | undefined;
         // 422 → no template available for this student's state + type.
-        setCreateError(body?.message ?? 'Could not create the document.');
+        setCreateError(body?.message ?? t('newDocumentModal.createGenericError'));
       } else {
-        setCreateError('Could not create the document.');
+        setCreateError(t('newDocumentModal.createGenericError'));
       }
     } finally {
       setCreating(false);
@@ -83,23 +86,23 @@ function NewDocumentForm({
   if (isLoading) {
     return (
       <div className="flex justify-center py-6">
-        <Spinner label="Loading document types…" />
+        <Spinner label={t('newDocumentModal.loadingTypes')} />
       </div>
     );
   }
 
   if (error) {
     return (
-      <Notice variant="error" title="Could not load document types">
-        {error}
+      <Notice variant="error" title={t('newDocumentModal.loadTypesErrorTitle')}>
+        {error.kind === 'server' ? error.message : t('newDocumentModal.loadTypesErrorGeneric')}
       </Notice>
     );
   }
 
   if (types.length === 0) {
     return (
-      <Notice variant="info" title="No document types available">
-        Ask an administrator to enable a document type.
+      <Notice variant="info" title={t('newDocumentModal.noTypesTitle')}>
+        {t('newDocumentModal.noTypesDescription')}
       </Notice>
     );
   }
@@ -107,33 +110,31 @@ function NewDocumentForm({
   return (
     <div className="space-y-4">
       <Select
-        label="Document type"
+        label={t('newDocumentModal.typeLabel')}
         value={effectiveId}
         onChange={(e) => setSelectedId(Number(e.target.value))}
         data-testid="new-document-type"
       >
-        {types.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.displayName}
+        {types.map((docType) => (
+          <option key={docType.id} value={docType.id}>
+            {docType.displayName}
           </option>
         ))}
       </Select>
-      <p className="text-sm text-brand-slate-500">
-        The matching template for this student's state is applied automatically.
-      </p>
+      <p className="text-sm text-brand-slate-500">{t('newDocumentModal.templateHint')}</p>
       {createError && (
         <div role="alert">
-          <Notice variant="error" title="Cannot create this document">
+          <Notice variant="error" title={t('newDocumentModal.createErrorTitle')}>
             {createError}
           </Notice>
         </div>
       )}
       <div className="flex items-center justify-end gap-2 pt-2">
         <Button variant="ghost" onClick={onClose} disabled={creating}>
-          Cancel
+          {t('newDocumentModal.cancel')}
         </Button>
         <Button onClick={handleCreate} loading={creating} data-testid="new-document-create">
-          Create document
+          {t('newDocumentModal.create')}
         </Button>
       </div>
     </div>

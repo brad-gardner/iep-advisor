@@ -1,28 +1,32 @@
 import { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
+import { getActiveLanguage } from '@/lib/i18n/format';
 import { calendarItemLocalDateIso } from '../lib/calendar-item-date';
 import type { CalendarItemDto } from '../types';
 import type { CalendarDay } from '../hooks/use-calendar-range';
 
-const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+// Computed from the active i18next language (`Intl.DateTimeFormat`, keyed on
+// a reference Sunday) rather than a static English array, so the column
+// headers — and the day names Intl weaves into `dayAriaLabel` below — follow
+// the active language like every other date-facing text in the app (see
+// `docs/i18n/README.md`'s "Formatting"). `new Date(2024, 0, 7)` is simply a
+// known Sunday; the grid it labels is unrelated to that year.
+function weekdayLabels(language: string): string[] {
+  const formatter = new Intl.DateTimeFormat(language, { weekday: 'short' });
+  const referenceSunday = new Date(2024, 0, 7);
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(referenceSunday);
+    date.setDate(date.getDate() + i);
+    return formatter.format(date);
+  });
+}
 
 interface CalendarMonthGridProps {
   days: CalendarDay[];
   items: CalendarItemDto[];
   selectedIso: string | null;
   onSelectDay: (iso: string) => void;
-}
-
-function dayAriaLabel(day: CalendarDay, count: number): string {
-  const dateLabel = day.date.toLocaleDateString(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-  const todaySuffix = day.isToday ? ', today' : '';
-  const countSuffix = count > 0 ? `, ${count} item${count === 1 ? '' : 's'}` : '';
-  return `${dateLabel}${todaySuffix}${countSuffix}`;
 }
 
 /**
@@ -36,9 +40,25 @@ function dayAriaLabel(day: CalendarDay, count: number): string {
  * that overriding a button's role to `gridcell` silences that announcement.
  */
 export function CalendarMonthGrid({ days, items, selectedIso, onSelectDay }: CalendarMonthGridProps) {
+  const { t } = useTranslation('calendar');
+  const language = getActiveLanguage();
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const labels = weekdayLabels(language);
 
   const countFor = (iso: string) => items.filter((item) => calendarItemLocalDateIso(item) === iso).length;
+
+  function dayAriaLabel(day: CalendarDay, count: number): string {
+    const dateLabel = day.date.toLocaleDateString(language, {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    const parts = [dateLabel];
+    if (day.isToday) parts.push(t('monthGrid.today'));
+    if (count > 0) parts.push(t('monthGrid.itemCount', { count }));
+    return parts.join(', ');
+  }
 
   // Prefer the selected day's index; if it isn't part of the currently
   // visible grid at all (e.g. a stale selection left over from a month the
@@ -85,10 +105,14 @@ export function CalendarMonthGrid({ days, items, selectedIso, onSelectDay }: Cal
   };
 
   return (
-    <div role="grid" aria-label="Calendar month" className="rounded-card border border-brand-slate-200 overflow-hidden">
+    <div
+      role="grid"
+      aria-label={t('monthGrid.ariaLabel')}
+      className="rounded-card border border-brand-slate-200 overflow-hidden"
+    >
       <div role="row" className="grid grid-cols-7 border-b border-brand-slate-200 bg-brand-slate-50">
-        {WEEKDAY_LABELS.map((label) => (
-          <div key={label} role="columnheader" className="px-2 py-2 text-center text-xs font-medium text-brand-slate-500">
+        {labels.map((label, i) => (
+          <div key={i} role="columnheader" className="px-2 py-2 text-center text-xs font-medium text-brand-slate-500">
             {label}
           </div>
         ))}

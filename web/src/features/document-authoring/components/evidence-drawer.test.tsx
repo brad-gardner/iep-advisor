@@ -1,5 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+// `document-authoring` is a staff-only namespace (plan phase 5) — see
+// `@/app/lazy-routes/staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
+// admin namespaces". This component renders directly here (not through the
+// lazy route), so its English must be registered the same way the real
+// route chunk does.
+import '@/app/lazy-routes/staff-locales';
 import { EvidenceDrawer } from './evidence-drawer';
 import type { StudentEvidenceBundle } from '../api/evidence-api';
 

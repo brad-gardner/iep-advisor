@@ -14,14 +14,6 @@ export const OBLIGATION_KINDS = [
   'EvaluatorSubmission',
 ] as const;
 export type ObligationKind = (typeof OBLIGATION_KINDS)[number];
-export const OBLIGATION_KIND_LABELS: Record<ObligationKind, string> = {
-  AnnualReview: 'Annual review',
-  Reevaluation: 'Reevaluation',
-  EtrDue: 'ETR',
-  GoalObservationStale: 'Goal progress overdue',
-  EvaluationDetermination: 'Evaluation determination',
-  EvaluatorSubmission: 'Evaluator submission',
-};
 
 /** Icons for the plan 7 obligation kinds only (never colour/icon-only — every
  *  row still carries its text label alongside). The plan 4 kinds render
@@ -34,12 +26,12 @@ export const OBLIGATION_KIND_ICONS: Partial<Record<ObligationKind, LucideIcon>> 
 
 export const OBLIGATION_STATUSES = ['Upcoming', 'DueSoon', 'Overdue', 'Unknown'] as const;
 export type ObligationStatus = (typeof OBLIGATION_STATUSES)[number];
-export const OBLIGATION_STATUS_LABELS: Record<ObligationStatus, string> = {
-  Upcoming: 'Upcoming',
-  DueSoon: 'Due soon',
-  Overdue: 'Overdue',
-  Unknown: 'Unknown',
-};
+// Display labels for both enums above live in `@/lib/obligation-label.ts`
+// (`obligationKindLabel`/`obligationStatusLabel`, translated via the
+// staff-only `obligations` namespace — i18n plan phase 5). Every caller now
+// uses those helpers (or, for `ObligationStatusChip`, its own
+// `useTranslation('obligations')`), so the old `OBLIGATION_KIND_LABELS`/
+// `OBLIGATION_STATUS_LABELS` English maps were removed outright.
 
 export interface ObligationDto {
   kind: ObligationKind;

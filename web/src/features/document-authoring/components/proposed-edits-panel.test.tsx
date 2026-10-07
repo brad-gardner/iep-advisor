@@ -3,7 +3,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { TemplateVersionDetailDto } from '@/features/admin/templates/types';
 import type { ProposedEditDto } from '@/features/meetings/types';
-
+// `document-authoring` and `meetings-staff` are both staff-only namespaces
+// (plan phase 5) — see `@/app/lazy-routes/staff-locales`'s doc comment and
+// `docs/i18n/README.md`'s "Staff and admin namespaces". This component
+// renders directly here (not through the lazy route), so their English must
+// be registered the same way the real route chunk does. `meetings-staff` is
+// needed because `ProposedEditsPanel` now names it in its own
+// `useTranslation` call (for `meetingDecisionOutcomeLabel`).
+import '@/app/lazy-routes/staff-locales';
 const decisionsApi = vi.hoisted(() => ({
   getProposedEdits: vi.fn(),
   markDecisionApplied: vi.fn(),

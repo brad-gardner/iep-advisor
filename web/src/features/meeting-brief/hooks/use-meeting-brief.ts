@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AxiosError } from 'axios';
 import { apiErrorMessage } from '@/lib/api-error';
 import { generateBrief, getBrief } from '../api/meeting-brief-api';
@@ -20,6 +21,7 @@ interface UseMeetingBriefResult {
 /** A meeting's pre-meeting brief (plan 7, decision 2): loads once, and offers
  *  a generate/regenerate action that replaces it in place. */
 export function useMeetingBrief(meetingId: number): UseMeetingBriefResult {
+  const { t } = useTranslation('meeting-brief');
   const [brief, setBrief] = useState<MeetingBriefDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -52,7 +54,7 @@ export function useMeetingBrief(meetingId: number): UseMeetingBriefResult {
           setNotFound(false);
           setError(null);
         } else {
-          setError(res.message ?? 'Could not load the brief.');
+          setError(res.message ?? t('page.loadBriefFailed'));
         }
       } catch (err) {
         if (!active) return;
@@ -60,7 +62,7 @@ export function useMeetingBrief(meetingId: number): UseMeetingBriefResult {
           setNotFound(true);
           setError(null);
         } else {
-          setError(apiErrorMessage(err, 'Could not load the brief.'));
+          setError(apiErrorMessage(err, t('page.loadBriefFailed')));
         }
       } finally {
         if (active) setIsLoading(false);
@@ -69,6 +71,9 @@ export function useMeetingBrief(meetingId: number): UseMeetingBriefResult {
     return () => {
       active = false;
     };
+    // `t` omitted deliberately (see `docs/i18n/README.md`'s "An effect that
+    // fetches on mount never has `t` in its dependency array").
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meetingId]);
 
   // Only the most recently started regenerate may apply its result or clear the spinner: a
@@ -88,14 +93,18 @@ export function useMeetingBrief(meetingId: number): UseMeetingBriefResult {
         setNotFound(false);
         setError(null);
       } else {
-        setGenerateError(res.message ?? 'Could not generate the brief.');
+        setGenerateError(res.message ?? t('page.generateBriefFailed'));
       }
     } catch (err) {
       if (!isCurrent()) return;
-      setGenerateError(apiErrorMessage(err, 'Could not generate the brief.'));
+      setGenerateError(apiErrorMessage(err, t('page.generateBriefFailed')));
     } finally {
       if (isCurrent()) setIsGenerating(false);
     }
+    // `t` omitted deliberately — same reasoning as the load effect above;
+    // `regenerate`'s identity changing on a language switch would also
+    // disturb any caller that depends on it (e.g. a retry button's effect).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meetingId]);
 
   return { brief, isLoading, notFound, error, isGenerating, generateError, regenerate };

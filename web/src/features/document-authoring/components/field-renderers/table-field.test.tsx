@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import type { TemplateFieldDto } from '@/features/admin/templates/types';
+// `document-authoring` is a staff-only namespace (plan phase 5) — see
+// `@/app/lazy-routes/staff-locales`'s doc comment and `docs/i18n/README.md`'s "Staff and
+// admin namespaces". This component renders directly here (not through the
+// lazy route), so its English must be registered the same way the real
+// route chunk does.
+import '@/app/lazy-routes/staff-locales';
 import { TableField } from './table-field';
 import { ToastProvider } from '@/components/ui/toast';
 import { DocumentFlushContext } from '../../hooks/flush-registry-context';
@@ -100,7 +106,15 @@ describe('TableField (semantic row block)', () => {
       ],
       onSave
     );
-    const shownDate = new Date('2025-10-14T00:00:00').toLocaleDateString();
+    // `formatCarriedDate` (table-cell-format.ts) now delegates to the shared,
+    // active-language-aware `formatDate` (plan requirement: dates follow the
+    // active locale) rather than a bare `toLocaleDateString()`, so this must
+    // match that formatter's output, not the browser-default numeric format.
+    const shownDate = new Date('2025-10-14T00:00:00').toLocaleDateString('en', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
     expect(screen.getByTestId(`field-${fieldKey}-row-0-carried`)).toHaveTextContent(`Carried from IEP v1 (${shownDate}) · not yet reviewed`);
 
     fireEvent.click(screen.getByTestId(`field-${fieldKey}-row-0-keep`));

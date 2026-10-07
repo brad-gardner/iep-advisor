@@ -15,9 +15,6 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 public class GoalRecordService : IGoalRecordService
 {
-    private const string PermissionMessage = "You do not have permission to access this student's goals.";
-    private const string GoalNotFoundMessage = "Goal not found.";
-    private const string InstanceNotFoundMessage = "Document not found.";
     private const string DefaultRetirementReason = "Removed from the document";
 
     private readonly ApplicationDbContext _context;
@@ -149,7 +146,7 @@ public class GoalRecordService : IGoalRecordService
     public async Task<ServiceResult<List<GoalRecordModel>>> GetForStudentAsync(int userId, int schoolStudentId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, schoolStudentId, AccessRole.Viewer, ct))
-            return ServiceResult<List<GoalRecordModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<GoalRecordModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["GoalRecords.Permission"]);
 
         var records = await LoadCurrentAsync(g => g.SchoolStudentId == schoolStudentId, ct);
         return ServiceResult<List<GoalRecordModel>>.SuccessResult(records);
@@ -158,7 +155,7 @@ public class GoalRecordService : IGoalRecordService
     public async Task<ServiceResult<List<GoalLineageModel>>> GetHistoryForStudentAsync(int userId, int schoolStudentId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, schoolStudentId, AccessRole.Viewer, ct))
-            return ServiceResult<List<GoalLineageModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<GoalLineageModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["GoalRecords.Permission"]);
 
         var all = await _context.GoalRecords.AsNoTracking()
             .Where(g => g.SchoolStudentId == schoolStudentId)
@@ -182,9 +179,8 @@ public class GoalRecordService : IGoalRecordService
 
     public async Task<ServiceResult<List<GoalRecordModel>>> GetForChildAsync(int userId, int childId, CancellationToken ct = default)
     {
-        // Multilingual plan Phase 3: this is the only parent-reachable path in GoalRecordService (the
-        // others are staff/org-access methods, Phase 5) — localized directly rather than through the
-        // shared English-only PermissionMessage const used by those unconverted methods.
+        // Multilingual plan Phase 3: this is the only parent-reachable path in GoalRecordService; the
+        // staff/org-access methods below were converted in Phase 5.
         if (!await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Viewer, ct))
             return ServiceResult<List<GoalRecordModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["GoalRecords.Permission"]);
 
@@ -205,14 +201,14 @@ public class GoalRecordService : IGoalRecordService
         int userId, int goalRecordId, CreateGoalObservationModel model, CancellationToken ct = default)
     {
         if (model.Value == null && string.IsNullOrWhiteSpace(model.Note))
-            return ServiceResult<GoalObservationModel>.FailureResult("Enter a value or a note.");
+            return ServiceResult<GoalObservationModel>.FailureResult(ServiceErrorKind.Validation, _localizer["GoalRecords.ValueOrNoteRequired"]);
 
         var record = await _context.GoalRecords.FirstOrDefaultAsync(g => g.Id == goalRecordId, ct);
         if (record == null)
-            return ServiceResult<GoalObservationModel>.FailureResult(GoalNotFoundMessage);
+            return ServiceResult<GoalObservationModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["GoalRecords.GoalNotFound"]);
 
         if (!await _orgAccess.CanActOnStudentAsync(userId, record.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<GoalObservationModel>.FailureResult(PermissionMessage);
+            return ServiceResult<GoalObservationModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["GoalRecords.Permission"]);
 
         var observation = new GoalObservation
         {
@@ -235,19 +231,19 @@ public class GoalRecordService : IGoalRecordService
         int userId, int goalRecordId, UpdateGoalStatusModel model, CancellationToken ct = default)
     {
         if (model.Status is not (GoalRecordStatus.Active or GoalRecordStatus.Met or GoalRecordStatus.NotMet))
-            return ServiceResult<GoalRecordModel>.FailureResult("Status must be Active, Met, or NotMet.");
+            return ServiceResult<GoalRecordModel>.FailureResult(ServiceErrorKind.Validation, _localizer["GoalRecords.InvalidStatus"]);
         if (model.Status == GoalRecordStatus.NotMet && string.IsNullOrWhiteSpace(model.Reason))
-            return ServiceResult<GoalRecordModel>.FailureResult("A reason is required when marking a goal Not Met.");
+            return ServiceResult<GoalRecordModel>.FailureResult(ServiceErrorKind.Validation, _localizer["GoalRecords.ReasonRequiredForNotMet"]);
 
         var record = await _context.GoalRecords
             .Include(g => g.AuthoredDocumentVersion).ThenInclude(v => v.DocumentType)
             .Include(g => g.Observations)
             .FirstOrDefaultAsync(g => g.Id == goalRecordId, ct);
         if (record == null)
-            return ServiceResult<GoalRecordModel>.FailureResult(GoalNotFoundMessage);
+            return ServiceResult<GoalRecordModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["GoalRecords.GoalNotFound"]);
 
         if (!await _orgAccess.CanActOnStudentAsync(userId, record.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<GoalRecordModel>.FailureResult(PermissionMessage);
+            return ServiceResult<GoalRecordModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["GoalRecords.Permission"]);
 
         record.Status = model.Status;
         record.StatusReason = model.Status == GoalRecordStatus.NotMet ? model.Reason!.Trim() : model.Reason?.Trim();
@@ -262,20 +258,20 @@ public class GoalRecordService : IGoalRecordService
         int userId, int documentInstanceId, CreateGoalRetirementModel model, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(model.Reason))
-            return ServiceResult.FailureResult("A reason is required to remove a goal.");
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["GoalRecords.ReasonRequiredForRemoval"]);
 
         var instance = await _context.DocumentInstances.AsNoTracking()
             .Where(i => i.Id == documentInstanceId)
             .Select(i => new { i.SchoolStudentId, i.Status })
             .FirstOrDefaultAsync(ct);
         if (instance == null)
-            return ServiceResult.FailureResult(InstanceNotFoundMessage);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (!await _orgAccess.CanActOnStudentAsync(userId, instance.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult.FailureResult(PermissionMessage);
+            return ServiceResult.FailureResult(ServiceErrorKind.Forbidden, _localizer["GoalRecords.Permission"]);
 
         if (instance.Status is not (DocumentInstanceStatus.Draft or DocumentInstanceStatus.Finalizing))
-            return ServiceResult.FailureResult("This document can no longer be edited.");
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Documents.NoLongerEditable"]);
 
         await _context.GoalRetirements.AddAsync(new GoalRetirement
         {

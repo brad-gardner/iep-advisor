@@ -1,12 +1,14 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
 import { Select } from '@/components/ui/input';
 import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { apiErrorMessage } from '@/lib/api-error';
+import { meetingDecisionOutcomeLabel } from '@/lib/meeting-labels';
 import { updateDecision } from '../api/meeting-decisions-api';
-import { MEETING_DECISION_OUTCOMES, MEETING_DECISION_OUTCOME_LABELS } from '../types';
+import { MEETING_DECISION_OUTCOMES } from '../types';
 import type { MeetingDecisionDto, MeetingDecisionOutcome } from '../types';
 
 interface EditDecisionDialogProps {
@@ -19,6 +21,7 @@ const TEXT_MAX_LENGTH = 2000;
 
 /** Edit a decision's text/outcome (the target is fixed once recorded). */
 export function EditDecisionDialog({ decision, onClose, onUpdated }: EditDecisionDialogProps) {
+  const { t } = useTranslation(['meetings-staff', 'common']);
   const [text, setText] = useState(decision?.text ?? '');
   const [outcome, setOutcome] = useState<MeetingDecisionOutcome>(decision?.outcome ?? 'Agreed');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,10 +47,10 @@ export function EditDecisionDialog({ decision, onClose, onUpdated }: EditDecisio
         onUpdated(res.data);
         onClose();
       } else {
-        setError(res.message ?? 'Could not update this decision.');
+        setError(res.message ?? t('editDecisionDialog.saveFailed'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not update this decision.'));
+      setError(apiErrorMessage(err, t('editDecisionDialog.saveFailed')));
     } finally {
       setIsSubmitting(false);
     }
@@ -58,12 +61,12 @@ export function EditDecisionDialog({ decision, onClose, onUpdated }: EditDecisio
       open={decision !== null}
       onClose={onClose}
       preventClose={isSubmitting}
-      title="Edit decision"
+      title={t('editDecisionDialog.title')}
       data-testid="edit-decision-dialog"
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
-            Cancel
+            {t('common:ui.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -71,7 +74,7 @@ export function EditDecisionDialog({ decision, onClose, onUpdated }: EditDecisio
             disabled={text.trim().length === 0 || isMarkdownOverLimit(text, TEXT_MAX_LENGTH)}
             data-testid="edit-decision-submit"
           >
-            Save changes
+            {t('editDecisionDialog.saveButton')}
           </Button>
         </>
       }
@@ -83,7 +86,7 @@ export function EditDecisionDialog({ decision, onClose, onUpdated }: EditDecisio
           </div>
         )}
         <RichTextEditor
-          label="Decision *"
+          label={t('editDecisionDialog.decisionLabel')}
           value={text}
           onChange={setText}
           minRows={3}
@@ -92,14 +95,14 @@ export function EditDecisionDialog({ decision, onClose, onUpdated }: EditDecisio
           data-testid="edit-decision-text"
         />
         <Select
-          label="Outcome *"
+          label={t('editDecisionDialog.outcomeLabel')}
           value={outcome}
           onChange={(e) => setOutcome(e.target.value as MeetingDecisionOutcome)}
           data-testid="edit-decision-outcome"
         >
           {MEETING_DECISION_OUTCOMES.map((o) => (
             <option key={o} value={o}>
-              {MEETING_DECISION_OUTCOME_LABELS[o]}
+              {meetingDecisionOutcomeLabel(o)}
             </option>
           ))}
         </Select>

@@ -11,6 +11,7 @@ public class MeetingBriefConfiguration : IEntityTypeConfiguration<MeetingBrief>
         builder.HasKey(b => b.Id);
 
         builder.Property(b => b.BriefJson).IsRequired();
+        builder.Property(b => b.Language).HasMaxLength(10);
 
         builder.HasOne(b => b.Meeting)
             .WithMany()

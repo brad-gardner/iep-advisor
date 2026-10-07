@@ -1,10 +1,14 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -44,10 +48,11 @@ public sealed class DocumentInstanceServiceTests : IDisposable
         => new(
             ctx,
             new OrgAccessService(ctx),
-            new TemplateResolutionService(ctx, NullLogger<TemplateResolutionService>.Instance),
-            new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance),
+            new TemplateResolutionService(ctx, NullLogger<TemplateResolutionService>.Instance, TestSupport.TestLocalizers.Messages()),
+            new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()),
             _audit,
-            NullLogger<DocumentInstanceService>.Instance);
+            NullLogger<DocumentInstanceService>.Instance,
+            TestSupport.TestLocalizers.Messages());
 
     // ---------------------------------------------------------------- Seed helpers
 
@@ -1092,6 +1097,70 @@ public sealed class DocumentInstanceServiceTests : IDisposable
         var row = ReadValues(verify, instanceId).GetProperty(keys.GoalsFieldKey.ToString())[0];
         var criteria = row.GetProperty(RowMetaKeys.Objectives)[0].GetProperty("criteria").GetString();
         Assert.Equal(2000, criteria!.Length);
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5
+
+    private sealed class TestController : ControllerBase
+    {
+    }
+
+    [Fact]
+    public async Task Create_NoTemplate_UnderSpanishCulture_MessageIsSpanish_AndMapsTo422ViaErrorKind()
+    {
+        var s = SeedSchoolWithStudent("create-blocked-es");
+        // No template seeded at all.
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).CreateAsync(s.StudentId, IepTypeId, s.CollaboratorUserId);
+
+        Assert.False(result.Success);
+        Assert.Equal("Todavía no hay una plantilla de documento disponible para este tipo de documento. Pida a un administrador que publique una.", result.Message);
+        Assert.Equal(ServiceErrorKind.Unprocessable, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        var objectResult = Assert.IsType<UnprocessableEntityObjectResult>(action);
+        Assert.Equal(StatusCodes.Status422UnprocessableEntity, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task SaveValues_TableColumnTypeMismatch_UnderSpanishCulture_LocalizesColumnSuffix()
+    {
+        // Multilingual plan phase 5 review fix P3-4: the "column" suffix CoerceTable appends to the
+        // field's (untranslated, district-authored) Label is itself UI chrome and must be localized —
+        // via Documents.TableColumnLabel — rather than the hardcoded English "{0} column".
+        var s = SeedSchoolWithStudent("col-type-mismatch-es");
+        var keys = SeedGoalsTemplate();
+        var instanceId = await CreateInstanceAsync(s);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var patch = Patch($$"""
+        { "{{keys.GoalsFieldKey}}": [ { "{{keys.GoalTextCol}}": 123 } ] }
+        """);
+        var result = await CreateService(ctx).SaveValuesAsync(instanceId, patch, null, s.CollaboratorUserId);
+
+        Assert.False(result.Success);
+        Assert.Equal("'columna Goals' debe ser texto.", result.Message);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+    }
+
+    [Fact]
+    public async Task Get_UnknownInstance_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        var s = SeedSchoolWithStudent("get-unknown-es");
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).GetAsync(-1, s.CollaboratorUserId);
+
+        Assert.False(result.Success);
+        Assert.Equal("Documento no encontrado.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
     }
 
     public void Dispose() => _connection.Dispose();

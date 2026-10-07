@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Templates;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -20,10 +22,12 @@ namespace IepAssistant.Api.Controllers;
 public class TemplateAuthoringController : ControllerBase
 {
     private readonly ITemplateAuthoringService _service;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public TemplateAuthoringController(ITemplateAuthoringService service)
+    public TemplateAuthoringController(ITemplateAuthoringService service, IStringLocalizer<Messages> localizer)
     {
         _service = service;
+        _localizer = localizer;
     }
 
     // ---------------------------------------------------------------- Version tree (form-schema preview)
@@ -39,7 +43,7 @@ public class TemplateAuthoringController : ControllerBase
     [HttpPost("document-template-versions/{versionId:int}/sections")]
     public async Task<IActionResult> AddSection(int versionId, [FromBody] AddSectionRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
         if (!TryDecodeRowVersion(request.RowVersion, out var rowVersion)) return InvalidRowVersion();
 
         return Respond(await _service.AddSectionAsync(User.GetUserId(), versionId, request.Title, rowVersion, ct));
@@ -48,7 +52,7 @@ public class TemplateAuthoringController : ControllerBase
     [HttpPut("document-template-sections/{sectionId:int}")]
     public async Task<IActionResult> UpdateSection(int sectionId, [FromBody] UpdateSectionRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
         if (!TryDecodeRowVersion(request.RowVersion, out var rowVersion)) return InvalidRowVersion();
 
         return Respond(await _service.UpdateSectionAsync(User.GetUserId(), sectionId, request.Title, rowVersion, ct));
@@ -65,7 +69,7 @@ public class TemplateAuthoringController : ControllerBase
     [HttpPut("document-template-versions/{versionId:int}/sections/order")]
     public async Task<IActionResult> ReorderSections(int versionId, [FromBody] ReorderRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
         if (!TryDecodeRowVersion(request.RowVersion, out var rowVersion)) return InvalidRowVersion();
 
         return Respond(await _service.ReorderSectionsAsync(User.GetUserId(), versionId, request.OrderedIds, rowVersion, ct));
@@ -76,7 +80,7 @@ public class TemplateAuthoringController : ControllerBase
     [HttpPost("document-template-sections/{sectionId:int}/fields")]
     public async Task<IActionResult> AddField(int sectionId, [FromBody] AddFieldRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
         if (!TryDecodeRowVersion(request.RowVersion, out var rowVersion)) return InvalidRowVersion();
 
         return Respond(await _service.AddFieldAsync(
@@ -86,7 +90,7 @@ public class TemplateAuthoringController : ControllerBase
     [HttpPut("document-template-fields/{fieldId:int}")]
     public async Task<IActionResult> UpdateField(int fieldId, [FromBody] UpdateFieldRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
         if (!TryDecodeRowVersion(request.RowVersion, out var rowVersion)) return InvalidRowVersion();
 
         return Respond(await _service.UpdateFieldAsync(
@@ -104,7 +108,7 @@ public class TemplateAuthoringController : ControllerBase
     [HttpPut("document-template-sections/{sectionId:int}/fields/order")]
     public async Task<IActionResult> ReorderFields(int sectionId, [FromBody] ReorderRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
         if (!TryDecodeRowVersion(request.RowVersion, out var rowVersion)) return InvalidRowVersion();
 
         return Respond(await _service.ReorderFieldsAsync(User.GetUserId(), sectionId, request.OrderedIds, rowVersion, ct));
@@ -137,26 +141,15 @@ public class TemplateAuthoringController : ControllerBase
             return Ok(ApiResponse<TemplateVersionDetailDto>.SuccessResponse(
                 DocumentTemplateMappers.MapVersionDetail(result.Data!)));
 
-        // Publish gathers multiple field-level errors.
+        // Publish gathers multiple field-level errors — a structural signal, not a status-by-text match.
         if (result.Errors.Count > 0)
             return BadRequest(ApiResponse<object>.Error(result.Errors));
 
-        var message = result.Message ?? "Request failed";
-
-        if (message.Contains("changed by someone else", StringComparison.OrdinalIgnoreCase))
-            return Conflict(ApiResponse<object>.Error(message));
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
+        return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
     }
 
     private IActionResult InvalidRowVersion()
-        => BadRequest(ApiResponse<object>.Error("The provided row version is not valid base64."));
+        => BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRowVersion"]));
 
     /// <summary>
     /// Decodes a base64 concurrency token; blank -> null (success). Returns false only on malformed

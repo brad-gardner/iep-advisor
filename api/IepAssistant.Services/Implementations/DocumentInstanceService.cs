@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -16,6 +17,12 @@ namespace IepAssistant.Services.Implementations;
 /// is delegated to <see cref="IOrgAccessService.CanActOnStudentAsync"/> at <c>Collaborator+</c> for
 /// every operation. Value-document edits are validated against the pinned template schema and guarded by
 /// a service-rotated optimistic-concurrency token (mirroring <c>TemplateAuthoringService</c>).
+///
+/// <para>Multilingual plan (2026-10-06) phase 5: every failure <c>DocumentInstanceController</c> maps to
+/// a status carries an explicit <see cref="ServiceErrorKind"/>, propagated from <see cref="_resolution"/>
+/// (422 Unprocessable) and <see cref="_authoring"/> (whatever kind it set) rather than re-derived from
+/// their message text. A field's configured <c>Label</c> interpolated into a type-mismatch message is
+/// district-authored content and is never translated.</para>
 /// </summary>
 public class DocumentInstanceService : IDocumentInstanceService
 {
@@ -29,14 +36,6 @@ public class DocumentInstanceService : IDocumentInstanceService
     private const int MaxObjectiveTargetDateLength = 50;
     private const string OwnerNotTeamMemberWarningCode = "ownerNotTeamMember";
 
-    private const string PermissionMessage = "You do not have permission to access this document.";
-    private const string InstanceNotFoundMessage = "Document not found.";
-    private const string NotDraftEditMessage = "This document can no longer be edited.";
-    private const string NotDraftDeleteMessage = "Only a draft document can be deleted.";
-    private const string ConcurrencyMessage = "This document was changed by someone else. Please reload and try again.";
-    private const string SharedDraftBlocksDeleteMessage = "This document has been shared with the family and cannot be deleted. Withdraw the share first.";
-    private const string TooLargeMessage = "This document is too large to save. Please reduce its content.";
-
     private static readonly JsonSerializerOptions ConfigJsonOptions = TemplateFieldConfigValidator.JsonOptions;
 
     private readonly ApplicationDbContext _context;
@@ -47,6 +46,7 @@ public class DocumentInstanceService : IDocumentInstanceService
     private readonly ILogger<DocumentInstanceService> _logger;
     private readonly IStudentEvidenceService? _evidence;
     private readonly IDocumentPrefillService? _prefill;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public DocumentInstanceService(
         ApplicationDbContext context,
@@ -55,6 +55,7 @@ public class DocumentInstanceService : IDocumentInstanceService
         ITemplateAuthoringService authoring,
         IAuditLogger audit,
         ILogger<DocumentInstanceService> logger,
+        IStringLocalizer<Messages> localizer,
         IStudentEvidenceService? evidence = null,
         IDocumentPrefillService? prefill = null)
     {
@@ -64,6 +65,7 @@ public class DocumentInstanceService : IDocumentInstanceService
         _authoring = authoring;
         _audit = audit;
         _logger = logger;
+        _localizer = localizer;
         _evidence = evidence;
         _prefill = prefill;
     }
@@ -74,7 +76,7 @@ public class DocumentInstanceService : IDocumentInstanceService
         int schoolStudentId, int documentTypeId, int actingUserId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(actingUserId, schoolStudentId, AccessRole.Collaborator, ct))
-            return Fail(PermissionMessage);
+            return Fail(ServiceErrorKind.Forbidden, _localizer["Documents.Permission"]);
 
         // Resolve the student's state (authz already confirmed the student exists + is in scope):
         // an explicit student state wins, else the school's, else the district's. Students are almost
@@ -86,10 +88,11 @@ public class DocumentInstanceService : IDocumentInstanceService
             .Select(s => s.StateCode ?? s.School.StateCode ?? s.School.District.StateCode)
             .FirstOrDefaultAsync(ct);
 
-        // Resolve + pin a Published template version. A blocked resolution propagates its friendly message.
+        // Resolve + pin a Published template version. A blocked resolution propagates its friendly
+        // message AND its ErrorKind (422 Unprocessable) — never re-derived from the message text.
         var resolution = await _resolution.ResolveAsync(stateCode, documentTypeId, ct);
         if (!resolution.Success)
-            return Fail(resolution.Message!);
+            return Fail(resolution.ErrorKind, resolution.Message!);
 
         // "Never blank": prefill from the student's evidence. Any failure degrades to an empty draft
         // (logged) — prefill must never block creating a document.
@@ -112,7 +115,7 @@ public class DocumentInstanceService : IDocumentInstanceService
                     var patch = values.ToDictionary(kv => kv.Key, kv => JsonSerializer.SerializeToElement(kv.Value));
                     var target = new JsonObject();
                     var prefillWarnings = new List<DocumentSaveWarningModel>();
-                    var error = ApplyPatch(target, patch, fields, activeTeamUserIds, prefillWarnings);
+                    var error = ApplyPatch(target, patch, fields, activeTeamUserIds, prefillWarnings, _localizer);
                     if (error == null)
                         initialValues = target.ToJsonString();
                     else
@@ -160,10 +163,10 @@ public class DocumentInstanceService : IDocumentInstanceService
     {
         var header = await LoadHeaderAsync(instanceId, ct);
         if (header == null)
-            return Fail(InstanceNotFoundMessage);
+            return Fail(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (!await _orgAccess.CanActOnStudentAsync(actingUserId, header.SchoolStudentId, AccessRole.Collaborator, ct))
-            return Fail(PermissionMessage);
+            return Fail(ServiceErrorKind.Forbidden, _localizer["Documents.Permission"]);
 
         var result = await BuildDetailResultAsync(instanceId, ct);
         if (result.Success)
@@ -175,7 +178,7 @@ public class DocumentInstanceService : IDocumentInstanceService
         int schoolStudentId, int actingUserId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(actingUserId, schoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<List<DocumentInstanceSummaryModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<DocumentInstanceSummaryModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Documents.Permission"]);
 
         var rows = await _context.DocumentInstances
             .AsNoTracking()
@@ -207,22 +210,22 @@ public class DocumentInstanceService : IDocumentInstanceService
     {
         var header = await LoadHeaderAsync(instanceId, ct);
         if (header == null)
-            return FailValues(InstanceNotFoundMessage);
+            return FailValues(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (!await _orgAccess.CanActOnStudentAsync(actingUserId, header.SchoolStudentId, AccessRole.Collaborator, ct))
-            return FailValues(PermissionMessage);
+            return FailValues(ServiceErrorKind.Forbidden, _localizer["Documents.Permission"]);
 
         // Edits are blocked once the instance leaves Draft (Finalizing/Finalized).
         if (header.Status != DocumentInstanceStatus.Draft)
-            return FailValues(NotDraftEditMessage);
+            return FailValues(ServiceErrorKind.Validation, _localizer["Documents.NoLongerEditable"]);
 
         var instance = await _context.DocumentInstances.FirstOrDefaultAsync(i => i.Id == instanceId, ct);
         if (instance == null)
-            return FailValues(InstanceNotFoundMessage);
+            return FailValues(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
-        var concurrency = CheckConcurrency(instance.RowVersion, rowVersion);
+        var concurrency = CheckConcurrency(instance.RowVersion, rowVersion, _localizer);
         if (concurrency != null)
-            return FailValues(concurrency);
+            return FailValues(ServiceErrorKind.Conflict, concurrency);
 
         // Load the pinned version's fields (denormalized version FK) for schema validation.
         var fieldsByKey = await LoadFieldsByKeyAsync(instance.DocumentTemplateVersionId, ct);
@@ -237,13 +240,13 @@ public class DocumentInstanceService : IDocumentInstanceService
 
         var merged = ParseValues(instance.ValuesJson);
         var warnings = new List<DocumentSaveWarningModel>();
-        var applyError = ApplyPatch(merged, valuesPatch, fieldsByKey, activeTeamUserIds, warnings);
+        var applyError = ApplyPatch(merged, valuesPatch, fieldsByKey, activeTeamUserIds, warnings, _localizer);
         if (applyError != null)
-            return FailValues(applyError);
+            return FailValues(ServiceErrorKind.Validation, applyError);
 
         var serialized = merged.ToJsonString();
         if (Encoding.UTF8.GetByteCount(serialized) > MaxValuesJsonBytes)
-            return FailValues(TooLargeMessage);
+            return FailValues(ServiceErrorKind.Validation, _localizer["Documents.TooLargeToSave"]);
 
         var now = DateTime.UtcNow;
         instance.ValuesJson = serialized;
@@ -258,7 +261,7 @@ public class DocumentInstanceService : IDocumentInstanceService
         }
         catch (DbUpdateConcurrencyException)
         {
-            return FailValues(ConcurrencyMessage);
+            return FailValues(ServiceErrorKind.Conflict, _localizer["Documents.ConcurrencyConflict"]);
         }
 
         _audit.Record(AuditAction.Edit, actingUserId, "DocumentInstance", instanceId);
@@ -278,17 +281,17 @@ public class DocumentInstanceService : IDocumentInstanceService
     {
         var header = await LoadHeaderAsync(instanceId, ct);
         if (header == null)
-            return ServiceResult.FailureResult(InstanceNotFoundMessage);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (!await _orgAccess.CanActOnStudentAsync(actingUserId, header.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult.FailureResult(PermissionMessage);
+            return ServiceResult.FailureResult(ServiceErrorKind.Forbidden, _localizer["Documents.Permission"]);
 
         if (header.Status != DocumentInstanceStatus.Draft)
-            return ServiceResult.FailureResult(NotDraftDeleteMessage);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Documents.OnlyDraftCanBeDeleted"]);
 
         var instance = await _context.DocumentInstances.FirstOrDefaultAsync(i => i.Id == instanceId, ct);
         if (instance == null)
-            return ServiceResult.FailureResult(InstanceNotFoundMessage);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         _context.DocumentInstances.Remove(instance);
         try
@@ -299,7 +302,7 @@ public class DocumentInstanceService : IDocumentInstanceService
         {
             // RowVersion is in the DELETE WHERE clause; a concurrent edit surfaces the same friendly
             // concurrency message rather than a 500 (consistent with SaveValuesAsync).
-            return ServiceResult.FailureResult(ConcurrencyMessage);
+            return ServiceResult.FailureResult(ServiceErrorKind.Conflict, _localizer["Documents.ConcurrencyConflict"]);
         }
         catch (DbUpdateException)
         {
@@ -308,7 +311,7 @@ public class DocumentInstanceService : IDocumentInstanceService
             // touching it). A Draft-status instance CAN have been shared with the family before
             // someone tries to delete it (sharing is allowed at Draft/Finalizing) — that now surfaces
             // as a friendly refusal instead of silently destroying the family's shared history.
-            return ServiceResult.FailureResult(SharedDraftBlocksDeleteMessage);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Documents.SharedDraftBlocksDelete"]);
         }
 
         _logger.LogInformation("User {UserId} deleted document instance {InstanceId}.", actingUserId, instanceId);
@@ -340,7 +343,7 @@ public class DocumentInstanceService : IDocumentInstanceService
     /// </summary>
     private static string? ApplyPatch(
         JsonObject target, IReadOnlyDictionary<string, JsonElement> patch, IReadOnlyDictionary<Guid, TemplateField> fieldsByKey,
-        IReadOnlySet<int> activeTeamUserIds, List<DocumentSaveWarningModel> warnings)
+        IReadOnlySet<int> activeTeamUserIds, List<DocumentSaveWarningModel> warnings, IStringLocalizer<Messages> localizer)
     {
         foreach (var (rawKey, value) in patch)
         {
@@ -348,7 +351,7 @@ public class DocumentInstanceService : IDocumentInstanceService
             if (!Guid.TryParse(rawKey, out var fieldKey) || !fieldsByKey.TryGetValue(fieldKey, out var field))
                 continue;
 
-            var (node, error) = CoerceFieldValue(field, value, activeTeamUserIds, warnings);
+            var (node, error) = CoerceFieldValue(field, value, activeTeamUserIds, warnings, localizer);
             if (error != null)
                 return error;
 
@@ -360,7 +363,7 @@ public class DocumentInstanceService : IDocumentInstanceService
 
     /// <summary>Coerces + validates a top-level field value. Returns (node, null) on success or (null, error) on a type mismatch.</summary>
     private static (JsonNode? Node, string? Error) CoerceFieldValue(
-        TemplateField field, JsonElement value, IReadOnlySet<int> activeTeamUserIds, List<DocumentSaveWarningModel> warnings)
+        TemplateField field, JsonElement value, IReadOnlySet<int> activeTeamUserIds, List<DocumentSaveWarningModel> warnings, IStringLocalizer<Messages> localizer)
     {
         if (value.ValueKind == JsonValueKind.Null || value.ValueKind == JsonValueKind.Undefined)
             return (null, null); // clear
@@ -369,20 +372,20 @@ public class DocumentInstanceService : IDocumentInstanceService
         {
             case FieldType.RichText:
                 if (value.ValueKind != JsonValueKind.String)
-                    return (null, TypeError(field.Label, "formatted text"));
+                    return (null, TypeError(localizer, "Documents.FieldMustBeFormattedText", field.Label));
                 return (JsonValue.Create(RichTextSanitizer.Sanitize(value.GetString())), null);
 
             case FieldType.Table:
-                return CoerceTable(field, value, activeTeamUserIds, warnings);
+                return CoerceTable(field, value, activeTeamUserIds, warnings, localizer);
 
             default:
-                var (scalar, error) = CoerceScalar(field.FieldType, value, field.Label);
+                var (scalar, error) = CoerceScalar(field.FieldType, value, field.Label, localizer);
                 return (scalar, error);
         }
     }
 
     /// <summary>Coerces a scalar (non-Table, non-RichText) value per type. Used for top-level fields and table cells.</summary>
-    private static (JsonNode? Node, string? Error) CoerceScalar(FieldType type, JsonElement value, string label)
+    private static (JsonNode? Node, string? Error) CoerceScalar(FieldType type, JsonElement value, string label, IStringLocalizer<Messages> localizer)
     {
         if (value.ValueKind == JsonValueKind.Null || value.ValueKind == JsonValueKind.Undefined)
             return (null, null);
@@ -392,27 +395,27 @@ public class DocumentInstanceService : IDocumentInstanceService
             case FieldType.Checkbox:
                 if (value.ValueKind is JsonValueKind.True or JsonValueKind.False)
                     return (JsonValue.Create(value.GetBoolean()), null);
-                return (null, TypeError(label, "a checkbox (true/false)"));
+                return (null, TypeError(localizer, "Documents.FieldMustBeCheckbox", label));
 
             case FieldType.Date:
                 if (value.ValueKind != JsonValueKind.String)
-                    return (null, TypeError(label, "a date"));
+                    return (null, TypeError(localizer, "Documents.FieldMustBeDate", label));
                 var dateStr = value.GetString();
                 if (string.IsNullOrWhiteSpace(dateStr))
                     return (null, null); // blank clears
                 if (!DateTime.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
-                    return (null, TypeError(label, "a valid date"));
+                    return (null, TypeError(localizer, "Documents.FieldMustBeValidDate", label));
                 return (JsonValue.Create(dateStr), null);
 
             case FieldType.Text:
             case FieldType.Select:
                 if (value.ValueKind != JsonValueKind.String)
-                    return (null, TypeError(label, "text"));
+                    return (null, TypeError(localizer, "Documents.FieldMustBeText", label));
                 return (JsonValue.Create(value.GetString()), null);
 
             default:
                 // RichText/Table are not valid scalar/column types (config validation forbids them in tables).
-                return (null, TypeError(label, "a supported value"));
+                return (null, TypeError(localizer, "Documents.FieldMustBeSupportedValue", label));
         }
     }
 
@@ -431,10 +434,10 @@ public class DocumentInstanceService : IDocumentInstanceService
     /// </list>
     /// </summary>
     private static (JsonNode? Node, string? Error) CoerceTable(
-        TemplateField field, JsonElement value, IReadOnlySet<int> activeTeamUserIds, List<DocumentSaveWarningModel> warnings)
+        TemplateField field, JsonElement value, IReadOnlySet<int> activeTeamUserIds, List<DocumentSaveWarningModel> warnings, IStringLocalizer<Messages> localizer)
     {
         if (value.ValueKind != JsonValueKind.Array)
-            return (null, TypeError(field.Label, "a table (list of rows)"));
+            return (null, TypeError(localizer, "Documents.FieldMustBeTable", field.Label));
 
         var columns = ParseTableColumns(field.ConfigJson);
         var semantic = TemplateSemanticsReader.ReadField(field.FieldType, field.ConfigJson).Semantic;
@@ -446,7 +449,7 @@ public class DocumentInstanceService : IDocumentInstanceService
         foreach (var rowElement in value.EnumerateArray())
         {
             if (rowElement.ValueKind != JsonValueKind.Object)
-                return (null, $"'{field.Label}' has an invalid table row.");
+                return (null, localizer["Documents.InvalidTableRow", field.Label]);
 
             var row = new JsonObject();
             Guid? rowId = null;
@@ -497,7 +500,10 @@ public class DocumentInstanceService : IDocumentInstanceService
                 if (!Guid.TryParse(cell.Name, out var columnKey) || !columns.TryGetValue(columnKey, out var columnType))
                     continue;
 
-                var (node, error) = CoerceScalar(columnType, cell.Value, $"{field.Label} column");
+                // Multilingual plan phase 5 review fix P3-4: the "column" suffix is UI chrome, not
+                // district-authored content (field.Label itself stays untranslated — see the class doc
+                // comment), so it is localized via Documents.TableColumnLabel rather than hardcoded English.
+                var (node, error) = CoerceScalar(columnType, cell.Value, localizer["Documents.TableColumnLabel", field.Label], localizer);
                 if (error != null)
                     return (null, error);
 
@@ -526,7 +532,7 @@ public class DocumentInstanceService : IDocumentInstanceService
                     FieldKey = field.FieldKey.ToString(),
                     RowId = finalId.ToString(),
                     Code = OwnerNotTeamMemberWarningCode,
-                    Message = $"The owner selected for a row in '{field.Label}' is not an active member of the student's team, so it was not saved."
+                    Message = localizer["Documents.OwnerNotActiveTeamMember", field.Label]
                 });
             }
             rows.Add(row);
@@ -644,7 +650,7 @@ public class DocumentInstanceService : IDocumentInstanceService
         }
     }
 
-    private static string TypeError(string label, string expected) => $"'{label}' must be {expected}.";
+    private static string TypeError(IStringLocalizer<Messages> localizer, string resourceKey, string label) => localizer[resourceKey, label];
 
     // ---------------------------------------------------------------- Owner-on-team validation
 
@@ -701,13 +707,13 @@ public class DocumentInstanceService : IDocumentInstanceService
     // ---------------------------------------------------------------- Concurrency
 
     /// <summary>Manual optimistic-concurrency check against the client token (mirrors TemplateAuthoringService). Null = proceed.</summary>
-    private static string? CheckConcurrency(byte[]? currentToken, byte[]? clientToken)
+    private static string? CheckConcurrency(byte[]? currentToken, byte[]? clientToken, IStringLocalizer<Messages> localizer)
     {
         if (currentToken == null || currentToken.Length == 0)
             return null; // never-rotated row accepts any/no token
         if (clientToken == null || clientToken.Length == 0)
             return null; // no token supplied — EF's WHERE clause still guards a truly concurrent write
-        return currentToken.AsSpan().SequenceEqual(clientToken) ? null : ConcurrencyMessage;
+        return currentToken.AsSpan().SequenceEqual(clientToken) ? null : localizer["Documents.ConcurrencyConflict"];
     }
 
     // ---------------------------------------------------------------- Loading + mapping
@@ -761,12 +767,13 @@ public class DocumentInstanceService : IDocumentInstanceService
             .FirstOrDefaultAsync(ct);
 
         if (instance == null)
-            return Fail(InstanceNotFoundMessage);
+            return Fail(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
-        // Reuse the Phase 2 tree builder for the pinned version's section/field schema.
+        // Reuse the Phase 2 tree builder for the pinned version's section/field schema. Its ErrorKind
+        // (set by TemplateAuthoringService) propagates as-is — never re-derived from the message text.
         var tree = await _authoring.GetVersionAsync(instance.DocumentTemplateVersionId, ct);
         if (!tree.Success)
-            return Fail(tree.Message ?? "The pinned template version could not be loaded.");
+            return Fail(tree.ErrorKind, tree.Message ?? _localizer["Documents.PinnedVersionUnavailable"]);
 
         return ServiceResult<DocumentInstanceDetailModel>.SuccessResult(new DocumentInstanceDetailModel
         {
@@ -790,9 +797,9 @@ public class DocumentInstanceService : IDocumentInstanceService
         });
     }
 
-    private static ServiceResult<DocumentInstanceDetailModel> Fail(string message)
-        => ServiceResult<DocumentInstanceDetailModel>.FailureResult(message);
+    private static ServiceResult<DocumentInstanceDetailModel> Fail(ServiceErrorKind kind, string message)
+        => ServiceResult<DocumentInstanceDetailModel>.FailureResult(kind, message);
 
-    private static ServiceResult<DocumentInstanceValuesModel> FailValues(string message)
-        => ServiceResult<DocumentInstanceValuesModel>.FailureResult(message);
+    private static ServiceResult<DocumentInstanceValuesModel> FailValues(ServiceErrorKind kind, string message)
+        => ServiceResult<DocumentInstanceValuesModel>.FailureResult(kind, message);
 }

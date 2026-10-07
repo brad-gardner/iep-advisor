@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
@@ -25,6 +26,7 @@ interface AmendDialogProps {
  * the new draft's editor on success.
  */
 export function AmendDialog({ open, versionId, onClose, onAmended }: AmendDialogProps) {
+  const { t } = useTranslation('document-authoring');
   const [reason, setReason] = useState('');
   const [effectiveDate, setEffectiveDate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,10 +60,10 @@ export function AmendDialog({ open, versionId, onClose, onAmended }: AmendDialog
         onAmended(res.data.instanceId);
         reset();
       } else {
-        setError(res.message ?? 'Could not amend this version.');
+        setError(res.message ?? t('amendDialog.genericError'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not amend this version.'));
+      setError(apiErrorMessage(err, t('amendDialog.genericError')));
     } finally {
       setIsSubmitting(false);
     }
@@ -72,12 +74,12 @@ export function AmendDialog({ open, versionId, onClose, onAmended }: AmendDialog
       open={open}
       onClose={handleClose}
       preventClose={isSubmitting}
-      title="Amend this version"
+      title={t('amendDialog.title')}
       data-testid="amend-dialog"
       footer={
         <>
           <Button variant="ghost" onClick={handleClose} disabled={isSubmitting}>
-            Cancel
+            {t('amendDialog.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -85,16 +87,13 @@ export function AmendDialog({ open, versionId, onClose, onAmended }: AmendDialog
             disabled={!canSubmit}
             data-testid="amend-dialog-submit"
           >
-            Create amendment
+            {t('amendDialog.confirm')}
           </Button>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <p className="text-sm text-brand-slate-600">
-          Creates a new draft prefilled from this version. Finalizing it will produce the next version,
-          linked back to this one.
-        </p>
+        <p className="text-sm text-brand-slate-600">{t('amendDialog.body')}</p>
 
         {error && (
           <div role="alert">
@@ -103,7 +102,7 @@ export function AmendDialog({ open, versionId, onClose, onAmended }: AmendDialog
         )}
 
         <RichTextEditor
-          label="Reason for the amendment"
+          label={t('amendDialog.reasonLabel')}
           value={reason}
           onChange={setReason}
           minRows={3}
@@ -111,10 +110,10 @@ export function AmendDialog({ open, versionId, onClose, onAmended }: AmendDialog
           required
           data-testid="amend-dialog-reason"
         />
-        <p className="text-xs text-brand-slate-500">At least {MIN_REASON_LENGTH} characters.</p>
+        <p className="text-xs text-brand-slate-500">{t('amendDialog.minLengthHint', { count: MIN_REASON_LENGTH })}</p>
 
         <Input
-          label="Effective date (optional)"
+          label={t('amendDialog.effectiveDateLabel')}
           type="date"
           value={effectiveDate}
           onChange={(e) => setEffectiveDate(e.target.value)}

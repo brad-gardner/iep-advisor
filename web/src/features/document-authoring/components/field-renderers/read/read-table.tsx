@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import i18n from '@/lib/i18n';
 import { parseConfig, readColumnOptions, type TableColumn } from '@/features/admin/templates/template-config';
 import { OWNER_ELIGIBLE_SEMANTICS, type FieldSemantic } from '@/features/admin/templates/document-semantics';
 import { formatDate } from '@/lib/format-date';
@@ -32,6 +34,11 @@ export function ReadTable(props: ReadFieldRendererProps) {
 }
 
 function ReadTableGeneric({ field, value, semantic }: ReadFieldRendererProps & { semantic: FieldSemantic | undefined }) {
+  // `educator` alongside `document-authoring`: `resolveOwnerDisplay` below
+  // renders a `teamRoleLabel` (`educator:teamRole.*`, staff-only) — this
+  // hook call is what makes a language switch re-render once that
+  // namespace's Spanish loads.
+  const { t } = useTranslation(['document-authoring', 'educator']);
   const config = parseConfig(field.fieldType, field.configJson);
   const columns = config.kind === 'Table' ? config.table.columns : [];
   const rows = coerceRows(value);
@@ -40,13 +47,13 @@ function ReadTableGeneric({ field, value, semantic }: ReadFieldRendererProps & {
 
   return (
     <div id={fieldElementId(field.id)} data-testid={`read-field-${field.fieldKey}`}>
-      <h3 className="text-[13px] font-medium text-brand-slate-500">{field.label || 'Untitled field'}</h3>
+      <h3 className="text-[13px] font-medium text-brand-slate-500">{field.label || t('readShared.untitledField')}</h3>
       {rows.length === 0 ? (
-        <p className="mt-0.5 text-[15px] italic text-brand-slate-500">No rows yet.</p>
+        <p className="mt-0.5 text-[15px] italic text-brand-slate-500">{t('readTable.noRowsYet')}</p>
       ) : (
         <div className="mt-1.5 overflow-x-auto rounded-card border border-brand-slate-200">
           <table className="w-full border-collapse text-sm">
-            <caption className="sr-only">{field.label || 'Table field'}</caption>
+            <caption className="sr-only">{field.label || t('readTable.tableFieldFallback')}</caption>
             <thead>
               <tr className="bg-brand-slate-50">
                 {columns.map((c) => (
@@ -55,12 +62,12 @@ function ReadTableGeneric({ field, value, semantic }: ReadFieldRendererProps & {
                     scope="col"
                     className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600"
                   >
-                    {c.label || 'Column'}
+                    {c.label || t('readTable.column')}
                   </th>
                 ))}
                 {ownerEligible && (
                   <th scope="col" className="border-b border-brand-slate-200 px-3 py-2 text-left text-[13px] font-medium text-brand-slate-600">
-                    Owner
+                    {t('readTable.owner')}
                   </th>
                 )}
               </tr>
@@ -96,7 +103,7 @@ function ReadTableGeneric({ field, value, semantic }: ReadFieldRendererProps & {
 }
 
 function formatCell(column: TableColumn, value: TableCellValue | undefined): string {
-  if (column.type === 'Checkbox') return value === true ? 'Yes' : 'No';
+  if (column.type === 'Checkbox') return value === true ? i18n.t('document-authoring:readCheckbox.yes') : i18n.t('document-authoring:readCheckbox.no');
   if (column.type === 'Date') return typeof value === 'string' && value ? formatDate(value) : '—';
   if (column.type === 'Select') {
     const str = typeof value === 'string' ? value : '';

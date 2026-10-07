@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 interface AmendmentChainProps {
@@ -27,6 +28,7 @@ export function AmendmentChain({
   amendedByVersionNumbers,
   'data-testid': testId,
 }: AmendmentChainProps) {
+  const { t } = useTranslation('document-authoring');
   if (amendsVersionId == null && amendedByVersionIds.length === 0) return null;
 
   return (
@@ -37,17 +39,17 @@ export function AmendmentChain({
           className="text-brand-teal-600 underline"
           data-testid={testId ? `${testId}-amends` : undefined}
         >
-          Amends v{amendsVersionNumber ?? amendsVersionId}
+          {t('amendmentChain.amends', { number: amendsVersionNumber ?? amendsVersionId })}
         </Link>
       )}
       {amendedByVersionIds.length > 0 && (
         <span data-testid={testId ? `${testId}-amended-by` : undefined}>
-          Amended by{' '}
+          {t('amendmentChain.amendedByPrefix')}{' '}
           {amendedByVersionIds.map((id, i) => (
             <span key={id}>
               {i > 0 && ', '}
               <Link to={versionHref(studentId, id)} className="text-brand-teal-600 underline">
-                v{amendedByVersionNumbers?.[i] ?? id}
+                {`v${amendedByVersionNumbers?.[i] ?? id}`}
               </Link>
             </span>
           ))}

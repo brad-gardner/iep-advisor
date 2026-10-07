@@ -43,7 +43,7 @@ public sealed class ChildLinkServiceTests : IDisposable
         => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), email, new CapturingAuditLogger(), NullLogger<ChildLinkService>.Instance, TestSupport.TestLocalizers.Messages());
 
     private static EducatorService CreateEducator(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<EducatorService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<EducatorService>.Instance, TestSupport.TestLocalizers.Messages());
 
     // ----------------------------------------------------------------- seed helpers
 

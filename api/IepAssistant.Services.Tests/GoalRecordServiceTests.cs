@@ -52,7 +52,7 @@ public sealed class GoalRecordServiceTests : IDisposable
             ctx,
             new OrgAccessService(ctx),
             new AccessService(ctx),
-            new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance),
+            new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()),
             new NoopBlobStorageFake(),
             _audit,
             CreateGoalService(ctx),
@@ -540,6 +540,49 @@ public sealed class GoalRecordServiceTests : IDisposable
 
     private sealed class TestController : ControllerBase
     {
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5: staff paths
+
+    [Fact]
+    public async Task GetForStudentAsync_Stranger_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind()
+    {
+        var s = Seed(nameof(GetForStudentAsync_Stranger_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind));
+        var stranger = new User { Email = "strangeres@example.com", PasswordHash = "x", FirstName = "No", LastName = "Access", Role = UserRole.Educator };
+        using (var seedCtx = CreateContext())
+        {
+            seedCtx.Users.Add(stranger);
+            seedCtx.SaveChanges();
+        }
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateGoalService(ctx).GetForStudentAsync(stranger.Id, s.StudentId);
+
+        Assert.False(result.Success);
+        Assert.Equal("No tiene permiso para acceder a las metas de este estudiante.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddObservationAsync_NoValueOrNote_UnderSpanishCulture_MessageIsSpanish_AndMapsTo400ViaErrorKind()
+    {
+        var s = Seed(nameof(AddObservationAsync_NoValueOrNote_UnderSpanishCulture_MessageIsSpanish_AndMapsTo400ViaErrorKind));
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateGoalService(ctx).AddObservationAsync(s.TeacherId, -1, new CreateGoalObservationModel());
+
+        Assert.False(result.Success);
+        Assert.Equal("Ingrese un valor o una nota.", result.Message);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<BadRequestObjectResult>(action);
     }
 
     public void Dispose() => _connection.Dispose();

@@ -1,8 +1,12 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -17,7 +21,7 @@ public sealed class FamilyContactServiceTests : IDisposable
 {
     private readonly RosterTestDb _db = new();
 
-    private FamilyContactService CreateService(ApplicationDbContext ctx) => new(ctx, new OrgAccessService(ctx));
+    private FamilyContactService CreateService(ApplicationDbContext ctx) => new(ctx, new OrgAccessService(ctx), TestSupport.TestLocalizers.Messages());
 
     private sealed class NoClaude : IClaudeClient
     {
@@ -29,8 +33,8 @@ public sealed class FamilyContactServiceTests : IDisposable
         var access = new AccessService(ctx);
         var org = new OrgAccessService(ctx);
         var workspace = new StudentWorkspaceService(ctx, access, org, new NoClaude(), TestSupport.TestLocalizers.Ai(), NullLogger<StudentWorkspaceService>.Instance);
-        var contributions = new ParentContributionService(ctx, access, org, new CapturingAuditLogger());
-        return new StudentEvidenceService(ctx, org, workspace, contributions, new CapturingAuditLogger());
+        var contributions = new ParentContributionService(ctx, access, org, new CapturingAuditLogger(), TestSupport.TestLocalizers.Messages());
+        return new StudentEvidenceService(ctx, org, workspace, contributions, new CapturingAuditLogger(), TestSupport.TestLocalizers.Messages());
     }
 
     [Fact]
@@ -129,6 +133,54 @@ public sealed class FamilyContactServiceTests : IDisposable
 
         var read = await service.GetContactAttemptsAsync(viewerUserId, studentId);
         Assert.True(read.Success);
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5
+
+    private sealed class TestController : ControllerBase
+    {
+    }
+
+    [Fact]
+    public async Task GetContactAttemptsAsync_Stranger_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var studentId = _db.Student(schoolId);
+        var (strangerUserId, _) = _db.Staff("strangeres@example.com", districtId, _db.School(districtId, "School Bes"), Models.OrgRoleIds.Teacher);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).GetContactAttemptsAsync(strangerUserId, studentId);
+
+        Assert.False(result.Success);
+        Assert.Equal("No tiene permiso para acceder a este estudiante.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task BuildForStaffAsync_Stranger_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School Evidence Es");
+        var studentId = _db.Student(schoolId);
+        var (strangerUserId, _) = _db.Staff("evidencestrangeres@example.com", districtId, _db.School(districtId, "School Evidence Bes"), Models.OrgRoleIds.Teacher);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = _db.Context();
+        var result = await CreateEvidenceService(ctx).BuildForStaffAsync(strangerUserId, studentId);
+
+        Assert.False(result.Success);
+        Assert.Equal("No tiene permiso para ver a este estudiante.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
     }
 
     public void Dispose() => _db.Dispose();

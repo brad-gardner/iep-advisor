@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SendHorizonal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -9,6 +10,7 @@ interface ChatComposerProps {
 
 // Text input + Send. Enter sends; Shift+Enter inserts a newline.
 export function ChatComposer({ disabled, onSend }: ChatComposerProps) {
+  const { t } = useTranslation('document-authoring');
   const [value, setValue] = useState('');
 
   const submit = () => {
@@ -27,7 +29,7 @@ export function ChatComposer({ disabled, onSend }: ChatComposerProps) {
       }}
     >
       <label htmlFor="chat-composer-input" className="sr-only">
-        Ask about this IEP
+        {t('chatComposer.srLabel')}
       </label>
       <textarea
         id="chat-composer-input"
@@ -40,7 +42,7 @@ export function ChatComposer({ disabled, onSend }: ChatComposerProps) {
             submit();
           }
         }}
-        placeholder="Ask about this IEP…"
+        placeholder={t('chatComposer.placeholder')}
         className="w-full resize-none rounded-input border border-brand-slate-200 px-3 py-2 text-sm text-brand-slate-800 transition-colors placeholder:text-brand-slate-500 focus:border-brand-teal-500 focus:outline-none focus:ring-[3px] focus:ring-brand-teal-50"
         data-testid="chat-input"
       />
@@ -50,7 +52,7 @@ export function ChatComposer({ disabled, onSend }: ChatComposerProps) {
         className="px-3 py-2"
         disabled={disabled || value.trim().length === 0}
         data-testid="chat-send"
-        aria-label="Send message"
+        aria-label={t('chatComposer.sendAriaLabel')}
       >
         <SendHorizonal className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
       </Button>

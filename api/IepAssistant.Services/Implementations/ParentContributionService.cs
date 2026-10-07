@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
@@ -6,28 +7,42 @@ using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
+/// <summary>Multilingual plan (2026-10-06) phase 5 (review fix P3-6 corrected this comment): every
+/// failure a controller maps to a status carries an explicit <see cref="ServiceErrorKind"/>, and every
+/// message is localized (<c>Messages.resx</c>/<c>.es.resx</c>). <c>ParentContributionsController</c>
+/// maps EVERY endpoint through the shared
+/// <see cref="IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure"/>, so the
+/// SAME "Child profile not found." text intentionally carries a different <see cref="ServiceErrorKind"/>
+/// at each call site below, to match the controller's PRE-EXISTING per-endpoint status choices:
+/// <see cref="GetForChildAsync"/> sets <see cref="ServiceErrorKind.NotFound"/> (its route always 404s),
+/// while <see cref="CreateAsync"/> sets <see cref="ServiceErrorKind.Validation"/> (its route always
+/// 400s on any failure, pre-existing, pinned by tests) — the kind lives on the
+/// <see cref="ServiceResult"/> instance and is exactly what <c>MapServiceFailure</c> switches on, never
+/// derived from the shared message text.</summary>
 public class ParentContributionService : IParentContributionService
 {
     private const int MaxPerChild = 30;
-    private const string NotFound = "Contribution not found.";
+    private const int MaxTextLength = 2000;
 
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _access;
     private readonly IOrgAccessService _orgAccess;
     private readonly IAuditLogger _audit;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public ParentContributionService(ApplicationDbContext context, IAccessService access, IOrgAccessService orgAccess, IAuditLogger audit)
+    public ParentContributionService(ApplicationDbContext context, IAccessService access, IOrgAccessService orgAccess, IAuditLogger audit, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _access = access;
         _orgAccess = orgAccess;
         _audit = audit;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<List<ParentContributionModel>>> GetForChildAsync(int childId, int userId, CancellationToken ct = default)
     {
         if (await _access.GetRoleAsync(childId, userId, ct) == null)
-            return ServiceResult<List<ParentContributionModel>>.FailureResult("Child profile not found.");
+            return ServiceResult<List<ParentContributionModel>>.FailureResult(ServiceErrorKind.NotFound, _localizer["Contributions.ChildNotFound"]);
 
         var items = await _context.ParentContributions.AsNoTracking()
             .Where(c => c.ChildProfileId == childId)
@@ -39,13 +54,13 @@ public class ParentContributionService : IParentContributionService
     public async Task<ServiceResult<ParentContributionModel>> CreateAsync(int childId, int userId, SaveParentContributionModel model, CancellationToken ct = default)
     {
         if (!await _access.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult<ParentContributionModel>.FailureResult("Child profile not found.");
+            return ServiceResult<ParentContributionModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Contributions.ChildNotFound"]);
         var error = Validate(model);
-        if (error != null) return ServiceResult<ParentContributionModel>.FailureResult(error);
+        if (error != null) return ServiceResult<ParentContributionModel>.FailureResult(ServiceErrorKind.Validation, error);
 
         var count = await _context.ParentContributions.CountAsync(c => c.ChildProfileId == childId, ct);
         if (count >= MaxPerChild)
-            return ServiceResult<ParentContributionModel>.FailureResult($"Maximum of {MaxPerChild} notes per child.");
+            return ServiceResult<ParentContributionModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Contributions.MaxPerChild", MaxPerChild]);
 
         var entity = new ParentContribution
         {
@@ -67,9 +82,9 @@ public class ParentContributionService : IParentContributionService
     {
         var entity = await _context.ParentContributions.FirstOrDefaultAsync(c => c.Id == id, ct);
         if (entity == null || !await _access.HasMinimumRoleAsync(entity.ChildProfileId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult<ParentContributionModel>.FailureResult(NotFound);
+            return ServiceResult<ParentContributionModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Contributions.NotFound"]);
         var error = Validate(model);
-        if (error != null) return ServiceResult<ParentContributionModel>.FailureResult(error);
+        if (error != null) return ServiceResult<ParentContributionModel>.FailureResult(ServiceErrorKind.Validation, error);
 
         var newlyShared = model.IsShared && !entity.IsShared;
         entity.Kind = model.Kind;
@@ -87,7 +102,7 @@ public class ParentContributionService : IParentContributionService
     {
         var entity = await _context.ParentContributions.FirstOrDefaultAsync(c => c.Id == id, ct);
         if (entity == null || !await _access.HasMinimumRoleAsync(entity.ChildProfileId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult.FailureResult(NotFound);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Contributions.NotFound"]);
         _context.ParentContributions.Remove(entity);
         await _context.SaveChangesAsync(ct);
         return ServiceResult.SuccessResult();
@@ -96,7 +111,7 @@ public class ParentContributionService : IParentContributionService
     public async Task<ServiceResult<List<ParentContributionModel>>> GetSharedForSchoolStudentAsync(int educatorUserId, int schoolStudentId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(educatorUserId, schoolStudentId, AccessRole.Viewer, ct))
-            return ServiceResult<List<ParentContributionModel>>.FailureResult("You do not have permission to view this student.");
+            return ServiceResult<List<ParentContributionModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Contributions.NoPermissionViewStudent"]);
 
         // Only accepted, active links; only notes the family explicitly marked shared.
         var childIds = await _context.ChildLinks.AsNoTracking()
@@ -116,11 +131,11 @@ public class ParentContributionService : IParentContributionService
         return ServiceResult<List<ParentContributionModel>>.SuccessResult(items.Select(Map).ToList());
     }
 
-    private static string? Validate(SaveParentContributionModel model)
+    private string? Validate(SaveParentContributionModel model)
     {
-        if (string.IsNullOrWhiteSpace(model.Text)) return "Text is required.";
-        if (model.Text.Trim().Length > 2000) return "Text must be 2000 characters or fewer.";
-        if (!Enum.IsDefined(model.Kind)) return "Invalid kind.";
+        if (string.IsNullOrWhiteSpace(model.Text)) return _localizer["Contributions.TextRequired"];
+        if (model.Text.Trim().Length > MaxTextLength) return _localizer["Contributions.TextTooLong", MaxTextLength];
+        if (!Enum.IsDefined(model.Kind)) return _localizer["Contributions.InvalidKind"];
         return null;
     }
 

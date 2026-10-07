@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
@@ -19,9 +20,9 @@ import {
   ROW_BLOCK_SEMANTICS,
   ROW_CONFIRMED_KEY,
   ROW_OBJECTIVES_KEY,
-  rowBlockItemLabel,
 } from '@/features/admin/templates/document-semantics';
 import type { AssistKind } from '../../api/assist-types';
+import { addRowItemLabel, removeRowItemLabel, rowBlockItemNoun } from '../../lib/row-block-item-label';
 import { FieldAssistBar } from './field-assist-bar';
 import { TeamMemberSelect } from '../team-member-select';
 import {
@@ -71,6 +72,7 @@ function toSaveableCells(cells: KeyedRow['cells'], isGoalsTable: boolean): Keyed
  * partial draft (validation is enforced at finalize in Phase 4).
  */
 export function TableField({ field, value, disabled, onSave, initialFocusRowKey }: FieldRendererProps) {
+  const { t } = useTranslation(['document-authoring', 'common']);
   const config = parseConfig(field.fieldType, field.configJson);
   const table =
     config.kind === 'Table' ? config.table : { columns: [], minRows: undefined, maxRows: undefined };
@@ -194,7 +196,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
       removeRow(target.rowKey);
       setPendingGoalRemoval(null);
     } catch (err) {
-      setGoalRemovalError(apiErrorMessage(err, 'Could not record the retirement reason.'));
+      setGoalRemovalError(apiErrorMessage(err, t('rowBlock.retirementReasonError')));
     } finally {
       setGoalRemovalSubmitting(false);
     }
@@ -214,7 +216,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
     id: `${field.fieldKey}:${rowKey}:${col.columnKey}`,
     label: () => {
       const index = rowsRef.current.findIndex((r) => r.key === rowKey);
-      return `${rowBlockItemLabel(blockSemantic)} ${index + 1} — ${col.label || 'field'}`;
+      return `${rowBlockItemNoun(blockSemantic)} ${index + 1} — ${col.label || t('tableField.column')}`;
     },
     apply: (text: string) => {
       if (disabledRef.current) return;
@@ -327,18 +329,18 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
     return (
       <div id={fieldElementId(field.id)} tabIndex={-1} role="group" aria-labelledby={labelId} data-testid={`field-${field.fieldKey}`}>
         <div id={labelId} className="mb-2 block text-[13px] font-medium text-brand-slate-600">
-          {field.label || 'Untitled field'}
+          {field.label || t('fieldLabel.untitled')}
           {field.required && (
             <>
               <span className="ml-1 text-brand-danger-700" aria-hidden="true">
                 *
               </span>
-              <span className="sr-only"> (required)</span>
+              <span className="sr-only"> {t('common:ui.required')}</span>
             </>
           )}
         </div>
         {rows.length === 0 ? (
-          <p className="mb-2 text-sm text-brand-slate-500">No rows yet.</p>
+          <p className="mb-2 text-sm text-brand-slate-500">{t('tableField.noRowsYet')}</p>
         ) : (
           <ol className="space-y-3">
             {rows.map((row, rowIndex) => {
@@ -353,7 +355,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
                 >
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <span className="flex min-w-0 flex-wrap items-center gap-2 text-[13px] font-medium text-brand-slate-500">
-                      {rowBlockItemLabel(blockSemantic)} {rowIndex + 1}
+                      {rowBlockItemNoun(blockSemantic)} {rowIndex + 1}
                       {carried && (
                         <span
                           className={
@@ -364,9 +366,14 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
                           aria-live="polite"
                           data-testid={`field-${field.fieldKey}-row-${rowIndex}-carried`}
                         >
-                          Carried from {carried.label ?? 'prior version'}
-                          {carried.date ? ` (${formatCarriedDate(carried.date)})` : ''}
-                          {reviewed ? ' · reviewed' : ' · not yet reviewed'}
+                          {t(
+                            reviewed ? 'rowBlock.carriedFromReviewed' : 'rowBlock.carriedFromNotReviewed',
+                            {
+                              label: carried.date
+                                ? `${carried.label ?? t('rowBlock.priorVersion')} (${formatCarriedDate(carried.date)})`
+                                : carried.label ?? t('rowBlock.priorVersion'),
+                            }
+                          )}
                         </span>
                       )}
                     </span>
@@ -383,7 +390,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
                           }}
                           data-testid={`field-${field.fieldKey}-row-${rowIndex}-keep`}
                         >
-                          Keep as-is
+                          {t('rowBlock.keepAsIs')}
                         </Button>
                       )}
                       <Button
@@ -394,7 +401,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
                           const primaryValue = primaryColumn ? row.cells[primaryColumn.columnKey] : undefined;
                           requestRemoveRow(row.key, typeof primaryValue === 'string' ? primaryValue : '');
                         }}
-                        aria-label={`Remove ${rowBlockItemLabel(blockSemantic).toLowerCase()} ${rowIndex + 1}`}
+                        aria-label={removeRowItemLabel(blockSemantic, rowIndex + 1)}
                         data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
                       >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -408,7 +415,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
                       return (
                         <div key={col.columnKey} className={wide ? 'sm:col-span-2' : undefined}>
                           <label htmlFor={cellId} className="mb-1 block text-[13px] font-medium text-brand-slate-600">
-                            {col.label || 'Column'}
+                            {col.label || t('tableField.column')}
                             {col.required && (
                               <span className="ml-1 text-brand-danger-700" aria-hidden="true">
                                 *
@@ -438,7 +445,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
                         htmlFor={`field-${field.fieldKey}-owner-${rowIndex}`}
                         className="mb-1 block text-[13px] font-medium text-brand-slate-600"
                       >
-                        Owner
+                        {t('rowBlock.owner')}
                       </label>
                       <TeamMemberSelect
                         id={`field-${field.fieldKey}-owner-${rowIndex}`}
@@ -470,7 +477,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
                     />
                   ) : (
                     !disabled && (
-                      <p className="mt-2 text-xs text-brand-slate-500">AI help is available once this row has saved.</p>
+                      <p className="mt-2 text-xs text-brand-slate-500">{t('rowBlock.aiHelpAvailableAfterSave')}</p>
                     )
                   )}
                 </li>
@@ -487,7 +494,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
             data-testid={`field-${field.fieldKey}-add`}
           >
             <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-            Add {rowBlockItemLabel(blockSemantic).toLowerCase()}
+            {addRowItemLabel(blockSemantic)}
           </Button>
         </div>
       </div>
@@ -497,20 +504,20 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
   return (
     <div id={fieldElementId(field.id)} tabIndex={-1} role="group" aria-labelledby={labelId}>
       <div id={labelId} className="mb-1 block text-[13px] font-medium text-brand-slate-600">
-        {field.label || 'Untitled field'}
+        {field.label || t('fieldLabel.untitled')}
         {field.required && (
           <span className="ml-1 text-brand-danger-700" aria-hidden="true">
             *
           </span>
         )}
-        {field.required && <span className="sr-only"> (required)</span>}
+        {field.required && <span className="sr-only"> {t('common:ui.required')}</span>}
       </div>
       <div
         className="overflow-x-auto rounded-card border border-brand-slate-200"
         data-testid={`field-${field.fieldKey}`}
       >
         <table className="w-full border-collapse text-sm">
-          <caption className="sr-only">{field.label || 'Table field'}</caption>
+          <caption className="sr-only">{field.label || t('tableField.tableFieldFallback')}</caption>
           <thead>
             <tr className="bg-brand-slate-50">
               {columns.map((c) => (
@@ -519,19 +526,19 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
                   scope="col"
                   className="border-b border-brand-slate-200 px-2 py-2 text-left text-[13px] font-medium text-brand-slate-600"
                 >
-                  {c.label || 'Column'}
+                  {c.label || t('tableField.column')}
                   {c.required && (
                     <>
                       <span className="ml-1 text-brand-danger-700" aria-hidden="true">
                         *
                       </span>
-                      <span className="sr-only"> (required)</span>
+                      <span className="sr-only"> {t('common:ui.required')}</span>
                     </>
                   )}
                 </th>
               ))}
               <th scope="col" className="w-12 border-b border-brand-slate-200 px-2 py-2">
-                <span className="sr-only">Row actions</span>
+                <span className="sr-only">{t('common:ui.rowActions')}</span>
               </th>
             </tr>
           </thead>
@@ -542,7 +549,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
                   colSpan={columns.length + 1}
                   className="px-3 py-4 text-center text-sm text-brand-slate-500"
                 >
-                  No rows yet.
+                  {t('tableField.noRowsYet')}
                 </td>
               </tr>
             ) : (
@@ -567,7 +574,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
                       size="sm"
                       disabled={disabled || atMin}
                       onClick={() => removeRow(row.key)}
-                      aria-label={`Remove row ${rowIndex + 1}`}
+                      aria-label={t('tableField.removeRow', { number: rowIndex + 1 })}
                       data-testid={`field-${field.fieldKey}-remove-${rowIndex}`}
                     >
                       <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -588,7 +595,7 @@ export function TableField({ field, value, disabled, onSave, initialFocusRowKey 
           data-testid={`field-${field.fieldKey}-add`}
         >
           <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-          Add row
+          {t('tableField.addRow')}
         </Button>
       </div>
     </div>
@@ -632,7 +639,10 @@ export function TableCell({
   // in-app navigation that blurs the cell persists the edit before unmount.
   onBlur: () => void;
 }) {
-  const ariaLabel = inputId ? undefined : `${column.label || 'Column'}, row ${rowIndex + 1}`;
+  const { t } = useTranslation('document-authoring');
+  const ariaLabel = inputId
+    ? undefined
+    : t('tableField.cellAriaLabel', { column: column.label || t('tableField.column'), number: rowIndex + 1 });
   const testId = `field-${fieldKey}-cell-${rowIndex}-${column.columnKey}`;
   const strValue = typeof value === 'string' ? value : '';
 
@@ -710,7 +720,7 @@ export function TableCell({
           className={cellInputClass}
           data-testid={testId}
         >
-          <option value="">Select…</option>
+          <option value="">{t('tableField.selectPlaceholder')}</option>
           {readColumnOptions(column.configJson).map((o) => (
             <option key={o.value} value={o.value}>
               {o.label?.trim() || o.value}

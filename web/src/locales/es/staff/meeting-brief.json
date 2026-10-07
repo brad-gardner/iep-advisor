@@ -1,0 +1,49 @@
+{
+  "page": {
+    "title": "Resumen de la reunión",
+    "loading": "Cargando resumen…",
+    "noBriefTitle": "Aún no hay resumen",
+    "noBriefDescription": "Genere un resumen previo a la reunión a partir de la última revisión compartida o del borrador en curso.",
+    "generate": "Generar",
+    "regenerate": "Regenerar",
+    "loadFailedTitle": "No se pudo cargar este resumen",
+    "loadFailedFallback": "Este resumen no está disponible.",
+    "generatedAt": "Generado el {{date}}",
+    "source": "Fuente: {{source}} — {{label}}",
+    "summaryHeading": "Resumen",
+    "changesHeading": "Qué cambió",
+    "resourceCommitmentsHeading": "Compromisos de recursos",
+    "checklistHeading": "Lista de verificación de procedimiento",
+    "familyResponsesHeading": "Respuestas familiares abiertas",
+    "familyResponsesEmpty": "Nada en espera de respuesta.",
+    "offlineParticipationHeading": "Participación familiar sin conexión",
+    "contactAttemptsHeading": "Intentos de contacto (últimos 90 días)",
+    "contactAttemptsEmpty": "Ninguno registrado.",
+    "offlineInputHeading": "Aportes sin conexión (últimos 90 días)",
+    "offlineInputEmpty": "Ninguno registrado.",
+    "backToCalendar": "← Volver al calendario",
+    "loadBriefFailed": "No se pudo cargar el resumen.",
+    "generateBriefFailed": "No se pudo generar el resumen."
+  },
+  "checklist": {
+    "empty": "No hay nada que verificar para este tipo de reunión.",
+    "satisfied": "Cumplido",
+    "notSatisfied": "No cumplido",
+    "unknown": "Desconocido"
+  },
+  "resourceCommitments": {
+    "empty": "No se detectaron compromisos de recursos en este borrador."
+  },
+  "sourceKind": {
+    "SharedRevision": "Revisión compartida",
+    "Draft": "Borrador en curso"
+  },
+  "resourceCommitmentKind": {
+    "NewService": "Servicio nuevo",
+    "ChangedService": "Servicio modificado",
+    "Placement": "Colocación",
+    "Esy": "Año escolar extendido",
+    "OneToOne": "Apoyo individual (1:1)",
+    "Transportation": "Transporte"
+  }
+}

@@ -1,7 +1,8 @@
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { TEAM_ROLE_LABELS } from '@/features/educator/types';
-import { INVITE_STATUS_LABELS } from '../types';
+import { teamRoleLabel } from '@/features/educator/lib/student-enum-labels';
+import { inviteStatusLabel } from '@/lib/invite-status-label';
 import type { AttendanceEntry, InviteStatus, MeetingParticipantDto } from '../types';
 
 const inviteStatusVariant: Record<InviteStatus, 'success' | 'error' | 'warning' | 'neutral'> = {
@@ -23,6 +24,10 @@ interface ParticipantListProps {
 /** Read-only roster: name, functional role, and RSVP status; optionally an
  * attendance capture control (checkbox + excusal note) per row. */
 export function ParticipantList({ participants, attendance }: ParticipantListProps) {
+  // `educator` alongside `meetings-staff`: `teamRoleLabel` below is backed
+  // by that staff-only namespace, and this hook call is what makes a
+  // language switch re-render this list once its Spanish loads.
+  const { t } = useTranslation(['meetings-staff', 'educator']);
   return (
     <ul className="divide-y divide-brand-slate-100" data-testid="meeting-participant-list">
       {participants.map((p) => {
@@ -33,14 +38,14 @@ export function ParticipantList({ participants, attendance }: ParticipantListPro
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-brand-slate-800">{p.displayName}</p>
                 <p className="text-xs text-brand-slate-500">
-                  {TEAM_ROLE_LABELS[p.teamRole]}
-                  {p.isRequired ? '' : ' · optional'}
-                  {p.isFamily ? ' · family' : ''}
-                  {p.isStudent ? ' · student' : ''}
+                  {teamRoleLabel(p.teamRole)}
+                  {p.isRequired ? '' : t('participantList.optionalSuffix')}
+                  {p.isFamily ? t('participantList.familySuffix') : ''}
+                  {p.isStudent ? t('participantList.studentSuffix') : ''}
                 </p>
               </div>
               <Badge variant={inviteStatusVariant[p.inviteStatus]}>
-                {INVITE_STATUS_LABELS[p.inviteStatus]}
+                {inviteStatusLabel(p.inviteStatus)}
               </Badge>
             </div>
 
@@ -54,15 +59,15 @@ export function ParticipantList({ participants, attendance }: ParticipantListPro
                     className="h-3.5 w-3.5 rounded border-brand-slate-300 text-brand-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-500"
                     data-testid={`attendance-checkbox-${p.id}`}
                   />
-                  Attended
+                  {t('participantList.attendedLabel')}
                 </label>
                 {!(entry?.attended ?? false) && (
                   <Input
                     id={`excusal-note-${p.id}`}
-                    label="Excusal note"
+                    label={t('participantList.excusalNoteLabel')}
                     value={entry?.excusalNote ?? ''}
                     onChange={(e) => attendance.onChange(p.id, false, e.target.value)}
-                    placeholder="Optional"
+                    placeholder={t('participantList.excusalNotePlaceholder')}
                     className="w-56"
                   />
                 )}

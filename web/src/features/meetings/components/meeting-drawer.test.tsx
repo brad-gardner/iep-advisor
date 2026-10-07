@@ -1,11 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ToastProvider } from '@/components/ui/toast';
 import { apiRejection } from '@/test/axios-rejection';
+import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 import { makeMeeting, makeParticipant } from '../test/fixtures';
-
+// `educator` is a staff-only namespace (plan phase 5) — `ParticipantList`
+// (rendered inside `MeetingDrawer`) names it in its own `useTranslation`
+// call (for `teamRoleLabel`), so its English must be registered here the
+// same way the real staff route chunk does. See `docs/i18n/README.md`'s
+// "Staff and admin namespaces".
+import '@/app/lazy-routes/staff-locales';
 const meetingsApi = vi.hoisted(() => ({
   rsvpToMeeting: vi.fn(),
   cancelMeeting: vi.fn(),
@@ -32,7 +38,11 @@ const sharedDraftsApi = vi.hoisted(() => ({
 vi.mock('@/features/shared-drafts/api/shared-drafts-api', () => sharedDraftsApi);
 
 import { MeetingDrawer } from './meeting-drawer';
-
+// `meetings-staff` is a staff-only namespace (plan phase 5) — its English
+// isn't bundled in `resources` (see `lib/i18n/index.ts`), only registered
+// by this side-effect import, exactly as the real lazy route chunk
+// (`app/lazy-routes/staff-routes.tsx`) registers it before the educator
+// calendar/student detail pages that host this drawer can render.
 function renderDrawer(meeting = makeMeeting(), onUpdated = vi.fn()) {
   const onClose = vi.fn();
   render(
@@ -49,6 +59,8 @@ describe('MeetingDrawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+
+  afterEach(() => resetTestLanguage());
 
   it('renders meeting details and the participant roster', () => {
     renderDrawer();
@@ -202,5 +214,21 @@ describe('MeetingDrawer', () => {
     renderDrawer(makeMeeting({ canManage: false }));
     expect(screen.queryByTestId('meeting-cancel-open')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Status')).not.toBeInTheDocument();
+  });
+
+  it('renders the meeting type/status and manage section in Spanish', async () => {
+    await renderInSpanish(
+      <ToastProvider>
+        <MemoryRouter>
+          <MeetingDrawer open meeting={makeMeeting()} onClose={vi.fn()} onUpdated={vi.fn()} />
+        </MemoryRouter>
+      </ToastProvider>,
+      { ns: 'meetings-staff' }
+    );
+
+    expect(screen.getByTestId('meeting-drawer')).toHaveTextContent('Revisión anual');
+    expect(screen.getAllByText('Programada').length).toBeGreaterThan(0);
+    expect(screen.getByText('Administrar')).toBeInTheDocument();
+    expect(screen.getByText('Reprogramar')).toBeInTheDocument();
   });
 });

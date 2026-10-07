@@ -1,0 +1,49 @@
+{
+  "page": {
+    "title": "Meeting brief",
+    "loading": "Loading brief…",
+    "noBriefTitle": "No brief yet",
+    "noBriefDescription": "Generate a pre-meeting brief from the latest shared revision or live draft.",
+    "generate": "Generate",
+    "regenerate": "Regenerate",
+    "loadFailedTitle": "Could not load this brief",
+    "loadFailedFallback": "This brief is unavailable.",
+    "generatedAt": "Generated {{date}}",
+    "source": "Source: {{source}} — {{label}}",
+    "summaryHeading": "Summary",
+    "changesHeading": "What changed",
+    "resourceCommitmentsHeading": "Resource commitments",
+    "checklistHeading": "Procedural checklist",
+    "familyResponsesHeading": "Open family responses",
+    "familyResponsesEmpty": "Nothing waiting on a reply.",
+    "offlineParticipationHeading": "Offline family participation",
+    "contactAttemptsHeading": "Contact attempts (last 90 days)",
+    "contactAttemptsEmpty": "None recorded.",
+    "offlineInputHeading": "Offline input (last 90 days)",
+    "offlineInputEmpty": "None recorded.",
+    "backToCalendar": "← Back to calendar",
+    "loadBriefFailed": "Could not load the brief.",
+    "generateBriefFailed": "Could not generate the brief."
+  },
+  "checklist": {
+    "empty": "Nothing to check for this meeting type.",
+    "satisfied": "Satisfied",
+    "notSatisfied": "Not satisfied",
+    "unknown": "Unknown"
+  },
+  "resourceCommitments": {
+    "empty": "No resource commitments detected in this draft."
+  },
+  "sourceKind": {
+    "SharedRevision": "Shared revision",
+    "Draft": "Live draft"
+  },
+  "resourceCommitmentKind": {
+    "NewService": "New service",
+    "ChangedService": "Changed service",
+    "Placement": "Placement",
+    "Esy": "Extended school year",
+    "OneToOne": "1:1 support",
+    "Transportation": "Transportation"
+  }
+}

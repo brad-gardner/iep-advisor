@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -12,26 +13,31 @@ namespace IepAssistant.Services.Implementations;
 /// student; mutations = admin in scope (DistrictAdmin/SchoolAdmin via <see cref="IOrgAccessService"/>)
 /// or the student's current lead case manager. Writes go through <see cref="StudentTeamWriter"/> so the
 /// access-row and single-lead invariants are shared with bulk assignment and the importer.
+///
+/// Multilingual plan (2026-10-06) phase 5: every failure the controller (<c>EducatorController</c>'s
+/// team routes) maps to a status now carries an explicit <see cref="ServiceErrorKind"/>, and every
+/// message is localized (<c>Messages.resx</c>/<c>.es.resx</c>) — see
+/// <see cref="IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure"/>.
 /// </summary>
 public class StudentTeamService : IStudentTeamService
 {
-    private const string PermissionMessage = "You do not have permission to manage this student's team.";
-
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
     private readonly ILogger<StudentTeamService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public StudentTeamService(ApplicationDbContext context, IOrgAccessService orgAccess, ILogger<StudentTeamService> logger)
+    public StudentTeamService(ApplicationDbContext context, IOrgAccessService orgAccess, ILogger<StudentTeamService> logger, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
         _logger = logger;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<List<StudentTeamMemberModel>>> GetTeamAsync(int userId, int studentId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
-            return ServiceResult<List<StudentTeamMemberModel>>.FailureResult("You do not have permission to access this student.");
+            return ServiceResult<List<StudentTeamMemberModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionAccessStudent"]);
 
         var members = await ProjectMembers(_context.StudentTeamMembers.AsNoTracking()
                 .Where(m => m.SchoolStudentId == studentId && m.IsActive))
@@ -46,9 +52,9 @@ public class StudentTeamService : IStudentTeamService
 
     public async Task<ServiceResult<List<EligibleStaffModel>>> GetEligibleStaffAsync(int userId, int studentId, CancellationToken ct = default)
     {
-        var (student, caller, denied) = await AuthorizeMutationAsync(userId, studentId, ct);
+        var (student, caller, kind, denied) = await AuthorizeMutationAsync(userId, studentId, ct);
         if (denied != null)
-            return ServiceResult<List<EligibleStaffModel>>.FailureResult(denied);
+            return ServiceResult<List<EligibleStaffModel>>.FailureResult(kind, denied);
 
         var districtId = caller!.DistrictId;
         var schoolId = student!.SchoolId;
@@ -77,15 +83,15 @@ public class StudentTeamService : IStudentTeamService
 
     public async Task<ServiceResult<StudentTeamMemberModel>> AddMemberAsync(int userId, int studentId, AddTeamMemberModel model, CancellationToken ct = default)
     {
-        var (student, caller, denied) = await AuthorizeMutationAsync(userId, studentId, ct);
+        var (student, caller, kind, denied) = await AuthorizeMutationAsync(userId, studentId, ct);
         if (denied != null)
-            return ServiceResult<StudentTeamMemberModel>.FailureResult(denied);
+            return ServiceResult<StudentTeamMemberModel>.FailureResult(kind, denied);
 
         var target = await _context.StaffProfiles.AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == model.StaffProfileId, ct);
-        var candidateError = StudentTeamWriter.ValidateTeamCandidate(target, caller!.DistrictId, student!.SchoolId);
+        var candidateError = StudentTeamWriter.ValidateTeamCandidate(target, caller!.DistrictId, student!.SchoolId, _localizer);
         if (candidateError != null)
-            return ServiceResult<StudentTeamMemberModel>.FailureResult(candidateError);
+            return ServiceResult<StudentTeamMemberModel>.FailureResult(candidateError.Value.Kind, candidateError.Value.Message);
 
         await using var tx = await _context.Database.BeginTransactionAsync(ct);
         var member = await StudentTeamWriter.UpsertMemberAsync(_context, student, target!.UserId, model.TeamRole,
@@ -101,14 +107,14 @@ public class StudentTeamService : IStudentTeamService
 
     public async Task<ServiceResult<StudentTeamMemberModel>> UpdateMemberAsync(int userId, int studentId, int memberId, UpdateTeamMemberModel model, CancellationToken ct = default)
     {
-        var (student, _, denied) = await AuthorizeMutationAsync(userId, studentId, ct);
+        var (student, _, kind, denied) = await AuthorizeMutationAsync(userId, studentId, ct);
         if (denied != null)
-            return ServiceResult<StudentTeamMemberModel>.FailureResult(denied);
+            return ServiceResult<StudentTeamMemberModel>.FailureResult(kind, denied);
 
         var member = await _context.StudentTeamMembers
             .FirstOrDefaultAsync(m => m.Id == memberId && m.SchoolStudentId == studentId && m.IsActive, ct);
         if (member == null)
-            return ServiceResult<StudentTeamMemberModel>.FailureResult("Team member not found.");
+            return ServiceResult<StudentTeamMemberModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Team.MemberNotFound"]);
 
         if (model.TeamRole != null)
             member.TeamRole = model.TeamRole.Value;
@@ -123,14 +129,14 @@ public class StudentTeamService : IStudentTeamService
 
     public async Task<ServiceResult<StudentTeamMemberModel>> SetLeadAsync(int userId, int studentId, int memberId, CancellationToken ct = default)
     {
-        var (student, _, denied) = await AuthorizeMutationAsync(userId, studentId, ct);
+        var (student, _, kind, denied) = await AuthorizeMutationAsync(userId, studentId, ct);
         if (denied != null)
-            return ServiceResult<StudentTeamMemberModel>.FailureResult(denied);
+            return ServiceResult<StudentTeamMemberModel>.FailureResult(kind, denied);
 
         var member = await _context.StudentTeamMembers
             .FirstOrDefaultAsync(m => m.Id == memberId && m.SchoolStudentId == studentId && m.IsActive, ct);
         if (member == null)
-            return ServiceResult<StudentTeamMemberModel>.FailureResult("Team member not found.");
+            return ServiceResult<StudentTeamMemberModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Team.MemberNotFound"]);
 
         if (!member.IsLead)
         {
@@ -145,53 +151,53 @@ public class StudentTeamService : IStudentTeamService
 
     public async Task<ServiceResult> RemoveMemberAsync(int userId, int studentId, int memberId, CancellationToken ct = default)
     {
-        var (student, _, denied) = await AuthorizeMutationAsync(userId, studentId, ct);
+        var (student, _, kind, denied) = await AuthorizeMutationAsync(userId, studentId, ct);
         if (denied != null)
-            return ServiceResult.FailureResult(denied);
+            return ServiceResult.FailureResult(kind, denied);
 
         var member = await _context.StudentTeamMembers
             .FirstOrDefaultAsync(m => m.Id == memberId && m.SchoolStudentId == studentId, ct);
         if (member == null)
-            return ServiceResult.FailureResult("Team member not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Team.MemberNotFound"]);
         if (!member.IsActive)
-            return ServiceResult.SuccessResult("Team member already removed.");
+            return ServiceResult.SuccessResult(_localizer["Team.MemberAlreadyRemoved"]);
 
         if (member.IsLead)
         {
             var othersRemain = await _context.StudentTeamMembers
                 .AnyAsync(m => m.SchoolStudentId == studentId && m.IsActive && m.Id != memberId, ct);
             if (othersRemain)
-                return ServiceResult.FailureResult("Choose a new lead case manager first.");
+                return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Team.ChooseNewLeadFirst"]);
         }
 
         await StudentTeamWriter.DeactivateMemberAsync(_context, student!, member, userId, null, ct);
 
         _logger.LogInformation("Team member {MemberId} removed from student {StudentId} by user {CallerId}", memberId, studentId, userId);
-        return ServiceResult.SuccessResult("Team member removed.");
+        return ServiceResult.SuccessResult(_localizer["Team.MemberRemoved"]);
     }
 
     // ----------------------------------------------------------------- helpers
 
     /// <summary>Loads the tracked student and checks the caller may change its team: admin in scope, or the lead.</summary>
-    private async Task<(SchoolStudent? Student, StaffContext? Caller, string? Denied)> AuthorizeMutationAsync(int userId, int studentId, CancellationToken ct)
+    private async Task<(SchoolStudent? Student, StaffContext? Caller, ServiceErrorKind Kind, string? Denied)> AuthorizeMutationAsync(int userId, int studentId, CancellationToken ct)
     {
         var caller = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (caller == null)
-            return (null, null, "Educator profile not found.");
+            return (null, null, ServiceErrorKind.NotFound, _localizer["Educator.ProfileNotFound"]);
 
         // Scope check (admins pass by scope; teacher-tier need an active access row); also rules out
         // non-existent students without leaking existence.
         if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
-            return (null, caller, PermissionMessage);
+            return (null, caller, ServiceErrorKind.Forbidden, _localizer["Team.NoPermissionManageTeam"]);
 
         var student = await _context.SchoolStudents.FirstOrDefaultAsync(s => s.Id == studentId, ct);
         if (student == null)
-            return (null, caller, "Student not found.");
+            return (null, caller, ServiceErrorKind.NotFound, _localizer["Educator.StudentNotFound"]);
 
         if (!OrgRoleIds.IsAdmin(caller.OrgRoleId) && student.CaseManagerUserId != userId)
-            return (null, caller, PermissionMessage);
+            return (null, caller, ServiceErrorKind.Forbidden, _localizer["Team.NoPermissionManageTeam"]);
 
-        return (student, caller, null);
+        return (student, caller, ServiceErrorKind.None, null);
     }
 
     private async Task<StudentTeamMemberModel> LoadMemberAsync(int memberId, CancellationToken ct)

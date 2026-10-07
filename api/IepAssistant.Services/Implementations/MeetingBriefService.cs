@@ -1,12 +1,15 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -18,22 +21,19 @@ namespace IepAssistant.Services.Implementations;
 /// <see cref="MeetingBrief"/> row in place, mirroring <see cref="MeetingSummaryService"/>'s single-row
 /// shape. Entirely advisory: never writes to the draft, never auto-applies anything.
 ///
-/// <para><b>Multilingual plan (2026-10-06) phase 3:</b> this brief is STAFF-facing only (the LEA rep
+/// <para><b>Multilingual plan (2026-10-06) phase 5:</b> this brief is STAFF-facing only (the LEA rep
 /// preparing to run the meeting) — contrast <see cref="MeetingSummaryService"/>, whose summary goes to the
-/// family. It is deliberately excluded from response-language for now: <see cref="ComposeSummaryAsync"/>'s
-/// Claude call never appends <c>ResponseLanguage.SystemLine</c>, so the AI-drafted <c>summary</c> is always
-/// English regardless of the requesting staff member's preferred language, and <see cref="MeetingBrief"/>
-/// has no <c>Language</c> column. Phase 5 (student and school staff) is where staff-facing AI output gets
-/// localized; this is the one Phase-3 AI surface intentionally left for that phase rather than converted
-/// here.</para>
+/// family. <see cref="ComposeSummaryAsync"/>'s Claude call now appends <c>ResponseLanguage.SystemLine</c>
+/// for the requesting staff member's UI culture (<c>GenerateAsync</c> runs synchronously inside the
+/// request, so <c>CultureInfo.CurrentUICulture</c> is already correct — no background worker, no
+/// <c>CultureScope.For</c> re-application needed). The resolved language is captured on
+/// <see cref="MeetingBrief.Language"/> (migration <c>AddMeetingBriefLanguage</c>) and exposed as
+/// <see cref="MeetingBriefModel.GeneratedLanguage"/>, same contract as every other AI artifact. Every
+/// failure <c>MeetingsController</c>'s brief routes map to a status now also carries an explicit
+/// <see cref="ServiceErrorKind"/>.</para>
 /// </summary>
 public class MeetingBriefService : IMeetingBriefService
 {
-    private const string NotFoundMessage = "Meeting not found.";
-    private const string PermissionMessage = "You do not have permission to access this meeting.";
-    private const string NoBriefMessage = "No brief has been generated for this meeting yet.";
-    private const string UnavailableSummary = "A plain-language summary could not be drafted right now — the deterministic sections below are still accurate.";
-    private const string NoSourceSummary = "No draft is linked to this meeting yet, so there is no proposal to summarize.";
     private const int MaxTokens = 1024;
     private const int DraftCharBudget = 10_000;
     private const int RecentWindowDays = 90;
@@ -48,34 +48,49 @@ public class MeetingBriefService : IMeetingBriefService
     private readonly IClaudeClient _claude;
     private readonly IDraftResponseService _draftResponses;
     private readonly ILogger<MeetingBriefService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public MeetingBriefService(
         ApplicationDbContext context,
         IOrgAccessService orgAccess,
         IClaudeClient claude,
         IDraftResponseService draftResponses,
-        ILogger<MeetingBriefService> logger)
+        ILogger<MeetingBriefService> logger,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
         _claude = claude;
         _draftResponses = draftResponses;
         _logger = logger;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<MeetingBriefModel>> GetAsync(int userId, int meetingId, CancellationToken ct = default)
     {
         var meeting = await LoadMeetingHeaderAsync(meetingId, ct);
         if (meeting == null)
-            return ServiceResult<MeetingBriefModel>.FailureResult(NotFoundMessage);
+            return ServiceResult<MeetingBriefModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Meetings.MeetingNotFound"]);
         if (!await _orgAccess.CanActOnStudentAsync(userId, meeting.SchoolStudentId, AccessRole.Viewer, ct))
-            return ServiceResult<MeetingBriefModel>.FailureResult(PermissionMessage);
+            return ServiceResult<MeetingBriefModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Meetings.NoPermissionToView"]);
 
         var row = await _context.MeetingBriefs.AsNoTracking().FirstOrDefaultAsync(b => b.MeetingId == meetingId, ct);
         if (row == null)
-            return ServiceResult<MeetingBriefModel>.FailureResult(NoBriefMessage);
+            // Multilingual plan phase 5 review fix P2-2: NotFound (404), not Validation (400) — this is
+            // a deliberate status change. On main this failure carried no explicit ErrorKind, so
+            // MapServiceFailure fell back to its English-substring heuristic; the message ("No brief
+            // has been generated for this meeting yet.") doesn't contain "not found", so that fallback
+            // mapped it to 400 and the web client's empty/Generate state never triggered. 404 (matching
+            // IMeetingBriefService.GetAsync's own doc comment, "mapped to 404") is the intended fix.
+            return ServiceResult<MeetingBriefModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["MeetingBrief.NoBriefYet"]);
 
-        var model = Deserialize(row.BriefJson) ?? new MeetingBriefModel { MeetingId = meetingId, GeneratedAt = row.GeneratedAt };
+        var model = Deserialize(row.BriefJson) ?? new MeetingBriefModel
+        {
+            MeetingId = meetingId,
+            GeneratedAt = row.GeneratedAt,
+            Disclaimer = _localizer["MeetingBrief.Disclaimer"]
+        };
+        model.GeneratedLanguage = row.Language;
         return ServiceResult<MeetingBriefModel>.SuccessResult(model);
     }
 
@@ -83,9 +98,9 @@ public class MeetingBriefService : IMeetingBriefService
     {
         var meeting = await LoadMeetingHeaderAsync(meetingId, ct);
         if (meeting == null)
-            return ServiceResult<MeetingBriefModel>.FailureResult(NotFoundMessage);
+            return ServiceResult<MeetingBriefModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Meetings.MeetingNotFound"]);
         if (!await _orgAccess.CanActOnStudentAsync(userId, meeting.SchoolStudentId, AccessRole.Viewer, ct))
-            return ServiceResult<MeetingBriefModel>.FailureResult(PermissionMessage);
+            return ServiceResult<MeetingBriefModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Meetings.NoPermissionToView"]);
 
         var instanceId = meeting.DocumentInstanceId ?? await ResolveFallbackInstanceIdAsync(meeting.SchoolStudentId, ct);
 
@@ -114,14 +129,14 @@ public class MeetingBriefService : IMeetingBriefService
 
                 if (revision != null)
                 {
-                    source = new BriefSourceModel { Kind = BriefSourceKind.SharedRevision, Id = revision.Id, Label = $"{instanceHeader.DocumentTypeDisplayName} (shared with family)" };
+                    source = new BriefSourceModel { Kind = BriefSourceKind.SharedRevision, Id = revision.Id, Label = _localizer["MeetingBrief.SourceSharedWithFamily", instanceHeader.DocumentTypeDisplayName] };
                     sourceValues = ValueDocumentJson.Parse(revision.ValuesJson);
                     sourceTemplateVersionId = revision.DocumentTemplateVersionId;
                     sourceRevisionId = revision.Id;
                 }
                 else
                 {
-                    source = new BriefSourceModel { Kind = BriefSourceKind.Draft, Id = instanceHeader.Id, Label = $"{instanceHeader.DocumentTypeDisplayName} (draft)" };
+                    source = new BriefSourceModel { Kind = BriefSourceKind.Draft, Id = instanceHeader.Id, Label = _localizer["MeetingBrief.SourceDraft", instanceHeader.DocumentTypeDisplayName] };
                     sourceValues = ValueDocumentJson.Parse(instanceHeader.ValuesJson);
                     sourceTemplateVersionId = instanceHeader.DocumentTemplateVersionId;
                 }
@@ -146,6 +161,12 @@ public class MeetingBriefService : IMeetingBriefService
         var offlineInput = await LoadOfflineInputAsync(meeting.SchoolStudentId, ct);
         var contactAttempts = await LoadContactAttemptsAsync(meeting.SchoolStudentId, ct);
 
+        // Multilingual plan phase 5: the language the requesting staff member was using when they
+        // generated this brief — captured here (same expression AnalysisRunService uses) and persisted
+        // on MeetingBrief.Language, since GenerateAsync (unlike AnalysisRun) runs synchronously inside
+        // the request and never needs CultureScope.For to re-apply it later.
+        var language = SupportedLanguages.Normalize(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName) ?? SupportedLanguages.English;
+
         var model = new MeetingBriefModel
         {
             MeetingId = meetingId,
@@ -157,10 +178,15 @@ public class MeetingBriefService : IMeetingBriefService
             Checklist = checklist,
             OpenFamilyResponses = openResponses,
             OfflineInput = offlineInput,
-            ContactAttempts = contactAttempts
+            ContactAttempts = contactAttempts,
+            // Multilingual plan phase 5 review fix P3-3: localized from Messages.resx/.es.resx in the
+            // SAME resolved `language` captured on GeneratedLanguage below — CurrentUICulture is already
+            // that language here (see the class doc comment), so this call resolves to the matching text.
+            Disclaimer = _localizer["MeetingBrief.Disclaimer"],
+            GeneratedLanguage = language
         };
 
-        await UpsertAsync(meetingId, userId, model, sourceRevisionId, sourceVersionId, ct);
+        await UpsertAsync(meetingId, userId, model, sourceRevisionId, sourceVersionId, language, ct);
 
         return ServiceResult<MeetingBriefModel>.SuccessResult(model);
     }
@@ -171,7 +197,7 @@ public class MeetingBriefService : IMeetingBriefService
         MeetingHeader meeting, IReadOnlyList<TemplateSectionModel> sections, JsonObject? sourceValues, CancellationToken ct)
     {
         if (sourceValues == null)
-            return NoSourceSummary;
+            return _localizer["MeetingBrief.NoSourceSummary"];
 
         var userText = new StringBuilder();
         userText.AppendLine($"Meeting: {meeting.Title} ({meeting.Type}), scheduled {meeting.StartsAtUtc:MMMM d, yyyy}, for {meeting.StudentFirstName}.");
@@ -185,12 +211,12 @@ public class MeetingBriefService : IMeetingBriefService
         string? reply;
         try
         {
-            // Deliberately NO + ResponseLanguage.SystemLine(...) here — see the class doc comment. This
-            // brief is staff-facing only; staff-facing AI output is Phase 5's scope, not Phase 3's, so the
-            // summary stays English regardless of the requesting staff member's preferred language.
+            // Multilingual plan phase 5: GenerateAsync runs synchronously inside the request, so
+            // CurrentUICulture (set by RequestLocalization from the requesting staff member's saved
+            // preference) is already correct here — no CultureScope.For re-application needed.
             reply = await _claude.CompleteAsync(new ClaudeCompletionRequest
             {
-                SystemPrompt = DraftPrompts.MeetingBrief,
+                SystemPrompt = DraftPrompts.MeetingBrief + ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture),
                 UserText = userText.ToString(),
                 MaxTokens = MaxTokens
             }, ct);
@@ -198,10 +224,10 @@ public class MeetingBriefService : IMeetingBriefService
         catch (ClaudeApiException ex)
         {
             _logger.LogError(ex, "Meeting brief summary for meeting {MeetingId} failed with {Kind}", meeting.Id, ex.Kind);
-            return UnavailableSummary;
+            return _localizer["MeetingBrief.UnavailableSummary"];
         }
 
-        return string.IsNullOrWhiteSpace(reply) ? UnavailableSummary : reply.Trim();
+        return string.IsNullOrWhiteSpace(reply) ? _localizer["MeetingBrief.UnavailableSummary"] : reply.Trim();
     }
 
     // ---------------------------------------------------------------- Changes vs. latest finalized version
@@ -318,9 +344,9 @@ public class MeetingBriefService : IMeetingBriefService
             items.Add(new BriefChecklistItemModel
             {
                 Key = "requiredParticipants",
-                Label = "Required participants present",
+                Label = _localizer["MeetingBrief.Checklist.RequiredParticipantsLabel"],
                 Satisfied = null,
-                Detail = "No required participants are listed for this meeting."
+                Detail = _localizer["MeetingBrief.Checklist.NoRequiredParticipants"]
             });
         }
         else
@@ -332,11 +358,11 @@ public class MeetingBriefService : IMeetingBriefService
             items.Add(new BriefChecklistItemModel
             {
                 Key = "requiredParticipants",
-                Label = "Required participants present",
+                Label = _localizer["MeetingBrief.Checklist.RequiredParticipantsLabel"],
                 Satisfied = satisfied,
                 Detail = missing.Count == 0
-                    ? "All required participants attended."
-                    : $"Missing: {string.Join(", ", missing.Select(p => string.IsNullOrWhiteSpace(p.Name) ? "Unknown" : p.Name))}"
+                    ? _localizer["MeetingBrief.Checklist.AllAttended"]
+                    : _localizer["MeetingBrief.Checklist.Missing", string.Join(", ", missing.Select(p => string.IsNullOrWhiteSpace(p.Name) ? _localizer["MeetingBrief.Checklist.UnknownParticipant"].Value : p.Name))]
             });
         }
 
@@ -349,9 +375,11 @@ public class MeetingBriefService : IMeetingBriefService
         items.Add(new BriefChecklistItemModel
         {
             Key = "noticeTiming",
-            Label = $"Notice sent at least {NoticeMinDays} days before the meeting",
+            Label = _localizer["MeetingBrief.Checklist.NoticeTimingLabel", NoticeMinDays],
             Satisfied = noticeSatisfied,
-            Detail = earliestNotice == null ? "No meeting notice is on record." : $"Notice sent {earliestNotice:yyyy-MM-dd}."
+            Detail = earliestNotice == null
+                ? _localizer["MeetingBrief.Checklist.NoNoticeOnRecord"]
+                : _localizer["MeetingBrief.Checklist.NoticeSentOn", earliestNotice.Value.ToString("yyyy-MM-dd")]
         });
 
         var cutoff = await ResolveFamilyInputCutoffAsync(meeting.SchoolStudentId, ct);
@@ -368,7 +396,7 @@ public class MeetingBriefService : IMeetingBriefService
         items.Add(new BriefChecklistItemModel
         {
             Key = "familyInput",
-            Label = "Family input received",
+            Label = _localizer["MeetingBrief.Checklist.FamilyInputLabel"],
             Satisfied = hasContribution || hasOfflineInput || hasDraftResponse,
             Detail = null
         });
@@ -432,7 +460,7 @@ public class MeetingBriefService : IMeetingBriefService
 
     // ---------------------------------------------------------------- Persistence
 
-    private async Task UpsertAsync(int meetingId, int userId, MeetingBriefModel model, int? sourceRevisionId, int? sourceVersionId, CancellationToken ct)
+    private async Task UpsertAsync(int meetingId, int userId, MeetingBriefModel model, int? sourceRevisionId, int? sourceVersionId, string language, CancellationToken ct)
     {
         var briefJson = JsonSerializer.Serialize(model);
         var existing = await _context.MeetingBriefs.FirstOrDefaultAsync(b => b.MeetingId == meetingId, ct);
@@ -443,6 +471,7 @@ public class MeetingBriefService : IMeetingBriefService
             existing.SourceRevisionId = sourceRevisionId;
             existing.SourceVersionId = sourceVersionId;
             existing.GeneratedByUserId = userId;
+            existing.Language = language;
             existing.UpdatedById = userId;
         }
         else
@@ -455,6 +484,7 @@ public class MeetingBriefService : IMeetingBriefService
                 SourceRevisionId = sourceRevisionId,
                 SourceVersionId = sourceVersionId,
                 GeneratedByUserId = userId,
+                Language = language,
                 CreatedById = userId,
                 UpdatedById = userId
             }, ct);

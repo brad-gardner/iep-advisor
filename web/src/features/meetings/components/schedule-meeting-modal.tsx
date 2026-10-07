@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Drawer } from '@/components/ui/drawer';
 import { ScheduleMeetingForm } from './schedule-meeting-form';
 import type { MeetingDto } from '../types';
@@ -25,9 +26,9 @@ export function ScheduleMeetingModal({
   meeting,
   onSaved,
 }: ScheduleMeetingModalProps) {
-  const title = meeting
-    ? `Reschedule meeting${studentName ? ` — ${studentName}` : ''}`
-    : `Schedule meeting${studentName ? ` — ${studentName}` : ''}`;
+  const { t } = useTranslation('meetings-staff');
+  const base = meeting ? t('scheduleModal.rescheduleMeeting') : t('scheduleModal.scheduleMeeting');
+  const title = studentName ? t('scheduleModal.titleWithStudent', { base, student: studentName }) : base;
 
   // A save that is in flight cannot be dismissed away — it would still land and fire onSaved.
   const [submitting, setSubmitting] = useState(false);

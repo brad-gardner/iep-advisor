@@ -1,9 +1,12 @@
+using System.Globalization;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -15,13 +18,22 @@ namespace IepAssistant.Services.Implementations;
 /// IEP-scoped chat folds the prior turns + a compact draft rendering into one Claude call and is
 /// fully ephemeral (nothing persisted). All draft-derived text is wrapped in tags and the prompts
 /// instruct the model to treat it strictly as data, mirroring the analysis prompt guard.
+///
+/// <para>Multilingual plan (2026-10-06) phase 5: every failure <c>IepAssistController</c> maps to a
+/// status carries an explicit <see cref="ServiceErrorKind"/>, and every message is localized
+/// (<c>Messages.resx</c>/<c>.es.resx</c>).</para>
+///
+/// <para><b>Phase 5 review fix P2-7 (coordinator decision) — language split, mirroring
+/// <c>DocumentAssistService</c>:</b> <see cref="AssistGoalAsync"/>/<see cref="AssistSectionAsync"/>/
+/// <see cref="AssistServiceLineAsync"/> insert their suggestion DIRECTLY INTO A DRAFT FIELD if accepted,
+/// and the draft is a district legal record in its own fixed language, so <see cref="CompleteAssistAsync"/>
+/// never appends <see cref="ResponseLanguage.SystemLine"/> — always English, regardless of the
+/// requester's UI culture. <see cref="ChatAsync"/>'s reply is never inserted into the draft, so it keeps
+/// appending <see cref="ResponseLanguage.SystemLine"/> for the requester's UI culture, same as before.
+/// Neither path persists its own generatedLanguage field.</para>
 /// </summary>
 public class IepAssistService : IIepAssistService
 {
-    private const string PermissionMessage = "You do not have permission to access this IEP draft.";
-    private const string DraftNotFoundMessage = "IEP draft not found.";
-    private const string UnavailableMessage = "AI assist is temporarily unavailable.";
-
     // Token budgets. The model itself comes from Anthropic:Model — no call site names one.
     private const int AssistMaxTokens = 1024;
     private const int ChatMaxTokens = 2048;
@@ -31,19 +43,22 @@ public class IepAssistService : IIepAssistService
     private readonly IClaudeClient _claude;
     private readonly IAuditLogger _audit;
     private readonly ILogger<IepAssistService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public IepAssistService(
         ApplicationDbContext context,
         IOrgAccessService orgAccess,
         IClaudeClient claude,
         IAuditLogger audit,
-        ILogger<IepAssistService> logger)
+        ILogger<IepAssistService> logger,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
         _claude = claude;
         _audit = audit;
         _logger = logger;
+        _localizer = localizer;
     }
 
     // ---------------------------------------------------------------- Goal assist
@@ -52,13 +67,13 @@ public class IepAssistService : IIepAssistService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, ct);
         if (!access.Success)
-            return ServiceResult<AssistResultModel>.FailureResult(access.Message!);
+            return ServiceResult<AssistResultModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var goal = await _context.IepDraftGoals
             .AsNoTracking()
             .FirstOrDefaultAsync(g => g.Id == goalId && g.IepDraftId == draftId, ct);
         if (goal == null)
-            return ServiceResult<AssistResultModel>.FailureResult("Goal not found.");
+            return ServiceResult<AssistResultModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["IepAssist.GoalNotFound"]);
 
         var systemPrompt = GoalSystemPrompt;
         var userText = BuildGoalUserText(goal, kind);
@@ -71,13 +86,13 @@ public class IepAssistService : IIepAssistService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, ct);
         if (!access.Success)
-            return ServiceResult<AssistResultModel>.FailureResult(access.Message!);
+            return ServiceResult<AssistResultModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var section = await _context.IepDraftSections
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.Id == sectionId && s.IepDraftId == draftId, ct);
         if (section == null)
-            return ServiceResult<AssistResultModel>.FailureResult("Section not found.");
+            return ServiceResult<AssistResultModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["IepAssist.SectionNotFound"]);
 
         var systemPrompt = SectionSystemPrompt;
         var userText = BuildSectionUserText(section, kind);
@@ -90,13 +105,13 @@ public class IepAssistService : IIepAssistService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, ct);
         if (!access.Success)
-            return ServiceResult<AssistResultModel>.FailureResult(access.Message!);
+            return ServiceResult<AssistResultModel>.FailureResult(access.ErrorKind, access.Message!);
 
         var line = await _context.IepDraftServiceLines
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.Id == serviceLineId && s.IepDraftId == draftId, ct);
         if (line == null)
-            return ServiceResult<AssistResultModel>.FailureResult("Service line not found.");
+            return ServiceResult<AssistResultModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["IepAssist.ServiceLineNotFound"]);
 
         var systemPrompt = ServiceLineSystemPrompt;
         var userText = BuildServiceLineUserText(line, kind);
@@ -109,10 +124,10 @@ public class IepAssistService : IIepAssistService
     {
         var access = await ResolveDraftAccessAsync(userId, draftId, ct);
         if (!access.Success)
-            return ServiceResult<ChatReplyModel>.FailureResult(access.Message!);
+            return ServiceResult<ChatReplyModel>.FailureResult(access.ErrorKind, access.Message!);
 
         if (messages == null || messages.Count == 0)
-            return ServiceResult<ChatReplyModel>.FailureResult("At least one message is required.");
+            return ServiceResult<ChatReplyModel>.FailureResult(ServiceErrorKind.Validation, _localizer["IepAssist.AtLeastOneMessageRequired"]);
 
         // Load the full draft aggregate to render as context. Same split-query shape as IepDraftService.GetDraft.
         var draft = await _context.IepDrafts
@@ -125,12 +140,15 @@ public class IepAssistService : IIepAssistService
             .Include(d => d.TransitionItems)
             .FirstOrDefaultAsync(d => d.Id == draftId, ct);
         if (draft == null)
-            return ServiceResult<ChatReplyModel>.FailureResult(DraftNotFoundMessage);
+            return ServiceResult<ChatReplyModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["IepAssist.DraftNotFound"]);
 
         // Chat reads the whole draft, so record a single View audit entry (cheap, fire-and-forget).
         _audit.Record(AuditAction.View, userId, "IepDraft", draftId);
 
-        var systemPrompt = BuildChatSystemPrompt(draft);
+        // Multilingual plan phase 5: the reply goes straight to the requesting staff member, in their
+        // chosen UI language (RequestLocalization has already set CurrentUICulture by the time this
+        // controller action runs) — never persisted with its own generatedLanguage field.
+        var systemPrompt = BuildChatSystemPrompt(draft) + ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture);
         var userText = BuildChatUserText(messages);
 
         string? reply;
@@ -149,13 +167,13 @@ public class IepAssistService : IIepAssistService
             // uncaught 500. That only stayed hidden while the model was dead and the feature
             // unreachable; pointing it at a live model makes the gap real.
             _logger.LogError(ex, "IEP chat for draft {DraftId} failed with {Kind}", draftId, ex.Kind);
-            return ServiceResult<ChatReplyModel>.FailureResult(UnavailableMessage);
+            return ServiceResult<ChatReplyModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["IepAssist.Unavailable"]);
         }
 
         if (string.IsNullOrWhiteSpace(reply))
         {
             _logger.LogWarning("IEP chat: Claude returned no content for draft {DraftId}.", draftId);
-            return ServiceResult<ChatReplyModel>.FailureResult(UnavailableMessage);
+            return ServiceResult<ChatReplyModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["IepAssist.Unavailable"]);
         }
 
         return ServiceResult<ChatReplyModel>.SuccessResult(new ChatReplyModel { Reply = reply.Trim() });
@@ -165,6 +183,15 @@ public class IepAssistService : IIepAssistService
 
     private async Task<ServiceResult<AssistResultModel>> CompleteAssistAsync(string systemPrompt, string userText, CancellationToken ct)
     {
+        // Multilingual plan phase 5 review fix P2-7 (coordinator decision, superseding the phase 5
+        // reasoning this comment used to carry — "same reasoning as the chat path"): this suggestion
+        // (goal / section / service-line) is INSERTED DIRECTLY INTO A DRAFT FIELD if the staff member
+        // accepts it, and the draft is a district legal record in its own fixed language — never the
+        // staff member's UI language, which would insert mixed-language content into an otherwise
+        // single-language draft. So, unlike ChatAsync below, this path does NOT append
+        // ResponseLanguage.SystemLine; the suggestion always comes back in English regardless of
+        // CultureInfo.CurrentUICulture.
+
         string? suggestion;
         try
         {
@@ -178,13 +205,13 @@ public class IepAssistService : IIepAssistService
         catch (ClaudeApiException ex)
         {
             _logger.LogError(ex, "IEP assist failed with {Kind}", ex.Kind);
-            return ServiceResult<AssistResultModel>.FailureResult(UnavailableMessage);
+            return ServiceResult<AssistResultModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["IepAssist.Unavailable"]);
         }
 
         if (string.IsNullOrWhiteSpace(suggestion))
         {
             _logger.LogWarning("IEP assist: Claude returned no content.");
-            return ServiceResult<AssistResultModel>.FailureResult(UnavailableMessage);
+            return ServiceResult<AssistResultModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["IepAssist.Unavailable"]);
         }
 
         return ServiceResult<AssistResultModel>.SuccessResult(new AssistResultModel { Suggestion = suggestion.Trim() });
@@ -407,11 +434,11 @@ public class IepAssistService : IIepAssistService
             .FirstOrDefaultAsync(ct);
 
         if (studentId == null)
-            return ServiceResult.FailureResult(DraftNotFoundMessage);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["IepAssist.DraftNotFound"]);
 
         // Org access (player-coach: admins pass within scope; teachers need active Collaborator+).
         return await _orgAccess.CanActOnStudentAsync(userId, studentId.Value, AccessRole.Collaborator, ct)
             ? ServiceResult.SuccessResult()
-            : ServiceResult.FailureResult(PermissionMessage);
+            : ServiceResult.FailureResult(ServiceErrorKind.Forbidden, _localizer["IepAssist.Permission"]);
     }
 }

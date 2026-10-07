@@ -1,0 +1,43 @@
+{
+  "card": {
+    "heading": "Sobre {{name}} en casa",
+    "addNoteButton": "Agregar una nota",
+    "description": "Fortalezas, inquietudes, qué funciona. Las notas son privadas a menos que elija compartir alguna con el equipo escolar; las notas compartidas ayudan al equipo (y a sus sugerencias de IA) a ver a su hijo como usted lo ve.",
+    "loadingAriaLabel": "Cargando notas",
+    "loadErrorTitle": "No se pudieron cargar las notas",
+    "noNotesYet": "Aún no hay notas."
+  },
+  "addForm": {
+    "kindLabel": "Esto es",
+    "noteLabel": "Nota",
+    "sharedLabel": "Visible para el equipo escolar",
+    "saveButton": "Guardar",
+    "savedSharedToast": "Guardada y compartida con el equipo escolar",
+    "savedPrivateToast": "Guardada (privada)",
+    "saveFailedToast": "No se pudo guardar"
+  },
+  "item": {
+    "visibleBadge": "Visible para el equipo escolar",
+    "privateBadge": "Privada para su familia",
+    "makePrivateAction": "Hacer privada",
+    "shareAction": "Compartir",
+    "toggleAriaLabel": "{{action}}: {{excerpt}}",
+    "deleteAriaLabel": "Eliminar nota: {{excerpt}}",
+    "nowVisibleToast": "Ahora visible para el equipo escolar",
+    "nowPrivateToast": "Ahora privada",
+    "updateFailedToast": "No se pudo actualizar"
+  },
+  "deleteDialog": {
+    "title": "Eliminar nota",
+    "message": "¿Eliminar esta nota? Si se compartió, el equipo escolar ya no la verá.",
+    "confirmLabel": "Eliminar",
+    "deleteFailed": "No se pudo eliminar esta nota."
+  },
+  "kind": {
+    "Strength": "Una fortaleza",
+    "Concern": "Una inquietud",
+    "WorksAtHome": "Qué funciona en casa",
+    "Priority": "Una prioridad para este año",
+    "Other": "Algo más"
+  }
+}

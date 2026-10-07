@@ -1,5 +1,6 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 
 const api = vi.hoisted(() => ({
   listContributions: vi.fn(),
@@ -68,6 +69,17 @@ describe('AboutMyChildCard', () => {
     await waitFor(() => expect(screen.getByTestId('contribution-1')).toBeInTheDocument());
     expect(screen.queryByTestId('contribution-add')).not.toBeInTheDocument();
     expect(screen.queryByTestId('contribution-1-toggle')).not.toBeInTheDocument();
+  });
+
+  afterEach(() => resetTestLanguage());
+
+  it('renders the heading and visibility badges in Spanish', async () => {
+    await renderInSpanish(<AboutMyChildCard childId={4} childName="Jordan" canEdit />);
+    await waitFor(() => expect(screen.getByTestId('contribution-1')).toBeInTheDocument());
+
+    expect(screen.getByText('Sobre Jordan en casa')).toBeInTheDocument();
+    expect(screen.getByTestId('contribution-1-visibility')).toHaveTextContent('Visible para el equipo escolar');
+    expect(screen.getByTestId('contribution-2-visibility')).toHaveTextContent('Privada para su familia');
   });
 });
 

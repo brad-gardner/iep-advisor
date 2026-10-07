@@ -1,13 +1,15 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
 import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { useDocumentList } from '@/features/document-authoring/hooks/use-document-list';
 import { apiErrorMessage } from '@/lib/api-error';
+import { familyContactMethodLabel } from '@/lib/family-contact-label';
 import { toDateInputValue } from '@/lib/format-date';
 import { recordOfflineInput } from '../api/family-contact-api';
-import { FAMILY_CONTACT_METHODS, FAMILY_CONTACT_METHOD_LABELS } from '../types';
+import { FAMILY_CONTACT_METHODS } from '../types';
 import type { FamilyContactMethod, OfflineFamilyInputDto } from '../types';
 
 interface RecordOfflineInputFormProps {
@@ -21,6 +23,7 @@ const SUMMARY_MAX_LENGTH = 4000;
 /** Record family input received outside the app: method, date, a summary, and
  *  an optional link to the draft it pertains to (plan 7, decision 7). */
 export function RecordOfflineInputForm({ studentId, onLogged, onCancel }: RecordOfflineInputFormProps) {
+  const { t } = useTranslation(['family-contact', 'common']);
   const { documents } = useDocumentList(studentId);
   const [method, setMethod] = useState<FamilyContactMethod>('Letter');
   const [receivedAt, setReceivedAt] = useState(toDateInputValue(new Date().toISOString()));
@@ -46,10 +49,10 @@ export function RecordOfflineInputForm({ studentId, onLogged, onCancel }: Record
       if (res.success && res.data) {
         onLogged(res.data);
       } else {
-        setError(res.message ?? 'Could not record this input.');
+        setError(res.message ?? t('offlineForm.saveFailed'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not record this input.'));
+      setError(apiErrorMessage(err, t('offlineForm.saveFailed')));
     } finally {
       setIsSubmitting(false);
     }
@@ -64,19 +67,19 @@ export function RecordOfflineInputForm({ studentId, onLogged, onCancel }: Record
       )}
       <div className="grid gap-3 sm:grid-cols-2">
         <Select
-          label="Method *"
+          label={t('offlineForm.methodLabel')}
           value={method}
           onChange={(e) => setMethod(e.target.value as FamilyContactMethod)}
           data-testid="offline-input-method"
         >
           {FAMILY_CONTACT_METHODS.map((m) => (
             <option key={m} value={m}>
-              {FAMILY_CONTACT_METHOD_LABELS[m]}
+              {familyContactMethodLabel(m)}
             </option>
           ))}
         </Select>
         <Input
-          label="Received"
+          label={t('offlineForm.receivedLabel')}
           type="date"
           value={receivedAt}
           onChange={(e) => setReceivedAt(e.target.value)}
@@ -85,12 +88,12 @@ export function RecordOfflineInputForm({ studentId, onLogged, onCancel }: Record
       </div>
       {documents.length > 0 && (
         <Select
-          label="Linked draft (optional)"
+          label={t('offlineForm.linkedDraftLabel')}
           value={documentInstanceId}
           onChange={(e) => setDocumentInstanceId(e.target.value)}
           data-testid="offline-input-document"
         >
-          <option value="">None</option>
+          <option value="">{t('offlineForm.noneOption')}</option>
           {documents.map((d) => (
             <option key={d.id} value={d.id}>
               {d.documentTypeDisplayName}
@@ -99,7 +102,7 @@ export function RecordOfflineInputForm({ studentId, onLogged, onCancel }: Record
         </Select>
       )}
       <RichTextEditor
-        label="Summary *"
+        label={t('offlineForm.summaryLabel')}
         value={summary}
         onChange={setSummary}
         minRows={3}
@@ -109,10 +112,10 @@ export function RecordOfflineInputForm({ studentId, onLogged, onCancel }: Record
       />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={isSubmitting}>
-          Cancel
+          {t('common:ui.cancel')}
         </Button>
         <Button type="submit" size="sm" loading={isSubmitting} disabled={!canSubmit} data-testid="offline-input-submit">
-          Record input
+          {t('offlineForm.submitButton')}
         </Button>
       </div>
     </form>

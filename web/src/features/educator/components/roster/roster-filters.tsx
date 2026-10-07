@@ -1,12 +1,10 @@
 import { useEffect, useEffectEvent, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input, Select } from '@/components/ui/input';
 import type { DistrictSchool } from '@/features/district-admin/types';
-import {
-  GRADE_LEVELS,
-  GRADE_LEVEL_LABELS,
-  STUDENT_STATUSES,
-  STUDENT_STATUS_LABELS,
-} from '../../types';
+import { gradeLevelLabel } from '@/lib/grade-level-label';
+import { studentStatusLabel } from '../../lib/student-enum-labels';
+import { GRADE_LEVELS, STUDENT_STATUSES } from '../../types';
 import type { GradeLevel, StudentStatusFilter } from '../../types';
 import type { RosterQuery, RosterQueryPatch } from '../../hooks/use-roster-query';
 import { SchoolFilter } from '../school-filter';
@@ -23,6 +21,7 @@ interface RosterFiltersProps {
 // Server-driven roster filters. The search box is debounced so typing does
 // not fire a request per keystroke; every other control emits immediately.
 export function RosterFilters({ value, onChange, schools }: RosterFiltersProps) {
+  const { t } = useTranslation('educator');
   const [search, setSearch] = useState(value.q);
   // The last `q` this box sent up, and the last URL `q` it has seen. When the
   // URL changes from outside (sidebar link, deep link while mounted) the box
@@ -56,8 +55,8 @@ export function RosterFilters({ value, onChange, schools }: RosterFiltersProps) 
       <Input
         id="educator-students-search"
         type="search"
-        label="Search students"
-        placeholder="Name or student ID"
+        label={t('rosterFilters.searchLabel')}
+        placeholder={t('rosterFilters.searchPlaceholder')}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         data-testid="educator-students-search"
@@ -73,30 +72,30 @@ export function RosterFilters({ value, onChange, schools }: RosterFiltersProps) 
 
       <Select
         id="educator-students-status-filter"
-        label="Status"
+        label={t('rosterFilters.statusLabel')}
         value={value.status}
         onChange={(e) => onChange({ status: e.target.value as StudentStatusFilter })}
         data-testid="educator-students-status-filter"
       >
         {STUDENT_STATUSES.map((status) => (
           <option key={status} value={status}>
-            {STUDENT_STATUS_LABELS[status]}
+            {studentStatusLabel(status)}
           </option>
         ))}
-        <option value="All">All</option>
+        <option value="All">{t('rosterFilters.statusAll')}</option>
       </Select>
 
       <Select
         id="educator-students-grade-filter"
-        label="Grade"
+        label={t('rosterFilters.gradeLabel')}
         value={value.grade}
         onChange={(e) => onChange({ grade: e.target.value as GradeLevel | '' })}
         data-testid="educator-students-grade-filter"
       >
-        <option value="">All grades</option>
+        <option value="">{t('rosterFilters.gradeAll')}</option>
         {GRADE_LEVELS.map((grade) => (
           <option key={grade} value={grade}>
-            {GRADE_LEVEL_LABELS[grade]}
+            {gradeLevelLabel(grade)}
           </option>
         ))}
       </Select>

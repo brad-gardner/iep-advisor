@@ -1,12 +1,15 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -18,14 +21,24 @@ namespace IepAssistant.Services.Implementations;
 /// semantic-labelled rendering of the rest of the document is supplied as context. Same trust rules
 /// as the legacy assist: suggestions are never applied automatically, all document text is wrapped
 /// in data tags, and every call requires an active Collaborator+ grant on the student.
+///
+/// <para>Multilingual plan (2026-10-06) phase 5: every failure <c>DocumentAssistController</c> maps to
+/// a status carries an explicit <see cref="ServiceErrorKind"/>, and every message is localized
+/// (<c>Messages.resx</c>/<c>.es.resx</c>).</para>
+///
+/// <para><b>Phase 5 review fix P2-7 (coordinator decision) — language split between the two surfaces
+/// this service exposes:</b> <see cref="AssistAsync"/>'s suggestion (goal / section / service-line /
+/// generic-row) is INSERTED DIRECTLY INTO A DOCUMENT FIELD if accepted, and the document is a district
+/// legal record in its own fixed language — so <see cref="CompleteAssistAsync"/> never appends
+/// <see cref="ResponseLanguage.SystemLine"/>; it always comes back in English regardless of the
+/// requester's UI culture. <see cref="ChatAsync"/>'s reply is never inserted into the document — it is
+/// only ever shown to the requesting staff member — so it keeps appending
+/// <see cref="ResponseLanguage.SystemLine"/> for <see cref="CultureInfo.CurrentUICulture"/> (set by
+/// <c>RequestLocalization</c> from the signed-in user's saved preference), same as before. Neither path
+/// persists its own language/generatedLanguage field the way an AnalysisRun or MeetingBrief does.</para>
 /// </summary>
 public sealed class DocumentAssistService : IDocumentAssistService
 {
-    private const string PermissionMessage = "You do not have permission to access this document.";
-    private const string NotFoundMessage = "Document not found.";
-    private const string FieldNotFoundMessage = "Field not found on this document's template.";
-    private const string RowNotFoundMessage = "Row not found.";
-    private const string UnavailableMessage = "AI assist is temporarily unavailable.";
     private const int AssistMaxTokens = 2048;
     private const int ChatMaxTokens = 2048;
     private const int ContextCharBudget = 12_000;
@@ -38,6 +51,7 @@ public sealed class DocumentAssistService : IDocumentAssistService
     private readonly IClaudeClient _claude;
     private readonly IAuditLogger _audit;
     private readonly ILogger<DocumentAssistService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
     private readonly IStudentEvidenceService? _evidence;
     private const int EvidenceCharBudget = 9_000;
     private const int MaxEvidenceItemChars = 700;
@@ -48,6 +62,7 @@ public sealed class DocumentAssistService : IDocumentAssistService
         IClaudeClient claude,
         IAuditLogger audit,
         ILogger<DocumentAssistService> logger,
+        IStringLocalizer<Messages> localizer,
         IStudentEvidenceService? evidence = null)
     {
         _context = context;
@@ -55,6 +70,7 @@ public sealed class DocumentAssistService : IDocumentAssistService
         _claude = claude;
         _audit = audit;
         _logger = logger;
+        _localizer = localizer;
         _evidence = evidence;
     }
 
@@ -65,12 +81,12 @@ public sealed class DocumentAssistService : IDocumentAssistService
     {
         var loaded = await LoadAsync(userId, instanceId, ct);
         if (!loaded.Success)
-            return ServiceResult<AssistResultModel>.FailureResult(loaded.Message!);
+            return ServiceResult<AssistResultModel>.FailureResult(loaded.ErrorKind, loaded.Message!);
         var doc = loaded.Data!;
 
         var field = doc.FieldsByKey.GetValueOrDefault(fieldKey);
         if (field == null)
-            return ServiceResult<AssistResultModel>.FailureResult(FieldNotFoundMessage);
+            return ServiceResult<AssistResultModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["DocumentAssist.FieldNotFound"]);
 
         var (semantic, columnSemantics) = TemplateSemanticsReader.ReadField(field.FieldType, field.ConfigJson);
         var columnLabels = TemplateSemanticsReader.ReadColumnLabels(field.ConfigJson);
@@ -84,11 +100,11 @@ public sealed class DocumentAssistService : IDocumentAssistService
         if (field.FieldType == FieldType.Table)
         {
             if (rowId == null)
-                return ServiceResult<AssistResultModel>.FailureResult("A row is required for table assist.");
+                return ServiceResult<AssistResultModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DocumentAssist.RowRequired"]);
 
             var row = FindRow(doc.Values, fieldKey, rowId.Value);
             if (row == null)
-                return ServiceResult<AssistResultModel>.FailureResult(RowNotFoundMessage);
+                return ServiceResult<AssistResultModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["DocumentAssist.RowNotFound"]);
 
             (systemPrompt, var heading, var action) = semantic switch
             {
@@ -244,9 +260,9 @@ public sealed class DocumentAssistService : IDocumentAssistService
     {
         var loaded = await LoadAsync(userId, instanceId, ct);
         if (!loaded.Success)
-            return ServiceResult<ChatReplyModel>.FailureResult(loaded.Message!);
+            return ServiceResult<ChatReplyModel>.FailureResult(loaded.ErrorKind, loaded.Message!);
         if (messages == null || messages.Count == 0)
-            return ServiceResult<ChatReplyModel>.FailureResult("At least one message is required.");
+            return ServiceResult<ChatReplyModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DocumentAssist.AtLeastOneMessageRequired"]);
         // Bound the prompt: keep only the most recent turns (the client resends the whole thread).
         if (messages.Count > MaxChatTurns)
             messages = messages.Skip(messages.Count - MaxChatTurns).ToList();
@@ -260,6 +276,9 @@ public sealed class DocumentAssistService : IDocumentAssistService
         system.AppendLine("<document>");
         system.Append(RenderDocument(doc, excludeFieldKey: null, budget: ContextCharBudget));
         system.AppendLine("</document>");
+        // Multilingual plan phase 5: same reasoning as CompleteAssistAsync — the reply goes straight to
+        // the requesting staff member, in their chosen UI language.
+        system.Append(ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture));
 
         var user = new StringBuilder();
         user.AppendLine("Conversation so far:");
@@ -284,13 +303,13 @@ public sealed class DocumentAssistService : IDocumentAssistService
         catch (ClaudeApiException ex)
         {
             _logger.LogError(ex, "Document chat for instance {InstanceId} failed with {Kind}", instanceId, ex.Kind);
-            return ServiceResult<ChatReplyModel>.FailureResult(UnavailableMessage);
+            return ServiceResult<ChatReplyModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["DocumentAssist.Unavailable"]);
         }
 
         if (string.IsNullOrWhiteSpace(reply))
         {
             _logger.LogWarning("Document chat: Claude returned no content for instance {InstanceId}.", instanceId);
-            return ServiceResult<ChatReplyModel>.FailureResult(UnavailableMessage);
+            return ServiceResult<ChatReplyModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["DocumentAssist.Unavailable"]);
         }
 
         return ServiceResult<ChatReplyModel>.SuccessResult(new ChatReplyModel { Reply = reply.Trim() });
@@ -316,10 +335,10 @@ public sealed class DocumentAssistService : IDocumentAssistService
             .Select(i => new { i.SchoolStudentId, i.DocumentTemplateVersionId, i.ValuesJson, TypeName = i.DocumentType.DisplayName })
             .FirstOrDefaultAsync(ct);
         if (header == null)
-            return ServiceResult<LoadedDocument>.FailureResult(NotFoundMessage);
+            return ServiceResult<LoadedDocument>.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (!await _orgAccess.CanActOnStudentAsync(userId, header.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<LoadedDocument>.FailureResult(PermissionMessage);
+            return ServiceResult<LoadedDocument>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Documents.Permission"]);
 
         var sections = await _context.TemplateSections.AsNoTracking()
             .Where(s => s.DocumentTemplateVersionId == header.DocumentTemplateVersionId)
@@ -449,6 +468,15 @@ public sealed class DocumentAssistService : IDocumentAssistService
 
     private async Task<ServiceResult<AssistResultModel>> CompleteAssistAsync(string systemPrompt, string userText, int instanceId, CancellationToken ct)
     {
+        // Multilingual plan phase 5 review fix P2-7 (coordinator decision, superseding the phase 5
+        // reasoning this comment used to carry): the suggestion returned here (goal / section /
+        // service-line / generic-row) is INSERTED DIRECTLY INTO A DOCUMENT FIELD if the staff member
+        // accepts it, and the document is a district legal record in the document's own language —
+        // never the staff member's UI language, which would insert mixed-language content into an
+        // otherwise-English (or otherwise-Spanish) document. So, unlike ChatAsync below, this path does
+        // NOT append ResponseLanguage.SystemLine; the suggestion always comes back in English regardless
+        // of CultureInfo.CurrentUICulture.
+
         string? suggestion;
         try
         {
@@ -462,13 +490,13 @@ public sealed class DocumentAssistService : IDocumentAssistService
         catch (ClaudeApiException ex)
         {
             _logger.LogError(ex, "Document assist for instance {InstanceId} failed with {Kind}", instanceId, ex.Kind);
-            return ServiceResult<AssistResultModel>.FailureResult(UnavailableMessage);
+            return ServiceResult<AssistResultModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["DocumentAssist.Unavailable"]);
         }
 
         if (string.IsNullOrWhiteSpace(suggestion))
         {
             _logger.LogWarning("Document assist: Claude returned no content for instance {InstanceId}.", instanceId);
-            return ServiceResult<AssistResultModel>.FailureResult(UnavailableMessage);
+            return ServiceResult<AssistResultModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["DocumentAssist.Unavailable"]);
         }
 
         return ServiceResult<AssistResultModel>.SuccessResult(new AssistResultModel { Suggestion = suggestion.Trim() });

@@ -25,7 +25,14 @@ public enum ServiceErrorKind
     /// <summary>402 — an active subscription (or similar paid entitlement) is required. Added in the
     /// multilingual plan's phase 3 for <c>AnalysisRunService</c>'s "Active subscription required."
     /// failure, which its controller previously detected by matching the English word "subscription".</summary>
-    PaymentRequired
+    PaymentRequired,
+
+    /// <summary>422 — the request is well-formed but cannot be processed as-is (e.g. no Published
+    /// document template exists yet to pin). Added in the multilingual plan's phase 5 for
+    /// <c>TemplateResolutionService</c>'s "no document template" failure, which
+    /// <c>DocumentInstanceController</c> previously detected by matching the English phrase
+    /// "no document template".</summary>
+    Unprocessable
 }
 
 public class ServiceResult

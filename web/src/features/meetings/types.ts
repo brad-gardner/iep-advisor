@@ -16,26 +16,17 @@ export const MEETING_TYPES = [
   'Other',
 ] as const;
 export type MeetingType = (typeof MEETING_TYPES)[number];
-export const MEETING_TYPE_LABELS: Record<MeetingType, string> = {
-  AnnualReview: 'Annual review',
-  InitialIep: 'Initial IEP',
-  Amendment: 'Amendment',
-  EtrEligibility: 'ETR / eligibility',
-  Reevaluation: 'Reevaluation',
-  Transition: 'Transition',
-  ManifestationDetermination: 'Manifestation determination',
-  Other: 'Other',
-};
+// Display label: `@/lib/meeting-labels.ts`'s `meetingTypeLabel`
+// (`common:meetingType.*`, always eager — i18n plan phase 5). Every caller
+// now uses the helper, so the old `MEETING_TYPE_LABELS` English map was
+// removed outright.
 
 export const MEETING_STATUSES = ['Proposed', 'Scheduled', 'Held', 'Continued', 'Cancelled'] as const;
 export type MeetingStatus = (typeof MEETING_STATUSES)[number];
-export const MEETING_STATUS_LABELS: Record<MeetingStatus, string> = {
-  Proposed: 'Proposed',
-  Scheduled: 'Scheduled',
-  Held: 'Held',
-  Continued: 'Continued',
-  Cancelled: 'Cancelled',
-};
+// Display label: `@/lib/meeting-labels.ts`'s `meetingStatusLabel`
+// (`common:meetingStatus.*`, always eager — i18n plan phase 5). Every caller
+// now uses the helper, so the old `MEETING_STATUS_LABELS` English map was
+// removed outright.
 
 // The subset of statuses settable via POST /api/meetings/{id}/status.
 export const SETTABLE_MEETING_STATUSES = ['Scheduled', 'Held', 'Continued'] as const;
@@ -200,11 +191,10 @@ export interface DefaultParticipantDto {
 
 export const MEETING_DECISION_OUTCOMES = ['Agreed', 'Disagreed', 'Deferred'] as const;
 export type MeetingDecisionOutcome = (typeof MEETING_DECISION_OUTCOMES)[number];
-export const MEETING_DECISION_OUTCOME_LABELS: Record<MeetingDecisionOutcome, string> = {
-  Agreed: 'Agreed',
-  Disagreed: 'Disagreed',
-  Deferred: 'Deferred',
-};
+// Display label: `@/lib/meeting-labels.ts`'s `meetingDecisionOutcomeLabel`
+// (`meetings-staff:decisionOutcome.*`, staff-only — i18n plan phase 5).
+// Every caller now uses the helper, so the old
+// `MEETING_DECISION_OUTCOME_LABELS` English map was removed outright.
 
 export interface MeetingDecisionDto {
   id: number;

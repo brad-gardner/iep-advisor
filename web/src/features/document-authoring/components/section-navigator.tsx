@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import type { TemplateSectionDto } from '../types';
 import { jumpToSection, sectionDomId } from '../lib/section-dom';
@@ -15,10 +16,11 @@ interface SectionNavigatorProps {
  * chip row below `lg`.
  */
 export function SectionNavigator({ sections, activeId, onJump }: SectionNavigatorProps) {
+  const { t } = useTranslation('document-authoring');
   if (sections.length === 0) return null;
 
   return (
-    <nav aria-label="Document sections" className="lg:sticky lg:top-4 lg:self-start" data-testid="section-navigator">
+    <nav aria-label={t('sectionNavigator.ariaLabel')} className="lg:sticky lg:top-4 lg:self-start" data-testid="section-navigator">
       <ol className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
         {sections.map((s, i) => (
           <li key={s.id} className="shrink-0">
@@ -37,14 +39,21 @@ export function SectionNavigator({ sections, activeId, onJump }: SectionNavigato
               data-testid={`section-nav-${s.id}`}
             >
               <span className="mr-1.5 text-brand-slate-500">{i + 1}</span>
-              {s.title || 'Untitled section'}
+              {s.title || t('sectionCard.untitledSection')}
             </a>
           </li>
         ))}
       </ol>
       <p className="mt-2 hidden text-xs text-brand-slate-500 lg:block">
-        Press <kbd className="rounded border px-1">[</kbd> / <kbd className="rounded border px-1">]</kbd> to move between
-        sections · <kbd className="rounded border px-1">E</kbd> to edit
+        <Trans
+          t={t}
+          i18nKey="sectionNavigator.shortcutHint"
+          components={{
+            bracketOpen: <kbd className="rounded border px-1" />,
+            bracketClose: <kbd className="rounded border px-1" />,
+            editKey: <kbd className="rounded border px-1" />,
+          }}
+        />
       </p>
     </nav>
   );

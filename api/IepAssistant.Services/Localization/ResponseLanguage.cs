@@ -31,9 +31,19 @@ public static class ResponseLanguage
     /// and names exactly as written (never translate or alter a quotation), and names the glossary as the
     /// source of truth for special-education terminology so vocabulary stays consistent with the rest of
     /// the Spanish site.
+    ///
+    /// <para>Phase 5 review fix P3-8: dropped "for a US family" — this ONE instruction is shared by
+    /// every Spanish-preferring requester <see cref="SystemLine"/> is called for, staff and parents
+    /// alike (e.g. <c>DocumentAssistService.ChatAsync</c>, <c>MeetingBriefService</c>), not just the
+    /// family-facing callers it was originally written for, so the audience assumption baked into the
+    /// text was wrong for every staff caller. Everything else — neutral Latin American Spanish, formal
+    /// "usted", the acronym/glossary rules — is unchanged, and this also changes the Spanish instruction
+    /// seen by parent-facing callers (fine: it was never a USER-visible string, only a system-prompt
+    /// instruction, and "neutral Latin American Spanish" alone already says everything the dropped
+    /// phrase added).</para>
     /// </summary>
     private const string SpanishInstruction =
-        "\n\nRESPONSE LANGUAGE: Respond in Spanish — neutral Latin American Spanish for a US family, " +
+        "\n\nRESPONSE LANGUAGE: Respond in Spanish — neutral Latin American Spanish, " +
         "formal \"usted\" throughout (never \"tú\"/\"vosotros\"). Keep the special-education acronyms " +
         "IEP, ETR, IDEA, FAPE and LRE exactly as written — do not translate or spell them out differently. " +
         "Keep any quoted document text, names and dates exactly as given to you, in their original " +

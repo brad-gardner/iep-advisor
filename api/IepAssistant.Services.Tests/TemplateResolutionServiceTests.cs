@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
+using IepAssistant.Services.Models;
 using Xunit;
 
 namespace IepAssistant.Services.Tests;
@@ -37,7 +39,7 @@ public sealed class TemplateResolutionServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private TemplateResolutionService CreateService(ApplicationDbContext ctx)
-        => new(ctx, NullLogger<TemplateResolutionService>.Instance);
+        => new(ctx, NullLogger<TemplateResolutionService>.Instance, TestSupport.TestLocalizers.Messages());
 
     /// <summary>Seeds a template for (state, docType) with the given versions; returns the created version ids keyed by version number.</summary>
     private Dictionary<int, int> SeedTemplate(string? state, int docTypeId, params (int Number, TemplateVersionStatus Status)[] versions)
@@ -173,6 +175,20 @@ public sealed class TemplateResolutionServiceTests : IDisposable
 
         Assert.False(result.Success);
         Assert.Contains("no document template", result.Message!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5
+
+    [Fact]
+    public async Task Resolve_NoTemplate_UnderSpanishCulture_MessageIsSpanish_AndIsUnprocessableViaErrorKind()
+    {
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).ResolveAsync(null, IepTypeId);
+
+        Assert.False(result.Success);
+        Assert.Equal("Todavía no hay una plantilla de documento disponible para este tipo de documento. Pida a un administrador que publique una.", result.Message);
+        Assert.Equal(ServiceErrorKind.Unprocessable, result.ErrorKind);
     }
 
     public void Dispose() => _connection.Dispose();

@@ -1,9 +1,11 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Evaluations;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -13,6 +15,10 @@ namespace IepAssistant.Api.Controllers;
 /// Evaluation case lifecycle: referral → consent → clock → determination → ETR handoff (plan 7, decision
 /// 1). Declares only <c>[Authorize]</c> — per-resource authorization (Viewer+ to read, Collaborator+ to
 /// write) is enforced inside <see cref="IEvaluationCaseService"/>.
+///
+/// Multilingual plan (2026-10-06) phase 5: failures map via the shared
+/// <see cref="ServiceFailureMapperExtensions.MapServiceFailure"/>, switching on each result's
+/// <see cref="ServiceErrorKind"/> rather than matching (possibly Spanish) message text.
 /// </summary>
 [ApiController]
 [Authorize]
@@ -22,10 +28,12 @@ public class EvaluationCaseController : ControllerBase
     private const long MaxConsentFileBytes = 10 * 1024 * 1024;
 
     private readonly IEvaluationCaseService _cases;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public EvaluationCaseController(IEvaluationCaseService cases)
+    public EvaluationCaseController(IEvaluationCaseService cases, IStringLocalizer<Messages> localizer)
     {
         _cases = cases;
+        _localizer = localizer;
     }
 
     [HttpGet]
@@ -34,7 +42,7 @@ public class EvaluationCaseController : ControllerBase
     public async Task<IActionResult> Get(int studentId, CancellationToken ct)
     {
         var result = await _cases.GetForStudentAsync(User.GetUserId(), studentId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<EvaluationCaseDto?>.SuccessResponse(result.Data == null ? null : EvaluationMappers.MapCase(result.Data)));
     }
 
@@ -44,7 +52,7 @@ public class EvaluationCaseController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Create(int studentId, [FromBody] CreateEvaluationCaseRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _cases.CreateAsync(User.GetUserId(), studentId, new CreateEvaluationCaseModel
         {
@@ -52,7 +60,7 @@ public class EvaluationCaseController : ControllerBase
             ReferralDate = request.ReferralDate,
             ReferralSource = request.ReferralSource
         }, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var dto = EvaluationMappers.MapCase(result.Data!);
         return CreatedAtAction(nameof(Get), new { studentId }, ApiResponse<EvaluationCaseDto>.SuccessResponse(dto));
@@ -65,7 +73,7 @@ public class EvaluationCaseController : ControllerBase
     public async Task<IActionResult> RequestConsent(int studentId, [FromBody] RequestConsentRequest? request, CancellationToken ct)
     {
         var result = await _cases.RequestConsentAsync(User.GetUserId(), studentId, request?.RequestedAt, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<EvaluationCaseDto>.SuccessResponse(EvaluationMappers.MapCase(result.Data!)));
     }
 
@@ -107,12 +115,12 @@ public class EvaluationCaseController : ControllerBase
             }
             catch (JsonException)
             {
-                return BadRequest(ApiResponse<object>.Error("Invalid request body."));
+                return BadRequest(ApiResponse<object>.Error(_localizer["EvaluationCasesApi.InvalidRequestBody"]));
             }
         }
 
         if (receivedAt == null)
-            return BadRequest(ApiResponse<object>.Error("receivedAt is required."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["EvaluationCasesApi.ReceivedAtRequired"]));
 
         var result = await _cases.ReceiveConsentAsync(User.GetUserId(), studentId, new ReceiveConsentModel
         {
@@ -121,7 +129,7 @@ public class EvaluationCaseController : ControllerBase
             FileName = fileName,
             ContentType = contentType
         }, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<EvaluationCaseDto>.SuccessResponse(EvaluationMappers.MapCase(result.Data!)));
     }
 
@@ -132,7 +140,7 @@ public class EvaluationCaseController : ControllerBase
     public async Task<IActionResult> GetConsentDownloadUrl(int studentId, CancellationToken ct)
     {
         var result = await _cases.GetConsentDownloadUrlAsync(User.GetUserId(), studentId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<string>.SuccessResponse(result.Data));
     }
 
@@ -142,14 +150,14 @@ public class EvaluationCaseController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> OverrideDueDate(int studentId, [FromBody] OverrideDueDateRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _cases.OverrideDueDateAsync(User.GetUserId(), studentId, new OverrideDueDateModel
         {
             DeterminationDueDate = request.DeterminationDueDate,
             Reason = request.Reason
         }, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<EvaluationCaseDto>.SuccessResponse(EvaluationMappers.MapCase(result.Data!)));
     }
 
@@ -159,7 +167,7 @@ public class EvaluationCaseController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> AddAssignment(int studentId, [FromBody] CreateEvaluatorAssignmentRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _cases.AddAssignmentAsync(User.GetUserId(), studentId, new CreateEvaluatorAssignmentModel
         {
@@ -167,7 +175,7 @@ public class EvaluationCaseController : ControllerBase
             Domain = request.Domain,
             DueDate = request.DueDate
         }, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var dto = EvaluationMappers.MapAssignment(result.Data!);
         return Created($"/api/educator/students/{studentId}/evaluation/assignments/{dto.Id}", ApiResponse<EvaluatorAssignmentDto>.SuccessResponse(dto));
@@ -186,7 +194,7 @@ public class EvaluationCaseController : ControllerBase
             Notes = request.Notes,
             DueDate = request.DueDate
         }, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<EvaluatorAssignmentDto>.SuccessResponse(EvaluationMappers.MapAssignment(result.Data!)));
     }
 
@@ -197,7 +205,7 @@ public class EvaluationCaseController : ControllerBase
     public async Task<IActionResult> RemoveAssignment(int studentId, int assignmentId, CancellationToken ct)
     {
         var result = await _cases.RemoveAssignmentAsync(User.GetUserId(), assignmentId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return NoContent();
     }
 
@@ -207,7 +215,7 @@ public class EvaluationCaseController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Determine(int studentId, [FromBody] DetermineEvaluationRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _cases.DetermineAsync(User.GetUserId(), studentId, new DetermineEvaluationModel
         {
@@ -216,7 +224,7 @@ public class EvaluationCaseController : ControllerBase
             Rationale = request.Rationale,
             EtrAuthoredVersionId = request.EtrAuthoredVersionId
         }, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<EvaluationCaseDto>.SuccessResponse(EvaluationMappers.MapCase(result.Data!)));
     }
 
@@ -227,7 +235,7 @@ public class EvaluationCaseController : ControllerBase
     public async Task<IActionResult> Close(int studentId, CancellationToken ct)
     {
         var result = await _cases.CloseAsync(User.GetUserId(), studentId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<EvaluationCaseDto>.SuccessResponse(EvaluationMappers.MapCase(result.Data!)));
     }
 
@@ -238,19 +246,8 @@ public class EvaluationCaseController : ControllerBase
     public async Task<IActionResult> CreateIep(int studentId, CancellationToken ct)
     {
         var result = await _cases.CreateIepFromEtrAsync(User.GetUserId(), studentId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return StatusCode(StatusCodes.Status201Created, ApiResponse<CreateIepResponseDto>.SuccessResponse(new CreateIepResponseDto { InstanceId = result.Data }));
     }
 
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

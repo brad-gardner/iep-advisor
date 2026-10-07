@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderInSpanish, resetTestLanguage } from '@/test/i18n-test-utils';
 
 const familyContactApi = vi.hoisted(() => ({
   getContactAttempts: vi.fn(),
@@ -16,7 +17,12 @@ vi.mock('@/features/document-authoring/hooks/use-document-list', () => ({
 }));
 
 import { FamilyContactCard } from './family-contact-card';
-
+// `family-contact` is a staff-only namespace (plan phase 5) — its English
+// isn't bundled in `resources` (see `lib/i18n/index.ts`), only registered
+// by this side-effect import, exactly as the real lazy route chunk
+// (`app/lazy-routes/staff-routes.tsx`) registers it before the page that
+// hosts this card (the educator student detail page) can render.
+import '@/app/lazy-routes/staff-locales';
 describe('FamilyContactCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -24,6 +30,8 @@ describe('FamilyContactCard', () => {
     familyContactApi.getContactAttempts.mockResolvedValue({ success: true, data: [] });
     familyContactApi.getOfflineInput.mockResolvedValue({ success: true, data: [] });
   });
+
+  afterEach(() => resetTestLanguage());
 
   it('shows empty hints for both lists when there is no history', async () => {
     render(<FamilyContactCard studentId={10} />);
@@ -113,5 +121,14 @@ describe('FamilyContactCard', () => {
     expect(await screen.findByTestId('contact-attempt-3')).toBeInTheDocument();
     const strong = screen.getByText('confirmed');
     expect(strong.tagName).toBe('STRONG');
+  });
+
+  it('renders the heading and section labels in Spanish', async () => {
+    await renderInSpanish(<FamilyContactCard studentId={10} />, { ns: 'family-contact' });
+
+    expect(await screen.findByText('Contacto con la familia')).toBeInTheDocument();
+    expect(screen.getByText('Intentos de contacto')).toBeInTheDocument();
+    expect(screen.getByText('Aún no se han registrado intentos de contacto.')).toBeInTheDocument();
+    expect(screen.getByText('Aporte sin conexión')).toBeInTheDocument();
   });
 });

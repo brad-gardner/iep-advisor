@@ -2990,6 +2990,10 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Property<int>("GeneratedByUserId")
                         .HasColumnType("int");
 
+                    b.Property<string>("Language")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<int>("MeetingId")
                         .HasColumnType("int");
 

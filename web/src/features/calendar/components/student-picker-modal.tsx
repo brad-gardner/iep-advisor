@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
@@ -14,6 +15,7 @@ interface StudentPickerModalProps {
 /** Search-and-pick a student, used to start "Schedule meeting" from the
  * calendar (which has no student in context yet). */
 export function StudentPickerModal({ open, onClose, onSelect }: StudentPickerModalProps) {
+  const { t } = useTranslation('calendar');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SchoolStudent[] | null>(null);
 
@@ -35,22 +37,22 @@ export function StudentPickerModal({ open, onClose, onSelect }: StudentPickerMod
   }, [open, query]);
 
   return (
-    <Modal open={open} onClose={onClose} title="Schedule meeting" data-testid="student-picker-modal">
+    <Modal open={open} onClose={onClose} title={t('studentPicker.title')} data-testid="student-picker-modal">
       <div className="space-y-3">
         <Input
           id="student-picker-search"
-          label="Find a student"
+          label={t('studentPicker.findStudentLabel')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Name or student ID"
+          placeholder={t('studentPicker.placeholder')}
           autoFocus
         />
         {results === null ? (
           <div className="flex justify-center py-6">
-            <Spinner label="Searching…" />
+            <Spinner label={t('studentPicker.searching')} />
           </div>
         ) : results.length === 0 ? (
-          <p className="py-4 text-center text-sm text-brand-slate-500">No students found.</p>
+          <p className="py-4 text-center text-sm text-brand-slate-500">{t('studentPicker.noResults')}</p>
         ) : (
           <ul className="max-h-72 divide-y divide-brand-slate-100 overflow-y-auto rounded-input border border-brand-slate-200">
             {results.map((student) => (

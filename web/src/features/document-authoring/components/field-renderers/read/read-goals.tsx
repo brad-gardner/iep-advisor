@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Ruler, CalendarClock, ListChecks } from 'lucide-react';
 import { parseConfig } from '@/features/admin/templates/template-config';
 import { ROW_CONFIRMED_KEY, ROW_OBJECTIVES_KEY } from '@/features/admin/templates/document-semantics';
@@ -22,6 +23,11 @@ import type { ReadFieldRendererProps } from './types';
  * directly in that goal's focused editor, instead of the generic Edit.
  */
 export function ReadGoals({ field, value, onEditRow }: ReadFieldRendererProps) {
+  // `educator` alongside `document-authoring`: `resolveOwnerDisplay` below
+  // renders a `teamRoleLabel` (`educator:teamRole.*`, staff-only) — this
+  // hook call is what makes a language switch re-render once that
+  // namespace's Spanish loads.
+  const { t } = useTranslation(['document-authoring', 'educator']);
   const config = parseConfig(field.fieldType, field.configJson);
   const columns = config.kind === 'Table' ? config.table.columns : [];
   const domainCol = columns.find((c) => c.semantic === 'domain');
@@ -34,13 +40,11 @@ export function ReadGoals({ field, value, onEditRow }: ReadFieldRendererProps) {
   return (
     <div id={fieldElementId(field.id)} data-testid={`read-field-${field.fieldKey}`}>
       <div className="flex items-baseline gap-2">
-        <h3 className="text-[13px] font-medium text-brand-slate-500">{field.label || 'Untitled field'}</h3>
-        <span className="text-xs text-brand-slate-500">
-          {rows.length} goal{rows.length === 1 ? '' : 's'}
-        </span>
+        <h3 className="text-[13px] font-medium text-brand-slate-500">{field.label || t('readShared.untitledField')}</h3>
+        <span className="text-xs text-brand-slate-500">{t('readGoals.goalCount', { count: rows.length })}</span>
       </div>
       {rows.length === 0 ? (
-        <p className="mt-0.5 text-[15px] italic text-brand-slate-500">No goals yet.</p>
+        <p className="mt-0.5 text-[15px] italic text-brand-slate-500">{t('readGoals.noGoalsYet')}</p>
       ) : (
         <ol className="mt-2 space-y-3">
           {rows.map((row, index) => (
@@ -101,6 +105,7 @@ export function GoalReadCard({
   editButtonId,
   testIdPrefix,
 }: GoalReadCardProps) {
+  const { t } = useTranslation('document-authoring');
   const prefix = testIdPrefix ?? `read-goal-${index}`;
   const carried = carriedFrom(row);
   const reviewed = row.cells[ROW_CONFIRMED_KEY] === true;
@@ -135,9 +140,11 @@ export function GoalReadCard({
                 )}
                 data-testid={`${prefix}-carried`}
               >
-                Carried from {carried.label ?? 'prior version'}
-                {carried.date ? ` (${formatCarriedDate(carried.date)})` : ''}
-                {!reviewed && ' · needs review'}
+                {t(reviewed ? 'readShared.carriedFrom' : 'readShared.carriedFromNeedsReview', {
+                  label: carried.date
+                    ? `${carried.label ?? t('readShared.priorVersion')} (${formatCarriedDate(carried.date)})`
+                    : carried.label ?? t('readShared.priorVersion'),
+                })}
               </span>
             )}
           </div>
@@ -146,7 +153,7 @@ export function GoalReadCard({
               <Markdown content={text} disableLinks />
             </div>
           ) : (
-            <p className="mt-2 text-[15px] italic text-brand-slate-500">No goal statement yet</p>
+            <p className="mt-2 text-[15px] italic text-brand-slate-500">{t('readGoals.noGoalStatementYet')}</p>
           )}
           <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-brand-slate-600">
             {measurementText && (
@@ -163,7 +170,7 @@ export function GoalReadCard({
             )}
             <span className="inline-flex items-center gap-1.5">
               <ListChecks className="h-3.5 w-3.5 text-brand-slate-400" aria-hidden="true" />
-              {objectivesCount} objective{objectivesCount === 1 ? '' : 's'}
+              {t('readGoals.objectiveCount', { count: objectivesCount })}
             </span>
           </div>
         </div>
@@ -171,7 +178,7 @@ export function GoalReadCard({
           {owner ? (
             <span className={cn('text-sm text-brand-slate-600', owner.former && 'italic')}>{owner.label}</span>
           ) : (
-            <span className="text-xs text-brand-amber-600">No owner</span>
+            <span className="text-xs text-brand-amber-600">{t('readShared.noOwner')}</span>
           )}
           {onEdit && (
             <Button
@@ -179,10 +186,10 @@ export function GoalReadCard({
               variant="secondary"
               size="sm"
               onClick={onEdit}
-              aria-label={`Edit goal ${index + 1}`}
+              aria-label={t('readGoals.editGoalAriaLabel', { number: index + 1 })}
               data-testid={`${prefix}-edit`}
             >
-              Edit goal
+              {t('readGoals.editGoal')}
             </Button>
           )}
         </div>

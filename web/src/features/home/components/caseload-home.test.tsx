@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+// `obligations` is a staff-only namespace (plan phase 5) — `DueSoonSection`
+// now names it in its own `useTranslation` call (for `obligationKindLabel`),
+// so its English must be registered the same way the real staff route
+// chunk does. See `docs/i18n/README.md`'s "Staff and admin namespaces".
+import '@/app/lazy-routes/staff-locales';
 import {
   makeHomeDraft,
   makeHomeMeeting,

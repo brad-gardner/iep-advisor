@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
@@ -16,6 +17,7 @@ interface ConsentSectionProps {
 /** Consent request (date-stamp only) → receive (date + optional PDF) →
  *  download link, once uploaded. */
 export function ConsentSection({ studentId, evaluation, onChanged }: ConsentSectionProps) {
+  const { t } = useTranslation('evaluation');
   const [isRequesting, setIsRequesting] = useState(false);
   const [receivedAt, setReceivedAt] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -30,9 +32,9 @@ export function ConsentSection({ studentId, evaluation, onChanged }: ConsentSect
     try {
       const res = await requestConsent(studentId);
       if (res.success && res.data) onChanged(res.data);
-      else setError(res.message ?? 'Could not request consent.');
+      else setError(res.message ?? t('consentSection.requestFailed'));
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not request consent.'));
+      setError(apiErrorMessage(err, t('consentSection.requestFailed')));
     } finally {
       setIsRequesting(false);
     }
@@ -41,7 +43,7 @@ export function ConsentSection({ studentId, evaluation, onChanged }: ConsentSect
   const handleReceive = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!receivedAt) {
-      setError('Received date is required.');
+      setError(t('consentSection.receivedDateRequired'));
       return;
     }
     setIsReceiving(true);
@@ -54,10 +56,10 @@ export function ConsentSection({ studentId, evaluation, onChanged }: ConsentSect
         setFile(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
       } else {
-        setError(res.message ?? 'Could not record consent.');
+        setError(res.message ?? t('consentSection.recordFailed'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not record consent.'));
+      setError(apiErrorMessage(err, t('consentSection.recordFailed')));
     } finally {
       setIsReceiving(false);
     }
@@ -71,10 +73,10 @@ export function ConsentSection({ studentId, evaluation, onChanged }: ConsentSect
       if (res.success && res.data) {
         window.open(res.data, '_blank', 'noopener,noreferrer');
       } else {
-        setError(res.message ?? 'Could not prepare the download.');
+        setError(res.message ?? t('consentSection.downloadFailed'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not prepare the download.'));
+      setError(apiErrorMessage(err, t('consentSection.downloadFailed')));
     } finally {
       setIsDownloading(false);
     }
@@ -82,7 +84,7 @@ export function ConsentSection({ studentId, evaluation, onChanged }: ConsentSect
 
   return (
     <div className="space-y-3" data-testid="evaluation-consent-section">
-      <h3 className="text-sm font-medium text-brand-slate-600">Consent</h3>
+      <h3 className="text-sm font-medium text-brand-slate-600">{t('consentSection.heading')}</h3>
 
       {error && (
         <div role="alert">
@@ -98,18 +100,18 @@ export function ConsentSection({ studentId, evaluation, onChanged }: ConsentSect
           loading={isRequesting}
           data-testid="evaluation-consent-request"
         >
-          Request consent
+          {t('consentSection.requestButton')}
         </Button>
       )}
 
       {evaluation.consentRequestedAt && !evaluation.consentReceivedAt && (
         <form onSubmit={handleReceive} className="space-y-3">
           <p className="text-sm text-brand-slate-500">
-            Consent requested {formatDate(evaluation.consentRequestedAt)}.
+            {t('consentSection.consentRequestedOn', { date: formatDate(evaluation.consentRequestedAt) })}
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Input
-              label="Consent received *"
+              label={t('consentSection.receivedDateLabel')}
               type="date"
               required
               value={receivedAt}
@@ -118,7 +120,7 @@ export function ConsentSection({ studentId, evaluation, onChanged }: ConsentSect
             />
             <div>
               <label className="mb-1 block text-[13px] font-medium text-brand-slate-600" htmlFor="evaluation-consent-file">
-                Consent document (optional PDF)
+                {t('consentSection.fileLabel')}
               </label>
               <input
                 id="evaluation-consent-file"
@@ -132,14 +134,14 @@ export function ConsentSection({ studentId, evaluation, onChanged }: ConsentSect
             </div>
           </div>
           <Button type="submit" size="sm" loading={isReceiving} data-testid="evaluation-consent-receive-submit">
-            Record consent received
+            {t('consentSection.recordReceivedButton')}
           </Button>
         </form>
       )}
 
       {evaluation.consentReceivedAt && (
         <div className="flex flex-wrap items-center gap-3 text-sm text-brand-slate-600">
-          <span>Consent received {formatDate(evaluation.consentReceivedAt)}.</span>
+          <span>{t('consentSection.consentReceivedOn', { date: formatDate(evaluation.consentReceivedAt) })}</span>
           {evaluation.hasConsentDocument && (
             <Button
               variant="ghost"
@@ -148,7 +150,9 @@ export function ConsentSection({ studentId, evaluation, onChanged }: ConsentSect
               loading={isDownloading}
               data-testid="evaluation-consent-download"
             >
-              Download {evaluation.consentFileName ?? 'consent document'}
+              {t('consentSection.downloadButton', {
+                name: evaluation.consentFileName ?? t('consentSection.defaultFileName'),
+              })}
             </Button>
           )}
         </div>

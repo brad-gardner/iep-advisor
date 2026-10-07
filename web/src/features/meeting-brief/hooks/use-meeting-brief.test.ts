@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { MeetingBriefDto } from '../types';
-
+// `meeting-brief` is a staff-only namespace (plan phase 5) — its English
+// isn't bundled in `resources` (see `lib/i18n/index.ts`), only registered by
+// this side-effect import, exactly as the page's real lazy route chunk
+// (`app/lazy-routes/staff-routes.tsx`) registers it. The hook calls
+// `useTranslation('meeting-brief')`, so even this hook-only test needs it.
+import '@/app/lazy-routes/staff-locales';
 const briefApi = vi.hoisted(() => ({ getBrief: vi.fn(), generateBrief: vi.fn() }));
 vi.mock('../api/meeting-brief-api', () => briefApi);
 

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
@@ -18,9 +19,11 @@ namespace IepAssistant.Services.Implementations;
 /// notes, analyses, advocacy goals and unshared student entries are never included — the bundle is
 /// built with the acting staff member's access and nothing more.
 /// </summary>
+/// <summary>Multilingual plan (2026-10-06) phase 5: both failures <c>StudentEvidenceController</c> maps
+/// to a status carry an explicit <see cref="ServiceErrorKind"/>, and the message is localized
+/// (<c>Messages.resx</c>/<c>.es.resx</c>).</summary>
 public sealed class StudentEvidenceService : IStudentEvidenceService
 {
-    private const string PermissionMessage = "You do not have permission to view this student.";
     private static readonly Regex TagStripper = new("<[^>]+>", RegexOptions.Compiled);
 
     private readonly ApplicationDbContext _context;
@@ -28,25 +31,28 @@ public sealed class StudentEvidenceService : IStudentEvidenceService
     private readonly IStudentWorkspaceService _workspace;
     private readonly IParentContributionService _contributions;
     private readonly IAuditLogger _audit;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public StudentEvidenceService(
         ApplicationDbContext context,
         IOrgAccessService orgAccess,
         IStudentWorkspaceService workspace,
         IParentContributionService contributions,
-        IAuditLogger audit)
+        IAuditLogger audit,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
         _workspace = workspace;
         _contributions = contributions;
         _audit = audit;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<StudentEvidenceBundle>> BuildForStaffAsync(int userId, int schoolStudentId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, schoolStudentId, AccessRole.Viewer, ct))
-            return ServiceResult<StudentEvidenceBundle>.FailureResult(PermissionMessage);
+            return ServiceResult<StudentEvidenceBundle>.FailureResult(ServiceErrorKind.Forbidden, _localizer["StudentEvidence.Permission"]);
 
         var items = new List<EvidenceItem>();
         var sources = new List<EvidenceSource>();
@@ -64,7 +70,7 @@ public sealed class StudentEvidenceService : IStudentEvidenceService
             })
             .FirstOrDefaultAsync(ct);
         if (student == null)
-            return ServiceResult<StudentEvidenceBundle>.FailureResult("Student not found.");
+            return ServiceResult<StudentEvidenceBundle>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.StudentNotFound"]);
 
         var identity = new List<string> { $"Name: {student.FirstName} {student.LastName}".Trim() };
         if (student.DateOfBirth is { } dob) identity.Add($"Date of birth: {dob:yyyy-MM-dd} (age {Age(dob)})");

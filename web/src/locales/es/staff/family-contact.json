@@ -1,0 +1,43 @@
+{
+  "card": {
+    "heading": "Contacto con la familia",
+    "contactAttemptsHeading": "Intentos de contacto",
+    "logAttemptButton": "Registrar intento",
+    "noAttemptsYet": "Aún no se han registrado intentos de contacto.",
+    "offlineInputHeading": "Aporte sin conexión",
+    "recordInputButton": "Registrar aporte",
+    "noInputYet": "Aún no se ha registrado ningún aporte sin conexión.",
+    "loadFailed": "No se pudo cargar el historial de contacto con la familia."
+  },
+  "logForm": {
+    "methodLabel": "Método *",
+    "outcomeLabel": "Resultado *",
+    "dateLabel": "Fecha",
+    "noteLabel": "Nota (opcional)",
+    "submitButton": "Registrar intento",
+    "saveFailed": "No se pudo registrar este intento de contacto."
+  },
+  "offlineForm": {
+    "methodLabel": "Método *",
+    "receivedLabel": "Recibido",
+    "linkedDraftLabel": "Borrador vinculado (opcional)",
+    "noneOption": "Ninguno",
+    "summaryLabel": "Resumen *",
+    "submitButton": "Registrar aporte",
+    "saveFailed": "No se pudo registrar este aporte."
+  },
+  "method": {
+    "Email": "Correo electrónico",
+    "Phone": "Teléfono",
+    "Letter": "Carta",
+    "InPerson": "En persona",
+    "Portal": "Portal"
+  },
+  "outcome": {
+    "Reached": "Contactado",
+    "NoAnswer": "Sin respuesta",
+    "LeftMessage": "Se dejó un mensaje",
+    "Declined": "Rechazado",
+    "Returned": "Llamada/mensaje devuelto"
+  }
+}

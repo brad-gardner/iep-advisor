@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import type { TableColumn } from '@/components/ui/table';
-import { GRADE_LEVEL_LABELS } from '../../types';
+import i18n from '@/lib/i18n';
+import { gradeLevelLabel } from '@/lib/grade-level-label';
 import type { SchoolStudent } from '../../types';
 import { StudentStatusBadge } from '../student-status-badge';
 
@@ -10,17 +11,22 @@ export function studentDisplayName(student: SchoolStudent): string {
 
 // Roster columns. Sorting is page-local (the server pages; the Table sorts the
 // rows it was given), which is why `sortValue` stays on the simple columns.
+// Header text uses the plain `i18n.t` singleton (not a hook — this is a
+// builder function, not a component) and is called fresh on every render of
+// the host page rather than memoized, so a language switch is reflected
+// immediately (see `educator-students-page.tsx`).
 export function rosterColumns(options: { showSchool: boolean }): TableColumn<SchoolStudent>[] {
+  const t = i18n.t;
   const columns: TableColumn<SchoolStudent>[] = [
     {
       key: 'name',
-      header: 'Student',
+      header: t('educator:rosterColumns.student'),
       cell: studentDisplayName,
       sortValue: (s) => studentDisplayName(s).toLowerCase(),
     },
     {
       key: 'externalId',
-      header: 'Student ID',
+      header: t('educator:rosterColumns.studentId'),
       hideBelow: 'md',
       cell: (s) => s.externalStudentId || '—',
       sortValue: (s) => s.externalStudentId ?? '',
@@ -30,7 +36,7 @@ export function rosterColumns(options: { showSchool: boolean }): TableColumn<Sch
   if (options.showSchool) {
     columns.push({
       key: 'school',
-      header: 'School',
+      header: t('educator:rosterColumns.school'),
       hideBelow: 'md',
       cell: (s) => (s.schoolName ? <Badge variant="neutral">{s.schoolName}</Badge> : '—'),
       sortValue: (s) => s.schoolName ?? '',
@@ -40,21 +46,21 @@ export function rosterColumns(options: { showSchool: boolean }): TableColumn<Sch
   columns.push(
     {
       key: 'grade',
-      header: 'Grade',
+      header: t('educator:rosterColumns.grade'),
       align: 'right',
       hideBelow: 'md',
-      cell: (s) => (s.gradeLevel ? GRADE_LEVEL_LABELS[s.gradeLevel] : '—'),
+      cell: (s) => (s.gradeLevel ? gradeLevelLabel(s.gradeLevel) : '—'),
       sortValue: (s) => s.gradeLevel ?? '',
     },
     {
       key: 'status',
-      header: 'Status',
+      header: t('educator:rosterColumns.status'),
       cell: (s) => <StudentStatusBadge status={s.status} />,
       sortValue: (s) => s.status,
     },
     {
       key: 'caseManager',
-      header: 'Case manager',
+      header: t('educator:rosterColumns.caseManager'),
       hideBelow: 'lg',
       cell: (s) => s.caseManagerName || '—',
       sortValue: (s) => s.caseManagerName ?? '',

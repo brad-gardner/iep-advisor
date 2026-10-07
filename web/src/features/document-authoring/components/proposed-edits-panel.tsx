@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { buildFieldLocationLookup } from '@/features/draft-sharing/lib/field-lookup';
-import { MEETING_DECISION_OUTCOME_LABELS } from '@/features/meetings/types';
 import type { MeetingDecisionOutcome, ProposedEditDto } from '@/features/meetings/types';
 import { formatDate } from '@/lib/format-date';
+import { meetingDecisionOutcomeLabel } from '@/lib/meeting-labels';
 import { useProposedEdits } from '../hooks/use-proposed-edits';
 import { jumpToFieldWhenVisible } from '../lib/section-dom';
 import { fieldElementId } from './field-renderers/types';
@@ -30,6 +31,10 @@ interface ProposedEditsPanelProps {
  * applied" only records that a human already made the change by hand.
  */
 export function ProposedEditsPanel({ instanceId, templateVersion }: ProposedEditsPanelProps) {
+  // `meetings-staff` alongside `document-authoring`: `meetingDecisionOutcomeLabel`
+  // below is backed by that staff-only namespace, and this hook call is what
+  // makes a language switch re-render this panel once its Spanish loads.
+  const { t } = useTranslation(['document-authoring', 'meetings-staff']);
   const { edits, isLoading, error, retry, markApplied, markingId } = useProposedEdits(instanceId);
   const fieldLookup = useMemo(() => buildFieldLocationLookup(templateVersion), [templateVersion]);
 
@@ -42,25 +47,28 @@ export function ProposedEditsPanel({ instanceId, templateVersion }: ProposedEdit
   return (
     <details className="rounded-card border border-brand-slate-200 p-4" data-testid="proposed-edits-panel">
       <summary className="cursor-pointer text-sm font-medium text-brand-slate-800">
-        Proposed edits from meetings{edits.length > 0 ? ` (${edits.length})` : ''}
+        {edits.length > 0 ? t('proposedEditsPanel.summaryCount', { count: edits.length }) : t('proposedEditsPanel.summary')}
       </summary>
 
       <div className="mt-3 space-y-3">
         {error && (
           <div role="alert">
-            <Notice variant="error" title={error}>
+            <Notice
+              variant="error"
+              title={error.kind === 'server' ? error.message : t('proposedEditsPanel.loadErrorGeneric')}
+            >
               <Button size="sm" variant="secondary" className="mt-2" onClick={retry} data-testid="proposed-edits-retry">
-                Try again
+                {t('proposedEditsPanel.tryAgain')}
               </Button>
             </Notice>
           </div>
         )}
 
-        {!error && isLoading && <p className="text-sm text-brand-slate-500">Loading…</p>}
+        {!error && isLoading && <p className="text-sm text-brand-slate-500">{t('proposedEditsPanel.loading')}</p>}
 
         {!error && !isLoading && edits.length === 0 && (
           <p className="text-sm text-brand-slate-500" data-testid="proposed-edits-empty">
-            No decisions from meetings yet.
+            {t('proposedEditsPanel.empty')}
           </p>
         )}
 
@@ -82,7 +90,7 @@ export function ProposedEditsPanel({ instanceId, templateVersion }: ProposedEdit
                     )}
                     <p className="text-sm text-brand-slate-800">{edit.text}</p>
                   </div>
-                  <Badge variant={OUTCOME_VARIANT[edit.outcome]}>{MEETING_DECISION_OUTCOME_LABELS[edit.outcome]}</Badge>
+                  <Badge variant={OUTCOME_VARIANT[edit.outcome]}>{meetingDecisionOutcomeLabel(edit.outcome)}</Badge>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   {edit.targetFieldKey && fieldLookup.has(edit.targetFieldKey) && (
@@ -92,12 +100,12 @@ export function ProposedEditsPanel({ instanceId, templateVersion }: ProposedEdit
                       onClick={() => jumpTo(edit)}
                       data-testid={`proposed-edit-jump-${edit.decisionId}`}
                     >
-                      Jump to field
+                      {t('proposedEditsPanel.jumpToField')}
                     </Button>
                   )}
                   {edit.appliedAt ? (
                     <span className="text-xs text-brand-slate-500" data-testid={`proposed-edit-applied-${edit.decisionId}`}>
-                      Applied {formatDate(edit.appliedAt)}
+                      {t('proposedEditsPanel.applied', { date: formatDate(edit.appliedAt) })}
                     </span>
                   ) : (
                     <Button
@@ -107,7 +115,7 @@ export function ProposedEditsPanel({ instanceId, templateVersion }: ProposedEdit
                       onClick={() => markApplied(edit.decisionId)}
                       data-testid={`proposed-edit-mark-applied-${edit.decisionId}`}
                     >
-                      Mark applied
+                      {t('proposedEditsPanel.markApplied')}
                     </Button>
                   )}
                 </div>
