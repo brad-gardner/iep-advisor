@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
@@ -26,11 +27,13 @@ public class DocumentCompletenessService : IDocumentCompletenessService
 
     private readonly ApplicationDbContext _context;
     private readonly ITemplateAuthoringService _authoring;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public DocumentCompletenessService(ApplicationDbContext context, ITemplateAuthoringService authoring)
+    public DocumentCompletenessService(ApplicationDbContext context, ITemplateAuthoringService authoring, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _authoring = authoring;
+        _localizer = localizer;
     }
 
     public DocumentCompletenessModel Compute(IReadOnlyList<TemplateSectionModel> sections, string? valuesJson)
@@ -139,11 +142,14 @@ public class DocumentCompletenessService : IDocumentCompletenessService
             .Select(i => new { i.ValuesJson, i.DocumentTemplateVersionId })
             .FirstOrDefaultAsync(ct);
         if (instance == null)
-            return ServiceResult<DocumentCompletenessModel>.FailureResult("Document not found.");
+            return ServiceResult<DocumentCompletenessModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["DocumentCompleteness.DocumentNotFound"]);
 
         var tree = await _authoring.GetVersionAsync(instance.DocumentTemplateVersionId, ct);
         if (!tree.Success)
-            return ServiceResult<DocumentCompletenessModel>.FailureResult(tree.Message ?? "The pinned template version could not be loaded.");
+            // Propagate the inner failure's ErrorKind (mirrors AuthoredDocumentVersionService.GetVersionAsync)
+            // rather than the bare-message overload, which defaults to None.
+            return ServiceResult<DocumentCompletenessModel>.FailureResult(
+                tree.ErrorKind, tree.Message ?? _localizer["DocumentCompleteness.TemplateVersionLoadFailed"]);
 
         return ServiceResult<DocumentCompletenessModel>.SuccessResult(Compute(tree.Data!.Sections, instance.ValuesJson));
     }

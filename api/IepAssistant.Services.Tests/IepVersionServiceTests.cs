@@ -73,7 +73,7 @@ public sealed class IepVersionServiceTests : IDisposable
     }
 
     private IepVersionPdfService CreatePdfService(ApplicationDbContext ctx, IBlobStorageService blob)
-        => new(ctx, blob, NullLogger<IepVersionPdfService>.Instance);
+        => new(ctx, blob, NullLogger<IepVersionPdfService>.Instance, TestSupport.TestLocalizers.Pdf());
 
     public IepVersionServiceTests()
     {
@@ -94,7 +94,7 @@ public sealed class IepVersionServiceTests : IDisposable
     private IepVersionService CreateVersionService(ApplicationDbContext ctx, IBlobStorageService? blob = null)
         => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), blob ?? new SuccessBlobStorageFake(), _audit, NullLogger<IepVersionService>.Instance, TestSupport.TestLocalizers.Messages());
     private IepDraftService CreateDraftService(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), _audit, NullLogger<IepDraftService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), _audit, NullLogger<IepDraftService>.Instance, TestSupport.TestLocalizers.Messages());
 
     // ---------------------------------------------------------------- Seed helpers
 
@@ -527,6 +527,153 @@ public sealed class IepVersionServiceTests : IDisposable
             Assert.False(string.IsNullOrWhiteSpace(pdf.Checksum));
         }
         Assert.NotEmpty(blob.LastBytes!);
+    }
+
+    // ---------------------------------------------------------------- Multilingual plan phase 7: per-language PDFs
+
+    [Fact]
+    public async Task RenderAsync_EnglishThenSpanish_CoexistAsSeparateRows_WithDistinctBlobPathsAndBytes()
+    {
+        var s = SeedSchoolWithStudent("pdf-i18n");
+        var draftId = await CreateDraftAsync(s);
+        await AddGoalAsync(s, draftId, "Improve reading fluency");
+        var v = await FinalizeAsync(s, draftId); // creates the English row and renders it below
+
+        var englishBlob = new SuccessBlobStorageFake();
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, englishBlob).RenderAsync(v.Id); // language omitted -> English, unchanged
+
+        // A Spanish render needs its own tracking row first — GetPdfStatusAsync (covered separately below)
+        // is what creates it in production; here we create it directly to isolate RenderAsync's own behavior.
+        using (var ctx = CreateContext())
+        {
+            ctx.IepVersionPdfs.Add(new IepVersionPdf { IepVersionId = v.Id, Language = "es", RenderStatus = PdfRenderStatus.Pending });
+            ctx.SaveChanges();
+        }
+
+        var spanishBlob = new SuccessBlobStorageFake();
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, spanishBlob).RenderAsync(v.Id, "es");
+
+        // Distinct blob paths — the English key is the pre-phase-7 literal, unchanged.
+        Assert.Equal($"iep-versions/{v.Id}/iep-v{v.VersionNumber}.pdf", englishBlob.LastBlobPath);
+        Assert.Equal($"iep-versions/{v.Id}/iep-v{v.VersionNumber}.es.pdf", spanishBlob.LastBlobPath);
+        Assert.NotEqual(englishBlob.LastBlobPath, spanishBlob.LastBlobPath);
+
+        // Distinct rendered bytes — the Spanish PDF's labels ("Metas", "Adaptaciones", …) differ from the
+        // English ones ("Goals", "Accommodations", …), so the two renders can never be byte-identical.
+        Assert.NotEqual(englishBlob.LastBytes, spanishBlob.LastBytes);
+
+        using (var ctx = CreateContext())
+        {
+            var rows = ctx.IepVersionPdfs.Where(p => p.IepVersionId == v.Id).OrderBy(p => p.Language).ToList();
+            Assert.Equal(2, rows.Count);
+
+            var english = Assert.Single(rows, p => p.Language == "en");
+            Assert.Equal(PdfRenderStatus.Rendered, english.RenderStatus);
+
+            var spanish = Assert.Single(rows, p => p.Language == "es");
+            Assert.Equal(PdfRenderStatus.Rendered, spanish.RenderStatus);
+            Assert.NotEqual(english.Checksum, spanish.Checksum);
+        }
+    }
+
+    [Fact]
+    public async Task GetPdfStatus_FirstSpanishPoll_CreatesPendingRow_FlagsNeedsRender_LeavesEnglishRowUntouched()
+    {
+        var s = SeedSchoolWithStudent("pdf-status-es");
+        var draftId = await CreateDraftAsync(s);
+        var v = await FinalizeAsync(s, draftId);
+
+        var blob = new SuccessBlobStorageFake();
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, blob).RenderAsync(v.Id); // English is Rendered
+
+        using (var ctx = CreateContext())
+        using (CultureScope.For("es"))
+        {
+            var result = await CreateVersionService(ctx).GetPdfStatusAsync(s.EducatorUserId, v.Id);
+
+            Assert.True(result.Success, result.Message);
+            Assert.True(result.Data!.NeedsRender);
+            Assert.Equal("es", result.Data.Language);
+            Assert.Equal(PdfRenderStatus.Pending, result.Data.RenderStatus);
+            Assert.Null(result.Data.Url); // not Rendered yet, so no download URL is minted
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var rows = ctx.IepVersionPdfs.Where(p => p.IepVersionId == v.Id).ToList();
+            Assert.Equal(2, rows.Count);
+            Assert.Equal(PdfRenderStatus.Rendered, Assert.Single(rows, p => p.Language == "en").RenderStatus);
+            Assert.Equal(PdfRenderStatus.Pending, Assert.Single(rows, p => p.Language == "es").RenderStatus);
+        }
+
+        // A second poll, still Pending, must NOT flag NeedsRender again (it would duplicate the queued render).
+        using (var ctx = CreateContext())
+        using (CultureScope.For("es"))
+        {
+            var again = await CreateVersionService(ctx).GetPdfStatusAsync(s.EducatorUserId, v.Id);
+            Assert.True(again.Success, again.Message);
+            Assert.False(again.Data!.NeedsRender);
+        }
+    }
+
+    /// <summary>
+    /// Review fix (2026-10-07): GetPdfStatusAsync's Add+SaveChanges for a brand-new (version, language)
+    /// row is now wrapped in try/catch DbUpdateException, detaching the loser and re-querying AsNoTracking
+    /// so two concurrent first polls join the SAME render instead of one failing outright. Genuinely
+    /// interleaving two overlapping GetPdfStatusAsync calls isn't reachable from a single-threaded test —
+    /// the method's OWN existence check would simply see the other call's already-committed row and never
+    /// reach the Add+Save path at all. So this instead proves the mechanism the catch block relies on
+    /// directly: a concurrent insert for the exact same (version, language) genuinely collides on the
+    /// unique index (<see cref="IepVersionPdfConfiguration"/>), and detaching the loser + re-querying
+    /// AsNoTracking (exactly what the catch block does) recovers the winner's row.
+    /// </summary>
+    [Fact]
+    public async Task GetPdfStatus_ConcurrentFirstPollInsertRace_ReQueryPathRecoversTheWinnerRow()
+    {
+        var s = SeedSchoolWithStudent("pdf-status-race");
+        var draftId = await CreateDraftAsync(s);
+        var v = await FinalizeAsync(s, draftId);
+
+        using var winnerCtx = CreateContext();
+        var winnerRow = new IepVersionPdf { IepVersionId = v.Id, Language = "es", RenderStatus = PdfRenderStatus.Pending };
+        winnerCtx.IepVersionPdfs.Add(winnerRow);
+        winnerCtx.SaveChanges();
+
+        using var loserCtx = CreateContext();
+        var loserRow = new IepVersionPdf { IepVersionId = v.Id, Language = "es", RenderStatus = PdfRenderStatus.Pending };
+        loserCtx.IepVersionPdfs.Add(loserRow);
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => loserCtx.SaveChangesAsync());
+
+        loserCtx.Entry(loserRow).State = EntityState.Detached;
+        var recovered = await loserCtx.IepVersionPdfs.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.IepVersionId == v.Id && p.Language == "es");
+
+        Assert.NotNull(recovered);
+        Assert.Equal(winnerRow.Id, recovered!.Id);
+        Assert.NotEqual(loserRow.Id, recovered.Id);
+    }
+
+    [Fact]
+    public async Task GetPdfStatus_EnglishPoll_UnaffectedByPhase7_StillReturnsRenderedRowAndUrl()
+    {
+        var s = SeedSchoolWithStudent("pdf-status-en");
+        var draftId = await CreateDraftAsync(s);
+        var v = await FinalizeAsync(s, draftId);
+
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, new SuccessBlobStorageFake()).RenderAsync(v.Id);
+
+        using var ctx2 = CreateContext();
+        var result = await CreateVersionService(ctx2).GetPdfStatusAsync(s.EducatorUserId, v.Id);
+
+        Assert.True(result.Success, result.Message);
+        Assert.False(result.Data!.NeedsRender);
+        Assert.Equal(PdfRenderStatus.Rendered, result.Data.RenderStatus);
+        Assert.False(string.IsNullOrWhiteSpace(result.Data.Url));
     }
 
     // ---------------------------------------------------------------- Audit (P6a)

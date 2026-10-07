@@ -4,18 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError, loadErrorText } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
 import { obligationKindLabel } from '@/lib/obligation-label';
 import { listStudentObligations } from '../api/obligations-api';
 import type { ObligationDto } from '../types';
 import { ObligationStatusChip } from './obligation-status-chip';
-
-// A server-provided message is already resolved text and is shown as-is;
-// the generic fallback is translated at RENDER time (below), not stored
-// pre-translated here, so the mount effect never needs `t` in its
-// dependency array (same idiom as `useHome`/`MeetingRsvpPage`'s `LoadError`).
-type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 interface StudentTimelineCardProps {
   studentId: number;
@@ -43,12 +37,11 @@ export function StudentTimelineCard({ studentId, onEditDates }: StudentTimelineC
           setObligations(response.data);
           setError(null);
         } else {
-          setError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
+          setError(toLoadError(response));
         }
       } catch (err) {
         if (!active) return;
-        const serverMessage = apiErrorMessage(err, '');
-        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+        setError(toLoadError(err));
       }
     })();
     return () => {
@@ -58,7 +51,7 @@ export function StudentTimelineCard({ studentId, onEditDates }: StudentTimelineC
     // a plain language switch would be wasteful.
   }, [studentId, retryToken]);
 
-  const displayError = error ? (error.kind === 'server' ? error.message : t('obligations:card.loadFailed')) : null;
+  const displayError = loadErrorText(error, t('obligations:card.loadFailed'));
 
   return (
     <Card data-testid="student-timeline-card">

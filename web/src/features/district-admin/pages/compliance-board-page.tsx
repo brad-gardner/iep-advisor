@@ -6,7 +6,7 @@ import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePageTitle } from '@/hooks/use-page-title';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError, loadErrorText } from '@/lib/api-error';
 import { ORG_ROLE } from '@/features/educator/types';
 import { useEducatorProfile } from '@/features/educator/hooks/use-educator-profile';
 import { getComplianceBoard, getDistrictSchools } from '../api/district-api';
@@ -35,12 +35,6 @@ function parseRangeDays(raw: string | null): ComplianceRangeDays {
  * date range. Every tile and per-school cell drills to the roster with the
  * matching filter, so the counts here and there always agree.
  */
-// A server-provided message is already resolved text and is shown as-is; the
-// generic fallback is translated at RENDER time (see the `error` derivation
-// below) rather than baked into state at fetch time, so a language switch
-// after a failed load shows the new language immediately without refetching.
-type BoardLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
-
 export function ComplianceBoardPage() {
   const { t } = useTranslation('district-admin');
   usePageTitle(t('complianceBoard.title'));
@@ -77,7 +71,7 @@ export function ComplianceBoardPage() {
   const [loaded, setLoaded] = useState<{
     key: string;
     board: ComplianceBoardDto | null;
-    error: BoardLoadError | null;
+    error: LoadError | null;
   } | null>(null);
 
   // DistrictAdmin needs the school list for the picker; SchoolAdmin never
@@ -114,19 +108,15 @@ export function ComplianceBoardPage() {
           setLoaded({
             key: requestKey,
             board: null,
-            error: response.message ? { kind: 'server', message: response.message } : { kind: 'generic' },
+            error: toLoadError(response),
           });
         }
       } catch (err) {
         if (active) {
-          // `apiErrorMessage` with no fallback (`''`) tells us ONLY whether the
-          // server itself supplied a message — the generic text is filled in
-          // at render, in whichever language is active then.
-          const serverMessage = apiErrorMessage(err, '');
           setLoaded({
             key: requestKey,
             board: null,
-            error: serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' },
+            error: toLoadError(err),
           });
         }
       }
@@ -139,11 +129,7 @@ export function ComplianceBoardPage() {
   const isLoading = loaded?.key !== requestKey;
   const board = isLoading ? null : (loaded?.board ?? null);
   const loadError = isLoading ? null : (loaded?.error ?? null);
-  const error = loadError
-    ? loadError.kind === 'server'
-      ? loadError.message
-      : t('complianceBoard.loadError')
-    : null;
+  const error = loadErrorText(loadError, t('complianceBoard.loadError'));
 
   return (
     <PageLayout

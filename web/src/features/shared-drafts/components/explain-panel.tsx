@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { GeneratedLanguageNotice } from '@/lib/i18n/generated-language-notice';
+import { loadErrorText } from '@/lib/api-error';
 import { useDraftReviewContext } from '../hooks/draft-review-context';
 
 type ExplainTarget =
@@ -33,6 +34,7 @@ export function ExplainPanel({ target, 'data-testid': testId }: ExplainPanelProp
       ? explanations.getItemExplanation(target.fieldKey, target.rowId)
       : explanations.getSectionExplanation(target.sectionId, target.title);
   const label = target.kind === 'section' ? t('explainPanel.explainSection') : t('explainPanel.explain');
+  const explanationError = loadErrorText(explanations.error, t('explainPanel.loadError'));
 
   const handleToggle = () => {
     if (!revealed) explanations.ensureLoaded();
@@ -71,12 +73,9 @@ export function ExplainPanel({ target, 'data-testid': testId }: ExplainPanelProp
             <span className="flex items-center gap-2 text-brand-slate-500">
               <Spinner size="sm" /> {t('explainPanel.explaining')}
             </span>
-          ) : explanations.error ? (
+          ) : explanationError ? (
             <div role="alert">
-              <Notice
-                variant="error"
-                title={explanations.error.kind === 'server' ? explanations.error.message : t('explainPanel.loadError')}
-              />
+              <Notice variant="error" title={explanationError} />
             </div>
           ) : (
             <p className="text-brand-slate-500">

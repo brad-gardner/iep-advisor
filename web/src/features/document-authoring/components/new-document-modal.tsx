@@ -7,6 +7,7 @@ import { Notice } from '@/components/ui/notice';
 import { Select } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import type { ApiResponse } from '@/types/api';
+import { loadErrorText } from '@/lib/api-error';
 import { createDocument } from '../api/documents-api';
 import { useDocumentTypes } from '../hooks/use-document-types';
 
@@ -94,7 +95,7 @@ function NewDocumentForm({
   if (error) {
     return (
       <Notice variant="error" title={t('newDocumentModal.loadTypesErrorTitle')}>
-        {error.kind === 'server' ? error.message : t('newDocumentModal.loadTypesErrorGeneric')}
+        {loadErrorText(error, t('newDocumentModal.loadTypesErrorGeneric'))}
       </Notice>
     );
   }

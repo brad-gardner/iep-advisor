@@ -1,17 +1,14 @@
 import { useCallback, useRef, useState } from 'react';
+import { type LoadError, toLoadError } from '@/lib/api-error';
 import { chat } from '../api/document-assist-api';
 import type { ChatMessage } from '../api/assist-types';
 import { friendlyAssistError } from '../lib/assist-errors';
-
-/** A server-provided (or already-translated `friendlyAssistError`) message is
- *  resolved text; the generic case is translated at render time by the caller. */
-export type UseDocumentChatError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 export interface UseDocumentChatResult {
   messages: ChatMessage[];
   isSending: boolean;
   // A transient error line shown beneath the thread (not added to messages).
-  error: UseDocumentChatError | null;
+  error: LoadError | null;
   send: (text: string) => void;
 }
 
@@ -21,7 +18,7 @@ export interface UseDocumentChatResult {
 export function useDocumentChat(instanceId: number): UseDocumentChatResult {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
-  const [error, setError] = useState<UseDocumentChatError | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
 
   // The ref is written synchronously with every change (never via an effect),
   // so a send issued right after a reply lands always sees the full thread.
@@ -50,7 +47,7 @@ export function useDocumentChat(instanceId: number): UseDocumentChatResult {
             const { reply } = res.data;
             commitMessages([...messagesRef.current, { role: 'assistant', content: reply }]);
           } else {
-            setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+            setError(toLoadError(res));
           }
         })
         .catch((err: unknown) => {

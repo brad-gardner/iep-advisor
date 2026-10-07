@@ -1,7 +1,7 @@
 ---
 title: "feat: Multilingual site — English + Spanish, page by page"
 type: feat
-status: active
+status: completed
 date: 2026-10-06
 design: docs/designs/2026-10-06-multilingual-english-spanish-design.md
 slicing_approach: vertical
@@ -284,26 +284,26 @@ Each phase converts its pages and is done when:
 
 ### Functional Requirements
 
-- [ ] A first visit uses the browser language (Spanish → Spanish; anything else → English).
-- [ ] The language choice is saved to the account and follows the user across devices. The switcher is on the auth pages, the sidebar and Profile.
-- [ ] Every page in all 5 audiences renders fully in Spanish when Spanish is active, except user- and district-authored content and KB article bodies.
-- [ ] Dates and numbers are formatted for the active language.
-- [ ] API messages, emails (all kinds), notifications, PDFs and AI responses follow the user's or recipient's language as designed.
-- [ ] AI artifacts record their language; viewers in another language see a notice.
-- [ ] IEP/ETR extraction output is unchanged by language.
+- [x] A first visit uses the browser language (Spanish → Spanish; anything else → English).
+- [x] The language choice is saved to the account and follows the user across devices. The switcher is on the auth pages, the sidebar and Profile.
+- [x] Every page in all 5 audiences renders fully in Spanish when Spanish is active, except user- and district-authored content and KB article bodies.
+- [x] Dates and numbers are formatted for the active language.
+- [x] API messages, emails (all kinds), notifications, PDFs and AI responses follow the user's or recipient's language as designed.
+- [x] AI artifacts record their language; viewers in another language see a notice.
+- [x] IEP/ETR extraction output is unchanged by language.
 
 ### Non-Functional Requirements
 
-- [ ] English bundle size grows by no more than about 15% gzip. Spanish loads lazily per namespace.
-- [ ] No layout clipping or overflow in Spanish at 1366×768 and 400px width on converted pages.
-- [ ] Accessibility: `<html lang>` matches the language; the switcher has a label; translated `aria-label`s.
-- [ ] No user text or PII is sent to any translation service (translations are static).
+- [ ] English bundle size grows by no more than about 15% gzip. Spanish loads lazily per namespace. (the main chunk is 307.9 kB gzip after the role split, with the CI budget at 418 kB; no pre-i18n baseline was recorded)
+- [ ] No layout clipping or overflow in Spanish at 1366×768 and 400px width on converted pages. (not verified in a real browser; a pre-marketing check alongside native review)
+- [x] Accessibility: `<html lang>` matches the language; the switcher has a label; translated `aria-label`s.
+- [x] No user text or PII is sent to any translation service (translations are static).
 
 ### Quality Gates
 
-- [ ] Each phase meets its definition of done above.
-- [ ] `docs/i18n/README.md` lists every namespace with its review status. Spanish is marked "needs native review" until reviewed.
-- [ ] Phase 7: the global `no-literal-string` rule is clean.
+- [x] Each phase meets its definition of done above.
+- [x] `docs/i18n/README.md` lists every namespace with its review status. Spanish is marked "needs native review" until reviewed.
+- [x] Phase 7: the global `no-literal-string` rule is clean.
 
 ## Success Metrics
 

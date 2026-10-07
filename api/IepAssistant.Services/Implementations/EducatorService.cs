@@ -465,7 +465,11 @@ public class EducatorService : IEducatorService
         {
             var error = StudentTeamWriter.ValidateTeamCandidate(target, ctx.DistrictId, student.SchoolId, _localizer);
             if (error != null)
-                return ServiceResult<BulkAssignResultModel>.FailureResult(error.Value.Kind, $"{student.FirstName} {student.LastName}: {error.Value.Message}".Trim());
+            {
+                var studentName = $"{student.FirstName} {student.LastName}".Trim();
+                return ServiceResult<BulkAssignResultModel>.FailureResult(
+                    error.Value.Kind, _localizer["Educator.BulkAssignStudentValidationError", studentName, error.Value.Message]);
+            }
         }
 
         var toAssign = students.Where(s => s.CaseManagerUserId != target.UserId).ToList();

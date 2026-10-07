@@ -1,4 +1,9 @@
 {
+  "childTab": {
+    "heading": "ETRs",
+    "newButton": "New ETR",
+    "newDrawerTitle": "New ETR"
+  },
   "documentIdFallback": "ETR #{{id}}",
   "evaluationType": {
     "initial": "Initial Evaluation",

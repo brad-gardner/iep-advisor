@@ -3,14 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui/spinner';
 import { Notice } from '@/components/ui/notice';
 import { EmptyState } from '@/components/ui/empty-state';
+import { type LoadError, loadErrorText } from '@/lib/api-error';
 import type { EtrSection } from '../types';
-import type { UseEtrSectionsError } from '../hooks/use-etr-sections';
 import { EtrSectionCard } from './etr-section-card';
 
 interface EtrSectionsListProps {
   sections: EtrSection[];
   isLoading: boolean;
-  error: UseEtrSectionsError | null;
+  error: LoadError | null;
 }
 
 export function EtrSectionsList({ sections, isLoading, error }: EtrSectionsListProps) {
@@ -24,8 +24,8 @@ export function EtrSectionsList({ sections, isLoading, error }: EtrSectionsListP
   }
 
   if (error) {
-    const message = error.kind === 'server' ? error.message : t('common:ui.genericError');
-    return <Notice variant="error" title={message} data-testid="etr-sections-error" />;
+    const message = loadErrorText(error, t('common:ui.genericError'));
+    return <Notice variant="error" title={message ?? t('common:ui.genericError')} data-testid="etr-sections-error" />;
   }
 
   if (sections.length === 0) {

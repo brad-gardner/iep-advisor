@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Footer ("Page {CurrentPageNumber} of {TotalPages}") — split in two because QuestPDF's page-number
+       widgets are live elements composed between these spans, not plain text substituted into a format
+       string. Shared by IepVersionPdfDocument and AuthoredDocumentPdfDocument. -->
+  <data name="Pdf.PagePrefix" xml:space="preserve">
+    <value>Page </value>
+  </data>
+  <data name="Pdf.PageOfMiddle" xml:space="preserve">
+    <value> of </value>
+  </data>
+  <data name="Pdf.Version" xml:space="preserve">
+    <value>Version {0}</value>
+  </data>
+  <data name="Pdf.Finalized" xml:space="preserve">
+    <value>Finalized: {0}</value>
+  </data>
+  <data name="Pdf.Effective" xml:space="preserve">
+    <value>Effective: {0}</value>
+  </data>
+  <!-- IepVersionPdfDocument (legacy P5a layout) -->
+  <data name="Pdf.PresentLevelsAndNarrative" xml:space="preserve">
+    <value>Present Levels &amp; Narrative</value>
+  </data>
+  <data name="Pdf.Goals" xml:space="preserve">
+    <value>Goals</value>
+  </data>
+  <data name="Pdf.Goal" xml:space="preserve">
+    <value>Goal</value>
+  </data>
+  <data name="Pdf.Baseline" xml:space="preserve">
+    <value>Baseline</value>
+  </data>
+  <data name="Pdf.TargetCriteria" xml:space="preserve">
+    <value>Target Criteria</value>
+  </data>
+  <data name="Pdf.Measurement" xml:space="preserve">
+    <value>Measurement</value>
+  </data>
+  <data name="Pdf.Timeframe" xml:space="preserve">
+    <value>Timeframe</value>
+  </data>
+  <data name="Pdf.Services" xml:space="preserve">
+    <value>Services</value>
+  </data>
+  <data name="Pdf.Service" xml:space="preserve">
+    <value>Service</value>
+  </data>
+  <data name="Pdf.Frequency" xml:space="preserve">
+    <value>Frequency</value>
+  </data>
+  <data name="Pdf.Duration" xml:space="preserve">
+    <value>Duration</value>
+  </data>
+  <data name="Pdf.Location" xml:space="preserve">
+    <value>Location</value>
+  </data>
+  <data name="Pdf.Provider" xml:space="preserve">
+    <value>Provider</value>
+  </data>
+  <data name="Pdf.Dates" xml:space="preserve">
+    <value>Dates</value>
+  </data>
+  <data name="Pdf.Accommodations" xml:space="preserve">
+    <value>Accommodations</value>
+  </data>
+  <data name="Pdf.Transition" xml:space="preserve">
+    <value>Transition</value>
+  </data>
+  <!-- AuthoredDocumentPdfDocument (State Document Template Engine, generic + OH form layouts) -->
+  <data name="Pdf.Document" xml:space="preserve">
+    <value>Document</value>
+  </data>
+  <data name="Pdf.NotAddressed" xml:space="preserve">
+    <value>Not addressed</value>
+  </data>
+  <data name="Pdf.Objectives" xml:space="preserve">
+    <value>Objectives</value>
+  </data>
+  <data name="Pdf.Participants" xml:space="preserve">
+    <value>Participants</value>
+  </data>
+  <data name="Pdf.Attended" xml:space="preserve">
+    <value>Attended</value>
+  </data>
+  <data name="Pdf.DidNotAttend" xml:space="preserve">
+    <value>Did not attend</value>
+  </data>
+  <data name="Pdf.AttendanceNotRecorded" xml:space="preserve">
+    <value>Attendance not recorded</value>
+  </data>
+  <data name="Pdf.Signatures" xml:space="preserve">
+    <value>Signatures</value>
+  </data>
+  <data name="Pdf.ParentGuardian" xml:space="preserve">
+    <value>Parent/Guardian</value>
+  </data>
+  <data name="Pdf.Student" xml:space="preserve">
+    <value>Student</value>
+  </data>
+  <data name="Pdf.DistrictRepresentative" xml:space="preserve">
+    <value>District Representative</value>
+  </data>
+  <data name="Pdf.Teacher" xml:space="preserve">
+    <value>Teacher</value>
+  </data>
+  <data name="Pdf.NameFieldLine" xml:space="preserve">
+    <value>Name: _______________________</value>
+  </data>
+  <data name="Pdf.SignatureFieldLine" xml:space="preserve">
+    <value>Signature: _______________________</value>
+  </data>
+  <data name="Pdf.DateFieldLine" xml:space="preserve">
+    <value>Date: __________</value>
+  </data>
+  <data name="Pdf.Responsible" xml:space="preserve">
+    <value>Responsible: {0}</value>
+  </data>
+  <data name="Pdf.ResponsibleHeader" xml:space="preserve">
+    <value>Responsible</value>
+  </data>
+  <data name="Pdf.Yes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="Pdf.No" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="Pdf.StudentLine" xml:space="preserve">
+    <value>Student: {0}</value>
+  </data>
+  <data name="Pdf.DateOfBirthLine" xml:space="preserve">
+    <value>Date of birth: {0}</value>
+  </data>
+  <data name="Pdf.DistrictLine" xml:space="preserve">
+    <value>District: {0}</value>
+  </data>
+  <data name="Pdf.IepEtrDateLine" xml:space="preserve">
+    <value>IEP date: {0}   ETR date: {1}</value>
+  </data>
+  <data name="Pdf.MeetingDateLine" xml:space="preserve">
+    <value>Meeting date: {0}</value>
+  </data>
+  <data name="Pdf.VersionFormVersionLine" xml:space="preserve">
+    <value>Version {0} — Form version: template v{1}</value>
+  </data>
+  <data name="Pdf.OhioForm" xml:space="preserve">
+    <value>Ohio Department of Education Form {0}</value>
+  </data>
+  <data name="Pdf.AmendmentTo" xml:space="preserve">
+    <value>Amendment to v{0}</value>
+  </data>
+  <data name="Pdf.EffectiveSuffix" xml:space="preserve">
+    <value> — effective {0}</value>
+  </data>
+</root>

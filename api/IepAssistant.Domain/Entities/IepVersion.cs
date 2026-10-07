@@ -33,5 +33,10 @@ public class IepVersion : BaseEntity, IAuditableEntity
     public ICollection<IepVersionAccommodation> Accommodations { get; set; } = new List<IepVersionAccommodation>();
     public ICollection<IepVersionTransitionItem> TransitionItems { get; set; } = new List<IepVersionTransitionItem>();
 
-    public IepVersionPdf? Pdf { get; set; }
+    /// <summary>
+    /// One row per rendered language (multilingual plan phase 7) — was a singular one-to-one nav before
+    /// this phase. Callers that want "the" (English) PDF status for backward-compatible summaries select
+    /// the row whose <see cref="IepVersionPdf.Language"/> is <c>null</c> or <c>"en"</c>.
+    /// </summary>
+    public ICollection<IepVersionPdf> Pdfs { get; set; } = new List<IepVersionPdf>();
 }

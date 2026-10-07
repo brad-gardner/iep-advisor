@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Pdf.PagePrefix" xml:space="preserve">
+    <value>Página </value>
+  </data>
+  <data name="Pdf.PageOfMiddle" xml:space="preserve">
+    <value> de </value>
+  </data>
+  <data name="Pdf.Version" xml:space="preserve">
+    <value>Versión {0}</value>
+  </data>
+  <data name="Pdf.Finalized" xml:space="preserve">
+    <value>Finalizado: {0}</value>
+  </data>
+  <data name="Pdf.Effective" xml:space="preserve">
+    <value>Vigente: {0}</value>
+  </data>
+  <data name="Pdf.PresentLevelsAndNarrative" xml:space="preserve">
+    <value>Niveles actuales y narrativa</value>
+  </data>
+  <data name="Pdf.Goals" xml:space="preserve">
+    <value>Metas</value>
+  </data>
+  <data name="Pdf.Goal" xml:space="preserve">
+    <value>Meta</value>
+  </data>
+  <data name="Pdf.Baseline" xml:space="preserve">
+    <value>Línea base</value>
+  </data>
+  <data name="Pdf.TargetCriteria" xml:space="preserve">
+    <value>Criterios de logro</value>
+  </data>
+  <data name="Pdf.Measurement" xml:space="preserve">
+    <value>Medición</value>
+  </data>
+  <data name="Pdf.Timeframe" xml:space="preserve">
+    <value>Plazo</value>
+  </data>
+  <data name="Pdf.Services" xml:space="preserve">
+    <value>Servicios</value>
+  </data>
+  <data name="Pdf.Service" xml:space="preserve">
+    <value>Servicio</value>
+  </data>
+  <data name="Pdf.Frequency" xml:space="preserve">
+    <value>Frecuencia</value>
+  </data>
+  <data name="Pdf.Duration" xml:space="preserve">
+    <value>Duración</value>
+  </data>
+  <data name="Pdf.Location" xml:space="preserve">
+    <value>Entorno</value>
+  </data>
+  <data name="Pdf.Provider" xml:space="preserve">
+    <value>Proveedor</value>
+  </data>
+  <data name="Pdf.Dates" xml:space="preserve">
+    <value>Fechas</value>
+  </data>
+  <data name="Pdf.Accommodations" xml:space="preserve">
+    <value>Adaptaciones</value>
+  </data>
+  <data name="Pdf.Transition" xml:space="preserve">
+    <value>Transición</value>
+  </data>
+  <data name="Pdf.Document" xml:space="preserve">
+    <value>Documento</value>
+  </data>
+  <data name="Pdf.NotAddressed" xml:space="preserve">
+    <value>No abordado</value>
+  </data>
+  <data name="Pdf.Objectives" xml:space="preserve">
+    <value>Objetivos</value>
+  </data>
+  <data name="Pdf.Participants" xml:space="preserve">
+    <value>Participantes</value>
+  </data>
+  <data name="Pdf.Attended" xml:space="preserve">
+    <value>Asistió</value>
+  </data>
+  <data name="Pdf.DidNotAttend" xml:space="preserve">
+    <value>No asistió</value>
+  </data>
+  <data name="Pdf.AttendanceNotRecorded" xml:space="preserve">
+    <value>Asistencia no registrada</value>
+  </data>
+  <data name="Pdf.Signatures" xml:space="preserve">
+    <value>Firmas</value>
+  </data>
+  <data name="Pdf.ParentGuardian" xml:space="preserve">
+    <value>Padre/tutor</value>
+  </data>
+  <data name="Pdf.Student" xml:space="preserve">
+    <value>Estudiante</value>
+  </data>
+  <data name="Pdf.DistrictRepresentative" xml:space="preserve">
+    <value>Representante del distrito</value>
+  </data>
+  <data name="Pdf.Teacher" xml:space="preserve">
+    <value>Maestro</value>
+  </data>
+  <data name="Pdf.NameFieldLine" xml:space="preserve">
+    <value>Nombre: _______________________</value>
+  </data>
+  <data name="Pdf.SignatureFieldLine" xml:space="preserve">
+    <value>Firma: _______________________</value>
+  </data>
+  <data name="Pdf.DateFieldLine" xml:space="preserve">
+    <value>Fecha: __________</value>
+  </data>
+  <data name="Pdf.Responsible" xml:space="preserve">
+    <value>Responsable: {0}</value>
+  </data>
+  <data name="Pdf.ResponsibleHeader" xml:space="preserve">
+    <value>Responsable</value>
+  </data>
+  <data name="Pdf.Yes" xml:space="preserve">
+    <value>Sí</value>
+  </data>
+  <data name="Pdf.No" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="Pdf.StudentLine" xml:space="preserve">
+    <value>Estudiante: {0}</value>
+  </data>
+  <data name="Pdf.DateOfBirthLine" xml:space="preserve">
+    <value>Fecha de nacimiento: {0}</value>
+  </data>
+  <data name="Pdf.DistrictLine" xml:space="preserve">
+    <value>Distrito: {0}</value>
+  </data>
+  <data name="Pdf.IepEtrDateLine" xml:space="preserve">
+    <value>Fecha del IEP: {0}   Fecha del ETR: {1}</value>
+  </data>
+  <data name="Pdf.MeetingDateLine" xml:space="preserve">
+    <value>Fecha de la reunión: {0}</value>
+  </data>
+  <data name="Pdf.VersionFormVersionLine" xml:space="preserve">
+    <value>Versión {0} — Versión del formulario: plantilla v{1}</value>
+  </data>
+  <data name="Pdf.OhioForm" xml:space="preserve">
+    <value>Formulario {0} del Departamento de Educación de Ohio</value>
+  </data>
+  <data name="Pdf.AmendmentTo" xml:space="preserve">
+    <value>Enmienda a la v{0}</value>
+  </data>
+  <data name="Pdf.EffectiveSuffix" xml:space="preserve">
+    <value> — vigente desde {0}</value>
+  </data>
+</root>

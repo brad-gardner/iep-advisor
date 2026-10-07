@@ -10,18 +10,12 @@ import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, apiErrorMessage, toLoadError, loadErrorText } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { listNotifications, markAllNotificationsRead, markNotificationRead } from '../api/notifications-api';
 import { useNotificationsContext } from '../hooks/use-notifications-context';
 import type { NotificationDto } from '../types';
-
-// A server-provided message is already resolved text and shown as-is; the
-// generic fallback is translated at RENDER time (see `error` below) rather
-// than load time, so a language switch after a failed load shows the new
-// language immediately, with no refetch (phase 2 review).
-type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 export function NotificationsPage() {
   const { t } = useTranslation(['notifications', 'common']);
@@ -48,12 +42,11 @@ export function NotificationsPage() {
           setItems(response.data.items);
           setLoadError(null);
         } else {
-          setLoadError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
+          setLoadError(toLoadError(response));
         }
       } catch (err) {
         if (!active) return;
-        const serverMessage = apiErrorMessage(err, '');
-        setLoadError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+        setLoadError(toLoadError(err));
       }
     })();
     return () => {
@@ -62,11 +55,7 @@ export function NotificationsPage() {
     // `t` deliberately excluded — see the `LoadError` comment above.
   }, [retryToken]);
 
-  const error = loadError
-    ? loadError.kind === 'server'
-      ? loadError.message
-      : t('notificationsPage.loadFailed')
-    : null;
+  const error = loadErrorText(loadError, t('notificationsPage.loadFailed'));
 
   const handleMarkRead = async (notification: NotificationDto) => {
     if (notification.readAt) return;

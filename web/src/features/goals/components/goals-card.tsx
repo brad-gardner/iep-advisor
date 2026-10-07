@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
+import { loadErrorText } from '@/lib/api-error';
 import { useStudentGoals } from '../hooks/use-student-goals';
 import { GoalCard } from './goal-card';
 
@@ -22,7 +23,7 @@ export function GoalsCard({ studentId }: GoalsCardProps) {
   const { goals, isLoading, error, retry, applyObservation, applyStatusChange } = useStudentGoals(studentId);
   const [searchParams] = useSearchParams();
   const focusGoalId = searchParams.get('goal');
-  const errorMessage = error ? (error.kind === 'server' ? error.message : t('common:ui.genericError')) : null;
+  const errorMessage = loadErrorText(error, t('common:ui.genericError'));
 
   // Scroll/focus the deep-linked card exactly once, when it first exists. `goals` is a fresh
   // array after every log/status update, so keying only on it would yank focus back to the

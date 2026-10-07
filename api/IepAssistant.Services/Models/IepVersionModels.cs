@@ -90,6 +90,18 @@ public class IepVersionTransitionItemModel
 public class IepVersionPdfStatusModel
 {
     public int VersionId { get; set; }
+
+    /// <summary>Multilingual plan phase 7: the language this status reflects (the caller's resolved
+    /// current UI language — see <c>SupportedLanguages.CurrentUiLanguage</c>), internal-only (not carried
+    /// onto <c>IepVersionPdfStatusDto</c>) — used by the controller to enqueue a render for the SAME
+    /// language <see cref="NeedsRender"/> flagged, without re-resolving it.</summary>
+    public string Language { get; set; } = Localization.SupportedLanguages.English;
+
+    /// <summary>Multilingual plan phase 7: true only when this call just created the tracking row for
+    /// <see cref="Language"/> (first request for that language) — the controller enqueues a render
+    /// exactly then, never on a later poll of an already-queued row. Internal-only, not carried onto the DTO.</summary>
+    public bool NeedsRender { get; set; }
+
     public PdfRenderStatus RenderStatus { get; set; }
     public string? Url { get; set; }
     public DateTime? RenderedAt { get; set; }

@@ -9,17 +9,11 @@ import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Spinner } from '@/components/ui/spinner';
 import { usePageTitle } from '@/hooks/use-page-title';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError, loadErrorText } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
 import { GeneratedLanguageNotice } from '@/lib/i18n/generated-language-notice';
 import { getMeetingSummary } from '../api/shared-drafts-api';
 import type { MeetingSummaryDto } from '../types';
-
-// A server-provided message is already resolved text; the generic fallback
-// is translated at RENDER time (see the `error` render block below), not
-// stored pre-translated here, so the mount effect never needs `t` in its
-// dependency array (same idiom as `useHome`).
-type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 /** Parent read-only view of a sent post-meeting family summary. The server
  *  only returns a summary to a family caller once it's Sent (a draft-in-
@@ -48,8 +42,7 @@ export function MeetingSummaryPage() {
       })
       .catch((err: unknown) => {
         if (!active) return;
-        const serverMessage = apiErrorMessage(err, '');
-        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+        setError(toLoadError(err));
         setSummary(null);
       });
     return () => {
@@ -74,7 +67,7 @@ export function MeetingSummaryPage() {
     return (
       <PageLayout title={t('meetingSummaryPage.unavailableTitle')} breadcrumb={[{ label: t('meetingSummaryPage.breadcrumbOverview'), to: backTo }]}>
         <div role="alert">
-          <Notice variant="error" title={error.kind === 'server' ? error.message : t('meetingSummaryPage.loadError')} />
+          <Notice variant="error" title={loadErrorText(error, t('meetingSummaryPage.loadError')) ?? t('meetingSummaryPage.loadError')} />
         </div>
       </PageLayout>
     );

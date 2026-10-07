@@ -619,4 +619,87 @@ public sealed class AuthoredDocumentPdfDocumentTests
         Assert.NotEmpty(bytes);
         Assert.Contains("Section: Accommodations", doc.Outline);
     }
+
+    // ---------------------------------------------------------------- Header snapshot round-trip (review fix 2026-10-07)
+
+    /// <summary>
+    /// <see cref="AuthoredDocumentPdfHeaderContext"/> is persisted as JSON (System.Text.Json, no custom
+    /// options) on <see cref="AuthoredDocumentPdf.HeaderSnapshotJson"/> and read back by
+    /// <c>AuthoredDocumentPdfService.ResolveHeaderContextAsync</c> for every later render/retry in every
+    /// language. Records compare their <see cref="IReadOnlyList{T}"/>/<see cref="IReadOnlyDictionary{TKey,TValue}"/>
+    /// properties by reference (not value), so this asserts element-by-element plus a re-serialize
+    /// byte-for-byte match rather than relying on record equality.
+    /// </summary>
+    [Fact]
+    public void HeaderSnapshotJson_RoundTrips_ParticipantsOwnerRolesAndDateTimesExactly()
+    {
+        var original = new AuthoredDocumentPdfHeaderContext(
+            StateCode: "OH",
+            DocumentTypeKey: "iep",
+            StudentFirstName: "Alice",
+            StudentLastName: "Nguyen",
+            StudentDateOfBirth: new DateTime(2014, 3, 2, 0, 0, 0, DateTimeKind.Unspecified),
+            DistrictName: "Riverside District",
+            IepDate: new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Unspecified),
+            EtrDate: new DateTime(2025, 11, 1, 0, 0, 0, DateTimeKind.Unspecified),
+            MeetingDate: new DateTime(2026, 7, 20, 14, 30, 15, DateTimeKind.Utc),
+            Participants: new List<AuthoredDocumentPdfParticipant>
+            {
+                new("Pat Case Manager", "CaseManager", true),
+                new("External Parent", "Parent", null)
+            },
+            AmendsVersionNumber: 2,
+            EffectiveDate: new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Unspecified),
+            OwnerRoleByUserId: new Dictionary<int, string> { [7] = "Case Manager", [42] = "Speech-Language Pathologist" });
+
+        var json = JsonSerializer.Serialize(original);
+        var roundTripped = JsonSerializer.Deserialize<AuthoredDocumentPdfHeaderContext>(json);
+
+        Assert.NotNull(roundTripped);
+        Assert.Equal(original.StateCode, roundTripped!.StateCode);
+        Assert.Equal(original.DocumentTypeKey, roundTripped.DocumentTypeKey);
+        Assert.Equal(original.StudentFirstName, roundTripped.StudentFirstName);
+        Assert.Equal(original.StudentLastName, roundTripped.StudentLastName);
+        Assert.Equal(original.StudentDateOfBirth, roundTripped.StudentDateOfBirth);
+        Assert.Equal(original.DistrictName, roundTripped.DistrictName);
+        Assert.Equal(original.IepDate, roundTripped.IepDate);
+        Assert.Equal(original.EtrDate, roundTripped.EtrDate);
+        Assert.Equal(original.MeetingDate, roundTripped.MeetingDate);
+        Assert.Equal(original.AmendsVersionNumber, roundTripped.AmendsVersionNumber);
+        Assert.Equal(original.EffectiveDate, roundTripped.EffectiveDate);
+
+        Assert.Equal(original.Participants.Count, roundTripped.Participants.Count);
+        for (var i = 0; i < original.Participants.Count; i++)
+        {
+            Assert.Equal(original.Participants[i].Name, roundTripped.Participants[i].Name);
+            Assert.Equal(original.Participants[i].Role, roundTripped.Participants[i].Role);
+            Assert.Equal(original.Participants[i].Attended, roundTripped.Participants[i].Attended);
+        }
+
+        Assert.NotNull(roundTripped.OwnerRoleByUserId);
+        Assert.Equal(original.OwnerRoleByUserId!.Count, roundTripped.OwnerRoleByUserId!.Count);
+        foreach (var (userId, role) in original.OwnerRoleByUserId)
+            Assert.Equal(role, roundTripped.OwnerRoleByUserId[userId]);
+
+        // Byte-for-byte: re-serializing the round-tripped value reproduces the exact same JSON, proving
+        // nothing was silently coerced/truncated anywhere in the graph (dictionary int keys included).
+        Assert.Equal(json, JsonSerializer.Serialize(roundTripped));
+    }
+
+    [Fact]
+    public void HeaderSnapshotJson_RoundTrips_NullOptionalFieldsAndEmptyParticipants()
+    {
+        var original = AuthoredDocumentPdfHeaderContext.Empty;
+
+        var json = JsonSerializer.Serialize(original);
+        var roundTripped = JsonSerializer.Deserialize<AuthoredDocumentPdfHeaderContext>(json);
+
+        Assert.NotNull(roundTripped);
+        Assert.Null(roundTripped!.StateCode);
+        Assert.Null(roundTripped.StudentDateOfBirth);
+        Assert.Null(roundTripped.MeetingDate);
+        Assert.Empty(roundTripped.Participants);
+        Assert.Null(roundTripped.OwnerRoleByUserId);
+        Assert.Equal(json, JsonSerializer.Serialize(roundTripped));
+    }
 }

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text.Json;
 using ClosedXML.Excel;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Models;
 
@@ -40,7 +41,6 @@ internal static class ImportWorkbook
     /// <summary>Longest cell text kept (the rest is dropped) so a pathological cell cannot bloat PayloadJson.</summary>
     public const int MaxCellLength = 1000;
 
-    private const string TooLargeToReadMessage = "The workbook is too large to import. Remove unused sheets, formatting or data and try again.";
     public const string ClearToken = "CLEAR";
     public const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -53,38 +53,46 @@ internal static class ImportWorkbook
 
     public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    /// <summary>Returns a user-facing rejection for a bad upload, or null when it may be parsed.</summary>
-    public static string? ValidateUpload(ImportUploadModel upload)
+    /// <summary>
+    /// Returns a user-facing rejection for a bad upload, or null when it may be parsed. Multilingual plan
+    /// phase 7: <paramref name="localizer"/> is threaded through (rather than making this class an
+    /// instance) because every caller (<c>RosterImportService</c>/<c>StaffImportService</c>) already holds
+    /// one. The first 4 checks mirror <c>DistrictImportsController.ReadUploadAsync</c>'s own pre-check
+    /// (reached here only in the rare case something calls a service directly without going through that
+    /// controller) and reuse its EXACT resx keys so the two never drift into two different translations of
+    /// the same English sentence.
+    /// </summary>
+    public static string? ValidateUpload(ImportUploadModel upload, IStringLocalizer<Messages> localizer)
     {
         if (upload.Content.Length == 0 || upload.Length <= 0)
-            return "Choose a file to upload.";
+            return localizer["DistrictImports.ChooseFileToUpload"];
         if (upload.Length > MaxBytes || upload.Content.LongLength > MaxBytes)
-            return "The file is larger than 5 MB.";
+            return localizer["DistrictImports.FileTooLarge"];
 
         var extension = Path.GetExtension(upload.FileName ?? string.Empty);
         if (!string.Equals(extension, ".xlsx", StringComparison.OrdinalIgnoreCase))
             return extension.Equals(".xlsm", StringComparison.OrdinalIgnoreCase)
-                ? "Macro-enabled workbooks (.xlsm) are not accepted. Save the file as .xlsx and try again."
-                : "Only .xlsx workbooks are accepted.";
+                ? localizer["DistrictImports.MacroWorkbooksNotAccepted"]
+                : localizer["DistrictImports.OnlyXlsxAccepted"];
 
         var contentType = (upload.ContentType ?? string.Empty).Split(';')[0].Trim();
         if (contentType.Length > 0 && !AcceptedContentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase))
-            return "Only .xlsx workbooks are accepted.";
+            return localizer["DistrictImports.OnlyXlsxAccepted"];
 
         // Defense in depth: a macro workbook renamed to .xlsx still carries its VBA project.
         try
         {
             using var zip = new ZipArchive(new MemoryStream(upload.Content), ZipArchiveMode.Read, leaveOpen: false);
             if (zip.Entries.Any(e => e.FullName.EndsWith("vbaProject.bin", StringComparison.OrdinalIgnoreCase)))
-                return "Macro-enabled workbooks are not accepted. Save the file as .xlsx and try again.";
+                return localizer["ImportWorkbook.MacroWorkbookDetected"];
             if (!zip.Entries.Any(e => e.FullName.Equals("xl/workbook.xml", StringComparison.OrdinalIgnoreCase)))
-                return "The file could not be read as an Excel workbook (.xlsx).";
+                return localizer["ImportWorkbook.CouldNotReadWorkbook"];
             if (ExceedsDecompressionBudget(zip))
-                return TooLargeToReadMessage;
+                return localizer["ImportWorkbook.WorkbookTooLargeToImport"];
         }
         catch (InvalidDataException)
         {
-            return "The file could not be read as an Excel workbook (.xlsx).";
+            return localizer["ImportWorkbook.CouldNotReadWorkbook"];
         }
 
         return null;
@@ -115,7 +123,9 @@ internal static class ImportWorkbook
     /// data from row 2; blank rows are skipped; unknown columns ignored. Fails on a missing sheet, missing
     /// required columns, or more than <see cref="MaxRows"/> data rows.
     /// </summary>
-    public static (List<ImportSheetRow>? Rows, string? Error) ReadSheet(byte[] content, string sheetName, IReadOnlyList<string> columns, IReadOnlyList<string[]> requiredColumnGroups)
+    public static (List<ImportSheetRow>? Rows, string? Error) ReadSheet(
+        byte[] content, string sheetName, IReadOnlyList<string> columns, IReadOnlyList<string[]> requiredColumnGroups,
+        IStringLocalizer<Messages> localizer)
     {
         XLWorkbook workbook;
         try
@@ -124,14 +134,16 @@ internal static class ImportWorkbook
         }
         catch (Exception)
         {
-            return (null, "The file could not be read as an Excel workbook (.xlsx).");
+            return (null, localizer["ImportWorkbook.CouldNotReadWorkbook"]);
         }
 
         using (workbook)
         {
+            // sheetName/columns are a file-format token the user's workbook must match verbatim — never
+            // translated — only the sentence AROUND it is localized.
             var sheet = workbook.Worksheets.FirstOrDefault(w => string.Equals(w.Name, sheetName, StringComparison.OrdinalIgnoreCase));
             if (sheet == null)
-                return (null, $"The workbook must contain a sheet named '{sheetName}'.");
+                return (null, string.Format(localizer["ImportWorkbook.MissingSheet"].Value, sheetName));
 
             var lastColumn = sheet.LastColumnUsed()?.ColumnNumber() ?? 0;
             var columnIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -147,12 +159,13 @@ internal static class ImportWorkbook
             foreach (var group in requiredColumnGroups)
             {
                 if (!group.Any(columnIndex.ContainsKey))
-                    return (null, $"Missing required column: {string.Join(" or ", group)}.");
+                    return (null, string.Format(localizer["ImportWorkbook.MissingRequiredColumn"].Value,
+                        string.Join(localizer["ImportWorkbook.Or"].Value, group)));
             }
 
             var lastRow = sheet.LastRowUsed()?.RowNumber() ?? 1;
             if (lastRow - 1 > MaxRows)
-                return (null, $"The sheet has more than {MaxRows:N0} data rows. Split the file and try again.");
+                return (null, string.Format(localizer["ImportWorkbook.TooManyDataRows"].Value, MaxRows.ToString("N0", CultureInfo.CurrentCulture)));
 
             var rows = new List<ImportSheetRow>();
             for (var r = 2; r <= lastRow; r++)
@@ -334,8 +347,10 @@ internal static class ImportWorkbook
         batch.ErrorCount = rows.Count(r => r.Outcome == ImportRowOutcome.Error);
     }
 
-    /// <summary>Marks every row whose key repeats within the file as an error (both/all copies).</summary>
-    public static void FlagDuplicateKeys(List<ImportRow> rows, string keyLabel)
+    /// <summary>Marks every row whose key repeats within the file as an error (both/all copies).
+    /// <paramref name="keyLabel"/> (e.g. "StudentId"/"Email") is the literal column-name token, never
+    /// translated — only the sentence around it is.</summary>
+    public static void FlagDuplicateKeys(List<ImportRow> rows, string keyLabel, IStringLocalizer<Messages> localizer)
     {
         foreach (var group in rows.Where(r => r.Key.Length > 0).GroupBy(r => r.Key, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
         {
@@ -343,7 +358,7 @@ internal static class ImportWorkbook
             foreach (var row in group)
             {
                 row.Outcome = ImportRowOutcome.Error;
-                row.Message = $"Duplicate {keyLabel} in file (rows {rowNumbers}).";
+                row.Message = string.Format(localizer["ImportWorkbook.DuplicateKeyInFile"].Value, keyLabel, rowNumbers);
                 row.ChangesJson = "[]";
             }
         }

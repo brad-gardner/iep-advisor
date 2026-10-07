@@ -184,6 +184,11 @@
     "Continued": "Continuada",
     "Cancelled": "Cancelada"
   },
+  "rootError": {
+    "title": "Algo salió mal",
+    "body": "Ocurrió un error inesperado. Nuestro equipo ya fue notificado.",
+    "goToDashboard": "Ir al panel"
+  },
   "generatedLanguage": {
     "title": "Generado en {{language}}",
     "body": "El asistente escribió esto en {{language}}. Los resultados nuevos usarán su idioma actual.",

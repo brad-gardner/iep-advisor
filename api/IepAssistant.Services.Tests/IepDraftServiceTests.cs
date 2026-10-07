@@ -37,7 +37,7 @@ public sealed class IepDraftServiceTests : IDisposable
     private readonly CapturingAuditLogger _audit = new();
 
     private IepDraftService CreateService(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), _audit, NullLogger<IepDraftService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), _audit, NullLogger<IepDraftService>.Instance, TestSupport.TestLocalizers.Messages());
 
     // ---------------------------------------------------------------- Seed helpers
 

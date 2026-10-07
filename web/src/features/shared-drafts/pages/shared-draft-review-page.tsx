@@ -9,6 +9,7 @@ import { PageLayout } from '@/components/ui/page-layout';
 import { Spinner } from '@/components/ui/spinner';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { formatDate } from '@/lib/format-date';
+import { loadErrorText } from '@/lib/api-error';
 import { AcknowledgeControl } from '../components/acknowledge-control';
 import { ChangeSummaryChips } from '../components/change-summary-chips';
 import { FrozenSectionList } from '../components/frozen-section-list';
@@ -44,6 +45,8 @@ export function SharedDraftReviewPage() {
   );
 
   const backTo = `/children/${childId}/shared-drafts`;
+  const notesError = loadErrorText(notesState.error, t('notesLoadError'));
+  const responsesError = loadErrorText(responsesState.error, t('responsesLoadError'));
 
   // Every card (and its always-mounted drawers) reads this context; a stable
   // value means one "Explain"/"Ask"/"Respond" doesn't re-render the whole list.
@@ -84,7 +87,7 @@ export function SharedDraftReviewPage() {
     return (
       <PageLayout title={t('reviewPage.unavailableTitle')} breadcrumb={[{ label: t('listPage.breadcrumbSelf'), to: backTo }]}>
         <div role="alert">
-          <Notice variant="error" title={error && error.kind === 'server' ? error.message : t('reviewPage.unavailableDefault')}>
+          <Notice variant="error" title={loadErrorText(error, t('reviewPage.unavailableDefault')) ?? t('reviewPage.unavailableDefault')}>
             <Button variant="secondary" className="mt-2" onClick={retry} data-testid="shared-draft-retry">
               {t('common:ui.tryAgain')}
             </Button>
@@ -132,20 +135,14 @@ export function SharedDraftReviewPage() {
             </Card>
           )}
 
-          {notesState.error && (
+          {notesError && (
             <div role="alert">
-              <Notice
-                variant="error"
-                title={notesState.error.kind === 'server' ? notesState.error.message : t('notesLoadError')}
-              />
+              <Notice variant="error" title={notesError} />
             </div>
           )}
-          {responsesState.error && (
+          {responsesError && (
             <div role="alert">
-              <Notice
-                variant="error"
-                title={responsesState.error.kind === 'server' ? responsesState.error.message : t('responsesLoadError')}
-              />
+              <Notice variant="error" title={responsesError} />
             </div>
           )}
 

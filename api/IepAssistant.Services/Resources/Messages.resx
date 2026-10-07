@@ -909,6 +909,9 @@
   <data name="Educator.NoPermissionManageSelectedStudents" xml:space="preserve">
     <value>You do not have permission to manage one or more of the selected students.</value>
   </data>
+  <data name="Educator.BulkAssignStudentValidationError" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
   <data name="Educator.NoPermissionAssignStaff" xml:space="preserve">
     <value>You do not have permission to assign staff to this student.</value>
   </data>
@@ -1748,5 +1751,158 @@
   </data>
   <data name="AuditLog.VersionNumber" xml:space="preserve">
     <value>Version #{0}</value>
+  </data>
+  <!-- Multilingual plan phase 7: ParentPrepQuestionService -->
+  <data name="ParentPrepQuestions.ChildNotFound" xml:space="preserve">
+    <value>Child profile not found.</value>
+  </data>
+  <data name="ParentPrepQuestions.QuestionNotFound" xml:space="preserve">
+    <value>Prep question not found.</value>
+  </data>
+  <data name="ParentPrepQuestions.TextRequired" xml:space="preserve">
+    <value>Question text is required.</value>
+  </data>
+  <data name="ParentPrepQuestions.TextTooLong" xml:space="preserve">
+    <value>Question must be {0} characters or fewer.</value>
+  </data>
+  <data name="ParentPrepQuestions.InvalidSource" xml:space="preserve">
+    <value>Source must be 'parent' or 'advocate'.</value>
+  </data>
+  <data name="ParentPrepQuestions.ProvideTextOrChecked" xml:space="preserve">
+    <value>Provide text or isChecked.</value>
+  </data>
+  <data name="ParentPrepQuestions.IdsRequired" xml:space="preserve">
+    <value>ids is required.</value>
+  </data>
+  <data name="ParentPrepQuestions.IdsMustNotRepeat" xml:space="preserve">
+    <value>ids must not repeat.</value>
+  </data>
+  <data name="ParentPrepQuestions.IdsMustBelongToChild" xml:space="preserve">
+    <value>Every id must be one of this child's prep questions.</value>
+  </data>
+  <!-- Multilingual plan phase 7: DocumentCompletenessService -->
+  <data name="DocumentCompleteness.DocumentNotFound" xml:space="preserve">
+    <value>Document not found.</value>
+  </data>
+  <data name="DocumentCompleteness.TemplateVersionLoadFailed" xml:space="preserve">
+    <value>The pinned template version could not be loaded.</value>
+  </data>
+  <!-- Multilingual plan phase 7: UserService -->
+  <data name="Users.NotFound" xml:space="preserve">
+    <value>User not found.</value>
+  </data>
+  <data name="Users.InvalidRole" xml:space="preserve">
+    <value>Invalid role '{0}'.</value>
+  </data>
+  <data name="Users.UpdatedSuccessfully" xml:space="preserve">
+    <value>User updated successfully.</value>
+  </data>
+  <data name="Users.DeletedSuccessfully" xml:space="preserve">
+    <value>User deleted successfully.</value>
+  </data>
+  <!-- Multilingual plan phase 7: IepDraftService -->
+  <data name="IepDrafts.Permission" xml:space="preserve">
+    <value>You do not have permission to access this IEP draft.</value>
+  </data>
+  <data name="IepDrafts.DraftNotFound" xml:space="preserve">
+    <value>IEP draft not found.</value>
+  </data>
+  <data name="IepDrafts.SectionNotFound" xml:space="preserve">
+    <value>Section not found.</value>
+  </data>
+  <data name="IepDrafts.GoalNotFound" xml:space="preserve">
+    <value>Goal not found.</value>
+  </data>
+  <data name="IepDrafts.ServiceLineNotFound" xml:space="preserve">
+    <value>Service line not found.</value>
+  </data>
+  <data name="IepDrafts.AccommodationNotFound" xml:space="preserve">
+    <value>Accommodation not found.</value>
+  </data>
+  <data name="IepDrafts.TransitionItemNotFound" xml:space="preserve">
+    <value>Transition item not found.</value>
+  </data>
+  <data name="IepDrafts.DraftBeingFinalized" xml:space="preserve">
+    <value>The draft is being finalized; try again in a moment.</value>
+  </data>
+  <!-- Multilingual plan phase 7: ImportWorkbook (shared by RosterImportService/StaffImportService).
+       The first 4 reuse DistrictImportsController's exact keys/text (see ValidateUpload's doc comment);
+       the rest are new. Sheet/column names and the literal {0} tokens they interpolate stay English. -->
+  <data name="ImportWorkbook.MacroWorkbookDetected" xml:space="preserve">
+    <value>Macro-enabled workbooks are not accepted. Save the file as .xlsx and try again.</value>
+  </data>
+  <data name="ImportWorkbook.CouldNotReadWorkbook" xml:space="preserve">
+    <value>The file could not be read as an Excel workbook (.xlsx).</value>
+  </data>
+  <data name="ImportWorkbook.WorkbookTooLargeToImport" xml:space="preserve">
+    <value>The workbook is too large to import. Remove unused sheets, formatting or data and try again.</value>
+  </data>
+  <data name="ImportWorkbook.MissingSheet" xml:space="preserve">
+    <value>The workbook must contain a sheet named '{0}'.</value>
+  </data>
+  <data name="ImportWorkbook.MissingRequiredColumn" xml:space="preserve">
+    <value>Missing required column: {0}.</value>
+  </data>
+  <data name="ImportWorkbook.Or" xml:space="preserve">
+    <value> or </value>
+  </data>
+  <data name="ImportWorkbook.TooManyDataRows" xml:space="preserve">
+    <value>The sheet has more than {0} data rows. Split the file and try again.</value>
+  </data>
+  <data name="ImportWorkbook.DuplicateKeyInFile" xml:space="preserve">
+    <value>Duplicate {0} in file (rows {1}).</value>
+  </data>
+  <!-- Multilingual plan phase 7: RosterImportService "Changes" preview field labels -->
+  <data name="RosterImport.FieldSchool" xml:space="preserve">
+    <value>School</value>
+  </data>
+  <data name="RosterImport.TeamMembersWillBeDeactivated" xml:space="preserve">
+    <value>Team: {0} member(s) will be deactivated</value>
+  </data>
+  <data name="RosterImport.FieldFirstName" xml:space="preserve">
+    <value>First name</value>
+  </data>
+  <data name="RosterImport.FieldLastName" xml:space="preserve">
+    <value>Last name</value>
+  </data>
+  <data name="RosterImport.FieldDateOfBirth" xml:space="preserve">
+    <value>Date of birth</value>
+  </data>
+  <data name="RosterImport.FieldGrade" xml:space="preserve">
+    <value>Grade</value>
+  </data>
+  <data name="RosterImport.FieldDisability" xml:space="preserve">
+    <value>Disability</value>
+  </data>
+  <data name="RosterImport.FieldHomeLanguage" xml:space="preserve">
+    <value>Home language</value>
+  </data>
+  <data name="RosterImport.FieldCaseManager" xml:space="preserve">
+    <value>Case manager</value>
+  </data>
+  <data name="RosterImport.FieldStatus" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="RosterImport.FieldIepDate" xml:space="preserve">
+    <value>IEP date</value>
+  </data>
+  <data name="RosterImport.FieldAnnualReviewDue" xml:space="preserve">
+    <value>Annual review due</value>
+  </data>
+  <data name="RosterImport.FieldEtrDate" xml:space="preserve">
+    <value>ETR date</value>
+  </data>
+  <data name="RosterImport.FieldReevaluationDue" xml:space="preserve">
+    <value>Reevaluation due</value>
+  </data>
+  <!-- Multilingual plan phase 7: StaffImportService "Changes" preview field labels -->
+  <data name="StaffImport.FieldRole" xml:space="preserve">
+    <value>Role</value>
+  </data>
+  <data name="StaffImport.FieldSchool" xml:space="preserve">
+    <value>School</value>
+  </data>
+  <data name="StaffImport.FieldTitle" xml:space="preserve">
+    <value>Title</value>
   </data>
 </root>

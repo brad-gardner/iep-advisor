@@ -1714,7 +1714,9 @@ public class DemoSeeder : IDemoSeeder
             var versionNumberById = await _context.AuthoredDocumentVersions.Where(v => versionIds.Contains(v.Id)).ToDictionaryAsync(v => v.Id, v => v.VersionNumber, ct);
             foreach (var pdf in pdfs.Where(p => p.RenderStatus == PdfRenderStatus.Rendered))
                 if (versionNumberById.TryGetValue(pdf.AuthoredDocumentVersionId, out var versionNumber))
-                    await TryDeleteBlobAsync(IAuthoredDocumentPdfService.BlobPathFor(pdf.AuthoredDocumentVersionId, versionNumber), ct);
+                    // Multilingual plan phase 7: pass the row's own Language — a version can now have
+                    // more than one rendered blob (one per language), each at its own path.
+                    await TryDeleteBlobAsync(IAuthoredDocumentPdfService.BlobPathFor(pdf.AuthoredDocumentVersionId, versionNumber, pdf.Language), ct);
             _context.AuthoredDocumentPdfs.RemoveRange(pdfs);
             await _context.SaveChangesAsync(ct);
 

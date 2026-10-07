@@ -1,4 +1,9 @@
 {
+  "childTab": {
+    "heading": "IEP",
+    "newButton": "Nuevo IEP",
+    "newDrawerTitle": "Nuevo IEP"
+  },
   "sectionType": {
     "full": {
       "student_profile": "Perfil del estudiante",

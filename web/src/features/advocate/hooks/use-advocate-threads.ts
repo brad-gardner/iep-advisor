@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, apiErrorMessage, toLoadError } from '@/lib/api-error';
 import i18n from '@/lib/i18n';
 import { createAdvocateThread, deleteAdvocateThread, listAdvocateThreads, renameAdvocateThread } from '../api/advocate-api';
 import type { AdvocateThreadDto } from '../types/advocate';
-
-/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
-export type ThreadsLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 // Live `i18n.t()` calls (not frozen constants) — see `docs/i18n/README.md`'s
 // "Display-label helpers" pattern.
@@ -27,7 +24,7 @@ export function threadsDeleteFailed(): string {
  */
 export function useAdvocateThreads(childId: number) {
   const [threads, setThreads] = useState<AdvocateThreadDto[] | null>(null);
-  const [error, setError] = useState<ThreadsLoadError | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -39,13 +36,12 @@ export function useAdvocateThreads(childId: number) {
           setThreads(res.data);
           setError(null);
         } else {
-          setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+          setError(toLoadError(res));
         }
       })
       .catch((err) => {
         if (!active) return;
-        const message = apiErrorMessage(err, '');
-        setError(message ? { kind: 'server', message } : { kind: 'generic' });
+        setError(toLoadError(err));
       });
     return () => {
       active = false;

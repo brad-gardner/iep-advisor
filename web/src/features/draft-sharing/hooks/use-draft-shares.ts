@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError } from '@/lib/api-error';
 import { getShares } from '../api/draft-sharing-api';
 import type { SharedDraftRevisionDto } from '../types';
-
-/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
-export type UseDraftSharesError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 interface UseDraftSharesResult {
   shares: SharedDraftRevisionDto[];
@@ -13,14 +10,14 @@ interface UseDraftSharesResult {
    *  successor — i.e. nothing currently Active). */
   latestActive: SharedDraftRevisionDto | null;
   isLoading: boolean;
-  error: UseDraftSharesError | null;
+  error: LoadError | null;
 }
 
 /** Every revision shared for this document instance, newest first — drives the
  *  staff-side "Shared as revision N" banner under the editor header. */
 export function useDraftShares(instanceId: number): UseDraftSharesResult {
   const [shares, setShares] = useState<SharedDraftRevisionDto[]>([]);
-  const [error, setError] = useState<UseDraftSharesError | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -31,11 +28,10 @@ export function useDraftShares(instanceId: number): UseDraftSharesResult {
         const res = await getShares(instanceId);
         if (!active) return;
         if (res.success && res.data) setShares(res.data);
-        else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setError(toLoadError(res));
       } catch (err) {
         if (!active) return;
-        const message = apiErrorMessage(err, '');
-        setError(message ? { kind: 'server', message } : { kind: 'generic' });
+        setError(toLoadError(err));
       } finally {
         if (active) setIsLoading(false);
       }

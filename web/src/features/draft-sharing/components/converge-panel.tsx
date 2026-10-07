@@ -9,6 +9,7 @@ import { jumpToFieldWhenVisible } from '@/features/document-authoring/lib/sectio
 import type { DocumentInstanceStatus } from '@/features/document-authoring/types';
 import { ChangeSummaryChips } from '@/features/shared-drafts/components/change-summary-chips';
 import { formatDate } from '@/lib/format-date';
+import { loadErrorText } from '@/lib/api-error';
 import { useConverge } from '../hooks/use-converge';
 import { buildFieldLocationLookup } from '../lib/field-lookup';
 import { ResolveResponseDialog } from './resolve-response-dialog';
@@ -37,6 +38,7 @@ export function ConvergePanel({ instanceId, status, templateVersion, onBeforeJum
   const { converge, isLoading, error, retry, applyResolvedResponse } = useConverge(instanceId);
   const [resolving, setResolving] = useState<DraftResponseDto | null>(null);
   const fieldLookup = useMemo(() => buildFieldLocationLookup(templateVersion), [templateVersion]);
+  const errorMessage = loadErrorText(error, t('converge.loadErrorDefault'));
 
   if (isLoading) {
     return (
@@ -51,7 +53,7 @@ export function ConvergePanel({ instanceId, status, templateVersion, onBeforeJum
   if (!converge) {
     return (
       <div role="alert">
-        <Notice variant="error" title={error && error.kind === 'server' ? error.message : t('converge.loadErrorDefault')}>
+        <Notice variant="error" title={errorMessage ?? t('converge.loadErrorDefault')}>
           <Button variant="secondary" className="mt-2" onClick={retry} data-testid="converge-retry">
             {t('common:ui.tryAgain')}
           </Button>
@@ -73,7 +75,7 @@ export function ConvergePanel({ instanceId, status, templateVersion, onBeforeJum
     <div className="space-y-6" data-testid="converge-panel">
       {error && (
         <div role="alert">
-          <Notice variant="error" title={error.kind === 'server' ? error.message : t('converge.loadErrorDefault')}>
+          <Notice variant="error" title={errorMessage ?? t('converge.loadErrorDefault')}>
             <Button variant="secondary" className="mt-2" onClick={retry} data-testid="converge-retry">
               {t('common:ui.tryAgain')}
             </Button>

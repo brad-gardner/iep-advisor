@@ -22,7 +22,7 @@ public sealed class HomeServiceTests : IDisposable
     {
         var orgAccess = new OrgAccessService(ctx);
         var obligationService = new ObligationService(ctx, orgAccess, TestSupport.TestLocalizers.Messages());
-        var completeness = new DocumentCompletenessService(ctx, new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()));
+        var completeness = new DocumentCompletenessService(ctx, new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()), TestSupport.TestLocalizers.Messages());
         // Shares the same IOrgAccessService instance HomeService uses (matches production DI, where
         // IOrgAccessService is Scoped) so its per-request staff-context memo is actually shared across
         // HomeService/ObligationService/DistrictService, as it would be for a real request.

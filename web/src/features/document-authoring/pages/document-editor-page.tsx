@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Spinner } from '@/components/ui/spinner';
 import { ConvergeTab } from '@/features/draft-sharing/components/converge-tab';
+import { loadErrorText } from '@/lib/api-error';
 import { useDocumentInstance } from '../hooks/use-document-instance';
 import { DocumentEditor } from '../components/document-editor';
 import { usePageTitle } from '@/hooks/use-page-title';
@@ -45,9 +46,7 @@ export function DocumentEditorPage() {
         title={t('editorPage.notFoundTitle')}
         description={
           loadError
-            ? loadError.kind === 'server'
-              ? loadError.message
-              : t('editorPage.loadErrorGeneric')
+            ? (loadErrorText(loadError, t('editorPage.loadErrorGeneric')) ?? t('editorPage.loadErrorGeneric'))
             : t('editorPage.notFoundDescription')
         }
         action={

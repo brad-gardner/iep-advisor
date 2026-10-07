@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
@@ -9,6 +10,7 @@ import { EtrDocumentList } from "@/features/etr-documents/components/etr-documen
 import type { ChildOutletContext } from "./child-detail-page";
 
 export function ChildEtrsTab() {
+  const { t } = useTranslation("etr-documents");
   const { child, childId } = useOutletContext<ChildOutletContext>();
   const [showCreateEtr, setShowCreateEtr] = useState(false);
   const {
@@ -21,14 +23,14 @@ export function ChildEtrsTab() {
   return (
     <Card data-testid="etr-documents-section">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="font-serif">ETRs</h2>
+        <h2 className="font-serif">{t("childTab.heading")}</h2>
         {!isViewer && (
           <Button
             variant="secondary"
             onClick={() => setShowCreateEtr(true)}
             data-testid="new-etr-button"
           >
-            New ETR
+            {t("childTab.newButton")}
           </Button>
         )}
       </div>
@@ -41,7 +43,7 @@ export function ChildEtrsTab() {
       <Drawer
         open={showCreateEtr}
         onClose={() => setShowCreateEtr(false)}
-        title="New ETR"
+        title={t("childTab.newDrawerTitle")}
         size="lg"
         data-testid="new-etr-drawer"
       >

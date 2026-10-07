@@ -8,6 +8,18 @@ namespace IepAssistant.Domain.Entities;
 public class IepVersionPdf : BaseEntity, IAuditableEntity
 {
     public int IepVersionId { get; set; }
+
+    /// <summary>
+    /// Multilingual plan (2026-10-06) phase 7: "en"/"es" (see <c>SupportedLanguages</c>), nullable for
+    /// backward compatibility — every row created before this column existed is NULL and is treated as
+    /// English everywhere this is queried (never re-backfilled, exactly like <c>MeetingBrief.Language</c>/
+    /// the AI-artifact Language columns). One row per (IepVersionId, Language): the unique index on
+    /// <see cref="IepVersionId"/> alone became a composite <c>(IepVersionId, Language)</c> index so an
+    /// English and a Spanish render of the same version coexist as separate rows instead of overwriting
+    /// each other.
+    /// </summary>
+    public string? Language { get; set; }
+
     public string? BlobUri { get; set; }
     public string? Checksum { get; set; }
     public DateTime? RenderedAt { get; set; }

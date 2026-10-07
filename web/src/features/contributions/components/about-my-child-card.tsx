@@ -10,6 +10,7 @@ import { Notice } from '@/components/ui/notice';
 import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
+import { type LoadError, toLoadError, loadErrorText } from '@/lib/api-error';
 import { contributionKindLabel } from '@/lib/contribution-label';
 import {
   CONTRIBUTION_KINDS,
@@ -29,12 +30,6 @@ interface AboutMyChildCardProps {
 }
 
 const NOTE_TEXT_MAX_LENGTH = 2000;
-
-// A server-provided message is already resolved text and is shown as-is;
-// the generic fallback is translated at RENDER time (below), not stored
-// pre-translated here, so the mount effect never needs `t` in its
-// dependency array (same idiom as `useHome`/`MeetingRsvpPage`'s `LoadError`).
-type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 /**
  * The family's "about my child at home" notes. Each note is private until the
@@ -65,7 +60,7 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
       .then((res) => {
         if (!active) return;
         if (res.success && res.data) setItems(res.data);
-        else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setError(toLoadError(res));
       })
       .catch(() => {
         if (active) setError({ kind: 'generic' });
@@ -80,7 +75,7 @@ export function AboutMyChildCard({ childId, childName, canEdit }: AboutMyChildCa
     // a plain language switch would be wasteful.
   }, [childId]);
 
-  const displayError = error ? (error.kind === 'server' ? error.message : t('card.loadErrorTitle')) : null;
+  const displayError = loadErrorText(error, t('card.loadErrorTitle'));
 
   const submit = async () => {
     if (!text.trim() || isMarkdownOverLimit(text, NOTE_TEXT_MAX_LENGTH)) return;

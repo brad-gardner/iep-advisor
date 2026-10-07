@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -90,14 +91,25 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
     private readonly AuthoredDocumentPdfHeaderContext _header;
     private readonly IReadOnlyDictionary<int, string> _ownerRoleByUserId;
     private readonly bool _isOhForm;
+    private readonly PdfLabels _labels;
     private readonly List<string> _outline = new();
 
+    /// <param name="labels">
+    /// Multilingual plan phase 7: every app-generated word this document prints. Defaults to
+    /// <see cref="PdfLabels.English"/> — the exact pre-phase-7 literals — so every existing call site
+    /// (including every test) that omits it keeps producing byte-identical English output. The render
+    /// service passes the requester's resolved <see cref="PdfLabels"/> for an actual render. Document
+    /// CONTENT and district-authored template labels (<paramref name="tree"/>'s section/field titles,
+    /// <paramref name="valuesJson"/>'s values) are never translated — only the labels printed around them.
+    /// </param>
     public AuthoredDocumentPdfDocument(
         string documentTypeDisplayName, int versionNumber, DateTime finalizedAt,
         TemplateVersionDetailModel tree, string? valuesJson,
-        AuthoredDocumentPdfHeaderContext? header = null)
+        AuthoredDocumentPdfHeaderContext? header = null,
+        PdfLabels? labels = null)
     {
-        _documentTypeDisplayName = string.IsNullOrWhiteSpace(documentTypeDisplayName) ? "Document" : documentTypeDisplayName;
+        _labels = labels ?? PdfLabels.English;
+        _documentTypeDisplayName = string.IsNullOrWhiteSpace(documentTypeDisplayName) ? _labels.Document : documentTypeDisplayName;
         _versionNumber = versionNumber;
         _finalizedAt = finalizedAt;
         _tree = tree;
@@ -145,9 +157,9 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
             page.Content().Element(_isOhForm ? ComposeOhContent : ComposeContent);
             page.Footer().AlignCenter().Text(text =>
             {
-                text.Span("Page ");
+                text.Span(_labels.PagePrefix);
                 text.CurrentPageNumber();
-                text.Span(" of ");
+                text.Span(_labels.PageOfMiddle);
                 text.TotalPages();
             });
         });
@@ -161,8 +173,8 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
         container.Column(col =>
         {
             col.Item().Text(_documentTypeDisplayName).FontSize(18).Bold();
-            col.Item().Text($"Version {_versionNumber}").FontSize(11).SemiBold();
-            col.Item().Text($"Finalized: {_finalizedAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}")
+            col.Item().Text(string.Format(_labels.Version, _versionNumber)).FontSize(11).SemiBold();
+            col.Item().Text(string.Format(_labels.Finalized, _finalizedAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)))
                 .FontSize(9).FontColor(Colors.Grey.Darken1);
             if (_header.AmendsVersionNumber.HasValue)
                 col.Item().Element(c => AmendmentBanner(c));
@@ -227,14 +239,14 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
         {
             col.Item().Text(_documentTypeDisplayName).FontSize(18).Bold();
             if (formId != null)
-                col.Item().Text($"Ohio Department of Education Form {formId}").FontSize(10).SemiBold();
-            col.Item().Text($"Student: {studentName}").FontSize(10);
-            col.Item().Text($"Date of birth: {FormatDate(_header.StudentDateOfBirth)}").FontSize(9);
-            col.Item().Text($"District: {_header.DistrictName ?? "—"}").FontSize(9);
-            col.Item().Text($"IEP date: {FormatDate(_header.IepDate)}   ETR date: {FormatDate(_header.EtrDate)}").FontSize(9);
-            col.Item().Text($"Meeting date: {FormatDate(_header.MeetingDate)}").FontSize(9);
-            col.Item().Text($"Version {_versionNumber} — Form version: template v{_tree.VersionNumber}").FontSize(9).FontColor(Colors.Grey.Darken1);
-            col.Item().Text($"Finalized: {FormatDate(_finalizedAt)}").FontSize(9).FontColor(Colors.Grey.Darken1);
+                col.Item().Text(string.Format(_labels.OhioForm, formId)).FontSize(10).SemiBold();
+            col.Item().Text(string.Format(_labels.StudentLine, studentName)).FontSize(10);
+            col.Item().Text(string.Format(_labels.DateOfBirthLine, FormatDate(_header.StudentDateOfBirth))).FontSize(9);
+            col.Item().Text(string.Format(_labels.DistrictLine, _header.DistrictName ?? "—")).FontSize(9);
+            col.Item().Text(string.Format(_labels.IepEtrDateLine, FormatDate(_header.IepDate), FormatDate(_header.EtrDate))).FontSize(9);
+            col.Item().Text(string.Format(_labels.MeetingDateLine, FormatDate(_header.MeetingDate))).FontSize(9);
+            col.Item().Text(string.Format(_labels.VersionFormVersionLine, _versionNumber, _tree.VersionNumber)).FontSize(9).FontColor(Colors.Grey.Darken1);
+            col.Item().Text(string.Format(_labels.Finalized, FormatDate(_finalizedAt))).FontSize(9).FontColor(Colors.Grey.Darken1);
 
             if (_header.AmendsVersionNumber.HasValue)
                 col.Item().Element(c => AmendmentBanner(c));
@@ -269,7 +281,7 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                         if (field.Required)
                         {
                             Note($"Not addressed: {field.Label}");
-                            col.Item().Element(c => LabeledText(c, field.Label, "Not addressed"));
+                            col.Item().Element(c => LabeledText(c, field.Label, _labels.NotAddressed));
                             rendered++;
                         }
                         continue;
@@ -297,7 +309,7 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                 if (rendered == 0)
                 {
                     Note($"Not addressed: {section.Title}");
-                    col.Item().Text("Not addressed").Italic().FontColor(Colors.Grey.Darken1);
+                    col.Item().Text(_labels.NotAddressed).Italic().FontColor(Colors.Grey.Darken1);
                 }
             }
 
@@ -391,7 +403,7 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
 
             blocks.Add(container => container.Column(col =>
             {
-                col.Item().Text($"Goal {n}").Bold().FontSize(11);
+                col.Item().Text($"{_labels.Goal} {n}").Bold().FontSize(11);
                 foreach (var (columnKey, label) in columnLabels)
                 {
                     var cell = rowNode[columnKey.ToString()];
@@ -411,11 +423,11 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                 }
 
                 if (ownerRole != null)
-                    col.Item().PaddingTop(2).Text($"Responsible: {ownerRole}").FontSize(9).Italic();
+                    col.Item().PaddingTop(2).Text(string.Format(_labels.Responsible, ownerRole)).FontSize(9).Italic();
 
                 if (objectiveTexts.Count > 0)
                 {
-                    col.Item().PaddingTop(2).Text("Objectives").SemiBold().FontSize(9);
+                    col.Item().PaddingTop(2).Text(_labels.Objectives).SemiBold().FontSize(9);
                     for (var i = 0; i < objectiveTexts.Count; i++)
                         col.Item().PaddingLeft(10).Text($"{i + 1}. {objectiveTexts[i]}").FontSize(9);
                 }
@@ -428,15 +440,15 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
     {
         container.Column(col =>
         {
-            col.Item().Text("Participants").SemiBold().FontSize(12);
+            col.Item().Text(_labels.Participants).SemiBold().FontSize(12);
             if (_header.Participants.Count == 0)
             {
-                col.Item().Text("Not addressed").Italic().FontColor(Colors.Grey.Darken1);
+                col.Item().Text(_labels.NotAddressed).Italic().FontColor(Colors.Grey.Darken1);
                 return;
             }
             foreach (var p in _header.Participants)
             {
-                var attended = p.Attended switch { true => "Attended", false => "Did not attend", _ => "Attendance not recorded" };
+                var attended = p.Attended switch { true => _labels.Attended, false => _labels.DidNotAttend, _ => _labels.AttendanceNotRecorded };
                 col.Item().Text($"{p.Name} — {p.Role} — {attended}").FontSize(9);
             }
         });
@@ -444,23 +456,23 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
 
     private void ComposeSignatures(IContainer container)
     {
-        var lines = new List<string> { "Parent/Guardian" };
+        var lines = new List<string> { _labels.ParentGuardian };
         if (IsStudentOldEnoughToSign())
-            lines.Add("Student");
-        lines.Add("District Representative");
-        lines.Add("Teacher");
+            lines.Add(_labels.Student);
+        lines.Add(_labels.DistrictRepresentative);
+        lines.Add(_labels.Teacher);
 
         container.Column(col =>
         {
-            col.Item().Text("Signatures").SemiBold().FontSize(12);
+            col.Item().Text(_labels.Signatures).SemiBold().FontSize(12);
             foreach (var line in lines)
             {
                 col.Item().PaddingTop(8).Text(line).FontSize(9).SemiBold();
                 col.Item().Row(row =>
                 {
-                    row.RelativeItem().Text("Name: _______________________").FontSize(9);
-                    row.RelativeItem().Text("Signature: _______________________").FontSize(9);
-                    row.RelativeItem().Text("Date: __________").FontSize(9);
+                    row.RelativeItem().Text(_labels.NameFieldLine).FontSize(9);
+                    row.RelativeItem().Text(_labels.SignatureFieldLine).FontSize(9);
+                    row.RelativeItem().Text(_labels.DateFieldLine).FontSize(9);
                 });
             }
         });
@@ -479,9 +491,9 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
     private void AmendmentBanner(IContainer container)
     {
         Note("Amendment");
-        var effective = _header.EffectiveDate.HasValue ? $" — effective {FormatDate(_header.EffectiveDate)}" : string.Empty;
+        var effective = _header.EffectiveDate.HasValue ? string.Format(_labels.EffectiveSuffix, FormatDate(_header.EffectiveDate)) : string.Empty;
         container.Background(Colors.Yellow.Lighten3).Padding(4)
-            .Text($"Amendment to v{_header.AmendsVersionNumber}{effective}").Bold().FontSize(10);
+            .Text(string.Format(_labels.AmendmentTo, _header.AmendsVersionNumber) + effective).Bold().FontSize(10);
     }
 
     // =================================================================== Shared fields
@@ -512,7 +524,7 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                 break;
 
             case FieldType.Checkbox:
-                LabeledText(container, field.Label, AsBool(node) == true ? "Yes" : "No");
+                LabeledText(container, field.Label, AsBool(node) == true ? _labels.Yes : _labels.No);
                 break;
 
             case FieldType.Table:
@@ -561,7 +573,7 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                     foreach (var column in columns)
                         HeaderCell(header, column.Label);
                     if (showOwnerColumn)
-                        HeaderCell(header, "Responsible");
+                        HeaderCell(header, _labels.ResponsibleHeader);
                 });
 
                 if (rows != null)
@@ -584,6 +596,9 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
                         }
                         if (showOwnerColumn)
                             BodyCell(table, row != null ? ResolveOwnerRole(row) ?? string.Empty : string.Empty);
+                        // Note: ResolveOwnerRole returns a bare role name for this grid cell (not the
+                        // "Responsible: {0}" sentence used in goal blocks) — the column header already
+                        // reads "Responsible", so repeating the word per cell would be redundant.
                     }
                 }
             });
@@ -640,13 +655,14 @@ public sealed class AuthoredDocumentPdfDocument : IDocument
         return string.IsNullOrWhiteSpace(match.Label) ? match.Value : match.Label!;
     }
 
-    private static string FormatCell(TableColumn column, JsonNode? cell)
+    // Instance (not static, unlike its sibling formatters above) so Checkbox cells can read _labels.
+    private string FormatCell(TableColumn column, JsonNode? cell)
     {
         return column.Type switch
         {
             FieldType.Date => FormatDate(AsString(cell)),
             FieldType.Select => SelectDisplay(column.ConfigJson, AsString(cell)),
-            FieldType.Checkbox => AsBool(cell) == true ? "Yes" : (AsBool(cell) == false ? "No" : string.Empty),
+            FieldType.Checkbox => AsBool(cell) == true ? _labels.Yes : (AsBool(cell) == false ? _labels.No : string.Empty),
             _ => AsString(cell) ?? string.Empty
         };
     }

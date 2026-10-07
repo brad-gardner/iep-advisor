@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+// The singleton api-client reads for Accept-Language.
+import appI18n from '@/lib/i18n';
 import { usePolling } from '@/hooks/use-polling';
 import { getPdfStatus, retryPdf } from '../api/iep-versions-api';
 import type { IepVersionPdfStatusDto, PdfRenderStatus } from '../types';
@@ -22,11 +25,34 @@ export function usePdfStatus(
   // Seed value from the summary/detail so the badge renders before the first fetch.
   initialStatus?: string | null
 ): UsePdfStatusResult {
-  const seeded = isRenderStatus(initialStatus) ? initialStatus : null;
+  const { i18n } = useTranslation();
+  const language = i18n.resolvedLanguage;
+  // The server keeps one rendered PDF row per (version, language), and the
+  // seed comes from the ENGLISH row on list/detail data — trusting it while
+  // a non-English language is active would show an already-"Rendered"
+  // download action (with the cached English url) for a language whose row
+  // may not even exist yet.
+  const seeded = language === 'en' && isRenderStatus(initialStatus) ? initialStatus : null;
   const [pdf, setPdf] = useState<IepVersionPdfStatusDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [timedOut, setTimedOut] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+
+  // The server keeps one PDF row per (version, language); `pdf`/`isLoading`
+  // cache ONE language's result at a time, and `trackedLanguage` is which
+  // language that cache reflects. When the ACTIVE language changes (an
+  // in-app switch, no page reload), reset synchronously DURING RENDER —
+  // React's documented "adjusting state when a prop changes" pattern, not a
+  // useEffect — so a stale Rendered status + url from the PREVIOUS language
+  // never flashes on screen (or gets silently downloaded) while the effect
+  // below fetches the new language's row.
+  const [trackedLanguage, setTrackedLanguage] = useState(language);
+  if (language !== trackedLanguage) {
+    setTrackedLanguage(language);
+    setPdf(null);
+    setIsLoading(true);
+    setTimedOut(false);
+  }
 
   const status = pdf?.renderStatus ?? seeded;
   // Keep polling while Pending/unknown AND while Rendered-but-url-not-yet-available
@@ -37,7 +63,12 @@ export function usePdfStatus(
 
   const fetchStatus = useCallback(async () => {
     try {
+      // Requests carry the language active when sent (api-client's Accept-Language);
+      // drop the answer if the language switched while it was in flight, so a
+      // previous language's row never overwrites the reset state.
+      const sentWith = appI18n.language;
       const res = await getPdfStatus(versionId);
+      if (appI18n.language !== sentWith) return;
       if (res.success && res.data) {
         setPdf(res.data);
       }
@@ -46,7 +77,11 @@ export function usePdfStatus(
     }
   }, [versionId]);
 
-  // Initial fetch.
+  // Initial fetch, and re-fetch whenever `trackedLanguage` changes — the
+  // render-time reset above already cleared the previous language's cached
+  // state/url by the time this runs. The server resolves the PDF row from
+  // Accept-Language (which api-client sets from `i18n.language`), creating/
+  // queuing that language's row on this call if it doesn't exist yet.
   useEffect(() => {
     let active = true;
     setIsLoading(true);
@@ -63,7 +98,7 @@ export function usePdfStatus(
     return () => {
       active = false;
     };
-  }, [versionId]);
+  }, [versionId, trackedLanguage]);
 
   usePolling(fetchStatus, 5000, isPending && !isLoading);
 
@@ -87,7 +122,9 @@ export function usePdfStatus(
     setTimedOut(false);
     startedAtRef.current = Date.now();
     try {
+      const sentWith = appI18n.language;
       const res = await retryPdf(versionId);
+      if (appI18n.language !== sentWith) return;
       if (res.success && res.data) {
         setPdf(res.data);
       } else {

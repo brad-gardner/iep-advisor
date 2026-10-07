@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import { type LoadError, toLoadError } from '@/lib/api-error';
 import { listAuthoredVersions } from '../api/documents-api';
 import type { AuthoredDocumentVersionSummaryDto } from '../types';
-
-/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
-export type UseAuthoredVersionsError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 interface UseAuthoredVersionsResult {
   versions: AuthoredDocumentVersionSummaryDto[];
   isLoading: boolean;
-  error: UseAuthoredVersionsError | null;
+  error: LoadError | null;
   /** Re-fetch the list (e.g. after a finalize creates a new version). */
   refresh: () => void;
 }
@@ -18,7 +16,7 @@ interface UseAuthoredVersionsResult {
 export function useAuthoredVersions(studentId: number): UseAuthoredVersionsResult {
   const [versions, setVersions] = useState<AuthoredDocumentVersionSummaryDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<UseAuthoredVersionsError | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   // The effect body only calls setState after an await, keeping it effect-safe
@@ -30,7 +28,7 @@ export function useAuthoredVersions(studentId: number): UseAuthoredVersionsResul
       .then((res) => {
         if (cancelled) return;
         if (res.success && res.data) setVersions(res.data);
-        else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setError(toLoadError(res));
       })
       .catch(() => {
         if (!cancelled) setError({ kind: 'generic' });

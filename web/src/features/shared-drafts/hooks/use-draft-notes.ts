@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError, apiErrorMessage } from '@/lib/api-error';
 import { deleteDraftNote, getDraftNotes } from '../api/shared-drafts-api';
 import type { ParentDraftNoteDto } from '../types';
-
-// See `use-shared-draft-detail.ts`'s `SharedDraftDetailError` for why the
-// generic fallback is a KIND, translated at render time by the sole consumer
-// (`SharedDraftReviewPage`, via `shared-drafts:notesLoadError`) rather than a
-// string stored here.
-export type DraftNotesLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 interface UseDraftNotesResult {
   notes: ParentDraftNoteDto[];
   isLoading: boolean;
-  error: DraftNotesLoadError | null;
+  error: LoadError | null;
   /** Append a freshly-answered note (from `askDraftQuestion`) to the list. */
   addNote: (note: ParentDraftNoteDto) => void;
   /** `message` is the server's own text when it supplied one; the caller
@@ -28,7 +22,7 @@ interface UseDraftNotesResult {
  */
 export function useDraftNotes(revisionId: number): UseDraftNotesResult {
   const [notes, setNotes] = useState<ParentDraftNoteDto[]>([]);
-  const [error, setError] = useState<DraftNotesLoadError | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -39,11 +33,10 @@ export function useDraftNotes(revisionId: number): UseDraftNotesResult {
         const res = await getDraftNotes(revisionId);
         if (!active) return;
         if (res.success && res.data) setNotes(res.data);
-        else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setError(toLoadError(res));
       } catch (err) {
         if (!active) return;
-        const serverMessage = apiErrorMessage(err, '');
-        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+        setError(toLoadError(err));
       } finally {
         if (active) setIsLoading(false);
       }
@@ -51,7 +44,9 @@ export function useDraftNotes(revisionId: number): UseDraftNotesResult {
     return () => {
       active = false;
     };
-    // `t` deliberately excluded — see `DraftNotesLoadError` above.
+    // `t` deliberately excluded — the generic fallback is a KIND, translated
+    // at render time by the sole consumer (`SharedDraftReviewPage`, via
+    // `shared-drafts:notesLoadError`) rather than a string stored here.
   }, [revisionId]);
 
   const addNote = useCallback((note: ParentDraftNoteDto) => {

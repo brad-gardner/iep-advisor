@@ -12,6 +12,7 @@ import { Table, type TableColumn } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { relativeTime } from '@/lib/relative-time';
+import { loadErrorText } from '@/lib/api-error';
 import { deleteDocument } from '../api/documents-api';
 import { useDocumentList } from '../hooks/use-document-list';
 import { useAuthoredVersions } from '../hooks/use-authored-versions';
@@ -172,7 +173,7 @@ export function DocumentListPage() {
     >
       {error && (
         <Notice variant="error" title={t('list.loadErrorTitle')}>
-          {error.kind === 'server' ? error.message : t('list.loadErrorGeneric')}
+          {loadErrorText(error, t('list.loadErrorGeneric'))}
         </Notice>
       )}
 
@@ -209,7 +210,7 @@ export function DocumentListPage() {
 
       {versionsError ? (
         <Notice variant="error" title={t('list.finalizedVersionsLoadErrorTitle')}>
-          {versionsError.kind === 'server' ? versionsError.message : t('list.finalizedVersionsLoadErrorGeneric')}
+          {loadErrorText(versionsError, t('list.finalizedVersionsLoadErrorGeneric'))}
         </Notice>
       ) : (
         (versionsLoading || versions.length > 0) && (

@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError } from '@/lib/api-error';
 import { getDraftResponses } from '../api/shared-drafts-api';
 import type { DraftResponseDto } from '../types';
-
-// See `use-shared-draft-detail.ts`'s `SharedDraftDetailError` for why the
-// generic fallback is a KIND, translated at render time by the sole consumer
-// (`SharedDraftReviewPage`, via `shared-drafts:responsesLoadError`) rather
-// than a string stored here.
-export type DraftResponsesLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 interface UseDraftResponsesResult {
   responses: DraftResponseDto[];
   isLoading: boolean;
-  error: DraftResponsesLoadError | null;
+  error: LoadError | null;
   /** Append a freshly-submitted response to the list. */
   addResponse: (response: DraftResponseDto) => void;
 }
@@ -22,7 +16,7 @@ interface UseDraftResponsesResult {
  *  page's "My responses" section. */
 export function useDraftResponses(revisionId: number): UseDraftResponsesResult {
   const [responses, setResponses] = useState<DraftResponseDto[]>([]);
-  const [error, setError] = useState<DraftResponsesLoadError | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -33,11 +27,10 @@ export function useDraftResponses(revisionId: number): UseDraftResponsesResult {
         const res = await getDraftResponses(revisionId);
         if (!active) return;
         if (res.success && res.data) setResponses(res.data);
-        else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setError(toLoadError(res));
       } catch (err) {
         if (!active) return;
-        const serverMessage = apiErrorMessage(err, '');
-        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+        setError(toLoadError(err));
       } finally {
         if (active) setIsLoading(false);
       }
@@ -45,7 +38,9 @@ export function useDraftResponses(revisionId: number): UseDraftResponsesResult {
     return () => {
       active = false;
     };
-    // `t` deliberately excluded — see `DraftResponsesLoadError` above.
+    // `t` deliberately excluded — the generic fallback is a KIND, translated
+    // at render time by the sole consumer (`SharedDraftReviewPage`, via
+    // `shared-drafts:responsesLoadError`) rather than a string stored here.
   }, [revisionId]);
 
   const addResponse = useCallback((response: DraftResponseDto) => {

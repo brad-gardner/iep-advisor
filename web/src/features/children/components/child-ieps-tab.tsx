@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
@@ -9,6 +10,7 @@ import { IepDocumentList } from "@/features/iep-documents/components/iep-documen
 import type { ChildOutletContext } from "./child-detail-page";
 
 export function ChildIepsTab() {
+  const { t } = useTranslation("iep-documents");
   const { child, childId, reloadChild } =
     useOutletContext<ChildOutletContext>();
   const [showCreateIep, setShowCreateIep] = useState(false);
@@ -22,14 +24,14 @@ export function ChildIepsTab() {
   return (
     <Card data-testid="iep-documents-section">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="font-serif">IEPs</h2>
+        <h2 className="font-serif">{t("childTab.heading")}</h2>
         {!isViewer && (
           <Button
             variant="secondary"
             onClick={() => setShowCreateIep(true)}
             data-testid="new-iep-button"
           >
-            New IEP
+            {t("childTab.newButton")}
           </Button>
         )}
       </div>
@@ -48,7 +50,7 @@ export function ChildIepsTab() {
       <Drawer
         open={showCreateIep}
         onClose={() => setShowCreateIep(false)}
-        title="New IEP"
+        title={t("childTab.newDrawerTitle")}
         size="lg"
         data-testid="new-iep-drawer"
       >

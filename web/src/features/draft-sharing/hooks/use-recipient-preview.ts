@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError } from '@/lib/api-error';
 import { getSharePreview } from '../api/draft-sharing-api';
 import type { RecipientPreviewDto } from '../types';
-
-/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
-export type UseRecipientPreviewError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 interface UseRecipientPreviewResult {
   preview: RecipientPreviewDto | null;
   isLoading: boolean;
-  error: UseRecipientPreviewError | null;
+  error: LoadError | null;
   reload: () => void;
 }
 
@@ -22,7 +19,7 @@ interface UseRecipientPreviewResult {
  */
 export function useRecipientPreview(instanceId: number): UseRecipientPreviewResult {
   const [preview, setPreview] = useState<RecipientPreviewDto | null>(null);
-  const [error, setError] = useState<UseRecipientPreviewError | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
@@ -33,11 +30,10 @@ export function useRecipientPreview(instanceId: number): UseRecipientPreviewResu
         const res = await getSharePreview(instanceId);
         if (!active) return;
         if (res.success && res.data) setPreview(res.data);
-        else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setError(toLoadError(res));
       } catch (err) {
         if (!active) return;
-        const message = apiErrorMessage(err, '');
-        setError(message ? { kind: 'server', message } : { kind: 'generic' });
+        setError(toLoadError(err));
       }
     })();
     return () => {

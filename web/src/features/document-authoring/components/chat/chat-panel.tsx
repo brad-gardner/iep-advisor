@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MessageSquare, X } from 'lucide-react';
+import { loadErrorText } from '@/lib/api-error';
 import type { UseDocumentChatResult } from '../../hooks/use-document-chat';
 import { ChatComposer } from './chat-composer';
 import { ChatMessageBubble } from './chat-message-bubble';
@@ -71,7 +72,7 @@ export function ChatPanel({ chat, onClose }: ChatPanelProps) {
         )}
         {error && (
           <p className="text-[13px] text-brand-danger-700" data-testid="chat-error">
-            {error.kind === 'server' ? error.message : t('chatPanel.genericError')}
+            {loadErrorText(error, t('chatPanel.genericError'))}
           </p>
         )}
       </div>

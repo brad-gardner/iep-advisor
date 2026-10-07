@@ -6,6 +6,7 @@ import { Notice } from '@/components/ui/notice';
 import { buildFieldLocationLookup } from '@/features/draft-sharing/lib/field-lookup';
 import type { MeetingDecisionOutcome, ProposedEditDto } from '@/features/meetings/types';
 import { formatDate } from '@/lib/format-date';
+import { loadErrorText } from '@/lib/api-error';
 import { meetingDecisionOutcomeLabel } from '@/lib/meeting-labels';
 import { useProposedEdits } from '../hooks/use-proposed-edits';
 import { jumpToFieldWhenVisible } from '../lib/section-dom';
@@ -55,7 +56,7 @@ export function ProposedEditsPanel({ instanceId, templateVersion }: ProposedEdit
           <div role="alert">
             <Notice
               variant="error"
-              title={error.kind === 'server' ? error.message : t('proposedEditsPanel.loadErrorGeneric')}
+              title={loadErrorText(error, t('proposedEditsPanel.loadErrorGeneric')) ?? t('proposedEditsPanel.loadErrorGeneric')}
             >
               <Button size="sm" variant="secondary" className="mt-2" onClick={retry} data-testid="proposed-edits-retry">
                 {t('proposedEditsPanel.tryAgain')}

@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import { type LoadError, toLoadError } from '@/lib/api-error';
 import { listDocuments } from '../api/documents-api';
 import type { DocumentInstanceSummaryDto } from '../types';
-
-/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
-export type UseDocumentListError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 interface UseDocumentListResult {
   documents: DocumentInstanceSummaryDto[];
   isLoading: boolean;
-  error: UseDocumentListError | null;
+  error: LoadError | null;
   /** Drop a document from the list after a successful delete. */
   removeDocument: (id: number) => void;
 }
@@ -17,7 +15,7 @@ interface UseDocumentListResult {
 export function useDocumentList(studentId: number): UseDocumentListResult {
   const [documents, setDocuments] = useState<DocumentInstanceSummaryDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<UseDocumentListError | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
 
   useEffect(() => {
     // isLoading/error already start pending, so the effect only resolves them.
@@ -26,7 +24,7 @@ export function useDocumentList(studentId: number): UseDocumentListResult {
       .then((res) => {
         if (cancelled) return;
         if (res.success && res.data) setDocuments(res.data);
-        else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setError(toLoadError(res));
       })
       .catch(() => {
         if (!cancelled) setError({ kind: 'generic' });

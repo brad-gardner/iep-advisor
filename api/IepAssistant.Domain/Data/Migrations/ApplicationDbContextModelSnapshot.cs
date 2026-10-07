@@ -390,6 +390,13 @@ namespace IepAssistant.Domain.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<string>("HeaderSnapshotJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<string>("RenderStatus")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -406,8 +413,9 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AuthoredDocumentVersionId")
-                        .IsUnique();
+                    b.HasIndex("AuthoredDocumentVersionId", "Language")
+                        .IsUnique()
+                        .HasFilter("[Language] IS NOT NULL");
 
                     b.ToTable("AuthoredDocumentPdfs");
                 });
@@ -2477,6 +2485,10 @@ namespace IepAssistant.Domain.Data.Migrations
                     b.Property<int>("IepVersionId")
                         .HasColumnType("int");
 
+                    b.Property<string>("Language")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<string>("RenderStatus")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -2493,8 +2505,9 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IepVersionId")
-                        .IsUnique();
+                    b.HasIndex("IepVersionId", "Language")
+                        .IsUnique()
+                        .HasFilter("[Language] IS NOT NULL");
 
                     b.ToTable("IepVersionPdfs");
                 });
@@ -5121,8 +5134,8 @@ namespace IepAssistant.Domain.Data.Migrations
             modelBuilder.Entity("IepAssistant.Domain.Entities.AuthoredDocumentPdf", b =>
                 {
                     b.HasOne("IepAssistant.Domain.Entities.AuthoredDocumentVersion", "AuthoredDocumentVersion")
-                        .WithOne("Pdf")
-                        .HasForeignKey("IepAssistant.Domain.Entities.AuthoredDocumentPdf", "AuthoredDocumentVersionId")
+                        .WithMany("Pdfs")
+                        .HasForeignKey("AuthoredDocumentVersionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -5623,8 +5636,8 @@ namespace IepAssistant.Domain.Data.Migrations
             modelBuilder.Entity("IepAssistant.Domain.Entities.IepVersionPdf", b =>
                 {
                     b.HasOne("IepAssistant.Domain.Entities.IepVersion", "IepVersion")
-                        .WithOne("Pdf")
-                        .HasForeignKey("IepAssistant.Domain.Entities.IepVersionPdf", "IepVersionId")
+                        .WithMany("Pdfs")
+                        .HasForeignKey("IepVersionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -6300,7 +6313,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
             modelBuilder.Entity("IepAssistant.Domain.Entities.AuthoredDocumentVersion", b =>
                 {
-                    b.Navigation("Pdf");
+                    b.Navigation("Pdfs");
 
                     b.Navigation("SignedArtifacts");
                 });
@@ -6359,7 +6372,7 @@ namespace IepAssistant.Domain.Data.Migrations
 
                     b.Navigation("Goals");
 
-                    b.Navigation("Pdf");
+                    b.Navigation("Pdfs");
 
                     b.Navigation("Sections");
 

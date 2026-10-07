@@ -7,6 +7,7 @@ import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Spinner } from '@/components/ui/spinner';
 import { formatDate } from '@/lib/format-date';
+import { loadErrorText } from '@/lib/api-error';
 import { AmendDialog } from '../components/amend-dialog';
 import { AmendmentChain } from '../components/amendment-chain';
 import { AuthoredPdfDownload } from '../components/authored-pdf-download';
@@ -60,7 +61,7 @@ export function AuthoredVersionDetailPage() {
         breadcrumb={[{ label: t('authoredVersionDetailPage.breadcrumbDocuments'), to: backTo }]}
       >
         <Notice variant="error" title={t('authoredVersionDetailPage.loadErrorTitle')}>
-          {error ? (error.kind === 'server' ? error.message : t('authoredVersionDetailPage.unavailableBody')) : t('authoredVersionDetailPage.unavailableBody')}
+          {loadErrorText(error, t('authoredVersionDetailPage.unavailableBody')) ?? t('authoredVersionDetailPage.unavailableBody')}
         </Notice>
       </PageLayout>
     );

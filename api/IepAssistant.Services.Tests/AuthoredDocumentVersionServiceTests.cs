@@ -71,7 +71,7 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
             TestSupport.TestLocalizers.Messages());
 
     private AuthoredDocumentPdfService CreatePdfService(ApplicationDbContext ctx, IBlobStorageService blob)
-        => new(ctx, new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()), blob, NullLogger<AuthoredDocumentPdfService>.Instance);
+        => new(ctx, new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()), blob, NullLogger<AuthoredDocumentPdfService>.Instance, TestSupport.TestLocalizers.Pdf());
 
     // ---- Blob fakes ----
     /// <summary>The smallest byte sequence the upload guard accepts as a PDF.</summary>
@@ -269,14 +269,17 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
             ValuesJson = ValidValues(keys),
             FinalizedByUserId = s.CollaboratorUserId,
             FinalizedAt = new DateTime(2026, 7, 20, 0, 0, 0, DateTimeKind.Utc),
-            Pdf = pdfStatus is PdfRenderStatus status
-                ? new AuthoredDocumentPdf
+            Pdfs = pdfStatus is PdfRenderStatus status
+                ? new List<AuthoredDocumentPdf>
                 {
-                    RenderStatus = status,
-                    RenderedAt = status == PdfRenderStatus.Rendered ? new DateTime(2026, 7, 20, 1, 0, 0, DateTimeKind.Utc) : null,
-                    ErrorMessage = status == PdfRenderStatus.Error ? "prior render failed" : null
+                    new()
+                    {
+                        RenderStatus = status,
+                        RenderedAt = status == PdfRenderStatus.Rendered ? new DateTime(2026, 7, 20, 1, 0, 0, DateTimeKind.Utc) : null,
+                        ErrorMessage = status == PdfRenderStatus.Error ? "prior render failed" : null
+                    }
                 }
-                : null
+                : new List<AuthoredDocumentPdf>()
         };
         ctx.AuthoredDocumentVersions.Add(version);
         ctx.SaveChanges();
@@ -778,7 +781,7 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
                 ValuesJson = values,
                 FinalizedByUserId = s.CollaboratorUserId,
                 FinalizedAt = new DateTime(2026, 7, 20, 0, 0, 0, DateTimeKind.Utc),
-                Pdf = new AuthoredDocumentPdf { RenderStatus = PdfRenderStatus.Pending }
+                Pdfs = new List<AuthoredDocumentPdf> { new() { RenderStatus = PdfRenderStatus.Pending } }
             };
             ctx.AuthoredDocumentVersions.Add(version);
             ctx.SaveChanges();
@@ -1036,6 +1039,303 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
             Assert.Equal(PdfRenderStatus.Error, ctx.AuthoredDocumentPdfs.Single(p => p.AuthoredDocumentVersionId == versionId).RenderStatus);
     }
 
+    // ---------------------------------------------------------------- Multilingual plan phase 7: per-language PDFs
+
+    [Fact]
+    public async Task RenderAsync_EnglishThenSpanish_CoexistAsSeparateRows_WithDistinctBlobPathsAndBytes()
+    {
+        var s = SeedSchoolWithStudent("pdf-i18n");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Pending);
+
+        var englishBlob = new SuccessBlobStorageFake();
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, englishBlob).RenderAsync(versionId); // language omitted -> English, unchanged
+
+        // A Spanish render needs its own tracking row first — GetPdfStatusAsync (covered separately below)
+        // is what creates it in production; here we create it directly to isolate RenderAsync's own behavior.
+        using (var ctx = CreateContext())
+        {
+            ctx.AuthoredDocumentPdfs.Add(new AuthoredDocumentPdf { AuthoredDocumentVersionId = versionId, Language = "es", RenderStatus = PdfRenderStatus.Pending });
+            ctx.SaveChanges();
+        }
+
+        var spanishBlob = new SuccessBlobStorageFake();
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, spanishBlob).RenderAsync(versionId, "es");
+
+        // Distinct blob paths — the English key is the pre-phase-7 literal, unchanged.
+        Assert.Equal($"authored-docs/{versionId}/doc-v1.pdf", englishBlob.LastBlobPath);
+        Assert.Equal($"authored-docs/{versionId}/doc-v1.es.pdf", spanishBlob.LastBlobPath);
+        Assert.NotEqual(englishBlob.LastBlobPath, spanishBlob.LastBlobPath);
+
+        // Distinct rendered bytes — the Spanish PDF's labels differ from the English ones, so the two
+        // renders can never be byte-identical.
+        Assert.NotEqual(englishBlob.LastBytes, spanishBlob.LastBytes);
+
+        using (var ctx = CreateContext())
+        {
+            var rows = ctx.AuthoredDocumentPdfs.Where(p => p.AuthoredDocumentVersionId == versionId).ToList();
+            Assert.Equal(2, rows.Count);
+
+            // SeedFinalizedVersion's row predates this phase's explicit Language tagging (mirrors a real
+            // pre-migration row) — null means English, same as everywhere else this column is read.
+            var english = Assert.Single(rows, p => p.Language == null);
+            Assert.Equal(PdfRenderStatus.Rendered, english.RenderStatus);
+
+            var spanish = Assert.Single(rows, p => p.Language == "es");
+            Assert.Equal(PdfRenderStatus.Rendered, spanish.RenderStatus);
+            Assert.NotEqual(english.Checksum, spanish.Checksum);
+        }
+    }
+
+    /// <summary>Seeds a Held meeting (plus one participant) for <paramref name="studentId"/>, returning the
+    /// meeting id. Used by the header-freeze tests below to give <c>BuildHeaderContextAsync</c>'s "latest
+    /// Held meeting" query something to pick up — and something that can change between renders.</summary>
+    private int SeedHeldMeeting(int studentId, int createdByUserId, DateTime startsAtUtc, string participantName, TeamRole participantRole)
+    {
+        using var ctx = CreateContext();
+        var meeting = new Meeting
+        {
+            SchoolStudentId = studentId,
+            Type = MeetingType.AnnualReview,
+            Title = "IEP Meeting",
+            StartsAtUtc = startsAtUtc,
+            Status = MeetingStatus.Held,
+            CreatedByUserId = createdByUserId
+        };
+        ctx.Meetings.Add(meeting);
+        ctx.SaveChanges();
+
+        ctx.MeetingParticipants.Add(new MeetingParticipant
+        {
+            MeetingId = meeting.Id,
+            ExternalName = participantName,
+            TeamRole = participantRole,
+            RsvpToken = Guid.NewGuid().ToString("N")
+        });
+        ctx.SaveChanges();
+
+        return meeting.Id;
+    }
+
+    [Fact]
+    public async Task RenderAsync_SpanishAfterEnglish_ReusesFrozenHeaderSnapshot_EvenWhenLatestHeldMeetingChangesBetween()
+    {
+        var s = SeedSchoolWithStudent("pdf-header-freeze");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Pending);
+
+        // The meeting/participant in place when English renders — this is what must stay frozen.
+        SeedHeldMeeting(s.StudentId, s.CollaboratorUserId, new DateTime(2026, 6, 1, 10, 0, 0, DateTimeKind.Utc), "Original Case Manager", TeamRole.CaseManager);
+
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, new SuccessBlobStorageFake()).RenderAsync(versionId);
+
+        string frozenJsonAfterEnglish;
+        using (var ctx = CreateContext())
+        {
+            var english = Assert.Single(ctx.AuthoredDocumentPdfs.Where(p => p.AuthoredDocumentVersionId == versionId && p.Language == null));
+            Assert.False(string.IsNullOrEmpty(english.HeaderSnapshotJson));
+            frozenJsonAfterEnglish = english.HeaderSnapshotJson!;
+
+            var frozen = JsonSerializer.Deserialize<AuthoredDocumentPdfHeaderContext>(frozenJsonAfterEnglish)!;
+            Assert.Equal(new DateTime(2026, 6, 1, 10, 0, 0, DateTimeKind.Utc), frozen.MeetingDate);
+            Assert.Equal("Original Case Manager", Assert.Single(frozen.Participants).Name);
+        }
+
+        // Now the team changes: a LATER Held meeting with a different participant — if anything rebuilt
+        // the header live for the Spanish render, this is what it would (wrongly) pick up instead.
+        SeedHeldMeeting(s.StudentId, s.CollaboratorUserId, new DateTime(2026, 9, 15, 10, 0, 0, DateTimeKind.Utc), "Replacement Case Manager", TeamRole.CaseManager);
+
+        using (var ctx = CreateContext())
+        {
+            ctx.AuthoredDocumentPdfs.Add(new AuthoredDocumentPdf { AuthoredDocumentVersionId = versionId, Language = "es", RenderStatus = PdfRenderStatus.Pending });
+            ctx.SaveChanges();
+        }
+
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, new SuccessBlobStorageFake()).RenderAsync(versionId, "es");
+
+        using (var ctx = CreateContext())
+        {
+            var rows = ctx.AuthoredDocumentPdfs.Where(p => p.AuthoredDocumentVersionId == versionId).ToList();
+
+            var english = Assert.Single(rows, p => p.Language == null);
+            Assert.Equal(PdfRenderStatus.Rendered, english.RenderStatus);
+            // First resolution wins: the English row's snapshot is untouched by the later Spanish render,
+            // byte-for-byte, and still reflects the ORIGINAL meeting/participant — not the replacement.
+            Assert.Equal(frozenJsonAfterEnglish, english.HeaderSnapshotJson);
+
+            var spanish = Assert.Single(rows, p => p.Language == "es");
+            Assert.Equal(PdfRenderStatus.Rendered, spanish.RenderStatus);
+            // The snapshot lives only on the English row — the Spanish row never gets its own copy.
+            Assert.Null(spanish.HeaderSnapshotJson);
+        }
+    }
+
+    [Fact]
+    public async Task RenderAsync_RetryAfterFailure_ReusesTheSameFrozenHeaderSnapshot()
+    {
+        var s = SeedSchoolWithStudent("pdf-header-retry");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Pending);
+
+        SeedHeldMeeting(s.StudentId, s.CollaboratorUserId, new DateTime(2026, 5, 1, 9, 0, 0, DateTimeKind.Utc), "Case Manager A", TeamRole.CaseManager);
+
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, new SuccessBlobStorageFake()).RenderAsync(versionId);
+
+        string frozenJson;
+        using (var ctx = CreateContext())
+        {
+            var english = Assert.Single(ctx.AuthoredDocumentPdfs.Where(p => p.AuthoredDocumentVersionId == versionId));
+            frozenJson = english.HeaderSnapshotJson!;
+            Assert.False(string.IsNullOrEmpty(frozenJson));
+        }
+
+        // Simulate a later failed render (e.g. a transient blob outage) needing a retry, after the team
+        // changed again — the retry must still reuse the ORIGINAL frozen header, not rebuild live.
+        SeedHeldMeeting(s.StudentId, s.CollaboratorUserId, new DateTime(2026, 10, 1, 9, 0, 0, DateTimeKind.Utc), "Case Manager B", TeamRole.CaseManager);
+        using (var ctx = CreateContext())
+        {
+            var english = ctx.AuthoredDocumentPdfs.Single(p => p.AuthoredDocumentVersionId == versionId);
+            english.RenderStatus = PdfRenderStatus.Error;
+            english.ErrorMessage = "simulated transient failure";
+            ctx.SaveChanges();
+        }
+
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, new SuccessBlobStorageFake()).RenderAsync(versionId); // retry, English
+
+        using (var ctx = CreateContext())
+        {
+            var english = ctx.AuthoredDocumentPdfs.Single(p => p.AuthoredDocumentVersionId == versionId);
+            Assert.Equal(PdfRenderStatus.Rendered, english.RenderStatus);
+            Assert.Equal(frozenJson, english.HeaderSnapshotJson);
+
+            var header = JsonSerializer.Deserialize<AuthoredDocumentPdfHeaderContext>(english.HeaderSnapshotJson!)!;
+            Assert.Equal(new DateTime(2026, 5, 1, 9, 0, 0, DateTimeKind.Utc), header.MeetingDate);
+            Assert.Equal("Case Manager A", Assert.Single(header.Participants).Name);
+        }
+    }
+
+    [Fact]
+    public async Task RenderAsync_UnreadableHeaderSnapshot_FallsBackToLiveHeader_InsteadOfFailing()
+    {
+        var s = SeedSchoolWithStudent("pdf-header-corrupt");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Pending);
+
+        using (var ctx = CreateContext())
+        {
+            var english = ctx.AuthoredDocumentPdfs.Single(p => p.AuthoredDocumentVersionId == versionId);
+            english.HeaderSnapshotJson = "{\"StudentFirstName\": 42";
+            ctx.SaveChanges();
+        }
+
+        using (var ctx = CreateContext())
+            await CreatePdfService(ctx, new SuccessBlobStorageFake()).RenderAsync(versionId);
+
+        using (var ctx = CreateContext())
+        {
+            var english = ctx.AuthoredDocumentPdfs.Single(p => p.AuthoredDocumentVersionId == versionId);
+            Assert.Equal(PdfRenderStatus.Rendered, english.RenderStatus);
+        }
+    }
+
+    [Fact]
+    public async Task GetPdfStatus_FirstSpanishPoll_CreatesPendingRow_FlagsNeedsRender_LeavesEnglishRowUntouched()
+    {
+        var s = SeedSchoolWithStudent("pdf-status-es");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered);
+
+        using (var ctx = CreateContext())
+        using (CultureScope.For("es"))
+        {
+            var result = await CreateService(ctx).GetPdfStatusAsync(versionId, s.CollaboratorUserId);
+
+            Assert.True(result.Success, result.Message);
+            Assert.True(result.Data!.NeedsRender);
+            Assert.Equal("es", result.Data.Language);
+            Assert.Equal(PdfRenderStatus.Pending, result.Data.RenderStatus);
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var rows = ctx.AuthoredDocumentPdfs.Where(p => p.AuthoredDocumentVersionId == versionId).ToList();
+            Assert.Equal(2, rows.Count);
+            Assert.Equal(PdfRenderStatus.Rendered, Assert.Single(rows, p => p.Language == null).RenderStatus);
+            Assert.Equal(PdfRenderStatus.Pending, Assert.Single(rows, p => p.Language == "es").RenderStatus);
+        }
+
+        // A second poll, still Pending, must NOT flag NeedsRender again (it would duplicate the queued render).
+        using (var ctx = CreateContext())
+        using (CultureScope.For("es"))
+        {
+            var again = await CreateService(ctx).GetPdfStatusAsync(versionId, s.CollaboratorUserId);
+            Assert.True(again.Success, again.Message);
+            Assert.False(again.Data!.NeedsRender);
+        }
+    }
+
+    /// <summary>
+    /// Review fix (2026-10-07): GetPdfStatusAsync's Add+SaveChanges for a brand-new (version, language)
+    /// row is now wrapped in try/catch DbUpdateException, detaching the loser and re-querying AsNoTracking
+    /// so two concurrent first polls join the SAME render instead of one failing outright. Genuinely
+    /// interleaving two overlapping GetPdfStatusAsync calls isn't reachable from a single-threaded test —
+    /// the method's OWN existence check would simply see the other call's already-committed row and never
+    /// reach the Add+Save path at all. So this instead proves the mechanism the catch block relies on
+    /// directly: a concurrent insert for the exact same (version, language) genuinely collides on the
+    /// unique index (<see cref="AuthoredDocumentPdfConfiguration"/>), and detaching the loser + re-querying
+    /// AsNoTracking (exactly what the catch block does) recovers the winner's row.
+    /// </summary>
+    [Fact]
+    public async Task GetPdfStatus_ConcurrentFirstPollInsertRace_ReQueryPathRecoversTheWinnerRow()
+    {
+        var s = SeedSchoolWithStudent("pdf-status-race");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered);
+
+        using var winnerCtx = CreateContext();
+        var winnerRow = new AuthoredDocumentPdf { AuthoredDocumentVersionId = versionId, Language = "es", RenderStatus = PdfRenderStatus.Pending };
+        winnerCtx.AuthoredDocumentPdfs.Add(winnerRow);
+        winnerCtx.SaveChanges();
+
+        using var loserCtx = CreateContext();
+        var loserRow = new AuthoredDocumentPdf { AuthoredDocumentVersionId = versionId, Language = "es", RenderStatus = PdfRenderStatus.Pending };
+        loserCtx.AuthoredDocumentPdfs.Add(loserRow);
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => loserCtx.SaveChangesAsync());
+
+        loserCtx.Entry(loserRow).State = EntityState.Detached;
+        var recovered = await loserCtx.AuthoredDocumentPdfs.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.AuthoredDocumentVersionId == versionId && p.Language == "es");
+
+        Assert.NotNull(recovered);
+        Assert.Equal(winnerRow.Id, recovered!.Id);
+        Assert.NotEqual(loserRow.Id, recovered.Id);
+    }
+
+    [Fact]
+    public async Task GetPdfDownloadUrl_SpanishRequested_ButOnlyEnglishRendered_Fails()
+    {
+        var s = SeedSchoolWithStudent("dl-es-not-ready");
+        var keys = SeedTemplate(IepTypeId);
+        var versionId = SeedFinalizedVersion(s, keys, IepTypeId, PdfRenderStatus.Rendered);
+
+        using var ctx = CreateContext();
+        using var _lang = CultureScope.For("es");
+        var result = await CreateService(ctx).GetPdfDownloadUrlAsync(versionId, s.CollaboratorUserId);
+
+        // The English row is Rendered, but a Spanish-requesting caller must get the SPANISH row's status —
+        // which doesn't exist yet — never silently served the English PDF. ErrorKind (not message text,
+        // which is correctly Spanish here) is what a caller should ever branch on.
+        Assert.False(result.Success);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+    }
+
     // ---------------------------------------------------------------- Parent / child read authorization
 
     [Fact]
@@ -1267,10 +1567,10 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
         await queue.EnqueueAsync(sentinel);
 
         var drained = new List<int>();
-        await foreach (var id in queue.DequeueAllAsync(CancellationToken.None))
+        await foreach (var (versionId, _) in queue.DequeueAllAsync(CancellationToken.None))
         {
-            if (id == sentinel) break;
-            drained.Add(id);
+            if (versionId == sentinel) break;
+            drained.Add(versionId);
         }
         return drained;
     }

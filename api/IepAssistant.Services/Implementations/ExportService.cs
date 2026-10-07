@@ -9,6 +9,7 @@ using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -303,10 +304,13 @@ public class ExportService : IExportService
                 s.CaseManagerUserId, s.Status, s.IepDate, s.AnnualReviewDueDate, s.EtrDate, s.ReevaluationDueDate))
             .ToDictionaryAsync(s => s.Id, ct);
 
+        // Multilingual plan phase 7: the export reflects the ENGLISH row specifically (Pdf became Pdfs,
+        // one row per language) — the same PDF-readiness signal this export showed before this phase.
         var versions = await _context.AuthoredDocumentVersions.AsNoTracking()
             .Where(v => studentIds.Contains(v.SchoolStudentId))
             .Select(v => new VersionRow(v.Id, v.SchoolStudentId, v.VersionNumber, v.DocumentType.Key, v.ValuesJson,
-                v.Pdf != null ? v.Pdf.RenderStatus : PdfRenderStatus.Pending))
+                v.Pdfs.Where(p => p.Language == null || p.Language == SupportedLanguages.English)
+                    .Select(p => (PdfRenderStatus?)p.RenderStatus).FirstOrDefault() ?? PdfRenderStatus.Pending))
             .ToListAsync(ct);
 
         var artifacts = await _context.SignedArtifacts.AsNoTracking()
