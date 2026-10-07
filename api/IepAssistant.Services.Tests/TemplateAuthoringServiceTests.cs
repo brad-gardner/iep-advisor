@@ -48,7 +48,7 @@ public sealed class TemplateAuthoringServiceTests : IDisposable
     private TemplateAuthoringService CreateService(ApplicationDbContext ctx)
         => new(ctx, _audit, NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages());
     private DocumentTemplateService CreateTemplateService(ApplicationDbContext ctx)
-        => new(ctx, _audit, NullLogger<DocumentTemplateService>.Instance);
+        => new(ctx, _audit, NullLogger<DocumentTemplateService>.Instance, TestSupport.TestLocalizers.Messages());
 
     // ---------------------------------------------------------------- Helpers
 

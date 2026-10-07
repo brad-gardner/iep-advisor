@@ -1293,4 +1293,391 @@
   <data name="MeetingBrief.Checklist.FamilyInputLabel" xml:space="preserve">
     <value>Family input received</value>
   </data>
+  <data name="District.ProfileNotFound" xml:space="preserve">
+    <value>Educator profile not found.</value>
+  </data>
+  <data name="District.NotFound" xml:space="preserve">
+    <value>District not found.</value>
+  </data>
+  <data name="District.NoPermissionChangeSettings" xml:space="preserve">
+    <value>You do not have permission to change district settings.</value>
+  </data>
+  <data name="District.NoPermissionViewDashboard" xml:space="preserve">
+    <value>You do not have permission to view the district dashboard.</value>
+  </data>
+  <data name="District.NoPermissionCreateSchools" xml:space="preserve">
+    <value>You do not have permission to create schools.</value>
+  </data>
+  <data name="District.SchoolNameRequired" xml:space="preserve">
+    <value>School name is required.</value>
+  </data>
+  <data name="District.SchoolNameTooLong" xml:space="preserve">
+    <value>School name must be 200 characters or fewer.</value>
+  </data>
+  <data name="District.StateCodeInvalidLength" xml:space="preserve">
+    <value>State code must be 2 characters.</value>
+  </data>
+  <data name="District.NoPermissionEditSchools" xml:space="preserve">
+    <value>You do not have permission to edit schools.</value>
+  </data>
+  <data name="District.SchoolNotFound" xml:space="preserve">
+    <value>School not found.</value>
+  </data>
+  <data name="District.NoPermissionDeactivateSchools" xml:space="preserve">
+    <value>You do not have permission to deactivate schools.</value>
+  </data>
+  <data name="District.CannotDeactivateActiveStudents" xml:space="preserve">
+    <value>This school cannot be deactivated while it has {0} active student(s). Move or remove them first.</value>
+  </data>
+  <data name="District.CannotDeactivateActiveStaff" xml:space="preserve">
+    <value>This school cannot be deactivated while it has {0} active staff member(s). Reassign or deactivate them first.</value>
+  </data>
+  <data name="District.DateRangeOutOfBounds" xml:space="preserve">
+    <value>The requested date range is out of bounds.</value>
+  </data>
+  <data name="District.NoPermissionViewData" xml:space="preserve">
+    <value>You do not have permission to view this data.</value>
+  </data>
+  <data name="District.NoPermissionViewSchoolData" xml:space="preserve">
+    <value>You do not have permission to view this school's data.</value>
+  </data>
+  <data name="District.SchoolAlreadyDeactivated" xml:space="preserve">
+    <value>School is already deactivated.</value>
+  </data>
+  <data name="District.SchoolDeactivated" xml:space="preserve">
+    <value>School deactivated.</value>
+  </data>
+  <data name="StaffInvite.ProfileNotFound" xml:space="preserve">
+    <value>Staff profile not found.</value>
+  </data>
+  <data name="StaffInvite.EmailRequired" xml:space="preserve">
+    <value>Email is required.</value>
+  </data>
+  <data name="StaffInvite.EmailTooLong" xml:space="preserve">
+    <value>Email must be 256 characters or fewer.</value>
+  </data>
+  <data name="StaffInvite.InvalidOrgRole" xml:space="preserve">
+    <value>Invalid org role.</value>
+  </data>
+  <data name="StaffInvite.DistrictAdminInviteNoSchool" xml:space="preserve">
+    <value>A District Admin invite must not specify a school.</value>
+  </data>
+  <data name="StaffInvite.SchoolRequiredForInvite" xml:space="preserve">
+    <value>A school is required for School Admin and Teacher invites.</value>
+  </data>
+  <data name="StaffInvite.SchoolNotFound" xml:space="preserve">
+    <value>School not found.</value>
+  </data>
+  <data name="StaffInvite.NoPermissionInviteDistrictAdmin" xml:space="preserve">
+    <value>You do not have permission to invite a District Admin.</value>
+  </data>
+  <data name="StaffInvite.CallerNoSchool" xml:space="preserve">
+    <value>Your account is not assigned to a school.</value>
+  </data>
+  <data name="StaffInvite.NoPermissionInviteOtherSchool" xml:space="preserve">
+    <value>You do not have permission to invite staff to another school.</value>
+  </data>
+  <data name="StaffInvite.NoPermissionInviteStaff" xml:space="preserve">
+    <value>You do not have permission to invite staff.</value>
+  </data>
+  <data name="StaffInvite.EmailAlreadyHasAccount" xml:space="preserve">
+    <value>That email already has an account. Staff must be invited with an email that isn't already registered — please use your work email.</value>
+  </data>
+  <data name="StaffInvite.EmailAlreadyInvited" xml:space="preserve">
+    <value>That email has already been invited.</value>
+  </data>
+  <data name="StaffInvite.NoPermissionViewStaffList" xml:space="preserve">
+    <value>You do not have permission to view the staff list.</value>
+  </data>
+  <data name="StaffInvite.InviteNotFound" xml:space="preserve">
+    <value>Invite not found.</value>
+  </data>
+  <data name="StaffInvite.NoPermissionManageDistrictAdminInvites" xml:space="preserve">
+    <value>You do not have permission to manage District Admin invites.</value>
+  </data>
+  <data name="StaffInvite.NoPermissionManageInvitesOtherSchool" xml:space="preserve">
+    <value>You do not have permission to manage invites for another school.</value>
+  </data>
+  <data name="StaffInvite.NoPermissionManageStaffInvites" xml:space="preserve">
+    <value>You do not have permission to manage staff invites.</value>
+  </data>
+  <data name="StaffInvite.NoLongerPending" xml:space="preserve">
+    <value>Invite is no longer pending.</value>
+  </data>
+  <data name="StaffInvite.NoPermissionManageDistrictAdmin" xml:space="preserve">
+    <value>You do not have permission to manage a District Admin.</value>
+  </data>
+  <data name="StaffInvite.NoPermissionManageStaffOtherSchool" xml:space="preserve">
+    <value>You do not have permission to manage staff at another school.</value>
+  </data>
+  <data name="StaffInvite.NoPermissionManageStaff" xml:space="preserve">
+    <value>You do not have permission to manage staff.</value>
+  </data>
+  <data name="StaffInvite.StaffMemberNotFound" xml:space="preserve">
+    <value>Staff member not found.</value>
+  </data>
+  <data name="StaffInvite.AlreadyDeactivated" xml:space="preserve">
+    <value>Staff member is already deactivated.</value>
+  </data>
+  <data name="StaffInvite.CannotDeactivateLastAdmin" xml:space="preserve">
+    <value>You cannot deactivate the last active District Admin of the district.</value>
+  </data>
+  <data name="StaffInvite.Deactivated" xml:space="preserve">
+    <value>Staff member deactivated.</value>
+  </data>
+  <data name="StaffInvite.AlreadyActive" xml:space="preserve">
+    <value>Staff member is already active.</value>
+  </data>
+  <data name="StaffInvite.Reactivated" xml:space="preserve">
+    <value>Staff member reactivated.</value>
+  </data>
+  <data name="StaffInvite.InviteSent" xml:space="preserve">
+    <value>Invite sent successfully.</value>
+  </data>
+  <data name="StaffInvite.InviteRevoked" xml:space="preserve">
+    <value>Invite revoked.</value>
+  </data>
+  <data name="StaffInvite.InviteResent" xml:space="preserve">
+    <value>Invite resent.</value>
+  </data>
+  <data name="StaffInvite.InvalidOrExpiredInvite" xml:space="preserve">
+    <value>Invalid or expired invite.</value>
+  </data>
+  <data name="StaffInvite.NameRequired" xml:space="preserve">
+    <value>First and last name are required.</value>
+  </data>
+  <data name="StaffInvite.PasswordRequired" xml:space="preserve">
+    <value>A password is required.</value>
+  </data>
+  <data name="StaffInvite.AcceptNoLongerValid" xml:space="preserve">
+    <value>This invite is no longer valid.</value>
+  </data>
+  <data name="StaffInvite.AcceptExpired" xml:space="preserve">
+    <value>This invite has expired.</value>
+  </data>
+  <data name="StaffInvite.AccountAlreadyExists" xml:space="preserve">
+    <value>An account already exists for this email. This invite can't be used with an existing account.</value>
+  </data>
+  <data name="StaffInvite.AlreadyUsed" xml:space="preserve">
+    <value>This invite has already been used.</value>
+  </data>
+  <data name="StaffInvite.TokenRequired" xml:space="preserve">
+    <value>Token is required.</value>
+  </data>
+  <data name="StaffInvite.CouldNotAccept" xml:space="preserve">
+    <value>Could not accept invite.</value>
+  </data>
+  <data name="RosterImport.StudentIdRequired" xml:space="preserve">
+    <value>StudentId is required.</value>
+  </data>
+  <data name="RosterImport.StudentIdTooLong" xml:space="preserve">
+    <value>StudentId must be 64 characters or fewer.</value>
+  </data>
+  <data name="RosterImport.StudentIdCannotBeCleared" xml:space="preserve">
+    <value>StudentId cannot be cleared.</value>
+  </data>
+  <data name="RosterImport.SchoolCannotBeCleared" xml:space="preserve">
+    <value>School cannot be cleared.</value>
+  </data>
+  <data name="RosterImport.UnknownSchoolCode" xml:space="preserve">
+    <value>Unknown school code '{0}'.</value>
+  </data>
+  <data name="RosterImport.UnknownSchoolName" xml:space="preserve">
+    <value>Unknown school '{0}'.</value>
+  </data>
+  <data name="RosterImport.SchoolRequiredForNewStudent" xml:space="preserve">
+    <value>SchoolName (or SchoolCode) is required for a new student.</value>
+  </data>
+  <data name="RosterImport.CallerNoSchool" xml:space="preserve">
+    <value>Your account is not assigned to a school.</value>
+  </data>
+  <data name="RosterImport.OnlyImportForSchool" xml:space="preserve">
+    <value>You can only import students for {0}.</value>
+  </data>
+  <data name="RosterImport.FirstNameCannotBeCleared" xml:space="preserve">
+    <value>FirstName cannot be cleared.</value>
+  </data>
+  <data name="RosterImport.LastNameCannotBeCleared" xml:space="preserve">
+    <value>LastName cannot be cleared.</value>
+  </data>
+  <data name="RosterImport.NamesTooLong" xml:space="preserve">
+    <value>Names must be 100 characters or fewer.</value>
+  </data>
+  <data name="RosterImport.FirstNameRequiredForNewStudent" xml:space="preserve">
+    <value>FirstName is required for a new student.</value>
+  </data>
+  <data name="RosterImport.LastNameRequiredForNewStudent" xml:space="preserve">
+    <value>LastName is required for a new student.</value>
+  </data>
+  <data name="RosterImport.DateOfBirthCannotBeCleared" xml:space="preserve">
+    <value>DateOfBirth cannot be cleared.</value>
+  </data>
+  <data name="RosterImport.UnrecognizedDateOfBirth" xml:space="preserve">
+    <value>Unrecognized DateOfBirth '{0}' (use yyyy-mm-dd).</value>
+  </data>
+  <data name="RosterImport.DateOfBirthRequiredForNewStudent" xml:space="preserve">
+    <value>DateOfBirth is required for a new student.</value>
+  </data>
+  <data name="RosterImport.GradeCannotBeCleared" xml:space="preserve">
+    <value>Grade cannot be cleared.</value>
+  </data>
+  <data name="RosterImport.UnknownGrade" xml:space="preserve">
+    <value>Unknown grade '{0}' (use PK, K, 1–12 or Ungraded).</value>
+  </data>
+  <data name="RosterImport.GradeRequiredForNewStudent" xml:space="preserve">
+    <value>Grade is required for a new student.</value>
+  </data>
+  <data name="RosterImport.UnknownDisabilityCategory" xml:space="preserve">
+    <value>Unknown disability category '{0}'.</value>
+  </data>
+  <data name="RosterImport.HomeLanguageTooLong" xml:space="preserve">
+    <value>HomeLanguage must be 32 characters or fewer.</value>
+  </data>
+  <data name="RosterImport.CaseManagerNotAvailable" xml:space="preserve">
+    <value>Case manager '{0}' is not available for your school.</value>
+  </data>
+  <data name="RosterImport.CaseManagerNotActiveStaff" xml:space="preserve">
+    <value>Case manager '{0}' is not an active staff member in this district.</value>
+  </data>
+  <data name="RosterImport.CaseManagerIsDistrictAdmin" xml:space="preserve">
+    <value>Case manager '{0}' is a District Admin and cannot be assigned to a student.</value>
+  </data>
+  <data name="RosterImport.CaseManagerNotAtStudentSchool" xml:space="preserve">
+    <value>Case manager '{0}' is not at the student's school.</value>
+  </data>
+  <data name="RosterImport.UnrecognizedDate" xml:space="preserve">
+    <value>Unrecognized {0} '{1}' (use yyyy-mm-dd).</value>
+  </data>
+  <data name="RosterImport.StatusCannotBeCleared" xml:space="preserve">
+    <value>Status cannot be cleared.</value>
+  </data>
+  <data name="RosterImport.UnknownStatus" xml:space="preserve">
+    <value>Unknown status '{0}' (use Active, Exited or Archived).</value>
+  </data>
+  <data name="RosterImport.StudentNoLongerExists" xml:space="preserve">
+    <value>This student no longer exists.</value>
+  </data>
+  <data name="RosterImport.NoPermissionImportStudents" xml:space="preserve">
+    <value>You do not have permission to import students.</value>
+  </data>
+  <data name="RosterImport.ProfileNotFound" xml:space="preserve">
+    <value>Educator profile not found.</value>
+  </data>
+  <data name="RosterImport.ImportNotFound" xml:space="preserve">
+    <value>Import not found.</value>
+  </data>
+  <data name="RosterImport.NotStudentRoster" xml:space="preserve">
+    <value>This import is not a student roster.</value>
+  </data>
+  <data name="RosterImport.AlreadyCommitted" xml:space="preserve">
+    <value>This import has already been committed.</value>
+  </data>
+  <data name="RosterImport.FixErrorsOrImportValidOnly" xml:space="preserve">
+    <value>Fix the errors or choose to import valid rows only.</value>
+  </data>
+  <data name="DistrictImports.ChooseFileToUpload" xml:space="preserve">
+    <value>Choose a file to upload.</value>
+  </data>
+  <data name="DistrictImports.FileTooLarge" xml:space="preserve">
+    <value>The file is larger than 5 MB.</value>
+  </data>
+  <data name="DistrictImports.MacroWorkbooksNotAccepted" xml:space="preserve">
+    <value>Macro-enabled workbooks (.xlsm) are not accepted. Save the file as .xlsx and try again.</value>
+  </data>
+  <data name="DistrictImports.OnlyXlsxAccepted" xml:space="preserve">
+    <value>Only .xlsx workbooks are accepted.</value>
+  </data>
+  <data name="Export.NoPermissionRequestExport" xml:space="preserve">
+    <value>You do not have permission to request this export.</value>
+  </data>
+  <data name="Export.JobNotFound" xml:space="preserve">
+    <value>Export not found.</value>
+  </data>
+  <data name="Export.NotReady" xml:space="preserve">
+    <value>This export is not ready for download yet.</value>
+  </data>
+  <data name="Export.StudentNotFound" xml:space="preserve">
+    <value>Student not found.</value>
+  </data>
+  <data name="Admin.InvalidStatus" xml:space="preserve">
+    <value>Invalid status: {0}</value>
+  </data>
+  <data name="Admin.EmailNotFound" xml:space="preserve">
+    <value>Email not found</value>
+  </data>
+  <data name="Admin.OnlyFailedOrCancelledCanResend" xml:space="preserve">
+    <value>Only a Failed or Cancelled email can be resent (current status: {0}).</value>
+  </data>
+  <data name="Admin.OneTimeLinkContentNotKept" xml:space="preserve">
+    <value>This message carried a one-time link and its content is not kept; ask the user to request a new link instead.</value>
+  </data>
+  <data name="Admin.EmailRequeued" xml:space="preserve">
+    <value>Email re-queued for delivery</value>
+  </data>
+  <data name="Admin.SentEmailCannotBeCancelled" xml:space="preserve">
+    <value>A sent email cannot be cancelled.</value>
+  </data>
+  <data name="Admin.EmailCancelled" xml:space="preserve">
+    <value>Email cancelled</value>
+  </data>
+  <data name="DocumentTemplate.NameRequired" xml:space="preserve">
+    <value>Template name is required.</value>
+  </data>
+  <data name="DocumentTemplate.StateCodeInvalid" xml:space="preserve">
+    <value>State code must be a 2-letter code (e.g. OH), or left blank for the default template.</value>
+  </data>
+  <data name="DocumentTemplate.DocumentTypeNotExist" xml:space="preserve">
+    <value>The selected document type does not exist.</value>
+  </data>
+  <data name="DocumentTemplate.DocumentTypeNotActive" xml:space="preserve">
+    <value>The selected document type is not active.</value>
+  </data>
+  <data name="DocumentTemplate.AlreadyExists" xml:space="preserve">
+    <value>A template for {0} in {1} already exists.</value>
+  </data>
+  <data name="DocumentTemplate.DefaultScope" xml:space="preserve">
+    <value>the default</value>
+  </data>
+  <data name="Templates.AddAtLeastOneSection" xml:space="preserve">
+    <value>Add at least one section before publishing.</value>
+  </data>
+  <data name="Templates.SectionMustHaveField" xml:space="preserve">
+    <value>Section '{0}' must have at least one field.</value>
+  </data>
+  <data name="Templates.FieldError" xml:space="preserve">
+    <value>Field '{0}': {1}</value>
+  </data>
+  <data name="AuditLog.NoPermissionViewActivityLog" xml:space="preserve">
+    <value>You do not have permission to view the activity log.</value>
+  </data>
+  <data name="AuditLog.PageSizeMustBePositive" xml:space="preserve">
+    <value>Page size must be greater than zero.</value>
+  </data>
+  <data name="AuditLog.CursorMustNotBeNegative" xml:space="preserve">
+    <value>Cursor must not be negative.</value>
+  </data>
+  <data name="AuditLog.InvalidAction" xml:space="preserve">
+    <value>Invalid action '{0}'.</value>
+  </data>
+  <data name="AuditLog.FormerStaffMember" xml:space="preserve">
+    <value>Former staff member</value>
+  </data>
+  <data name="AuditLog.UnknownUser" xml:space="preserve">
+    <value>Unknown user</value>
+  </data>
+  <data name="AuditLog.DeletedStudent" xml:space="preserve">
+    <value>Deleted student</value>
+  </data>
+  <data name="AuditLog.IepDraftFor" xml:space="preserve">
+    <value>IEP draft for {0}</value>
+  </data>
+  <data name="AuditLog.DraftNumber" xml:space="preserve">
+    <value>Draft #{0}</value>
+  </data>
+  <data name="AuditLog.IepVersionFor" xml:space="preserve">
+    <value>IEP version for {0}</value>
+  </data>
+  <data name="AuditLog.VersionNumber" xml:space="preserve">
+    <value>Version #{0}</value>
+  </data>
 </root>

@@ -36,7 +36,7 @@ public sealed class AuditLogQueryServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private AuditLogQueryService CreateService(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx));
+        => new(ctx, new OrgAccessService(ctx), TestSupport.TestLocalizers.Messages());
 
     // ----------------------------------------------------------------- seed helpers
 

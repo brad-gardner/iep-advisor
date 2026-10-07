@@ -12,6 +12,11 @@ using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
+/// <summary>
+/// Multilingual plan (2026-10-06) phase 6 (todos/249): <see cref="ServiceErrorKind"/> added to its one
+/// failure for consistency with later-phase services, even though <c>AuthController</c> maps it to a
+/// fixed status today (not via <c>MapServiceFailure</c>) — see todos/249.
+/// </summary>
 public class PasswordResetService : IPasswordResetService
 {
     private readonly IUserRepository _userRepository;
@@ -81,7 +86,7 @@ public class PasswordResetService : IPasswordResetService
 
         if (resetToken == null)
         {
-            return ServiceResult.FailureResult(_localizer["PasswordReset.InvalidOrExpiredToken"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["PasswordReset.InvalidOrExpiredToken"]);
         }
 
         var user = resetToken.User;

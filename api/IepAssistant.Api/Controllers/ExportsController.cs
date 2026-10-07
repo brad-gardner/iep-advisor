@@ -37,7 +37,7 @@ public class ExportsController : ControllerBase
     public async Task<IActionResult> EnqueueDistrictExport(CancellationToken ct)
     {
         var result = await _exports.EnqueueDistrictExportAsync(User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result);
 
         await _queue.EnqueueAsync(result.Data!.Id, CancellationToken.None);
         return Accepted(ApiResponse<ExportJobIdDto>.SuccessResponse(new ExportJobIdDto { JobId = result.Data!.Id }));
@@ -49,7 +49,7 @@ public class ExportsController : ControllerBase
     public async Task<IActionResult> ListDistrictExports(CancellationToken ct)
     {
         var result = await _exports.ListDistrictExportsAsync(User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result);
         return Ok(ApiResponse<List<ExportJobDto>>.SuccessResponse(result.Data!.Select(ExportMappers.MapJob).ToList()));
     }
 
@@ -60,7 +60,7 @@ public class ExportsController : ControllerBase
     public async Task<IActionResult> EnqueueStudentExport(int id, CancellationToken ct)
     {
         var result = await _exports.EnqueueStudentExportAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result);
 
         await _queue.EnqueueAsync(result.Data!.Id, CancellationToken.None);
         return Accepted(ApiResponse<ExportJobIdDto>.SuccessResponse(new ExportJobIdDto { JobId = result.Data!.Id }));
@@ -73,7 +73,7 @@ public class ExportsController : ControllerBase
     public async Task<IActionResult> GetStatus(int id, CancellationToken ct)
     {
         var result = await _exports.GetStatusAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result);
         return Ok(ApiResponse<ExportJobDto>.SuccessResponse(ExportMappers.MapJob(result.Data!)));
     }
 
@@ -85,17 +85,8 @@ public class ExportsController : ControllerBase
     public async Task<IActionResult> Download(int id, CancellationToken ct)
     {
         var result = await _exports.GetDownloadUrlAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result);
         return Ok(ApiResponse<AuthoredDocumentPdfDownloadDto>.SuccessResponse(new AuthoredDocumentPdfDownloadDto { Url = result.Data! }));
     }
 
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

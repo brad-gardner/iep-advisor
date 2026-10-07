@@ -36,7 +36,7 @@ public sealed class DistrictServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private DistrictService CreateService(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), NullLogger<DistrictService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), NullLogger<DistrictService>.Instance, TestSupport.TestLocalizers.Messages());
 
     // ----------------------------------------------------------------- seed helpers
 

@@ -28,13 +28,14 @@ namespace IepAssistant.Services.Implementations;
 /// (SchoolStudent/StudentEvidence/DocumentInstance/AuthoredDocumentVersion/Meeting/GoalRecord/
 /// EvaluationCase), gathers the in-scope ids for each, and filters rows created in the last two years —
 /// documented limitation rather than a generic cross-resource-type join.</para>
+///
+/// <para>Multilingual plan (2026-10-06) phase 6: every failure <see cref="Api.Controllers.ExportsController"/>
+/// maps to a status carries an explicit <see cref="ServiceErrorKind"/>, and every message is localized
+/// (<c>Messages.resx</c>/<c>.es.resx</c>) — see
+/// <see cref="IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure"/>.</para>
 /// </summary>
 public class ExportService : IExportService
 {
-    private const string PermissionMessage = "You do not have permission to request this export.";
-    private const string JobNotFoundMessage = "Export not found.";
-    private const string NotReadyMessage = "This export is not ready for download yet.";
-    private const string StudentNotFoundMessage = "Student not found.";
     private static readonly TimeSpan DownloadExpiry = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan AuditWindow = TimeSpan.FromDays(365 * 2);
 
@@ -47,6 +48,7 @@ public class ExportService : IExportService
     private readonly INotificationService _notifications;
     private readonly ILogger<ExportService> _logger;
     private readonly IStringLocalizer<Notifications> _notificationsLocalizer;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public ExportService(
         ApplicationDbContext context,
@@ -54,7 +56,8 @@ public class ExportService : IExportService
         IBlobStorageService blob,
         INotificationService notifications,
         ILogger<ExportService> logger,
-        IStringLocalizer<Notifications> notificationsLocalizer)
+        IStringLocalizer<Notifications> notificationsLocalizer,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
@@ -62,6 +65,7 @@ public class ExportService : IExportService
         _notifications = notifications;
         _logger = logger;
         _notificationsLocalizer = notificationsLocalizer;
+        _localizer = localizer;
     }
 
     // ---------------------------------------------------------------- Enqueue + read
@@ -70,7 +74,7 @@ public class ExportService : IExportService
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null || ctx.OrgRoleId != OrgRoleIds.DistrictAdmin)
-            return ServiceResult<ExportJobModel>.FailureResult(PermissionMessage);
+            return ServiceResult<ExportJobModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Export.NoPermissionRequestExport"]);
 
         var job = new ExportJob
         {
@@ -92,7 +96,7 @@ public class ExportService : IExportService
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null || ctx.OrgRoleId != OrgRoleIds.DistrictAdmin)
-            return ServiceResult<List<ExportJobModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<ExportJobModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Export.NoPermissionRequestExport"]);
 
         var rows = await MapQuery(_context.ExportJobs.AsNoTracking()
                 // Both scopes: a "Export record" from a student page lands here too, so the admin
@@ -107,14 +111,14 @@ public class ExportService : IExportService
     public async Task<ServiceResult<ExportJobModel>> EnqueueStudentExportAsync(int userId, int schoolStudentId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, schoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<ExportJobModel>.FailureResult(PermissionMessage);
+            return ServiceResult<ExportJobModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Export.NoPermissionRequestExport"]);
 
         var districtId = await _context.SchoolStudents.AsNoTracking()
             .Where(s => s.Id == schoolStudentId)
             .Select(s => (int?)s.DistrictId)
             .FirstOrDefaultAsync(ct);
         if (districtId == null)
-            return ServiceResult<ExportJobModel>.FailureResult(StudentNotFoundMessage);
+            return ServiceResult<ExportJobModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Export.StudentNotFound"]);
 
         var job = new ExportJob
         {
@@ -137,9 +141,9 @@ public class ExportService : IExportService
     {
         var job = await _context.ExportJobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId, ct);
         if (job == null)
-            return ServiceResult<ExportJobModel>.FailureResult(JobNotFoundMessage);
+            return ServiceResult<ExportJobModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Export.JobNotFound"]);
         if (!await CanReadJobAsync(userId, job, ct))
-            return ServiceResult<ExportJobModel>.FailureResult(PermissionMessage);
+            return ServiceResult<ExportJobModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Export.NoPermissionRequestExport"]);
 
         return ServiceResult<ExportJobModel>.SuccessResult(await MapAsync(jobId, ct));
     }
@@ -148,11 +152,11 @@ public class ExportService : IExportService
     {
         var job = await _context.ExportJobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId, ct);
         if (job == null)
-            return ServiceResult<string>.FailureResult(JobNotFoundMessage);
+            return ServiceResult<string>.FailureResult(ServiceErrorKind.NotFound, _localizer["Export.JobNotFound"]);
         if (!await CanReadJobAsync(userId, job, ct))
-            return ServiceResult<string>.FailureResult(PermissionMessage);
+            return ServiceResult<string>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Export.NoPermissionRequestExport"]);
         if (job.Status != ExportJobStatus.Completed || string.IsNullOrWhiteSpace(job.BlobPath))
-            return ServiceResult<string>.FailureResult(NotReadyMessage);
+            return ServiceResult<string>.FailureResult(ServiceErrorKind.Validation, _localizer["Export.NotReady"]);
 
         var url = await _blob.GetDownloadUrlAsync(job.BlobPath, DownloadExpiry);
         return ServiceResult<string>.SuccessResult(url);

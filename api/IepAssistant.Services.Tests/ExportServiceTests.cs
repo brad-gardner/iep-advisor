@@ -47,7 +47,7 @@ public sealed class ExportServiceTests : IDisposable
     }
 
     private ExportService CreateService(ApplicationDbContext ctx, IBlobStorageService blob) =>
-        new(ctx, new OrgAccessService(ctx), blob, new NotificationService(ctx, TestSupport.TestLocalizers.Messages()), NullLogger<ExportService>.Instance, TestSupport.TestLocalizers.Notifications());
+        new(ctx, new OrgAccessService(ctx), blob, new NotificationService(ctx, TestSupport.TestLocalizers.Messages()), NullLogger<ExportService>.Instance, TestSupport.TestLocalizers.Notifications(), TestSupport.TestLocalizers.Messages());
 
     [Fact]
     public async Task RunAsync_StudentScope_ProducesCompleteManifest_ExcludesParentDraftNotes_ScopesToOneStudent()

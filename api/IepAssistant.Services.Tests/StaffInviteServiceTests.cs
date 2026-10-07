@@ -52,7 +52,8 @@ public sealed class StaffInviteServiceTests : IDisposable
 
     private StaffInviteService CreateService(ApplicationDbContext ctx, CapturingEmailService email, bool exposeLinks = false)
         => new(ctx, new OrgAccessService(ctx), email, new JwtTokenFactory(_configuration),
-               new InviteLinkExposure(exposeLinks), _configuration, NullLogger<StaffInviteService>.Instance);
+               new InviteLinkExposure(exposeLinks), _configuration, NullLogger<StaffInviteService>.Instance,
+               TestSupport.TestLocalizers.Messages());
 
     // ----------------------------------------------------------------- seed helpers
 

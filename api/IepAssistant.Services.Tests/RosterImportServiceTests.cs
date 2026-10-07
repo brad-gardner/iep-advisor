@@ -44,12 +44,12 @@ public sealed class RosterImportServiceTests : IDisposable
         .Build();
 
     private RosterImportService Roster(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), _audit, NullLogger<RosterImportService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), _audit, NullLogger<RosterImportService>.Instance, TestSupport.TestLocalizers.Messages());
 
     private StaffImportService StaffImports(ApplicationDbContext ctx)
     {
         var org = new OrgAccessService(ctx);
-        var invites = new StaffInviteService(ctx, org, _email, new JwtTokenFactory(_configuration), new InviteLinkExposure(false), _configuration, NullLogger<StaffInviteService>.Instance);
+        var invites = new StaffInviteService(ctx, org, _email, new JwtTokenFactory(_configuration), new InviteLinkExposure(false), _configuration, NullLogger<StaffInviteService>.Instance, TestSupport.TestLocalizers.Messages());
         return new StaffImportService(ctx, org, invites, _audit, NullLogger<StaffImportService>.Instance);
     }
 

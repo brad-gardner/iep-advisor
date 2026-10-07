@@ -42,7 +42,7 @@ public sealed class DocumentTemplateServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private DocumentTemplateService CreateService(ApplicationDbContext ctx)
-        => new(ctx, _audit, NullLogger<DocumentTemplateService>.Instance);
+        => new(ctx, _audit, NullLogger<DocumentTemplateService>.Instance, TestSupport.TestLocalizers.Messages());
 
     // ---------------------------------------------------------------- Seed rows
 

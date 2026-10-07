@@ -43,7 +43,7 @@ public class AuditLogController : ControllerBase
         }, ct);
 
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<AuditLogPageDto>.SuccessResponse(MapPage(result.Data!)));
     }
@@ -65,18 +65,4 @@ public class AuditLogController : ControllerBase
             CreatedAt = e.CreatedAt
         }).ToList()
     };
-
-    // Mirrors DistrictController.MapFailure: permission → 403, not found → 404, else → 400.
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

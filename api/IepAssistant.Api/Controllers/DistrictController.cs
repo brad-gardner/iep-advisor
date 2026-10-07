@@ -27,7 +27,7 @@ public class DistrictController : ControllerBase
     {
         var result = await _districtService.GetOverviewAsync(User.GetUserId(), ct);
         if (!result.Success)
-            return MapFailure<DistrictOverviewDto>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<DistrictOverviewDto>.SuccessResponse(MapOverview(result.Data!)));
     }
@@ -44,7 +44,7 @@ public class DistrictController : ControllerBase
 
         var result = await _districtService.UpdateFamilyDraftSharingAsync(User.GetUserId(), request.FamilyDraftSharingEnabled, ct);
         if (!result.Success)
-            return MapFailure<DistrictOverviewDto>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<DistrictOverviewDto>.SuccessResponse(MapOverview(result.Data!)));
     }
@@ -56,7 +56,7 @@ public class DistrictController : ControllerBase
     {
         var result = await _districtService.GetDashboardAsync(User.GetUserId(), ct);
         if (!result.Success)
-            return MapFailure<DistrictDashboardDto>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<DistrictDashboardDto>.SuccessResponse(MapDashboard(result.Data!)));
     }
@@ -68,7 +68,7 @@ public class DistrictController : ControllerBase
     {
         var result = await _districtService.GetSchoolsAsync(User.GetUserId(), ct);
         if (!result.Success)
-            return MapFailure<IEnumerable<DistrictSchoolDto>>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<IEnumerable<DistrictSchoolDto>>.SuccessResponse(result.Data!.Select(MapSchool)));
     }
@@ -89,7 +89,7 @@ public class DistrictController : ControllerBase
         }, ct);
 
         if (!result.Success)
-            return MapFailure<DistrictSchoolDto>(result.Message);
+            return this.MapServiceFailure(result);
 
         var dto = MapSchool(result.Data!);
         return CreatedAtAction(nameof(GetSchools), new { }, ApiResponse<DistrictSchoolDto>.SuccessResponse(dto));
@@ -112,7 +112,7 @@ public class DistrictController : ControllerBase
         }, ct);
 
         if (!result.Success)
-            return MapFailure<DistrictSchoolDto>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<DistrictSchoolDto>.SuccessResponse(MapSchool(result.Data!)));
     }
@@ -126,7 +126,7 @@ public class DistrictController : ControllerBase
     {
         var result = await _districtService.DeactivateSchoolAsync(User.GetUserId(), id, ct);
         if (!result.Success)
-            return MapFailure<object>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
@@ -142,7 +142,7 @@ public class DistrictController : ControllerBase
     {
         var result = await _districtService.GetComplianceBoardAsync(User.GetUserId(), schoolId, from, to, ct);
         if (!result.Success)
-            return MapFailure<ComplianceBoardDto>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<ComplianceBoardDto>.SuccessResponse(MapComplianceBoard(result.Data!)));
     }
@@ -154,7 +154,7 @@ public class DistrictController : ControllerBase
     {
         var result = await _districtService.GetAdoptionAsync(User.GetUserId(), schoolId, days, ct);
         if (!result.Success)
-            return MapFailure<AdoptionDto>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<AdoptionDto>.SuccessResponse(MapAdoption(result.Data!)));
     }
@@ -166,7 +166,7 @@ public class DistrictController : ControllerBase
     {
         var result = await _districtService.GetEngagementAsync(User.GetUserId(), schoolId, ct);
         if (!result.Success)
-            return MapFailure<EngagementDto>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<EngagementDto>.SuccessResponse(MapEngagement(result.Data!)));
     }
@@ -301,17 +301,4 @@ public class DistrictController : ControllerBase
             ActiveStudents = s.ActiveStudents
         }).ToList()
     };
-
-    private IActionResult MapFailure<T>(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

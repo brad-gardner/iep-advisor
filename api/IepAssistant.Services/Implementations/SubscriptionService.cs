@@ -14,6 +14,11 @@ using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
+/// <summary>
+/// Multilingual plan (2026-10-06) phase 6 (todos/249): <see cref="ServiceErrorKind"/> added to every
+/// failure for consistency with later-phase services, even though <c>StripeController</c> maps every
+/// one of these to a fixed status today (not via <c>MapServiceFailure</c>) — see todos/249.
+/// </summary>
 public class SubscriptionService : ISubscriptionService
 {
     private readonly ApplicationDbContext _context;
@@ -320,10 +325,10 @@ public class SubscriptionService : ISubscriptionService
     {
         var user = await _context.Users.FindAsync([userId], ct);
         if (user == null)
-            return ServiceResult.FailureResult(_localizer["AuthApi.UserNotFound"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["AuthApi.UserNotFound"]);
 
         if (user.SubscriptionStatus == "active")
-            return ServiceResult.FailureResult(_localizer["Subscription.AlreadyActive"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Conflict, _localizer["Subscription.AlreadyActive"]);
 
         // Atomic redemption: only update if code is valid AND not yet redeemed
         var rowsAffected = await _context.Set<BetaInviteCode>()
@@ -334,7 +339,7 @@ public class SubscriptionService : ISubscriptionService
                 .SetProperty(c => c.RedeemedAt, DateTime.UtcNow), ct);
 
         if (rowsAffected == 0)
-            return ServiceResult.FailureResult(_localizer["Subscription.InvalidInviteCode"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["Subscription.InvalidInviteCode"]);
 
         // Grant subscription
         user.SubscriptionStatus = "active";
@@ -350,7 +355,7 @@ public class SubscriptionService : ISubscriptionService
     public async Task<ServiceResult<List<string>>> GenerateBetaCodesAsync(int count, DateTime? expiresAt, CancellationToken ct = default)
     {
         if (count <= 0 || count > 100)
-            return ServiceResult<List<string>>.FailureResult(_localizer["Subscription.CountOutOfRange"]);
+            return ServiceResult<List<string>>.FailureResult(ServiceErrorKind.Validation, _localizer["Subscription.CountOutOfRange"]);
 
         var codes = new List<string>();
 

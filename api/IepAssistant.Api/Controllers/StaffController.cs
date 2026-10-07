@@ -32,7 +32,7 @@ public class StaffController : ControllerBase
     {
         var result = await _service.ListAsync(User.GetUserId(), ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<StaffListDto>.SuccessResponse(MapList(result.Data!)));
     }
@@ -54,7 +54,7 @@ public class StaffController : ControllerBase
         }, ct);
 
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
 
         return CreatedAtAction(nameof(GetStaff), new { }, ApiResponse<StaffInviteDto>.SuccessResponse(MapInvite(result.Data!), result.Message));
     }
@@ -67,7 +67,7 @@ public class StaffController : ControllerBase
     {
         var result = await _service.RevokeAsync(User.GetUserId(), id, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
@@ -80,7 +80,7 @@ public class StaffController : ControllerBase
     {
         var result = await _service.ResendAsync(User.GetUserId(), id, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<StaffInviteDto>.SuccessResponse(MapInvite(result.Data!), result.Message));
     }
@@ -94,7 +94,7 @@ public class StaffController : ControllerBase
     {
         var result = await _service.DeactivateStaffAsync(User.GetUserId(), staffProfileId, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
 
         var data = result.Data!;
         return Ok(ApiResponse<DeactivateStaffResponseDto>.SuccessResponse(new DeactivateStaffResponseDto
@@ -114,7 +114,7 @@ public class StaffController : ControllerBase
     {
         var result = await _service.ReactivateStaffAsync(User.GetUserId(), staffProfileId, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
@@ -161,16 +161,4 @@ public class StaffController : ControllerBase
         }).ToList()
     };
 
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

@@ -8,6 +8,11 @@ using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
+/// <summary>
+/// Multilingual plan (2026-10-06) phase 6 (todos/249): <see cref="ServiceErrorKind"/> added to every
+/// failure for consistency with later-phase services, even though <c>ChildrenController</c> maps every
+/// one of these to a fixed status today (not via <c>MapServiceFailure</c>) — see todos/249.
+/// </summary>
 public class ChildProfileService : IChildProfileService
 {
     private readonly IChildProfileRepository _repository;
@@ -71,11 +76,11 @@ public class ChildProfileService : IChildProfileService
     public async Task<ServiceResult> UpdateAsync(int id, int userId, UpdateChildProfileModel model, CancellationToken cancellationToken = default)
     {
         if (!await _accessService.HasMinimumRoleAsync(id, userId, AccessRole.Owner, cancellationToken))
-            return ServiceResult.FailureResult(_localizer["Children.NotFound"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Children.NotFound"]);
 
         var entity = await _repository.GetByIdForUserAsync(id, userId, cancellationToken);
         if (entity == null)
-            return ServiceResult.FailureResult(_localizer["Children.NotFound"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Children.NotFound"]);
 
         if (model.FirstName != null)
             entity.FirstName = model.FirstName;
@@ -106,11 +111,11 @@ public class ChildProfileService : IChildProfileService
     public async Task<ServiceResult> DeleteAsync(int id, int userId, CancellationToken cancellationToken = default)
     {
         if (!await _accessService.HasMinimumRoleAsync(id, userId, AccessRole.Owner, cancellationToken))
-            return ServiceResult.FailureResult(_localizer["Children.NotFound"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Children.NotFound"]);
 
         var entity = await _repository.GetByIdForUserAsync(id, userId, cancellationToken);
         if (entity == null)
-            return ServiceResult.FailureResult(_localizer["Children.NotFound"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Children.NotFound"]);
 
         entity.IsActive = false;
         entity.UpdatedById = userId;
@@ -123,16 +128,16 @@ public class ChildProfileService : IChildProfileService
     public async Task<ServiceResult> SetCurrentIepAsync(int childId, int iepDocumentId, int userId, CancellationToken cancellationToken = default)
     {
         if (!await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult.FailureResult(_localizer["Children.NotFound"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Children.NotFound"]);
 
         var child = await _repository.GetByIdForUserAsync(childId, userId, cancellationToken);
         if (child == null)
-            return ServiceResult.FailureResult(_localizer["Children.NotFound"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Children.NotFound"]);
 
         var iep = await _context.IepDocuments
             .FirstOrDefaultAsync(d => d.Id == iepDocumentId && d.ChildProfileId == childId, cancellationToken);
         if (iep == null)
-            return ServiceResult.FailureResult(_localizer["Children.IepNotFoundForChild"]);
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Children.IepNotFoundForChild"]);
 
         child.CurrentIepDocumentId = iepDocumentId;
         child.UpdatedById = userId;
