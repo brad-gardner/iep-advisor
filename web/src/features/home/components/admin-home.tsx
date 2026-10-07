@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { DistrictOverviewCard } from '@/features/district-admin/components/district-overview-card';
 import { DistrictDashboardTiles } from '@/features/district-admin/components/district-dashboard-tiles';
 import { SetupChecklistCard } from '@/features/district-admin/components/setup-checklist-card';
@@ -26,6 +27,7 @@ interface AdminHomeProps {
  * summary and adoption/engagement teasers up top.
  */
 export function AdminHome({ staff, isDistrict, generatedAt }: AdminHomeProps) {
+  const { t } = useTranslation('home');
   return (
     <div className="space-y-6" data-testid="staff-home-admin">
       {isDistrict && <SetupChecklistCard />}
@@ -36,7 +38,7 @@ export function AdminHome({ staff, isDistrict, generatedAt }: AdminHomeProps) {
       {isDistrict && <AdoptionEngagementTeaser />}
 
       <ThisWeekSection
-        title={isDistrict ? 'Meetings this week' : 'Meetings this week in my building'}
+        title={isDistrict ? t('adminHome.meetingsThisWeekDistrict') : t('adminHome.meetingsThisWeekBuilding')}
         subtitle={`${formatDate(staff.weekStart)} – ${formatDate(staff.weekEnd)}`}
         meetings={staff.meetingsThisWeek}
         showBriefNote

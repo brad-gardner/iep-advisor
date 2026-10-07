@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,24 +10,26 @@ import { SubscribeButton } from './subscribe-button';
 import { createPortalSession } from '../api/subscription-api';
 import { useSubscription } from '../hooks/use-subscription';
 import { getActiveLanguage } from '@/lib/i18n/format';
+import i18n from '@/lib/i18n';
 import type { SubscriptionStatus as SubscriptionStatusType, ChildUsage } from '@/types/api';
 
 function statusBadge(status: string) {
   switch (status) {
     case 'active':
-      return <Badge variant="success" data-testid="subscription-status">Active</Badge>;
+      return <Badge variant="success" data-testid="subscription-status">{i18n.t('subscription:status.active')}</Badge>;
     case 'past_due':
-      return <Badge variant="warning" data-testid="subscription-status">Past Due</Badge>;
+      return <Badge variant="warning" data-testid="subscription-status">{i18n.t('subscription:status.pastDue')}</Badge>;
     case 'canceled':
-      return <Badge variant="neutral" data-testid="subscription-status">Canceled</Badge>;
+      return <Badge variant="neutral" data-testid="subscription-status">{i18n.t('subscription:status.canceled')}</Badge>;
     case 'expired':
-      return <Badge variant="neutral" data-testid="subscription-status">Expired</Badge>;
+      return <Badge variant="neutral" data-testid="subscription-status">{i18n.t('subscription:status.expired')}</Badge>;
     default:
-      return <Badge variant="neutral" data-testid="subscription-status">No Subscription</Badge>;
+      return <Badge variant="neutral" data-testid="subscription-status">{i18n.t('subscription:status.none')}</Badge>;
   }
 }
 
 function UsageBar({ usage }: { usage: ChildUsage }) {
+  const { t } = useTranslation('subscription');
   const pct = usage.analysisLimit > 0
     ? Math.min((usage.analysisCount / usage.analysisLimit) * 100, 100)
     : 0;
@@ -36,7 +39,7 @@ function UsageBar({ usage }: { usage: ChildUsage }) {
       <div className="flex items-center justify-between text-sm">
         <span className="text-brand-slate-600 font-medium">{usage.childName}</span>
         <span className="text-brand-slate-500 text-xs">
-          {usage.analysisCount} of {usage.analysisLimit} analyses used
+          {t('status.analysesUsed', { count: usage.analysisCount, limit: usage.analysisLimit })}
         </span>
       </div>
       <div className="h-2 bg-brand-slate-100 rounded-full overflow-hidden">
@@ -50,6 +53,7 @@ function UsageBar({ usage }: { usage: ChildUsage }) {
 }
 
 function ManageButton() {
+  const { t } = useTranslation('subscription');
   const { show } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -60,19 +64,20 @@ function ManageButton() {
       window.location.href = url;
     } catch {
       // Redirect failed — surface it instead of silently resetting.
-      show({ message: 'Could not open the billing portal. Please try again.', variant: 'error' });
+      show({ message: t('status.manageFailed'), variant: 'error' });
       setIsLoading(false);
     }
   };
 
   return (
     <Button variant="secondary" onClick={handleManage} loading={isLoading}>
-      Manage Subscription
+      {t('status.manage')}
     </Button>
   );
 }
 
 function StatusContent({ data }: { data: SubscriptionStatusType }) {
+  const { t } = useTranslation('subscription');
   const isActive = data.status === 'active';
   const usageEntries = data.childUsage ? Object.values(data.childUsage) : [];
 
@@ -80,18 +85,19 @@ function StatusContent({ data }: { data: SubscriptionStatusType }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-serif text-lg font-semibold text-brand-slate-800">
-          Your plan
+          {t('status.yourPlan')}
         </h3>
         {statusBadge(data.status)}
       </div>
 
       {isActive && data.expiresAt && (
         <p className="text-sm text-brand-slate-500">
-          Renews{' '}
-          {new Date(data.expiresAt).toLocaleDateString(getActiveLanguage(), {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric',
+          {t('status.renews', {
+            date: new Date(data.expiresAt).toLocaleDateString(getActiveLanguage(), {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            }),
           })}
         </p>
       )}
@@ -99,7 +105,7 @@ function StatusContent({ data }: { data: SubscriptionStatusType }) {
       {usageEntries.length > 0 && (
         <div className="space-y-3">
           <p className="text-xs font-semibold text-brand-slate-500 uppercase tracking-wide">
-            Usage
+            {t('status.usage')}
           </p>
           {usageEntries.map((u) => (
             <UsageBar key={u.childId} usage={u} />
@@ -119,6 +125,7 @@ function StatusContent({ data }: { data: SubscriptionStatusType }) {
 }
 
 export function SubscriptionStatusCard() {
+  const { t } = useTranslation('subscription');
   const { status, isLoading, reload } = useSubscription();
 
   if (isLoading) {
@@ -135,10 +142,10 @@ export function SubscriptionStatusCard() {
   if (!status) {
     return (
       <Card>
-        <Notice variant="error" title="Unable to load subscription status">
+        <Notice variant="error" title={t('status.loadFailedTitle')}>
           <div className="mt-3">
             <Button variant="secondary" size="sm" onClick={() => reload()}>
-              Try again
+              {t('common:ui.tryAgain')}
             </Button>
           </div>
         </Notice>

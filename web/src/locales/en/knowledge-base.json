@@ -1,0 +1,23 @@
+{
+  "page": {
+    "pageTitle": "Knowledge Base",
+    "subtitle": "Plain-language guides to IEP laws, your rights, and special education terms",
+    "noResults": "No entries match your search",
+    "disclaimer": "This information is provided for educational purposes. It is not legal advice."
+  },
+  "search": {
+    "placeholder": "Search knowledge base...",
+    "ariaLabel": "Search knowledge base"
+  },
+  "categories": {
+    "all": "All",
+    "rights": "Rights",
+    "provisions": "Provisions",
+    "glossary": "Glossary",
+    "process": "Process",
+    "tips": "Tips"
+  },
+  "entryCard": {
+    "availableInEnglish": "Available in English"
+  }
+}

@@ -8,20 +8,46 @@ import { detectInitialLanguage, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from './
 
 export const defaultNS = 'common';
 
-// English is bundled (no network round-trip, no flash of missing text on the
-// very first paint). Spanish is lazy — loaded per namespace, on demand, by
-// the resourcesToBackend plugin below.
+// The two SHELL namespaces (`common`, `auth`) are bundled for English (no
+// network round-trip, no flash of missing text on the very first paint) —
+// see `ns` below. Spanish always loads lazily, per namespace, on demand, via
+// the resourcesToBackend plugin below. So does English for every OTHER,
+// feature-level namespace (`children`, `home`, …): those aren't bundled in
+// either language, so the very first `useTranslation('<namespace>')` call
+// for one — in English or Spanish — goes through the same backend.
 export const resources = {
   en: { common: enCommon, auth: enAuth },
 } as const;
 
-// Every Spanish namespace file, eagerly discovered but lazily IMPORTED
-// (import.meta.glob without `eager: true` yields loader functions, not the
-// modules themselves) — Vite code-splits each into its own chunk.
-const esLoaders = import.meta.glob('/src/locales/es/*.json') as Record<
+// Every locale JSON file, for both languages, eagerly discovered but lazily
+// IMPORTED (import.meta.glob without `eager: true` yields loader functions,
+// not the modules themselves) — Vite code-splits each into its own chunk.
+// `partialBundledLanguages: true` below means this is only ever actually
+// consulted for a (language, namespace) pair NOT already in `resources`
+// above — i.e. `en/common` and `en/auth` are served directly from the
+// bundle, never through this backend, even though their files also match
+// this glob.
+const localeLoaders = import.meta.glob(['/src/locales/en/*.json', '/src/locales/es/*.json']) as Record<
   string,
   () => Promise<{ default: Record<string, unknown> }>
 >;
+
+// Every feature-level namespace name, derived from the `en/*.json` files on
+// disk (minus the two shell namespaces, already bundled above) — so this
+// list updates itself as phases add namespaces, with nothing to hand-
+// maintain here. Exported for `test/setup.ts`: tests stay English by
+// default and mostly assert synchronously right after `render()`, so it
+// preloads every one of these before any test runs, the same way the shell
+// namespaces are already synchronously available via `resources`. Without
+// that, the FIRST test in a worker to render a component that calls
+// `useTranslation('<feature namespace>')` would see the raw `ns:key` text
+// for one tick (react-i18next re-renders once the lazy load resolves, but a
+// synchronous `getByText`/`getByRole` right after `render()` runs before
+// that).
+export const featureNamespaces = Object.keys(localeLoaders)
+  .filter((path) => path.startsWith('/src/locales/en/'))
+  .map((path) => path.slice('/src/locales/en/'.length, -'.json'.length))
+  .filter((ns) => ns !== 'common' && ns !== 'auth');
 
 // Exported so callers that need to know initialization has settled (the
 // test setup, chiefly — see `test/setup.ts`) can await it instead of relying
@@ -32,7 +58,7 @@ export const i18nReady = i18next
   .use(
     resourcesToBackend(async (language: string, namespace: string) => {
       const path = `/src/locales/${language}/${namespace}.json`;
-      const loader = esLoaders[path];
+      const loader = localeLoaders[path];
       if (!loader) {
         throw new Error(`[i18n] no locale file for ${language}/${namespace}`);
       }
@@ -43,8 +69,10 @@ export const i18nReady = i18next
   .use(initReactI18next)
   .init({
     resources,
-    // English namespaces above are used directly; the backend is only
-    // consulted for languages/namespaces not already bundled (i.e. es/*).
+    // The shell namespaces above are used directly; the backend is only
+    // consulted for a (language, namespace) pair not already bundled there
+    // — every namespace in Spanish, and every feature-level namespace (not
+    // `common`/`auth`) in English too.
     partialBundledLanguages: true,
     // Resolved once, synchronously, by `detectInitialLanguage` (cached
     // account language, else a pre-login choice, else the browser, else

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ObligationStatusChip } from '@/features/obligations/components/obligation-status-chip';
 import { OBLIGATION_KIND_ICONS, OBLIGATION_KIND_LABELS } from '@/features/obligations/types';
 import type { ObligationDto } from '@/features/obligations/types';
@@ -9,12 +10,13 @@ import { WorkItemRow } from './work-item-row';
  * variants only — admins get the board instead). Unknown dates render via the
  * shared `ObligationStatusChip`'s "Unknown" state, never as healthy. */
 export function DueSoonSection({ obligations }: { obligations: ObligationDto[] }) {
+  const { t } = useTranslation('home');
   return (
     <ListSection
-      title="Due soon / overdue"
+      title={t('dueSoon.title')}
       data-testid="home-due-soon"
       items={obligations}
-      emptyHint="Nothing due soon or overdue on your caseload."
+      emptyHint={t('dueSoon.emptyHint')}
       // Plan 7 kinds (goal-observation, evaluator submission) can produce more
       // than one obligation per (student, kind) — the source label disambiguates
       // (it names the specific goal/domain), unlike the plan 4 kinds where it's

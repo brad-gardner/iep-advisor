@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ChildForm } from '@/features/children/components/child-form';
 import { createChild } from '@/features/children/api/children-api';
@@ -9,6 +10,7 @@ interface ChildStepProps {
 }
 
 export function ChildStep({ onNext, onSkip }: ChildStepProps) {
+  const { t } = useTranslation('onboarding');
   const handleSubmit = async (
     data: CreateChildProfileRequest
   ): Promise<{ success: boolean; error?: string }> => {
@@ -18,9 +20,9 @@ export function ChildStep({ onNext, onSkip }: ChildStepProps) {
         onNext();
         return { success: true };
       }
-      return { success: false, error: response.message || 'Failed to create child profile' };
+      return { success: false, error: response.message || t('child.createFailed') };
     } catch {
-      return { success: false, error: 'An error occurred creating the profile' };
+      return { success: false, error: t('child.genericError') };
     }
   };
 
@@ -28,19 +30,18 @@ export function ChildStep({ onNext, onSkip }: ChildStepProps) {
     <div className="space-y-6">
       <div className="space-y-2">
         <h1 className="font-serif text-2xl text-brand-slate-800">
-          Add Your First Child
+          {t('child.heading')}
         </h1>
         <p className="text-sm text-brand-slate-500 leading-relaxed">
-          We'll use this information to personalize your IEP analysis. Only a
-          first name is required — you can add more details later.
+          {t('child.body')}
         </p>
       </div>
 
-      <ChildForm onSubmit={handleSubmit} submitLabel="Save & Continue" />
+      <ChildForm onSubmit={handleSubmit} submitLabel={t('child.submitLabel')} />
 
       <div className="flex justify-start">
         <Button variant="ghost" onClick={onSkip} data-testid="onboarding-skip-child">
-          Skip for now
+          {t('child.skip')}
         </Button>
       </div>
     </div>

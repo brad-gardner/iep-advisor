@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
@@ -7,6 +8,7 @@ interface KnowledgeBaseSearchProps {
 }
 
 export function KnowledgeBaseSearch({ value, onChange }: KnowledgeBaseSearchProps) {
+  const { t } = useTranslation('knowledge-base');
   return (
     <div className="relative">
       <Search
@@ -19,8 +21,8 @@ export function KnowledgeBaseSearch({ value, onChange }: KnowledgeBaseSearchProp
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Search knowledge base..."
-        aria-label="Search knowledge base"
+        placeholder={t('search.placeholder')}
+        aria-label={t('search.ariaLabel')}
         data-testid="kb-search"
         className="!pl-10"
       />

@@ -22,6 +22,7 @@ import {
   isSupportedLanguage,
   getPreLoginLanguage,
   setPreLoginLanguage,
+  clearPreLoginLanguage,
   setLastDisplayLanguage,
   clearLastDisplayLanguage,
   detectBrowserLanguage,
@@ -113,6 +114,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // browser's own languages, then `en`.
     const resolved: SupportedLanguage = getPreLoginLanguage() ?? detectBrowserLanguage();
 
+    // Apply on screen too — not just persisted. Without this, a visitor whose
+    // browser language differed from whatever i18next happened to initialize
+    // with (e.g. the sign-out carry-over from a previous account on this
+    // device) would have the right language saved to their new account but
+    // see the wrong one until their next reload.
+    if (i18n.language !== resolved) {
+      void i18n.changeLanguage(resolved);
+    }
+
     const backfillPromise = updateProfileApi({ preferredLanguage: resolved })
       .then((response) => {
         if (!response.success || !response.data) return;
@@ -197,10 +207,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // The sign-out carry-over's job (showing the login page in the right
     // language) is done now that someone has actually signed in — clear it
     // so it can't later be mistaken for this or a future visitor's own
-    // choice. The explicit pre-login choice, if any, is left alone (see
-    // `lib/i18n/detect.ts`).
+    // choice.
     clearLastDisplayLanguage();
     syncLanguagePreference(userData, languageGenerationRef.current);
+    // The explicit pre-login choice's job is also done: `syncLanguagePreference`
+    // above already read it synchronously (before this call returns) if this
+    // account had no saved preference yet. Clearing it AFTER that call — never
+    // before — means a future account signing in on this same device (a
+    // shared/kiosk browser) never inherits a choice that belonged to whoever
+    // was sitting at this device before *this* sign-in (todos/247).
+    clearPreLoginLanguage();
   }, [syncLanguagePreference]);
 
   const login = async (data: LoginRequest): Promise<LoginResult> => {
@@ -318,6 +334,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    // Bump first, before anything else: invalidates any in-flight
+    // `setLanguage` PUT or backfill (`syncLanguagePreference`) so its
+    // response — landing after sign-out — can't `setUser`/`setStoredUser`
+    // and leave the app looking signed-in with no token (todos/247).
+    languageGenerationRef.current++;
+
     // Keep whatever language was active — it's still correct, it just has
     // nowhere to live once the account's saved preference is gone. Recorded
     // as the sign-out *display* carry-over (never the explicit pre-login
@@ -376,8 +398,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: true };
       }
       if (response.success && response.data) {
-        setUser(response.data);
-        setStoredUser(JSON.stringify(response.data));
+        // Narrowed into its own `const` so the closure below keeps the
+        // non-undefined type — TS doesn't carry a property-access narrowing
+        // (`response.data`) through a nested function the way it does a
+        // plain variable.
+        const data = response.data;
+        // Functional form, not a bare `setUser(data)`: if `logout()` ran
+        // while this PUT was in flight, `user` is already `null` and must
+        // stay that way — a slow response arriving after sign-out must never
+        // resurrect a signed-in-looking user with no token (todos/247). The
+        // generation check above already covers "superseded by a newer
+        // language switch"; this covers "superseded by sign-out" too, since
+        // logout doesn't change what `generation` captured at the top of this
+        // function. The updater runs synchronously, so `wasSignedIn` is
+        // correct by the time `setUser` returns — gating the `setStoredUser`
+        // write below on the *current* state, not the stale `user` closure.
+        let wasSignedIn = false;
+        setUser((prev) => {
+          if (prev) wasSignedIn = true;
+          return prev ? data : prev;
+        });
+        if (wasSignedIn) setStoredUser(JSON.stringify(data));
         return { success: true };
       }
       return { success: false, error: response.message || t('context.updateFailed') };

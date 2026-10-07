@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Logo } from '@/components/ui/logo';
 import { Notice } from '@/components/ui/notice';
 import { ProgressDots } from '@/components/ui/progress-dots';
@@ -11,14 +12,15 @@ import { ChildStep } from './child-step';
 import { NextSteps } from './next-steps';
 
 const TOTAL_STEPS = 4;
-const STEP_LABELS = ['Welcome', 'Set State', 'Add Child', 'Next Steps'];
 
 export function OnboardingFlow() {
-  usePageTitle('Get started');
+  const { t } = useTranslation('onboarding');
+  usePageTitle(t('flow.pageTitle'));
   const [step, setStep] = useState(0);
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { completeOnboarding } = useAuth();
+  const stepLabels = [t('flow.stepWelcome'), t('flow.stepState'), t('flow.stepChild'), t('flow.stepNext')];
 
   const next = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
 
@@ -26,7 +28,7 @@ export function OnboardingFlow() {
     setError('');
     const result = await completeOnboarding();
     if (result?.success === false) {
-      setError('Failed to complete onboarding. Please try again.');
+      setError(t('flow.completeFailed'));
       return;
     }
     navigate('/dashboard');
@@ -44,11 +46,11 @@ export function OnboardingFlow() {
         <ProgressDots
           current={step}
           total={TOTAL_STEPS}
-          labels={STEP_LABELS}
+          labels={stepLabels}
           testId="onboarding-progress"
         />
         <p className="text-xs text-brand-slate-500" aria-live="polite">
-          Step {step + 1} of {TOTAL_STEPS}
+          {t('flow.stepOf', { current: step + 1, total: TOTAL_STEPS })}
         </p>
       </div>
 

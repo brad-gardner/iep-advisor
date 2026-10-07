@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/format-date';
 import { ListSection } from './list-section';
@@ -8,12 +9,13 @@ import type { ParentDocumentDto } from '../types';
  * ([] until then). `linkPath` is server-provided, so no client-side route
  * guessing is needed. */
 export function DocumentsToReviewSection({ items }: { items: ParentDocumentDto[] }) {
+  const { t } = useTranslation('home');
   return (
     <ListSection
-      title="Documents to review"
+      title={t('documentsToReview.title')}
       data-testid="home-documents-to-review"
       items={items}
-      emptyHint="No documents waiting on your review."
+      emptyHint={t('documentsToReview.emptyHint')}
       itemKey={(doc) => `${doc.kind}-${doc.id}`}
       renderRow={(doc) => (
         <WorkItemRow
@@ -24,7 +26,7 @@ export function DocumentsToReviewSection({ items }: { items: ParentDocumentDto[]
           meta={
             <>
               <Badge variant={doc.kind === 'Finalized' ? 'success' : 'info'}>
-                {doc.kind === 'Finalized' ? 'Finalized' : 'Shared draft'}
+                {doc.kind === 'Finalized' ? t('documentsToReview.finalized') : t('documentsToReview.sharedDraft')}
               </Badge>
               {formatDate(doc.date)}
             </>

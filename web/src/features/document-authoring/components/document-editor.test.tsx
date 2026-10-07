@@ -283,29 +283,59 @@ describe('DocumentEditor', () => {
     documentsApi.finalizeDocument.mockResolvedValueOnce({ success: true, data: finalizedVersion() });
     render(<Harness initialValues={{ [PROFILE_FIELD]: 'Jordan', [PRESENT_FIELD]: '' }} />);
 
+    // Open and type into section 1 BEFORE opening section 2 — not the
+    // "open both, then type into both" order this test used before
+    // (todos/246). `SectionCard`'s own open-focus effect schedules a
+    // `requestAnimationFrame` that auto-focuses the first field in ITS
+    // section's body as soon as `isOpen` flips true (see the comment on
+    // that effect, around `hasMountedRef`/`raf` there). That's a REAL timer
+    // (jsdom's RAF is not microtask-flushed by `act()`/`user.type()`'s own
+    // awaits — see `test/setup.ts`'s note on RAF "surfacing as test-run
+    // noise... occasionally after the test that triggered it has already
+    // finished"), so opening section 2 while section 1's own RAF (or
+    // section 2's own, newly-scheduled one) is still pending left a real
+    // window for it to fire mid-keystroke and steal focus from the profile
+    // field to the present field, silently dropping the typed "!" (observed
+    // once on CI: saved "Jordan" instead of "Jordan!"). Finishing section
+    // 1's edit before section 2 even opens means any stray RAF only ever
+    // re-focuses an element that's already the right target (a no-op), for
+    // either section, at every point in this sequence.
     await user.click(screen.getByTestId('section-1-edit'));
-    await user.click(screen.getByTestId('section-2-edit'));
     await user.type(screen.getByTestId(`field-${PROFILE_FIELD}`), '!');
+    await user.click(screen.getByTestId('section-2-edit'));
     await user.type(screen.getByTestId(`field-${PRESENT_FIELD}`), 'Doing well.');
 
     await user.click(screen.getByTestId('finalize-button'));
     await user.click(screen.getByTestId('finalize-confirm'));
 
-    await waitFor(() => expect(documentsApi.finalizeDocument).toHaveBeenCalled());
-    // Both edits were flushed (not lost) ahead of the snapshot, and both
-    // sections closed once that flush was confirmed clean. Each section's
-    // field save lands via its own independent `setDetail` update — not
-    // necessarily in the same React commit as the other, or as `closeAll`'s
-    // own state update — so every one of these is asserted inside the SAME
-    // waitFor rather than read synchronously right after the call above:
-    // under load, a later re-render settling after that first check resolves
-    // (but before this line runs) can otherwise read a still-stale DOM.
-    await waitFor(() => {
-      expect(screen.getByTestId('read-field-profile-field')).toHaveTextContent('Jordan!');
-      expect(screen.getByTestId('read-field-present-field')).toHaveTextContent('Doing well.');
-      expect(screen.getByTestId('section-1-edit')).toBeInTheDocument();
-      expect(screen.getByTestId('section-2-edit')).toBeInTheDocument();
-    });
+    // Everything this test cares about — the mock being called AND the DOM
+    // reflecting the post-flush state — is asserted inside ONE waitFor, not
+    // split across two sequential ones. `toHaveBeenCalled()` becoming true
+    // only proves `finalizeDocument(instanceId)` was reached inside
+    // `handleConfirm`; it says nothing about whether the state update from
+    // `sectionEditing.closeAll()` (called just before it, in the same async
+    // continuation) has actually been FLUSHED to the DOM yet — React can
+    // commit that in a later microtask, which only `waitFor`'s own retry
+    // loop (not a second, independent `waitFor` starting its own fresh
+    // first poll) reliably outlasts. Both edits were flushed (not lost)
+    // ahead of the snapshot, and both sections closed once that flush was
+    // confirmed clean — each field's save lands via its own independent
+    // `setDetail` update, not necessarily in the same commit as the other
+    // or as `closeAll`'s, so every assertion below stays in this SAME
+    // `waitFor`. A slightly longer-than-default timeout gives this nested
+    // two-level `Promise.all` flush chain (document → section → field,
+    // times two open sections) a bit more headroom under real CI resource
+    // contention (todos/246).
+    await waitFor(
+      () => {
+        expect(documentsApi.finalizeDocument).toHaveBeenCalled();
+        expect(screen.getByTestId('read-field-profile-field')).toHaveTextContent('Jordan!');
+        expect(screen.getByTestId('read-field-present-field')).toHaveTextContent('Doing well.');
+        expect(screen.getByTestId('section-1-edit')).toBeInTheDocument();
+        expect(screen.getByTestId('section-2-edit')).toBeInTheDocument();
+      },
+      { timeout: 2000 }
+    );
   });
 
   it('Finalize does not close sections, or call finalizeDocument, when the flushed save fails', async () => {

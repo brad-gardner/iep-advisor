@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { CreateChildProfileRequest } from "@/types/api";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ export function ChildForm({
   submitLabel,
   embedded = false,
 }: ChildFormProps) {
+  const { t } = useTranslation("children");
   const [firstName, setFirstName] = useState(initialValues?.firstName ?? "");
   const [lastName, setLastName] = useState(initialValues?.lastName ?? "");
   const [dateOfBirth, setDateOfBirth] = useState(
@@ -77,7 +79,7 @@ export function ChildForm({
     });
 
     if (!result.success) {
-      setError(result.error ?? "Something went wrong");
+      setError(result.error ?? t("form.genericError"));
     }
 
     setIsSubmitting(false);
@@ -92,7 +94,7 @@ export function ChildForm({
       {error && <Notice variant="error" title={error} />}
 
       <Input
-        label="First Name *"
+        label={t("fields.firstName")}
         required
         value={firstName}
         onChange={(e) => setFirstName(e.target.value)}
@@ -101,7 +103,7 @@ export function ChildForm({
       />
 
       <Input
-        label="Last Name"
+        label={t("fields.lastName")}
         value={lastName}
         onChange={(e) => setLastName(e.target.value)}
         maxLength={100}
@@ -109,7 +111,7 @@ export function ChildForm({
       />
 
       <Input
-        label="Date of Birth"
+        label={t("fields.dateOfBirth")}
         type="date"
         value={dateOfBirth}
         onChange={(e) => setDateOfBirth(e.target.value)}
@@ -117,7 +119,7 @@ export function ChildForm({
       />
 
       <Select
-        label="Grade Level"
+        label={t("fields.gradeLevel")}
         value={gradeLevel}
         onChange={(e) => setGradeLevel(e.target.value)}
         data-testid="child-grade-level"
@@ -130,7 +132,7 @@ export function ChildForm({
       </Select>
 
       <Select
-        label="Disability Category"
+        label={t("fields.disabilityCategory")}
         value={disabilityCategory}
         onChange={(e) => setDisabilityCategory(e.target.value)}
         data-testid="child-disability-category"
@@ -143,7 +145,7 @@ export function ChildForm({
       </Select>
 
       <Input
-        label="School District"
+        label={t("fields.schoolDistrict")}
         value={schoolDistrict}
         onChange={(e) => setSchoolDistrict(e.target.value)}
         maxLength={200}
@@ -156,7 +158,7 @@ export function ChildForm({
         className="w-full"
         data-testid="child-form-submit"
       >
-        {isSubmitting ? "Saving..." : submitLabel}
+        {isSubmitting ? t("form.saving") : submitLabel}
       </Button>
     </form>
   );

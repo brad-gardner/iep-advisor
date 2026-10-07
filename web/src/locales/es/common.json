@@ -53,7 +53,10 @@
     "actionsFor": "Acciones para {{label}}",
     "nothingToShow": "Nada para mostrar todavía.",
     "breadcrumb": "Ruta de navegación",
-    "required": "(obligatorio)"
+    "required": "(obligatorio)",
+    "notSet": "Sin establecer",
+    "currentValueSuffix": "{{value}} (valor actual)",
+    "tryAgain": "Intentar de nuevo"
   },
   "toast": {
     "dismiss": "Descartar notificación"
@@ -112,5 +115,39 @@
     "Teacher": "Maestro",
     "RelatedServiceProvider": "Proveedor de servicios relacionados",
     "GeneralEducator": "Maestro de educación general"
+  },
+  "gradeLevel": {
+    "Pre-K": "Prekínder",
+    "Kindergarten": "Kínder",
+    "1st": "1.er grado",
+    "2nd": "2.º grado",
+    "3rd": "3.er grado",
+    "4th": "4.º grado",
+    "5th": "5.º grado",
+    "6th": "6.º grado",
+    "7th": "7.º grado",
+    "8th": "8.º grado",
+    "9th": "9.º grado",
+    "10th": "10.º grado",
+    "11th": "11.º grado",
+    "12th": "12.º grado",
+    "Ungraded": "Sin grado"
+  },
+  "disabilityCategory": {
+    "Autism": "Autismo",
+    "DeafBlindness": "Sordoceguera",
+    "Deafness": "Sordera",
+    "DevelopmentalDelay": "Retraso en el desarrollo",
+    "EmotionalDisturbance": "Trastorno emocional",
+    "HearingImpairment": "Discapacidad auditiva",
+    "IntellectualDisability": "Discapacidad intelectual",
+    "MultipleDisabilities": "Discapacidades múltiples",
+    "OrthopedicImpairment": "Discapacidad ortopédica",
+    "OtherHealthImpairment": "Otro impedimento de salud",
+    "SpecificLearningDisability": "Discapacidad específica del aprendizaje",
+    "SpeechOrLanguageImpairment": "Trastorno del habla o del lenguaje",
+    "TraumaticBrainInjury": "Lesión cerebral traumática",
+    "VisualImpairment": "Discapacidad visual (incluida la ceguera)",
+    "Other": "Otra"
   }
 }

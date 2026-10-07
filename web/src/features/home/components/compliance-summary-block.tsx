@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { COMPLIANCE_SUMMARY_TILES } from '@/features/district-admin/lib/compliance-tiles';
 import type { ComplianceSummaryDto } from '@/features/district-admin/types';
@@ -9,15 +10,16 @@ import { rosterAttentionHref } from '../lib/roster-links';
 /** DistrictAdmin home teaser: the same counts as the compliance board with no
  * filters, each linking straight to the roster, plus a link to the full board. */
 export function ComplianceSummaryBlock({ summary }: { summary: ComplianceSummaryDto }) {
-  const denominator = `of ${summary.activeStudents} active students`;
+  const { t } = useTranslation('home');
+  const denominator = t('complianceSummary.denominator', { count: summary.activeStudents });
   return (
     <HomeSection
-      title="Compliance summary"
+      title={t('complianceSummary.heading')}
       data-testid="home-compliance-summary"
       action={
         <Link to="/educator/admin/compliance">
           <Button variant="secondary" size="sm" data-testid="home-compliance-summary-board-link">
-            View compliance board
+            {t('complianceSummary.viewBoard')}
           </Button>
         </Link>
       }

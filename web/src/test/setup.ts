@@ -2,7 +2,7 @@ import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 import { createElement, type ChangeEvent } from 'react';
 import type { RichTextEditorProps } from '@/components/ui/rich-text-editor';
-import i18n, { i18nReady } from '@/lib/i18n';
+import i18n, { i18nReady, featureNamespaces } from '@/lib/i18n';
 
 // Initialize i18next synchronously (from this suite's point of view) with
 // English before any test file renders a component that calls `t()` — the
@@ -13,6 +13,18 @@ import i18n, { i18nReady } from '@/lib/i18n';
 // `renderInSpanish` (`src/test/i18n-test-utils.tsx`).
 await i18nReady;
 await i18n.changeLanguage('en');
+// Every feature-level namespace (`children`, `home`, …) loads lazily, in
+// EITHER language — see `lib/i18n/index.ts`. Only the two shell namespaces
+// (`common`, `auth`) are bundled and therefore already loaded at this
+// point. Without this, the FIRST test in a worker to render a component
+// that calls `useTranslation('<feature namespace>')` would hit a real,
+// if brief, English load — react-i18next re-renders once it resolves, but
+// most existing tests assert synchronously right after `render()` (no
+// `findBy`/`waitFor`), so they'd see the raw `ns:key` text instead.
+// Preloading every known feature namespace here, once, up front, means
+// every test — in every file, in any order — sees it already loaded, the
+// same as the two bundled ones.
+await i18n.loadNamespaces(featureNamespaces);
 
 // Fail the test immediately on a genuinely missing translation key, instead
 // of relying on each Spanish-rendering test to separately regex-check the
@@ -32,6 +44,17 @@ await i18n.changeLanguage('en');
 i18n.options.saveMissing = true;
 i18n.options.missingKeyHandler = (lngs, ns, key, _fallbackValue, _updateMissing, opt) => {
   if (opt && typeof opt === 'object' && 'defaultValue' in opt && opt.defaultValue !== key) return;
+  const primaryLng = Array.isArray(lngs) ? lngs[0] : lngs;
+  // A feature-level namespace (anything but the bundled `common`/`auth`)
+  // loads lazily, in EITHER language — see `lib/i18n/index.ts`'s
+  // `localeLoaders`. The very first render of a component that calls
+  // `useTranslation('<that namespace>')` happens before that async load
+  // resolves (no Suspense boundary — `react: { useSuspense: false }`), so
+  // `t()` genuinely has nothing loaded to check yet; react-i18next
+  // re-renders once it resolves. That's a transient "not loaded yet", not a
+  // missing key, and must not fail the test — only a key still missing
+  // AFTER its namespace has loaded is a real bug.
+  if (!i18n.hasLoadedNamespace(ns, { lng: primaryLng })) return;
   const languages = Array.isArray(lngs) ? lngs.join(', ') : lngs;
   throw new Error(`[i18n] missing translation for "${ns}:${key}" (${languages})`);
 };

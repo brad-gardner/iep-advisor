@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
@@ -12,7 +13,8 @@ import { usePageTitle } from '@/hooks/use-page-title';
 type Status = 'loading' | 'ready' | 'submitting' | 'success' | 'error';
 
 export function AcceptLinkPage() {
-  usePageTitle('Accept school link');
+  const { t } = useTranslation('child-links');
+  usePageTitle(t('acceptLink.pageTitle'));
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
 
@@ -35,12 +37,12 @@ export function AcceptLinkPage() {
           setStatus('ready');
         } else {
           setStatus('error');
-          setErrorMessage(response.message || 'This link is invalid or has expired.');
+          setErrorMessage(response.message || t('acceptLink.invalidLink'));
         }
       } catch {
         if (active) {
           setStatus('error');
-          setErrorMessage('An error occurred while loading this link.');
+          setErrorMessage(t('acceptLink.loadError'));
         }
       }
     }
@@ -49,7 +51,7 @@ export function AcceptLinkPage() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [token, t]);
 
   // Missing token is derived at render time (no setState-in-effect needed).
   const isMissingToken = !token;
@@ -68,11 +70,11 @@ export function AcceptLinkPage() {
         setStatus('success');
       } else {
         setStatus('error');
-        setErrorMessage(response.message || 'Failed to accept this link.');
+        setErrorMessage(response.message || t('acceptLink.acceptFailed'));
       }
     } catch {
       setStatus('error');
-      setErrorMessage('An error occurred while accepting this link.');
+      setErrorMessage(t('acceptLink.acceptError'));
     }
   };
 
@@ -87,11 +89,11 @@ export function AcceptLinkPage() {
   return (
     <div className="max-w-md mx-auto py-12">
       <Card className="text-center">
-        <h1 className="font-serif mb-4">Link to Your School</h1>
+        <h1 className="font-serif mb-4">{t('acceptLink.heading')}</h1>
 
         {status === 'loading' && !isMissingToken && (
           <div className="flex justify-center py-6">
-            <Spinner label="Loading link…" />
+            <Spinner label={t('acceptLink.loadingLink')} />
           </div>
         )}
 
@@ -99,14 +101,29 @@ export function AcceptLinkPage() {
           <div className="space-y-5">
             <p className="text-sm text-brand-slate-600">
               {preview.schoolName ? (
-                <>
-                  <span className="font-medium text-brand-slate-800">{preview.schoolName}</span>{' '}
-                  invited you to connect{' '}
-                </>
+                <Trans
+                  t={t}
+                  i18nKey="acceptLink.invitedWithSchool"
+                  values={{ school: preview.schoolName, student: studentName }}
+                  tOptions={{ interpolation: { escapeValue: true } }}
+                  shouldUnescape
+                  components={{
+                    school: <span className="font-medium text-brand-slate-800" />,
+                    student: <span className="font-medium text-brand-slate-800" />,
+                  }}
+                />
               ) : (
-                'You were invited to connect '
+                <Trans
+                  t={t}
+                  i18nKey="acceptLink.invitedWithoutSchool"
+                  values={{ student: studentName }}
+                  tOptions={{ interpolation: { escapeValue: true } }}
+                  shouldUnescape
+                  components={{
+                    student: <span className="font-medium text-brand-slate-800" />,
+                  }}
+                />
               )}
-              <span className="font-medium text-brand-slate-800">{studentName}</span>.
             </p>
 
             <ChildLinkChoice
@@ -121,19 +138,21 @@ export function AcceptLinkPage() {
               className="w-full"
               data-testid="accept-link-submit"
             >
-              Accept &amp; Link
+              {t('acceptLink.acceptAndLink')}
             </Button>
           </div>
         )}
 
         {status === 'success' && (
           <div className="space-y-4">
-            <Notice variant="success" title="Linked!">
-              {studentName ? `${studentName} is now linked to your account.` : 'The student is now linked to your account.'}
+            <Notice variant="success" title={t('acceptLink.linkedTitle')}>
+              {studentName
+                ? t('acceptLink.linkedNamed', { name: studentName })
+                : t('acceptLink.linkedGeneric')}
             </Notice>
             <Link to={childHref}>
               <Button data-testid="accept-link-continue">
-                {accepted?.childProfileId ? 'View Child' : 'Go to Dashboard'}
+                {accepted?.childProfileId ? t('acceptLink.viewChild') : t('acceptLink.goToDashboard')}
               </Button>
             </Link>
           </div>
@@ -145,12 +164,12 @@ export function AcceptLinkPage() {
               variant="error"
               title={
                 isMissingToken
-                  ? 'No link token provided.'
-                  : errorMessage || 'Something went wrong'
+                  ? t('acceptLink.noToken')
+                  : errorMessage || t('acceptLink.genericError')
               }
             />
             <Link to="/dashboard">
-              <Button variant="secondary">Go to Dashboard</Button>
+              <Button variant="secondary">{t('acceptLink.goToDashboard')}</Button>
             </Link>
           </div>
         )}

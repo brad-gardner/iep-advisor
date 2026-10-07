@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { removeToken, setStoredUser, setToken } from '@/lib/auth';
+import { getStoredUser, removeToken, setStoredUser, setToken } from '@/lib/auth';
 import {
   getPreLoginLanguage,
   setPreLoginLanguage,
@@ -47,7 +47,7 @@ function makeUser(overrides: Partial<User> = {}): User {
 // value (not exposed by the real `LanguageSwitcher`, which only renders a
 // generic error message) for tests that need to assert on it directly.
 function LanguageProbe() {
-  const { setLanguage, user } = useAuth();
+  const { setLanguage, login, logout, user } = useAuth();
   const [lastResult, setLastResult] = useState<string | null>(null);
   return (
     <div>
@@ -55,6 +55,10 @@ function LanguageProbe() {
       <span data-testid="probe-result">{lastResult ?? 'none'}</span>
       <button onClick={() => void setLanguage('es').then((r) => setLastResult(JSON.stringify(r)))}>switch</button>
       <button onClick={() => void setLanguage('en').then((r) => setLastResult(JSON.stringify(r)))}>switch-en</button>
+      {/* Fake credentials: every test controls the resolved response via the
+          `authApi.login` mock, so the actual field values here never matter. */}
+      <button onClick={() => void login({ email: 'probe@example.com', password: 'x' })}>login</button>
+      <button onClick={() => logout()}>logout</button>
     </div>
   );
 }
@@ -368,5 +372,101 @@ describe('shared-device language carry-over (logout -> sign-in)', () => {
     await waitFor(() =>
       expect(authApi.updateProfile).toHaveBeenCalledWith({ preferredLanguage: 'es' })
     );
+  });
+});
+
+describe('todos/247: explicit pre-login choice is a one-time, one-visitor signal', () => {
+  let restoreBrowserLanguages: () => void;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    removeToken();
+    clearPreLoginLanguage();
+    clearLastDisplayLanguage();
+  });
+
+  afterEach(async () => {
+    removeToken();
+    clearPreLoginLanguage();
+    clearLastDisplayLanguage();
+    restoreBrowserLanguages?.();
+    await i18n.changeLanguage('en');
+  });
+
+  it("clears the explicit pre-login choice after sign-in, so a later null-preference account on the same device backfills from the browser, not the previous visitor's choice", async () => {
+    setPreLoginLanguage('es'); // someone on this (possibly shared) device explicitly chose Spanish pre-login
+    restoreBrowserLanguages = stubBrowserLanguages(['en-US']); // user B's browser, used only for B's backfill below
+
+    const userA = makeUser({ id: 1, email: 'a@example.com', preferredLanguage: null });
+    authApi.login.mockResolvedValueOnce({ success: true, data: { token: 'a-jwt', user: userA } });
+    authApi.updateProfile.mockResolvedValueOnce({
+      success: true,
+      data: { ...userA, preferredLanguage: 'es' },
+    });
+
+    const user = userEvent.setup();
+    renderProbe();
+    await screen.findByText('signed-out');
+
+    // User A signs in: the pre-login 'es' backs A's own backfill (expected —
+    // it really was chosen on this device before anyone signed in)...
+    await user.click(screen.getByRole('button', { name: 'login' }));
+    await waitFor(() =>
+      expect(authApi.updateProfile).toHaveBeenNthCalledWith(1, { preferredLanguage: 'es' })
+    );
+    // ...and is cleared immediately after, right after `syncLanguagePreference`
+    // read it — not before (it must still be there for A's own backfill to see).
+    await waitFor(() => expect(getPreLoginLanguage()).toBeNull());
+
+    await user.click(screen.getByRole('button', { name: 'logout' }));
+    await screen.findByText('signed-out');
+
+    // User B signs in next, on the same device, with no saved preference.
+    const userB = makeUser({ id: 2, email: 'b@example.com', preferredLanguage: null });
+    authApi.login.mockResolvedValueOnce({ success: true, data: { token: 'b-jwt', user: userB } });
+    authApi.updateProfile.mockResolvedValueOnce({
+      success: true,
+      data: { ...userB, preferredLanguage: 'en' },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'login' }));
+
+    // B's backfill must use the browser ('en'), never A's leftover 'es'.
+    await waitFor(() =>
+      expect(authApi.updateProfile).toHaveBeenNthCalledWith(2, { preferredLanguage: 'en' })
+    );
+  });
+
+  it('leaves the user signed out, with nothing written to the stored user, when logout runs while a language PUT is still in flight', async () => {
+    const signedInUser = makeUser({ preferredLanguage: 'en' });
+    setToken('a-jwt');
+    setStoredUser(JSON.stringify(signedInUser));
+    authApi.getCurrentUser.mockResolvedValue({ success: true, data: signedInUser });
+
+    let resolvePut!: (value: { success: true; data: User }) => void;
+    authApi.updateProfile.mockImplementation(
+      () => new Promise((resolve) => { resolvePut = resolve; })
+    );
+
+    const user = userEvent.setup();
+    renderProbe();
+    await screen.findByText('en'); // loadUser resolved
+
+    await user.click(screen.getByRole('button', { name: 'switch' })); // setLanguage('es') — PUT held open
+    await waitFor(() => expect(authApi.updateProfile).toHaveBeenCalledWith({ preferredLanguage: 'es' }));
+
+    // Sign out while that PUT is still unresolved.
+    await user.click(screen.getByRole('button', { name: 'logout' }));
+    await screen.findByText('signed-out');
+    expect(getStoredUser()).toBeNull(); // logout's removeToken() already cleared it
+
+    // Now let the slow PUT resolve, with a signed-in-looking payload.
+    resolvePut({ success: true, data: { ...signedInUser, preferredLanguage: 'es' } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Must still be signed out — the stale response must not resurrect a
+    // user with no token, nor write one back to storage.
+    expect(screen.getByTestId('probe-user')).toHaveTextContent('signed-out');
+    expect(getStoredUser()).toBeNull();
   });
 });

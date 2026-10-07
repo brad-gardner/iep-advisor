@@ -1,0 +1,49 @@
+{
+  "page": {
+    "pageTitle": "Suscripción",
+    "haveInviteCode": "¿Tiene un código de invitación?",
+    "redeemHere": "Canjéelo aquí"
+  },
+  "status": {
+    "active": "Activa",
+    "pastDue": "Pago atrasado",
+    "canceled": "Cancelada",
+    "expired": "Vencida",
+    "none": "Sin suscripción",
+    "analysesUsed": "{{count}} de {{limit}} análisis usados",
+    "manage": "Administrar suscripción",
+    "manageFailed": "No se pudo abrir el portal de facturación. Inténtelo de nuevo.",
+    "yourPlan": "Su plan",
+    "renews": "Se renueva el {{date}}",
+    "usage": "Uso",
+    "loadFailedTitle": "No se pudo cargar el estado de la suscripción"
+  },
+  "subscribeButton": {
+    "label": "Suscribirse — $50/año",
+    "startFailed": "No se pudo iniciar el pago. Inténtelo de nuevo."
+  },
+  "required": {
+    "title": "Se requiere una suscripción",
+    "description": "Suscríbase a IEP Advisor Pro para desbloquear esta función."
+  },
+  "cancelPage": {
+    "heading": "Pago cancelado",
+    "body": "No se preocupe: puede suscribirse cuando quiera.",
+    "back": "Volver a Suscripción"
+  },
+  "successPage": {
+    "heading": "¡Está suscrito!",
+    "body": "Gracias por suscribirse a IEP Advisor Pro. Ahora tiene acceso completo a todas las funciones.",
+    "goToDashboard": "Ir al panel"
+  },
+  "redeemPage": {
+    "pageTitle": "Canjear código de invitación",
+    "pageLayoutTitle": "Canjear código de invitación",
+    "description": "Ingrese el código de invitación de 8 caracteres que recibió para activar su suscripción.",
+    "successToast": "¡Código de invitación canjeado! Su suscripción ya está activa.",
+    "invalidCode": "Código de invitación inválido o vencido.",
+    "codeLabel": "Código de invitación",
+    "codePlaceholder": "ABCD1234",
+    "submit": "Canjear"
+  }
+}

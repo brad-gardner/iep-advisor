@@ -1,0 +1,35 @@
+{
+  "bell": {
+    "ariaLabelUnread": "Notificaciones, {{count}} sin leer",
+    "ariaLabelDefault": "Notificaciones",
+    "menuLabel": "Notificaciones",
+    "empty": "Aún no hay notificaciones.",
+    "unreadLive_one": "{{count}} notificación sin leer",
+    "unreadLive_other": "{{count}} notificaciones sin leer",
+    "seeAll": "Ver todas"
+  },
+  "notificationsPage": {
+    "pageTitle": "Notificaciones",
+    "markAllRead": "Marcar todas como leídas",
+    "loadFailed": "No se pudieron cargar las notificaciones",
+    "markReadFailed": "No se pudo marcar como leída",
+    "markAllReadSuccess": "Todas las notificaciones se marcaron como leídas",
+    "markAllFailed": "No se pudieron marcar todas como leídas",
+    "emptyTitle": "Aún no hay notificaciones",
+    "emptyDescription": "Las actualizaciones y recordatorios de reuniones aparecerán aquí.",
+    "emailFailedPrefix": "No se pudo enviar el correo: {{error}}",
+    "newBadge": "Nueva"
+  },
+  "adminFailures": {
+    "pageTitle": "Errores de correo de notificaciones",
+    "subtitle": "Notificaciones cuyo envío de correo falló.",
+    "loadFailed": "No se pudieron cargar los errores de correo",
+    "columnKind": "Tipo",
+    "columnTitle": "Título",
+    "columnError": "Error",
+    "columnCreated": "Creado",
+    "tableLabel": "Errores de correo",
+    "emptyTitle": "Sin errores de correo",
+    "emptyDescription": "Todos los correos de notificación se enviaron correctamente."
+  }
+}

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { KnowledgeBaseEntry } from '@/types/api';
@@ -9,6 +10,13 @@ interface KnowledgeBaseEntryCardProps {
 }
 
 export function KnowledgeBaseEntryCard({ entry, highlighted = false }: KnowledgeBaseEntryCardProps) {
+  // Only the chrome around this card is translated — `entry.title`,
+  // `entry.content`, `entry.legalReference`, `entry.state` and `entry.tags`
+  // are the article's own DB content and stay exactly as authored (future
+  // work; see the plan's knowledge-base article-translation follow-up). The
+  // note below is this phase's stand-in: tell a Spanish reader plainly that
+  // the article itself is still English.
+  const { t, i18n } = useTranslation('knowledge-base');
   return (
     <Card
       id={`kb-entry-${entry.id}`}
@@ -21,6 +29,12 @@ export function KnowledgeBaseEntryCard({ entry, highlighted = false }: Knowledge
       )}
 
       <h3 className="font-serif text-lg text-brand-slate-800 mb-2">{entry.title}</h3>
+
+      {i18n.resolvedLanguage === 'es' && (
+        <p className="text-xs italic text-brand-slate-500 mb-2" data-testid="kb-entry-english-note">
+          {t('entryCard.availableInEnglish')}
+        </p>
+      )}
 
       <p className="text-sm text-brand-slate-600 leading-relaxed mb-3">{entry.content}</p>
 

@@ -1,20 +1,22 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { PageLayout } from '@/components/ui/page-layout';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { SubscriptionStatusCard } from './subscription-status';
 
 export function SubscriptionPage() {
-  usePageTitle('Subscription');
+  const { t } = useTranslation('subscription');
+  usePageTitle(t('page.pageTitle'));
   return (
-    <PageLayout title="Subscription">
+    <PageLayout title={t('page.pageTitle')}>
       <div className="max-w-lg">
         <SubscriptionStatusCard />
       </div>
 
       <p className="text-sm text-brand-slate-500">
-        Have an invite code?{' '}
+        {t('page.haveInviteCode')}{' '}
         <Link to="/redeem-invite" className="text-brand-teal-500 hover:text-brand-teal-600 underline">
-          Redeem it here
+          {t('page.redeemHere')}
         </Link>
       </p>
     </PageLayout>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -13,7 +14,8 @@ import type { NotificationDto } from '../types';
 
 /** Platform admin: notifications where the email send failed, newest first. */
 export function AdminNotificationFailuresPage() {
-  usePageTitle('Notification email failures');
+  const { t } = useTranslation('notifications');
+  usePageTitle(t('adminFailures.pageTitle'));
   const [items, setItems] = useState<NotificationDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Bumped by the "Try again" button to re-run the load effect below.
@@ -29,28 +31,28 @@ export function AdminNotificationFailuresPage() {
           setItems(response.data);
           setError(null);
         } else {
-          setError(response.message ?? 'Could not load email failures');
+          setError(response.message ?? t('adminFailures.loadFailed'));
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load email failures'));
+        if (active) setError(apiErrorMessage(err, t('adminFailures.loadFailed')));
       }
     })();
     return () => {
       active = false;
     };
-  }, [retryToken]);
+  }, [retryToken, t]);
 
   const columns: TableColumn<NotificationDto>[] = [
-    { key: 'kind', header: 'Kind', cell: (n) => n.kind, sortValue: (n) => n.kind },
-    { key: 'title', header: 'Title', cell: (n) => n.title, sortValue: (n) => n.title },
+    { key: 'kind', header: t('adminFailures.columnKind'), cell: (n) => n.kind, sortValue: (n) => n.kind },
+    { key: 'title', header: t('adminFailures.columnTitle'), cell: (n) => n.title, sortValue: (n) => n.title },
     {
       key: 'error',
-      header: 'Error',
+      header: t('adminFailures.columnError'),
       cell: (n) => <span className="text-brand-danger-700">{n.emailError}</span>,
     },
     {
       key: 'created',
-      header: 'Created',
+      header: t('adminFailures.columnCreated'),
       align: 'right',
       cell: (n) => formatDate(n.createdAt),
       sortValue: (n) => n.createdAt,
@@ -58,19 +60,19 @@ export function AdminNotificationFailuresPage() {
   ];
 
   return (
-    <PageLayout title="Notification email failures" subtitle="Notifications where the email send failed.">
+    <PageLayout title={t('adminFailures.pageTitle')} subtitle={t('adminFailures.subtitle')}>
       {error && (
         <div role="alert">
           <Notice variant="error" title={error}>
-            <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
-              Try again
+            <Button size="sm" variant="secondary" onClick={() => setRetryToken((n) => n + 1)}>
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
       )}
       {!error && (
         <Table
-          label="Email failures"
+          label={t('adminFailures.tableLabel')}
           columns={columns}
           rows={items ?? []}
           rowKey={(n) => n.id}
@@ -79,8 +81,8 @@ export function AdminNotificationFailuresPage() {
           empty={
             <EmptyState
               icon={AlertTriangle}
-              title="No email failures"
-              description="Every notification email has sent successfully."
+              title={t('adminFailures.emptyTitle')}
+              description={t('adminFailures.emptyDescription')}
             />
           }
         />

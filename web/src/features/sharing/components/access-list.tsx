@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
 import type { ChildAccessEntry } from '@/types/api';
 import { getAccessList, revokeAccess } from '../api/sharing-api';
@@ -7,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/components/ui/toast';
+import { sharingRoleLabel } from '../lib/role-label';
 
 interface AccessListProps {
   childId: number;
@@ -14,6 +16,7 @@ interface AccessListProps {
 }
 
 export function AccessList({ childId, isOwner }: AccessListProps) {
+  const { t } = useTranslation('sharing');
   const [entries, setEntries] = useState<ChildAccessEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [revokingId, setRevokingId] = useState<number | null>(null);
@@ -45,7 +48,7 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
       if (response.success) {
         setRevokingId(null);
         await load();
-        show({ message: 'Access revoked', variant: 'success' });
+        show({ message: t('accessList.revokedToast'), variant: 'success' });
       }
     } catch {
       // handled by interceptor
@@ -65,7 +68,7 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
   if (entries.length === 0) {
     return (
       <p className="text-sm text-brand-slate-500 py-2">
-        No one else has access to this profile.
+        {t('accessList.empty')}
       </p>
     );
   }
@@ -73,7 +76,7 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
   return (
     <div className="space-y-2">
       {entries.map((entry) => {
-        const displayName = entry.userName || entry.userEmail || entry.inviteEmail || 'Unknown';
+        const displayName = entry.userName || entry.userEmail || entry.inviteEmail || t('accessList.unknownName');
         const displayEmail = entry.userEmail || entry.inviteEmail;
         const isEntryOwner = entry.role === 'owner';
 
@@ -95,13 +98,13 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
 
             <div className="flex items-center gap-2 shrink-0">
               {entry.isPending && (
-                <Badge variant="warning">Pending</Badge>
+                <Badge variant="warning">{t('accessList.pendingBadge')}</Badge>
               )}
               {isEntryOwner ? (
-                <Badge variant="success">Owner</Badge>
+                <Badge variant="success">{sharingRoleLabel(entry.role)}</Badge>
               ) : (
                 <Badge variant="neutral">
-                  {entry.role.charAt(0).toUpperCase() + entry.role.slice(1)}
+                  {sharingRoleLabel(entry.role)}
                 </Badge>
               )}
               {isOwner && !isEntryOwner && (
@@ -109,7 +112,7 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
                   variant="danger"
                   className="!px-2 !py-1"
                   onClick={() => setRevokingId(entry.id)}
-                  aria-label={`Revoke access for ${displayName}`}
+                  aria-label={t('accessList.revokeAriaLabel', { name: displayName })}
                   data-testid="revoke-access"
                 >
                   <Trash2 className="w-3.5 h-3.5" strokeWidth={1.8} aria-hidden="true" />
@@ -122,9 +125,9 @@ export function AccessList({ childId, isOwner }: AccessListProps) {
 
       <ConfirmDialog
         open={revokingId !== null}
-        title="Revoke access"
-        message="They will immediately lose access to this child's profile. You can re-invite them later."
-        confirmLabel="Revoke access"
+        title={t('accessList.revokeDialogTitle')}
+        message={t('accessList.revokeDialogMessage')}
+        confirmLabel={t('accessList.revokeDialogTitle')}
         loading={isRevoking}
         onConfirm={confirmRevoke}
         onCancel={() => setRevokingId(null)}

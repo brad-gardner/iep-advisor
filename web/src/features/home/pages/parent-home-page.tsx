@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
@@ -24,22 +25,23 @@ import type { HomeMeetingDto, ParentNextMeetingDto } from '../types';
  * dashboard body unchanged (see `LegacyParentHome`).
  */
 export function ParentHomePage() {
+  const { t } = useTranslation('home');
   const { user } = useAuth();
   const { home, isLoading, error, retry } = useHome();
   // Reflects a successful RSVP into the rendered next-meeting card without a
   // full home refetch. Reset whenever the underlying meeting id changes.
   const [meetingOverride, setMeetingOverride] = useState<ParentNextMeetingDto | null>(null);
 
-  const title = `Welcome, ${user?.firstName ?? ''}`.trim();
-  usePageTitle(title || 'Home');
+  const title = t('parentPage.welcome', { name: user?.firstName ?? '' }).trim();
+  usePageTitle(title || t('parentPage.home'));
 
   if (isLoading) {
     return (
       <PageLayout title={title}>
-        <div className="space-y-6" role="status" aria-label="Loading your home">
+        <div className="space-y-6" role="status" aria-label={t('parentPage.loadingAriaLabel')}>
           <Skeleton className="h-40 w-full" />
           <Skeleton className="h-40 w-full" />
-          <span className="sr-only">Loading…</span>
+          <span className="sr-only">{t('parentPage.loading')}</span>
         </div>
       </PageLayout>
     );
@@ -50,9 +52,9 @@ export function ParentHomePage() {
       <PageLayout title={title}>
         <Card data-testid="parent-home-error">
           <div role="alert">
-            <Notice variant="error" title={error ?? "Couldn't load your home"}>
+            <Notice variant="error" title={error ?? t('errors.loadFailedTitle')}>
               <Button variant="secondary" className="mt-2" onClick={retry} data-testid="parent-home-retry">
-                Try again
+                {t('common:ui.tryAgain')}
               </Button>
             </Notice>
           </div>
@@ -95,7 +97,7 @@ export function ParentHomePage() {
           />
         ) : (
           <Card data-testid="parent-home-next-meeting-empty">
-            <EmptyHint>No upcoming meetings scheduled.</EmptyHint>
+            <EmptyHint>{t('parentPage.noUpcomingMeetings')}</EmptyHint>
           </Card>
         )}
 

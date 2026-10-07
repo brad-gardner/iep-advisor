@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Bell } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,8 @@ import { useNotificationsContext } from '../hooks/use-notifications-context';
 import type { NotificationDto } from '../types';
 
 export function NotificationsPage() {
-  usePageTitle('Notifications');
+  const { t } = useTranslation('notifications');
+  usePageTitle(t('notificationsPage.pageTitle'));
   const { show: showToast } = useToast();
   // The sidebar bell shares this same count (see `NotificationsProvider`) —
   // refreshed below after a successful mark-read/mark-all so the badge in
@@ -40,16 +42,16 @@ export function NotificationsPage() {
           setItems(response.data.items);
           setError(null);
         } else {
-          setError(response.message ?? 'Could not load notifications');
+          setError(response.message ?? t('notificationsPage.loadFailed'));
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load notifications'));
+        if (active) setError(apiErrorMessage(err, t('notificationsPage.loadFailed')));
       }
     })();
     return () => {
       active = false;
     };
-  }, [retryToken]);
+  }, [retryToken, t]);
 
   const handleMarkRead = async (notification: NotificationDto) => {
     if (notification.readAt) return;
@@ -61,7 +63,7 @@ export function NotificationsPage() {
       );
       refreshUnreadCount();
     } catch (err) {
-      showToast({ message: apiErrorMessage(err, 'Could not mark as read'), variant: 'error' });
+      showToast({ message: apiErrorMessage(err, t('notificationsPage.markReadFailed')), variant: 'error' });
     }
   };
 
@@ -71,13 +73,13 @@ export function NotificationsPage() {
       const response = await markAllNotificationsRead();
       if (response.success) {
         setItems((prev) => prev?.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })) ?? prev);
-        showToast({ message: 'All notifications marked read', variant: 'success' });
+        showToast({ message: t('notificationsPage.markAllReadSuccess'), variant: 'success' });
         refreshUnreadCount();
       } else {
-        showToast({ message: response.message ?? 'Could not mark all as read', variant: 'error' });
+        showToast({ message: response.message ?? t('notificationsPage.markAllFailed'), variant: 'error' });
       }
     } catch (err) {
-      showToast({ message: apiErrorMessage(err, 'Could not mark all as read'), variant: 'error' });
+      showToast({ message: apiErrorMessage(err, t('notificationsPage.markAllFailed')), variant: 'error' });
     } finally {
       setMarkingAll(false);
     }
@@ -87,7 +89,7 @@ export function NotificationsPage() {
 
   return (
     <PageLayout
-      title="Notifications"
+      title={t('notificationsPage.pageTitle')}
       actions={
         <Button
           variant="secondary"
@@ -97,15 +99,15 @@ export function NotificationsPage() {
           disabled={!hasUnread}
           data-testid="notifications-mark-all-read"
         >
-          Mark all read
+          {t('notificationsPage.markAllRead')}
         </Button>
       }
     >
       {error && (
         <div role="alert">
           <Notice variant="error" title={error}>
-            <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
-              Try again
+            <Button size="sm" variant="secondary" onClick={() => setRetryToken((n) => n + 1)}>
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
@@ -122,8 +124,8 @@ export function NotificationsPage() {
       {!error && items !== null && items.length === 0 && (
         <EmptyState
           icon={Bell}
-          title="No notifications yet"
-          description="Meeting updates and reminders will show up here."
+          title={t('notificationsPage.emptyTitle')}
+          description={t('notificationsPage.emptyDescription')}
         />
       )}
 
@@ -141,10 +143,12 @@ export function NotificationsPage() {
                     <p className="mt-1 text-sm text-brand-slate-600">{n.body}</p>
                     <p className="mt-1 text-xs text-brand-slate-500">{formatDate(n.createdAt)}</p>
                     {n.emailError && (
-                      <p className="mt-1 text-xs text-brand-danger-600">Email failed: {n.emailError}</p>
+                      <p className="mt-1 text-xs text-brand-danger-600">
+                        {t('notificationsPage.emailFailedPrefix', { error: n.emailError })}
+                      </p>
                     )}
                   </div>
-                  {!n.readAt && <Badge variant="info">New</Badge>}
+                  {!n.readAt && <Badge variant="info">{t('notificationsPage.newBadge')}</Badge>}
                 </div>
               </Card>
             );

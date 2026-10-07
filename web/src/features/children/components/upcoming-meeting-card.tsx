@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ const inviteBadgeVariant: Record<InviteStatus, 'success' | 'error' | 'warning' |
 /** Parent child-overview card: the child's next scheduled meeting with
  * Accept/Decline/Tentative RSVP buttons. Renders nothing if there is none. */
 export function UpcomingMeetingCard({ childId }: { childId: number }) {
+  const { t } = useTranslation('children');
   // `undefined` = loading, `null` = loaded with nothing upcoming.
   const [meeting, setMeeting] = useState<MeetingDto | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -60,16 +62,16 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
           setMeeting(nextUpcoming(response.data));
           setError(null);
         } else {
-          setError(response.message ?? 'Could not load upcoming meetings');
+          setError(response.message ?? t('upcomingMeeting.loadError'));
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load upcoming meetings'));
+        if (active) setError(apiErrorMessage(err, t('upcomingMeeting.loadError')));
       }
     })();
     return () => {
       active = false;
     };
-  }, [childId, retryToken]);
+  }, [childId, retryToken, t]);
 
   const handleRsvp = async (status: InviteStatus) => {
     if (!meeting) return;
@@ -78,9 +80,9 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
     try {
       const response = await rsvpToMeeting(meeting.id, { status });
       if (response.success && response.data) setMeeting(response.data);
-      else setRsvpError(response.message ?? 'Could not record your response');
+      else setRsvpError(response.message ?? t('upcomingMeeting.rsvpError'));
     } catch (err) {
-      setRsvpError(apiErrorMessage(err, 'Could not record your response'));
+      setRsvpError(apiErrorMessage(err, t('upcomingMeeting.rsvpError')));
     } finally {
       setResponding(null);
     }
@@ -91,8 +93,8 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
       <Card data-testid="upcoming-meeting-error">
         <div role="alert">
           <Notice variant="error" title={error}>
-            <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
-              Try again
+            <Button size="sm" variant="secondary" onClick={() => setRetryToken((n) => n + 1)}>
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
@@ -106,7 +108,7 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
     <Card data-testid="upcoming-meeting-card">
       <div className="mb-2 flex items-center gap-2">
         <Calendar className="h-4 w-4 text-brand-teal-500" strokeWidth={1.8} aria-hidden="true" />
-        <h2 className="font-serif text-base text-brand-slate-800">Upcoming meeting</h2>
+        <h2 className="font-serif text-base text-brand-slate-800">{t('upcomingMeeting.heading')}</h2>
       </div>
       <p className="font-medium text-brand-slate-800">{meeting.title || meeting.type}</p>
       <p className="text-sm text-brand-slate-600">{formatMeetingWhen(meeting.startsAtUtc, meeting.durationMinutes)}</p>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { apiErrorMessage } from '@/lib/api-error';
 import { getHome } from '../api/home-api';
 import type { HomeDto } from '../types';
@@ -19,6 +20,7 @@ interface UseHomeResult {
  * fetch behind the existing error until it resolves.
  */
 export function useHome(): UseHomeResult {
+  const { t } = useTranslation('home');
   const [home, setHome] = useState<HomeDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Bumped by the "Try again" button to re-run the load effect below.
@@ -34,16 +36,16 @@ export function useHome(): UseHomeResult {
           setHome(response.data);
           setError(null);
         } else {
-          setError(response.message ?? 'Could not load your home');
+          setError(response.message ?? t('errors.loadFailed'));
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load your home'));
+        if (active) setError(apiErrorMessage(err, t('errors.loadFailed')));
       }
     })();
     return () => {
       active = false;
     };
-  }, [retryToken]);
+  }, [retryToken, t]);
 
   return {
     home,

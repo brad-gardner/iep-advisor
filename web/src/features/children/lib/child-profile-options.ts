@@ -26,6 +26,9 @@ import {
   DISABILITY_CATEGORIES,
   DISABILITY_CATEGORY_LABELS,
 } from "@/features/educator/types";
+import i18n from "@/lib/i18n";
+import { gradeLevelLabel } from "@/lib/grade-level-label";
+import { disabilityCategoryLabel } from "@/lib/disability-category-label";
 
 export interface ChildProfileOption {
   value: string;
@@ -111,7 +114,11 @@ export function normalizeGradeLevel(value: string | null | undefined): string {
 export function buildGradeLevelOptions(
   currentValue: string | null | undefined,
 ): ChildProfileOption[] {
-  return buildOptions(GRADE_LEVEL_OPTIONS, normalizeGradeLevel(currentValue));
+  return buildOptions(
+    GRADE_LEVEL_OPTIONS,
+    normalizeGradeLevel(currentValue),
+    gradeLevelLabel,
+  );
 }
 
 // ------------------------------------------------------------ Disability category
@@ -197,6 +204,7 @@ export function buildDisabilityCategoryOptions(
   return buildOptions(
     DISABILITY_CATEGORY_OPTIONS,
     normalizeDisabilityCategory(currentValue),
+    disabilityCategoryLabel,
   );
 }
 
@@ -205,10 +213,11 @@ export function buildDisabilityCategoryOptions(
 function buildOptions(
   canonicalOptions: readonly string[],
   normalizedCurrentValue: string,
+  labelFor: (value: string) => string,
 ): ChildProfileOption[] {
   const options: ChildProfileOption[] = [
-    { value: "", label: "Not set" },
-    ...canonicalOptions.map((value) => ({ value, label: value })),
+    { value: "", label: i18n.t("common:ui.notSet") },
+    ...canonicalOptions.map((value) => ({ value, label: labelFor(value) })),
   ];
 
   if (
@@ -217,7 +226,9 @@ function buildOptions(
   ) {
     options.push({
       value: normalizedCurrentValue,
-      label: `${normalizedCurrentValue} (current value)`,
+      label: i18n.t("common:ui.currentValueSuffix", {
+        value: normalizedCurrentValue,
+      }),
     });
   }
 

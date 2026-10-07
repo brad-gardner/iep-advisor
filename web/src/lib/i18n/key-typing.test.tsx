@@ -1,4 +1,3 @@
-import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { Trans, useTranslation } from 'react-i18next';
 import i18n from './index';
@@ -17,10 +16,15 @@ import i18n from './index';
  * silently becoming `any` (and therefore un-typo-checkable) without any
  * other test noticing.
  *
- * JSX syntax needs a `.tsx` file, so `<Trans i18nKey="..." />` is written
- * as the equivalent `createElement(Trans, { i18nKey: '...' })` here to stay
- * in `.ts` (this file also runs as an ordinary Vitest file — see the inert
- * `describe`/`it` below — so it needs to load like any other test module).
+ * `.tsx`, not `.ts` (phase 2): the `Trans` canary below needs real JSX —
+ * `React.createElement(Trans, { i18nKey: '...', ns: 'common' })` does NOT
+ * get the same per-element generic inference JSX syntax does, so with a
+ * LAZY, loosely-typed feature namespace now in `CustomTypeOptions`
+ * (`LazyNamespaces` in `types.d.ts` — `children`, as of phase 2;
+ * `Record<string, string>` accepts any key), `createElement`'s inference
+ * fell back to the widest namespace it could satisfy and the canary went
+ * vacuously green even with an explicit `ns` prop pinned. Actual JSX
+ * resolves `Ns` from the `ns` attribute correctly.
  */
 export function _keyTypingCanary_doNotCall(): void {
   // @ts-expect-error -- unknown key in the default ('common') namespace must not type-check
@@ -33,8 +37,23 @@ export function _keyTypingCanary_doNotCall(): void {
   }
   void useAuthCanary;
 
-  // @ts-expect-error -- unknown i18nKey must not type-check
-  createElement(Trans, { i18nKey: '__missing__' });
+  // `ns` is explicit (rather than relying on the default namespace) so this
+  // stays pinned to a namespace that's still STRICTLY typed — `common` —
+  // rather than resolving across every namespace including a loose,
+  // lazy-feature one (see the file doc comment above).
+  // @ts-expect-error -- unknown i18nKey in the strictly-typed 'common' namespace must not type-check
+  <Trans i18nKey="__missing__" ns="common" />;
+
+  function useChildrenCanary() {
+    const { t } = useTranslation('children');
+    // A lazy, loosely-typed feature namespace accepts ANY string key at
+    // compile time by design (see `types.d.ts`'s `LazyNamespaces`) — this is
+    // NOT wrapped in `@ts-expect-error`; it documents that this line is
+    // SUPPOSED to compile, so a future tightening of `LazyNamespaces` that
+    // breaks it is caught by a normal `tsc` error here, not silently.
+    return t('this key does not exist either, and that is fine for now');
+  }
+  void useChildrenCanary;
 }
 
 describe('i18n key typing canary', () => {

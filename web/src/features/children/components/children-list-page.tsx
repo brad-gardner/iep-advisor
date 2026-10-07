@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Users, Plus } from "lucide-react";
 import { useChildren } from "../hooks/use-children";
 import { createChild } from "../api/children-api";
@@ -13,10 +14,13 @@ import { PageLayout } from "@/components/ui/page-layout";
 import { useToast } from "@/components/ui/toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { SharedBadge } from "@/features/sharing/components/shared-badge";
+import { gradeLevelLabel } from "@/lib/grade-level-label";
+import { disabilityCategoryLabel } from "@/lib/disability-category-label";
 import type { CreateChildProfileRequest } from "@/types/api";
 
 export function ChildrenListPage() {
-  usePageTitle("Your Children");
+  const { t } = useTranslation("children");
+  usePageTitle(t("list.pageTitle"));
   const { children, isLoading, reload } = useChildren();
   const { show: showToast } = useToast();
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -27,49 +31,49 @@ export function ChildrenListPage() {
       if (response.success) {
         await reload();
         setIsAddOpen(false);
-        showToast({ message: "Child profile added", variant: "success" });
+        showToast({ message: t("list.toastCreated"), variant: "success" });
         return { success: true };
       }
       return {
         success: false,
-        error: response.message || "Failed to create child profile",
+        error: response.message || t("list.createFailed"),
       };
     } catch {
-      return { success: false, error: "An error occurred" };
+      return { success: false, error: t("errors.generic") };
     }
   };
 
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading children…" />
+        <Spinner label={t("dashboard.loadingChildren")} />
       </div>
     );
   }
 
   return (
     <PageLayout
-      title="Your Children"
+      title={t("list.pageTitle")}
       actions={
         <Button
           onClick={() => setIsAddOpen(true)}
           data-testid="add-child-button"
         >
           <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-          Add Child
+          {t("list.addChild")}
         </Button>
       }
     >
       {children.length === 0 ? (
         <EmptyState
           icon={Users}
-          title="No child profiles yet."
+          title={t("list.emptyTitle")}
           action={
             <Button
               onClick={() => setIsAddOpen(true)}
               data-testid="add-first-child-button"
             >
-              Add Your First Child
+              {t("list.addFirstChild")}
             </Button>
           }
           data-testid="children-empty-state"
@@ -91,9 +95,11 @@ export function ChildrenListPage() {
                   </div>
                 )}
                 <div className="mt-2 flex flex-wrap gap-3 text-xs text-brand-slate-500">
-                  {child.gradeLevel && <span>Grade: {child.gradeLevel}</span>}
+                  {child.gradeLevel && (
+                    <span>{t("list.gradePrefix", { grade: gradeLevelLabel(child.gradeLevel) })}</span>
+                  )}
                   {child.disabilityCategory && (
-                    <span>{child.disabilityCategory}</span>
+                    <span>{disabilityCategoryLabel(child.disabilityCategory)}</span>
                   )}
                   {child.schoolDistrict && <span>{child.schoolDistrict}</span>}
                 </div>
@@ -106,13 +112,13 @@ export function ChildrenListPage() {
       <Drawer
         open={isAddOpen}
         onClose={() => setIsAddOpen(false)}
-        title="Add child"
+        title={t("list.addChildDrawerTitle")}
         size="lg"
         data-testid="add-child-drawer"
       >
         <ChildForm
           onSubmit={handleCreate}
-          submitLabel="Create Profile"
+          submitLabel={t("list.createProfile")}
           embedded
         />
       </Drawer>
