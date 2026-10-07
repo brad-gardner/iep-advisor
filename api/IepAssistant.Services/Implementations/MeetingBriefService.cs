@@ -77,14 +77,19 @@ public class MeetingBriefService : IMeetingBriefService
         var row = await _context.MeetingBriefs.AsNoTracking().FirstOrDefaultAsync(b => b.MeetingId == meetingId, ct);
         if (row == null)
             // Multilingual plan phase 5 review fix P2-2: NotFound (404), not Validation (400) — this is
-            // a deliberate status change. "Nothing generated yet, POST .../brief to generate it" was
-            // always meant to be a 404 (IMeetingBriefService.GetAsync's own doc comment already says
-            // "mapped to 404"), so the web client's empty/Generate state can key off a real 404. The
-            // pre-existing 400 was a bug introduced when this failure was given an explicit ErrorKind,
-            // not an intentional contract to preserve.
+            // a deliberate status change. On main this failure carried no explicit ErrorKind, so
+            // MapServiceFailure fell back to its English-substring heuristic; the message ("No brief
+            // has been generated for this meeting yet.") doesn't contain "not found", so that fallback
+            // mapped it to 400 and the web client's empty/Generate state never triggered. 404 (matching
+            // IMeetingBriefService.GetAsync's own doc comment, "mapped to 404") is the intended fix.
             return ServiceResult<MeetingBriefModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["MeetingBrief.NoBriefYet"]);
 
-        var model = Deserialize(row.BriefJson) ?? new MeetingBriefModel { MeetingId = meetingId, GeneratedAt = row.GeneratedAt };
+        var model = Deserialize(row.BriefJson) ?? new MeetingBriefModel
+        {
+            MeetingId = meetingId,
+            GeneratedAt = row.GeneratedAt,
+            Disclaimer = _localizer["MeetingBrief.Disclaimer"]
+        };
         model.GeneratedLanguage = row.Language;
         return ServiceResult<MeetingBriefModel>.SuccessResult(model);
     }

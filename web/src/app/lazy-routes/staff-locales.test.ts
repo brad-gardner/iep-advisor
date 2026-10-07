@@ -18,46 +18,48 @@ import i18n from '@/lib/i18n';
 // happens once regardless, which is exactly what makes testing "absent,
 // then present, for every namespace at once" the right shape here).
 //
-// A spot-check per namespace (one real key's value), not a full snapshot of
-// each namespace's content — a snapshot here would just duplicate (and
-// drift from) the JSON files; `locale-parity.test.ts` already covers their
-// actual content exhaustively.
-const SPOT_CHECKS: Record<string, { path: string; value: unknown }> = {
-  educator: { path: 'studentsPage.title', value: 'Students' },
-  evaluation: { path: 'card.heading', value: 'Evaluation' },
-  'family-contact': { path: 'card.heading', value: 'Family contact' },
-  'meeting-brief': { path: 'page.title', value: 'Meeting brief' },
-  'meetings-staff': { path: 'decisionsPanel.heading', value: 'Decisions' },
-  obligations: { path: 'card.heading', value: 'Timeline' },
-  'document-authoring': { path: 'list.title', value: 'Documents' },
-};
+// Checks that the REGISTERED bundle deep-equals the actual on-disk JSON
+// (and that the JSON itself isn't accidentally empty) — not a hand-picked
+// spot-check value per namespace (the previous `SPOT_CHECKS` map), which
+// needed a new entry, by hand, every time a namespace was added. Reading
+// the same files `staff-locales.ts` itself globs, rather than hand-copying
+// one expected value per namespace, means adding a new staff namespace
+// needs nothing added HERE either — see `docs/i18n/README.md`'s "Adding a
+// new staff/admin namespace" steps. This doesn't duplicate
+// `locale-parity.test.ts` (which checks en/es key-shape PARITY across every
+// namespace, staff or not) — this file is the one place that proves the
+// registration MECHANISM itself (timing + content fidelity), independent of
+// what any particular key says.
+const staffEnModules = import.meta.glob('/src/locales/en/staff/*.json', { eager: true }) as Record<
+  string,
+  { default: Record<string, unknown> }
+>;
 
-function readPath(obj: unknown, path: string): unknown {
-  return path.split('.').reduce<unknown>((acc, key) => (acc as Record<string, unknown> | undefined)?.[key], obj);
+function namespaceOfBasename(path: string): string {
+  return path.slice(path.lastIndexOf('/') + 1, -'.json'.length);
 }
 
 // Discovered the same way `staff-locales.ts` discovers them — so a new
 // staff namespace is covered here automatically too, with nothing to add.
-const staffNamespaces = Object.keys(
-  import.meta.glob('/src/locales/en/staff/*.json', { eager: true })
-).map((path) => path.slice(path.lastIndexOf('/') + 1, -'.json'.length));
+const staffNamespaces = Object.keys(staffEnModules).map(namespaceOfBasename);
 
 describe('staff namespace registration (app/lazy-routes/staff-locales)', () => {
-  it('found every staff namespace this suite knows a spot-check for (keep SPOT_CHECKS in sync with locales/en/staff/*.json)', () => {
-    expect(new Set(staffNamespaces)).toEqual(new Set(Object.keys(SPOT_CHECKS)));
+  it('found at least one staff namespace to guard (sanity check the glob itself)', () => {
+    expect(staffNamespaces.length).toBeGreaterThan(0);
   });
 
   it.each(staffNamespaces)('%s is absent from i18n resources before the staff chunk registers it', (ns) => {
     expect(i18n.hasResourceBundle('en', ns)).toBe(false);
   });
 
-  it('registers every staff namespace once the staff chunk (its `staff-locales` entry) is imported', async () => {
+  it('registers every staff namespace, with content matching its on-disk JSON exactly, once the staff chunk (its `staff-locales` entry) is imported', async () => {
     await import('./staff-locales');
 
-    for (const ns of staffNamespaces) {
+    for (const [path, mod] of Object.entries(staffEnModules)) {
+      const ns = namespaceOfBasename(path);
+      expect(Object.keys(mod.default).length).toBeGreaterThan(0); // the fixture file itself isn't accidentally empty
       expect(i18n.hasResourceBundle('en', ns)).toBe(true);
-      const check = SPOT_CHECKS[ns];
-      expect(readPath(i18n.getResourceBundle('en', ns), check.path)).toBe(check.value);
+      expect(i18n.getResourceBundle('en', ns)).toEqual(mod.default);
     }
   });
 

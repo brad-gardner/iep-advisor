@@ -1,4 +1,5 @@
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import * as Sentry from '@sentry/react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -27,12 +28,36 @@ interface MainLayoutProps {
 // could otherwise ignore. `main.tsx`'s `vite:preloadError` listener already
 // retries once, automatically, before this ever renders; reaching here means
 // that retry didn't happen (a different render error) or already happened
-// once and the problem persists, so the only further remediation offered is
-// a manual reload rather than `resetError()` — `React.lazy`'s rejected
-// import promise is cached for the component's lifetime, so re-rendering the
-// same tree without a full reload would just throw again.
-function LazyRouteErrorFallback() {
+// once and the problem persists, so the only remediation offered directly in
+// the UI is a manual reload rather than `resetError()` — `React.lazy`'s
+// rejected import promise is cached for the component's lifetime, so
+// re-rendering the SAME route without a full reload would just throw again.
+//
+// Navigating AWAY, though, renders a DIFFERENT route's children — which the
+// Sentry boundary would otherwise never attempt, since once it's caught an
+// error it keeps showing this fallback regardless of how `children` changes,
+// until something explicitly calls `resetError()`. Without the effect below,
+// a broken route's error would stay plastered over every page the sidebar
+// still lets someone click through to, since `MainLayout` itself (and the
+// `Sentry.ErrorBoundary` wrapping its `children`) stays mounted across a
+// route change — only the `children` passed into it swap. Comparing the
+// CURRENT `useLocation().pathname` against the one captured when this
+// fallback first mounted (i.e. when the error was caught) and resetting the
+// moment it changes lets a navigation past the broken route render normally
+// again, with no `key` remount of the whole layout (which would also tear
+// down and rebuild the sidebar/notifications poll on every navigation, not
+// just a recovery from error).
+function LazyRouteErrorFallback({ resetError }: { resetError: () => void }) {
   const { t } = useTranslation('common');
+  const { pathname } = useLocation();
+  const pathnameWhenCaught = useRef(pathname);
+
+  useEffect(() => {
+    if (pathname !== pathnameWhenCaught.current) {
+      resetError();
+    }
+  }, [pathname, resetError]);
+
   return (
     <div
       className="flex flex-col items-center gap-3 py-12 text-center"
@@ -45,6 +70,24 @@ function LazyRouteErrorFallback() {
       </Button>
     </div>
   );
+}
+
+// A STABLE, module-level reference for `Sentry.ErrorBoundary`'s `fallback`
+// render-prop — never an inline arrow function in `MainLayout`'s own JSX.
+// Sentry's `ErrorBoundary.render()` uses a function `fallback` AS A REACT
+// COMPONENT TYPE (`React.createElement(fallback, props)`), so if a NEW
+// function value were passed on every `MainLayout` render (which an inline
+// arrow function here would be, since `MainLayout` itself re-renders every
+// time `children` changes — i.e. on every navigation), React would see a
+// different "component type" at that position each time and UNMOUNT the
+// previous fallback instance to mount a fresh one — silently discarding
+// `LazyRouteErrorFallback`'s `pathnameWhenCaught` ref the moment navigation
+// happens, which is exactly the one piece of state the reset-on-navigation
+// behavior above depends on. Keeping this function's identity fixed across
+// renders is what lets that ref (and the effect reading it) survive the
+// navigation that's supposed to trigger `resetError()`.
+function renderLazyRouteErrorFallback({ resetError }: { resetError: () => void }) {
+  return <LazyRouteErrorFallback resetError={resetError} />;
 }
 
 export function MainLayout({ children, wide }: MainLayoutProps) {
@@ -68,7 +111,7 @@ export function MainLayout({ children, wide }: MainLayoutProps) {
 
         <main className="md:ml-64">
           <div className={cn('mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-16 md:pt-8', wide ? 'max-w-[1400px]' : 'max-w-7xl')}>
-            <Sentry.ErrorBoundary fallback={<LazyRouteErrorFallback />}>{children}</Sentry.ErrorBoundary>
+            <Sentry.ErrorBoundary fallback={renderLazyRouteErrorFallback}>{children}</Sentry.ErrorBoundary>
           </div>
         </main>
       </div>

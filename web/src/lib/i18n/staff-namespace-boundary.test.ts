@@ -84,10 +84,27 @@ for (const [path, text] of Object.entries(allSourceModules)) {
 }
 
 /** Static `import ... from '...'`, `export ... from '...'`, and bare `import '...'`
- *  specifiers only — NOT `import(...)` (dynamic), which is the lazy-chunk boundary. */
+ *  specifiers only — NOT `import(...)` (dynamic), which is the lazy-chunk boundary.
+ *
+ *  `fromImportRe`'s middle section (`[^(;]*?`) deliberately EXCLUDES newlines
+ *  from neither of its two exclusions — it only excludes `(` (so a dynamic
+ *  `import(...)` call, which has no `from` clause anyway, can never be
+ *  mistaken for one by spanning into unrelated code that happens to contain
+ *  a later `from`) and `;` (a statement terminator — this codebase always
+ *  ends an import/export statement with one, so stopping there keeps the
+ *  match from ever crossing into a LATER, unrelated statement). Allowing
+ *  newlines through is exactly what lets this follow a multi-line named-
+ *  import clause:
+ *    import {
+ *      Foo,
+ *      Bar,
+ *    } from '@/some/module';
+ *  A real ES import/export clause (default name, `* as X`, or a `{ ... }`
+ *  list, in any combination) never itself contains a `(`, so excluding `(`
+ *  rather than excluding `\n` is what makes this safe to span lines with. */
 function staticImportSpecifiers(source: string): string[] {
   const specifiers: string[] = [];
-  const fromImportRe = /(?:^|\n)[^\n]*?\b(?:import|export)\b[^(;\n]*?\bfrom\s*['"]([^'"]+)['"]/g;
+  const fromImportRe = /\b(?:import|export)\b[^(;]*?\bfrom\s*['"]([^'"]+)['"]/g;
   const sideEffectImportRe = /(?:^|\n)\s*import\s*['"]([^'"]+)['"]/g;
   for (const re of [fromImportRe, sideEffectImportRe]) {
     let match: RegExpExecArray | null;
@@ -167,9 +184,58 @@ function usesStaffNamespace(source: string, ns: string): boolean {
   return new RegExp(`['"\`]${escaped}:`).test(code);
 }
 
+// Regression coverage for a real bug in the walk itself (not in what it
+// guards against): `fromImportRe` used to exclude `\n` from its middle
+// section, so it silently stopped following any import whose named-import
+// clause spans multiple lines — e.g.
+//   import {
+//     Foo,
+//     Bar,
+//   } from '@/some/module';
+// Prettier/this codebase's own style wraps a named-import list like that
+// routinely, so the OLD regex understated `eagerlyReachableFiles()` — a
+// file reachable only through one of these multi-line imports was
+// invisible to the walk, and any staff-namespace violation inside it would
+// have gone uncaught. These two tests isolate the regex fix itself (fixture
+// strings, not real files) from the "no violations" test below (which
+// exercises the fix against the real source tree).
+describe('staticImportSpecifiers (multi-line imports)', () => {
+  it('follows a multi-line named-import clause', () => {
+    const source = `import {\n  Foo,\n  Bar,\n} from '@/some/module';\n`;
+    expect(staticImportSpecifiers(source)).toEqual(['@/some/module']);
+  });
+
+  it('follows a multi-line `export ... from` clause', () => {
+    const source = `export {\n  Foo,\n} from './local-module';\n`;
+    expect(staticImportSpecifiers(source)).toEqual(['./local-module']);
+  });
+
+  it('still does not follow a dynamic import(), even a multi-line one', () => {
+    const source = `const mod = await import(\n  '@/some/lazy-module'\n);\n`;
+    expect(staticImportSpecifiers(source)).toEqual([]);
+  });
+
+  it('does not let a multi-line import cross into a later, unrelated statement', () => {
+    const source = `import {\n  Foo,\n} from '@/real-module';\nfunction f() {\n  return from(x);\n}\n`;
+    expect(staticImportSpecifiers(source)).toEqual(['@/real-module']);
+  });
+});
+
 describe('staff namespace boundary', () => {
   it('found at least one staff namespace to guard (sanity check the glob itself)', () => {
     expect(staffNamespaces.length).toBeGreaterThan(0);
+  });
+
+  it('the eager walk now reaches a real file ONLY reachable through a multi-line import (regression for the regex fix above)', () => {
+    // `features/auth/stores/auth-context.tsx` is reached from `main.tsx`
+    // only via `app/index.tsx` → `app/provider` → ... → `use-auth.ts` →
+    // this file, and its own first two imports (`@/types/api`,
+    // `../api/auth-api`) are themselves multi-line named-import clauses —
+    // so this file being present here proves the walk is actually
+    // exercising the fixed regex against real source, not just the
+    // isolated fixtures above.
+    const eager = eagerlyReachableFiles();
+    expect(eager.has('/src/features/auth/stores/auth-context.tsx')).toBe(true);
   });
 
   it('never calls useTranslation/t with a staff-only namespace from eagerly-reachable source', () => {
@@ -187,6 +253,14 @@ describe('staff namespace boundary', () => {
       }
     }
 
+    // Confirms the walk reaching MORE files now (including ones only
+    // reachable through a multi-line import — see the test above) still
+    // surfaces no real violation — only the allowlisted
+    // `lib/meeting-labels.ts` (a deliberate, confirmed-safe mix of an eager
+    // and a staff-only export in one file; see the allowlist's own doc
+    // comment) would ever be excluded, and it's excluded by name, not by
+    // suppressing a result here.
     expect(violations).toEqual([]);
+    expect([...ALLOWLIST]).toEqual(['/src/lib/meeting-labels.ts']);
   });
 });

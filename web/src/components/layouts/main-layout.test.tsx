@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import type { User } from '@/types/api';
 
 const useAuthMock = vi.fn();
@@ -110,6 +110,51 @@ describe('MainLayout', () => {
 
       expect(reload).toHaveBeenCalledTimes(1);
       Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+    });
+
+    it('resets and renders the new route normally after navigating away, instead of staying stuck on the old error', async () => {
+      // `MainLayout` itself (and the `Sentry.ErrorBoundary` wrapping its
+      // `children`) stays mounted across a route change — only `children`
+      // swaps — so this proves the boundary actually RESETS on navigation
+      // rather than continuing to show the stale fallback from the route
+      // that threw.
+      function NavigateAway() {
+        const navigate = useNavigate();
+        return (
+          <button onClick={() => navigate('/b')}>go to b</button>
+        );
+      }
+
+      render(
+        <MemoryRouter initialEntries={['/a']}>
+          <NavigateAway />
+          <Routes>
+            <Route
+              path="/a"
+              element={
+                <MainLayout>
+                  <Boom />
+                </MainLayout>
+              }
+            />
+            <Route
+              path="/b"
+              element={
+                <MainLayout>
+                  <p data-testid="page-b">Page B</p>
+                </MainLayout>
+              }
+            />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      expect(screen.getByTestId('lazy-route-error')).toBeInTheDocument();
+
+      screen.getByRole('button', { name: 'go to b' }).click();
+
+      expect(await screen.findByTestId('page-b')).toBeInTheDocument();
+      expect(screen.queryByTestId('lazy-route-error')).not.toBeInTheDocument();
     });
   });
 });

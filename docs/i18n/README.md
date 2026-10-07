@@ -318,6 +318,11 @@ the same way as every other namespace.
     `i18n.hasResourceBundle('en', ns)` is `false` before importing
     `./staff-locales`, and `true` after, for each one — proving every staff
     namespace truly isn't loaded until the shared registration module runs.
+    It then also asserts the REGISTERED bundle deep-equals the actual
+    `locales/en/staff/<ns>.json` content on disk (reading the same files
+    `staff-locales.ts` itself globs, not a hand-picked spot-check value per
+    namespace) — so a new staff namespace needs nothing added to this test
+    file either; it's covered automatically by the same glob.
   - A component test that renders a staff-namespace page DIRECTLY (not
     through the lazy route) must import `@/app/lazy-routes/staff-locales`
     for its side effect first, the same way a real lazy route chunk does —
@@ -346,11 +351,15 @@ follow):**
    as any namespace — glossary, `{{placeholders}}`, parity test).
 2. Add `import type En<Ns> from '@/locales/en/staff/<ns>.json';` to
    `lib/i18n/types.d.ts` and list `<ns>: typeof En<Ns>;` in `EnResources`.
-3. Nothing else to wire up — `app/lazy-routes/staff-locales.ts` discovers
-   every `locales/en/staff/*.json` file (including this new one)
-   automatically via its own `import.meta.glob`, and all three lazy area
-   barrels already import that one shared module. Skip straight to using
-   the namespace.
+3. Nothing else to wire up for the NAMESPACE itself — `app/lazy-routes/
+   staff-locales.ts` discovers every `locales/en/staff/*.json` file
+   (including this new one) automatically via its own `import.meta.glob`,
+   and all three existing lazy area barrels (`staff-routes.tsx`,
+   `district-admin-routes.tsx`, `platform-admin-routes.tsx`) already import
+   that one shared module. Skip straight to using the namespace — UNLESS
+   the page using it lives behind a brand-new FOURTH lazy area barrel (not
+   one of the three above); see the note at the end of "Staff namespaces
+   across areas" below for what that barrel itself must do.
 4. In the page/component, `useTranslation('<ns>')` (or `useTranslation(['<ns>',
    'common'])` to also reach `common:`) exactly as any other namespace.
 5. In that component's OWN tests, import `@/app/lazy-routes/staff-locales`
@@ -565,6 +574,8 @@ prerequisite for marketing Spanish, not for shipping it.
 ## Staff namespaces across areas
 
 `app/lazy-routes/staff-locales.ts` registers every staff/admin English namespace it finds under `locales/en/staff/*.json` (one eager `import.meta.glob`, not a hand-written import per namespace). All three lazy area chunks (staff, district-admin, platform-admin) import this one shared module, because shared staff components render across areas. A new staff namespace needs nothing added here or to an individual barrel — dropping its `en/staff/<ns>.json` file on disk is enough; the glob picks it up. Tests that render staff pages import this module directly.
+
+**Any new lazy area barrel must import `./staff-locales` too.** This is per-BARREL, not per-namespace: `staff-locales.ts` registering a namespace's English does nothing for a page unless something on that page's own lazy-chunk path imported `staff-locales.ts` for its side effect before the page renders — which is exactly what `staff-routes.tsx`/`district-admin-routes.tsx`/`platform-admin-routes.tsx` each do today. If a future phase adds a fourth lazy area (a new top-level `React.lazy` barrel under `app/lazy-routes/`, grouping some new set of routes the way those three group theirs) and any page in it uses a staff namespace, that new barrel file needs its own `import '@/app/lazy-routes/staff-locales';` at the top — otherwise every staff namespace it uses throws the `[i18n] unexpected backend request for en/<ns>` error the first time one of its pages renders (see "How English actually loads, then" above), since nothing on that barrel's own import path would have registered it. This is a one-line addition when it's needed; it needs no new line for a namespace added to an EXISTING barrel's area, which is the common case covered by the numbered steps above.
 
 ## Server-side AI language (Phase 3)
 

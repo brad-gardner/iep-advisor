@@ -3,7 +3,12 @@ import { initReactI18next } from 'react-i18next';
 import resourcesToBackend from 'i18next-resources-to-backend';
 import * as Sentry from '@sentry/react';
 import { detectInitialLanguage, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from './detect';
-import type { EnResources } from './types';
+// `types.d.ts` is not imported here: it augments `i18next`'s own
+// `CustomTypeOptions` (module augmentation), which applies across the whole
+// program once the file is included by `tsconfig.json` (`"include":
+// ["src"]`) — no explicit import needed, and nothing in this file
+// references `EnResources` as a type anymore (see
+// `registerEnglishNamespace`'s doc comment below for why).
 
 export const defaultNS = 'common';
 
@@ -184,13 +189,17 @@ i18next.on('failedLoading', (lng, ns, msg) => {
 // See `docs/i18n/README.md` ("Staff and admin namespaces") and
 // `app/lazy-routes/staff-locales.ts` for the full mechanism.
 //
-// Generic over `EnResources` (`types.d.ts`) rather than `(ns: string,
-// resource: Record<string, unknown>)` so a call site is checked against the
-// SAME strict per-namespace shape `useTranslation(ns)` is — passing
-// `evaluation.json`'s content for `ns: 'educator'`, or a namespace name
-// `EnResources` doesn't know about, is now a `tsc` error at the call site
-// instead of only surfacing later as a confusing runtime translation bug.
-export function registerEnglishNamespace<K extends keyof EnResources>(ns: K, resource: EnResources[K]): void {
+// `(ns: string, resource: Record<string, unknown>)`, not generic over
+// `EnResources` — `staff-locales.ts` (this function's only caller) already
+// casts both `ns` (`as keyof EnResources`, derived from a filename at
+// runtime) and `resource` (`as EnResources[typeof ns]`, from an
+// `import.meta.glob` match Vite can't type per-file) before calling in, so
+// a generic signature here checks nothing a plain one wouldn't — the
+// un-narrowed values are cast to fit BEFORE they ever reach this function,
+// not inferred from it. The real per-namespace strictness still comes from
+// `types.d.ts`'s `EnResources` wherever a namespace's keys are actually
+// read (every `useTranslation(ns)` call site).
+export function registerEnglishNamespace(ns: string, resource: Record<string, unknown>): void {
   i18next.addResourceBundle('en', ns, resource, true, true);
 }
 

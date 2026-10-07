@@ -1,5 +1,4 @@
 import { registerEnglishNamespace } from '@/lib/i18n';
-import type { EnResources } from '@/lib/i18n/types';
 
 // Registers every staff/admin English namespace found under
 // `locales/en/staff/*.json`, by namespace NAME (the filename) — one eager
@@ -30,14 +29,15 @@ function namespaceOfBasename(path: string): string {
 }
 
 for (const [path, mod] of Object.entries(staffEnModules)) {
-  const ns = namespaceOfBasename(path) as keyof EnResources;
-  // `mod.default`'s real shape is whatever `locales/en/staff/<ns>.json`
-  // happens to contain — the glob can't narrow it to the specific
-  // `EnResources[K]` a literal namespace name would get from a direct
-  // `import en<Ns> from '...'` (same reason `lib/i18n/index.ts`'s own
+  const ns = namespaceOfBasename(path);
+  // `registerEnglishNamespace` takes a plain `(ns: string, resource:
+  // Record<string, unknown>)` — `mod.default`'s real shape is whatever
+  // `locales/en/staff/<ns>.json` happens to contain, which the glob can't
+  // narrow any further (same reason `lib/i18n/index.ts`'s own
   // `resources.en` assembly isn't literally key-checked either, for the
   // eager parent namespaces). `types.d.ts`'s `EnResources` entry for this
-  // namespace is still what makes `useTranslation(ns)` itself strictly
-  // typed everywhere it's actually used.
-  registerEnglishNamespace(ns, mod.default as EnResources[typeof ns]);
+  // namespace is what makes `useTranslation(ns)` itself strictly typed
+  // everywhere it's actually used — this loop only needs to get the raw
+  // JSON registered under the right namespace NAME.
+  registerEnglishNamespace(ns, mod.default);
 }

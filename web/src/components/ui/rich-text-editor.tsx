@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState, type ComponentType } from 'react';
 import type { Editor } from '@tiptap/react';
+import { markBackgroundImportStart, markBackgroundImportEnd } from '@/lib/preload-error-reload';
 
 /**
  * Returns true when markdown text exceeds maxLength. Shared with forms that
@@ -83,12 +84,19 @@ let warmed = false;
  * carries the whole stack's first execution (several times the warm cost).
  * Safe to call repeatedly; only signed-in surfaces should call it, since it
  * downloads ~150 kB gzip that public pages never need.
+ *
+ * Marked as a background import (`markBackgroundImportStart`/`End`,
+ * `lib/preload-error-reload.ts`) for the duration of the fetch: this is a
+ * prefetch nobody is waiting on, so a failed/missing chunk here must never
+ * trigger that module's page-wide reload recovery the way a failed
+ * navigation route chunk should — see its doc comment.
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function warmRichTextEditor(): void {
   if (warmed) return;
   warmed = true;
   const run = () => {
+    markBackgroundImportStart();
     void loadImpl()
       .then((m) => {
         LoadedImpl = m.default;
@@ -96,7 +104,8 @@ export function warmRichTextEditor(): void {
       })
       .catch(() => {
         warmed = false; // let a later call retry after a transient chunk-load failure
-      });
+      })
+      .finally(markBackgroundImportEnd);
   };
   if (typeof window === 'undefined') return;
   // Safari has no requestIdleCallback; a short timer is the usual stand-in.

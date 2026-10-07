@@ -357,21 +357,29 @@ public sealed class IepAssistServiceTests : IDisposable
         var draftId = CreateDraft(s);
         var goalId = AddGoal(draftId, "Read 80 words per minute");
 
+        string esSystemPrompt;
         using (var _lang = CultureScope.For("es"))
         {
             using var ctx = CreateContext();
             var result = await CreateService(ctx).AssistGoalAsync(s.CollaboratorUserId, draftId, goalId, AssistKind.Rewrite);
             Assert.True(result.Success, result.Message);
             Assert.DoesNotContain("RESPONSE LANGUAGE", _claude.LastRequest!.SystemPrompt);
+            esSystemPrompt = _claude.LastRequest!.SystemPrompt;
         }
 
+        string enSystemPrompt;
         using (var _lang = CultureScope.For("en"))
         {
             using var ctx = CreateContext();
             var result = await CreateService(ctx).AssistGoalAsync(s.CollaboratorUserId, draftId, goalId, AssistKind.Rewrite);
             Assert.True(result.Success, result.Message);
             Assert.DoesNotContain("RESPONSE LANGUAGE", _claude.LastRequest!.SystemPrompt);
+            enSystemPrompt = _claude.LastRequest!.SystemPrompt;
         }
+
+        // Insertable suggestions stay English regardless of UI culture: the prompt itself must be
+        // byte-identical under Spanish and English, not merely free of a RESPONSE LANGUAGE line.
+        Assert.Equal(enSystemPrompt, esSystemPrompt);
     }
 
     [Fact]
