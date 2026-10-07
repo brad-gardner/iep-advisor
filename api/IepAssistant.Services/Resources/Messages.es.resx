@@ -399,6 +399,9 @@
   <data name="Api.InvalidRequest" xml:space="preserve">
     <value>Solicitud no válida</value>
   </data>
+  <data name="Api.InvalidRowVersion" xml:space="preserve">
+    <value>La versión de fila proporcionada no es base64 válido.</value>
+  </data>
   <data name="StudentWorkspaceApi.InvalidEntryKind" xml:space="preserve">
     <value>Tipo de entrada no válido.</value>
   </data>
@@ -419,6 +422,51 @@
   </data>
   <data name="Documents.DeletedSuccessfully" xml:space="preserve">
     <value>Documento eliminado correctamente.</value>
+  </data>
+  <data name="Documents.NoLongerEditable" xml:space="preserve">
+    <value>Este documento ya no se puede editar.</value>
+  </data>
+  <data name="Documents.OnlyDraftCanBeDeleted" xml:space="preserve">
+    <value>Solo se puede eliminar un documento en borrador.</value>
+  </data>
+  <data name="Documents.ConcurrencyConflict" xml:space="preserve">
+    <value>Este documento fue modificado por otra persona. Vuelva a cargarlo e inténtelo de nuevo.</value>
+  </data>
+  <data name="Documents.SharedDraftBlocksDelete" xml:space="preserve">
+    <value>Este documento se ha compartido con la familia y no se puede eliminar. Retire el recurso compartido primero.</value>
+  </data>
+  <data name="Documents.TooLargeToSave" xml:space="preserve">
+    <value>Este documento es demasiado grande para guardarse. Reduzca su contenido.</value>
+  </data>
+  <data name="Documents.PinnedVersionUnavailable" xml:space="preserve">
+    <value>No se pudo cargar la versión fijada de la plantilla.</value>
+  </data>
+  <data name="Documents.FieldMustBeFormattedText" xml:space="preserve">
+    <value>'{0}' debe ser texto con formato.</value>
+  </data>
+  <data name="Documents.FieldMustBeCheckbox" xml:space="preserve">
+    <value>'{0}' debe ser una casilla de verificación (verdadero/falso).</value>
+  </data>
+  <data name="Documents.FieldMustBeDate" xml:space="preserve">
+    <value>'{0}' debe ser una fecha.</value>
+  </data>
+  <data name="Documents.FieldMustBeValidDate" xml:space="preserve">
+    <value>'{0}' debe ser una fecha válida.</value>
+  </data>
+  <data name="Documents.FieldMustBeText" xml:space="preserve">
+    <value>'{0}' debe ser texto.</value>
+  </data>
+  <data name="Documents.FieldMustBeSupportedValue" xml:space="preserve">
+    <value>'{0}' debe tener un valor admitido.</value>
+  </data>
+  <data name="Documents.FieldMustBeTable" xml:space="preserve">
+    <value>'{0}' debe ser una tabla (lista de filas).</value>
+  </data>
+  <data name="Documents.InvalidTableRow" xml:space="preserve">
+    <value>'{0}' tiene una fila de tabla no válida.</value>
+  </data>
+  <data name="Documents.OwnerNotActiveTeamMember" xml:space="preserve">
+    <value>La persona responsable seleccionada para una fila en '{0}' no es un miembro activo del equipo del estudiante, por lo que no se guardó.</value>
   </data>
   <data name="IepDocuments.InvalidMeetingTypeDetailed" xml:space="preserve">
     <value>Tipo de reunión no válido. Debe ser: initial, annual_review, amendment o reevaluation.</value>
@@ -785,5 +833,446 @@
   </data>
   <data name="Home.WorkspaceNudge" xml:space="preserve">
     <value>Agregue sus fortalezas, intereses y metas a su espacio de autogestión.</value>
+  </data>
+  <data name="Educator.ProfileNotFound" xml:space="preserve">
+    <value>Perfil de educador no encontrado.</value>
+  </data>
+  <data name="Educator.FirstNameRequired" xml:space="preserve">
+    <value>El nombre del estudiante es obligatorio.</value>
+  </data>
+  <data name="Educator.SchoolRequiredChoose" xml:space="preserve">
+    <value>Se requiere una escuela. Elija una escuela para este estudiante.</value>
+  </data>
+  <data name="Educator.SchoolNotFound" xml:space="preserve">
+    <value>Escuela no encontrada.</value>
+  </data>
+  <data name="Educator.SchoolRequiredToCreate" xml:space="preserve">
+    <value>Se requiere una escuela para crear un estudiante.</value>
+  </data>
+  <data name="Educator.NoPermissionCreateOtherSchool" xml:space="preserve">
+    <value>No tiene permiso para crear un estudiante en otra escuela.</value>
+  </data>
+  <data name="Educator.DuplicateExternalId" xml:space="preserve">
+    <value>El ID del estudiante ya está en uso en este distrito.</value>
+  </data>
+  <data name="Educator.DateRangeOutOfBounds" xml:space="preserve">
+    <value>El intervalo de fechas solicitado está fuera de los límites permitidos.</value>
+  </data>
+  <data name="Educator.NoPermissionAccessStudent" xml:space="preserve">
+    <value>No tiene permiso para acceder a este estudiante.</value>
+  </data>
+  <data name="Educator.StudentNotFound" xml:space="preserve">
+    <value>Estudiante no encontrado.</value>
+  </data>
+  <data name="Educator.NoPermissionEditStudent" xml:space="preserve">
+    <value>No tiene permiso para editar a este estudiante.</value>
+  </data>
+  <data name="Educator.AlreadyExited" xml:space="preserve">
+    <value>El estudiante ya fue dado de baja.</value>
+  </data>
+  <data name="Educator.NoPermissionChangeStatus" xml:space="preserve">
+    <value>No tiene permiso para cambiar el estado de este estudiante.</value>
+  </data>
+  <data name="Educator.NoPermissionTransferStudents" xml:space="preserve">
+    <value>No tiene permiso para transferir estudiantes.</value>
+  </data>
+  <data name="Educator.NoPermissionTransferThisStudent" xml:space="preserve">
+    <value>No tiene permiso para transferir a este estudiante.</value>
+  </data>
+  <data name="Educator.AlreadyAtSchool" xml:space="preserve">
+    <value>El estudiante ya está en esa escuela.</value>
+  </data>
+  <data name="Educator.NoPermissionAssignCaseManagers" xml:space="preserve">
+    <value>No tiene permiso para asignar administradores de caso.</value>
+  </data>
+  <data name="Educator.ChooseAtLeastOneStudent" xml:space="preserve">
+    <value>Elija al menos un estudiante.</value>
+  </data>
+  <data name="Educator.ChooseAtMostStudents" xml:space="preserve">
+    <value>Elija como máximo {0} estudiantes a la vez.</value>
+  </data>
+  <data name="Educator.NoPermissionManageSelectedStudents" xml:space="preserve">
+    <value>No tiene permiso para gestionar a uno o más de los estudiantes seleccionados.</value>
+  </data>
+  <data name="Educator.NoPermissionAssignStaff" xml:space="preserve">
+    <value>No tiene permiso para asignar personal a este estudiante.</value>
+  </data>
+  <data name="Educator.NoPermissionManageStaff" xml:space="preserve">
+    <value>No tiene permiso para gestionar al personal de este estudiante.</value>
+  </data>
+  <data name="Educator.AccessGrantNotFound" xml:space="preserve">
+    <value>Concesión de acceso no encontrada.</value>
+  </data>
+  <data name="Educator.AccessAlreadyRevoked" xml:space="preserve">
+    <value>El acceso ya fue revocado.</value>
+  </data>
+  <data name="Educator.AccessRevoked" xml:space="preserve">
+    <value>Acceso revocado.</value>
+  </data>
+  <data name="Team.StaffMemberNotFound" xml:space="preserve">
+    <value>Miembro del personal no encontrado.</value>
+  </data>
+  <data name="Team.DistrictAdminNoAssignment" xml:space="preserve">
+    <value>Un administrador del distrito no necesita una asignación por estudiante.</value>
+  </data>
+  <data name="Team.NotAtSchool" xml:space="preserve">
+    <value>Ese miembro del personal no está en la escuela de este estudiante.</value>
+  </data>
+  <data name="Team.MemberNotFound" xml:space="preserve">
+    <value>Miembro del equipo no encontrado.</value>
+  </data>
+  <data name="Team.MemberAlreadyRemoved" xml:space="preserve">
+    <value>El miembro del equipo ya fue eliminado.</value>
+  </data>
+  <data name="Team.ChooseNewLeadFirst" xml:space="preserve">
+    <value>Elija primero un nuevo administrador de caso principal.</value>
+  </data>
+  <data name="Team.MemberRemoved" xml:space="preserve">
+    <value>Miembro del equipo eliminado.</value>
+  </data>
+  <data name="Team.NoPermissionManageTeam" xml:space="preserve">
+    <value>No tiene permiso para gestionar el equipo de este estudiante.</value>
+  </data>
+  <data name="Meetings.NoPermissionToSchedule" xml:space="preserve">
+    <value>No tiene permiso para programar una reunión para este estudiante.</value>
+  </data>
+  <data name="Meetings.StartsAtInvalid" xml:space="preserve">
+    <value>startsAtUtc no es válido.</value>
+  </data>
+  <data name="Meetings.InvalidTimeZone" xml:space="preserve">
+    <value>Zona horaria no válida.</value>
+  </data>
+  <data name="Meetings.DurationRange" xml:space="preserve">
+    <value>La duración debe estar entre {0} y {1} minutos.</value>
+  </data>
+  <data name="Meetings.TitleInvalidCharacters" xml:space="preserve">
+    <value>El título contiene caracteres no válidos.</value>
+  </data>
+  <data name="Meetings.LocationInvalidCharacters" xml:space="preserve">
+    <value>La ubicación contiene caracteres no válidos.</value>
+  </data>
+  <data name="Meetings.VideoLinkInvalid" xml:space="preserve">
+    <value>El enlace de video debe ser una URL http(s).</value>
+  </data>
+  <data name="Meetings.ParticipantUserOrEmailRequired" xml:space="preserve">
+    <value>Cada participante debe tener un usuario o una dirección de correo electrónico externa.</value>
+  </data>
+  <data name="Meetings.ParticipantInvalidCharacters" xml:space="preserve">
+    <value>El participante contiene caracteres no válidos.</value>
+  </data>
+  <data name="Meetings.ParticipantEmailInvalid" xml:space="preserve">
+    <value>La dirección de correo electrónico del participante no es válida.</value>
+  </data>
+  <data name="Meetings.ParticipantDuplicate" xml:space="preserve">
+    <value>Un participante aparece más de una vez.</value>
+  </data>
+  <data name="Meetings.NoPermissionToScheduleMeetings" xml:space="preserve">
+    <value>No tiene permiso para programar reuniones para este estudiante.</value>
+  </data>
+  <data name="Meetings.NoPermissionToViewStudentMeetings" xml:space="preserve">
+    <value>No tiene permiso para ver las reuniones de este estudiante.</value>
+  </data>
+  <data name="Meetings.MeetingNotFound" xml:space="preserve">
+    <value>Reunión no encontrada.</value>
+  </data>
+  <data name="Meetings.NoPermissionToUpdate" xml:space="preserve">
+    <value>No tiene permiso para actualizar esta reunión.</value>
+  </data>
+  <data name="Meetings.CannotUpdateCancelled" xml:space="preserve">
+    <value>No se puede actualizar una reunión cancelada.</value>
+  </data>
+  <data name="Meetings.NoPermissionToCancel" xml:space="preserve">
+    <value>No tiene permiso para cancelar esta reunión.</value>
+  </data>
+  <data name="Meetings.InvalidStatusValue" xml:space="preserve">
+    <value>El estado debe ser Scheduled, Held o Continued.</value>
+  </data>
+  <data name="Meetings.CannotChangeStatusCancelled" xml:space="preserve">
+    <value>No se puede cambiar el estado de una reunión cancelada.</value>
+  </data>
+  <data name="Meetings.AttendanceOnlyHeld" xml:space="preserve">
+    <value>La asistencia solo se puede registrar para una reunión realizada.</value>
+  </data>
+  <data name="Meetings.ParticipantNotFound" xml:space="preserve">
+    <value>Participante no encontrado en esta reunión.</value>
+  </data>
+  <data name="Templates.NoTemplateAvailable" xml:space="preserve">
+    <value>Todavía no hay una plantilla de documento disponible para este tipo de documento. Pida a un administrador que publique una.</value>
+  </data>
+  <data name="Templates.VersionNotFound" xml:space="preserve">
+    <value>Versión de la plantilla no encontrada.</value>
+  </data>
+  <data name="Templates.SectionNotFound" xml:space="preserve">
+    <value>Sección de la plantilla no encontrada.</value>
+  </data>
+  <data name="Templates.FieldNotFound" xml:space="preserve">
+    <value>Campo de la plantilla no encontrado.</value>
+  </data>
+  <data name="Templates.TemplateNotFound" xml:space="preserve">
+    <value>Plantilla no encontrada.</value>
+  </data>
+  <data name="Templates.NotDraft" xml:space="preserve">
+    <value>Solo se puede editar una versión en borrador. Primero cree un nuevo borrador a partir de la versión publicada.</value>
+  </data>
+  <data name="Templates.ConcurrencyConflict" xml:space="preserve">
+    <value>Esta plantilla fue modificada por otra persona. Vuelva a cargarla e inténtelo de nuevo.</value>
+  </data>
+  <data name="Templates.SectionTitleRequired" xml:space="preserve">
+    <value>El título de la sección es obligatorio.</value>
+  </data>
+  <data name="Templates.FieldLabelRequired" xml:space="preserve">
+    <value>La etiqueta del campo es obligatoria.</value>
+  </data>
+  <data name="Templates.NoDraftToPublish" xml:space="preserve">
+    <value>Esta plantilla no tiene una versión en borrador para publicar.</value>
+  </data>
+  <data name="Templates.AlreadyHasDraft" xml:space="preserve">
+    <value>Esta plantilla ya tiene una versión en borrador. Publíquela o descártela antes de crear otra.</value>
+  </data>
+  <data name="Templates.NoPublishedVersionToFork" xml:space="preserve">
+    <value>Esta plantilla no tiene una versión publicada en la cual basar un nuevo borrador.</value>
+  </data>
+  <data name="Templates.SectionOrderInvalid" xml:space="preserve">
+    <value>El orden de las secciones debe incluir cada sección exactamente una vez.</value>
+  </data>
+  <data name="Templates.FieldOrderInvalid" xml:space="preserve">
+    <value>El orden de los campos debe incluir cada campo exactamente una vez.</value>
+  </data>
+  <data name="EvaluationCases.Permission" xml:space="preserve">
+    <value>No tiene permiso para acceder al caso de evaluación de este estudiante.</value>
+  </data>
+  <data name="EvaluationCases.AlreadyHasOpenCase" xml:space="preserve">
+    <value>Este estudiante ya tiene un caso de evaluación abierto.</value>
+  </data>
+  <data name="EvaluationCases.NoOpenCase" xml:space="preserve">
+    <value>Este estudiante no tiene un caso de evaluación abierto.</value>
+  </data>
+  <data name="EvaluationCases.CaseNoLongerOpen" xml:space="preserve">
+    <value>Este caso de evaluación ya no está abierto.</value>
+  </data>
+  <data name="EvaluationCases.ConsentMustBePdf" xml:space="preserve">
+    <value>El documento de consentimiento debe ser un PDF.</value>
+  </data>
+  <data name="EvaluationCases.ConsentTooLarge" xml:space="preserve">
+    <value>El documento de consentimiento debe ser de 10 MB o menos.</value>
+  </data>
+  <data name="EvaluationCases.NoConsentOnFile" xml:space="preserve">
+    <value>No hay ningún documento de consentimiento registrado para este caso.</value>
+  </data>
+  <data name="EvaluationCases.ReasonRequiredForDueDate" xml:space="preserve">
+    <value>Se requiere un motivo para cambiar la fecha límite de la determinación.</value>
+  </data>
+  <data name="EvaluationCases.DomainRequired" xml:space="preserve">
+    <value>El dominio es obligatorio.</value>
+  </data>
+  <data name="EvaluationCases.EvaluatorNotFound" xml:space="preserve">
+    <value>Evaluador no encontrado.</value>
+  </data>
+  <data name="EvaluationCases.AssignmentNotFound" xml:space="preserve">
+    <value>Asignación de evaluador no encontrada.</value>
+  </data>
+  <data name="EvaluationCases.RationaleRequired" xml:space="preserve">
+    <value>Se requiere una justificación de la determinación.</value>
+  </data>
+  <data name="EvaluationCases.IepTypeNotConfigured" xml:space="preserve">
+    <value>El tipo de documento IEP no está configurado.</value>
+  </data>
+  <data name="EvaluationCases.CouldNotCreateIepDraft" xml:space="preserve">
+    <value>No se pudo crear el borrador del IEP.</value>
+  </data>
+  <data name="EvaluationCasesApi.InvalidRequestBody" xml:space="preserve">
+    <value>El cuerpo de la solicitud no es válido.</value>
+  </data>
+  <data name="EvaluationCasesApi.ReceivedAtRequired" xml:space="preserve">
+    <value>Se requiere receivedAt.</value>
+  </data>
+  <data name="Obligations.NoPermissionViewStudent" xml:space="preserve">
+    <value>No tiene permiso para ver las obligaciones de este estudiante.</value>
+  </data>
+  <data name="Obligations.NoPermissionViewDistrict" xml:space="preserve">
+    <value>No tiene permiso para ver las obligaciones del distrito.</value>
+  </data>
+  <data name="Obligations.NoPermissionViewSchool" xml:space="preserve">
+    <value>No tiene permiso para ver las obligaciones de esta escuela.</value>
+  </data>
+  <data name="FamilyContact.Permission" xml:space="preserve">
+    <value>No tiene permiso para acceder a este estudiante.</value>
+  </data>
+  <data name="FamilyContact.SummaryRequired" xml:space="preserve">
+    <value>Se requiere un resumen de la aportación de la familia.</value>
+  </data>
+  <data name="FamilyContact.SummaryTooLong" xml:space="preserve">
+    <value>El resumen debe tener {0} caracteres o menos.</value>
+  </data>
+  <data name="Contributions.ChildNotFound" xml:space="preserve">
+    <value>Perfil del hijo no encontrado.</value>
+  </data>
+  <data name="Contributions.NotFound" xml:space="preserve">
+    <value>Aportación no encontrada.</value>
+  </data>
+  <data name="Contributions.MaxPerChild" xml:space="preserve">
+    <value>Máximo de {0} notas por hijo.</value>
+  </data>
+  <data name="Contributions.TextRequired" xml:space="preserve">
+    <value>El texto es obligatorio.</value>
+  </data>
+  <data name="Contributions.TextTooLong" xml:space="preserve">
+    <value>El texto debe tener {0} caracteres o menos.</value>
+  </data>
+  <data name="Contributions.InvalidKind" xml:space="preserve">
+    <value>Tipo no válido.</value>
+  </data>
+  <data name="Contributions.NoPermissionViewStudent" xml:space="preserve">
+    <value>No tiene permiso para ver a este estudiante.</value>
+  </data>
+  <data name="Calendar.UserNotFound" xml:space="preserve">
+    <value>Usuario no encontrado.</value>
+  </data>
+  <data name="Calendar.InvalidFeedLink" xml:space="preserve">
+    <value>El enlace del calendario no es válido.</value>
+  </data>
+  <data name="MeetingDecisions.Permission" xml:space="preserve">
+    <value>No tiene permiso para acceder a esta reunión.</value>
+  </data>
+  <data name="MeetingDecisions.DecisionNotFound" xml:space="preserve">
+    <value>Decisión no encontrada.</value>
+  </data>
+  <data name="MeetingDecisions.NotRecordable" xml:space="preserve">
+    <value>Las decisiones solo se pueden registrar una vez que la reunión esté en estado Held o Continued.</value>
+  </data>
+  <data name="MeetingDecisions.TextRequired" xml:space="preserve">
+    <value>El texto de la decisión es obligatorio.</value>
+  </data>
+  <data name="MeetingDecisions.TextTooLong" xml:space="preserve">
+    <value>El texto de la decisión debe tener {0} caracteres o menos.</value>
+  </data>
+  <data name="MeetingDecisions.TargetRowIdTooLong" xml:space="preserve">
+    <value>El id de la fila de destino debe tener {0} caracteres o menos.</value>
+  </data>
+  <data name="SignedArtifacts.PdfOnly" xml:space="preserve">
+    <value>El documento firmado debe ser un PDF.</value>
+  </data>
+  <data name="SignedArtifacts.TooLarge" xml:space="preserve">
+    <value>El documento firmado debe ser de 20 MB o menos.</value>
+  </data>
+  <data name="SignedArtifacts.VersionNotFound" xml:space="preserve">
+    <value>Versión del documento no encontrada.</value>
+  </data>
+  <data name="SignedArtifacts.Permission" xml:space="preserve">
+    <value>No tiene permiso para acceder a esta versión del documento.</value>
+  </data>
+  <data name="SignedArtifacts.ArtifactNotFound" xml:space="preserve">
+    <value>Documento firmado no encontrado.</value>
+  </data>
+  <data name="GoalRecords.ValueOrNoteRequired" xml:space="preserve">
+    <value>Ingrese un valor o una nota.</value>
+  </data>
+  <data name="GoalRecords.GoalNotFound" xml:space="preserve">
+    <value>Meta no encontrada.</value>
+  </data>
+  <data name="GoalRecords.InvalidStatus" xml:space="preserve">
+    <value>El estado debe ser Active, Met o NotMet.</value>
+  </data>
+  <data name="GoalRecords.ReasonRequiredForNotMet" xml:space="preserve">
+    <value>Se requiere un motivo al marcar una meta como no cumplida (Not Met).</value>
+  </data>
+  <data name="GoalRecords.ReasonRequiredForRemoval" xml:space="preserve">
+    <value>Se requiere un motivo para eliminar una meta.</value>
+  </data>
+  <data name="DraftResponses.ReplyTooLong" xml:space="preserve">
+    <value>La respuesta debe tener {0} caracteres o menos.</value>
+  </data>
+  <data name="DraftResponses.ResolveRequiresInput" xml:space="preserve">
+    <value>Proporcione una respuesta o marque esto como resuelto en el borrador.</value>
+  </data>
+  <data name="DraftResponses.ResponseNotFound" xml:space="preserve">
+    <value>Respuesta no encontrada.</value>
+  </data>
+  <data name="StudentEvidence.Permission" xml:space="preserve">
+    <value>No tiene permiso para ver a este estudiante.</value>
+  </data>
+  <data name="DocumentAssist.FieldNotFound" xml:space="preserve">
+    <value>Campo no encontrado en la plantilla de este documento.</value>
+  </data>
+  <data name="DocumentAssist.RowRequired" xml:space="preserve">
+    <value>Se requiere una fila para la asistencia de tabla.</value>
+  </data>
+  <data name="DocumentAssist.RowNotFound" xml:space="preserve">
+    <value>Fila no encontrada.</value>
+  </data>
+  <data name="DocumentAssist.AtLeastOneMessageRequired" xml:space="preserve">
+    <value>Se requiere al menos un mensaje.</value>
+  </data>
+  <data name="DocumentAssist.Unavailable" xml:space="preserve">
+    <value>La asistencia de IA no está disponible temporalmente.</value>
+  </data>
+  <data name="DocumentAssistApi.InvalidKind" xml:space="preserve">
+    <value>Tipo no válido.</value>
+  </data>
+  <data name="DocumentAssistApi.FieldKeyRequired" xml:space="preserve">
+    <value>Se requiere fieldKey.</value>
+  </data>
+  <data name="IepAssist.Permission" xml:space="preserve">
+    <value>No tiene permiso para acceder a este borrador de IEP.</value>
+  </data>
+  <data name="IepAssist.DraftNotFound" xml:space="preserve">
+    <value>Borrador de IEP no encontrado.</value>
+  </data>
+  <data name="IepAssist.Unavailable" xml:space="preserve">
+    <value>La asistencia de IA no está disponible temporalmente.</value>
+  </data>
+  <data name="IepAssist.GoalNotFound" xml:space="preserve">
+    <value>Meta no encontrada.</value>
+  </data>
+  <data name="IepAssist.SectionNotFound" xml:space="preserve">
+    <value>Sección no encontrada.</value>
+  </data>
+  <data name="IepAssist.ServiceLineNotFound" xml:space="preserve">
+    <value>Línea de servicio no encontrada.</value>
+  </data>
+  <data name="IepAssist.AtLeastOneMessageRequired" xml:space="preserve">
+    <value>Se requiere al menos un mensaje.</value>
+  </data>
+  <data name="MeetingBrief.NoBriefYet" xml:space="preserve">
+    <value>Todavía no se ha generado un resumen para esta reunión.</value>
+  </data>
+  <data name="MeetingBrief.NoSourceSummary" xml:space="preserve">
+    <value>Todavía no hay ningún borrador vinculado a esta reunión, por lo que no hay ninguna propuesta que resumir.</value>
+  </data>
+  <data name="MeetingBrief.UnavailableSummary" xml:space="preserve">
+    <value>No se pudo redactar un resumen en lenguaje sencillo en este momento; las secciones deterministas a continuación siguen siendo precisas.</value>
+  </data>
+  <data name="MeetingBrief.SourceSharedWithFamily" xml:space="preserve">
+    <value>{0} (compartido con la familia)</value>
+  </data>
+  <data name="MeetingBrief.SourceDraft" xml:space="preserve">
+    <value>{0} (borrador)</value>
+  </data>
+  <data name="MeetingBrief.Checklist.RequiredParticipantsLabel" xml:space="preserve">
+    <value>Participantes obligatorios presentes</value>
+  </data>
+  <data name="MeetingBrief.Checklist.NoRequiredParticipants" xml:space="preserve">
+    <value>No hay participantes obligatorios registrados para esta reunión.</value>
+  </data>
+  <data name="MeetingBrief.Checklist.AllAttended" xml:space="preserve">
+    <value>Todos los participantes obligatorios asistieron.</value>
+  </data>
+  <data name="MeetingBrief.Checklist.Missing" xml:space="preserve">
+    <value>Faltan: {0}</value>
+  </data>
+  <data name="MeetingBrief.Checklist.UnknownParticipant" xml:space="preserve">
+    <value>Desconocido</value>
+  </data>
+  <data name="MeetingBrief.Checklist.NoticeTimingLabel" xml:space="preserve">
+    <value>Aviso enviado al menos {0} días antes de la reunión</value>
+  </data>
+  <data name="MeetingBrief.Checklist.NoNoticeOnRecord" xml:space="preserve">
+    <value>No hay ningún aviso de reunión registrado.</value>
+  </data>
+  <data name="MeetingBrief.Checklist.NoticeSentOn" xml:space="preserve">
+    <value>Aviso enviado el {0}.</value>
+  </data>
+  <data name="MeetingBrief.Checklist.FamilyInputLabel" xml:space="preserve">
+    <value>Aportación de la familia recibida</value>
   </data>
 </root>

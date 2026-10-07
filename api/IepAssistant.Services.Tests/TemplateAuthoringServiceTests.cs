@@ -1,10 +1,14 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -42,7 +46,7 @@ public sealed class TemplateAuthoringServiceTests : IDisposable
 
     private ApplicationDbContext CreateContext() => new(_options);
     private TemplateAuthoringService CreateService(ApplicationDbContext ctx)
-        => new(ctx, _audit, NullLogger<TemplateAuthoringService>.Instance);
+        => new(ctx, _audit, NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages());
     private DocumentTemplateService CreateTemplateService(ApplicationDbContext ctx)
         => new(ctx, _audit, NullLogger<DocumentTemplateService>.Instance);
 
@@ -570,6 +574,44 @@ public sealed class TemplateAuthoringServiceTests : IDisposable
             ctx.TemplateSections.Remove(section);
             Assert.Throws<InvalidOperationException>(() => ctx.SaveChanges());
         }
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5
+
+    private sealed class TestController : ControllerBase
+    {
+    }
+
+    [Fact]
+    public async Task GetVersionAsync_UnknownVersion_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).GetVersionAsync(-1);
+
+        Assert.False(result.Success);
+        Assert.Equal("Versión de la plantilla no encontrada.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    [Fact]
+    public async Task AddSectionAsync_BlankTitle_UnderSpanishCulture_MessageIsSpanish_AndMapsTo400ViaErrorKind()
+    {
+        var (_, versionId) = await SeedDraftTemplateAsync();
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).AddSectionAsync(AdminUserId, versionId, "   ", null);
+
+        Assert.False(result.Success);
+        Assert.Equal("El título de la sección es obligatorio.", result.Message);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<BadRequestObjectResult>(action);
     }
 
     public void Dispose() => _connection.Dispose();

@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Documents;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 
 namespace IepAssistant.Api.Controllers;
@@ -12,16 +14,22 @@ namespace IepAssistant.Api.Controllers;
 /// <c>[Authorize]</c> — per-resource authorization (Collaborator+ on the student) is enforced inside
 /// <see cref="IDocumentInstanceService"/>, mirroring <see cref="IepDraftController"/>. Enums serialize
 /// as strings. Finalize / versioning / PDF are Phase 4 and not exposed here.
+///
+/// Multilingual plan (2026-10-06) phase 5: failures map via the shared
+/// <see cref="ServiceFailureMapperExtensions.MapServiceFailure"/>, switching on each result's
+/// <see cref="Services.Models.ServiceErrorKind"/> rather than matching (possibly Spanish) message text.
 /// </summary>
 [ApiController]
 [Authorize]
 public class DocumentInstanceController : ControllerBase
 {
     private readonly IDocumentInstanceService _service;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public DocumentInstanceController(IDocumentInstanceService service)
+    public DocumentInstanceController(IDocumentInstanceService service, IStringLocalizer<Messages> localizer)
     {
         _service = service;
+        _localizer = localizer;
     }
 
     [HttpPost("api/educator/students/{studentId:int}/documents")]
@@ -30,10 +38,10 @@ public class DocumentInstanceController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> Create(int studentId, [FromBody] CreateDocumentInstanceRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _service.CreateAsync(studentId, request.DocumentTypeId, User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var dto = DocumentInstanceMappers.MapDetail(result.Data!);
         return CreatedAtAction(nameof(Get), new { instanceId = dto.Id }, ApiResponse<DocumentInstanceDetailDto>.SuccessResponse(dto));
@@ -45,7 +53,7 @@ public class DocumentInstanceController : ControllerBase
     public async Task<IActionResult> List(int studentId, CancellationToken ct)
     {
         var result = await _service.ListForStudentAsync(studentId, User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<IEnumerable<DocumentInstanceSummaryDto>>.SuccessResponse(
             result.Data!.Select(DocumentInstanceMappers.MapSummary)));
@@ -58,7 +66,7 @@ public class DocumentInstanceController : ControllerBase
     public async Task<IActionResult> Get(int instanceId, CancellationToken ct)
     {
         var result = await _service.GetAsync(instanceId, User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<DocumentInstanceDetailDto>.SuccessResponse(DocumentInstanceMappers.MapDetail(result.Data!)));
     }
@@ -70,12 +78,12 @@ public class DocumentInstanceController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> SaveValues(int instanceId, [FromBody] SaveDocumentValuesRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
         if (!TryDecodeRowVersion(request.RowVersion, out var rowVersion))
-            return BadRequest(ApiResponse<object>.Error("The provided row version is not valid base64."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRowVersion"]));
 
         var result = await _service.SaveValuesAsync(instanceId, request.Values, rowVersion, User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         // Lightweight response: normalized values + rotated token only (the immutable pinned tree
         // stays on the client — no full-tree re-query/re-ship per autosave tick).
@@ -89,28 +97,7 @@ public class DocumentInstanceController : ControllerBase
     public async Task<IActionResult> Delete(int instanceId, CancellationToken ct)
     {
         var result = await _service.DeleteAsync(instanceId, User.GetUserId(), ct);
-        return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : MapFailure(result.Message);
-    }
-
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        // No resolvable template for the requested (state, document type) — a client-actionable 4xx.
-        if (message.Contains("no document template", StringComparison.OrdinalIgnoreCase))
-            return UnprocessableEntity(ApiResponse<object>.Error(message));
-
-        // Stale optimistic-concurrency token.
-        if (message.Contains("changed by someone else", StringComparison.OrdinalIgnoreCase))
-            return Conflict(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
+        return result.Success ? Ok(ApiResponse<object>.SuccessResponse(null)) : this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
     }
 
     /// <summary>

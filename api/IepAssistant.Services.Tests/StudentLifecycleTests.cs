@@ -19,7 +19,7 @@ public sealed class StudentLifecycleTests : IDisposable
     private readonly CapturingAuditLogger _audit = new();
 
     private EducatorService Service(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), _audit, NullLogger<EducatorService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), _audit, NullLogger<EducatorService>.Instance, TestSupport.TestLocalizers.Messages());
 
     private static UpdateSchoolStudentModel Update(string first = "Sam", string last = "Student", string? externalId = null, GradeLevel? grade = null) => new()
     {

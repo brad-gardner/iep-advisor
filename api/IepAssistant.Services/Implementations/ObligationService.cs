@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
@@ -6,26 +7,32 @@ using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
-/// <summary>Computed procedural deadlines (see <see cref="IObligationService"/>, plan 4 decision 2).</summary>
+/// <summary>Computed procedural deadlines (see <see cref="IObligationService"/>, plan 4 decision 2).
+///
+/// Multilingual plan (2026-10-06) phase 5: every failure <c>ObligationsController</c> maps to a status
+/// carries an explicit <see cref="ServiceErrorKind"/>, and every message is localized
+/// (<c>Messages.resx</c>/<c>.es.resx</c>).</summary>
 public class ObligationService : IObligationService
 {
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public ObligationService(ApplicationDbContext context, IOrgAccessService orgAccess)
+    public ObligationService(ApplicationDbContext context, IOrgAccessService orgAccess, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<List<ObligationModel>>> GetForStudentAsync(int userId, int studentId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
-            return ServiceResult<List<ObligationModel>>.FailureResult("You do not have permission to view this student's obligations.");
+            return ServiceResult<List<ObligationModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Obligations.NoPermissionViewStudent"]);
 
         var context = await LoadContextAsync(studentId, ct);
         if (context == null)
-            return ServiceResult<List<ObligationModel>>.FailureResult("Student not found.");
+            return ServiceResult<List<ObligationModel>>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.StudentNotFound"]);
 
         return ServiceResult<List<ObligationModel>>.SuccessResult(await ComputeAndFilterAsync(new List<StudentObligationContext> { context }, null, ct));
     }
@@ -34,7 +41,7 @@ public class ObligationService : IObligationService
     {
         var staffCtx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (staffCtx == null)
-            return ServiceResult<List<ObligationModel>>.FailureResult("Educator profile not found.");
+            return ServiceResult<List<ObligationModel>>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.ProfileNotFound"]);
 
         var students = OrgRoleIds.IsAdmin(staffCtx.OrgRoleId)
             ? await LoadScopedStudentsAsync(staffCtx, null, ct)
@@ -120,7 +127,7 @@ public class ObligationService : IObligationService
     {
         var staffCtx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (staffCtx == null)
-            return ServiceResult<List<ObligationModel>>.FailureResult("Educator profile not found.");
+            return ServiceResult<List<ObligationModel>>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.ProfileNotFound"]);
         return await GetForScopeAsync(staffCtx, schoolId, status, ct);
     }
 
@@ -130,9 +137,9 @@ public class ObligationService : IObligationService
     public async Task<ServiceResult<List<ObligationModel>>> GetForScopeAsync(StaffContext staffCtx, int? schoolId, ObligationStatus? status, CancellationToken ct = default)
     {
         if (!OrgRoleIds.IsAdmin(staffCtx.OrgRoleId))
-            return ServiceResult<List<ObligationModel>>.FailureResult("You do not have permission to view district obligations.");
+            return ServiceResult<List<ObligationModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Obligations.NoPermissionViewDistrict"]);
         if (schoolId.HasValue && !await _orgAccess.CanActOnSchoolAsync(staffCtx.UserId, schoolId.Value, ct))
-            return ServiceResult<List<ObligationModel>>.FailureResult("You do not have permission to view this school's obligations.");
+            return ServiceResult<List<ObligationModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Obligations.NoPermissionViewSchool"]);
 
         var students = await LoadScopedStudentsAsync(staffCtx, schoolId, ct);
         return ServiceResult<List<ObligationModel>>.SuccessResult(await ComputeAndFilterAsync(students, status, ct));

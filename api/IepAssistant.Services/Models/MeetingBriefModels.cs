@@ -67,4 +67,9 @@ public class MeetingBriefModel
     public List<FamilyContactAttemptModel> ContactAttempts { get; set; } = new();
 
     public string Disclaimer { get; set; } = "Advisory summary — the team's decisions are made in the meeting.";
+
+    /// <summary>The requester's language ("en"/"es") when this brief was generated — multilingual plan
+    /// (2026-10-06) phase 5, mirrors <c>MeetingBrief.Language</c>. Null means English (including every
+    /// brief generated before the column existed).</summary>
+    public string? GeneratedLanguage { get; set; }
 }

@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.IepAssist;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -10,19 +12,21 @@ namespace IepAssistant.Api.Controllers;
 
 /// <summary>
 /// Educator AI assist (P6b). Inline assists return a suggestion (never auto-applied); chat returns
-/// an ephemeral reply. Access is
-/// enforced in the service (Collaborator+ SchoolStudentAccess); failures map permission→403,
-/// not-found→404, "temporarily unavailable"→503, else 400.
+/// an ephemeral reply. Access is enforced in the service (Collaborator+ SchoolStudentAccess); failures
+/// map via the shared <see cref="ServiceFailureMapperExtensions.MapServiceFailure"/>, switching on each
+/// result's <see cref="ServiceErrorKind"/> rather than matching (possibly Spanish) message text.
 /// </summary>
 [ApiController]
 [Authorize]
 public class IepAssistController : ControllerBase
 {
     private readonly IIepAssistService _service;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public IepAssistController(IIepAssistService service)
+    public IepAssistController(IIepAssistService service, IStringLocalizer<Messages> localizer)
     {
         _service = service;
+        _localizer = localizer;
     }
 
     [HttpPost("api/iep-drafts/{draftId}/goals/{goalId}/assist")]
@@ -32,7 +36,7 @@ public class IepAssistController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AssistGoal(int draftId, int goalId, [FromBody] AssistRequest request, CancellationToken ct)
     {
-        if (!TryParseKind(request.Kind, out var kind)) return BadRequest(ApiResponse<object>.Error("Invalid kind."));
+        if (!TryParseKind(request.Kind, out var kind)) return BadRequest(ApiResponse<object>.Error(_localizer["DocumentAssistApi.InvalidKind"]));
 
         var result = await _service.AssistGoalAsync(User.GetUserId(), draftId, goalId, kind, ct);
         return MapAssist(result);
@@ -45,7 +49,7 @@ public class IepAssistController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AssistSection(int draftId, int sectionId, [FromBody] AssistRequest request, CancellationToken ct)
     {
-        if (!TryParseKind(request.Kind, out var kind)) return BadRequest(ApiResponse<object>.Error("Invalid kind."));
+        if (!TryParseKind(request.Kind, out var kind)) return BadRequest(ApiResponse<object>.Error(_localizer["DocumentAssistApi.InvalidKind"]));
 
         var result = await _service.AssistSectionAsync(User.GetUserId(), draftId, sectionId, kind, ct);
         return MapAssist(result);
@@ -58,7 +62,7 @@ public class IepAssistController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AssistServiceLine(int draftId, int serviceLineId, [FromBody] AssistRequest request, CancellationToken ct)
     {
-        if (!TryParseKind(request.Kind, out var kind)) return BadRequest(ApiResponse<object>.Error("Invalid kind."));
+        if (!TryParseKind(request.Kind, out var kind)) return BadRequest(ApiResponse<object>.Error(_localizer["DocumentAssistApi.InvalidKind"]));
 
         var result = await _service.AssistServiceLineAsync(User.GetUserId(), draftId, serviceLineId, kind, ct);
         return MapAssist(result);
@@ -71,14 +75,14 @@ public class IepAssistController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Chat(int draftId, [FromBody] ChatRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var messages = (request.Messages ?? new List<ChatMessageDto>())
             .Select(m => new ChatMessage { Role = m.Role, Content = m.Content })
             .ToList();
 
         var result = await _service.ChatAsync(User.GetUserId(), draftId, messages, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<ChatResponse>.SuccessResponse(new ChatResponse { Reply = result.Data!.Reply }));
     }
@@ -90,23 +94,7 @@ public class IepAssistController : ControllerBase
 
     private IActionResult MapAssist(ServiceResult<AssistResultModel> result)
     {
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<AssistResponse>.SuccessResponse(new AssistResponse { Suggestion = result.Data!.Suggestion }));
-    }
-
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        if (message.Contains("temporarily unavailable", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(503, ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
     }
 }

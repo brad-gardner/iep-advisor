@@ -259,5 +259,48 @@ public sealed class DraftResponseServiceTests : IDisposable
         Assert.Equal("Based on the evaluation results.", resolved.Data!.StaffReply);
     }
 
+    // ----------------------------------------------------------------- Multilingual plan phase 5: staff paths
+
+    [Fact]
+    public async Task ResolveAsync_RequiresReplyOrFlag_UnderSpanishCulture_MessageIsSpanish_AndMapsTo400ViaErrorKind()
+    {
+        var revisionId = SeedRevision("resolve-es", SharedDraftStatus.Active, out var s);
+        int responseId;
+        using (var ctx = CreateContext())
+        {
+            var (service, _) = CreateService(ctx);
+            var created = await service.CreateAsync(s.ParentId, revisionId, new CreateDraftResponseModel { Kind = DraftResponseKind.ChangeRequest, Text = "Please add OT." }, default);
+            responseId = created.Data!.Id;
+        }
+
+        using var _lang = CultureScope.For("es");
+        using var ctx2 = CreateContext();
+        var (service2, _) = CreateService(ctx2);
+        var result = await service2.ResolveAsync(s.TeacherId, responseId, new ResolveDraftResponseModel(), default);
+
+        Assert.False(result.Success);
+        Assert.Equal("Proporcione una respuesta o marque esto como resuelto en el borrador.", result.Message);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
+    [Fact]
+    public async Task GetForInstanceAsync_UnknownInstance_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var (service, _) = CreateService(ctx);
+        var result = await service.GetForInstanceAsync(1, -1, null, default);
+
+        Assert.False(result.Success);
+        Assert.Equal("Documento no encontrado.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
     public void Dispose() => _connection.Dispose();
 }

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -15,17 +16,23 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 public class TemplateResolutionService : ITemplateResolutionService
 {
-    /// <summary>Friendly, user-facing block message. The controller maps this to a 4xx (never a 500).</summary>
+    /// <summary>Friendly, user-facing block message (English reference copy — kept in sync with
+    /// <c>Templates.NoTemplateAvailable</c> in Messages.resx, which is what <see cref="ResolveAsync"/>
+    /// actually returns). Multilingual plan (2026-10-06) phase 5: the FailureResult call site now carries
+    /// <see cref="ServiceErrorKind.Unprocessable"/>, so <c>DocumentInstanceController</c>'s 422 never
+    /// depends on matching this (possibly Spanish) text.</summary>
     public const string NoTemplateMessage =
         "No document template is available for this document type yet. Ask an administrator to publish one.";
 
     private readonly ApplicationDbContext _context;
     private readonly ILogger<TemplateResolutionService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public TemplateResolutionService(ApplicationDbContext context, ILogger<TemplateResolutionService> logger)
+    public TemplateResolutionService(ApplicationDbContext context, ILogger<TemplateResolutionService> logger, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _logger = logger;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<TemplateResolutionModel>> ResolveAsync(
@@ -50,7 +57,7 @@ public class TemplateResolutionService : ITemplateResolutionService
         _logger.LogInformation(
             "Template resolution blocked: no Published template for documentType {DocumentTypeId} (state {State}).",
             documentTypeId, normalizedState ?? "default");
-        return ServiceResult<TemplateResolutionModel>.FailureResult(NoTemplateMessage);
+        return ServiceResult<TemplateResolutionModel>.FailureResult(ServiceErrorKind.Unprocessable, _localizer["Templates.NoTemplateAvailable"]);
     }
 
     /// <summary>

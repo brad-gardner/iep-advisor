@@ -280,6 +280,70 @@ public sealed class MeetingServiceTests : IDisposable
     {
     }
 
+    // ----------------------------------------------------------------- Multilingual plan phase 5: staff paths
+
+    [Fact]
+    public async Task CreateAsync_NonCollaborator_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School Create Es");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (viewerUserId, _) = _db.Staff("createforbidden@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.Access(studentId, viewerUserId, AccessRole.Viewer);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).CreateAsync(viewerUserId, studentId, BasicMeeting(DateTime.UtcNow.AddDays(1)));
+
+        Assert.False(result.Success);
+        Assert.Equal("No tiene permiso para programar una reunión para este estudiante.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_UnknownMeeting_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        using var _lang = CultureScope.For("es");
+        using var ctx = _db.Context();
+        var userId = _db.SeedUser("updateunknownes@example.com", UserRole.Educator);
+
+        var result = await CreateService(ctx).UpdateAsync(userId, -1, new UpdateMeetingModel());
+
+        Assert.False(result.Success);
+        Assert.Equal("Reunión no encontrada.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    [Fact]
+    public async Task CreateAsync_DurationOutOfRange_UnderSpanishCulture_MessageIsSpanish_AndMapsTo400ViaErrorKind()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School Duration Es");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (creatorUserId, _) = _db.Staff("durationes@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+        _db.Access(studentId, creatorUserId, AccessRole.Collaborator);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = _db.Context();
+        var model = BasicMeeting(DateTime.UtcNow.AddDays(1));
+        model.DurationMinutes = 5;
+        var result = await CreateService(ctx).CreateAsync(creatorUserId, studentId, model);
+
+        Assert.False(result.Success);
+        Assert.Equal($"La duración debe estar entre {MeetingService.MinDurationMinutes} y {MeetingService.MaxDurationMinutes} minutos.", result.Message);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
     [Fact]
     public async Task GetAsync_Participant_CanRead_EvenWithoutStudentAccess()
     {

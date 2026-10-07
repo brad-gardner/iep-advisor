@@ -1,9 +1,13 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -36,7 +40,7 @@ public sealed class EducatorServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private EducatorService CreateService(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), _audit, NullLogger<EducatorService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), _audit, NullLogger<EducatorService>.Instance, TestSupport.TestLocalizers.Messages());
 
     private int SeedUser(string email)
     {
@@ -607,6 +611,52 @@ public sealed class EducatorServiceTests : IDisposable
         Assert.Equal(teacherProfile, r.Data![0].StaffProfileId);
         Assert.Equal("teach@x.com", r.Data[0].Email);
         Assert.Equal(AccessRole.Collaborator, r.Data[0].AccessRole);
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5
+
+    private sealed class TestController : ControllerBase
+    {
+    }
+
+    [Fact]
+    public async Task GetStudentAsync_NonCollaborator_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind()
+    {
+        var userId = SeedUser("strangeres@example.com");
+        var districtId = SeedDistrict("Spanish District", "OH");
+        var schoolId = SeedSchool(districtId, "Spanish Elementary", "OH");
+        var studentId = SeedStudent(schoolId);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).GetStudentAsync(userId, studentId);
+
+        Assert.False(result.Success);
+        Assert.Equal("No tiene permiso para acceder a este estudiante.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateStudent_UnknownSchool_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        var userId = SeedUser("adminres@example.com");
+        var districtId = SeedDistrict("Spanish District 2", "OH");
+        SeedStaff(userId, districtId, null, OrgRoleIds.DistrictAdmin);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).CreateStudentAsync(userId, new CreateSchoolStudentModel { FirstName = "Sam", SchoolId = -1 });
+
+        Assert.False(result.Success);
+        Assert.Equal("Escuela no encontrada.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
     }
 
     public void Dispose() => _connection.Dispose();

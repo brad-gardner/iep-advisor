@@ -41,10 +41,11 @@ public sealed class DocumentSemanticsAndRowIdentityTests : IDisposable
     private DocumentInstanceService CreateInstanceService(ApplicationDbContext ctx) => new(
         ctx,
         new OrgAccessService(ctx),
-        new TemplateResolutionService(ctx, NullLogger<TemplateResolutionService>.Instance),
-        new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance),
+        new TemplateResolutionService(ctx, NullLogger<TemplateResolutionService>.Instance, TestSupport.TestLocalizers.Messages()),
+        new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()),
         new CapturingAuditLogger(),
-        NullLogger<DocumentInstanceService>.Instance);
+        NullLogger<DocumentInstanceService>.Instance,
+        TestSupport.TestLocalizers.Messages());
 
     // ---------------------------------------------------------------- Validator: semantics
 
@@ -252,7 +253,7 @@ public sealed class DocumentSemanticsAndRowIdentityTests : IDisposable
         Assert.Equal(3, second.Skipped.Count);
 
         using var verify = CreateContext();
-        var resolution = new TemplateResolutionService(verify, NullLogger<TemplateResolutionService>.Instance);
+        var resolution = new TemplateResolutionService(verify, NullLogger<TemplateResolutionService>.Instance, TestSupport.TestLocalizers.Messages());
         var ohIep = await resolution.ResolveAsync("OH", IepTypeId);
         var ohEtr = await resolution.ResolveAsync("OH", EtrTypeId);
         var def504 = await resolution.ResolveAsync(null, Section504TypeId);
@@ -369,7 +370,7 @@ public sealed class DocumentSemanticsAndRowIdentityTests : IDisposable
         Assert.Equal(TemplateVersionStatus.Published, versions[1].Status);
         Assert.Contains(FieldSemantics.Goals, TemplateSemanticsReader.Read(versions[1].Sections).Keys);
 
-        var resolved = await new TemplateResolutionService(verify, NullLogger<TemplateResolutionService>.Instance).ResolveAsync(null, IepTypeId);
+        var resolved = await new TemplateResolutionService(verify, NullLogger<TemplateResolutionService>.Instance, TestSupport.TestLocalizers.Messages()).ResolveAsync(null, IepTypeId);
         Assert.Equal(versions[1].Id, resolved.Data!.DocumentTemplateVersionId); // new documents pick v2
     }
 
@@ -400,7 +401,7 @@ public sealed class DocumentSemanticsAndRowIdentityTests : IDisposable
 
         using var verify = CreateContext();
         Assert.Equal(2, verify.DocumentTemplateVersions.Count(v => v.DocumentTemplateId == templateId));
-        var resolved = await new TemplateResolutionService(verify, NullLogger<TemplateResolutionService>.Instance).ResolveAsync(null, IepTypeId);
+        var resolved = await new TemplateResolutionService(verify, NullLogger<TemplateResolutionService>.Instance, TestSupport.TestLocalizers.Messages()).ResolveAsync(null, IepTypeId);
         Assert.Equal(2, resolved.Data!.VersionNumber); // admin's v2 still wins
     }
 

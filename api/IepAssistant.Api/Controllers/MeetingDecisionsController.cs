@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Meetings;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -20,10 +22,12 @@ namespace IepAssistant.Api.Controllers;
 public class MeetingDecisionsController : ControllerBase
 {
     private readonly IMeetingDecisionService _decisions;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public MeetingDecisionsController(IMeetingDecisionService decisions)
+    public MeetingDecisionsController(IMeetingDecisionService decisions, IStringLocalizer<Messages> localizer)
     {
         _decisions = decisions;
+        _localizer = localizer;
     }
 
     [HttpGet("meetings/{id:int}/decisions")]
@@ -33,7 +37,7 @@ public class MeetingDecisionsController : ControllerBase
     public async Task<IActionResult> GetForMeeting(int id, CancellationToken ct)
     {
         var result = await _decisions.GetForMeetingAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return MapFailure<List<MeetingDecisionDto>>(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<List<MeetingDecisionDto>>.SuccessResponse(result.Data!.Select(MeetingBriefMappers.MapDecision).ToList()));
     }
 
@@ -45,7 +49,7 @@ public class MeetingDecisionsController : ControllerBase
     public async Task<IActionResult> Create(int id, [FromBody] CreateMeetingDecisionRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid || request.Outcome == null)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _decisions.CreateAsync(User.GetUserId(), id, new CreateMeetingDecisionModel
         {
@@ -55,7 +59,7 @@ public class MeetingDecisionsController : ControllerBase
             Text = request.Text,
             Outcome = request.Outcome.Value
         }, ct);
-        if (!result.Success) return MapFailure<MeetingDecisionDto>(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var dto = MeetingBriefMappers.MapDecision(result.Data!);
         return Created($"/api/decisions/{dto.Id}", ApiResponse<MeetingDecisionDto>.SuccessResponse(dto));
@@ -69,14 +73,14 @@ public class MeetingDecisionsController : ControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] UpdateMeetingDecisionRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid || request.Outcome == null)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["Api.InvalidRequest"]));
 
         var result = await _decisions.UpdateAsync(User.GetUserId(), id, new UpdateMeetingDecisionModel
         {
             Text = request.Text,
             Outcome = request.Outcome.Value
         }, ct);
-        if (!result.Success) return MapFailure<MeetingDecisionDto>(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<MeetingDecisionDto>.SuccessResponse(MeetingBriefMappers.MapDecision(result.Data!)));
     }
 
@@ -87,7 +91,7 @@ public class MeetingDecisionsController : ControllerBase
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
         var result = await _decisions.DeleteAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return MapFailure<object>(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return NoContent();
     }
 
@@ -98,7 +102,7 @@ public class MeetingDecisionsController : ControllerBase
     public async Task<IActionResult> GetProposedEdits(int instanceId, CancellationToken ct)
     {
         var result = await _decisions.GetProposedEditsForInstanceAsync(User.GetUserId(), instanceId, ct);
-        if (!result.Success) return MapFailure<List<ProposedEditDto>>(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<List<ProposedEditDto>>.SuccessResponse(result.Data!.Select(MeetingBriefMappers.MapProposedEdit).ToList()));
     }
 
@@ -109,17 +113,8 @@ public class MeetingDecisionsController : ControllerBase
     public async Task<IActionResult> MarkApplied(int id, CancellationToken ct)
     {
         var result = await _decisions.MarkAppliedAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return MapFailure<ProposedEditDto>(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<ProposedEditDto>.SuccessResponse(MeetingBriefMappers.MapProposedEdit(result.Data!)));
     }
 
-    private IActionResult MapFailure<T>(string? message)
-    {
-        message ??= "Request failed";
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

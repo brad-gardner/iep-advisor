@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.IepAssist;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -10,18 +12,21 @@ namespace IepAssistant.Api.Controllers;
 
 /// <summary>
 /// Educator AI assist for template documents. Inline assists return a suggestion (never auto-applied);
-/// chat returns an ephemeral reply. Access is enforced in the service (Collaborator+); failures map
-/// permission→403, not-found→404, "temporarily unavailable"→503, else 400.
+/// chat returns an ephemeral reply. Access is enforced in the service (Collaborator+); failures map via
+/// the shared <see cref="ServiceFailureMapperExtensions.MapServiceFailure"/>, switching on each result's
+/// <see cref="ServiceErrorKind"/> rather than matching (possibly Spanish) message text.
 /// </summary>
 [ApiController]
 [Authorize]
 public class DocumentAssistController : ControllerBase
 {
     private readonly IDocumentAssistService _service;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public DocumentAssistController(IDocumentAssistService service)
+    public DocumentAssistController(IDocumentAssistService service, IStringLocalizer<Messages> localizer)
     {
         _service = service;
+        _localizer = localizer;
     }
 
     [HttpPost("api/documents/{instanceId:int}/assist")]
@@ -32,13 +37,13 @@ public class DocumentAssistController : ControllerBase
     public async Task<IActionResult> Assist(int instanceId, [FromBody] DocumentAssistRequest request, CancellationToken ct)
     {
         if (!Enum.TryParse<AssistKind>(request.Kind, ignoreCase: true, out var kind) || !Enum.IsDefined(kind))
-            return BadRequest(ApiResponse<object>.Error("Invalid kind."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["DocumentAssistApi.InvalidKind"]));
 
         if (request.FieldKey is not { } fieldKey || fieldKey == Guid.Empty)
-            return BadRequest(ApiResponse<object>.Error("fieldKey is required."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["DocumentAssistApi.FieldKeyRequired"]));
 
         var result = await _service.AssistAsync(User.GetUserId(), instanceId, fieldKey, request.RowId, kind, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         var data = result.Data!;
         return Ok(ApiResponse<AssistResponse>.SuccessResponse(new AssistResponse
         {
@@ -61,19 +66,7 @@ public class DocumentAssistController : ControllerBase
             .ToList();
 
         var result = await _service.ChatAsync(User.GetUserId(), instanceId, messages, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<ChatResponse>.SuccessResponse(new ChatResponse { Reply = result.Data!.Reply }));
-    }
-
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-        if (message.Contains("temporarily unavailable", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(503, ApiResponse<object>.Error(message));
-        return BadRequest(ApiResponse<object>.Error(message));
     }
 }

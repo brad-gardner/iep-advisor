@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
@@ -24,8 +25,12 @@ public sealed class MeetingBriefServiceTests : IDisposable
     private sealed class FakeClaudeClient : IClaudeClient
     {
         public string? CannedResponse { get; set; } = "The team is proposing an additional OT service and a placement change.";
+        public ClaudeCompletionRequest? LastRequest { get; private set; }
         public Task<string?> CompleteAsync(ClaudeCompletionRequest request, CancellationToken cancellationToken = default)
-            => Task.FromResult(CannedResponse);
+        {
+            LastRequest = request;
+            return Task.FromResult(CannedResponse);
+        }
     }
 
     private MeetingBriefService CreateService(ApplicationDbContext ctx, IClaudeClient? claude = null) => new(
@@ -33,7 +38,8 @@ public sealed class MeetingBriefServiceTests : IDisposable
         new OrgAccessService(ctx),
         claude ?? new FakeClaudeClient(),
         new DraftResponseService(ctx, new AccessService(ctx), new OrgAccessService(ctx), new NotificationService(ctx, TestSupport.TestLocalizers.Messages()), NullLogger<DraftResponseService>.Instance, TestSupport.TestLocalizers.Messages(), TestSupport.TestLocalizers.Notifications()),
-        NullLogger<MeetingBriefService>.Instance);
+        NullLogger<MeetingBriefService>.Instance,
+        TestSupport.TestLocalizers.Messages());
 
     private static string Cfg<T>(T config) => JsonSerializer.Serialize(config, TemplateFieldConfigValidator.JsonOptions);
 
@@ -235,6 +241,89 @@ public sealed class MeetingBriefServiceTests : IDisposable
         using var ctx = _db.Context();
         var result = await CreateService(ctx).GetAsync(userId, meetingId);
         Assert.False(result.Success);
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5
+
+    private sealed class TestController : Microsoft.AspNetCore.Mvc.ControllerBase
+    {
+    }
+
+    [Fact]
+    public async Task GetAsync_UnknownMeeting_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        var userId = _db.SeedUser("briefunknownes@example.com", UserRole.Educator);
+
+        using var _lang = IepAssistant.Services.Localization.CultureScope.For("es");
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).GetAsync(userId, -1);
+
+        Assert.False(result.Success);
+        Assert.Equal("Reunión no encontrada.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<Microsoft.AspNetCore.Mvc.NotFoundObjectResult>(action);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_UnderSpanishCulture_AppendsResponseLanguageLine_PersistsGeneratedLanguage_AbsentUnderEnglish()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "S-lang");
+        var studentId = _db.Student(schoolId, "Sam");
+        var (userId, _) = _db.Staff("brieflang@example.com", districtId, schoolId, OrgRoleIds.Teacher);
+        _db.Access(studentId, userId, AccessRole.Collaborator);
+
+        var keys = SeedTemplate(docTypeId: 1);
+        int instanceId;
+        using (var ctx = _db.Context())
+        {
+            var instance = new DocumentInstance
+            {
+                SchoolStudentId = studentId,
+                DocumentTypeId = 1,
+                DocumentTemplateVersionId = keys.VersionId,
+                Status = DocumentInstanceStatus.Draft,
+                ValuesJson = $$"""{ "{{keys.PlacementKey}}": "General education" }"""
+            };
+            ctx.DocumentInstances.Add(instance);
+            ctx.SaveChanges();
+            instanceId = instance.Id;
+        }
+        var meetingId = _db.Meeting(studentId, userId, DateTime.UtcNow.AddDays(3));
+        using (var ctx = _db.Context())
+        {
+            ctx.Meetings.Single(m => m.Id == meetingId).DocumentInstanceId = instanceId;
+            ctx.SaveChanges();
+        }
+
+        var claude = new FakeClaudeClient();
+
+        using (var _lang = IepAssistant.Services.Localization.CultureScope.For("es"))
+        {
+            using var ctx = _db.Context();
+            var result = await CreateService(ctx, claude).GenerateAsync(userId, meetingId);
+            Assert.True(result.Success, result.Message);
+            Assert.Equal("es", result.Data!.GeneratedLanguage);
+            Assert.Contains("RESPONSE LANGUAGE: Respond in Spanish", claude.LastRequest!.SystemPrompt);
+        }
+
+        using (var readCtx = _db.Context())
+        {
+            var cached = await CreateService(readCtx).GetAsync(userId, meetingId);
+            Assert.True(cached.Success, cached.Message);
+            Assert.Equal("es", cached.Data!.GeneratedLanguage);
+        }
+
+        using (var _lang = IepAssistant.Services.Localization.CultureScope.For("en"))
+        {
+            using var ctx = _db.Context();
+            var result = await CreateService(ctx, claude).GenerateAsync(userId, meetingId);
+            Assert.True(result.Success, result.Message);
+            Assert.Equal("en", result.Data!.GeneratedLanguage);
+            Assert.DoesNotContain("RESPONSE LANGUAGE", claude.LastRequest!.SystemPrompt);
+        }
     }
 
     public void Dispose() => _db.Dispose();

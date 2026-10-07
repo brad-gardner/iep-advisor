@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -17,25 +18,28 @@ namespace IepAssistant.Services.Implementations;
 /// non-Draft version) and defended by <c>ImmutableVersionInterceptor</c>. Because that interceptor
 /// does not catch <c>ExecuteUpdate</c>/<c>ExecuteDelete</c>, this service never uses bulk ops on
 /// version content.</para>
+///
+/// <para>Multilingual plan (2026-10-06) phase 5: every failure <c>TemplateAuthoringController</c> maps
+/// to a status carries an explicit <see cref="ServiceErrorKind"/>. <see cref="TemplateFieldConfigValidator"/>'s
+/// own messages (<c>configError</c> below) are left English-only — out of this phase's scope, shared with
+/// several other services — but always map to <see cref="ServiceErrorKind.Validation"/> here, which is
+/// exactly the fallback status they got before (none of its messages contain "not found" or "changed by
+/// someone else"). Section/field <c>Title</c>/<c>Label</c> interpolated into a message are
+/// district-authored content and stay exactly as the admin typed them, never translated.</para>
 /// </summary>
 public class TemplateAuthoringService : ITemplateAuthoringService
 {
-    private const string VersionNotFoundMessage = "Template version not found.";
-    private const string SectionNotFoundMessage = "Template section not found.";
-    private const string FieldNotFoundMessage = "Template field not found.";
-    private const string TemplateNotFoundMessage = "Template not found.";
-    private const string NotDraftMessage = "Only a Draft version can be edited. Create a new draft from the published version first.";
-    private const string ConcurrencyMessage = "This template was changed by someone else. Please reload and try again.";
-
     private readonly ApplicationDbContext _context;
     private readonly IAuditLogger _audit;
     private readonly ILogger<TemplateAuthoringService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public TemplateAuthoringService(ApplicationDbContext context, IAuditLogger audit, ILogger<TemplateAuthoringService> logger)
+    public TemplateAuthoringService(ApplicationDbContext context, IAuditLogger audit, ILogger<TemplateAuthoringService> logger, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _audit = audit;
         _logger = logger;
+        _localizer = localizer;
     }
 
     // ---------------------------------------------------------------- Reads
@@ -44,7 +48,7 @@ public class TemplateAuthoringService : ITemplateAuthoringService
     {
         var detail = await BuildDetailAsync(versionId, ct);
         return detail == null
-            ? ServiceResult<TemplateVersionDetailModel>.FailureResult(VersionNotFoundMessage)
+            ? ServiceResult<TemplateVersionDetailModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Templates.VersionNotFound"])
             : ServiceResult<TemplateVersionDetailModel>.SuccessResult(detail);
     }
 
@@ -54,13 +58,13 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         int userId, int versionId, string title, byte[]? rowVersion, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(title))
-            return Fail("Section title is required.");
+            return Fail(ServiceErrorKind.Validation, _localizer["Templates.SectionTitleRequired"]);
 
         var version = await LoadDraftVersionAsync(versionId, ct);
-        if (version == null) return Fail(await VersionErrorAsync(versionId, ct));
+        if (version == null) return await VersionErrorResultAsync(versionId, ct);
 
-        var guard = CheckConcurrency(version, rowVersion);
-        if (guard != null) return Fail(guard);
+        var guard = CheckConcurrency(version, rowVersion, _localizer);
+        if (guard != null) return Fail(ServiceErrorKind.Conflict, guard);
 
         var maxOrder = await _context.TemplateSections
             .Where(s => s.DocumentTemplateVersionId == versionId)
@@ -83,16 +87,16 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         int userId, int sectionId, string title, byte[]? rowVersion, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(title))
-            return Fail("Section title is required.");
+            return Fail(ServiceErrorKind.Validation, _localizer["Templates.SectionTitleRequired"]);
 
         var section = await _context.TemplateSections.FirstOrDefaultAsync(s => s.Id == sectionId, ct);
-        if (section == null) return Fail(SectionNotFoundMessage);
+        if (section == null) return Fail(ServiceErrorKind.NotFound, _localizer["Templates.SectionNotFound"]);
 
         var version = await LoadDraftVersionAsync(section.DocumentTemplateVersionId, ct);
-        if (version == null) return Fail(await VersionErrorAsync(section.DocumentTemplateVersionId, ct));
+        if (version == null) return await VersionErrorResultAsync(section.DocumentTemplateVersionId, ct);
 
-        var guard = CheckConcurrency(version, rowVersion);
-        if (guard != null) return Fail(guard);
+        var guard = CheckConcurrency(version, rowVersion, _localizer);
+        if (guard != null) return Fail(ServiceErrorKind.Conflict, guard);
 
         section.Title = title.Trim();
         section.UpdatedById = userId;
@@ -107,13 +111,13 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         var section = await _context.TemplateSections
             .Include(s => s.Fields)
             .FirstOrDefaultAsync(s => s.Id == sectionId, ct);
-        if (section == null) return Fail(SectionNotFoundMessage);
+        if (section == null) return Fail(ServiceErrorKind.NotFound, _localizer["Templates.SectionNotFound"]);
 
         var version = await LoadDraftVersionAsync(section.DocumentTemplateVersionId, ct);
-        if (version == null) return Fail(await VersionErrorAsync(section.DocumentTemplateVersionId, ct));
+        if (version == null) return await VersionErrorResultAsync(section.DocumentTemplateVersionId, ct);
 
-        var guard = CheckConcurrency(version, rowVersion);
-        if (guard != null) return Fail(guard);
+        var guard = CheckConcurrency(version, rowVersion, _localizer);
+        if (guard != null) return Fail(ServiceErrorKind.Conflict, guard);
 
         _context.TemplateSections.Remove(section);
 
@@ -124,16 +128,16 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         int userId, int versionId, IReadOnlyList<int> orderedSectionIds, byte[]? rowVersion, CancellationToken ct = default)
     {
         var version = await LoadDraftVersionAsync(versionId, ct);
-        if (version == null) return Fail(await VersionErrorAsync(versionId, ct));
+        if (version == null) return await VersionErrorResultAsync(versionId, ct);
 
-        var guard = CheckConcurrency(version, rowVersion);
-        if (guard != null) return Fail(guard);
+        var guard = CheckConcurrency(version, rowVersion, _localizer);
+        if (guard != null) return Fail(ServiceErrorKind.Conflict, guard);
 
         var sections = await _context.TemplateSections
             .Where(s => s.DocumentTemplateVersionId == versionId).ToListAsync(ct);
 
-        var orderError = ValidateReorderSet(orderedSectionIds, sections.Select(s => s.Id), "section");
-        if (orderError != null) return Fail(orderError);
+        var orderError = ValidateReorderSet(orderedSectionIds, sections.Select(s => s.Id), _localizer["Templates.SectionOrderInvalid"]);
+        if (orderError != null) return Fail(ServiceErrorKind.Validation, orderError);
 
         var byId = sections.ToDictionary(s => s.Id);
         for (var i = 0; i < orderedSectionIds.Count; i++)
@@ -153,19 +157,19 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         byte[]? rowVersion, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(label))
-            return Fail("Field label is required.");
+            return Fail(ServiceErrorKind.Validation, _localizer["Templates.FieldLabelRequired"]);
 
         var configError = TemplateFieldConfigValidator.Validate(fieldType, configJson);
-        if (configError != null) return Fail(configError);
+        if (configError != null) return Fail(ServiceErrorKind.Validation, configError);
 
         var section = await _context.TemplateSections.FirstOrDefaultAsync(s => s.Id == sectionId, ct);
-        if (section == null) return Fail(SectionNotFoundMessage);
+        if (section == null) return Fail(ServiceErrorKind.NotFound, _localizer["Templates.SectionNotFound"]);
 
         var version = await LoadDraftVersionAsync(section.DocumentTemplateVersionId, ct);
-        if (version == null) return Fail(await VersionErrorAsync(section.DocumentTemplateVersionId, ct));
+        if (version == null) return await VersionErrorResultAsync(section.DocumentTemplateVersionId, ct);
 
-        var guard = CheckConcurrency(version, rowVersion);
-        if (guard != null) return Fail(guard);
+        var guard = CheckConcurrency(version, rowVersion, _localizer);
+        if (guard != null) return Fail(ServiceErrorKind.Conflict, guard);
 
         var maxOrder = await _context.TemplateFields
             .Where(f => f.TemplateSectionId == sectionId)
@@ -193,19 +197,19 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         byte[]? rowVersion, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(label))
-            return Fail("Field label is required.");
+            return Fail(ServiceErrorKind.Validation, _localizer["Templates.FieldLabelRequired"]);
 
         var configError = TemplateFieldConfigValidator.Validate(fieldType, configJson);
-        if (configError != null) return Fail(configError);
+        if (configError != null) return Fail(ServiceErrorKind.Validation, configError);
 
         var field = await _context.TemplateFields.FirstOrDefaultAsync(f => f.Id == fieldId, ct);
-        if (field == null) return Fail(FieldNotFoundMessage);
+        if (field == null) return Fail(ServiceErrorKind.NotFound, _localizer["Templates.FieldNotFound"]);
 
         var version = await LoadDraftVersionAsync(field.DocumentTemplateVersionId, ct);
-        if (version == null) return Fail(await VersionErrorAsync(field.DocumentTemplateVersionId, ct));
+        if (version == null) return await VersionErrorResultAsync(field.DocumentTemplateVersionId, ct);
 
-        var guard = CheckConcurrency(version, rowVersion);
-        if (guard != null) return Fail(guard);
+        var guard = CheckConcurrency(version, rowVersion, _localizer);
+        if (guard != null) return Fail(ServiceErrorKind.Conflict, guard);
 
         // FieldKey is stable and never changes on update (values stay mapped).
         field.FieldType = fieldType;
@@ -221,13 +225,13 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         int userId, int fieldId, byte[]? rowVersion, CancellationToken ct = default)
     {
         var field = await _context.TemplateFields.FirstOrDefaultAsync(f => f.Id == fieldId, ct);
-        if (field == null) return Fail(FieldNotFoundMessage);
+        if (field == null) return Fail(ServiceErrorKind.NotFound, _localizer["Templates.FieldNotFound"]);
 
         var version = await LoadDraftVersionAsync(field.DocumentTemplateVersionId, ct);
-        if (version == null) return Fail(await VersionErrorAsync(field.DocumentTemplateVersionId, ct));
+        if (version == null) return await VersionErrorResultAsync(field.DocumentTemplateVersionId, ct);
 
-        var guard = CheckConcurrency(version, rowVersion);
-        if (guard != null) return Fail(guard);
+        var guard = CheckConcurrency(version, rowVersion, _localizer);
+        if (guard != null) return Fail(ServiceErrorKind.Conflict, guard);
 
         _context.TemplateFields.Remove(field);
 
@@ -238,19 +242,19 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         int userId, int sectionId, IReadOnlyList<int> orderedFieldIds, byte[]? rowVersion, CancellationToken ct = default)
     {
         var section = await _context.TemplateSections.FirstOrDefaultAsync(s => s.Id == sectionId, ct);
-        if (section == null) return Fail(SectionNotFoundMessage);
+        if (section == null) return Fail(ServiceErrorKind.NotFound, _localizer["Templates.SectionNotFound"]);
 
         var version = await LoadDraftVersionAsync(section.DocumentTemplateVersionId, ct);
-        if (version == null) return Fail(await VersionErrorAsync(section.DocumentTemplateVersionId, ct));
+        if (version == null) return await VersionErrorResultAsync(section.DocumentTemplateVersionId, ct);
 
-        var guard = CheckConcurrency(version, rowVersion);
-        if (guard != null) return Fail(guard);
+        var guard = CheckConcurrency(version, rowVersion, _localizer);
+        if (guard != null) return Fail(ServiceErrorKind.Conflict, guard);
 
         var fields = await _context.TemplateFields
             .Where(f => f.TemplateSectionId == sectionId).ToListAsync(ct);
 
-        var orderError = ValidateReorderSet(orderedFieldIds, fields.Select(f => f.Id), "field");
-        if (orderError != null) return Fail(orderError);
+        var orderError = ValidateReorderSet(orderedFieldIds, fields.Select(f => f.Id), _localizer["Templates.FieldOrderInvalid"]);
+        if (orderError != null) return Fail(ServiceErrorKind.Validation, orderError);
 
         var byId = fields.ToDictionary(f => f.Id);
         for (var i = 0; i < orderedFieldIds.Count; i++)
@@ -269,14 +273,14 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         int userId, int templateId, byte[]? rowVersion, CancellationToken ct = default)
     {
         var template = await _context.DocumentTemplates.FirstOrDefaultAsync(t => t.Id == templateId, ct);
-        if (template == null) return Fail(TemplateNotFoundMessage);
+        if (template == null) return Fail(ServiceErrorKind.NotFound, _localizer["Templates.TemplateNotFound"]);
 
         var version = await _context.DocumentTemplateVersions
             .FirstOrDefaultAsync(v => v.DocumentTemplateId == templateId && v.Status == TemplateVersionStatus.Draft, ct);
-        if (version == null) return Fail("This template has no Draft version to publish.");
+        if (version == null) return Fail(ServiceErrorKind.Validation, _localizer["Templates.NoDraftToPublish"]);
 
-        var guard = CheckConcurrency(version, rowVersion);
-        if (guard != null) return Fail(guard);
+        var guard = CheckConcurrency(version, rowVersion, _localizer);
+        if (guard != null) return Fail(ServiceErrorKind.Conflict, guard);
 
         // Structural + config validation — gather ALL problems as field-level errors.
         var errors = await ValidatePublishableAsync(version.Id, ct);
@@ -294,7 +298,7 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Fail(ConcurrencyMessage);
+            return Fail(ServiceErrorKind.Conflict, _localizer["Templates.ConcurrencyConflict"]);
         }
 
         // FERPA/governance audit: publish is what makes a template version the pinned schema for all
@@ -313,13 +317,13 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         int userId, int templateId, CancellationToken ct = default)
     {
         var template = await _context.DocumentTemplates.FirstOrDefaultAsync(t => t.Id == templateId, ct);
-        if (template == null) return Fail(TemplateNotFoundMessage);
+        if (template == null) return Fail(ServiceErrorKind.NotFound, _localizer["Templates.TemplateNotFound"]);
 
         // Only one Draft per template at a time.
         var hasDraft = await _context.DocumentTemplateVersions
             .AnyAsync(v => v.DocumentTemplateId == templateId && v.Status == TemplateVersionStatus.Draft, ct);
         if (hasDraft)
-            return Fail("This template already has a Draft version. Publish or discard it before creating another.");
+            return Fail(ServiceErrorKind.Validation, _localizer["Templates.AlreadyHasDraft"]);
 
         // Fork the latest Published version.
         var source = await _context.DocumentTemplateVersions
@@ -328,7 +332,7 @@ public class TemplateAuthoringService : ITemplateAuthoringService
             .OrderByDescending(v => v.VersionNumber)
             .FirstOrDefaultAsync(ct);
         if (source == null)
-            return Fail("This template has no published version to base a new draft on.");
+            return Fail(ServiceErrorKind.Validation, _localizer["Templates.NoPublishedVersionToFork"]);
 
         var sourceSections = await _context.TemplateSections
             .AsNoTracking()
@@ -385,7 +389,7 @@ public class TemplateAuthoringService : ITemplateAuthoringService
             // Backstop for the (DocumentTemplateId, VersionNumber) unique index: two concurrent forks
             // can both pass the AnyAsync/Max pre-checks, so the loser's duplicate version number is
             // translated into the same friendly single-draft error rather than surfacing as a 500.
-            return Fail("This template already has a Draft version. Publish or discard it before creating another.");
+            return Fail(ServiceErrorKind.Validation, _localizer["Templates.AlreadyHasDraft"]);
         }
 
         // Audit the fork (new Draft created from a Published version) alongside the app log (G-e.4).
@@ -448,15 +452,19 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         return version is { Status: TemplateVersionStatus.Draft } ? version : null;
     }
 
-    /// <summary>Distinguishes "not found" from "not a Draft" for a friendly message after LoadDraftVersionAsync returns null.</summary>
-    private async Task<string> VersionErrorAsync(int versionId, CancellationToken ct)
+    /// <summary>Distinguishes "not found" from "not a Draft" after <see cref="LoadDraftVersionAsync"/>
+    /// returns null, returning the matching <see cref="ServiceErrorKind"/> (NotFound/Validation) with a
+    /// localized message — never a bare string a controller would have to re-classify by matching text.</summary>
+    private async Task<ServiceResult<TemplateVersionDetailModel>> VersionErrorResultAsync(int versionId, CancellationToken ct)
     {
         var exists = await _context.DocumentTemplateVersions.AnyAsync(v => v.Id == versionId, ct);
-        return exists ? NotDraftMessage : VersionNotFoundMessage;
+        return exists
+            ? Fail(ServiceErrorKind.Validation, _localizer["Templates.NotDraft"])
+            : Fail(ServiceErrorKind.NotFound, _localizer["Templates.VersionNotFound"]);
     }
 
     /// <summary>Manual optimistic-concurrency check against the client-supplied token. Null = proceed.</summary>
-    private static string? CheckConcurrency(DocumentTemplateVersion version, byte[]? clientRowVersion)
+    private static string? CheckConcurrency(DocumentTemplateVersion version, byte[]? clientRowVersion, IStringLocalizer<Messages> localizer)
     {
         // First edit of a never-rotated draft (token still null) accepts any/no client token.
         if (version.RowVersion == null || version.RowVersion.Length == 0)
@@ -467,7 +475,7 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         if (clientRowVersion == null || clientRowVersion.Length == 0)
             return null;
 
-        return version.RowVersion.AsSpan().SequenceEqual(clientRowVersion) ? null : ConcurrencyMessage;
+        return version.RowVersion.AsSpan().SequenceEqual(clientRowVersion) ? null : localizer["Templates.ConcurrencyConflict"];
     }
 
     private static void RotateToken(DocumentTemplateVersion version)
@@ -487,7 +495,7 @@ public class TemplateAuthoringService : ITemplateAuthoringService
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Fail(ConcurrencyMessage);
+            return Fail(ServiceErrorKind.Conflict, _localizer["Templates.ConcurrencyConflict"]);
         }
 
         return await SuccessDetailAsync(versionId, ct);
@@ -497,23 +505,25 @@ public class TemplateAuthoringService : ITemplateAuthoringService
     {
         var detail = await BuildDetailAsync(versionId, ct);
         return detail == null
-            ? ServiceResult<TemplateVersionDetailModel>.FailureResult(VersionNotFoundMessage)
+            ? Fail(ServiceErrorKind.NotFound, _localizer["Templates.VersionNotFound"])
             : ServiceResult<TemplateVersionDetailModel>.SuccessResult(detail);
     }
 
-    private static ServiceResult<TemplateVersionDetailModel> Fail(string message)
-        => ServiceResult<TemplateVersionDetailModel>.FailureResult(message);
+    private static ServiceResult<TemplateVersionDetailModel> Fail(ServiceErrorKind kind, string message)
+        => ServiceResult<TemplateVersionDetailModel>.FailureResult(kind, message);
 
     private static string? NormalizeConfig(string? configJson)
         => string.IsNullOrWhiteSpace(configJson) ? null : configJson.Trim();
 
-    /// <summary>Ensures the reorder id set is exactly the current set (no missing/extra/duplicate ids).</summary>
-    private static string? ValidateReorderSet(IReadOnlyList<int> orderedIds, IEnumerable<int> currentIds, string noun)
+    /// <summary>Ensures the reorder id set is exactly the current set (no missing/extra/duplicate ids).
+    /// <paramref name="orderMessage"/> is the already-localized message to return on mismatch (callers pass
+    /// a per-noun resx key so "section"/"field" are translated, not interpolated as English words).</summary>
+    private static string? ValidateReorderSet(IReadOnlyList<int> orderedIds, IEnumerable<int> currentIds, string orderMessage)
     {
         var current = currentIds.ToHashSet();
         if (orderedIds.Count != current.Count || orderedIds.Distinct().Count() != orderedIds.Count
             || !orderedIds.All(current.Contains))
-            return $"The {noun} order must list every {noun} exactly once.";
+            return orderMessage;
         return null;
     }
 

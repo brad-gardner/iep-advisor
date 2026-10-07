@@ -1,8 +1,13 @@
 using System.Text;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
+using IepAssistant.Services.Models;
 using Xunit;
 
 namespace IepAssistant.Services.Tests;
@@ -17,8 +22,8 @@ public sealed class CalendarServiceTests : IDisposable
         var orgAccess = new OrgAccessService(ctx);
         var notifications = new NotificationService(ctx, TestSupport.TestLocalizers.Messages());
         var meetingService = new MeetingService(ctx, orgAccess, new AccessService(ctx), notifications, new CapturingAuditLogger(), Microsoft.Extensions.Logging.Abstractions.NullLogger<MeetingService>.Instance, TestSupport.TestLocalizers.Messages(), TestSupport.TestLocalizers.Notifications());
-        var obligationService = new ObligationService(ctx, orgAccess);
-        return new CalendarService(ctx, meetingService, obligationService, orgAccess, new IcsBuilder(), TestSupport.TestLocalizers.Emails());
+        var obligationService = new ObligationService(ctx, orgAccess, TestSupport.TestLocalizers.Messages());
+        return new CalendarService(ctx, meetingService, obligationService, orgAccess, new IcsBuilder(), TestSupport.TestLocalizers.Emails(), TestSupport.TestLocalizers.Messages());
     }
 
     [Fact]
@@ -197,9 +202,32 @@ public sealed class CalendarServiceTests : IDisposable
 
         // Sanity check: the authenticated GET /api/educator/obligations/mine equivalent keeps giving the
         // admin their full scope (both students) — only the anonymous feed is narrowed.
-        var obligationService = new ObligationService(readCtx, new OrgAccessService(readCtx));
+        var obligationService = new ObligationService(readCtx, new OrgAccessService(readCtx), TestSupport.TestLocalizers.Messages());
         var mine = await obligationService.GetMineAsync(adminUserId, null);
         Assert.Contains(mine.Data!, o => o.StudentName.Contains("Other"));
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5
+
+    private sealed class TestController : ControllerBase
+    {
+    }
+
+    [Fact]
+    public async Task GetMeetingIcsAsync_UnknownMeeting_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        var userId = _db.SeedUser("icsunknownes@example.com", UserRole.Educator);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).GetMeetingIcsAsync(userId, -1);
+
+        Assert.False(result.Success);
+        Assert.Equal("Reunión no encontrada.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
     }
 
     public void Dispose() => _db.Dispose();

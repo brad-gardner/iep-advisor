@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -8,6 +9,16 @@ using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
 
+/// <summary>
+/// Multilingual plan (2026-10-06) phase 5: every failure <c>EducatorController</c> maps to a status
+/// carries an explicit <see cref="ServiceErrorKind"/>, and every message is localized
+/// (<c>Messages.resx</c>/<c>.es.resx</c>) — see
+/// <see cref="IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure"/>.
+/// <see cref="DuplicateExternalIdMessage"/> stays an English-literal const: <c>RosterImportService</c>
+/// (phase 6) assigns it verbatim into an import report row, unlocalized until that phase. The two
+/// FailureResult call sites below that reach a controller use the localized
+/// <c>Educator.DuplicateExternalId</c> resource instead (same English text, byte-identical).
+/// </summary>
 public class EducatorService : IEducatorService
 {
     internal const string DuplicateExternalIdMessage = "Student ID already in use in this district.";
@@ -22,13 +33,15 @@ public class EducatorService : IEducatorService
     private readonly IOrgAccessService _orgAccess;
     private readonly IAuditLogger _audit;
     private readonly ILogger<EducatorService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public EducatorService(ApplicationDbContext context, IOrgAccessService orgAccess, IAuditLogger audit, ILogger<EducatorService> logger)
+    public EducatorService(ApplicationDbContext context, IOrgAccessService orgAccess, IAuditLogger audit, ILogger<EducatorService> logger, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
         _audit = audit;
         _logger = logger;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<EducatorProfileModel>> GetMeAsync(int userId, CancellationToken ct = default)
@@ -41,7 +54,7 @@ public class EducatorService : IEducatorService
             .FirstOrDefaultAsync(t => t.UserId == userId, ct);
 
         if (profile == null)
-            return ServiceResult<EducatorProfileModel>.FailureResult("Educator profile not found.");
+            return ServiceResult<EducatorProfileModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.ProfileNotFound"]);
 
         return ServiceResult<EducatorProfileModel>.SuccessResult(BuildProfileModel(profile));
     }
@@ -51,11 +64,11 @@ public class EducatorService : IEducatorService
     public async Task<ServiceResult<SchoolStudentModel>> CreateStudentAsync(int userId, CreateSchoolStudentModel model, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(model.FirstName))
-            return ServiceResult<SchoolStudentModel>.FailureResult("Student first name is required.");
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Educator.FirstNameRequired"]);
 
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return ServiceResult<SchoolStudentModel>.FailureResult("Educator profile not found.");
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.ProfileNotFound"]);
 
         // Resolve the target school per org role (never SchoolId=0/NRE).
         int targetSchoolId;
@@ -63,21 +76,21 @@ public class EducatorService : IEducatorService
         {
             // DistrictAdmin has no implicit school: an explicit, active, in-district school is required.
             if (model.SchoolId == null)
-                return ServiceResult<SchoolStudentModel>.FailureResult("A school is required. Please choose a school for this student.");
+                return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Educator.SchoolRequiredChoose"]);
 
             var schoolOk = await _context.Schools.AsNoTracking()
                 .AnyAsync(s => s.Id == model.SchoolId.Value && s.DistrictId == ctx.DistrictId && s.IsActive, ct);
             if (!schoolOk)
-                return ServiceResult<SchoolStudentModel>.FailureResult("School not found.");
+                return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.SchoolNotFound"]);
             targetSchoolId = model.SchoolId.Value;
         }
         else
         {
             // SchoolAdmin / Teacher-tier: own school only. An explicit mismatched school is denied.
             if (ctx.SchoolId == null)
-                return ServiceResult<SchoolStudentModel>.FailureResult("A school is required to create a student.");
+                return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Educator.SchoolRequiredToCreate"]);
             if (model.SchoolId != null && model.SchoolId.Value != ctx.SchoolId.Value)
-                return ServiceResult<SchoolStudentModel>.FailureResult("You do not have permission to create a student in another school.");
+                return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionCreateOtherSchool"]);
             targetSchoolId = ctx.SchoolId.Value;
         }
 
@@ -88,7 +101,7 @@ public class EducatorService : IEducatorService
 
         var externalId = NormalizeExternalId(model.ExternalStudentId);
         if (externalId != null && await ExternalIdInUseAsync(school.DistrictId, externalId, excludeStudentId: null, ct))
-            return ServiceResult<SchoolStudentModel>.FailureResult(DuplicateExternalIdMessage);
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Educator.DuplicateExternalId"]);
 
         var student = new SchoolStudent
         {
@@ -119,7 +132,7 @@ public class EducatorService : IEducatorService
         catch (DbUpdateException ex) when (IsExternalIdCollision(ex))
         {
             _context.Entry(student).State = EntityState.Detached;
-            return ServiceResult<SchoolStudentModel>.FailureResult(DuplicateExternalIdMessage);
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Educator.DuplicateExternalId"]);
         }
 
         await _context.SchoolStudentAccesses.AddAsync(new SchoolStudentAccess
@@ -139,7 +152,7 @@ public class EducatorService : IEducatorService
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return ServiceResult<List<SchoolStudentModel>>.FailureResult("Educator profile not found.");
+            return ServiceResult<List<SchoolStudentModel>>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.ProfileNotFound"]);
 
         var query = ScopedStudents(ctx, userId);
         if (query == null)
@@ -160,7 +173,7 @@ public class EducatorService : IEducatorService
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return ServiceResult<PagedResult<SchoolStudentModel>>.FailureResult("Educator profile not found.");
+            return ServiceResult<PagedResult<SchoolStudentModel>>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.ProfileNotFound"]);
 
         var page = Math.Max(1, search.Page);
         var pageSize = Math.Clamp(search.PageSize, 1, 200);
@@ -200,7 +213,7 @@ public class EducatorService : IEducatorService
             // Backs the compliance board's date-range-bound "dueInRange" drilldown (review-fix contract
             // addition 1) — Due30/Due60 above stay anchored on today regardless of From/To.
             if (!AdminQueryLimits.IsWithinRange(search.From, today) || !AdminQueryLimits.IsWithinRange(search.To, today))
-                return ServiceResult<PagedResult<SchoolStudentModel>>.FailureResult("The requested date range is out of bounds.");
+                return ServiceResult<PagedResult<SchoolStudentModel>>.FailureResult(ServiceErrorKind.Validation, _localizer["Educator.DateRangeOutOfBounds"]);
 
             var fromDate = (search.From ?? today).Date;
             var toDate = (search.To ?? fromDate.AddDays(60)).Date;
@@ -244,7 +257,7 @@ public class EducatorService : IEducatorService
         // Org access (player-coach: admins pass within scope; teachers need an active SchoolStudentAccess).
         // Identical gate to GetStudentsAsync ⇒ list authz == detail authz.
         if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
-            return ServiceResult<SchoolStudentModel>.FailureResult("You do not have permission to access this student.");
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionAccessStudent"]);
 
         var model = await _context.SchoolStudents
             .AsNoTracking()
@@ -252,7 +265,7 @@ public class EducatorService : IEducatorService
             .Select(Projection)
             .FirstOrDefaultAsync(ct);
         if (model == null)
-            return ServiceResult<SchoolStudentModel>.FailureResult("Student not found.");
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.StudentNotFound"]);
 
         return ServiceResult<SchoolStudentModel>.SuccessResult(model);
     }
@@ -262,20 +275,20 @@ public class EducatorService : IEducatorService
     public async Task<ServiceResult<SchoolStudentModel>> UpdateStudentAsync(int userId, int studentId, UpdateSchoolStudentModel model, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(model.FirstName))
-            return ServiceResult<SchoolStudentModel>.FailureResult("Student first name is required.");
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Educator.FirstNameRequired"]);
 
         // Collaborator+ on the student (teacher-tier) or an admin in scope (player-coach superset).
         if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Collaborator, ct))
-            return ServiceResult<SchoolStudentModel>.FailureResult("You do not have permission to edit this student.");
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionEditStudent"]);
 
         var student = await _context.SchoolStudents.FirstOrDefaultAsync(s => s.Id == studentId, ct);
         if (student == null)
-            return ServiceResult<SchoolStudentModel>.FailureResult("Student not found.");
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.StudentNotFound"]);
 
         var externalId = NormalizeExternalId(model.ExternalStudentId);
         if (externalId != null && externalId != student.ExternalStudentId
             && await ExternalIdInUseAsync(student.DistrictId, externalId, student.Id, ct))
-            return ServiceResult<SchoolStudentModel>.FailureResult(DuplicateExternalIdMessage);
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Educator.DuplicateExternalId"]);
 
         student.FirstName = model.FirstName.Trim();
         student.LastName = NormalizeOptional(model.LastName);
@@ -299,7 +312,7 @@ public class EducatorService : IEducatorService
         }
         catch (DbUpdateException ex) when (IsExternalIdCollision(ex))
         {
-            return ServiceResult<SchoolStudentModel>.FailureResult(DuplicateExternalIdMessage);
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Educator.DuplicateExternalId"]);
         }
 
         _audit.Record(AuditAction.Edit, userId, StudentResource, studentId);
@@ -308,12 +321,12 @@ public class EducatorService : IEducatorService
 
     public async Task<ServiceResult<SchoolStudentModel>> ExitStudentAsync(int userId, int studentId, ExitStudentModel model, CancellationToken ct = default)
     {
-        var (student, denied) = await LoadForAdminMutationAsync(userId, studentId, ct);
+        var (student, kind, denied) = await LoadForAdminMutationAsync(userId, studentId, ct);
         if (denied != null)
-            return ServiceResult<SchoolStudentModel>.FailureResult(denied);
+            return ServiceResult<SchoolStudentModel>.FailureResult(kind, denied);
 
         if (student!.Status == StudentStatus.Exited)
-            return ServiceResult<SchoolStudentModel>.FailureResult("Student has already been exited.");
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Educator.AlreadyExited"]);
 
         student.Status = StudentStatus.Exited;
         student.IsActive = false;
@@ -329,9 +342,9 @@ public class EducatorService : IEducatorService
 
     public async Task<ServiceResult<SchoolStudentModel>> ReactivateStudentAsync(int userId, int studentId, CancellationToken ct = default)
     {
-        var (student, denied) = await LoadForAdminMutationAsync(userId, studentId, ct);
+        var (student, kind, denied) = await LoadForAdminMutationAsync(userId, studentId, ct);
         if (denied != null)
-            return ServiceResult<SchoolStudentModel>.FailureResult(denied);
+            return ServiceResult<SchoolStudentModel>.FailureResult(kind, denied);
 
         if (student!.Status != StudentStatus.Active)
         {
@@ -351,9 +364,9 @@ public class EducatorService : IEducatorService
 
     public async Task<ServiceResult<SchoolStudentModel>> ArchiveStudentAsync(int userId, int studentId, CancellationToken ct = default)
     {
-        var (student, denied) = await LoadForAdminMutationAsync(userId, studentId, ct);
+        var (student, kind, denied) = await LoadForAdminMutationAsync(userId, studentId, ct);
         if (denied != null)
-            return ServiceResult<SchoolStudentModel>.FailureResult(denied);
+            return ServiceResult<SchoolStudentModel>.FailureResult(kind, denied);
 
         if (student!.Status != StudentStatus.Archived)
         {
@@ -373,25 +386,25 @@ public class EducatorService : IEducatorService
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return ServiceResult<SchoolStudentModel>.FailureResult("Educator profile not found.");
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.ProfileNotFound"]);
         if (ctx.OrgRoleId != OrgRoleIds.DistrictAdmin)
-            return ServiceResult<SchoolStudentModel>.FailureResult("You do not have permission to transfer students.");
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionTransferStudents"]);
         if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
-            return ServiceResult<SchoolStudentModel>.FailureResult("You do not have permission to transfer this student.");
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionTransferThisStudent"]);
 
         var student = await _context.SchoolStudents
             .Include(s => s.School).ThenInclude(s => s.District)
             .FirstOrDefaultAsync(s => s.Id == studentId, ct);
         if (student == null)
-            return ServiceResult<SchoolStudentModel>.FailureResult("Student not found.");
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.StudentNotFound"]);
 
         // Both schools must be active schools of the caller's district.
         var newSchool = await _context.Schools.AsNoTracking()
             .FirstOrDefaultAsync(s => s.Id == newSchoolId && s.DistrictId == ctx.DistrictId && s.IsActive, ct);
         if (newSchool == null)
-            return ServiceResult<SchoolStudentModel>.FailureResult("School not found.");
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.SchoolNotFound"]);
         if (newSchool.Id == student.SchoolId)
-            return ServiceResult<SchoolStudentModel>.FailureResult("The student is already at that school.");
+            return ServiceResult<SchoolStudentModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Educator.AlreadyAtSchool"]);
 
         var oldSchoolName = student.School.Name;
         var oldSchoolState = student.School.StateCode ?? student.School.District.StateCode;
@@ -424,22 +437,22 @@ public class EducatorService : IEducatorService
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return ServiceResult<BulkAssignResultModel>.FailureResult("Educator profile not found.");
+            return ServiceResult<BulkAssignResultModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.ProfileNotFound"]);
         if (!OrgRoleIds.IsAdmin(ctx.OrgRoleId))
-            return ServiceResult<BulkAssignResultModel>.FailureResult("You do not have permission to assign case managers.");
+            return ServiceResult<BulkAssignResultModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionAssignCaseManagers"]);
 
         var studentIds = model.StudentIds.Distinct().ToList();
         if (studentIds.Count == 0)
-            return ServiceResult<BulkAssignResultModel>.FailureResult("Choose at least one student.");
+            return ServiceResult<BulkAssignResultModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Educator.ChooseAtLeastOneStudent"]);
         if (studentIds.Count > MaxBulkStudents)
-            return ServiceResult<BulkAssignResultModel>.FailureResult($"Choose at most {MaxBulkStudents} students at a time.");
+            return ServiceResult<BulkAssignResultModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Educator.ChooseAtMostStudents", MaxBulkStudents]);
 
         var target = await _context.StaffProfiles.AsNoTracking()
             .FirstOrDefaultAsync(p => p.UserId == model.UserId && p.IsActive && p.DistrictId == ctx.DistrictId, ct);
         if (target == null)
-            return ServiceResult<BulkAssignResultModel>.FailureResult("Staff member not found.");
+            return ServiceResult<BulkAssignResultModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Team.StaffMemberNotFound"]);
         if (target.OrgRoleId == OrgRoleIds.DistrictAdmin)
-            return ServiceResult<BulkAssignResultModel>.FailureResult("A District Admin does not need a per-student assignment.");
+            return ServiceResult<BulkAssignResultModel>.FailureResult(ServiceErrorKind.Validation, _localizer["Team.DistrictAdminNoAssignment"]);
 
         // One scoped query authorizes the whole selection (ScopedStudents encodes the admin rule of
         // CanActOnStudentAsync); any id outside the caller's scope — or unknown — fails the request.
@@ -448,12 +461,12 @@ public class EducatorService : IEducatorService
             ? new List<SchoolStudent>()
             : await scoped.Where(s => studentIds.Contains(s.Id)).ToListAsync(ct);
         if (students.Count != studentIds.Count)
-            return ServiceResult<BulkAssignResultModel>.FailureResult("You do not have permission to manage one or more of the selected students.");
+            return ServiceResult<BulkAssignResultModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionManageSelectedStudents"]);
         foreach (var student in students)
         {
-            var error = StudentTeamWriter.ValidateTeamCandidate(target, ctx.DistrictId, student.SchoolId);
+            var error = StudentTeamWriter.ValidateTeamCandidate(target, ctx.DistrictId, student.SchoolId, _localizer);
             if (error != null)
-                return ServiceResult<BulkAssignResultModel>.FailureResult($"{student.FirstName} {student.LastName}: {error}".Trim());
+                return ServiceResult<BulkAssignResultModel>.FailureResult(error.Value.Kind, $"{student.FirstName} {student.LastName}: {error.Value.Message}".Trim());
         }
 
         var toAssign = students.Where(s => s.CaseManagerUserId != target.UserId).ToList();
@@ -479,7 +492,7 @@ public class EducatorService : IEducatorService
     public async Task<ServiceResult<List<StudentStaffAccessModel>>> GetStudentStaffAccessAsync(int userId, int studentId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
-            return ServiceResult<List<StudentStaffAccessModel>>.FailureResult("You do not have permission to access this student.");
+            return ServiceResult<List<StudentStaffAccessModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionAccessStudent"]);
 
         // Active grants joined to the grantee's StaffProfile (name/email/org role). A grant whose user has
         // no StaffProfile (shouldn't happen for staff grants) is excluded by the inner join.
@@ -509,11 +522,11 @@ public class EducatorService : IEducatorService
     {
         var caller = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (caller == null)
-            return ServiceResult<StudentStaffAccessModel>.FailureResult("Educator profile not found.");
+            return ServiceResult<StudentStaffAccessModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.ProfileNotFound"]);
 
         // ADMIN-only: teachers cannot assign staff.
         if (!OrgRoleIds.IsAdmin(caller.OrgRoleId))
-            return ServiceResult<StudentStaffAccessModel>.FailureResult("You do not have permission to assign staff to this student.");
+            return ServiceResult<StudentStaffAccessModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionAssignStaff"]);
 
         // The student must exist and fall within the caller's scope.
         var studentSchoolId = await _context.SchoolStudents.AsNoTracking()
@@ -521,18 +534,18 @@ public class EducatorService : IEducatorService
             .Select(s => (int?)s.SchoolId)
             .FirstOrDefaultAsync(ct);
         if (studentSchoolId == null)
-            return ServiceResult<StudentStaffAccessModel>.FailureResult("Student not found.");
+            return ServiceResult<StudentStaffAccessModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.StudentNotFound"]);
         if (!await _orgAccess.CanActOnSchoolAsync(userId, studentSchoolId.Value, ct))
-            return ServiceResult<StudentStaffAccessModel>.FailureResult("You do not have permission to assign staff to this student.");
+            return ServiceResult<StudentStaffAccessModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionAssignStaff"]);
 
         // The target staff member must be active and bound to the student's school (a school-bound
         // teacher/school-admin) or a multi-building provider. District admins act by scope and don't need
         // (or get) per-student grants.
         var target = await _context.StaffProfiles.AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == model.StaffProfileId && p.IsActive, ct);
-        var candidateError = StudentTeamWriter.ValidateTeamCandidate(target, caller.DistrictId, studentSchoolId.Value);
+        var candidateError = StudentTeamWriter.ValidateTeamCandidate(target, caller.DistrictId, studentSchoolId.Value, _localizer);
         if (candidateError != null)
-            return ServiceResult<StudentStaffAccessModel>.FailureResult(candidateError);
+            return ServiceResult<StudentStaffAccessModel>.FailureResult(candidateError.Value.Kind, candidateError.Value.Message);
 
         // Upsert against the unique (SchoolStudentId, UserId) row: reactivate / update role rather than
         // inserting a duplicate (the index would reject it anyway).
@@ -587,27 +600,27 @@ public class EducatorService : IEducatorService
     {
         var caller = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (caller == null)
-            return ServiceResult.FailureResult("Educator profile not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.ProfileNotFound"]);
 
         if (!OrgRoleIds.IsAdmin(caller.OrgRoleId))
-            return ServiceResult.FailureResult("You do not have permission to manage staff for this student.");
+            return ServiceResult.FailureResult(ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionManageStaff"]);
 
         var studentSchoolId = await _context.SchoolStudents.AsNoTracking()
             .Where(s => s.Id == studentId)
             .Select(s => (int?)s.SchoolId)
             .FirstOrDefaultAsync(ct);
         if (studentSchoolId == null)
-            return ServiceResult.FailureResult("Student not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.StudentNotFound"]);
         if (!await _orgAccess.CanActOnSchoolAsync(userId, studentSchoolId.Value, ct))
-            return ServiceResult.FailureResult("You do not have permission to manage staff for this student.");
+            return ServiceResult.FailureResult(ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionManageStaff"]);
 
         var grant = await _context.SchoolStudentAccesses
             .FirstOrDefaultAsync(a => a.Id == accessId && a.SchoolStudentId == studentId, ct);
         if (grant == null)
-            return ServiceResult.FailureResult("Access grant not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Educator.AccessGrantNotFound"]);
 
         if (!grant.IsActive)
-            return ServiceResult.SuccessResult("Access is already revoked.");
+            return ServiceResult.SuccessResult(_localizer["Educator.AccessAlreadyRevoked"]);
 
         grant.IsActive = false;
         grant.UpdatedById = userId;
@@ -615,7 +628,7 @@ public class EducatorService : IEducatorService
 
         _logger.LogInformation("Staff↔student access {AccessId} (student {StudentId}) revoked by user {CallerId}",
             accessId, studentId, userId);
-        return ServiceResult.SuccessResult("Access revoked.");
+        return ServiceResult.SuccessResult(_localizer["Educator.AccessRevoked"]);
     }
 
     // ----------------------------------------------------------------- helpers
@@ -655,18 +668,18 @@ public class EducatorService : IEducatorService
     }
 
     /// <summary>Admin-only lifecycle gate: caller is DistrictAdmin/SchoolAdmin and the student is in their scope.</summary>
-    private async Task<(SchoolStudent? Student, string? Denied)> LoadForAdminMutationAsync(int userId, int studentId, CancellationToken ct)
+    private async Task<(SchoolStudent? Student, ServiceErrorKind Kind, string? Denied)> LoadForAdminMutationAsync(int userId, int studentId, CancellationToken ct)
     {
         var ctx = await _orgAccess.GetStaffContextAsync(userId, ct);
         if (ctx == null)
-            return (null, "Educator profile not found.");
+            return (null, ServiceErrorKind.NotFound, _localizer["Educator.ProfileNotFound"]);
         if (!OrgRoleIds.IsAdmin(ctx.OrgRoleId))
-            return (null, "You do not have permission to change this student's status.");
+            return (null, ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionChangeStatus"]);
         if (!await _orgAccess.CanActOnStudentAsync(userId, studentId, AccessRole.Viewer, ct))
-            return (null, "You do not have permission to change this student's status.");
+            return (null, ServiceErrorKind.Forbidden, _localizer["Educator.NoPermissionChangeStatus"]);
 
         var student = await _context.SchoolStudents.FirstOrDefaultAsync(s => s.Id == studentId, ct);
-        return student == null ? (null, "Student not found.") : (student, null);
+        return student == null ? (null, ServiceErrorKind.NotFound, _localizer["Educator.StudentNotFound"]) : (student, ServiceErrorKind.None, null);
     }
 
     private Task<SchoolStudentModel> LoadStudentAsync(int studentId, CancellationToken ct)

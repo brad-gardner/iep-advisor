@@ -25,6 +25,18 @@ public class MeetingBrief : BaseEntity, IAuditableEntity
 
     public int GeneratedByUserId { get; set; }
 
+    /// <summary>
+    /// The requester's language ("en"/"es") when this brief was GENERATED (multilingual plan
+    /// 2026-10-06 phase 5, migration AddMeetingBriefLanguage) — captured at generate time.
+    /// <c>MeetingBriefService.GenerateAsync</c> is awaited synchronously inside the request (no
+    /// background worker), so <c>CultureInfo.CurrentUICulture</c> (set by RequestLocalization from the
+    /// signed-in user's saved preference) is already correct at the point the AI-drafted <c>summary</c>
+    /// is composed — no <c>CultureScope.For</c> re-application is needed the way <c>AnalysisRun.Language</c>
+    /// needs it for its background worker. Null means English (including every brief generated before
+    /// this column existed).
+    /// </summary>
+    public string? Language { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public int? CreatedById { get; set; }

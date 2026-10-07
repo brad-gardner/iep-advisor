@@ -63,7 +63,7 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
             ctx,
             new OrgAccessService(ctx),
             new AccessService(ctx),
-            new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance),
+            new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()),
             blob ?? new SuccessBlobStorageFake(),
             _audit,
             new GoalRecordService(ctx, new OrgAccessService(ctx), new AccessService(ctx), NullLogger<GoalRecordService>.Instance, TestSupport.TestLocalizers.Messages()),
@@ -71,7 +71,7 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
             TestSupport.TestLocalizers.Messages());
 
     private AuthoredDocumentPdfService CreatePdfService(ApplicationDbContext ctx, IBlobStorageService blob)
-        => new(ctx, new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance), blob, NullLogger<AuthoredDocumentPdfService>.Instance);
+        => new(ctx, new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()), blob, NullLogger<AuthoredDocumentPdfService>.Instance);
 
     // ---- Blob fakes ----
     /// <summary>The smallest byte sequence the upload guard accepts as a PDF.</summary>
@@ -1278,7 +1278,7 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
     // ---------------------------------------------------------------- Plan 7: amendments
 
     private SignedArtifactService CreateSignedArtifactService(ApplicationDbContext ctx, IBlobStorageService blob)
-        => new(ctx, new OrgAccessService(ctx), new AccessService(ctx), blob, _audit);
+        => new(ctx, new OrgAccessService(ctx), new AccessService(ctx), blob, _audit, TestSupport.TestLocalizers.Messages());
 
     [Fact]
     public async Task Amend_Then_Finalize_CreatesAmendmentChain_PreservingRowIds()
@@ -1489,6 +1489,25 @@ public sealed class AuthoredDocumentVersionServiceTests : IDisposable
         Assert.True(traversal.Success, traversal.Message);
         Assert.Equal("evil.pdf", traversal.Data!.FileName);
         Assert.DoesNotContain("..", ctx.SignedArtifacts.Single().FileName);
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5
+
+    [Fact]
+    public async Task SignedArtifact_ListAsync_UnknownVersion_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        var userId = 1;
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateSignedArtifactService(ctx, new SuccessBlobStorageFake()).ListAsync(userId, -1);
+
+        Assert.False(result.Success);
+        Assert.Equal("Versión del documento no encontrada.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
     }
 
     public void Dispose() => _connection.Dispose();

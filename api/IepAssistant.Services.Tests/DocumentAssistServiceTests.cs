@@ -1,11 +1,15 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -39,7 +43,7 @@ public sealed class DocumentAssistServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private DocumentAssistService CreateService(ApplicationDbContext ctx, IStudentEvidenceService? evidence = null, Microsoft.Extensions.Logging.ILogger<DocumentAssistService>? logger = null)
-        => new(ctx, new OrgAccessService(ctx), _claude, _audit, logger ?? NullLogger<DocumentAssistService>.Instance, evidence);
+        => new(ctx, new OrgAccessService(ctx), _claude, _audit, logger ?? NullLogger<DocumentAssistService>.Instance, TestSupport.TestLocalizers.Messages(), evidence);
 
     /// <summary>Canned evidence so grounding can be tested without the full bundle pipeline.</summary>
     private sealed class FakeEvidence : IStudentEvidenceService
@@ -377,6 +381,51 @@ public sealed class DocumentAssistServiceTests : IDisposable
         Assert.False(capturing.ContainsText("Read better"), "Goal text must never reach a log line.");
         Assert.False(capturing.ContainsText("42 wpm"), "Baseline text must never reach a log line.");
         Assert.False(capturing.ContainsText("Read better baseline question"), "Chat message content must never reach a log line.");
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5
+
+    private sealed class TestController : ControllerBase
+    {
+    }
+
+    [Fact]
+    public async Task Assist_UnknownInstance_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var userId = 1;
+        var result = await CreateService(ctx).AssistAsync(userId, -1, Guid.NewGuid(), null, AssistKind.Rewrite);
+
+        Assert.False(result.Success);
+        Assert.Equal("Documento no encontrado.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    [Fact]
+    public async Task AssistGoalRow_UnderSpanishCulture_AppendsResponseLanguageLine_AbsentUnderEnglish()
+    {
+        var s = Seed("lang");
+
+        using (var _lang = CultureScope.For("es"))
+        {
+            using var ctx = CreateContext();
+            var result = await CreateService(ctx).AssistAsync(s.TeacherId, s.InstanceId, s.GoalsKey, s.RowId, AssistKind.Rewrite);
+            Assert.True(result.Success, result.Message);
+            Assert.Contains("RESPONSE LANGUAGE: Respond in Spanish", _claude.LastRequest!.SystemPrompt);
+        }
+
+        using (var _lang = CultureScope.For("en"))
+        {
+            using var ctx = CreateContext();
+            var result = await CreateService(ctx).AssistAsync(s.TeacherId, s.InstanceId, s.GoalsKey, s.RowId, AssistKind.Rewrite);
+            Assert.True(result.Success, result.Message);
+            Assert.DoesNotContain("RESPONSE LANGUAGE", _claude.LastRequest!.SystemPrompt);
+            Assert.Equal(AssistPrompts.Goal, _claude.LastRequest!.SystemPrompt); // byte-identical in English
+        }
     }
 
     public void Dispose() => _connection.Dispose();

@@ -20,7 +20,7 @@ public sealed class DistrictComplianceTests : IDisposable
         => new(ctx, new OrgAccessService(ctx), NullLogger<DistrictService>.Instance);
 
     private EducatorService CreateEducatorService(Domain.Data.ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<EducatorService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<EducatorService>.Instance, TestSupport.TestLocalizers.Messages());
 
     public void Dispose() => _db.Dispose();
 

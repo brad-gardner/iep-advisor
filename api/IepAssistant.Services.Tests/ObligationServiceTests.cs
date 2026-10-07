@@ -1,5 +1,10 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
+using IepAssistant.Services.Models;
 using Xunit;
 
 namespace IepAssistant.Services.Tests;
@@ -10,7 +15,7 @@ public sealed class ObligationServiceTests : IDisposable
 {
     private readonly RosterTestDb _db = new();
 
-    private ObligationService CreateService(Domain.Data.ApplicationDbContext ctx) => new(ctx, new OrgAccessService(ctx));
+    private ObligationService CreateService(Domain.Data.ApplicationDbContext ctx) => new(ctx, new OrgAccessService(ctx), TestSupport.TestLocalizers.Messages());
 
     [Fact]
     public async Task GetForStudentAsync_OwnerIsLeadCaseManager()
@@ -175,7 +180,7 @@ public sealed class ObligationServiceTests : IDisposable
 
         using var ctx = _db.Context();
         var orgAccess = new OrgAccessService(ctx);
-        var service = new ObligationService(ctx, orgAccess);
+        var service = new ObligationService(ctx, orgAccess, TestSupport.TestLocalizers.Messages());
         var staffCtx = await orgAccess.GetStaffContextAsync(adminId);
 
         var byUserId = await service.GetForScopeAsync(adminId, null, null);
@@ -409,6 +414,33 @@ public sealed class ObligationServiceTests : IDisposable
         var result = await CreateService(readCtx).GetForStudentAsync(leadUserId, studentId);
 
         Assert.DoesNotContain(result.Data!, o => o.Kind == ObligationKind.EvaluatorSubmission);
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5
+
+    private sealed class TestController : Microsoft.AspNetCore.Mvc.ControllerBase
+    {
+    }
+
+    [Fact]
+    public async Task GetForStudentAsync_Stranger_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School Stranger Es", stateCode: "OH");
+        var studentId = _db.Student(schoolId, "Sam", "Student");
+        var (strangerUserId, _) = _db.Staff("strangeres@example.com", districtId, _db.School(districtId, "Other School"), Models.OrgRoleIds.Teacher);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).GetForStudentAsync(strangerUserId, studentId);
+
+        Assert.False(result.Success);
+        Assert.Equal("No tiene permiso para ver las obligaciones de este estudiante.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
     }
 
     public void Dispose() => _db.Dispose();

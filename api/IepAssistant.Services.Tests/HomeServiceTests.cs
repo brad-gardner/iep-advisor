@@ -21,8 +21,8 @@ public sealed class HomeServiceTests : IDisposable
     private HomeService CreateService(Domain.Data.ApplicationDbContext ctx)
     {
         var orgAccess = new OrgAccessService(ctx);
-        var obligationService = new ObligationService(ctx, orgAccess);
-        var completeness = new DocumentCompletenessService(ctx, new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance));
+        var obligationService = new ObligationService(ctx, orgAccess, TestSupport.TestLocalizers.Messages());
+        var completeness = new DocumentCompletenessService(ctx, new TemplateAuthoringService(ctx, new CapturingAuditLogger(), NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages()));
         // Shares the same IOrgAccessService instance HomeService uses (matches production DI, where
         // IOrgAccessService is Scoped) so its per-request staff-context memo is actually shared across
         // HomeService/ObligationService/DistrictService, as it would be for a real request.
@@ -236,7 +236,7 @@ public sealed class HomeServiceTests : IDisposable
         using (var ctx = _db.Context())
         {
             var orgAccess = new OrgAccessService(ctx);
-            var educatorService = new EducatorService(ctx, orgAccess, new CapturingAuditLogger(), NullLogger<EducatorService>.Instance);
+            var educatorService = new EducatorService(ctx, orgAccess, new CapturingAuditLogger(), NullLogger<EducatorService>.Instance, TestSupport.TestLocalizers.Messages());
             var transferResult = await educatorService.TransferStudentAsync(adminId, studentId, schoolB);
             Assert.True(transferResult.Success, transferResult.Message);
         }

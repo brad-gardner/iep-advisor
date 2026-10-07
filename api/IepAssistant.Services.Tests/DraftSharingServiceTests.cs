@@ -62,7 +62,7 @@ public sealed class DraftSharingServiceTests : IDisposable
     {
         var org = new OrgAccessService(ctx);
         var access = new AccessService(ctx);
-        var authoring = new TemplateAuthoringService(ctx, _audit, NullLogger<TemplateAuthoringService>.Instance);
+        var authoring = new TemplateAuthoringService(ctx, _audit, NullLogger<TemplateAuthoringService>.Instance, TestSupport.TestLocalizers.Messages());
         var notifications = new FakeNotifications();
         var responses = new DraftResponseService(ctx, access, org, notifications, NullLogger<DraftResponseService>.Instance, TestSupport.TestLocalizers.Messages(), TestSupport.TestLocalizers.Notifications());
         var sharing = new DraftSharingService(ctx, org, access, authoring, notifications, responses, _audit, NullLogger<DraftSharingService>.Instance, TestSupport.TestLocalizers.Messages(), TestSupport.TestLocalizers.Notifications());

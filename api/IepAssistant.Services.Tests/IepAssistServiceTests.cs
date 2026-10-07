@@ -1,10 +1,14 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -36,7 +40,7 @@ public sealed class IepAssistServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private IepAssistService CreateService(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), _claude, _audit, NullLogger<IepAssistService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), _claude, _audit, NullLogger<IepAssistService>.Instance, TestSupport.TestLocalizers.Messages());
 
     // ---------------------------------------------------------------- Fake Claude
 
@@ -320,5 +324,50 @@ public sealed class IepAssistServiceTests : IDisposable
 
         Assert.False(result.Success);
         Assert.Equal("AI assist is temporarily unavailable.", result.Message);
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5
+
+    private sealed class TestController : ControllerBase
+    {
+    }
+
+    [Fact]
+    public async Task AssistGoal_UnknownDraft_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        using var _lang = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).AssistGoalAsync(1, -1, -1, AssistKind.Rewrite);
+
+        Assert.False(result.Success);
+        Assert.Equal("Borrador de IEP no encontrado.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    [Fact]
+    public async Task AssistGoal_UnderSpanishCulture_AppendsResponseLanguageLine_AbsentUnderEnglish()
+    {
+        var s = SeedSchoolWithStudent("lang-es");
+        var draftId = CreateDraft(s);
+        var goalId = AddGoal(draftId, "Read 80 words per minute");
+
+        using (var _lang = CultureScope.For("es"))
+        {
+            using var ctx = CreateContext();
+            var result = await CreateService(ctx).AssistGoalAsync(s.CollaboratorUserId, draftId, goalId, AssistKind.Rewrite);
+            Assert.True(result.Success, result.Message);
+            Assert.Contains("RESPONSE LANGUAGE: Respond in Spanish", _claude.LastRequest!.SystemPrompt);
+        }
+
+        using (var _lang = CultureScope.For("en"))
+        {
+            using var ctx = CreateContext();
+            var result = await CreateService(ctx).AssistGoalAsync(s.CollaboratorUserId, draftId, goalId, AssistKind.Rewrite);
+            Assert.True(result.Success, result.Message);
+            Assert.DoesNotContain("RESPONSE LANGUAGE", _claude.LastRequest!.SystemPrompt);
+        }
     }
 }

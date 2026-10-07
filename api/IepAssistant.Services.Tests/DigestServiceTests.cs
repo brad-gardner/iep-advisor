@@ -18,7 +18,7 @@ public sealed class DigestServiceTests : IDisposable
     private static readonly IConfiguration EmptyConfig = new ConfigurationBuilder().Build();
 
     private DigestService CreateService(ApplicationDbContext ctx, IEmailService email)
-        => new(ctx, new ObligationService(ctx, new OrgAccessService(ctx)), email, EmptyConfig, NullLogger<DigestService>.Instance, TestSupport.TestLocalizers.Notifications());
+        => new(ctx, new ObligationService(ctx, new OrgAccessService(ctx), TestSupport.TestLocalizers.Messages()), email, EmptyConfig, NullLogger<DigestService>.Instance, TestSupport.TestLocalizers.Notifications());
 
     [Fact]
     public async Task RunForDateAsync_IncludesDueSoonOverdueAndMeetingsInNext7Days()

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Models;
@@ -19,18 +20,23 @@ internal static class StudentTeamWriter
     /// <summary>
     /// Validates that <paramref name="target"/> may sit on a team for a student at <paramref name="studentSchoolId"/>:
     /// active, same district, not a DistrictAdmin, and either at that school or a RelatedServiceProvider.
-    /// Returns a user-facing message on failure, null when allowed.
+    /// Returns the <see cref="ServiceErrorKind"/> and a user-facing, localized message on failure, null
+    /// when allowed. Multilingual plan (2026-10-06) phase 5: takes the caller's <see cref="IStringLocalizer{T}"/>
+    /// (a static helper has no DI of its own — mirrors <c>IcsMeetingInputMapper.Map</c>) rather than
+    /// returning a bare English string, so a caller's status mapping never depends on matching
+    /// (possibly Spanish) text.
     /// </summary>
-    public static string? ValidateTeamCandidate(StaffProfile? target, int districtId, int studentSchoolId)
+    public static (ServiceErrorKind Kind, string Message)? ValidateTeamCandidate(
+        StaffProfile? target, int districtId, int studentSchoolId, IStringLocalizer<Messages> localizer)
     {
         if (target == null || !target.IsActive || target.DistrictId != districtId)
-            return "Staff member not found.";
+            return (ServiceErrorKind.NotFound, localizer["Team.StaffMemberNotFound"]);
         if (target.OrgRoleId == OrgRoleIds.DistrictAdmin)
-            return "A District Admin does not need a per-student assignment.";
+            return (ServiceErrorKind.Validation, localizer["Team.DistrictAdminNoAssignment"]);
         if (target.OrgRoleId == OrgRoleIds.RelatedServiceProvider)
             return null;
         if (target.SchoolId == null || target.SchoolId.Value != studentSchoolId)
-            return "That staff member is not at this student's school.";
+            return (ServiceErrorKind.Validation, localizer["Team.NotAtSchool"]);
         return null;
     }
 

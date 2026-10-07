@@ -1,6 +1,10 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -16,7 +20,7 @@ public sealed class MeetingDecisionServiceTests : IDisposable
 {
     private readonly RosterTestDb _db = new();
 
-    private MeetingDecisionService CreateService(ApplicationDbContext ctx) => new(ctx, new OrgAccessService(ctx));
+    private MeetingDecisionService CreateService(ApplicationDbContext ctx) => new(ctx, new OrgAccessService(ctx), TestSupport.TestLocalizers.Messages());
 
     /// <summary>A minimal Draft DocumentInstance (no template validation needed for these tests).</summary>
     private int SeedMinimalInstance(int studentId, int docTypeId = 1)
@@ -132,6 +136,46 @@ public sealed class MeetingDecisionServiceTests : IDisposable
 
         using var readCtx = _db.Context();
         Assert.NotNull(readCtx.MeetingDecisions.Single(d => d.Id == decisionId).AppliedAt);
+    }
+
+    // ----------------------------------------------------------------- Multilingual plan phase 5
+
+    private sealed class TestController : ControllerBase
+    {
+    }
+
+    [Fact]
+    public async Task GetForMeetingAsync_UnknownMeeting_UnderSpanishCulture_MessageIsSpanish_AndMapsTo404ViaErrorKind()
+    {
+        var userId = _db.SeedUser("decisionunknownes@example.com", UserRole.Educator);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).GetForMeetingAsync(userId, -1);
+
+        Assert.False(result.Success);
+        Assert.Equal("Reunión no encontrada.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    [Fact]
+    public async Task CreateAsync_BlankText_UnderSpanishCulture_MessageIsSpanish_AndMapsTo400ViaErrorKind()
+    {
+        var userId = _db.SeedUser("decisionblankes@example.com", UserRole.Educator);
+
+        using var _lang = CultureScope.For("es");
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx).CreateAsync(userId, -1, new CreateMeetingDecisionModel { Text = "   ", Outcome = MeetingDecisionOutcome.Agreed });
+
+        Assert.False(result.Success);
+        Assert.Equal("El texto de la decisión es obligatorio.", result.Message);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<BadRequestObjectResult>(action);
     }
 
     public void Dispose() => _db.Dispose();
