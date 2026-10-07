@@ -2,18 +2,24 @@
 // English locales are bundled eagerly, so every converted page adds to the
 // main chunk; this fails the build above the budget and warns near it.
 // Run after `npm run build`.
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
 const FAIL_KB = 418;
 const WARN_KB = 405;
-const assets = join(import.meta.dirname, '..', 'dist', 'assets');
-const main = readdirSync(assets).filter((f) => /^index-.*\.js$/.test(f));
-if (main.length !== 1) {
-  console.error(`Expected one main chunk (index-*.js) in dist/assets, found ${main.length}.`);
+const dist = join(import.meta.dirname, '..', 'dist');
+// The entry chunk is the module script index.html loads — not any file that
+// happens to match index-*.js (a lazy chunk from an `index` module would too).
+const entry = readFileSync(join(dist, 'index.html'), 'utf8').match(
+  /<script[^>]*type="module"[^>]*src="\/assets\/([^"]+\.js)"/,
+);
+if (!entry) {
+  console.error('Could not find the entry module script in dist/index.html.');
   process.exit(1);
 }
+const main = [entry[1]];
+const assets = join(dist, 'assets');
 const kb = gzipSync(readFileSync(join(assets, main[0]))).length / 1000;
 console.log(`Main chunk ${main[0]}: ${kb.toFixed(2)} kB gzip (warn ${WARN_KB}, fail ${FAIL_KB})`);
 if (kb > FAIL_KB) {
