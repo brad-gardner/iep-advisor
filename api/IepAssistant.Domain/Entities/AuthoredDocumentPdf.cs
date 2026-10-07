@@ -22,6 +22,19 @@ public class AuthoredDocumentPdf : BaseEntity, IAuditableEntity
     /// </summary>
     public string? Language { get; set; }
 
+    /// <summary>
+    /// Review fix (2026-10-07, "freeze the authored-document PDF header"): the JSON-serialized
+    /// <c>AuthoredDocumentPdfHeaderContext</c> (System.Text.Json) resolved the FIRST time any language of
+    /// this version was rendered — student/district facts, the latest Held meeting's date and
+    /// participants, and the amendment banner fields. Lives ONLY on the ENGLISH row (<see cref="Language"/>
+    /// is <c>"en"</c> or null) regardless of which language renders; every other language's row leaves
+    /// this null. Null until the first render resolves it; once set, every later render/retry in every
+    /// language reuses it (nvarchar(max) — no size constraint on the serialized payload). Without this,
+    /// a Spanish PDF rendered on demand weeks after finalize could show a different meeting/team than the
+    /// English record, since <c>AuthoredDocumentPdfService.BuildHeaderContextAsync</c> reads live data.
+    /// </summary>
+    public string? HeaderSnapshotJson { get; set; }
+
     public PdfRenderStatus RenderStatus { get; set; } = PdfRenderStatus.Pending;
 
     public string? BlobUri { get; set; }

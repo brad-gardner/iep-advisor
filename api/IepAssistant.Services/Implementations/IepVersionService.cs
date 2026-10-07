@@ -348,16 +348,40 @@ public class IepVersionService : IIepVersionService
         var needsRender = false;
         if (pdf == null)
         {
-            pdf = new IepVersionPdf
+            var candidate = new IepVersionPdf
             {
                 IepVersionId = versionId,
                 Language = language,
                 RenderStatus = PdfRenderStatus.Pending,
                 CreatedById = userId
             };
-            await _context.IepVersionPdfs.AddAsync(pdf, ct);
-            await _context.SaveChangesAsync(ct);
-            needsRender = true;
+            try
+            {
+                await _context.IepVersionPdfs.AddAsync(candidate, ct);
+                await _context.SaveChangesAsync(ct);
+                pdf = candidate;
+                needsRender = true;
+            }
+            catch (DbUpdateException ex)
+            {
+                // Concurrent first poll: another request's insert for this exact (version, language) won
+                // the unique index race and committed first. Detach our losing row (never persisted) and
+                // read back the winner's — it exists now, so this request simply joins it instead of
+                // enqueuing a second, redundant render.
+                _context.Entry(candidate).State = EntityState.Detached;
+
+                var winner = await _context.IepVersionPdfs.AsNoTracking().FirstOrDefaultAsync(
+                    p => p.IepVersionId == versionId && (p.Language == language
+                        || (language == SupportedLanguages.English && p.Language == null)), ct);
+
+                if (winner == null)
+                {
+                    _logger.LogError(ex, "GetPdfStatus insert race on IepVersion {VersionId} language {Language} but no row found on re-query", versionId, language);
+                    throw;
+                }
+
+                pdf = winner;
+            }
         }
 
         var model = new IepVersionPdfStatusModel

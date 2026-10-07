@@ -127,9 +127,11 @@ public class IepVersionController : ControllerBase
         if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         // Multilingual plan phase 7: the service created a Pending row for this language and asks us to
-        // kick off its render (after-commit, isolated — same convention as Finalize/Retry).
+        // kick off its render (after-commit, isolated — same convention as Finalize/Retry, and as
+        // AuthoredDocumentVersionController's own GetPdfStatus — CancellationToken.None so a client
+        // disconnect never cancels the enqueue of a commit that already happened).
         if (result.Data!.NeedsRender)
-            await _pdfQueue.EnqueueAsync(versionId, result.Data.Language, ct);
+            await _pdfQueue.EnqueueAsync(versionId, result.Data.Language, CancellationToken.None);
 
         var m = result.Data!;
         return Ok(ApiResponse<IepVersionPdfStatusDto>.SuccessResponse(new IepVersionPdfStatusDto

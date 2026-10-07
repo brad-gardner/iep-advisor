@@ -512,7 +512,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         var needsRender = false;
         if (pdf == null)
         {
-            pdf = new AuthoredDocumentPdf
+            var candidate = new AuthoredDocumentPdf
             {
                 AuthoredDocumentVersionId = versionId,
                 Language = language,
@@ -520,9 +520,33 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
                 CreatedById = actingUserId,
                 UpdatedById = actingUserId
             };
-            await _context.AuthoredDocumentPdfs.AddAsync(pdf, ct);
-            await _context.SaveChangesAsync(ct);
-            needsRender = true;
+            try
+            {
+                await _context.AuthoredDocumentPdfs.AddAsync(candidate, ct);
+                await _context.SaveChangesAsync(ct);
+                pdf = candidate;
+                needsRender = true;
+            }
+            catch (DbUpdateException ex)
+            {
+                // Concurrent first poll: another request's insert for this exact (version, language) won
+                // the unique index race and committed first. Detach our losing row (never persisted) and
+                // read back the winner's — it exists now, so this request simply joins it instead of
+                // enqueuing a second, redundant render.
+                _context.Entry(candidate).State = EntityState.Detached;
+
+                var winner = await _context.AuthoredDocumentPdfs.AsNoTracking().FirstOrDefaultAsync(
+                    p => p.AuthoredDocumentVersionId == versionId && (p.Language == language
+                        || (language == SupportedLanguages.English && p.Language == null)), ct);
+
+                if (winner == null)
+                {
+                    _logger.LogError(ex, "GetPdfStatus insert race on AuthoredDocumentVersion {VersionId} language {Language} but no row found on re-query", versionId, language);
+                    throw;
+                }
+
+                pdf = winner;
+            }
         }
 
         var model = new AuthoredDocumentPdfStatusModel

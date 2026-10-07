@@ -50,6 +50,13 @@ namespace IepAssistant.Domain.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // Dropping back to the single-column unique index below only works if at most one row per
+            // version remains — delete the non-English renders first (a downgrade is a deliberate,
+            // destructive rollback of the multilingual-PDF feature; its Spanish/other-language rows have
+            // no home in the pre-this-migration schema).
+            migrationBuilder.Sql("DELETE FROM IepVersionPdfs WHERE Language IS NOT NULL AND Language <> 'en'");
+            migrationBuilder.Sql("DELETE FROM AuthoredDocumentPdfs WHERE Language IS NOT NULL AND Language <> 'en'");
+
             migrationBuilder.DropIndex(
                 name: "IX_IepVersionPdfs_IepVersionId_Language",
                 table: "IepVersionPdfs");

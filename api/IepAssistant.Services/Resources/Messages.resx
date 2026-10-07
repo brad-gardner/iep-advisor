@@ -909,6 +909,9 @@
   <data name="Educator.NoPermissionManageSelectedStudents" xml:space="preserve">
     <value>You do not have permission to manage one or more of the selected students.</value>
   </data>
+  <data name="Educator.BulkAssignStudentValidationError" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
   <data name="Educator.NoPermissionAssignStaff" xml:space="preserve">
     <value>You do not have permission to assign staff to this student.</value>
   </data>

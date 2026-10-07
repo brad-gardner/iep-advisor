@@ -241,6 +241,10 @@ describe('Spanish cross-audience smoke (app shell + one page per audience)', () 
 
     expect(screen.getAllByText('Inicio')[0]).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Cumplimiento' })).toBeInTheDocument();
+    // The heading renders before `getComplianceBoard` resolves; wait for the
+    // data-driven summary tiles so the raw-key check below actually covers
+    // the loaded (translated) content, not just the static title/subtitle.
+    expect(await screen.findByTestId('compliance-summary-tiles')).toBeInTheDocument();
     expectNoRawTranslationKeys();
   });
 

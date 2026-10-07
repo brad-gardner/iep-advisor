@@ -897,6 +897,9 @@
   <data name="Educator.NoPermissionManageSelectedStudents" xml:space="preserve">
     <value>No tiene permiso para gestionar a uno o más de los estudiantes seleccionados.</value>
   </data>
+  <data name="Educator.BulkAssignStudentValidationError" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
   <data name="Educator.NoPermissionAssignStaff" xml:space="preserve">
     <value>No tiene permiso para asignar personal a este estudiante.</value>
   </data>

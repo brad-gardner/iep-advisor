@@ -619,6 +619,44 @@ public sealed class IepVersionServiceTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Review fix (2026-10-07): GetPdfStatusAsync's Add+SaveChanges for a brand-new (version, language)
+    /// row is now wrapped in try/catch DbUpdateException, detaching the loser and re-querying AsNoTracking
+    /// so two concurrent first polls join the SAME render instead of one failing outright. Genuinely
+    /// interleaving two overlapping GetPdfStatusAsync calls isn't reachable from a single-threaded test —
+    /// the method's OWN existence check would simply see the other call's already-committed row and never
+    /// reach the Add+Save path at all. So this instead proves the mechanism the catch block relies on
+    /// directly: a concurrent insert for the exact same (version, language) genuinely collides on the
+    /// unique index (<see cref="IepVersionPdfConfiguration"/>), and detaching the loser + re-querying
+    /// AsNoTracking (exactly what the catch block does) recovers the winner's row.
+    /// </summary>
+    [Fact]
+    public async Task GetPdfStatus_ConcurrentFirstPollInsertRace_ReQueryPathRecoversTheWinnerRow()
+    {
+        var s = SeedSchoolWithStudent("pdf-status-race");
+        var draftId = await CreateDraftAsync(s);
+        var v = await FinalizeAsync(s, draftId);
+
+        using var winnerCtx = CreateContext();
+        var winnerRow = new IepVersionPdf { IepVersionId = v.Id, Language = "es", RenderStatus = PdfRenderStatus.Pending };
+        winnerCtx.IepVersionPdfs.Add(winnerRow);
+        winnerCtx.SaveChanges();
+
+        using var loserCtx = CreateContext();
+        var loserRow = new IepVersionPdf { IepVersionId = v.Id, Language = "es", RenderStatus = PdfRenderStatus.Pending };
+        loserCtx.IepVersionPdfs.Add(loserRow);
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => loserCtx.SaveChangesAsync());
+
+        loserCtx.Entry(loserRow).State = EntityState.Detached;
+        var recovered = await loserCtx.IepVersionPdfs.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.IepVersionId == v.Id && p.Language == "es");
+
+        Assert.NotNull(recovered);
+        Assert.Equal(winnerRow.Id, recovered!.Id);
+        Assert.NotEqual(loserRow.Id, recovered.Id);
+    }
+
     [Fact]
     public async Task GetPdfStatus_EnglishPoll_UnaffectedByPhase7_StillReturnsRenderedRowAndUrl()
     {
