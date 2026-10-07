@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, apiErrorMessage, toLoadError, loadErrorText } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
 import {
   getSignedArtifactDownloadUrl,
@@ -49,7 +49,7 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
   // A server message is already resolved text; the generic case is
   // translated at render time below — so the mount-fetch effect never needs
   // `t` in its dependency array (a language switch must not re-trigger it).
-  const [loadError, setLoadError] = useState<{ kind: 'server'; message: string } | { kind: 'generic' } | null>(null);
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [signerSummary, setSignerSummary] = useState('');
@@ -68,11 +68,10 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
         const res = await listSignedArtifacts(versionId);
         if (!active) return;
         if (res.success && res.data) setArtifacts(res.data);
-        else setLoadError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setLoadError(toLoadError(res));
       } catch (err) {
         if (active) {
-          const message = apiErrorMessage(err, '');
-          setLoadError(message ? { kind: 'server', message } : { kind: 'generic' });
+          setLoadError(toLoadError(err));
         }
       } finally {
         if (active) setIsLoading(false);
@@ -198,7 +197,7 @@ export function SignedArtifactsPanel({ versionId, onUploaded }: SignedArtifactsP
         <div role="alert">
           <Notice
             variant="error"
-            title={loadError.kind === 'server' ? loadError.message : t('signedArtifactsPanel.loadError')}
+            title={loadErrorText(loadError, t('signedArtifactsPanel.loadError')) ?? t('signedArtifactsPanel.loadError')}
           />
         </div>
       )}

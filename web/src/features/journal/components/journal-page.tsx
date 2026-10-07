@@ -10,7 +10,7 @@ import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/components/ui/toast';
 import { usePageTitle } from '@/hooks/use-page-title';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError, loadErrorText } from '@/lib/api-error';
 import type { ChildOutletContext } from '@/features/children/components/child-detail-page';
 import { listJournalEntries } from '../api/journal-api';
 import { journalEmptyCopy } from '../lib/copy';
@@ -37,9 +37,6 @@ function isJournalTag(value: string): value is JournalTag {
  * filterable by kind. Rendered inside the child layout (tab bar above), so the
  * child and the viewer's role come from the outlet context.
  */
-/** A server-provided message is already resolved text; the generic case is translated at render time. */
-type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
-
 export function JournalPage() {
   const { t } = useTranslation(['journal', 'common']);
   const { child, childId } = useOutletContext<ChildOutletContext>();
@@ -66,13 +63,12 @@ export function JournalPage() {
           setItems(res.data);
           setError(null);
         } else {
-          setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+          setError(toLoadError(res));
         }
       })
       .catch((err) => {
         if (!active) return;
-        const message = apiErrorMessage(err, '');
-        setError(message ? { kind: 'server', message } : { kind: 'generic' });
+        setError(toLoadError(err));
       });
     return () => {
       active = false;
@@ -110,7 +106,7 @@ export function JournalPage() {
   };
 
   const loading = items === null && error === null;
-  const errorMessage = error ? (error.kind === 'server' ? error.message : t('journal:page.loadFailed')) : null;
+  const errorMessage = loadErrorText(error, t('journal:page.loadFailed'));
 
   return (
     <div className="space-y-4" data-testid="journal-page">

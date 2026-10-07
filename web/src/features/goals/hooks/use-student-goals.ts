@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError } from '@/lib/api-error';
 import { getStudentGoals } from '../api/goals-api';
 import type { GoalObservationDto, GoalRecordDto, GoalTrajectoryDto } from '../types';
-
-/** A server-provided message is already resolved text; the generic case is translated at render time (see `GoalsCard`). */
-export type UseStudentGoalsError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 interface UseStudentGoalsResult {
   goals: GoalRecordDto[] | null;
   isLoading: boolean;
-  error: UseStudentGoalsError | null;
+  error: LoadError | null;
   retry: () => void;
   /** Optimistically append a freshly logged observation to its goal card. */
   applyObservation: (goalRecordId: number, observation: GoalObservationDto) => void;
@@ -27,7 +24,7 @@ function appendTrajectoryPoint(trajectory: GoalTrajectoryDto, observation: GoalO
  *  card on the educator student page. */
 export function useStudentGoals(studentId: number): UseStudentGoalsResult {
   const [goals, setGoals] = useState<GoalRecordDto[] | null>(null);
-  const [error, setError] = useState<UseStudentGoalsError | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
@@ -41,12 +38,11 @@ export function useStudentGoals(studentId: number): UseStudentGoalsResult {
           setGoals(res.data);
           setError(null);
         } else {
-          setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+          setError(toLoadError(res));
         }
       } catch (err) {
         if (!active) return;
-        const message = apiErrorMessage(err, '');
-        setError(message ? { kind: 'server', message } : { kind: 'generic' });
+        setError(toLoadError(err));
       }
     })();
     return () => {

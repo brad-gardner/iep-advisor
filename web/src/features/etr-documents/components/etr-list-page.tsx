@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PageLayout } from '@/components/ui/page-layout';
 import { useAllEtrs } from '../hooks/use-all-etrs';
 import { usePageTitle } from '@/hooks/use-page-title';
+import { loadErrorText } from '@/lib/api-error';
 import type { EtrDocumentListItem } from '../types';
 import { EtrListGroup } from './etr-list-group';
 
@@ -41,7 +42,7 @@ export function EtrListPage() {
   const { t } = useTranslation(['etr-documents', 'common']);
   usePageTitle(t('listPage.title'));
   const { etrs, loading, error, refresh } = useAllEtrs();
-  const errorMessage = error ? (error.kind === 'server' ? error.message : t('common:ui.genericError')) : null;
+  const errorMessage = loadErrorText(error, t('common:ui.genericError'));
   const groups = useMemo(() => groupByChild(etrs), [etrs]);
 
   return (

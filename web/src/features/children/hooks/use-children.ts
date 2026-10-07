@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ChildProfile } from "@/types/api";
+import { type LoadError, loadErrorText } from "@/lib/api-error";
 import { getChildren } from "../api/children-api";
 
 export function useChildren() {
@@ -11,8 +12,13 @@ export function useChildren() {
   // language switch after a failed load shows the new language immediately
   // rather than a stale snapshot (phase 2 review). This also lets `load`
   // drop `t` from its own dependencies, so a language switch mid-mount never
-  // re-triggers a redundant refetch.
-  const [hasError, setHasError] = useState(false);
+  // re-triggers a redundant refetch. Always `{ kind: 'generic' }` on failure
+  // here (never `toLoadError`) — a business-logic failure response carries no
+  // server message check today (`response.success === false` is silently
+  // ignored, same as before this swap), and a caught error's own message is
+  // deliberately discarded, matching this hook's pre-existing behavior
+  // exactly; only the shared `LoadError`/`loadErrorText` plumbing is new.
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
   // Counts every load attempt, including unmount, so a slower, superseded
   // call (e.g. a fast `reload()` double-click, or one still in flight at
   // unmount) can tell its response arrived after a newer attempt already
@@ -23,7 +29,7 @@ export function useChildren() {
     reqRef.current += 1;
     const id = reqRef.current;
     setIsLoading(true);
-    setHasError(false);
+    setLoadError(null);
     try {
       const response = await getChildren();
       if (id !== reqRef.current) return; // superseded — see reqRef
@@ -31,7 +37,7 @@ export function useChildren() {
         setChildren(response.data);
       }
     } catch {
-      if (id === reqRef.current) setHasError(true);
+      if (id === reqRef.current) setLoadError({ kind: 'generic' });
     } finally {
       if (id === reqRef.current) setIsLoading(false);
     }
@@ -44,5 +50,5 @@ export function useChildren() {
     };
   }, [load]);
 
-  return { children, isLoading, error: hasError ? t("errors.loadFailed") : null, reload: load };
+  return { children, isLoading, error: loadErrorText(loadError, t("errors.loadFailed")), reload: load };
 }

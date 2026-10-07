@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, apiErrorMessage, toLoadError, loadErrorText } from '@/lib/api-error';
 import { inviteStatusLabel } from '@/lib/invite-status-label';
 import { meetingTypeLabel } from '@/lib/meeting-labels';
 import { usePageTitle } from '@/hooks/use-page-title';
@@ -14,12 +14,6 @@ import { useLanguageQueryParam } from '@/lib/i18n/use-language-query-param';
 import { getMeetingByToken, submitTokenRsvp } from '../api/meetings-api';
 import { formatMeetingWhen } from '../lib/meeting-time';
 import type { InviteStatus, TokenRsvpResult } from '../types';
-
-// A server-provided message is already resolved text and is shown as-is;
-// the generic fallback is translated at RENDER time (see `displayError`
-// below), not stored pre-translated here, so the mount effect never needs
-// `t` in its dependency array (same idiom as `useHome`).
-type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 /**
  * Public, unauthenticated page linked from the meeting invitation email
@@ -78,12 +72,11 @@ export function MeetingRsvpPage() {
           setResult(response.data);
           setError(null);
         } else {
-          setError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
+          setError(toLoadError(response));
         }
       } catch (err) {
         if (!active) return;
-        const serverMessage = apiErrorMessage(err, '');
-        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+        setError(toLoadError(err));
       }
     })();
     return () => {
@@ -95,8 +88,7 @@ export function MeetingRsvpPage() {
     // snapshot string, so it already follows the active language.
   }, [token, retryToken]);
 
-  const displayError =
-    missingTokenError ?? (error ? (error.kind === 'server' ? error.message : t('rsvpPage.invalidLink')) : null);
+  const displayError = missingTokenError ?? loadErrorText(error, t('rsvpPage.invalidLink'));
 
   // Click-triggered (never a mount effect), so translating inline here is
   // safe — see `AcknowledgeControl` (shared-drafts) for the same reasoning.

@@ -6,17 +6,11 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Table, type TableColumn } from '@/components/ui/table';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError, loadErrorText } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { listNotificationFailures } from '../api/notifications-api';
 import type { NotificationDto } from '../types';
-
-// A server-provided message is already resolved text and shown as-is; the
-// generic fallback is translated at RENDER time (see `error` below) rather
-// than load time, so a language switch after a failed load shows the new
-// language immediately, with no refetch (phase 2 review).
-type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 /** Platform admin: notifications where the email send failed, newest first. */
 export function AdminNotificationFailuresPage() {
@@ -37,12 +31,11 @@ export function AdminNotificationFailuresPage() {
           setItems(response.data);
           setLoadError(null);
         } else {
-          setLoadError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
+          setLoadError(toLoadError(response));
         }
       } catch (err) {
         if (!active) return;
-        const serverMessage = apiErrorMessage(err, '');
-        setLoadError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+        setLoadError(toLoadError(err));
       }
     })();
     return () => {
@@ -51,11 +44,7 @@ export function AdminNotificationFailuresPage() {
     // `t` deliberately excluded — see the `LoadError` comment above.
   }, [retryToken]);
 
-  const error = loadError
-    ? loadError.kind === 'server'
-      ? loadError.message
-      : t('adminFailures.loadFailed')
-    : null;
+  const error = loadErrorText(loadError, t('adminFailures.loadFailed'));
 
   const columns: TableColumn<NotificationDto>[] = [
     { key: 'kind', header: t('adminFailures.columnKind'), cell: (n) => n.kind, sortValue: (n) => n.kind },

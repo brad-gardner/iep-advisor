@@ -6,6 +6,7 @@ import { Drawer } from '@/components/ui/drawer';
 import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
+import { type LoadError, toLoadError, loadErrorText } from '@/lib/api-error';
 import { getStudentEvidence, type EvidenceItem, type EvidenceKind, type StudentEvidenceBundle } from '../api/evidence-api';
 import type { ActiveFieldTarget } from '../hooks/document-editor-context';
 
@@ -48,7 +49,7 @@ export function EvidenceDrawer({ open, onClose, studentId, activeField }: Eviden
   // A server message is already resolved text; the generic case is
   // translated at render time below — so this effect never needs `t` in its
   // dependency array (a language switch must not re-trigger the fetch).
-  const [error, setError] = useState<{ kind: 'server'; message: string } | { kind: 'generic' } | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   const targetHintId = useId();
@@ -66,7 +67,7 @@ export function EvidenceDrawer({ open, onClose, studentId, activeField }: Eviden
           setBundle(res.data);
           setError(null);
           setLoaded(true);
-        } else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        } else setError(toLoadError(res));
       })
       .catch(() => {
         if (active) setError({ kind: 'generic' });
@@ -105,7 +106,7 @@ export function EvidenceDrawer({ open, onClose, studentId, activeField }: Eviden
         )}
         {error && (
           <Notice variant="error" title={t('evidenceDrawer.loadErrorTitle')}>
-            {error.kind === 'server' ? error.message : t('evidenceDrawer.loadError')}
+            {loadErrorText(error, t('evidenceDrawer.loadError'))}
           </Notice>
         )}
         {bundle && bundle.items.length === 0 && (

@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AxiosError } from 'axios';
 import i18n from '@/lib/i18n';
+import { type LoadError, toLoadError } from '@/lib/api-error';
 import type { ApiResponse } from '@/types/api';
 import type { AutosaveStatus } from '@/hooks/use-autosave';
 import { getDocument, saveValues as saveValuesApi } from '../api/documents-api';
 import type { DocumentInstanceDetailDto, DocumentSaveWarningDto, DocumentValuePatch } from '../types';
-
-/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
-export type UseDocumentInstanceLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 export interface SaveResult {
   ok: boolean;
@@ -41,7 +39,7 @@ const SAVED_LINGER_MS = 1500;
 export function useDocumentInstance(instanceId: number) {
   const [detail, setDetail] = useState<DocumentInstanceDetailDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<UseDocumentInstanceLoadError | null>(null);
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
   const [conflict, setConflict] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [saveStatus, setSaveStatus] = useState<AutosaveStatus>('idle');
@@ -98,7 +96,7 @@ export function useDocumentInstance(instanceId: number) {
         setLoadError(null);
         latchConflict(false);
         if (res.success && res.data) setDetailTree(res.data);
-        else setLoadError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setLoadError(toLoadError(res));
       } catch {
         if (!cancelled) setLoadError({ kind: 'generic' });
       } finally {

@@ -5,7 +5,7 @@ import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
 import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { Spinner } from '@/components/ui/spinner';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, apiErrorMessage, toLoadError, loadErrorText } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
 import { getSharePreview, shareDraft } from '../api/draft-sharing-api';
 import type { RecipientPreviewDto, SharedDraftRevisionDto } from '../types';
@@ -28,7 +28,7 @@ export function ShareWithFamilyModal({ open, onClose, instanceId, onShared }: Sh
   // A server-provided message is already resolved text; the generic fallback
   // is translated at RENDER time below, from the stored KIND, so the mount
   // effect never needs `t` in its dependency array (same idiom as `useHome`).
-  const [loadError, setLoadError] = useState<{ kind: 'server'; message: string } | { kind: 'generic' } | null>(null);
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
   const [message, setMessage] = useState('');
   const [isSharing, setIsSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -45,11 +45,10 @@ export function ShareWithFamilyModal({ open, onClose, instanceId, onShared }: Sh
         const res = await getSharePreview(instanceId);
         if (!active) return;
         if (res.success && res.data) setPreview(res.data);
-        else setLoadError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setLoadError(toLoadError(res));
       } catch (err) {
         if (!active) return;
-        const serverMessage = apiErrorMessage(err, '');
-        setLoadError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+        setLoadError(toLoadError(err));
       }
     })();
     return () => {
@@ -88,7 +87,7 @@ export function ShareWithFamilyModal({ open, onClose, instanceId, onShared }: Sh
       <div className="space-y-4">
         {loadError && (
           <div role="alert">
-            <Notice variant="error" title={loadError.kind === 'server' ? loadError.message : t('shareModal.loadErrorDefault')} />
+            <Notice variant="error" title={loadErrorText(loadError, t('shareModal.loadErrorDefault')) ?? t('shareModal.loadErrorDefault')} />
           </div>
         )}
 

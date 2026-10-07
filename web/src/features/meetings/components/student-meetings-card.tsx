@@ -8,19 +8,13 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, type TableColumn } from '@/components/ui/table';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError, loadErrorText } from '@/lib/api-error';
 import { meetingStatusLabel, meetingTypeLabel } from '@/lib/meeting-labels';
 import { listStudentMeetings } from '../api/meetings-api';
 import { formatMeetingWhen } from '../lib/meeting-time';
 import type { MeetingDto, MeetingStatus } from '../types';
 import { MeetingDrawer } from './meeting-drawer';
 import { ScheduleMeetingModal } from './schedule-meeting-modal';
-
-// A server-provided message is already resolved text and is shown as-is;
-// the generic fallback is translated at RENDER time (below), not stored
-// pre-translated here, so the mount effect never needs `t` in its
-// dependency array (same idiom as `useHome`/`MeetingRsvpPage`'s `LoadError`).
-type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 const statusBadgeVariant: Record<MeetingStatus, 'success' | 'error' | 'warning' | 'neutral'> = {
   Proposed: 'neutral',
@@ -63,12 +57,11 @@ export function StudentMeetingsCard({ studentId, studentName }: StudentMeetingsC
           setMeetings(response.data);
           setError(null);
         } else {
-          setError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
+          setError(toLoadError(response));
         }
       } catch (err) {
         if (!active) return;
-        const serverMessage = apiErrorMessage(err, '');
-        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+        setError(toLoadError(err));
       }
     })();
     return () => {
@@ -78,7 +71,7 @@ export function StudentMeetingsCard({ studentId, studentName }: StudentMeetingsC
     // a plain language switch would be wasteful.
   }, [studentId, retryToken]);
 
-  const displayError = error ? (error.kind === 'server' ? error.message : t('studentMeetingsCard.loadFailed')) : null;
+  const displayError = loadErrorText(error, t('studentMeetingsCard.loadFailed'));
 
   const upcoming = (meetings ?? [])
     .filter(isUpcoming)

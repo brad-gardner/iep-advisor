@@ -5,7 +5,7 @@ import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/lib/format-date';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError, loadErrorText } from '@/lib/api-error';
 import { getStudentGoalHistory } from '../api/goals-api';
 import { GoalStatusBadge } from './goal-status-badge';
 import type { GoalRecordDto } from '../types';
@@ -21,8 +21,6 @@ interface GoalHistoryDrawerProps {
 /** One goal lineage's full record history across finalizes/amendments —
  *  every prior "version" of the same goal row (Carried/Retired/Met/NotMet),
  *  newest first. Loaded lazily on open. */
-/** A server-provided message is already resolved text; the generic case is translated at render time. */
-type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 export function GoalHistoryDrawer({ open, onClose, studentId, lineageId, goalText }: GoalHistoryDrawerProps) {
   const { t } = useTranslation('goals');
@@ -54,14 +52,11 @@ export function GoalHistoryDrawer({ open, onClose, studentId, lineageId, goalTex
           setRecords(lineage?.records ?? []);
           setError(null);
         } else {
-          setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+          setError(toLoadError(res));
         }
       } catch (err) {
         if (!active) return;
-        // `apiErrorMessage`'s own fallback is discarded here (never shown) — the generic case is
-        // translated at render time below, not captured into state at the wrong language.
-        const message = apiErrorMessage(err, '');
-        setError(message ? { kind: 'server', message } : { kind: 'generic' });
+        setError(toLoadError(err));
       }
     })();
     return () => {
@@ -69,7 +64,7 @@ export function GoalHistoryDrawer({ open, onClose, studentId, lineageId, goalTex
     };
   }, [open, studentId, lineageId]);
 
-  const errorMessage = error ? (error.kind === 'server' ? error.message : t('historyDrawer.loadError')) : null;
+  const errorMessage = loadErrorText(error, t('historyDrawer.loadError'));
 
   return (
     <Drawer open={open} onClose={onClose} title={t('historyDrawer.title')} data-testid="goal-history-drawer">

@@ -1,13 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError } from '@/lib/api-error';
 import { getDraftExplanations } from '../api/shared-drafts-api';
 import type { DraftExplanationDto } from '../types';
-
-// See `use-shared-draft-detail.ts`'s `SharedDraftDetailError` for why the
-// generic fallback is a KIND, translated at render time by the sole consumer
-// (`ExplainPanel`, via `shared-drafts:explainPanel.loadError`) rather than a
-// string stored here.
-export type DraftExplanationsError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 export interface UseDraftExplanationsResult {
   /** Start the one shared fetch for this revision (a no-op once it has
@@ -15,7 +9,7 @@ export interface UseDraftExplanationsResult {
    *  only fires when a parent actually asks for one. */
   ensureLoaded: () => void;
   isLoading: boolean;
-  error: DraftExplanationsError | null;
+  error: LoadError | null;
   getItemExplanation: (fieldKey: string, rowId: string | null) => string | null;
   /** Section-level explanation: matched by the template section id the server
    *  resolved (`sectionId`), falling back to the title for unresolved ones. */
@@ -37,7 +31,7 @@ export interface UseDraftExplanationsResult {
 export function useDraftExplanations(revisionId: number): UseDraftExplanationsResult {
   const [data, setData] = useState<DraftExplanationDto | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<DraftExplanationsError | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const startedRef = useRef<number | null>(null);
 
   // A revision switch invalidates the previous state — computed during render
@@ -65,12 +59,11 @@ export function useDraftExplanations(revisionId: number): UseDraftExplanationsRe
       .then((res) => {
         if (startedRef.current !== revisionId) return; // superseded by a revision switch
         if (res.success && res.data) setData(res.data);
-        else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setError(toLoadError(res));
       })
       .catch((err: unknown) => {
         if (startedRef.current !== revisionId) return;
-        const serverMessage = apiErrorMessage(err, '');
-        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+        setError(toLoadError(err));
       })
       .finally(() => {
         if (startedRef.current === revisionId) setIsLoading(false);

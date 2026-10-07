@@ -7,12 +7,12 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
+import { type LoadError, loadErrorText } from '@/lib/api-error';
 import {
   PARENT_QUESTION_MAX_LENGTH,
   type AddParentQuestionResult,
   type MoveDirection,
   type ParentQuestion,
-  type ParentQuestionsLoadError,
   type SaveParentQuestionResult,
 } from '../hooks/use-parent-questions';
 import { ParentQuestionRow } from './parent-question-row';
@@ -20,7 +20,7 @@ import { ParentQuestionRow } from './parent-question-row';
 interface ParentQuestionsProps {
   questions: ParentQuestion[];
   isLoading?: boolean;
-  loadError?: ParentQuestionsLoadError | null;
+  loadError?: LoadError | null;
   /** True while an up/down move is being saved; the arrows wait for it. */
   isReordering?: boolean;
   /** Ids with a check-toggle PUT in flight — their checkbox waits for it. */
@@ -107,7 +107,7 @@ export function ParentQuestions({
     setRemoveError(null);
   };
 
-  const loadErrorMessage = loadError ? (loadError.kind === 'server' ? loadError.message : t('meeting-prep:loadError')) : null;
+  const loadErrorMessage = loadErrorText(loadError, t('meeting-prep:loadError'));
 
   return (
     <Card data-testid="parent-questions">

@@ -184,6 +184,11 @@
     "Continued": "Continued",
     "Cancelled": "Cancelled"
   },
+  "rootError": {
+    "title": "Something went wrong",
+    "body": "An unexpected error occurred. Our team has been notified.",
+    "goToDashboard": "Go to Dashboard"
+  },
   "generatedLanguage": {
     "title": "Generated in {{language}}",
     "body": "This was written by the assistant in {{language}}. New results will use your current language.",

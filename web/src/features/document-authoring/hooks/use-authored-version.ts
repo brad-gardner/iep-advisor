@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError } from '@/lib/api-error';
 import { getAuthoredVersion } from '../api/documents-api';
 import type { AuthoredDocumentVersionDetailDto } from '../types';
-
-/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
-export type UseAuthoredVersionError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 interface UseAuthoredVersionResult {
   version: AuthoredDocumentVersionDetailDto | null;
   isLoading: boolean;
-  error: UseAuthoredVersionError | null;
+  error: LoadError | null;
   /** Adopt a server response after a mutation (signed-artifact upload, amend). */
   applyUpdate: (patch: Partial<AuthoredDocumentVersionDetailDto>) => void;
 }
@@ -18,7 +15,7 @@ interface UseAuthoredVersionResult {
 export function useAuthoredVersion(versionId: number): UseAuthoredVersionResult {
   const [version, setVersion] = useState<AuthoredDocumentVersionDetailDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<UseAuthoredVersionError | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
 
   useEffect(() => {
     if (!versionId) return;
@@ -27,12 +24,11 @@ export function useAuthoredVersion(versionId: number): UseAuthoredVersionResult 
       .then((res) => {
         if (!active) return;
         if (res.success && res.data) setVersion(res.data);
-        else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setError(toLoadError(res));
       })
       .catch((err) => {
         if (!active) return;
-        const message = apiErrorMessage(err, '');
-        setError(message ? { kind: 'server', message } : { kind: 'generic' });
+        setError(toLoadError(err));
       })
       .finally(() => {
         if (active) setIsLoading(false);

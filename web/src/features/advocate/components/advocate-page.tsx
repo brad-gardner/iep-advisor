@@ -8,6 +8,7 @@ import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/components/ui/toast';
 import { usePageTitle } from '@/hooks/use-page-title';
+import { loadErrorText } from '@/lib/api-error';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import type { ChildOutletContext } from '@/features/children/components/child-detail-page';
 import { ADD_QUESTION_PARAM } from '@/features/meeting-prep/components/child-meeting-prep-tab';
@@ -253,11 +254,7 @@ export function AdvocatePage() {
     />
   );
 
-  const loadErrorMessage = thread.loadError
-    ? thread.loadError.kind === 'server'
-      ? thread.loadError.message
-      : t('advocate:thread.loadError')
-    : null;
+  const loadErrorMessage = loadErrorText(thread.loadError, t('advocate:thread.loadError'));
 
   return (
     <div className="space-y-3" data-testid="advocate-page">

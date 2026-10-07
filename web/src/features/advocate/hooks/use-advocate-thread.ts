@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, apiErrorMessage, toLoadError } from '@/lib/api-error';
 import {
   AdvocateRequestError,
   advocateUnavailableMessage,
@@ -8,9 +8,6 @@ import {
   type AdvocateRequestErrorCode,
 } from '../api/advocate-api';
 import type { AdvocateDoneFrame, AdvocateMessageDto, AdvocateToolFrame, AdvocateToolStatus } from '../types/advocate';
-
-/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
-export type ThreadLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 export interface ToolActivity {
   key: number;
@@ -123,7 +120,7 @@ function forThread<T>(keyed: Keyed<T> | null, threadId: number | null): T | null
  */
 export function useAdvocateThread(threadId: number | null, { onAnswered, onFailure }: Options = {}) {
   const [loaded, setLoaded] = useState<LoadedThread | null>(null);
-  const [loadFailure, setLoadFailure] = useState<Keyed<ThreadLoadError> | null>(null);
+  const [loadFailure, setLoadFailure] = useState<Keyed<LoadError> | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
   const [pending, setPending] = useState<PendingMessage | null>(null);
@@ -190,13 +187,12 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
           setLoaded({ threadId, messages: res.data.messages, disclaimer: res.data.disclaimer });
           setLoadFailure(null);
         } else {
-          setLoadFailure({ threadId, value: res.message ? { kind: 'server', message: res.message } : { kind: 'generic' } });
+          setLoadFailure({ threadId, value: toLoadError(res) });
         }
       })
       .catch((err) => {
         if (!active) return;
-        const message = apiErrorMessage(err, '');
-        setLoadFailure({ threadId, value: message ? { kind: 'server', message } : { kind: 'generic' } });
+        setLoadFailure({ threadId, value: toLoadError(err) });
       });
     return () => {
       active = false;

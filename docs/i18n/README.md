@@ -379,11 +379,14 @@ the same way as every other namespace.
     `ns` option (it's not in `featureNamespaces`, which only lists the
     eager/parent namespaces) — e.g. `renderInSpanish(<Page />, { ns:
     'educator' })`. See the same test file's Spanish test.
-  - The lint ratchet (`eslint.config.js`) is untouched by this: converting
-    ONE string in `educator-students-page.tsx` does not add
-    `src/features/educator/**` to the ratchet — that folder still has
-    plenty of unconverted literal strings, and stays un-ratcheted until the
-    phase that actually converts it.
+  - At the time this was written (phase 5), the lint ratchet
+    (`eslint.config.js`) was untouched by this: converting ONE string in
+    `educator-students-page.tsx` did not add `src/features/educator/**` to
+    the ratchet — that folder still had plenty of unconverted literal
+    strings, and stayed un-ratcheted until the phase that actually converted
+    it. **The rule is global as of phase 7** (see "The lint rule (global,
+    phase 7)" below), so this distinction no longer applies — every
+    namespace's literal strings are checked now, staff or otherwise.
 
 **Adding a new staff/admin namespace (conventions for the phases that
 follow):**
@@ -454,43 +457,32 @@ A missing Spanish key never shows a blank — i18next falls back to the English
 string. The parity test exists so that fallback is never relied upon in
 practice.
 
-## The lint ratchet
+## The lint rule (global, phase 7)
 
 `eslint.config.js` turns on `i18next/no-literal-string` (mode `jsx-only`, plus
-the `aria-label`/`title`/`placeholder`/`label`/`alt` attributes) **only for
-folders that have been converted**, so the project-wide ESLint baseline stays
-flat while the remaining phases convert the rest of `src`. Converted so far:
+the `aria-label`/`title`/`placeholder`/`label`/`alt` attributes) for **every**
+non-test file under `src/**/*.{ts,tsx}` — `files: ['src/**/*.{ts,tsx}']`. This
+replaced the phase-by-phase per-folder list that lived here through phase 6
+(each phase added its own converted folders so the project-wide baseline
+stayed flat while the rest of `src` was still unconverted). By phase 7 every
+feature folder had already been added to that list, so the per-folder form
+and the global form caught the same violations — the only remaining work was
+converting the last two literal-string files
+(`src/features/children/components/child-ieps-tab.tsx` and
+`child-etrs-tab.tsx`, previously excluded as iep-documents/etr-documents' own
+pages) and confirming the rest of `src` (`src/app`, `src/hooks`, `src/lib`,
+etc. — directories that were never JSX-literal violators, just not yet
+listed) stays clean under the global glob.
 
-- `src/features/auth/**`
-- `src/components/layouts/**`
-- `src/components/ui/**`
-- `src/lib/i18n/**`
-- `src/features/staff-invites/pages/staff-accept-invite-page.tsx` and
-  `src/features/staff-invites/components/accept-invite-form.tsx`
-- `src/features/student/components/student-accept-invite-page.tsx`
-- `src/features/children/**`
-- `src/features/home/**`
-- `src/features/onboarding/**`
-- `src/features/notifications/**`
-- `src/features/subscription/**`
-- `src/features/child-links/**`
-- `src/features/sharing/**`
-- `src/features/knowledge-base/**`
-- `src/features/meetings/components/rsvp-button-group.tsx` (not the rest of
-  `features/meetings` — that's phase 3 — but this one component renders
-  inside the phase-2 "next meeting"/"upcoming meeting" cards)
+Test files (`*.test.ts`/`*.test.tsx`) and `src/test/**` are excluded — they
+stay in English by design (see `test/setup.ts`); a test that specifically
+needs Spanish uses the `renderInSpanish` helper in
+`src/test/i18n-test-utils.tsx` instead of switching the lint rule's scope.
 
-`src/features/children/components/child-ieps-tab.tsx` and
-`child-etrs-tab.tsx` are explicitly excluded from the `children` ratchet —
-they're iep-documents/etr-documents' own pages (a later phase), just hosted
-under `children/components/` as the detail page's IEPs/ETRs tabs.
-
-Test files (`*.test.ts`/`*.test.tsx`) are excluded everywhere — they stay in
-English by design (see `test/setup.ts`); a test that specifically needs
-Spanish uses the `renderInSpanish` helper in `src/test/i18n-test-utils.tsx`
-instead of switching the lint rule's scope.
-
-The rule becomes global (non-test `web/src`) in the plan's last phase.
+`npx eslint .` must report 0 `i18next/no-literal-string` violations. The
+project's unrelated `react-hooks` baseline (pre-existing `set-state-in-effect`/
+`purity` findings, not part of this plan) keeps the total problem count at the
+same ≤35 it was before this phase.
 
 ## Namespace coverage and review status
 
@@ -499,6 +491,16 @@ namespace "Reviewed" here only after a native Spanish speaker (ideally with
 special-education familiarity) has signed off — see
 [`glossary-es.md`](./glossary-es.md#review-status). Reviewing is a
 prerequisite for marketing Spanish, not for shipping it.
+
+**Coverage reached 100% in phase 7**: every namespace below is converted, the
+`i18next/no-literal-string` lint rule is global (non-test `web/src` — see
+"The lint rule (global, phase 7)" above), and the last two
+previously-excluded files
+(`src/features/children/components/child-ieps-tab.tsx`,
+`child-etrs-tab.tsx` — the child detail page's IEPs/ETRs tabs, converted
+under the `iep-documents`/`etr-documents` namespaces they already belonged
+to) are now converted too. Every namespace's Spanish is still **Draft** —
+none has had its native review yet (see "Native review checklist" below).
 
 | Namespace | Converted in | Spanish status |
 |---|---|---|
@@ -542,7 +544,51 @@ prerequisite for marketing Spanish, not for shipping it.
 | `roster-import (staff)` | Phase 6 | Draft — needs native review |
 | `exports (staff)` | Phase 6 | Draft — needs native review |
 | `admin (staff)` | Phase 6 | Draft — needs native review |
-| `educator` (staff — `locales/{en,es}/staff/educator.json`, lazy-route-registered English; see "Staff and admin namespaces" above) | Phase 5 (foundation example — one string; the rest of `features/educator` converts later) | Draft — needs native review |
+| `educator` (staff — `locales/{en,es}/staff/educator.json`, lazy-route-registered English; see "Staff and admin namespaces" above) | Phase 5 (foundation example — one string), rest of `features/educator` converted by Phase 6 | Draft — needs native review |
+
+## Native review checklist
+
+Every namespace above is drafted, not reviewed — this is the checklist for
+the native Spanish speaker (ideally special-education literate) doing that
+review before Spanish is marketed. Reviewing is **not** a blocker for
+shipping; see [`glossary-es.md`](./glossary-es.md#review-status).
+
+1. **Read the glossary first.** [`glossary-es.md`](./glossary-es.md) fixes
+   the terminology, tone (formal **usted**), capitalization, and the IDEA
+   disability-category list — read it before judging any single string, so a
+   deliberate glossary choice (e.g. "exhaustividad de la evaluación" over a
+   more literal translation) isn't flagged as an error.
+2. **Walk the app in Spanish, one audience at a time**, using the language
+   switcher (auth pages, sidebar footer, or Profile): parent/family, staff
+   (`/educator/*`), district admin (`/educator/admin/*`), and platform admin
+   (`/admin/*`). The cross-audience Spanish smoke test (see "Tests" below)
+   lists one representative page per audience as a starting point, but a full
+   review should click through each namespace's own pages, not just the
+   smoke-tested ones.
+3. **Check every namespace's two locale files side by side**:
+   `web/src/locales/en/<namespace>.json` and
+   `web/src/locales/es/<namespace>.json` (or
+   `web/src/locales/{en,es}/staff/<namespace>.json` for a staff namespace —
+   see "Staff and admin namespaces"). Confirm each `es` value reads naturally
+   as a *translation* of its `en` counterpart's meaning, not just
+   grammatically correct Spanish in isolation.
+4. **Watch for the known trouble spots** the glossary calls out explicitly:
+   MFA ("verificación en dos pasos", never bare "MFA"), the referral/
+   evaluation-intake sense of "remisión" (not "referencia"), "exhaustividad
+   de la evaluación" (not "integridad de las pruebas"), "traslado" for the
+   ETR evaluation-type "transfer", and the disability-category list (stored
+   codes stay English; only the display label is Spanish).
+5. **Check formatting, not just wording**: dates/numbers follow Spanish
+   conventions (`lib/format-date.ts`), `<html lang>` is `es`, and no page
+   shows raw `ns:key` text or a mixed-language sentence (English glue text
+   around a Spanish value or vice versa).
+6. **Record the outcome**: once a namespace is reviewed and approved, change
+   its row's Spanish status above from "Draft — needs native review" to
+   "Reviewed" (and note the reviewer/date, following
+   [`glossary-es.md`](./glossary-es.md#review-status)'s own review-status
+   convention). Flag anything that needs a wording fix as a normal content
+   change — the glossary itself gets a new "Terms" row for a newly-settled
+   term, per its own "Add a term here before using a new one" rule.
 
 ## Tests
 

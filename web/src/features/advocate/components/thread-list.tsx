@@ -10,12 +10,13 @@ import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/cn';
 import { relativeTime } from '@/lib/relative-time';
-import { threadsRenameFailed, threadsDeleteFailed, type ThreadsLoadError } from '../hooks/use-advocate-threads';
+import { type LoadError, loadErrorText } from '@/lib/api-error';
+import { threadsRenameFailed, threadsDeleteFailed } from '../hooks/use-advocate-threads';
 import { ADVOCATE_TITLE_MAX_LENGTH, type AdvocateThreadDto } from '../types/advocate';
 
 interface ThreadListProps {
   threads: AdvocateThreadDto[] | null;
-  error: ThreadsLoadError | null;
+  error: LoadError | null;
   selectedId: number | null;
   onSelect: (id: number) => void;
   onNew: () => void;
@@ -57,7 +58,7 @@ export function ThreadList({
   const { t } = useTranslation('advocate');
   const [renaming, setRenaming] = useState<AdvocateThreadDto | null>(null);
   const [deleting, setDeleting] = useState<AdvocateThreadDto | null>(null);
-  const errorMessage = error ? (error.kind === 'server' ? error.message : t('threads.loadError')) : null;
+  const errorMessage = loadErrorText(error, t('threads.loadError'));
 
   return (
     <div

@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { PageLayout } from '@/components/ui/page-layout';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { formatDate } from '@/lib/format-date';
+import { type LoadError, toLoadError, loadErrorText } from '@/lib/api-error';
 import { getVersion } from '../api/iep-versions-api';
 import type { IepVersionDto } from '../types';
 import { DownloadPdfButton } from './download-pdf-button';
@@ -19,13 +20,6 @@ interface IepVersionDetailPageProps {
   backTo: string;
   backLabel: string;
 }
-
-// A server-provided message is already resolved text and shown as-is; the
-// generic fallback is translated at RENDER time (see `error` below) rather
-// than load time, so a language switch after a failed load shows the new
-// language immediately, with no refetch (same pattern as
-// upcoming-meeting-card.tsx — see docs/i18n/README.md).
-type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 export function IepVersionDetailPage({ canRetry, backTo, backLabel }: IepVersionDetailPageProps) {
   const { t } = useTranslation('iep-versions');
@@ -47,7 +41,7 @@ export function IepVersionDetailPage({ canRetry, backTo, backLabel }: IepVersion
       .then((res) => {
         if (!active) return;
         if (res.success && res.data) setVersion(res.data);
-        else setLoadError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setLoadError(toLoadError(res));
       })
       .catch(() => {
         if (active) setLoadError({ kind: 'generic' });
@@ -61,7 +55,7 @@ export function IepVersionDetailPage({ canRetry, backTo, backLabel }: IepVersion
     // `t` deliberately excluded — see the `LoadError` comment above.
   }, [versionId]);
 
-  const error = loadError ? (loadError.kind === 'server' ? loadError.message : t('detailPage.loadErrorGeneric')) : null;
+  const error = loadErrorText(loadError, t('detailPage.loadErrorGeneric'));
 
   if (isLoading) {
     return (

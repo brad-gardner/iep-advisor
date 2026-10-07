@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError, loadErrorText } from '@/lib/api-error';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { getHome } from '../api/home-api';
 import type { HomeDto } from '../types';
@@ -11,13 +11,6 @@ interface UseHomeResult {
   error: string | null;
   retry: () => void;
 }
-
-// A server-provided message is already resolved text (localized server-side,
-// per the plan's `.resx` work) and is shown as-is; the generic fallback is
-// translated at RENDER time instead of load time (see `useHome` below) so a
-// language switch after a failed load shows the new language immediately,
-// without needing to refetch.
-type HomeLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 /**
  * Loads the single role-scoped `GET /api/home` aggregate. A failure never
@@ -31,7 +24,7 @@ export function useHome(): UseHomeResult {
   const { t, i18n } = useTranslation('home');
   const { user } = useAuth();
   const [home, setHome] = useState<HomeDto | null>(null);
-  const [loadError, setLoadError] = useState<HomeLoadError | null>(null);
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
   // Bumped by the "Try again" button to re-run the load effect below.
   const [retryToken, setRetryToken] = useState(0);
 
@@ -45,15 +38,11 @@ export function useHome(): UseHomeResult {
           setHome(response.data);
           setLoadError(null);
         } else {
-          setLoadError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
+          setLoadError(toLoadError(response));
         }
       } catch (err) {
         if (!active) return;
-        // `apiErrorMessage` with no fallback (`''`) tells us ONLY whether the
-        // server itself supplied a message — the generic text is filled in
-        // below, at render, in whichever language is active then.
-        const serverMessage = apiErrorMessage(err, '');
-        setLoadError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+        setLoadError(toLoadError(err));
       }
     })();
     return () => {
@@ -83,7 +72,7 @@ export function useHome(): UseHomeResult {
   return {
     home,
     isLoading: home === null && loadError === null,
-    error: loadError ? (loadError.kind === 'server' ? loadError.message : t('errors.loadFailed')) : null,
+    error: loadErrorText(loadError, t('errors.loadFailed')),
     retry: () => setRetryToken((n) => n + 1),
   };
 }

@@ -4,6 +4,7 @@ import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Spinner } from '@/components/ui/spinner';
 import { formatDate } from '@/lib/format-date';
+import { loadErrorText } from '@/lib/api-error';
 import { AuthoredPdfDownload } from '../components/authored-pdf-download';
 import { AuthoredVersionSnapshot } from '../components/authored-version-snapshot';
 import { useAuthoredVersion } from '../hooks/use-authored-version';
@@ -48,7 +49,7 @@ export function ParentAuthoredVersionPage() {
   }
 
   if (error || !version) {
-    const errorMessage = error ? (error.kind === 'server' ? error.message : t('authoredVersion.loadErrorGeneric')) : t('authoredVersion.loadErrorGeneric');
+    const errorMessage = loadErrorText(error, t('authoredVersion.loadErrorGeneric')) ?? t('authoredVersion.loadErrorGeneric');
     return (
       <PageLayout title={t('authoredVersion.unavailableTitle')} breadcrumb={[{ label: t('authoredVersion.overviewBreadcrumb'), to: backTo }]}>
         <Notice variant="error" title={t('authoredVersion.loadErrorTitle')}>

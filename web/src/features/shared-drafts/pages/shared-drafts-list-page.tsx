@@ -10,13 +10,11 @@ import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Spinner } from '@/components/ui/spinner';
 import { usePageTitle } from '@/hooks/use-page-title';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError, loadErrorText } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
 import { getSharedDrafts } from '../api/shared-drafts-api';
 import { SHARED_DRAFT_STATUS_BADGE } from '../lib/status-badge';
 import type { SharedDraftRevisionDto } from '../types';
-
-type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 /** Every revision ever shared for this child, newest first — the parent's
  *  entry point onto the reading view (`/children/:childId/shared-drafts/:rev`). */
@@ -40,11 +38,10 @@ export function SharedDraftsListPage() {
         const res = await getSharedDrafts(childId);
         if (!active) return;
         if (res.success && res.data) setDrafts(res.data);
-        else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setError(toLoadError(res));
       } catch (err) {
         if (!active) return;
-        const serverMessage = apiErrorMessage(err, '');
-        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+        setError(toLoadError(err));
       }
     })();
     return () => {
@@ -68,7 +65,7 @@ export function SharedDraftsListPage() {
     return (
       <PageLayout title={t('listPage.pageTitle')} breadcrumb={[{ label: t('listPage.breadcrumbOverview'), to: backTo }]}>
         <div role="alert">
-          <Notice variant="error" title={error.kind === 'server' ? error.message : t('listPage.loadError')}>
+          <Notice variant="error" title={loadErrorText(error, t('listPage.loadError')) ?? t('listPage.loadError')}>
             <Button variant="secondary" className="mt-2" onClick={() => setRetryToken((n) => n + 1)}>
               {t('common:ui.tryAgain')}
             </Button>

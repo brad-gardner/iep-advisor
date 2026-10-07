@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/toast';
+import { type LoadError, toLoadError } from '@/lib/api-error';
 import i18n from '@/lib/i18n';
 import {
   createPrepQuestion,
@@ -22,9 +23,6 @@ export const PARENT_QUESTION_MAX_LENGTH = 500;
 export type AddParentQuestionResult = 'added' | 'duplicate' | 'invalid' | 'failed';
 export type SaveParentQuestionResult = 'saved' | 'duplicate' | 'invalid' | 'failed';
 export type MoveDirection = 'up' | 'down';
-
-/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
-export type ParentQuestionsLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 // Live `i18n.t()` calls (not frozen constants) — see `docs/i18n/README.md`'s
 // "Display-label helpers" pattern. Exported as functions so a test calls them
@@ -62,7 +60,7 @@ export function useParentQuestions(childId: number) {
   const { show } = useToast();
   const [questions, setQuestions] = useState<ParentQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<ParentQuestionsLoadError | null>(null);
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
   const [isReordering, setIsReordering] = useState(false);
   const [writeForbidden, setWriteForbidden] = useState(false);
   /** Ids with a check-toggle PUT in flight — the checkbox is disabled meanwhile so a
@@ -86,7 +84,7 @@ export function useParentQuestions(childId: number) {
       .then((res) => {
         if (!active) return;
         if (res.success && res.data) setQuestions(res.data);
-        else setLoadError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        else setLoadError(toLoadError(res));
       })
       .catch(() => {
         if (active) setLoadError({ kind: 'generic' });

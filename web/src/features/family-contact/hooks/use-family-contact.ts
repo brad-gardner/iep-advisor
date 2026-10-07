@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError, loadErrorText } from '@/lib/api-error';
 import { getContactAttempts, getOfflineInput } from '../api/family-contact-api';
 import type { FamilyContactAttemptDto, OfflineFamilyInputDto } from '../types';
-
-// A server-provided message is already resolved text and is shown as-is;
-// the generic fallback is translated at RENDER time (below), not stored
-// pre-translated here, so the mount effect never needs `t` in its
-// dependency array (same idiom as `useHome`/`MeetingRsvpPage`'s `LoadError`).
-type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 interface UseFamilyContactResult {
   attempts: FamilyContactAttemptDto[];
@@ -45,13 +39,11 @@ export function useFamilyContact(studentId: number): UseFamilyContactResult {
           setOfflineInput(inputRes.data);
           setError(null);
         } else {
-          const message = attemptsRes.message ?? inputRes.message;
-          setError(message ? { kind: 'server', message } : { kind: 'generic' });
+          setError(toLoadError({ message: attemptsRes.message ?? inputRes.message }));
         }
       } catch (err) {
         if (!active) return;
-        const serverMessage = apiErrorMessage(err, '');
-        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+        setError(toLoadError(err));
       } finally {
         if (active) setIsLoading(false);
       }
@@ -81,7 +73,7 @@ export function useFamilyContact(studentId: number): UseFamilyContactResult {
     attempts,
     offlineInput,
     isLoading,
-    error: error ? (error.kind === 'server' ? error.message : t('card.loadFailed')) : null,
+    error: loadErrorText(error, t('card.loadFailed')),
     retry,
     addAttempt,
     addOfflineInput,

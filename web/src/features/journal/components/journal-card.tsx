@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { apiErrorMessage } from '@/lib/api-error';
+import { type LoadError, toLoadError, loadErrorText } from '@/lib/api-error';
 import { listJournalEntries } from '../api/journal-api';
 import { journalEmptyCopy } from '../lib/copy';
 import type { JournalEntryDto } from '../types/journal';
@@ -29,9 +29,6 @@ const RECENT_COUNT = 5;
  * page. Saves go through the shared drawer and then re-read the list, so the
  * card always shows the server's own ordering rather than a local guess.
  */
-/** A server-provided message is already resolved text; the generic case is translated at render time. */
-type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
-
 export function JournalCard({ childId, childName, canEdit }: JournalCardProps) {
   const { t } = useTranslation(['journal', 'common']);
   const { show } = useToast();
@@ -51,13 +48,12 @@ export function JournalCard({ childId, childName, canEdit }: JournalCardProps) {
           setItems(res.data);
           setError(null);
         } else {
-          setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+          setError(toLoadError(res));
         }
       })
       .catch((err) => {
         if (!active) return;
-        const message = apiErrorMessage(err, '');
-        setError(message ? { kind: 'server', message } : { kind: 'generic' });
+        setError(toLoadError(err));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -82,7 +78,7 @@ export function JournalCard({ childId, childName, canEdit }: JournalCardProps) {
   };
 
   const journalHref = `/children/${childId}/journal`;
-  const errorMessage = error ? (error.kind === 'server' ? error.message : t('journal:card.loadFailed')) : null;
+  const errorMessage = loadErrorText(error, t('journal:card.loadFailed'));
 
   return (
     <Card data-testid="journal-card">
