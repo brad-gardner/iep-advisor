@@ -236,7 +236,7 @@ public sealed class EmailServicePhase4LanguageTests : IDisposable
 
         await CreateService(queue).SendStudentInviteEmailAsync("maestra-es2@example.com", "Pat", context, "tok123");
 
-        Assert.Contains("en la escuela Lincoln High School", queue.LastDraft!.HtmlBody);
+        Assert.Contains("en Lincoln High School", queue.LastDraft!.HtmlBody);
     }
 
     [Fact]
@@ -248,7 +248,7 @@ public sealed class EmailServicePhase4LanguageTests : IDisposable
 
         await CreateService(queue).SendStudentInviteEmailAsync("maestra-es3@example.com", "Pat", context, "tok123");
 
-        Assert.Contains("en la escuela su escuela", queue.LastDraft!.HtmlBody);
+        Assert.Contains("en su escuela", queue.LastDraft!.HtmlBody);
     }
 
     [Fact]
@@ -350,8 +350,34 @@ public sealed class EmailServicePhase4LanguageTests : IDisposable
 
         Assert.Equal("Su resumen diario de IEP Advisor", queue.LastDraft!.Subject);
         Assert.Contains("Buenos días, Lupe", queue.LastDraft.HtmlBody);
-        Assert.Contains("vence el 15 oct 2026", queue.LastDraft.HtmlBody);
+        Assert.Contains("vence el 15 de oct de 2026", queue.LastDraft.HtmlBody);
         Assert.Contains("Abrir IEP Advisor", queue.LastDraft.TextBody);
+    }
+
+    [Fact]
+    public async Task SendDigest_SpanishRecipient_MeetingRow_UsesLocalizedForConnectorInHtmlAndPlainText()
+    {
+        // Phase 4 review fix: the meeting row previously hardcoded the English word "for" regardless of
+        // the recipient's language, in both the HTML and plain-text bodies.
+        SeedUser("parent-es-meeting@example.com", "es");
+        var queue = new CapturingQueue();
+        var model = new DigestEmailModel
+        {
+            RecipientFirstName = "Lupe",
+            Obligations = new List<DigestObligationItem>(),
+            UpcomingMeetings = new List<DigestMeetingItem>
+            {
+                new() { StudentName = "Sam", Title = "Annual Review", StartsAtUtc = new DateTime(2026, 10, 15, 15, 0, 0, DateTimeKind.Utc), TimeZoneId = "America/New_York" }
+            },
+            DetailUrl = "https://app.example.com"
+        };
+
+        await CreateService(queue).SendDigestAsync("parent-es-meeting@example.com", model);
+
+        Assert.Contains("Annual Review para Sam", queue.LastDraft!.HtmlBody);
+        Assert.Contains("Annual Review para Sam", queue.LastDraft.TextBody);
+        Assert.DoesNotContain(" for ", queue.LastDraft.HtmlBody);
+        Assert.DoesNotContain(" for ", queue.LastDraft.TextBody);
     }
 
     [Fact]

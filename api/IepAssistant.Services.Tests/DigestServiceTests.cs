@@ -278,7 +278,7 @@ public sealed class DigestServiceTests : IDisposable
         public int SendCount { get; private set; }
         public bool ThrowOnSend { get; set; }
 
-        public override Task SendDigestAsync(string toEmail, DigestEmailModel model, CancellationToken ct = default)
+        public override Task SendDigestAsync(string toEmail, DigestEmailModel model, string? recipientLanguage = null, CancellationToken ct = default)
         {
             if (ThrowOnSend)
                 throw new InvalidOperationException("simulated ACS failure");

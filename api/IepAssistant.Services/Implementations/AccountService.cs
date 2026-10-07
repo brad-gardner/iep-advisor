@@ -6,6 +6,7 @@ using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Repositories;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -283,7 +284,10 @@ public class AccountService : IAccountService
         // unable to ever cancel.
         var purgeDate = user.DeletionRequestedAt.Value.AddDays(DeletionGraceDays);
         var token = _deletionTokenProtector.Protect($"{user.Id}|{user.DeletionRequestedAt.Value.Ticks}");
-        var cancelUrl = $"{_frontendUrl}/account/cancel-deletion?token={Uri.EscapeDataString(token)}";
+        // ?lang= lets the public cancel-deletion landing page open in this account's own language before
+        // anyone has to sign in (mirrors EmailService.AppendLangParam for pre-account invite links).
+        var lang = SupportedLanguages.Normalize(user.PreferredLanguage) ?? SupportedLanguages.English;
+        var cancelUrl = $"{_frontendUrl}/account/cancel-deletion?token={Uri.EscapeDataString(token)}&lang={Uri.EscapeDataString(lang)}";
         await _emailService.SendAccountDeletionCancelLinkEmailAsync(user.Email, user.FirstName, cancelUrl, purgeDate, ct);
 
         return ServiceResult.SuccessResult(_localizer["Account.ScheduledForDeletion"]);

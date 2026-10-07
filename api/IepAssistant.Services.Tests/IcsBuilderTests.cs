@@ -249,6 +249,24 @@ public class IcsBuilderTests
     }
 
     [Fact]
+    public void BuildMeetingEvent_VideoAndNotes_DescriptionJoinsWithARealLineBreak_NotTheLiteralBackslashN()
+    {
+        // Pre-existing bug: the parts used to be joined with the 2-character literal "\n" (backslash +
+        // 'n'), which EscapeText's backslash-doubling step turned into a literal "\n" in the rendered
+        // DESCRIPTION — calendar apps showed the text "\n" between the two parts instead of a line break.
+        var input = Meeting();
+        input.VideoUrl = "https://meet.example.com/xyz";
+        input.Notes = "Bring the latest progress report.";
+
+        var ics = Unfold(Text(_builder.BuildMeetingEvent(input, "REQUEST")));
+        var descriptionLine = ics.Split("\r\n").Single(l => l.StartsWith("DESCRIPTION:"));
+
+        // RFC 5545's escaped line break is exactly one backslash followed by 'n' (never two backslashes).
+        Assert.Contains("Video: https://meet.example.com/xyz\\nBring the latest progress report.", descriptionLine);
+        Assert.DoesNotContain("\\\\n", descriptionLine);
+    }
+
+    [Fact]
     public void BuildMeetingEvent_CustomVideoLabel_IsUsedInDescription()
     {
         var input = Meeting();

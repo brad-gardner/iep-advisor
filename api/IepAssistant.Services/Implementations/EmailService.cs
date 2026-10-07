@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -342,7 +341,7 @@ public class EmailService : IEmailService
 
         // Deep-links the admin straight to the staff management page so they can resend in one click.
         var staffUrl = $"{_frontendUrl}/educator/admin/staff";
-        var expiresDisplay = FormatLongDate(expiresAt, language);
+        var expiresDisplay = LocalizedDateFormat.LongDate(expiresAt, language);
 
         var safeInviteeEmail = WebUtility.HtmlEncode(inviteeEmail);
         var safeDistrictName = WebUtility.HtmlEncode(districtName);
@@ -511,7 +510,7 @@ IEP Advisor · iep-advisor.com
 
         var safeFirstName = WebUtility.HtmlEncode(firstName);
         var safeCancelUrl = WebUtility.HtmlEncode(cancelUrl);
-        var purgeDateDisplay = FormatLongDate(purgeDate, language);
+        var purgeDateDisplay = LocalizedDateFormat.LongDate(purgeDate, language);
 
         var subject = _localizer["AccountDeletionCancelLink.Subject"].Value;
         var heading = _localizer["AccountDeletionCancelLink.Heading"].Value;
@@ -596,22 +595,25 @@ IEP Advisor · iep-advisor.com
 
     // ----------------------------------------------------------------- Plan 4 additions (throw on failure)
 
-    public Task SendMeetingInvitationAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
-        => SendMeetingEmailAsync(toEmail, "Meeting.Invitation.SubjectPrefix", "Meeting.Invitation.Intro", "MeetingInvitation", model, ics, ct);
+    public Task SendMeetingInvitationAsync(string toEmail, MeetingEmailModel model, byte[] ics, string? recipientLanguage = null, CancellationToken ct = default)
+        => SendMeetingEmailAsync(toEmail, "Meeting.Invitation.SubjectPrefix", "Meeting.Invitation.Intro", "MeetingInvitation", model, ics, recipientLanguage, ct);
 
-    public Task SendMeetingUpdatedAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
-        => SendMeetingEmailAsync(toEmail, "Meeting.Updated.SubjectPrefix", "Meeting.Updated.Intro", "MeetingUpdated", model, ics, ct);
+    public Task SendMeetingUpdatedAsync(string toEmail, MeetingEmailModel model, byte[] ics, string? recipientLanguage = null, CancellationToken ct = default)
+        => SendMeetingEmailAsync(toEmail, "Meeting.Updated.SubjectPrefix", "Meeting.Updated.Intro", "MeetingUpdated", model, ics, recipientLanguage, ct);
 
-    public Task SendMeetingCancelledAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default)
-        => SendMeetingEmailAsync(toEmail, "Meeting.Cancelled.SubjectPrefix", "Meeting.Cancelled.Intro", "MeetingCancelled", model, ics, ct);
+    public Task SendMeetingCancelledAsync(string toEmail, MeetingEmailModel model, byte[] ics, string? recipientLanguage = null, CancellationToken ct = default)
+        => SendMeetingEmailAsync(toEmail, "Meeting.Cancelled.SubjectPrefix", "Meeting.Cancelled.Intro", "MeetingCancelled", model, ics, recipientLanguage, ct);
 
-    /// <summary>Note: the .ics attachment bytes are built by the CALLER (outside this worker's
-    /// ownership) before reaching here, so they are not re-rendered in the recipient's language — only
-    /// this email's own subject/HTML/plain-text wrapper is. See IcsBuilder.cs for why its one literal
-    /// string doesn't need a language hook.</summary>
-    private async Task SendMeetingEmailAsync(string toEmail, string subjectPrefixKey, string introTextKey, string kind, MeetingEmailModel model, byte[] ics, CancellationToken ct)
+    /// <summary>The .ics attachment bytes are built by the caller before reaching here (see
+    /// <see cref="Implementations.NotificationEmailService"/> and <see cref="IcsMeetingInputMapper"/> for
+    /// how its own text is localized) — this method only localizes its own subject/HTML/plain-text
+    /// wrapper around that attachment. <paramref name="recipientLanguage"/>, when given, is the caller's
+    /// already-resolved language for this recipient (see <see cref="ResolveRecipientAsync"/>); passing it
+    /// keeps the email body and the .ics attachment the caller built alongside it in agreement about which
+    /// language this recipient gets, without a second database lookup here.</summary>
+    private async Task SendMeetingEmailAsync(string toEmail, string subjectPrefixKey, string introTextKey, string kind, MeetingEmailModel model, byte[] ics, string? recipientLanguage, CancellationToken ct)
     {
-        var (language, _) = await ResolveRecipientAsync(toEmail, ct);
+        var (language, _) = await ResolveRecipientAsync(toEmail, ct, recipientLanguage);
         using var _scope = CultureScope.For(language);
 
         var subjectPrefix = _localizer[subjectPrefixKey].Value;
@@ -619,9 +621,7 @@ IEP Advisor · iep-advisor.com
         var forConnector = _localizer["Meeting.SubjectForConnector"].Value;
         var subject = $"{subjectPrefix}: {model.Title} {forConnector} {model.StudentFirstName}";
 
-        var (datePart, timePart) = FormatDateTimeParts(model.StartsAtUtc, language);
-        var atConnector = _localizer["Meeting.At"].Value;
-        var whenLine = $"{datePart} {atConnector} {timePart} ({model.TimeZoneId})";
+        var whenLine = $"{LocalizedDateFormat.MeetingDateTime(model.StartsAtUtc, language)} ({model.TimeZoneId})";
         var durationLabel = string.Format(_localizer["Meeting.DurationMinutes"].Value, model.DurationMinutes);
         var organizedByLine = string.Format(_localizer["Meeting.OrganizedBy"].Value, model.Title, model.StudentFirstName, model.OrganizerName);
         var detailsLabel = _localizer["Meeting.DetailsLabel"].Value;
@@ -646,9 +646,9 @@ IEP Advisor · iep-advisor.com
     /// originates from staff/attacker-controllable input (title, location, organizer/student names, and
     /// the app-constructed URLs) is HTML-encoded — a meeting Title containing markup must not execute in
     /// the recipient's mail client (todos/049). <paramref name="language"/> drives explicit date/time
-    /// formatting (Spanish month names) — see <see cref="FormatDateTimeParts"/>; <paramref name="localizer"/>
-    /// resolves the surrounding chrome text. Internal + static so it is unit-testable without a live ACS
-    /// connection.</summary>
+    /// formatting (Spanish month names) — see <see cref="LocalizedDateFormat.MeetingDateTime"/>;
+    /// <paramref name="localizer"/> resolves the surrounding chrome text. Internal + static so it is
+    /// unit-testable without a live ACS connection.</summary>
     internal static string RenderMeetingHtml(string introText, MeetingEmailModel model, string language, IStringLocalizer<Emails> localizer)
     {
         // Self-contained: `localizer["key"]` resolves against the AMBIENT CurrentUICulture, not the
@@ -663,9 +663,7 @@ IEP Advisor · iep-advisor.com
         var location = string.IsNullOrWhiteSpace(model.Location) ? null : WebUtility.HtmlEncode(model.Location);
         var detailUrl = WebUtility.HtmlEncode(model.DetailUrl);
 
-        var (datePart, timePart) = FormatDateTimeParts(model.StartsAtUtc, language);
-        var atConnector = localizer["Meeting.At"].Value;
-        var whenLine = $"{datePart} {atConnector} {timePart} ({timeZoneId})";
+        var whenLine = $"{LocalizedDateFormat.MeetingDateTime(model.StartsAtUtc, language)} ({timeZoneId})";
         var durationLabel = string.Format(localizer["Meeting.DurationMinutes"].Value, model.DurationMinutes);
         var organizedByLine = string.Format(localizer["Meeting.OrganizedBy"].Value, $"<strong>{title}</strong>", studentFirstName, organizerName);
         var icsAttachedText = localizer["Meeting.IcsAttached"].Value;
@@ -709,12 +707,12 @@ IEP Advisor · iep-advisor.com
             </div>";
     }
 
-    public async Task SendNotificationAsync(string toEmail, string title, string body, string linkUrl, CancellationToken ct = default)
+    public async Task SendNotificationAsync(string toEmail, string title, string body, string linkUrl, string? recipientLanguage = null, CancellationToken ct = default)
     {
-        // title/body come from the stored Notification row — the OTHER worker localizes those at
-        // creation time (NotificationService.cs, outside this worker's ownership). This method only
-        // localizes its own wrapper chrome (the button text), per the task's explicit scope.
-        var (language, _) = await ResolveRecipientAsync(toEmail, ct);
+        // title/body come from the stored Notification row, already localized at creation time
+        // (NotificationService.NotifyAsync builds them per recipient language). This method only
+        // localizes its own wrapper chrome — the button text.
+        var (language, _) = await ResolveRecipientAsync(toEmail, ct, recipientLanguage);
         using var _ = CultureScope.For(language);
 
         var html = RenderNotificationHtml(title, body, linkUrl, _localizer);
@@ -756,9 +754,9 @@ IEP Advisor · iep-advisor.com
             </div>";
     }
 
-    public async Task SendDigestAsync(string toEmail, DigestEmailModel model, CancellationToken ct = default)
+    public async Task SendDigestAsync(string toEmail, DigestEmailModel model, string? recipientLanguage = null, CancellationToken ct = default)
     {
-        var (language, _) = await ResolveRecipientAsync(toEmail, ct);
+        var (language, _) = await ResolveRecipientAsync(toEmail, ct, recipientLanguage);
         using var _ = CultureScope.For(language);
 
         var subject = _localizer["Digest.Subject"].Value;
@@ -777,12 +775,12 @@ IEP Advisor · iep-advisor.com
             (model.Obligations.Count == 0
                 ? $"{noDeadlines}\n"
                 : string.Concat(model.Obligations.Select(o =>
-                    $"- {ObligationStatusLabel(o.Status, _localizer)}: {ObligationKindLabel(o.Kind, _localizer)} {forConnector} {o.StudentName}{(o.DueDate.HasValue ? string.Format(dueDateSuffixFormat, FormatShortDate(o.DueDate.Value, language)) : "")}\n"))) +
+                    $"- {ObligationStatusLabel(o.Status, _localizer)}: {ObligationKindLabel(o.Kind, _localizer)} {forConnector} {o.StudentName}{(o.DueDate.HasValue ? string.Format(dueDateSuffixFormat, LocalizedDateFormat.ShortDate(o.DueDate.Value, language)) : "")}\n"))) +
             $"\n{meetingsHeadingPlain}\n" +
             (model.UpcomingMeetings.Count == 0
                 ? $"{noMeetings}\n"
                 : string.Concat(model.UpcomingMeetings.Select(m =>
-                    $"- {m.Title} for {m.StudentName} - {FormatShortDateTime(m.StartsAtUtc, language)} ({m.TimeZoneId})\n"))) +
+                    $"- {m.Title} {forConnector} {m.StudentName} - {LocalizedDateFormat.ShortDateTime(m.StartsAtUtc, language)} ({m.TimeZoneId})\n"))) +
             $"\n{buttonText}: {model.DetailUrl}";
 
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "Digest", null, ct);
@@ -794,9 +792,10 @@ IEP Advisor · iep-advisor.com
     /// <see cref="ObligationStatusLabel"/> instead of their raw <see cref="object.ToString"/> name (e.g.
     /// "AnnualReview") — unlike <c>EvaluatorAssignment.Domain</c> and <c>StaffInvite</c>'s org-role name,
     /// which stay as written because they are free text/district content, not an enum. Dates are formatted
-    /// explicitly for <paramref name="language"/> (see <see cref="FormatShortDate"/>/
-    /// <see cref="FormatShortDateTime"/>); <paramref name="localizer"/> resolves the surrounding chrome
-    /// text.</summary>
+    /// explicitly for <paramref name="language"/> (see <see cref="LocalizedDateFormat.ShortDate"/>/
+    /// <see cref="LocalizedDateFormat.ShortDateTime"/>); <paramref name="localizer"/> resolves the
+    /// surrounding chrome text, including the "for" connector between a meeting/obligation and its
+    /// student name.</summary>
     internal static string RenderDigestHtml(DigestEmailModel model, string language, IStringLocalizer<Emails> localizer)
     {
         // Self-contained: see RenderMeetingHtml's note on why this opens its own CultureScope.
@@ -812,13 +811,13 @@ IEP Advisor · iep-advisor.com
         var obligationRows = model.Obligations.Count == 0
             ? $"<p style=\"font-size: 13px; color: #A8B5B5;\">{noDeadlinesText}</p>"
             : string.Concat(model.Obligations.Select(o =>
-                $"<li style=\"font-size: 13px; color: #5A6F6F; margin-bottom: 4px;\"><strong>{ObligationStatusLabel(o.Status, localizer)}</strong> — {ObligationKindLabel(o.Kind, localizer)} {forConnector} {WebUtility.HtmlEncode(o.StudentName)}{(o.DueDate.HasValue ? string.Format(dueDateSuffixFormat, FormatShortDate(o.DueDate.Value, language)) : "")}</li>"));
+                $"<li style=\"font-size: 13px; color: #5A6F6F; margin-bottom: 4px;\"><strong>{ObligationStatusLabel(o.Status, localizer)}</strong> — {ObligationKindLabel(o.Kind, localizer)} {forConnector} {WebUtility.HtmlEncode(o.StudentName)}{(o.DueDate.HasValue ? string.Format(dueDateSuffixFormat, LocalizedDateFormat.ShortDate(o.DueDate.Value, language)) : "")}</li>"));
 
         var noMeetingsText = localizer["Digest.NoMeetings"].Value;
         var meetingRows = model.UpcomingMeetings.Count == 0
             ? $"<p style=\"font-size: 13px; color: #A8B5B5;\">{noMeetingsText}</p>"
             : string.Concat(model.UpcomingMeetings.Select(m =>
-                $"<li style=\"font-size: 13px; color: #5A6F6F; margin-bottom: 4px;\">{WebUtility.HtmlEncode(m.Title)} for {WebUtility.HtmlEncode(m.StudentName)} — {FormatShortDateTime(m.StartsAtUtc, language)} ({WebUtility.HtmlEncode(m.TimeZoneId)})</li>"));
+                $"<li style=\"font-size: 13px; color: #5A6F6F; margin-bottom: 4px;\">{WebUtility.HtmlEncode(m.Title)} {forConnector} {WebUtility.HtmlEncode(m.StudentName)} — {LocalizedDateFormat.ShortDateTime(m.StartsAtUtc, language)} ({WebUtility.HtmlEncode(m.TimeZoneId)})</li>"));
 
         var greetingHtml = string.Format(localizer["Digest.Greeting"].Value, recipientFirstName);
         var deadlinesHeading = localizer["Digest.DeadlinesHeadingHtml"].Value;
@@ -872,8 +871,18 @@ IEP Advisor · iep-advisor.com
     /// request UI culture; English outside a request), because there is no other language signal for
     /// someone who has never set a preference and isn't the person driving this request.
     /// </summary>
-    private async Task<(string Language, bool HasAccount)> ResolveRecipientAsync(string toEmail, CancellationToken ct)
+    /// <param name="knownLanguage">When the caller already loaded this exact recipient's
+    /// <see cref="Domain.Entities.User.PreferredLanguage"/> itself (e.g. <c>NotificationEmailService</c>
+    /// and <c>DigestService</c>, which batch-load every recipient's language up front for the bell
+    /// notification/.ics and want the email body to agree with it), it passes that value here and this
+    /// method returns it directly — skipping the lookup below entirely, rather than re-querying the same
+    /// row a second time and risking a different answer if the row changed in between.</param>
+    private async Task<(string Language, bool HasAccount)> ResolveRecipientAsync(string toEmail, CancellationToken ct, string? knownLanguage = null)
     {
+        var known = SupportedLanguages.Normalize(knownLanguage);
+        if (known != null)
+            return (known, true);
+
         var normalizedEmail = toEmail.Trim().ToLowerInvariant();
         var user = await _context.Users
             .AsNoTracking()
@@ -895,47 +904,6 @@ IEP Advisor · iep-advisor.com
     {
         var separator = url.Contains('?') ? "&" : "?";
         return $"{url}{separator}lang={Uri.EscapeDataString(language)}";
-    }
-
-    // ----------------------------------------------------------------- Explicit date/time formatting
-    //
-    // CurrentCulture stays English always by design (CultureScope touches only CurrentUICulture — see
-    // its own doc comment), so every date/time shown to a Spanish recipient must be formatted against an
-    // explicit culture rather than relying on ambient formatting. Verified against CultureInfo.GetCultureInfo
-    // ("en") producing byte-identical output to the prior unculture-qualified ToString calls.
-
-    private static (string DatePart, string TimePart) FormatDateTimeParts(DateTime value, string language)
-    {
-        var culture = CultureInfo.GetCultureInfo(language);
-        var datePart = language == SupportedLanguages.Spanish
-            ? value.ToString("d 'de' MMMM 'de' yyyy", culture)
-            : value.ToString("MMMM d, yyyy", culture);
-        var timePart = value.ToString("h:mm tt", culture);
-        return (datePart, timePart);
-    }
-
-    private static string FormatLongDate(DateTime value, string language)
-    {
-        var culture = CultureInfo.GetCultureInfo(language);
-        return language == SupportedLanguages.Spanish
-            ? value.ToString("d 'de' MMMM 'de' yyyy", culture)
-            : value.ToString("MMMM d, yyyy", culture);
-    }
-
-    private static string FormatShortDate(DateTime value, string language)
-    {
-        var culture = CultureInfo.GetCultureInfo(language);
-        return language == SupportedLanguages.Spanish
-            ? value.ToString("d MMM yyyy", culture)
-            : value.ToString("MMM d, yyyy", culture);
-    }
-
-    private static string FormatShortDateTime(DateTime value, string language)
-    {
-        var culture = CultureInfo.GetCultureInfo(language);
-        return language == SupportedLanguages.Spanish
-            ? value.ToString("d MMM, h:mm tt", culture)
-            : value.ToString("MMM d, h:mm tt", culture);
     }
 
     /// <summary>Composes an <see cref="OutboundEmailDraft"/> and enqueues it. This is the ONLY place any

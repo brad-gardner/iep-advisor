@@ -18,7 +18,7 @@ public sealed class CalendarServiceTests : IDisposable
         var notifications = new NotificationService(ctx, TestSupport.TestLocalizers.Messages());
         var meetingService = new MeetingService(ctx, orgAccess, new AccessService(ctx), notifications, new CapturingAuditLogger(), Microsoft.Extensions.Logging.Abstractions.NullLogger<MeetingService>.Instance, TestSupport.TestLocalizers.Messages(), TestSupport.TestLocalizers.Notifications());
         var obligationService = new ObligationService(ctx, orgAccess);
-        return new CalendarService(ctx, meetingService, obligationService, orgAccess, new IcsBuilder());
+        return new CalendarService(ctx, meetingService, obligationService, orgAccess, new IcsBuilder(), TestSupport.TestLocalizers.Emails());
     }
 
     [Fact]

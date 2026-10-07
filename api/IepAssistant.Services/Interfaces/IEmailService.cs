@@ -28,20 +28,30 @@ public interface IEmailService
     // and enqueues (see EmailService.EnqueueEmailAsync); none of them talk to ACS any more. The real
     // send, retry, and failure recording now happen entirely in OutboundEmailWorker/IEmailTransport.
 
-    /// <summary>New meeting invitation. <paramref name="ics"/> is attached as a .ics file (METHOD:REQUEST).</summary>
-    Task SendMeetingInvitationAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default);
+    /// <summary>New meeting invitation. <paramref name="ics"/> is attached as a .ics file (METHOD:REQUEST).
+    /// <paramref name="recipientLanguage"/>, when given, is the caller's already-resolved language for
+    /// this exact recipient (e.g. the same lookup that built <paramref name="ics"/>'s localized chrome) —
+    /// skips this method's own recipient lookup so the email body and the .ics attachment never disagree
+    /// about which language this recipient gets.</summary>
+    Task SendMeetingInvitationAsync(string toEmail, MeetingEmailModel model, byte[] ics, string? recipientLanguage = null, CancellationToken ct = default);
 
-    /// <summary>Meeting reschedule/detail change. <paramref name="ics"/> carries the bumped SEQUENCE.</summary>
-    Task SendMeetingUpdatedAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default);
+    /// <summary>Meeting reschedule/detail change. <paramref name="ics"/> carries the bumped SEQUENCE. See
+    /// <see cref="SendMeetingInvitationAsync"/> for <paramref name="recipientLanguage"/>.</summary>
+    Task SendMeetingUpdatedAsync(string toEmail, MeetingEmailModel model, byte[] ics, string? recipientLanguage = null, CancellationToken ct = default);
 
-    /// <summary>Meeting cancellation. <paramref name="ics"/> is a METHOD:CANCEL calendar object.</summary>
-    Task SendMeetingCancelledAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default);
+    /// <summary>Meeting cancellation. <paramref name="ics"/> is a METHOD:CANCEL calendar object. See
+    /// <see cref="SendMeetingInvitationAsync"/> for <paramref name="recipientLanguage"/>.</summary>
+    Task SendMeetingCancelledAsync(string toEmail, MeetingEmailModel model, byte[] ics, string? recipientLanguage = null, CancellationToken ct = default);
 
-    /// <summary>Generic in-app notification email (reminders, digests-as-fallback, drafts shared, etc.).</summary>
-    Task SendNotificationAsync(string toEmail, string title, string body, string linkUrl, CancellationToken ct = default);
+    /// <summary>Generic in-app notification email (reminders, digests-as-fallback, drafts shared, etc.).
+    /// <paramref name="recipientLanguage"/>, when given, is the caller's already-resolved language for
+    /// this recipient (it already loaded <c>title</c>/<c>body</c> in that same language) — skips this
+    /// method's own recipient lookup.</summary>
+    Task SendNotificationAsync(string toEmail, string title, string body, string linkUrl, string? recipientLanguage = null, CancellationToken ct = default);
 
-    /// <summary>Daily obligations + upcoming-meetings digest.</summary>
-    Task SendDigestAsync(string toEmail, DigestEmailModel model, CancellationToken ct = default);
+    /// <summary>Daily obligations + upcoming-meetings digest. See <see cref="SendNotificationAsync"/> for
+    /// <paramref name="recipientLanguage"/>.</summary>
+    Task SendDigestAsync(string toEmail, DigestEmailModel model, string? recipientLanguage = null, CancellationToken ct = default);
 
     /// <summary>Pilot-gates plan, phase 3 (C11 adoption slice): the 15-minute magic sign-in link for a
     /// staff member eligible for magic-link sign-in. Rendered in <paramref name="language"/> ("en"/"es",

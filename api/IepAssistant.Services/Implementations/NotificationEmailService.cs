@@ -105,7 +105,7 @@ public class NotificationEmailService : INotificationEmailService
                 && await TrySendMeetingEmailAsync(notification, recipientEmail, recipient.PreferredLanguage, ct);
 
             if (!sentViaMeetingFlow)
-                await _emailService.SendNotificationAsync(recipientEmail, notification.Title, notification.Body, BuildLinkUrl(notification.LinkPath), ct);
+                await _emailService.SendNotificationAsync(recipientEmail, notification.Title, notification.Body, BuildLinkUrl(notification.LinkPath), recipient.PreferredLanguage, ct);
 
             notification.EmailSentAt = DateTime.UtcNow;
             notification.EmailError = null;
@@ -151,9 +151,29 @@ public class NotificationEmailService : INotificationEmailService
             return false;
 
         var frontendUrl = FrontendUrl();
-        var organizerName = meeting.CreatedByUser != null
-            ? $"{meeting.CreatedByUser.FirstName} {meeting.CreatedByUser.LastName}".Trim()
-            : "Your school team";
+        var normalizedLang = SupportedLanguages.Normalize(recipientLanguage) ?? SupportedLanguages.English;
+        var langSuffix = $"&lang={Uri.EscapeDataString(normalizedLang)}";
+
+        // The "Your school team"/"Organizer" fallbacks (no CreatedByUser on file) and the emailed .ics's
+        // DESCRIPTION "Video:" label are all resolved under THIS recipient's language in one scope —
+        // IcsMeetingInputMapper's own defaults stay English, so CalendarService's authoritative
+        // single-meeting download (which has no per-recipient language of its own to resolve) is
+        // unaffected.
+        string organizerName;
+        IcsMeetingInput icsInput;
+        using (CultureScope.For(recipientLanguage))
+        {
+            organizerName = meeting.CreatedByUser != null
+                ? $"{meeting.CreatedByUser.FirstName} {meeting.CreatedByUser.LastName}".Trim()
+                : _localizer["Meeting.OrganizerTeamFallback"].Value;
+
+            // Shared with CalendarService's authoritative GET /api/meetings/{id}.ics mapping (todos/051,
+            // todos/064) so this best-effort emailed .ics carries the real (possibly bumped) Sequence.
+            icsInput = IcsMeetingInputMapper.Map(meeting, _localizer);
+            icsInput.VideoLabel = _localizer["Meeting.VideoLabel"].Value;
+        }
+        var ics = _icsBuilder.BuildMeetingEvent(icsInput, meeting.Status == MeetingStatus.Cancelled ? "CANCEL" : "REQUEST");
+
         var model = new MeetingEmailModel
         {
             StudentFirstName = meeting.SchoolStudent.FirstName,
@@ -164,31 +184,21 @@ public class NotificationEmailService : INotificationEmailService
             Location = meeting.Location,
             VideoUrl = meeting.VideoUrl,
             OrganizerName = organizerName,
-            RsvpAcceptUrl = $"{frontendUrl}/meetings/rsvp?token={participant.RsvpToken}&status=Accepted",
-            RsvpDeclineUrl = $"{frontendUrl}/meetings/rsvp?token={participant.RsvpToken}&status=Declined",
+            RsvpAcceptUrl = $"{frontendUrl}/meetings/rsvp?token={participant.RsvpToken}&status=Accepted{langSuffix}",
+            RsvpDeclineUrl = $"{frontendUrl}/meetings/rsvp?token={participant.RsvpToken}&status=Declined{langSuffix}",
             DetailUrl = $"{frontendUrl}/meetings/{meeting.Id}"
         };
-
-        // Shared with CalendarService's authoritative GET /api/meetings/{id}.ics mapping (todos/051,
-        // todos/064) so this best-effort emailed .ics carries the real (possibly bumped) Sequence.
-        var icsInput = IcsMeetingInputMapper.Map(meeting);
-        // Multilingual plan phase 4 review fix: localize the DESCRIPTION's "Video:" label for THIS
-        // recipient's language — IcsMeetingInputMapper's default ("Video", English) is left alone, so
-        // every other caller (CalendarService's own authoritative single-meeting download) is unaffected.
-        using (CultureScope.For(recipientLanguage))
-            icsInput.VideoLabel = _localizer["Meeting.VideoLabel"].Value;
-        var ics = _icsBuilder.BuildMeetingEvent(icsInput, meeting.Status == MeetingStatus.Cancelled ? "CANCEL" : "REQUEST");
 
         switch (notification.Kind)
         {
             case NotificationKind.MeetingScheduled:
-                await _emailService.SendMeetingInvitationAsync(recipientEmail, model, ics, ct);
+                await _emailService.SendMeetingInvitationAsync(recipientEmail, model, ics, recipientLanguage, ct);
                 break;
             case NotificationKind.MeetingUpdated:
-                await _emailService.SendMeetingUpdatedAsync(recipientEmail, model, ics, ct);
+                await _emailService.SendMeetingUpdatedAsync(recipientEmail, model, ics, recipientLanguage, ct);
                 break;
             case NotificationKind.MeetingCancelled:
-                await _emailService.SendMeetingCancelledAsync(recipientEmail, model, ics, ct);
+                await _emailService.SendMeetingCancelledAsync(recipientEmail, model, ics, recipientLanguage, ct);
                 break;
         }
         return true;

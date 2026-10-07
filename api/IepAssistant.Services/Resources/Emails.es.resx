@@ -198,7 +198,7 @@ Esta invitación vence en 14 días.</value>
     <value>para contribuir al IEP de {0}</value>
   </data>
   <data name="StudentInvite.ContextEducator" xml:space="preserve">
-    <value>en la escuela {0}</value>
+    <value>en {0}</value>
   </data>
   <data name="StudentInvite.UnknownSchool" xml:space="preserve">
     <value>su escuela</value>
@@ -363,11 +363,14 @@ Su cuenta ha sido desactivada mientras tanto, así que este enlace es la única 
   <data name="Meeting.SubjectForConnector" xml:space="preserve">
     <value>para</value>
   </data>
-  <data name="Meeting.At" xml:space="preserve">
-    <value>a las</value>
-  </data>
   <data name="Meeting.OrganizedBy" xml:space="preserve">
     <value>{0} para {1}, organizada por {2}.</value>
+  </data>
+  <data name="Meeting.OrganizerFallback" xml:space="preserve">
+    <value>Organizador</value>
+  </data>
+  <data name="Meeting.OrganizerTeamFallback" xml:space="preserve">
+    <value>El equipo de su escuela</value>
   </data>
   <data name="Meeting.DurationMinutes" xml:space="preserve">
     <value>{0} minutos</value>

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
@@ -24,7 +25,17 @@ using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Services;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
+
+// Multilingual plan (2026-10-06) phase 4 review fix: pin the DEFAULT culture new threads start with to
+// English, once, before anything else runs. RequestLocalization (below) and CultureScope.For both set
+// CurrentCulture/CurrentUICulture explicitly for the work they cover, but any thread that executes
+// outside both of those (a brand-new thread-pool thread's first bit of work, a library that spins up its
+// own thread) otherwise starts from CultureInfo.InstalledUICulture — the HOST OS's culture — which varies
+// by deployment environment and must never silently leak into user-facing text or date formatting.
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.GetCultureInfo(SupportedLanguages.English);
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.GetCultureInfo(SupportedLanguages.English);
 
 // QuestPDF runs under the free Community license (org is under the $1M-revenue threshold). Set once
 // at startup before any rendering — the P5b PDF worker generates IepVersion PDFs headless.

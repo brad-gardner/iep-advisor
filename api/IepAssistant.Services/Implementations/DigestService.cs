@@ -169,12 +169,10 @@ public class DigestService : IDigestService
 
             try
             {
-                // Multilingual plan (2026-10-06) phase 4: the digest EMAIL's own localization is
-                // EmailService's responsibility (owned elsewhere this phase) — this only ensures the
-                // ambient UI culture matches THIS recipient while it renders, mirroring how NotifyAsync
-                // wraps buildText in CultureScope for the bell notification above.
-                using var _ = CultureScope.For(info.PreferredLanguage);
-                await _emailService.SendDigestAsync(info.Email, model, ct);
+                // Pass this recipient's already-loaded language straight through so the digest EMAIL
+                // renders in the same language as the bell title/body built above, without EmailService
+                // re-querying the same user row to resolve it again.
+                await _emailService.SendDigestAsync(info.Email, model, info.PreferredLanguage, ct);
                 notification.EmailSentAt = DateTime.UtcNow;
             }
             catch (Exception ex)

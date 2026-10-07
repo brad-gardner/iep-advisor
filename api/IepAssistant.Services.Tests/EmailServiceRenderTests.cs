@@ -78,6 +78,20 @@ public class EmailServiceRenderTests
     }
 
     [Fact]
+    public void RenderMeetingHtml_Spanish_OneOClockHour_UsesSingularALaNotALas()
+    {
+        // Phase 4 review fix: "a las" was previously hardcoded regardless of hour — Spanish requires the
+        // singular "a la" immediately before a 1 o'clock hour ("a la 1:00 p. m."), "a las" otherwise.
+        var model = MeetingModel();
+        model.StartsAtUtc = new DateTime(2026, 10, 1, 13, 0, 0, DateTimeKind.Utc); // 1:00 PM
+
+        var html = EmailService.RenderMeetingHtml("Se ha programado una reunión", model, "es", Localizer);
+
+        Assert.Contains("a la 1:00", html);
+        Assert.DoesNotContain("a las 1:00", html);
+    }
+
+    [Fact]
     public void RenderNotificationHtml_TitleAndBodyWithMarkup_AreEncoded()
     {
         var html = EmailService.RenderNotificationHtml(Payload, Payload, "https://app.example.com/notifications", Localizer);
@@ -173,6 +187,28 @@ public class EmailServiceRenderTests
         Assert.Contains("para Sam", html);
         Assert.DoesNotContain("AnnualReview", html);
         Assert.DoesNotContain("Overdue", html);
+    }
+
+    [Fact]
+    public void RenderDigestHtml_Spanish_MeetingRow_UsesLocalizedForConnector()
+    {
+        // Phase 4 review fix: the meeting row previously hardcoded the English word "for" regardless of
+        // language — only the obligation row used the localized connector.
+        var model = new DigestEmailModel
+        {
+            RecipientFirstName = "Lupe",
+            Obligations = new List<DigestObligationItem>(),
+            UpcomingMeetings = new List<DigestMeetingItem>
+            {
+                new() { StudentName = "Sam", Title = "Annual Review", StartsAtUtc = DateTime.UtcNow, TimeZoneId = "America/New_York" }
+            },
+            DetailUrl = "https://app.example.com/notifications"
+        };
+
+        var html = EmailService.RenderDigestHtml(model, "es", Localizer);
+
+        Assert.Contains("Annual Review para Sam", html);
+        Assert.DoesNotContain(" for ", html);
     }
 
     [Fact]

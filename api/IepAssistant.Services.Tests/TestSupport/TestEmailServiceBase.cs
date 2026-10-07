@@ -23,11 +23,11 @@ public class TestEmailServiceBase : IEmailService
 
     // Plan 4 additions — throw in production on failure; the no-op default here simply "succeeds" so
     // suites that don't exercise these paths aren't forced to stub them.
-    public virtual Task SendMeetingInvitationAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default) => Task.CompletedTask;
-    public virtual Task SendMeetingUpdatedAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default) => Task.CompletedTask;
-    public virtual Task SendMeetingCancelledAsync(string toEmail, MeetingEmailModel model, byte[] ics, CancellationToken ct = default) => Task.CompletedTask;
-    public virtual Task SendNotificationAsync(string toEmail, string title, string body, string linkUrl, CancellationToken ct = default) => Task.CompletedTask;
-    public virtual Task SendDigestAsync(string toEmail, DigestEmailModel model, CancellationToken ct = default) => Task.CompletedTask;
+    public virtual Task SendMeetingInvitationAsync(string toEmail, MeetingEmailModel model, byte[] ics, string? recipientLanguage = null, CancellationToken ct = default) => Task.CompletedTask;
+    public virtual Task SendMeetingUpdatedAsync(string toEmail, MeetingEmailModel model, byte[] ics, string? recipientLanguage = null, CancellationToken ct = default) => Task.CompletedTask;
+    public virtual Task SendMeetingCancelledAsync(string toEmail, MeetingEmailModel model, byte[] ics, string? recipientLanguage = null, CancellationToken ct = default) => Task.CompletedTask;
+    public virtual Task SendNotificationAsync(string toEmail, string title, string body, string linkUrl, string? recipientLanguage = null, CancellationToken ct = default) => Task.CompletedTask;
+    public virtual Task SendDigestAsync(string toEmail, DigestEmailModel model, string? recipientLanguage = null, CancellationToken ct = default) => Task.CompletedTask;
 
     // Pilot-gates plan, phase 3.
     public virtual Task SendMagicLinkEmailAsync(string toEmail, string firstName, string magicLinkUrl, string? language = null, CancellationToken ct = default) => Task.CompletedTask;

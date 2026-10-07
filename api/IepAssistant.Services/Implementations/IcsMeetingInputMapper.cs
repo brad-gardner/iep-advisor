@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Models;
 
@@ -14,11 +15,16 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 internal static class IcsMeetingInputMapper
 {
-    public static IcsMeetingInput Map(Meeting meeting)
+    /// <summary>The organizer-name fallback (no <c>CreatedByUser</c> on file) resolves from
+    /// <paramref name="localizer"/> against whatever culture is ambient when this is called:
+    /// <see cref="CalendarService"/> calls it inside its own request, already culture-aware from
+    /// <c>RequestLocalization</c>; <see cref="NotificationEmailService"/> wraps the call in
+    /// <see cref="Localization.CultureScope.For"/> for the recipient it is emailing.</summary>
+    public static IcsMeetingInput Map(Meeting meeting, IStringLocalizer<Emails> localizer)
     {
         var organizerName = meeting.CreatedByUser != null
             ? $"{meeting.CreatedByUser.FirstName} {meeting.CreatedByUser.LastName}".Trim()
-            : "Organizer";
+            : localizer["Meeting.OrganizerFallback"].Value;
         var organizerEmail = meeting.CreatedByUser?.Email ?? "no-reply@iep-advisor.com";
 
         return new IcsMeetingInput

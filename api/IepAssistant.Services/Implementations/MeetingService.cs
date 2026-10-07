@@ -683,8 +683,10 @@ public class MeetingService : IMeetingService
         (string Title, string Body) BuildText(string lang)
         {
             // Explicit per-recipient-language date, never the ambient CurrentCulture (CultureScope
-            // deliberately leaves it alone) — see NotificationDateFormat's doc comment.
-            var formattedDate = NotificationDateFormat.FormatMeetingDateTime(meeting.StartsAtUtc, lang);
+            // deliberately leaves it alone) — see LocalizedDateFormat's doc comment. Shared with
+            // EmailService's meeting invitation/update/cancellation emails so the bell/email notification
+            // and the email never render this meeting's date-time two different ways.
+            var formattedDate = LocalizedDateFormat.MeetingDateTime(meeting.StartsAtUtc, lang);
             var title = _notificationsLocalizer[titleKey, meeting.Title];
             var body = _notificationsLocalizer[bodyKey, meeting.Title, studentName, formattedDate, meeting.TimeZoneId];
             return (title, body);

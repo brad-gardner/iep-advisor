@@ -18,7 +18,7 @@ public interface INotificationService
     /// set to that language, so an <c>IStringLocalizer</c> indexer call inside the callback resolves the
     /// right resx entry without the callback needing to touch culture itself — it receives the
     /// normalized language only for the rarer case of formatting a date explicitly (see
-    /// <see cref="Services.Localization.NotificationDateFormat"/>). A caller whose text never varies by
+    /// <see cref="Services.Localization.LocalizedDateFormat"/>). A caller whose text never varies by
     /// recipient may ignore the parameter entirely, e.g. <c>_ => ("Title", "Body")</c>.</para>
     /// </summary>
     Task NotifyAsync(IEnumerable<int> userIds, NotificationKind kind, Func<string, (string Title, string Body)> buildText,

@@ -362,11 +362,14 @@ Your account has been deactivated in the meantime, so this link is the only way 
   <data name="Meeting.SubjectForConnector" xml:space="preserve">
     <value>for</value>
   </data>
-  <data name="Meeting.At" xml:space="preserve">
-    <value>at</value>
-  </data>
   <data name="Meeting.OrganizedBy" xml:space="preserve">
     <value>{0} for {1}, organized by {2}.</value>
+  </data>
+  <data name="Meeting.OrganizerFallback" xml:space="preserve">
+    <value>Organizer</value>
+  </data>
+  <data name="Meeting.OrganizerTeamFallback" xml:space="preserve">
+    <value>Your school team</value>
   </data>
   <data name="Meeting.DurationMinutes" xml:space="preserve">
     <value>{0} minutes</value>

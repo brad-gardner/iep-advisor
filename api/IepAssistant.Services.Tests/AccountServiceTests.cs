@@ -122,6 +122,34 @@ public sealed class AccountServiceTests : IDisposable
         Assert.NotNull(user.DeletionRequestedAt);
         Assert.NotNull(email.LastCancelUrl);
         Assert.Contains("/account/cancel-deletion?token=", email.LastCancelUrl);
+        // Phase 4 review fix: the public cancel-deletion landing page opens in this account's own
+        // language before anyone has to sign in.
+        Assert.Contains("&lang=en", email.LastCancelUrl);
+    }
+
+    [Fact]
+    public async Task ScheduleDeletion_SpanishAccount_CancelUrlCarriesSpanishLangParam()
+    {
+        var provider = DataProtectionProvider.Create("shared-test-app");
+        int userId;
+        using (var ctx = CreateContext())
+        {
+            userId = SeedActiveParent(ctx, "es-deletion@example.com");
+            ctx.Users.Find(userId)!.PreferredLanguage = "es";
+            ctx.SaveChanges();
+        }
+
+        CapturingEmailService email;
+        using (var ctx = CreateContext())
+        {
+            var (service, capturedEmail) = CreateService(ctx, provider);
+            email = capturedEmail;
+            var result = await service.ScheduleDeletionAsync(userId, "Password1!", mfaCode: null);
+            Assert.True(result.Success, result.Message);
+        }
+
+        Assert.NotNull(email.LastCancelUrl);
+        Assert.Contains("&lang=es", email.LastCancelUrl);
     }
 
     /// <summary>Unified-analysis plan, phase 4: the export must carry a child's AnalysisRuns (with their
