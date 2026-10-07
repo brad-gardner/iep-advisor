@@ -228,6 +228,48 @@ special-education terminology), see [`glossary-es.md`](./glossary-es.md).
   phase 2 fix. An effect using this pattern typically also wants an `active`
   (or a ref-backed equivalent) guard so a superseded/unmounted call's
   response is never applied after the fact.
+- **Load errors: the shared `LoadError` pattern (phase 6 review) is THE
+  pattern now** — `src/lib/api-error.ts` exports `LoadError` (`{ kind:
+  'server'; message: string } | { kind: 'generic' }`, the same flag/code
+  shape the bullet above describes) plus two helpers that build and render
+  it: `toLoadError(resOrErr)` takes either a failed `ApiResponse` (reads its
+  optional `message`) or a caught error from a rejected request (resolved via
+  `apiErrorMessage`) — the two are told apart by `instanceof Error` — and
+  `loadErrorText(e, fallback)` renders a `LoadError | null` to display text
+  at RENDER time (a server message as-is, the generic case as the caller's
+  own current-language `fallback`). A mount-effect load becomes:
+  ```ts
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
+  // ...
+  if (res.success && res.data) {
+    setData(res.data);
+    setLoadError(null);
+  } else {
+    setLoadError(toLoadError(res));
+  }
+  // catch (err) { setLoadError(toLoadError(err)); }
+  // `t` deliberately excluded from the effect's deps — see the bullet above.
+  const error = loadErrorText(loadError, t('feature.loadFailedFallback'));
+  ```
+  This replaces two older, hand-rolled variants that both reduce to the same
+  shape: a locally re-declared `{ kind: 'server' } | { kind: 'generic' }`
+  union with its own inline `loadError.kind === 'server' ? loadError.message
+  : t(...)` ternary repeated at every call site (`useTemplates`,
+  `useDocumentTypes`, `useDistrictExports`, `useAdoptionEngagement` before
+  phase 6), and an even older `string | null` with an empty-string sentinel
+  meaning "no server message" (`useAuditIntegrity`, `useOutboundEmails`
+  before phase 6 — `apiErrorMessage(err, '')` stored directly as the "error
+  flag", which only works because `''` is falsy; `toLoadError`/`loadErrorText`
+  make that encoding explicit instead of relying on an empty string reading
+  as "no error yet"). **Phase 6 converted only this phase's own
+  hooks/components** (the ones named above, plus `useUsers`, whose old
+  `hasError: boolean` dropped the server message entirely) — an older copy
+  of either pattern elsewhere in the app (e.g. `useHome`'s `HomeLoadError`,
+  `useChildren`'s) is still correct and keeps working; it migrates to the
+  shared type in whichever later phase converts that feature, not in one
+  sweeping pass. A brand-new load effect should use `LoadError`/
+  `toLoadError`/`loadErrorText` directly rather than re-declaring the union
+  locally.
 
 ## Staff and admin namespaces (phase 5 foundation)
 

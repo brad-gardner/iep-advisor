@@ -248,12 +248,17 @@
       "Export": "Exportado",
       "Finalize": "Finalizado"
     },
-    "actionVerbs": {
-      "View": "vio",
-      "Edit": "editó",
-      "Share": "compartió",
-      "Export": "exportó",
-      "Finalize": "finalizó"
+    "actionSentences": {
+      "View": "<actor>{{actorName}}</actor> vio <resource>{{resourceName}}</resource>",
+      "View_withRecipient": "<actor>{{actorName}}</actor> vio <resource>{{resourceName}}</resource> con <recipient>{{recipientName}}</recipient>",
+      "Edit": "<actor>{{actorName}}</actor> editó <resource>{{resourceName}}</resource>",
+      "Edit_withRecipient": "<actor>{{actorName}}</actor> editó <resource>{{resourceName}}</resource> con <recipient>{{recipientName}}</recipient>",
+      "Share": "<actor>{{actorName}}</actor> compartió <resource>{{resourceName}}</resource>",
+      "Share_withRecipient": "<actor>{{actorName}}</actor> compartió <resource>{{resourceName}}</resource> con <recipient>{{recipientName}}</recipient>",
+      "Export": "<actor>{{actorName}}</actor> exportó <resource>{{resourceName}}</resource>",
+      "Export_withRecipient": "<actor>{{actorName}}</actor> exportó <resource>{{resourceName}}</resource> con <recipient>{{recipientName}}</recipient>",
+      "Finalize": "<actor>{{actorName}}</actor> finalizó <resource>{{resourceName}}</resource>",
+      "Finalize_withRecipient": "<actor>{{actorName}}</actor> finalizó <resource>{{resourceName}}</resource> con <recipient>{{recipientName}}</recipient>"
     }
   }
 }

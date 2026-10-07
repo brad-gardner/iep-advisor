@@ -1408,7 +1408,7 @@
     <value>El miembro del personal ya está desactivado.</value>
   </data>
   <data name="StaffInvite.CannotDeactivateLastAdmin" xml:space="preserve">
-    <value>No puede desactivar al último administrador del distrito activo.</value>
+    <value>No puede desactivar al último administrador activo del distrito.</value>
   </data>
   <data name="StaffInvite.Deactivated" xml:space="preserve">
     <value>Miembro del personal desactivado.</value>
@@ -1510,7 +1510,7 @@
     <value>Grade no se puede borrar.</value>
   </data>
   <data name="RosterImport.UnknownGrade" xml:space="preserve">
-    <value>Grado desconocido: '{0}' (use PK, K, 1–12 o Sin grado).</value>
+    <value>Grado desconocido: '{0}' (use PK, K, 1–12 o Ungraded).</value>
   </data>
   <data name="RosterImport.GradeRequiredForNewStudent" xml:space="preserve">
     <value>Grade es obligatorio para un estudiante nuevo.</value>
@@ -1555,7 +1555,7 @@
     <value>Importación no encontrada.</value>
   </data>
   <data name="RosterImport.NotStudentRoster" xml:space="preserve">
-    <value>Esta importación no es un listado de estudiantes.</value>
+    <value>Esta importación no es una lista de estudiantes.</value>
   </data>
   <data name="RosterImport.AlreadyCommitted" xml:space="preserve">
     <value>Esta importación ya ha sido confirmada.</value>
@@ -1574,6 +1574,75 @@
   </data>
   <data name="DistrictImports.OnlyXlsxAccepted" xml:space="preserve">
     <value>Solo se aceptan libros .xlsx.</value>
+  </data>
+  <data name="StaffImport.NoPermissionImportStaff" xml:space="preserve">
+    <value>No tiene permiso para importar personal.</value>
+  </data>
+  <data name="StaffImport.ProfileNotFound" xml:space="preserve">
+    <value>Perfil de educador no encontrado.</value>
+  </data>
+  <data name="StaffImport.CallerNoSchool" xml:space="preserve">
+    <value>Su cuenta no está asignada a una escuela.</value>
+  </data>
+  <data name="StaffImport.ImportNotFound" xml:space="preserve">
+    <value>Importación no encontrada.</value>
+  </data>
+  <data name="StaffImport.NotStaffList" xml:space="preserve">
+    <value>Esta importación no es una lista de personal.</value>
+  </data>
+  <data name="StaffImport.AlreadyCommitted" xml:space="preserve">
+    <value>Esta importación ya ha sido confirmada.</value>
+  </data>
+  <data name="StaffImport.FixErrorsOrImportValidOnly" xml:space="preserve">
+    <value>Corrija los errores o elija importar solo las filas válidas.</value>
+  </data>
+  <data name="StaffImport.StaffMemberNotFound" xml:space="preserve">
+    <value>Miembro del personal no encontrado.</value>
+  </data>
+  <data name="StaffImport.EmailRequired" xml:space="preserve">
+    <value>Email es obligatorio.</value>
+  </data>
+  <data name="StaffImport.InvalidEmail" xml:space="preserve">
+    <value>'{0}' no es un correo electrónico válido.</value>
+  </data>
+  <data name="StaffImport.RoleRequired" xml:space="preserve">
+    <value>Role es obligatorio.</value>
+  </data>
+  <data name="StaffImport.UnknownRole" xml:space="preserve">
+    <value>Rol desconocido: '{0}' (use DistrictAdmin, SchoolAdmin, Teacher, RelatedServiceProvider o GeneralEducator).</value>
+  </data>
+  <data name="StaffImport.SchoolNameCannotBeCleared" xml:space="preserve">
+    <value>SchoolName no se puede borrar.</value>
+  </data>
+  <data name="StaffImport.DistrictAdminMustNotHaveSchool" xml:space="preserve">
+    <value>Un administrador del distrito no debe tener una escuela.</value>
+  </data>
+  <data name="StaffImport.SchoolNameRequiredForRole" xml:space="preserve">
+    <value>Se requiere SchoolName para este rol.</value>
+  </data>
+  <data name="StaffImport.UnknownSchool" xml:space="preserve">
+    <value>Escuela desconocida: '{0}'.</value>
+  </data>
+  <data name="StaffImport.TitleTooLong" xml:space="preserve">
+    <value>Title debe tener 150 caracteres o menos.</value>
+  </data>
+  <data name="StaffImport.NoPermissionImportDistrictAdmin" xml:space="preserve">
+    <value>No tiene permiso para importar a un administrador del distrito.</value>
+  </data>
+  <data name="StaffImport.OnlyImportForOwnSchool" xml:space="preserve">
+    <value>Solo puede importar personal para su propia escuela.</value>
+  </data>
+  <data name="StaffImport.NoPermissionManageThatStaffMember" xml:space="preserve">
+    <value>No tiene permiso para administrar a ese miembro del personal.</value>
+  </data>
+  <data name="StaffImport.EmailAlreadyHasAccount" xml:space="preserve">
+    <value>Ese correo electrónico ya tiene una cuenta. El personal debe ser invitado con un correo electrónico que no esté ya registrado.</value>
+  </data>
+  <data name="StaffImport.EmailAlreadyInvited" xml:space="preserve">
+    <value>Ese correo electrónico ya ha sido invitado.</value>
+  </data>
+  <data name="StaffImport.CannotChangeRoleOfLastAdmin" xml:space="preserve">
+    <value>No puede cambiar el rol del último administrador activo del distrito.</value>
   </data>
   <data name="Export.NoPermissionRequestExport" xml:space="preserve">
     <value>No tiene permiso para solicitar esta exportación.</value>
@@ -1623,8 +1692,8 @@
   <data name="DocumentTemplate.AlreadyExists" xml:space="preserve">
     <value>Ya existe una plantilla para {0} en {1}.</value>
   </data>
-  <data name="DocumentTemplate.DefaultScope" xml:space="preserve">
-    <value>el valor predeterminado</value>
+  <data name="DocumentTemplate.AlreadyExistsDefault" xml:space="preserve">
+    <value>Ya existe una plantilla predeterminada para {0}.</value>
   </data>
   <data name="Templates.AddAtLeastOneSection" xml:space="preserve">
     <value>Agregue al menos una sección antes de publicar.</value>

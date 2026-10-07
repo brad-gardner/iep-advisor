@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Models;
 using Xunit;
 
 namespace IepAssistant.Services.Tests;
@@ -164,6 +165,9 @@ public sealed class DocumentTemplateServiceTests : IDisposable
             var dup = await CreateService(ctx).CreateTemplateAsync(AdminUserId, "OH", IepTypeId, "Ohio IEP again");
             Assert.False(dup.Success);
             Assert.Contains("already exists", dup.Message!, StringComparison.OrdinalIgnoreCase);
+            // Every failure this service returns is ServiceErrorKind.Validation (see its class doc) —
+            // AdminTemplatesController's status never depends on message text.
+            Assert.Equal(ServiceErrorKind.Validation, dup.ErrorKind);
         }
 
         // Only the first template was persisted.

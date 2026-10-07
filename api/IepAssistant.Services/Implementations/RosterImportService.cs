@@ -31,6 +31,11 @@ namespace IepAssistant.Services.Implementations;
 /// matching the literal header text in the workbook the user is editing;
 /// <see cref="ImportWorkbook"/>'s shared file-level validation messages (used by
 /// <c>StaffImportService</c> too) are intentionally left English-only this phase.
+///
+/// <para><c>ImportRow.Message</c> is written in whichever language is active for the request that wrote
+/// it — the uploader's at preview, the committer's at commit (which re-evaluates and overwrites every
+/// row's message; see <see cref="CommitClaimedAsync"/>). A batch previewed in one language and committed
+/// in another ends up with its stored row messages in the committer's language, not the uploader's.</para>
 /// </summary>
 public class RosterImportService : IRosterImportService
 {
@@ -737,7 +742,7 @@ public class RosterImportService : IRosterImportService
             _context.ChangeTracker.Clear();
             if (chunk.Count == 1)
             {
-                chunk[0].Error = EducatorService.DuplicateExternalIdMessage;
+                chunk[0].Error = _localizer["Educator.DuplicateExternalId"];
                 chunk[0].Student = null;
                 return;
             }

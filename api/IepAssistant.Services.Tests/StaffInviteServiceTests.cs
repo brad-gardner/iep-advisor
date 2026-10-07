@@ -191,6 +191,7 @@ public sealed class StaffInviteServiceTests : IDisposable
         });
         Assert.False(result.Success);
         Assert.Contains("must not specify a school", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
     }
 
     [Fact]
@@ -224,6 +225,7 @@ public sealed class StaffInviteServiceTests : IDisposable
         });
         Assert.False(result.Success);
         Assert.Contains("not found", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
     }
 
     [Fact]
@@ -318,6 +320,7 @@ public sealed class StaffInviteServiceTests : IDisposable
         });
         Assert.False(result.Success);
         Assert.Contains("permission", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
     }
 
     // ================================================================= Invite: rejection guards

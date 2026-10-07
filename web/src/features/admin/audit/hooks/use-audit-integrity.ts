@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { apiErrorMessage } from '@/lib/api-error';
+import { apiErrorMessage, loadErrorText, toLoadError, type LoadError } from '@/lib/api-error';
 import { listAuditIntegrityRuns, runAuditIntegrityCheck } from '../api/audit-admin-api';
 import type { AuditIntegrityRunDto } from '../types';
 
@@ -23,14 +23,11 @@ export function useAuditIntegrity(): UseAuditIntegrityResult {
   const { t } = useTranslation('admin');
   const [runs, setRuns] = useState<AuditIntegrityRunDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  // A server-provided message (from `res.message`/`apiErrorMessage`) is
-  // already resolved text and shown as-is; an EMPTY string from
-  // `apiErrorMessage(err, '')` means "no server message" — a flag, not yet
-  // translated, so a language switch after a failed load shows the new
+  // A flag (shared `LoadError` shape), not pre-translated text — translated
+  // at render, below, so a language switch after a failed load shows the new
   // language immediately rather than a stale snapshot (see
-  // `docs/i18n/README.md`'s note on never putting `t` in a mount-effect's
-  // dependency array).
-  const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
+  // `docs/i18n/README.md`'s "Load errors: the shared `LoadError` pattern").
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
   const reloadRef = useRef<() => void>(() => {});
@@ -46,12 +43,12 @@ export function useAuditIntegrity(): UseAuditIntegrityResult {
         if (!active || mine !== generation) return;
         if (res.success && res.data) {
           setRuns(res.data);
-          setLoadErrorMessage(null);
+          setLoadError(null);
         } else {
-          setLoadErrorMessage(res.message ?? '');
+          setLoadError(toLoadError(res));
         }
       } catch (err) {
-        if (active && mine === generation) setLoadErrorMessage(apiErrorMessage(err, ''));
+        if (active && mine === generation) setLoadError(toLoadError(err));
       } finally {
         if (active && mine === generation) setIsLoading(false);
       }
@@ -63,10 +60,10 @@ export function useAuditIntegrity(): UseAuditIntegrityResult {
     return () => {
       active = false;
     };
-    // `t` deliberately excluded — see the `loadErrorMessage` comment above.
+    // `t` deliberately excluded — see the `loadError` comment above.
   }, []);
 
-  const error = loadErrorMessage === null ? null : loadErrorMessage || t('audit.loadFailed');
+  const error = loadErrorText(loadError, t('audit.loadFailed'));
 
   const runCheck = useCallback(async () => {
     setIsRunning(true);

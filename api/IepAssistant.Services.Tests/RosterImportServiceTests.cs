@@ -50,7 +50,7 @@ public sealed class RosterImportServiceTests : IDisposable
     {
         var org = new OrgAccessService(ctx);
         var invites = new StaffInviteService(ctx, org, _email, new JwtTokenFactory(_configuration), new InviteLinkExposure(false), _configuration, NullLogger<StaffInviteService>.Instance, TestSupport.TestLocalizers.Messages());
-        return new StaffImportService(ctx, org, invites, _audit, NullLogger<StaffImportService>.Instance);
+        return new StaffImportService(ctx, org, invites, _audit, NullLogger<StaffImportService>.Instance, TestSupport.TestLocalizers.Messages());
     }
 
     // ----------------------------------------------------------------- workbook builders
@@ -139,6 +139,7 @@ public sealed class RosterImportServiceTests : IDisposable
         Assert.Contains("Specific Learning Disability", values.Column(2).CellsUsed().Select(c => c.GetString()));
         Assert.False(denied.Success);
         Assert.Contains("permission", denied.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, denied.ErrorKind);
     }
 
     // ----------------------------------------------------------------- upload rejections
@@ -392,6 +393,8 @@ public sealed class RosterImportServiceTests : IDisposable
 
         Assert.Equal("Import not found.", commit.Message);
         Assert.Equal("Import not found.", detail.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, commit.ErrorKind);
+        Assert.Equal(ServiceErrorKind.NotFound, detail.ErrorKind);
         Assert.Empty(history.Data!);
     }
 
@@ -606,6 +609,7 @@ public sealed class RosterImportServiceTests : IDisposable
 
         Assert.False(rejected.Success);
         Assert.Contains("too large to import", rejected.Message);
+        Assert.Equal(ServiceErrorKind.Validation, rejected.ErrorKind);
         Assert.Equal("HomeLanguage must be 32 characters or fewer.", Assert.Single(capped.Data!.Rows).Message);
         var payload = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(ctx.ImportRows.AsNoTracking().Single().PayloadJson)!;
         Assert.Equal(1000, payload["HomeLanguage"].Length);

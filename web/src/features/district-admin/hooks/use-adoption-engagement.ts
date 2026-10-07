@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { apiErrorMessage } from '@/lib/api-error';
+import { toLoadError, type LoadError } from '@/lib/api-error';
 import { getAdoption, getEngagement } from '../api/district-api';
 import type { AdoptionDto, EngagementDto } from '../types';
 
-/** A server-provided message is already resolved text and is shown as-is; the
- * generic case is translated by the caller at render time (it has the
- * current `t`) — see the module doc comment below. */
-export type AdoptionEngagementLoadError = { kind: 'server'; message: string } | { kind: 'generic' } | null;
+/** The shared `LoadError` shape, or `null` for "no error" — see
+ * `docs/i18n/README.md`'s "Load errors: the shared `LoadError` pattern". A
+ * server-provided message is shown as-is; the generic case is translated by
+ * the caller at render time (it has the current `t`). */
+export type AdoptionEngagementLoadError = LoadError | null;
 
 interface Loaded {
   key: string;
@@ -29,12 +30,6 @@ interface UseAdoptionEngagementResult {
   retry: () => void;
 }
 
-// A server-provided message is already resolved text and is shown as-is; a
-// missing one resolves to the `{ kind: 'generic' }` flag (translated at
-// render time by the caller, which has the current `t`) rather than a
-// pre-translated string baked in here — same reasoning as `useHome`'s
-// `HomeLoadError` (see `docs/i18n/README.md`: an effect that fetches on
-// mount never has `t` in its dependency array).
 interface LoadResult<T> {
   data: T | null;
   error: AdoptionEngagementLoadError;
@@ -44,10 +39,9 @@ async function loadAdoption(schoolId: number | null): Promise<LoadResult<Adoptio
   try {
     const res = await getAdoption({ schoolId: schoolId ?? undefined });
     if (res.success && res.data) return { data: res.data, error: null };
-    return { data: null, error: res.message ? { kind: 'server', message: res.message } : { kind: 'generic' } };
+    return { data: null, error: toLoadError(res) };
   } catch (err) {
-    const serverMessage = apiErrorMessage(err, '');
-    return { data: null, error: serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' } };
+    return { data: null, error: toLoadError(err) };
   }
 }
 
@@ -55,10 +49,9 @@ async function loadEngagement(schoolId: number | null): Promise<LoadResult<Engag
   try {
     const res = await getEngagement({ schoolId: schoolId ?? undefined });
     if (res.success && res.data) return { data: res.data, error: null };
-    return { data: null, error: res.message ? { kind: 'server', message: res.message } : { kind: 'generic' } };
+    return { data: null, error: toLoadError(res) };
   } catch (err) {
-    const serverMessage = apiErrorMessage(err, '');
-    return { data: null, error: serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' } };
+    return { data: null, error: toLoadError(err) };
   }
 }
 

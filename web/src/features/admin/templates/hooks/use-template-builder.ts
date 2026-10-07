@@ -45,7 +45,6 @@ const OK: MutationResult = { ok: true };
 // message is already resolved text and shown as-is.
 type LoadErrorKind =
   | { kind: 'server'; message: string }
-  | { kind: 'listFailed' }
   | { kind: 'notFound' }
   | { kind: 'noVersion' }
   | { kind: 'versionLoadFailed' }
@@ -95,7 +94,7 @@ export function useTemplateBuilder(templateId: number) {
         setLoadErrorKind(null);
         setConflict(false);
         if (!listRes.success || !listRes.data) {
-          setLoadErrorKind(listRes.message ? { kind: 'server', message: listRes.message } : { kind: 'listFailed' });
+          setLoadErrorKind(listRes.message ? { kind: 'server', message: listRes.message } : { kind: 'generic' });
           return;
         }
         const tmpl = listRes.data.find((tpl) => tpl.id === templateId);
@@ -134,9 +133,6 @@ export function useTemplateBuilder(templateId: number) {
     switch (loadErrorKind.kind) {
       case 'server':
         loadError = loadErrorKind.message;
-        break;
-      case 'listFailed':
-        loadError = t('templates.builder.loadErrorFallback');
         break;
       case 'notFound':
         loadError = t('templates.builder.notFound');

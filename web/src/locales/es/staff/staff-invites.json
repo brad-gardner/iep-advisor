@@ -8,7 +8,7 @@
     "columns": {
       "name": "Nombre",
       "email": "Correo electrónico",
-      "role": "Función",
+      "role": "Rol",
       "expires": "Vence"
     },
     "statusActive": "Activo",
@@ -50,7 +50,7 @@
   "inviteForm": {
     "emailLabel": "Correo electrónico laboral *",
     "emailPlaceholder": "nombre@distrito.org",
-    "roleLabel": "Función *",
+    "roleLabel": "Rol *",
     "schoolLabel": "Escuela *",
     "selectSchool": "Seleccione una escuela",
     "submit": "Enviar invitación",

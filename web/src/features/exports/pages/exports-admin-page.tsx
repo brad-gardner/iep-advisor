@@ -6,7 +6,7 @@ import { Notice } from '@/components/ui/notice';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Table, type TableColumn } from '@/components/ui/table';
 import { usePageTitle } from '@/hooks/use-page-title';
-import { apiErrorMessage } from '@/lib/api-error';
+import { apiErrorMessage, loadErrorText } from '@/lib/api-error';
 import { formatDate } from '@/lib/format-date';
 import { getExportDownloadUrl } from '../api/exports-api';
 import { useDistrictExports } from '../hooks/use-district-exports';
@@ -35,12 +35,6 @@ export function ExportsAdminPage() {
   const { jobs, isLoading, error, retry, requestExport, isRequesting, requestError } = useDistrictExports();
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-
-  // The hook stores a FLAG (server message or generic), not pre-translated
-  // text, so a language switch after a failed load shows the new language
-  // immediately — see `use-district-exports.ts`'s module doc comment.
-  const errorText = (loadError: typeof error, genericFallback: string): string | null =>
-    loadError ? (loadError.kind === 'server' ? loadError.message : genericFallback) : null;
 
   const handleDownload = async (jobId: number) => {
     setDownloadingId(jobId);
@@ -138,7 +132,7 @@ export function ExportsAdminPage() {
     >
       {requestError && (
         <div role="alert" className="mb-4">
-          <Notice variant="error" title={errorText(requestError, t('page.requestExportFailed')) ?? ''} />
+          <Notice variant="error" title={loadErrorText(requestError, t('page.requestExportFailed')) ?? ''} />
         </div>
       )}
       {downloadError && (
@@ -149,7 +143,7 @@ export function ExportsAdminPage() {
 
       {error ? (
         <Notice variant="error" title={t('page.couldNotLoadTitle')}>
-          {errorText(error, t('page.couldNotLoadTitle'))}
+          {loadErrorText(error, t('page.couldNotLoadTitle'))}
           <div>
             <Button size="sm" variant="secondary" className="mt-2" onClick={retry} data-testid="exports-retry">
               {t('page.tryAgain')}

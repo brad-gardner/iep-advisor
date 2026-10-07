@@ -1,17 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { loadErrorText, toLoadError, type LoadError } from '@/lib/api-error';
 import { listDocumentTypes } from '../admin-templates-api';
 import type { DocumentTypeDto } from '../types';
-
-// Same `{server message} | {generic}` shape as `useTemplates` — see that
-// file's comment, and `docs/i18n/README.md`'s note on never putting `t` in a
-// mount-effect's dependency array.
-type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 export function useDocumentTypes() {
   const { t } = useTranslation('admin');
   const [documentTypes, setDocumentTypes] = useState<DocumentTypeDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Same shared `LoadError` shape as `useTemplates` — see that file's
+  // comment, and `docs/i18n/README.md`'s "Load errors: the shared
+  // `LoadError` pattern".
   const [loadError, setLoadError] = useState<LoadError | null>(null);
   // Bumped by reload() to re-run the fetch effect. The effect body only calls
   // setState after an await, keeping it effect-safe (no synchronous setState).
@@ -26,11 +25,11 @@ export function useDocumentTypes() {
           setDocumentTypes(res.data);
           setLoadError(null);
         } else {
-          setLoadError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+          setLoadError(toLoadError(res));
         }
       })
-      .catch(() => {
-        if (!cancelled) setLoadError({ kind: 'generic' });
+      .catch((err) => {
+        if (!cancelled) setLoadError(toLoadError(err));
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -38,14 +37,10 @@ export function useDocumentTypes() {
     return () => {
       cancelled = true;
     };
-    // `t` deliberately excluded — see the `LoadError` comment above.
+    // `t` deliberately excluded — see the `loadError` comment above.
   }, [reloadKey]);
 
-  const error = loadError
-    ? loadError.kind === 'server'
-      ? loadError.message
-      : t('templates.createModal.errorDocTypesLoadFailed')
-    : null;
+  const error = loadErrorText(loadError, t('templates.createModal.errorDocTypesLoadFailed'));
 
   const reload = useCallback(() => {
     setIsLoading(true);

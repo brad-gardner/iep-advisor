@@ -1587,6 +1587,75 @@
   <data name="DistrictImports.OnlyXlsxAccepted" xml:space="preserve">
     <value>Only .xlsx workbooks are accepted.</value>
   </data>
+  <data name="StaffImport.NoPermissionImportStaff" xml:space="preserve">
+    <value>You do not have permission to import staff.</value>
+  </data>
+  <data name="StaffImport.ProfileNotFound" xml:space="preserve">
+    <value>Educator profile not found.</value>
+  </data>
+  <data name="StaffImport.CallerNoSchool" xml:space="preserve">
+    <value>Your account is not assigned to a school.</value>
+  </data>
+  <data name="StaffImport.ImportNotFound" xml:space="preserve">
+    <value>Import not found.</value>
+  </data>
+  <data name="StaffImport.NotStaffList" xml:space="preserve">
+    <value>This import is not a staff list.</value>
+  </data>
+  <data name="StaffImport.AlreadyCommitted" xml:space="preserve">
+    <value>This import has already been committed.</value>
+  </data>
+  <data name="StaffImport.FixErrorsOrImportValidOnly" xml:space="preserve">
+    <value>Fix the errors or choose to import valid rows only.</value>
+  </data>
+  <data name="StaffImport.StaffMemberNotFound" xml:space="preserve">
+    <value>Staff member not found.</value>
+  </data>
+  <data name="StaffImport.EmailRequired" xml:space="preserve">
+    <value>Email is required.</value>
+  </data>
+  <data name="StaffImport.InvalidEmail" xml:space="preserve">
+    <value>'{0}' is not a valid email.</value>
+  </data>
+  <data name="StaffImport.RoleRequired" xml:space="preserve">
+    <value>Role is required.</value>
+  </data>
+  <data name="StaffImport.UnknownRole" xml:space="preserve">
+    <value>Unknown role '{0}' (use DistrictAdmin, SchoolAdmin, Teacher, RelatedServiceProvider or GeneralEducator).</value>
+  </data>
+  <data name="StaffImport.SchoolNameCannotBeCleared" xml:space="preserve">
+    <value>SchoolName cannot be cleared.</value>
+  </data>
+  <data name="StaffImport.DistrictAdminMustNotHaveSchool" xml:space="preserve">
+    <value>A District Admin must not have a school.</value>
+  </data>
+  <data name="StaffImport.SchoolNameRequiredForRole" xml:space="preserve">
+    <value>SchoolName is required for this role.</value>
+  </data>
+  <data name="StaffImport.UnknownSchool" xml:space="preserve">
+    <value>Unknown school '{0}'.</value>
+  </data>
+  <data name="StaffImport.TitleTooLong" xml:space="preserve">
+    <value>Title must be 150 characters or fewer.</value>
+  </data>
+  <data name="StaffImport.NoPermissionImportDistrictAdmin" xml:space="preserve">
+    <value>You do not have permission to import a District Admin.</value>
+  </data>
+  <data name="StaffImport.OnlyImportForOwnSchool" xml:space="preserve">
+    <value>You can only import staff for your own school.</value>
+  </data>
+  <data name="StaffImport.NoPermissionManageThatStaffMember" xml:space="preserve">
+    <value>You do not have permission to manage that staff member.</value>
+  </data>
+  <data name="StaffImport.EmailAlreadyHasAccount" xml:space="preserve">
+    <value>That email already has an account. Staff must be invited with an email that isn't already registered.</value>
+  </data>
+  <data name="StaffImport.EmailAlreadyInvited" xml:space="preserve">
+    <value>That email has already been invited.</value>
+  </data>
+  <data name="StaffImport.CannotChangeRoleOfLastAdmin" xml:space="preserve">
+    <value>You cannot change the role of the last active District Admin of the district.</value>
+  </data>
   <data name="Export.NoPermissionRequestExport" xml:space="preserve">
     <value>You do not have permission to request this export.</value>
   </data>
@@ -1635,8 +1704,8 @@
   <data name="DocumentTemplate.AlreadyExists" xml:space="preserve">
     <value>A template for {0} in {1} already exists.</value>
   </data>
-  <data name="DocumentTemplate.DefaultScope" xml:space="preserve">
-    <value>the default</value>
+  <data name="DocumentTemplate.AlreadyExistsDefault" xml:space="preserve">
+    <value>A default template for {0} already exists.</value>
   </data>
   <data name="Templates.AddAtLeastOneSection" xml:space="preserve">
     <value>Add at least one section before publishing.</value>

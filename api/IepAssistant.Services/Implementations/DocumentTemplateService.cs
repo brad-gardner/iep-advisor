@@ -61,9 +61,8 @@ public class DocumentTemplateService : IDocumentTemplateService
             .AnyAsync(t => t.StateCode == normalizedState && t.DocumentTypeId == documentTypeId, ct);
         if (duplicate)
         {
-            var scope = normalizedState ?? _localizer["DocumentTemplate.DefaultScope"];
             return ServiceResult<DocumentTemplateModel>.FailureResult(ServiceErrorKind.Validation,
-                _localizer["DocumentTemplate.AlreadyExists", documentType.DisplayName, scope]);
+                AlreadyExistsMessage(normalizedState, documentType.DisplayName));
         }
 
         var now = DateTime.UtcNow;
@@ -97,9 +96,8 @@ public class DocumentTemplateService : IDocumentTemplateService
             // Backstop for the (StateCode, DocumentTypeId) unique index: two concurrent creates can
             // both pass the AnyAsync pre-check, so translate the index violation into the same
             // friendly error rather than letting it surface as a 500.
-            var scope = normalizedState ?? _localizer["DocumentTemplate.DefaultScope"];
             return ServiceResult<DocumentTemplateModel>.FailureResult(ServiceErrorKind.Validation,
-                _localizer["DocumentTemplate.AlreadyExists", documentType.DisplayName, scope]);
+                AlreadyExistsMessage(normalizedState, documentType.DisplayName));
         }
 
         // Audit template creation (its empty Draft v1) in the tamper-evident authoring trail (G-e.4).
@@ -160,6 +158,16 @@ public class DocumentTemplateService : IDocumentTemplateService
 
         return (trimmed.ToUpperInvariant(), null);
     }
+
+    /// <summary>
+    /// The default-scope case gets its own sentence key (<c>DocumentTemplate.AlreadyExistsDefault</c>)
+    /// rather than interpolating a "the default" phrase into the state-scoped sentence
+    /// (<c>DocumentTemplate.AlreadyExists</c>) — the merged form translated awkwardly into Spanish.
+    /// </summary>
+    private LocalizedString AlreadyExistsMessage(string? normalizedState, string documentTypeDisplayName)
+        => normalizedState == null
+            ? _localizer["DocumentTemplate.AlreadyExistsDefault", documentTypeDisplayName]
+            : _localizer["DocumentTemplate.AlreadyExists", documentTypeDisplayName, normalizedState];
 
     private static DocumentTemplateModel MapTemplate(DocumentTemplate t, DocumentType documentType)
     {

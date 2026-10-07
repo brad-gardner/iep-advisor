@@ -4,8 +4,9 @@ import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { BarChart } from '@/components/ui/charts/bar-chart';
+import { loadErrorText } from '@/lib/api-error';
 import { StatTile } from '@/features/home/components/stat-tile';
-import { useAdoptionEngagement, type AdoptionEngagementLoadError } from '../hooks/use-adoption-engagement';
+import { useAdoptionEngagement } from '../hooks/use-adoption-engagement';
 
 interface AdoptionEngagementTilesProps {
   /** `null` = district-wide (DistrictAdmin with no school filter, or SchoolAdmin
@@ -23,15 +24,6 @@ export function AdoptionEngagementTiles({ schoolId }: AdoptionEngagementTilesPro
   const { adoption, engagement, adoptionError, engagementError, isLoading, error, retry } =
     useAdoptionEngagement(schoolId);
 
-  // The hook stores a FLAG (server message or generic), not pre-translated
-  // text, so a language switch after a failed load shows the new language
-  // immediately — see `use-adoption-engagement.ts`'s module doc comment.
-  // This joint-failure case can't tell which endpoint produced a generic
-  // (non-server) failure, so it uses a neutral combined message rather than
-  // attributing it to either one.
-  const errorText = (loadError: AdoptionEngagementLoadError): string | null =>
-    loadError ? (loadError.kind === 'server' ? loadError.message : t('adoptionEngagement.errors.combined')) : null;
-
   if (isLoading) {
     return (
       <Card data-testid="adoption-engagement-loading">
@@ -42,12 +34,15 @@ export function AdoptionEngagementTiles({ schoolId }: AdoptionEngagementTilesPro
     );
   }
 
-  // Both endpoints failed — nothing to render at all.
+  // Both endpoints failed — nothing to render at all. This joint-failure
+  // case can't tell which endpoint produced a generic (non-server) failure,
+  // so it uses a neutral combined message rather than attributing it to
+  // either one.
   if (error) {
     return (
       <Card data-testid="adoption-engagement-error">
         <div role="alert">
-          <Notice variant="error" title={errorText(error) ?? ''}>
+          <Notice variant="error" title={loadErrorText(error, t('adoptionEngagement.errors.combined')) ?? ''}>
             <Button
               variant="secondary"
               className="mt-2"
@@ -68,7 +63,7 @@ export function AdoptionEngagementTiles({ schoolId }: AdoptionEngagementTilesPro
         <div role="alert">
           <Notice
             variant="error"
-            title={adoptionError.kind === 'server' ? adoptionError.message : t('adoptionEngagement.errors.adoption')}
+            title={loadErrorText(adoptionError, t('adoptionEngagement.errors.adoption')) ?? ''}
             data-testid="adoption-engagement-adoption-error"
           >
             <Button variant="secondary" className="mt-2" onClick={retry} data-testid="adoption-engagement-retry">
@@ -81,9 +76,7 @@ export function AdoptionEngagementTiles({ schoolId }: AdoptionEngagementTilesPro
         <div role="alert">
           <Notice
             variant="error"
-            title={
-              engagementError.kind === 'server' ? engagementError.message : t('adoptionEngagement.errors.engagement')
-            }
+            title={loadErrorText(engagementError, t('adoptionEngagement.errors.engagement')) ?? ''}
             data-testid="adoption-engagement-engagement-error"
           >
             <Button variant="secondary" className="mt-2" onClick={retry} data-testid="adoption-engagement-retry">

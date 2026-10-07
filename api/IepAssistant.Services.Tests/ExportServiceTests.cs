@@ -232,6 +232,46 @@ public sealed class ExportServiceTests : IDisposable
         using var ctx = _db.Context();
         var result = await CreateService(ctx, new InMemoryBlobStorageFake()).EnqueueDistrictExportAsync(userId);
         Assert.False(result.Success);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+    }
+
+    [Fact]
+    public async Task GetStatus_UnknownJob_NotFound()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "S");
+        var (userId, _) = _db.Staff("da@example.com", districtId, schoolId, OrgRoleIds.DistrictAdmin);
+
+        using var ctx = _db.Context();
+        var result = await CreateService(ctx, new InMemoryBlobStorageFake()).GetStatusAsync(userId, jobId: 999999);
+
+        Assert.False(result.Success);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+    }
+
+    [Fact]
+    public async Task GetDownloadUrl_JobNotCompleted_Validation()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "S");
+        var studentId = _db.Student(schoolId, "Sam");
+        var (userId, _) = _db.Staff("exp2@example.com", districtId, schoolId, OrgRoleIds.Teacher);
+        _db.Access(studentId, userId, AccessRole.Collaborator);
+
+        int jobId;
+        using (var ctx = _db.Context())
+        {
+            var enqueue = await CreateService(ctx, new InMemoryBlobStorageFake()).EnqueueStudentExportAsync(userId, studentId);
+            Assert.True(enqueue.Success, enqueue.Message);
+            jobId = enqueue.Data!.Id; // still Queued — never RunAsync'd
+        }
+
+        using (var ctx = _db.Context())
+        {
+            var result = await CreateService(ctx, new InMemoryBlobStorageFake()).GetDownloadUrlAsync(userId, jobId);
+            Assert.False(result.Success);
+            Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+        }
     }
 
     public void Dispose() => _db.Dispose();

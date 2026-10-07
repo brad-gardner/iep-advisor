@@ -14,11 +14,14 @@ import { rosterAttentionHref } from '../lib/roster-links';
  * `district-admin` is a staff-only namespace (multilingual plan phase 6) —
  * this component renders only behind the lazy staff route chunk (inside
  * `StaffHomePage` → `AdminHome`), never eagerly, so using it here is safe;
- * see `docs/i18n/README.md`'s "Staff and admin namespaces". It's listed here
- * only so `complianceTileLabel`'s Spanish bundle actually loads — the
- * `t()` calls below still come from `home`. */
+ * see `docs/i18n/README.md`'s "Staff and admin namespaces". A second,
+ * `district-admin`-scoped `t` is grabbed via its own `useTranslation` call
+ * just to pass to `complianceTileLabel` (which needs a `t` branded to that
+ * single namespace) — the component's OWN text still comes from `home`'s
+ * `t` below. */
 export function ComplianceSummaryBlock({ summary }: { summary: ComplianceSummaryDto }) {
-  const { t } = useTranslation(['home', 'district-admin']);
+  const { t } = useTranslation('home');
+  const { t: tDistrictAdmin } = useTranslation('district-admin');
   const denominator = t('complianceSummary.denominator', { count: summary.activeStudents });
   return (
     <HomeSection
@@ -36,7 +39,7 @@ export function ComplianceSummaryBlock({ summary }: { summary: ComplianceSummary
         {COMPLIANCE_SUMMARY_TILES.map((tile) => (
           <StatTile
             key={tile.key}
-            label={complianceTileLabel(tile.key)}
+            label={complianceTileLabel(tDistrictAdmin, tile.key)}
             value={summary[tile.key]}
             denominator={denominator}
             href={rosterAttentionHref(tile.attention)}

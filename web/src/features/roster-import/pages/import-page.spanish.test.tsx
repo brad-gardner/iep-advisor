@@ -85,7 +85,7 @@ describe('ImportPage in Spanish', () => {
     );
     // `WIZARD_STEP_LABEL_KEYS` feed `ProgressDots`, which folds the active
     // step's label into its own `aria-label`.
-    expect(screen.getByRole('progressbar', { name: /Plantilla/ })).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Paso 1 de 5: Plantilla' })).toBeInTheDocument();
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Importaciones anteriores' })).toBeInTheDocument());
     expect(screen.getByTestId('import-history-list')).toHaveTextContent('Confirmada');

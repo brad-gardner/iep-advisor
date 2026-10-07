@@ -16,10 +16,12 @@ namespace IepAssistant.Api.Controllers;
 /// files (incl. macro-enabled .xlsm), macro payloads, missing columns and more than 5,000 rows.
 ///
 /// Multilingual plan (2026-10-06) phase 6: switched from this controller's own private MapFailure (an
-/// inline copy of the English-substring heuristic) to the shared MapServiceFailure — see
-/// <see cref="RosterImportService"/>/<see cref="StaffImportService"/> for the matching
-/// <see cref="ServiceErrorKind"/> assignments. <see cref="ReadUploadAsync"/>'s own upload-shape rejections
-/// always return a fixed 400 (never from message text), so their messages only need localizing, not a kind.
+/// inline copy of the English-substring heuristic) to the shared MapServiceFailure. Both
+/// <see cref="RosterImportService"/> and <see cref="StaffImportService"/> now set a matching
+/// <see cref="ServiceErrorKind"/> on every failure this controller maps to a status — each reproducing
+/// its PRE-existing English-substring heuristic result so no route's status changed — and localize every
+/// message they return. <see cref="ReadUploadAsync"/>'s own upload-shape rejections always return a fixed
+/// 400 (never from message text), so their messages only need localizing, not a kind.
 /// </summary>
 [ApiController]
 [Authorize]

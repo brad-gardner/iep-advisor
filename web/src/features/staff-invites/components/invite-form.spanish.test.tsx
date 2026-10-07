@@ -21,7 +21,7 @@ describe('InviteForm in Spanish', () => {
       { ns: 'staff-invites' }
     );
 
-    const roleOptions = within(screen.getByLabelText('Función *'))
+    const roleOptions = within(screen.getByLabelText('Rol *'))
       .getAllByRole('option')
       .map((o) => o.textContent);
 

@@ -2,22 +2,13 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { formatDate } from '@/lib/format-date';
 import { orgRoleLabel } from '@/lib/org-role-label';
 import type { DashboardInvite } from '../types';
 
 interface DashboardInvitesTileProps {
   // Pending + expired invites, expired-first (server-ordered).
   invites: DashboardInvite[];
-}
-
-function formatExpiry(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
 }
 
 // Invites needing attention (pending + expired, expired flagged). Presentational:
@@ -52,7 +43,7 @@ export function DashboardInvitesTile({ invites }: DashboardInvitesTileProps) {
                   {invite.schoolName ? ` · ${invite.schoolName}` : ` · ${t('dashboard.invitesTile.districtWide')}`}
                   {' · '}
                   {isExpired ? t('dashboard.invitesTile.expiredOn') : t('dashboard.invitesTile.expires')}{' '}
-                  {formatExpiry(invite.inviteExpiresAt)}
+                  {formatDate(invite.inviteExpiresAt, '')}
                 </p>
               </li>
             );

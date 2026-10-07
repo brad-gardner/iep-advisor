@@ -1,17 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiErrorMessage } from '@/lib/api-error';
+import { toLoadError, type LoadError } from '@/lib/api-error';
 import { enqueueDistrictExport, listDistrictExports } from '../api/exports-api';
 import { IN_FLIGHT_EXPORT_STATUSES } from '../types';
 import type { ExportJobDto } from '../types';
 
 const POLL_INTERVAL_MS = 10_000;
 
-/** A server-provided message is already resolved text and is shown as-is;
- * the generic case is translated by the caller at render time (it has the
- * current `t`) — same reasoning as `useHome`'s `HomeLoadError` (see
- * `docs/i18n/README.md`: an effect that fetches on mount never has `t` in
- * its dependency array). */
-export type ExportsLoadError = { kind: 'server'; message: string } | { kind: 'generic' } | null;
+/** The shared `LoadError` shape, or `null` for "no error" — see
+ * `docs/i18n/README.md`'s "Load errors: the shared `LoadError` pattern". A
+ * server-provided message is shown as-is; the generic case is translated by
+ * the caller at render time (it has the current `t`). */
+export type ExportsLoadError = LoadError | null;
 
 interface UseDistrictExportsResult {
   jobs: ExportJobDto[];
@@ -58,13 +57,10 @@ export function useDistrictExports(): UseDistrictExportsResult {
           setJobs(res.data);
           setError(null);
         } else {
-          setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+          setError(toLoadError(res));
         }
       } catch (err) {
-        if (active && mine === generation) {
-          const serverMessage = apiErrorMessage(err, '');
-          setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
-        }
+        if (active && mine === generation) setError(toLoadError(err));
       } finally {
         if (active && mine === generation) setIsLoading(false);
       }
@@ -93,11 +89,10 @@ export function useDistrictExports(): UseDistrictExportsResult {
       if (res.success) {
         reloadRef.current();
       } else {
-        setRequestError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
+        setRequestError(toLoadError(res));
       }
     } catch (err) {
-      const serverMessage = apiErrorMessage(err, '');
-      setRequestError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
+      setRequestError(toLoadError(err));
     } finally {
       setIsRequesting(false);
     }

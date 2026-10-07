@@ -80,8 +80,8 @@
     "confirmAll": "Importar filas",
     "commitFailed": "No se pudo confirmar la importación",
     "outcomes": {
-      "New": "Nuevo",
-      "Updated": "Actualizado",
+      "New": "Nueva",
+      "Updated": "Actualizada",
       "Unchanged": "Sin cambios",
       "Error": "Error"
     }

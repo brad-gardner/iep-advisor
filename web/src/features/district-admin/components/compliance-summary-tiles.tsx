@@ -28,7 +28,7 @@ export function ComplianceSummaryTiles({ summary, drill, schoolId, from, to }: C
       {COMPLIANCE_SUMMARY_TILES.map((tile) => (
         <StatTile
           key={tile.key}
-          label={complianceTileLabel(tile.key)}
+          label={complianceTileLabel(t, tile.key)}
           value={summary[tile.key]}
           denominator={denominator}
           href={districtDrillHref(drill, tile.key, schoolId)}

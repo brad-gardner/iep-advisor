@@ -20,6 +20,7 @@ import { usePageTitle } from '@/hooks/use-page-title';
 import { formatDate } from '@/lib/format-date';
 import { disabilityCategoryLabel } from '@/lib/disability-category-label';
 import i18n from '@/lib/i18n';
+import { getActiveLanguage } from '@/lib/i18n/format';
 import { getDashboardStats, getRecentUsers } from '../api/admin-api';
 import type { AdminDashboardStats, AdminUser } from '@/types/api';
 import type { LucideIcon } from 'lucide-react';
@@ -244,7 +245,7 @@ function StatCard({ icon: Icon, label, value, delta }: StatCardProps) {
           <Badge variant="success">{t('dashboard.deltaThisWeek', { delta })}</Badge>
         )}
       </div>
-      <p className="mt-4 text-3xl font-semibold text-brand-slate-800">{value.toLocaleString()}</p>
+      <p className="mt-4 text-3xl font-semibold text-brand-slate-800">{value.toLocaleString(getActiveLanguage())}</p>
       <p className="text-sm text-brand-slate-500 mt-1">{label}</p>
     </Card>
   );
@@ -295,7 +296,7 @@ function StatusBreakdownCard({ title, icon: Icon, items, total }: StatusBreakdow
               <span className={`w-2.5 h-2.5 rounded-full ${item.color}`} />
               <span className="text-brand-slate-600">{item.label}</span>
             </div>
-            <span className="font-medium text-brand-slate-700">{item.value}</span>
+            <span className="font-medium text-brand-slate-700">{item.value.toLocaleString(getActiveLanguage())}</span>
           </div>
         ))}
       </div>
@@ -344,7 +345,7 @@ function BreakdownCard({ title, data, emptyLabel, labelFor = defaultBreakdownLab
             <div key={label}>
               <div className="flex justify-between text-xs mb-1">
                 <span className="text-brand-slate-600 capitalize">{labelFor(label)}</span>
-                <span className="font-medium text-brand-slate-700">{value}</span>
+                <span className="font-medium text-brand-slate-700">{value.toLocaleString(getActiveLanguage())}</span>
               </div>
               <div className="h-2 rounded-full bg-brand-slate-100 overflow-hidden">
                 <div
@@ -456,7 +457,7 @@ function QuickStatsCard({ items }: QuickStatsCardProps) {
               <Icon size={14} strokeWidth={1.8} className="text-brand-slate-400" />
               <span className="text-xs text-brand-slate-600">{label}</span>
             </div>
-            <span className="text-sm font-semibold text-brand-slate-700">{value}</span>
+            <span className="text-sm font-semibold text-brand-slate-700">{value.toLocaleString(getActiveLanguage())}</span>
           </div>
         ))}
       </div>

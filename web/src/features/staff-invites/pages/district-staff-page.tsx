@@ -12,6 +12,7 @@ import { PageLayout } from "@/components/ui/page-layout";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { formatDate } from "@/lib/format-date";
 import { orgRoleLabel } from "@/lib/org-role-label";
 import { useEducatorProfile } from "@/features/educator/hooks/use-educator-profile";
 import { getDistrictSchools } from "@/features/district-admin/api/district-api";
@@ -36,16 +37,6 @@ import type {
 } from "../types";
 
 const EMPTY_LIST: StaffListData = { members: [], pendingInvites: [] };
-
-function formatExpiry(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 export function DistrictStaffPage() {
   const { t } = useTranslation('staff-invites');
@@ -261,7 +252,7 @@ export function DistrictStaffPage() {
       header: t('districtStaffPage.columns.expires'),
       align: "right",
       hideBelow: "lg",
-      cell: (i) => formatExpiry(i.inviteExpiresAt),
+      cell: (i) => formatDate(i.inviteExpiresAt, ""),
       sortValue: (i) => i.inviteExpiresAt,
     },
   ];
