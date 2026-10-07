@@ -137,7 +137,7 @@ export function ProgressReportAnalysisTab({
                           ? t("analysisTab.severityLow")
                           : rf.severity}
                   </Badge>
-                  <Badge variant="neutral">{rf.category}</Badge>
+                  <Badge variant="neutral">{t(`analysisTab.category.${rf.category}`, { defaultValue: rf.category })}</Badge>
                 </div>
                 <p className="text-sm font-medium text-brand-slate-800">
                   {rf.finding}

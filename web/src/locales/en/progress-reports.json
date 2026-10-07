@@ -7,7 +7,6 @@
     "periodEnd": "Reporting Period End",
     "notes": "Notes (optional)",
     "notesPlaceholder": "Anything worth flagging about this report...",
-    "cancel": "Cancel",
     "create": "Create"
   },
   "goalProgressCard": {
@@ -42,7 +41,15 @@
     "redFlags": "Red Flags ({{count}})",
     "severityHigh": "High",
     "severityMedium": "Medium",
-    "severityLow": "Low"
+    "severityLow": "Low",
+    "category": {
+      "missing_data": "Missing data",
+      "boilerplate": "Boilerplate",
+      "regression": "Regression",
+      "insufficient_evidence": "Insufficient evidence",
+      "compliance": "Compliance",
+      "other": "Other"
+    }
   },
   "list": {
     "periodNotSet": "Reporting period not set",

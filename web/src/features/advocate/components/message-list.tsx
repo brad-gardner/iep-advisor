@@ -18,8 +18,6 @@ interface MessageListProps {
   /** The latest answer completed this session — announced once via the
    *  sr-only status node below. */
   announcement: AdvocateAnnouncement | null;
-  /** Thread-level fallback for a message with no `generatedLanguage` of its own. */
-  threadGeneratedLanguage?: string | null;
   handlers: SuggestionHandlers;
 }
 
@@ -81,7 +79,7 @@ const PAGE_PIN_THRESHOLD_PX = 96;
  * stream only while the reader has left it near the bottom, and sending re-pins
  * it because the reader asked for that.
  */
-export function MessageList({ childId, messages, pending, streaming, announcement, threadGeneratedLanguage, handlers }: MessageListProps) {
+export function MessageList({ childId, messages, pending, streaming, announcement, handlers }: MessageListProps) {
   const { t } = useTranslation('advocate');
   const scrollerRef = useRef<HTMLDivElement>(null);
   const tailRef = useRef<HTMLDivElement>(null);
@@ -211,7 +209,7 @@ export function MessageList({ childId, messages, pending, streaming, announcemen
                 citations={m.citations}
                 suggestions={m.suggestions}
                 truncated={m.truncated}
-                generatedLanguage={m.generatedLanguage ?? threadGeneratedLanguage}
+                generatedLanguage={m.generatedLanguage}
                 handlers={handlers}
               />
             ),

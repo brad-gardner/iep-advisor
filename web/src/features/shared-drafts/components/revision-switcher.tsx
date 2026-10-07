@@ -61,7 +61,7 @@ export function RevisionSwitcher({ childId, documentInstanceId, currentRevisionI
                   ? t('revisionSwitcher.itemWithStatus', {
                       number: rev.revisionNumber,
                       date: formatDate(rev.sharedAt),
-                      status: t(`status.${rev.status}`),
+                      status: t(`status.${rev.status}`, { defaultValue: rev.status }),
                     })
                   : t('revisionSwitcher.item', { number: rev.revisionNumber, date: formatDate(rev.sharedAt) })}
               </Link>

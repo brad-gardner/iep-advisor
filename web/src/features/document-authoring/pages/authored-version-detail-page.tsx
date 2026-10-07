@@ -58,7 +58,7 @@ export function AuthoredVersionDetailPage() {
         breadcrumb={[{ label: 'Documents', to: backTo }]}
       >
         <Notice variant="error" title="Could not load this version">
-          {error ?? 'This version is unavailable.'}
+          {error ? (error.kind === 'server' ? error.message : 'This version is unavailable.') : 'This version is unavailable.'}
         </Notice>
       </PageLayout>
     );

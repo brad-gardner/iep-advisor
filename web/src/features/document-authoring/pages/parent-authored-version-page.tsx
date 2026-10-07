@@ -33,7 +33,9 @@ export function ParentAuthoredVersionPage() {
   const childId = Number(childIdParam);
   const versionId = Number(versionIdParam);
   const { version, isLoading, error } = useAuthoredVersion(versionId);
-  usePageTitle(version ? `${version.documentTypeDisplayName} v${version.versionNumber}` : 'Document version');
+  usePageTitle(
+    version ? `${version.documentTypeDisplayName} v${version.versionNumber}` : t('authoredVersion.pageTitleFallback')
+  );
 
   const backTo = `/children/${childId}/overview`;
 
@@ -46,10 +48,11 @@ export function ParentAuthoredVersionPage() {
   }
 
   if (error || !version) {
+    const errorMessage = error ? (error.kind === 'server' ? error.message : t('authoredVersion.loadErrorGeneric')) : t('authoredVersion.loadErrorGeneric');
     return (
       <PageLayout title={t('authoredVersion.unavailableTitle')} breadcrumb={[{ label: t('authoredVersion.overviewBreadcrumb'), to: backTo }]}>
         <Notice variant="error" title={t('authoredVersion.loadErrorTitle')}>
-          {error ?? t('authoredVersion.loadErrorGeneric')}
+          {errorMessage}
         </Notice>
       </PageLayout>
     );

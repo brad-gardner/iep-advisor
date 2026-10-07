@@ -454,7 +454,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const setLanguage = async (language: SupportedLanguage) => {
     const generation = ++languageGenerationRef.current; // claims this attempt — see languageGenerationRef
-    const signedOutAtCallTime = !user;
+    // `getToken()`, not the closure `user` state: this function's `user`
+    // is whatever was current when ITS OWN render captured it, which can
+    // be stale by the time this runs — a caller that grabbed `setLanguage`
+    // from context before a sign-in/sign-out re-render still holds that
+    // older closure. `getToken()` reads the actual signed-in state live,
+    // at the instant each check runs, so a sign-in/sign-out that happens
+    // while `changeLanguage` below is in flight is never missed.
+    const signedOutAtCallTime = !getToken();
     if (signedOutAtCallTime) {
       // Set synchronously, before `changeLanguage` below is even called —
       // see `pendingExplicitChoiceRef`'s declaration for why a backfill
@@ -485,7 +492,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: t('context.languageUpdateError') };
     }
 
-    if (!user) {
+    if (!getToken()) {
+      // Re-checked live (not the closure `user`, and not the
+      // `signedOutAtCallTime` snapshot above) — a sign-in that completed
+      // while `changeLanguage` was resolving must be written to the
+      // account via the PUT below, not stranded in the pre-login key.
       // No account to save it to yet — remembered for this browser until sign-in.
       setPreLoginLanguage(language);
       return { success: true };

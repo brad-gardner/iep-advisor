@@ -20,17 +20,29 @@ function makeGoal(goalId: number): GoalAnalysis {
 }
 
 describe('AnalysisGoalsList', () => {
-  it('renders its "Goal Analysis" heading as an h2 by default', () => {
+  it('renders its "Goal Analysis" heading as an h2 by default, with correct singular/plural grammar', () => {
     render(<AnalysisGoalsList goalAnalyses={[makeGoal(1)]} />);
     expect(
-      screen.getByRole('heading', { level: 2, name: 'Goal Analysis (1 goals)' })
+      screen.getByRole('heading', { level: 2, name: 'Goal Analysis (1 goal)' })
     ).toBeInTheDocument();
   });
 
   it('renders the heading as an h3 when nested under another h2 (headingLevel={3})', () => {
     render(<AnalysisGoalsList goalAnalyses={[makeGoal(1)]} headingLevel={3} />);
     expect(
-      screen.getByRole('heading', { level: 3, name: 'Goal Analysis (1 goals)' })
+      screen.getByRole('heading', { level: 3, name: 'Goal Analysis (1 goal)' })
     ).toBeInTheDocument();
+  });
+
+  it('pluralizes the heading for more than one goal', () => {
+    render(<AnalysisGoalsList goalAnalyses={[makeGoal(1), makeGoal(2)]} />);
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Goal Analysis (2 goals)' })
+    ).toBeInTheDocument();
+  });
+
+  it('uses correct singular grammar for the strong/needs-improvement/concerns counts', () => {
+    render(<AnalysisGoalsList goalAnalyses={[makeGoal(1)]} />);
+    expect(screen.getByText('1 strong')).toBeInTheDocument();
   });
 });

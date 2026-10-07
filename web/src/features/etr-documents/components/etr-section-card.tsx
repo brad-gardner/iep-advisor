@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import type { EtrSection } from '../types';
-import { formatSectionTypeLabel } from '../lib/section-type-labels';
+import { sectionTypeLabel } from '@/lib/section-type-label';
 
 interface EtrSectionCardProps {
   section: EtrSection;
@@ -36,13 +36,13 @@ function humanizeKey(key: string): string {
 
 export function EtrSectionCard({ section, defaultOpen = false }: EtrSectionCardProps) {
   // `iep-documents` isn't this component's own namespace — included so its
-  // Spanish data is loaded before `formatSectionTypeLabel` (a plain
-  // function, not this hook's `t`) calls into it from render.
+  // Spanish data is loaded before `sectionTypeLabel` (a plain function, not
+  // this hook's `t`) calls into it from render.
   const { t } = useTranslation(['etr-documents', 'iep-documents']);
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const parsed = useMemo(() => tryParseJson(section.parsedContent), [section.parsedContent]);
   const hasStructured = parsed !== undefined && parsed !== null;
-  const label = formatSectionTypeLabel(section.sectionType);
+  const label = sectionTypeLabel(section.sectionType, 'full');
 
   return (
     <Card className="p-0" data-testid="etr-section-card">

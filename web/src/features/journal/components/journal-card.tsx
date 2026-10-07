@@ -103,7 +103,7 @@ export function JournalCard({ childId, childName, canEdit }: JournalCardProps) {
         <div className="space-y-2" role="status" aria-label={t('journal:card.loadingLabel')}>
           <Skeleton className="h-5 w-1/3" />
           <Skeleton className="h-5 w-3/4" />
-          <span className="sr-only">{t('journal:card.loading')}</span>
+          <span className="sr-only">{t('common:ui.loading')}</span>
         </div>
       )}
       {errorMessage && (

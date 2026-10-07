@@ -44,6 +44,7 @@
     "loadErrorTitle": "Could not load this IEP version",
     "loadErrorGeneric": "The version is unavailable.",
     "titleFallback": "IEP",
+    "pageTitleFallback": "IEP version",
     "finalized": "Finalized {{date}}",
     "effective": " · Effective {{date}}"
   },
@@ -58,6 +59,7 @@
     "unavailableTitle": "Document unavailable",
     "loadErrorTitle": "Could not load this document",
     "loadErrorGeneric": "This document is unavailable.",
+    "pageTitleFallback": "Document version",
     "overviewBreadcrumb": "Overview",
     "finalizedBySchool": "Finalized by the school {{date}}",
     "readOnlyTitle": "This is the school's finalized document",

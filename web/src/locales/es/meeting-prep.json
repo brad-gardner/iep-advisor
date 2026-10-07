@@ -21,9 +21,9 @@
   },
   "emptyState": {
     "title": "Prepárese para su reunión",
-    "descriptionIep": "en el IEP de su hijo o hija.",
-    "descriptionEtr": "en el ETR de su hijo o hija.",
-    "description": "Genere una lista de preparación personalizada con preguntas para hacer, documentos para llevar, derechos a los que referirse y posibles señales de alerta, según {{source}}",
+    "descriptionIep": "el IEP de su hijo o hija.",
+    "descriptionEtr": "el ETR de su hijo o hija.",
+    "description": "Genere una lista de preparación personalizada con preguntas para hacer, documentos para llevar, derechos a los que referirse y posibles señales de alerta basadas en {{source}}",
     "generate": "Generar preparación para la reunión"
   },
   "tab": {

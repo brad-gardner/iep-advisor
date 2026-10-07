@@ -62,7 +62,7 @@ export function SharedDraftsCard({ childId }: SharedDraftsCardProps) {
                 </span>
                 <span className="text-xs text-brand-slate-500">{t('card.sharedLine', { date: formatDate(rev.sharedAt) })}</span>
               </span>
-              <Badge variant={SHARED_DRAFT_STATUS_BADGE[rev.status]}>{t(`status.${rev.status}`)}</Badge>
+              <Badge variant={SHARED_DRAFT_STATUS_BADGE[rev.status]}>{t(`status.${rev.status}`, { defaultValue: rev.status })}</Badge>
             </Link>
           </li>
         ))}

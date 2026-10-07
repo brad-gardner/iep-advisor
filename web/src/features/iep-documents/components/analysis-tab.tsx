@@ -19,6 +19,7 @@ import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { sectionTypeLabel } from '@/lib/section-type-label';
+import { analysisSourceTypeLabel } from '@/features/analysis/lib/source-type-label';
 import { GeneratedLanguageNotice } from '@/lib/i18n/generated-language-notice';
 
 interface AnalysisTabProps {
@@ -44,7 +45,7 @@ interface AnalysisTabProps {
 }
 
 function otherSourceLabel(source: AnalysisRunOtherSource): string {
-  return source.label ?? `${source.sourceType} #${source.sourceId}`;
+  return source.label ?? `${analysisSourceTypeLabel(source.sourceType)} #${source.sourceId}`;
 }
 
 export function AnalysisTab({
@@ -64,7 +65,7 @@ export function AnalysisTab({
   initialView = 'overview',
   canAsk,
 }: AnalysisTabProps) {
-  const { t } = useTranslation(['iep-documents', 'common']);
+  const { t } = useTranslation(['iep-documents', 'common', 'analysis']);
   const [activeView, setActiveView] = useState<string>(initialView);
 
   // Ordinary (non-`iep_goals`) sections for this document, in display order.

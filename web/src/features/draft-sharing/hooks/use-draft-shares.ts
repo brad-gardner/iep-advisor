@@ -3,6 +3,9 @@ import { apiErrorMessage } from '@/lib/api-error';
 import { getShares } from '../api/draft-sharing-api';
 import type { SharedDraftRevisionDto } from '../types';
 
+/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
+export type UseDraftSharesError = { kind: 'server'; message: string } | { kind: 'generic' };
+
 interface UseDraftSharesResult {
   shares: SharedDraftRevisionDto[];
   /** The current Active revision, or `null` if the draft has never been
@@ -10,14 +13,14 @@ interface UseDraftSharesResult {
    *  successor — i.e. nothing currently Active). */
   latestActive: SharedDraftRevisionDto | null;
   isLoading: boolean;
-  error: string | null;
+  error: UseDraftSharesError | null;
 }
 
 /** Every revision shared for this document instance, newest first — drives the
  *  staff-side "Shared as revision N" banner under the editor header. */
 export function useDraftShares(instanceId: number): UseDraftSharesResult {
   const [shares, setShares] = useState<SharedDraftRevisionDto[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UseDraftSharesError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -28,9 +31,11 @@ export function useDraftShares(instanceId: number): UseDraftSharesResult {
         const res = await getShares(instanceId);
         if (!active) return;
         if (res.success && res.data) setShares(res.data);
-        else setError(res.message ?? 'Could not load share history.');
+        else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load share history.'));
+        if (!active) return;
+        const message = apiErrorMessage(err, '');
+        setError(message ? { kind: 'server', message } : { kind: 'generic' });
       } finally {
         if (active) setIsLoading(false);
       }

@@ -98,7 +98,7 @@ export function SharedDraftsListPage() {
                       {t('listPage.sharedByLine', { date: formatDate(rev.sharedAt), name: rev.sharedByName })}
                     </span>
                   </span>
-                  <Badge variant={SHARED_DRAFT_STATUS_BADGE[rev.status]}>{t(`status.${rev.status}`)}</Badge>
+                  <Badge variant={SHARED_DRAFT_STATUS_BADGE[rev.status]}>{t(`status.${rev.status}`, { defaultValue: rev.status })}</Badge>
                 </Card>
               </Link>
             </li>

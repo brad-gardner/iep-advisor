@@ -57,4 +57,15 @@ describe('MeetingRsvpPage in Spanish', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('A este enlace le falta su token de invitación.');
   });
+
+  it('falls back to the translated meeting type when the meeting has no title', async () => {
+    meetingsApi.getMeetingByToken.mockResolvedValue({
+      success: true,
+      data: { meeting: makeMeeting({ title: '', type: 'AnnualReview' }), status: 'Pending' },
+    });
+
+    await renderPage();
+
+    expect(await screen.findByText('Revisión anual')).toBeInTheDocument();
+  });
 });

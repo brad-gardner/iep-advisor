@@ -23,7 +23,7 @@ export interface UseDraftExplanationsResult {
   disclaimer: string | null;
   /** Language the AI generated this revision's explanations in — drives
    *  `GeneratedLanguageNotice` in `ExplainPanel`. */
-  generatedLanguage: string | null;
+  generatedLanguage: 'en' | 'es' | null;
 }
 
 /**

@@ -96,7 +96,7 @@ export interface DraftExplanationDto {
   disclaimer: string;
   /** Language the AI generated these explanations in — drives `GeneratedLanguageNotice`
    *  when it differs from the viewer's. Null/absent on a pre-i18n-migration record = English. */
-  generatedLanguage?: string | null;
+  generatedLanguage?: 'en' | 'es' | null;
 }
 
 export interface AskQuestionRequest {
@@ -122,7 +122,7 @@ export interface DraftAnswerDto {
   disclaimer: string;
   /** Language the AI generated this answer in — drives `GeneratedLanguageNotice`
    *  when it differs from the viewer's. Null/absent on a pre-i18n-migration record = English. */
-  generatedLanguage?: string | null;
+  generatedLanguage?: 'en' | 'es' | null;
 }
 
 /** Private to the parent who asked — never exposed to staff. */
@@ -137,7 +137,7 @@ export interface ParentDraftNoteDto {
   citations: DraftAnswerCitationDto[];
   createdAt: string;
   /** Carried over from the `DraftAnswerDto` that created this note — see there. */
-  generatedLanguage?: string | null;
+  generatedLanguage?: 'en' | 'es' | null;
 }
 
 export interface DraftResponseDto {
@@ -184,5 +184,5 @@ export interface MeetingSummaryDto {
   recipients: MeetingSummaryRecipientDto[];
   /** Language the AI drafted this summary in — drives `GeneratedLanguageNotice`
    *  when it differs from the viewer's. Null/absent on a pre-i18n-migration record = English. */
-  generatedLanguage?: string | null;
+  generatedLanguage?: 'en' | 'es' | null;
 }

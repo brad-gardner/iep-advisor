@@ -38,9 +38,12 @@
   },
   "timeline": {
     "noDate": "No date",
-    "goalsSuffix": "goals",
-    "sectionsSuffix": "sections",
-    "redFlagsSuffix": "red flags",
+    "goalsCount_one": "{{count}} goal",
+    "goalsCount_other": "{{count}} goals",
+    "sectionsCount_one": "{{count}} section",
+    "sectionsCount_other": "{{count}} sections",
+    "redFlagsCount_one": "{{count}} red flag",
+    "redFlagsCount_other": "{{count}} red flags",
     "compare": "Compare",
     "empty": "No IEPs found. Upload at least two IEPs to see a timeline and compare versions."
   },

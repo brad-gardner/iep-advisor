@@ -10,9 +10,12 @@ import type { DraftResponseKind } from '../types';
  * here alongside `DraftResponseKind` itself; `features/draft-sharing` (the
  * staff mirror of this feature) imports it directly rather than duplicating
  * it, same as it already does for `ChangeSummaryChips` and the shared DTOs.
- * Every `DraftResponseKind` has a translation, so an unrecognized value is a
- * `tsc` error at the call site, not a runtime concern.
+ * `kind` is typed as `DraftResponseKind` so a typo at the call site is still
+ * a `tsc` error, but the value itself comes from stored/server data that can
+ * outlive the client's known set, so a lookup miss falls back to the raw
+ * value via `defaultValue` rather than showing a raw
+ * `shared-drafts:responseKind.*` key.
  */
 export function draftResponseKindLabel(kind: DraftResponseKind): string {
-  return i18n.t(`shared-drafts:responseKind.${kind}`);
+  return i18n.t(`shared-drafts:responseKind.${kind}`, { defaultValue: kind });
 }

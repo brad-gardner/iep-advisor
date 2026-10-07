@@ -70,8 +70,6 @@ interface LoadedThread {
   threadId: number;
   messages: AdvocateMessageDto[];
   disclaimer: string;
-  /** Thread-level fallback for a message with no `generatedLanguage` of its own (API shape still settling — see `AdvocateThreadDto`). */
-  generatedLanguage?: string | null;
 }
 
 interface Keyed<T> {
@@ -189,7 +187,7 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
       .then((res) => {
         if (!active) return;
         if (res.success && res.data) {
-          setLoaded({ threadId, messages: res.data.messages, disclaimer: res.data.disclaimer, generatedLanguage: res.data.generatedLanguage });
+          setLoaded({ threadId, messages: res.data.messages, disclaimer: res.data.disclaimer });
           setLoadFailure(null);
         } else {
           setLoadFailure({ threadId, value: res.message ? { kind: 'server', message: res.message } : { kind: 'generic' } });
@@ -218,7 +216,7 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
       const res = await getAdvocateThread(run.threadId);
       if (res.success && res.data) {
         if (runRef.current !== run) return;
-        setLoaded({ threadId: run.threadId, messages: res.data.messages, disclaimer: res.data.disclaimer || done.disclaimer, generatedLanguage: res.data.generatedLanguage });
+        setLoaded({ threadId: run.threadId, messages: res.data.messages, disclaimer: res.data.disclaimer || done.disclaimer });
         synced = true;
       }
     } catch {
@@ -240,6 +238,7 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
             suggestions: done.suggestions,
             truncated: done.truncated,
             createdAt: new Date().toISOString(),
+            generatedLanguage: done.generatedLanguage,
           },
         ],
       }));
@@ -360,7 +359,6 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
   return {
     messages: current?.messages ?? [],
     disclaimer: current?.disclaimer ?? '',
-    threadGeneratedLanguage: current?.generatedLanguage ?? null,
     loading: threadId != null && current === null && loadError === null,
     loadError,
     reload,

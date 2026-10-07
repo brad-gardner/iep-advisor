@@ -41,6 +41,7 @@ export function EtrListPage() {
   const { t } = useTranslation(['etr-documents', 'common']);
   usePageTitle(t('listPage.title'));
   const { etrs, loading, error, refresh } = useAllEtrs();
+  const errorMessage = error ? (error.kind === 'server' ? error.message : t('common:ui.genericError')) : null;
   const groups = useMemo(() => groupByChild(etrs), [etrs]);
 
   return (
@@ -54,9 +55,9 @@ export function EtrListPage() {
         </div>
       )}
 
-      {!loading && error && (
+      {!loading && errorMessage && (
         <Notice variant="error" title={t('listPage.loadErrorTitle')} data-testid="etr-list-error">
-          <p className="mb-3">{error}</p>
+          <p className="mb-3">{errorMessage}</p>
           <Button onClick={refresh} variant="secondary" size="sm">
             {t('common:ui.tryAgain')}
           </Button>

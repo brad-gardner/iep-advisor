@@ -38,9 +38,12 @@
   },
   "timeline": {
     "noDate": "Sin fecha",
-    "goalsSuffix": "metas",
-    "sectionsSuffix": "secciones",
-    "redFlagsSuffix": "señales de alerta",
+    "goalsCount_one": "{{count}} meta",
+    "goalsCount_other": "{{count}} metas",
+    "sectionsCount_one": "{{count}} sección",
+    "sectionsCount_other": "{{count}} secciones",
+    "redFlagsCount_one": "{{count}} señal de alerta",
+    "redFlagsCount_other": "{{count}} señales de alerta",
     "compare": "Comparar",
     "empty": "No se encontraron IEP. Suba al menos dos IEP para ver una cronología y comparar versiones."
   },

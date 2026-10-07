@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/toast";
 import type { ChildOutletContext } from "@/features/children/components/child-detail-page";
 import { useMeetingPrep } from "../hooks/use-meeting-prep";
 import { useParentQuestions } from "../hooks/use-parent-questions";
-import { questionAddedToast, questionExistsToast, questionFailedToast } from "../lib/copy";
 import { MeetingPrepTab } from "./meeting-prep-tab";
 import { MeetingPrepDateControl } from "./meeting-prep-date-control";
 import { ParentQuestions } from "./parent-questions";
@@ -20,6 +20,7 @@ export const ADD_QUESTION_PARAM = "addQuestion";
  * meeting-date control above it and the parent's own question list.
  */
 export function ChildMeetingPrepTab() {
+  const { t } = useTranslation("meeting-prep");
   const { child, childId } = useOutletContext<ChildOutletContext>();
   const { show } = useToast();
   const canEdit = child.role === "owner" || child.role === "collaborator";
@@ -50,9 +51,9 @@ export function ChildMeetingPrepTab() {
     consumedRef.current = incoming;
     if (canEditQuestions) {
       void addQuestion(incoming, "advocate").then((result) => {
-        if (result === "added") show({ message: questionAddedToast(), variant: "success" });
-        else if (result === "duplicate") show({ message: questionExistsToast(), variant: "info" });
-        else if (result === "failed") show({ message: questionFailedToast(), variant: "error" });
+        if (result === "added") show({ message: t("toast.questionAdded"), variant: "success" });
+        else if (result === "duplicate") show({ message: t("toast.questionExists"), variant: "info" });
+        else if (result === "failed") show({ message: t("toast.questionFailed"), variant: "error" });
       });
     }
     setSearchParams(
@@ -63,11 +64,11 @@ export function ChildMeetingPrepTab() {
       },
       { replace: true },
     );
-  }, [incoming, questionsLoading, canEditQuestions, addQuestion, setSearchParams, show]);
+  }, [incoming, questionsLoading, canEditQuestions, addQuestion, setSearchParams, show, t]);
 
   const addTyped = async (text: string) => {
     const result = await addQuestion(text, "parent");
-    if (result === "added") show({ message: questionAddedToast(), variant: "success" });
+    if (result === "added") show({ message: t("toast.questionAdded"), variant: "success" });
     return result;
   };
 

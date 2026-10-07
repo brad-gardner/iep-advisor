@@ -356,7 +356,6 @@ export function AdvocatePage() {
                 pending={thread.pending}
                 streaming={thread.streaming}
                 announcement={thread.announcement}
-                threadGeneratedLanguage={thread.threadGeneratedLanguage}
                 handlers={suggestionHandlers}
               />
             )}

@@ -13,7 +13,6 @@
     "description": "A dated record of what happens — private to your family, never shared with the school team.",
     "addUpdate": "Add update",
     "loadingLabel": "Loading journal",
-    "loading": "Loading…",
     "loadError": "Could not load the journal",
     "loadFailed": "Could not load the journal.",
     "seeAll": "See all updates",

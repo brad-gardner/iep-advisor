@@ -125,7 +125,6 @@
     "notesPlaceholder": "Any notes about this meeting...",
     "creating": "Creating...",
     "create": "Create IEP",
-    "cancel": "Cancel",
     "createFailed": "Failed to create IEP",
     "createError": "An error occurred while creating the IEP"
   },
@@ -180,10 +179,14 @@
   },
   "goalsList": {
     "empty": "No goal analyses available.",
-    "heading": "Goal Analysis ({{count}} goals)",
-    "strongCount": "{{count}} strong",
-    "needsImprovementCount": "{{count}} need improvement",
-    "significantConcernsCount": "{{count}} significant concerns"
+    "heading_one": "Goal Analysis ({{count}} goal)",
+    "heading_other": "Goal Analysis ({{count}} goals)",
+    "strongCount_one": "{{count}} strong",
+    "strongCount_other": "{{count}} strong",
+    "needsImprovementCount_one": "{{count}} needs improvement",
+    "needsImprovementCount_other": "{{count}} need improvement",
+    "significantConcernsCount_one": "{{count}} significant concern",
+    "significantConcernsCount_other": "{{count}} significant concerns"
   },
   "sectionDetail": {
     "keyPoints": "Key Points",

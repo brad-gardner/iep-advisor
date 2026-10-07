@@ -18,7 +18,7 @@ export function CreateProgressReportForm({
   onCreated,
   onCancel,
 }: CreateProgressReportFormProps) {
-  const { t } = useTranslation("progress-reports");
+  const { t } = useTranslation(["progress-reports", "common"]);
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [notes, setNotes] = useState("");
@@ -86,7 +86,7 @@ export function CreateProgressReportForm({
 
       <div className="flex gap-2 justify-end">
         <Button type="button" variant="ghost" onClick={onCancel}>
-          {t("createForm.cancel")}
+          {t("common:ui.cancel")}
         </Button>
         <Button type="submit" loading={isSubmitting} data-testid="pr-submit">
           {t("createForm.create")}

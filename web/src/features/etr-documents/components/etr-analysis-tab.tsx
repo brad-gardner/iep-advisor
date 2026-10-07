@@ -13,6 +13,7 @@ import type {
 import { RunSectionDetail } from '@/features/analysis/components/run-section-detail';
 import { AdvocacyGapAnalysisSection } from '@/features/iep-documents/components/advocacy-gap-analysis';
 import { sectionTypeLabel } from '@/lib/section-type-label';
+import { analysisSourceTypeLabel } from '@/features/analysis/lib/source-type-label';
 import { GeneratedLanguageNotice } from '@/lib/i18n/generated-language-notice';
 import { EtrAnalysisEmptyState } from './etr-analysis-empty-state';
 import { EtrAnalysisProcessing } from './etr-analysis-processing';
@@ -45,7 +46,7 @@ interface EtrAnalysisTabProps {
 }
 
 function otherSourceLabel(source: AnalysisRunOtherSource): string {
-  return source.label ?? `${source.sourceType} #${source.sourceId}`;
+  return source.label ?? `${analysisSourceTypeLabel(source.sourceType)} #${source.sourceId}`;
 }
 
 export function EtrAnalysisTab({
@@ -64,7 +65,7 @@ export function EtrAnalysisTab({
   onTrigger,
   onReload,
 }: EtrAnalysisTabProps) {
-  const { t } = useTranslation(['etr-documents', 'iep-documents', 'common']);
+  const { t } = useTranslation(['etr-documents', 'iep-documents', 'common', 'analysis']);
   const [activeView, setActiveView] = useState<string>('overview');
 
   // Ordinary (non-`etr_completeness`/`etr_eligibility`) sections for this

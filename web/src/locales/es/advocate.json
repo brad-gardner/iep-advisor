@@ -77,7 +77,7 @@
     "hint": "Su primera pregunta inicia una nueva conversación sobre esto."
   },
   "askButton": {
-    "helperText": "Abre una conversación privada con el Asesor virtual sobre este elemento.",
+    "helperText": "Abre una conversación privada con el asesor virtual sobre este elemento.",
     "label": "Preguntarle al asesor virtual"
   },
   "message": {

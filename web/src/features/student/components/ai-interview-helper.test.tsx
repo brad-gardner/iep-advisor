@@ -6,7 +6,7 @@ import { AiInterviewHelper } from './ai-interview-helper';
 describe('AiInterviewHelper', () => {
   it('asks the assistant and shows the suggestion', async () => {
     const user = userEvent.setup();
-    const onInterview = vi.fn().mockResolvedValue({ suggestion: 'I want more time on tests.', generatedLanguage: 'en' });
+    const onInterview = vi.fn().mockResolvedValue({ suggestion: 'I want more time on tests.' });
     const onSave = vi.fn().mockResolvedValue(true);
     render(<AiInterviewHelper onInterview={onInterview} onSave={onSave} />);
 
@@ -15,24 +15,11 @@ describe('AiInterviewHelper', () => {
 
     expect(onInterview).toHaveBeenCalledWith('extra time');
     expect(await screen.findByTestId('ai-interview-suggestion')).toHaveTextContent('I want more time on tests.');
-    // Matches the viewer's (English) language — no notice.
-    expect(screen.queryByTestId('generated-language-notice')).not.toBeInTheDocument();
-  });
-
-  it("shows a 'generated in Spanish' notice when the suggestion's language differs from the viewer's", async () => {
-    const user = userEvent.setup();
-    const onInterview = vi.fn().mockResolvedValue({ suggestion: 'Quiero más tiempo.', generatedLanguage: 'es' });
-    render(<AiInterviewHelper onInterview={onInterview} onSave={vi.fn()} />);
-
-    await user.type(screen.getByTestId('ai-interview-prompt'), 'extra time');
-    await user.click(screen.getByTestId('ai-interview-ask'));
-
-    expect(await screen.findByTestId('generated-language-notice')).toHaveTextContent('Generated in Spanish');
   });
 
   it('saves the suggestion as a meeting statement and resets', async () => {
     const user = userEvent.setup();
-    const onInterview = vi.fn().mockResolvedValue({ suggestion: 'I want more time.', generatedLanguage: 'en' });
+    const onInterview = vi.fn().mockResolvedValue({ suggestion: 'I want more time.' });
     const onSave = vi.fn().mockResolvedValue(true);
     render(<AiInterviewHelper onInterview={onInterview} onSave={onSave} />);
 

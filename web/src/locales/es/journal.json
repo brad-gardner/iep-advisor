@@ -13,7 +13,6 @@
     "description": "Un registro con fecha de lo que ocurre — privado para su familia, nunca compartido con el equipo escolar.",
     "addUpdate": "Agregar actualización",
     "loadingLabel": "Cargando diario",
-    "loading": "Cargando…",
     "loadError": "No se pudo cargar el diario",
     "loadFailed": "No se pudo cargar el diario.",
     "seeAll": "Ver todas las actualizaciones",

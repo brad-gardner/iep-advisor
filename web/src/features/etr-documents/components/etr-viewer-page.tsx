@@ -84,7 +84,7 @@ export function EtrViewerPage() {
     etr.fileName ||
     (etr.evaluationType
       ? evaluationTypeLabel(etr.evaluationType)
-      : `ETR #${etr.id}`);
+      : t('documentIdFallback', { id: etr.id }));
 
   const sectionsTabDisabled = etr.status !== 'parsed';
   const sectionsTabHint =

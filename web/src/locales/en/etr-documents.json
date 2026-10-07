@@ -1,4 +1,5 @@
 {
+  "documentIdFallback": "ETR #{{id}}",
   "evaluationType": {
     "initial": "Initial Evaluation",
     "reevaluation": "Reevaluation",
@@ -24,7 +25,6 @@
     "notes": "Notes",
     "notesPlaceholder": "Any notes about this evaluation...",
     "create": "Create ETR",
-    "cancel": "Cancel",
     "createFailed": "Failed to create ETR",
     "createError": "An error occurred while creating the ETR"
   },
@@ -78,7 +78,8 @@
     "supported": "Supported",
     "unsupported": "Unsupported",
     "unknown": "—",
-    "urgentCount": "({{count}} urgent)",
+    "urgentCount_one": "({{count}} urgent)",
+    "urgentCount_other": "({{count}} urgent)",
     "areasOfConcern": "Areas of Concern ({{count}})"
   },
   "completenessView": {

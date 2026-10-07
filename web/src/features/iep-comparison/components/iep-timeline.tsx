@@ -32,15 +32,15 @@ function TimelineEntryCard({ entry }: { entry: TimelineEntry }) {
         </div>
       </div>
       <div className="flex gap-4 mt-3 text-[13px] text-brand-slate-500">
-        <span>
-          <span className="font-medium text-brand-slate-700">{entry.goalCount}</span> {t('timeline.goalsSuffix')}
+        <span className="font-medium text-brand-slate-700">
+          {t('timeline.goalsCount', { count: entry.goalCount })}
         </span>
-        <span>
-          <span className="font-medium text-brand-slate-700">{entry.sectionCount}</span> {t('timeline.sectionsSuffix')}
+        <span className="font-medium text-brand-slate-700">
+          {t('timeline.sectionsCount', { count: entry.sectionCount })}
         </span>
         {entry.redFlagCount > 0 && (
-          <span className="text-brand-danger-700">
-            <span className="font-medium">{entry.redFlagCount}</span> {t('timeline.redFlagsSuffix')}
+          <span className="font-medium text-brand-danger-700">
+            {t('timeline.redFlagsCount', { count: entry.redFlagCount })}
           </span>
         )}
       </div>

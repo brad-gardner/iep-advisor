@@ -4,16 +4,17 @@ import { Spinner } from '@/components/ui/spinner';
 import { Notice } from '@/components/ui/notice';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { EtrSection } from '../types';
+import type { UseEtrSectionsError } from '../hooks/use-etr-sections';
 import { EtrSectionCard } from './etr-section-card';
 
 interface EtrSectionsListProps {
   sections: EtrSection[];
   isLoading: boolean;
-  error: string | null;
+  error: UseEtrSectionsError | null;
 }
 
 export function EtrSectionsList({ sections, isLoading, error }: EtrSectionsListProps) {
-  const { t } = useTranslation('etr-documents');
+  const { t } = useTranslation(['etr-documents', 'common']);
   if (isLoading) {
     return (
       <div className="flex justify-center py-8" data-testid="etr-sections-loading">
@@ -23,7 +24,8 @@ export function EtrSectionsList({ sections, isLoading, error }: EtrSectionsListP
   }
 
   if (error) {
-    return <Notice variant="error" title={error} data-testid="etr-sections-error" />;
+    const message = error.kind === 'server' ? error.message : t('common:ui.genericError');
+    return <Notice variant="error" title={message} data-testid="etr-sections-error" />;
   }
 
   if (sections.length === 0) {

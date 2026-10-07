@@ -7,7 +7,6 @@
     "periodEnd": "Fin del período del informe",
     "notes": "Notas (opcional)",
     "notesPlaceholder": "Cualquier cosa que valga la pena señalar sobre este informe...",
-    "cancel": "Cancelar",
     "create": "Crear"
   },
   "goalProgressCard": {
@@ -42,7 +41,15 @@
     "redFlags": "Señales de alerta ({{count}})",
     "severityHigh": "Alta",
     "severityMedium": "Media",
-    "severityLow": "Baja"
+    "severityLow": "Baja",
+    "category": {
+      "missing_data": "Datos faltantes",
+      "boilerplate": "Texto genérico",
+      "regression": "Retroceso",
+      "insufficient_evidence": "Evidencia insuficiente",
+      "compliance": "Cumplimiento",
+      "other": "Otra"
+    }
   },
   "list": {
     "periodNotSet": "Período del informe no establecido",

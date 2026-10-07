@@ -8,6 +8,7 @@ import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { apiErrorMessage } from '@/lib/api-error';
 import { inviteStatusLabel } from '@/lib/invite-status-label';
+import { meetingTypeLabel } from '@/lib/meeting-labels';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { useLanguageQueryParam } from '@/lib/i18n/use-language-query-param';
 import { getMeetingByToken, submitTokenRsvp } from '../api/meetings-api';
@@ -144,7 +145,7 @@ export function MeetingRsvpPage() {
           <div className="space-y-4">
             <div>
               <p className="font-medium text-brand-slate-800">
-                {result.meeting.title || result.meeting.type}
+                {result.meeting.title || meetingTypeLabel(result.meeting.type)}
               </p>
               <p className="text-sm text-brand-slate-600">
                 {formatMeetingWhen(result.meeting.startsAtUtc, result.meeting.durationMinutes)}

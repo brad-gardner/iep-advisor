@@ -36,7 +36,9 @@ export function IepVersionDetailPage({ canRetry, backTo, backLabel }: IepVersion
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<LoadError | null>(null);
   usePageTitle(
-    version ? `${version.title || t('detailPage.titleFallback')} v${version.versionNumber}` : 'IEP version'
+    version
+      ? `${version.title || t('detailPage.titleFallback')} v${version.versionNumber}`
+      : t('detailPage.pageTitleFallback')
   );
 
   useEffect(() => {

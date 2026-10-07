@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { apiErrorMessage } from '@/lib/api-error';
+import { useAuth } from '@/features/auth/hooks/use-auth';
 import { getHome } from '../api/home-api';
 import type { HomeDto } from '../types';
 
@@ -28,6 +29,7 @@ type HomeLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
  */
 export function useHome(): UseHomeResult {
   const { t, i18n } = useTranslation('home');
+  const { user } = useAuth();
   const [home, setHome] = useState<HomeDto | null>(null);
   const [loadError, setLoadError] = useState<HomeLoadError | null>(null);
   // Bumped by the "Try again" button to re-run the load effect below.
@@ -62,18 +64,21 @@ export function useHome(): UseHomeResult {
     // text is translated below, at render, from `loadError`'s stored KIND
     // rather than a snapshot string, so it already follows the active
     // language with no refetch needed.
-    // `i18n.resolvedLanguage` deliberately included instead of
-    // `user?.preferredLanguage` (todos/248 P2): some of `/api/home`'s
-    // notices are localized server-side from `Accept-Language`, which
-    // follows the language actually IN USE, not the saved account
-    // preference — the two can diverge for a while (a lazy Spanish chunk
-    // still loading, or a failed `preferredLanguage` PUT that reverted).
-    // Keying on the saved preference left those notices in the old language
-    // in exactly those cases. `resolvedLanguage` changes only once a
-    // language switch has actually taken effect (never mid-switch, and
-    // never on a switch that reverted), so this still doesn't reintroduce
-    // the refetch-per-switch-attempt problem `t` was excluded for above.
-  }, [retryToken, i18n.resolvedLanguage]);
+    // `i18n.resolvedLanguage` AND `user?.preferredLanguage` are both
+    // included, because the server picks between them itself: a signed-in
+    // request is localized from the account's SAVED preference, not
+    // `Accept-Language`, while a signed-out one has no saved preference to
+    // read and falls back to `Accept-Language` (i.e. the language actually
+    // in use). So this effect must refetch on whichever of the two actually
+    // drives the response for the current viewer — `resolvedLanguage` for
+    // the signed-out case (a lazy Spanish chunk finishing, or a switch that
+    // reverted) and `user?.preferredLanguage` for the signed-in case (the
+    // backfill/PUT in `AuthProvider` landing after this effect's first run).
+    // `resolvedLanguage` changes only once a language switch has actually
+    // taken effect (never mid-switch, and never on a switch that reverted),
+    // so this still doesn't reintroduce the refetch-per-switch-attempt
+    // problem `t` was excluded for above.
+  }, [retryToken, i18n.resolvedLanguage, user?.preferredLanguage]);
 
   return {
     home,

@@ -21,7 +21,6 @@ const toast = vi.hoisted(() => ({ show: vi.fn() }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => toast }));
 
 import { ChildMeetingPrepTab } from './child-meeting-prep-tab';
-import { questionAddedToast, questionExistsToast } from '../lib/copy';
 import { questionsForbiddenMessage } from '../hooks/use-parent-questions';
 
 const child = (role: ChildProfile['role']): ChildProfile => ({
@@ -121,7 +120,7 @@ describe('ChildMeetingPrepTab — parent questions', () => {
     expect(list).toHaveTextContent(QUESTION);
     expect(prepQuestionsApi.createPrepQuestion).toHaveBeenCalledTimes(1);
     expect(prepQuestionsApi.createPrepQuestion).toHaveBeenCalledWith(4, { text: QUESTION, source: 'advocate' });
-    expect(toast.show).toHaveBeenCalledWith({ message: questionAddedToast(), variant: 'success' });
+    expect(toast.show).toHaveBeenCalledWith({ message: 'Added to your questions', variant: 'success' });
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/children/4/meeting-prep'));
     expect(screen.getByTestId('location')).not.toHaveTextContent('addQuestion');
     expect(toast.show).toHaveBeenCalledTimes(1);
@@ -133,7 +132,7 @@ describe('ChildMeetingPrepTab — parent questions', () => {
       data: question(7, QUESTION, { alreadyExisted: true }),
     });
     renderTab(`/children/4/meeting-prep?addQuestion=${encodeURIComponent(QUESTION)}`);
-    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: questionExistsToast(), variant: 'info' }));
+    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: 'Already in your questions', variant: 'info' }));
     expect(within(screen.getByTestId('parent-questions-list')).getAllByTestId('parent-question')).toHaveLength(1);
     expect(toast.show).toHaveBeenCalledTimes(1);
   });
@@ -141,7 +140,7 @@ describe('ChildMeetingPrepTab — parent questions', () => {
   it('does not round-trip a handed-off question already on the loaded list', async () => {
     prepQuestionsApi.listPrepQuestions.mockResolvedValue({ success: true, data: [question(7, QUESTION.toUpperCase())] });
     renderTab(`/children/4/meeting-prep?addQuestion=${encodeURIComponent(QUESTION)}`);
-    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: questionExistsToast(), variant: 'info' }));
+    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: 'Already in your questions', variant: 'info' }));
     expect(prepQuestionsApi.createPrepQuestion).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByTestId('location')).not.toHaveTextContent('addQuestion'));
   });
@@ -158,7 +157,7 @@ describe('ChildMeetingPrepTab — parent questions', () => {
     // reported at all, rather than the stale consumedRef silently eating it
     // (which would also leave `?addQuestion=` stuck in the URL).
     fireEvent.click(screen.getByTestId('relaunch'));
-    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: questionExistsToast(), variant: 'info' }));
+    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: 'Already in your questions', variant: 'info' }));
     await waitFor(() => expect(screen.getByTestId('location')).not.toHaveTextContent('addQuestion'));
     expect(prepQuestionsApi.createPrepQuestion).toHaveBeenCalledTimes(1);
   });
@@ -235,7 +234,7 @@ describe('ChildMeetingPrepTab — parent questions', () => {
     await waitFor(() => expect(screen.getByTestId('parent-questions-list')).toHaveTextContent('Who collects the progress data?'));
     expect(prepQuestionsApi.createPrepQuestion).toHaveBeenCalledWith(4, { text: 'Who collects the progress data?', source: 'parent' });
     expect(input).toHaveValue('');
-    expect(toast.show).toHaveBeenCalledWith({ message: questionAddedToast(), variant: 'success' });
+    expect(toast.show).toHaveBeenCalledWith({ message: 'Added to your questions', variant: 'success' });
 
     fireEvent.change(input, { target: { value: 'who collects the progress data?' } });
     fireEvent.submit(form);

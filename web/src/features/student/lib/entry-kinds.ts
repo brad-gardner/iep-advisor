@@ -34,11 +34,15 @@ const MANUAL_ENTRY_KIND_ORDER: ManualEntryKind[] = [
  * Translated label for a workspace entry kind — via `student:entryKinds.
  * <Kind>.label`. Same shape as `meetingTypeLabel`/`inviteStatusLabel`: a
  * plain function over `i18n.t`, callable from render bodies and plain code
- * alike. Every `StudentWorkspaceEntryKind` (including `AiInterviewAnswer`,
- * which has no section of its own) has a translation.
+ * alike. `kind` is typed as `StudentWorkspaceEntryKind` (including
+ * `AiInterviewAnswer`, which has no section of its own) so a typo at the
+ * call site is still a `tsc` error, but the value itself comes from stored/
+ * server data that can outlive the client's known set, so a lookup miss
+ * falls back to the raw value via `defaultValue` rather than showing a raw
+ * `student:entryKinds.*.label` key.
  */
 export function entryKindLabel(kind: StudentWorkspaceEntryKind): string {
-  return i18n.t(`student:entryKinds.${kind}.label`);
+  return i18n.t(`student:entryKinds.${kind}.label`, { defaultValue: kind });
 }
 
 /**

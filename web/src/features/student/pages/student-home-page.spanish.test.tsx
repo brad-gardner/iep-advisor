@@ -70,7 +70,7 @@ describe("StudentHomePage in Spanish", () => {
 
     await renderPage();
 
-    expect(document.title).toBe("Bienvenido, Ada · IEP Advisor");
+    expect(document.title).toBe("Le damos la bienvenida, Ada · IEP Advisor");
     expect(screen.getByRole("heading", { name: "Mis fortalezas" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Lo que quiero decir en mi reunión" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Entrevista con IA" })).toBeInTheDocument();

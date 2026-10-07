@@ -44,6 +44,7 @@
     "loadErrorTitle": "No se pudo cargar esta versión del IEP",
     "loadErrorGeneric": "La versión no está disponible.",
     "titleFallback": "IEP",
+    "pageTitleFallback": "Versión del IEP",
     "finalized": "Finalizado el {{date}}",
     "effective": " · Vigente desde el {{date}}"
   },
@@ -58,6 +59,7 @@
     "unavailableTitle": "Documento no disponible",
     "loadErrorTitle": "No se pudo cargar este documento",
     "loadErrorGeneric": "Este documento no está disponible.",
+    "pageTitleFallback": "Versión del documento",
     "overviewBreadcrumb": "Resumen",
     "finalizedBySchool": "Finalizado por la escuela el {{date}}",
     "readOnlyTitle": "Este es el documento finalizado de la escuela",

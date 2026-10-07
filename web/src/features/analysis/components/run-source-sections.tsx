@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { AnalysisGoalsList } from "@/features/iep-documents/components/analysis-goals-list";
+import { analysisSourceTypeLabel } from "../lib/source-type-label";
 import { RunSectionDetail } from "./run-section-detail";
 import { RunStatusBadge } from "./run-status-badge";
 import type { AnalysisRunSection, AnalysisRunSource } from "../types";
@@ -40,7 +41,7 @@ export function RunSourceSections({
 }: RunSourceSectionsProps) {
   const { t } = useTranslation("analysis");
   const ordered = [...sections].sort((a, b) => a.displayOrder - b.displayOrder);
-  const label = source.sourceLabel ?? `${source.sourceType} #${source.sourceId}`;
+  const label = source.sourceLabel ?? `${analysisSourceTypeLabel(source.sourceType)} #${source.sourceId}`;
   const href = sourceDocumentHref(childId, source);
   const goalAnalyses = ordered.find((s) => s.sectionKind === "iep_goals")?.goalAnalyses;
   const isFailed = source.status === "Error";

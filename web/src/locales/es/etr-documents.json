@@ -1,8 +1,9 @@
 {
+  "documentIdFallback": "ETR #{{id}}",
   "evaluationType": {
     "initial": "Evaluación inicial",
     "reevaluation": "Reevaluación",
-    "transfer": "Transferencia",
+    "transfer": "Traslado",
     "other": "Otra"
   },
   "documentState": {
@@ -24,7 +25,6 @@
     "notes": "Notas",
     "notesPlaceholder": "Cualquier nota sobre esta evaluación...",
     "create": "Crear ETR",
-    "cancel": "Cancelar",
     "createFailed": "No se pudo crear el ETR",
     "createError": "Ocurrió un error al crear el ETR"
   },
@@ -41,13 +41,13 @@
   },
   "emptyState": {
     "heading": "Analice este ETR",
-    "body": "Obtenga un análisis completo de esta evaluación, incluida la integridad de las pruebas, la revisión de elegibilidad y posibles inquietudes.",
+    "body": "Obtenga un análisis completo de esta evaluación, incluida la exhaustividad de la evaluación, la revisión de elegibilidad y posibles inquietudes.",
     "analyze": "Analizar ETR"
   },
   "processing": {
     "label": "Analizando…",
     "heading": "Analizando el ETR",
-    "body": "Esto generalmente toma unos minutos. Estamos revisando la integridad de las pruebas, la determinación de elegibilidad e identificando áreas que pueden necesitar atención.",
+    "body": "Esto generalmente toma unos minutos. Estamos revisando la exhaustividad de la evaluación, la determinación de elegibilidad e identificando áreas que pueden necesitar atención.",
     "checkStatus": "Verificar estado"
   },
   "analysisTab": {
@@ -67,7 +67,7 @@
     "reanalyze": "Volver a analizar",
     "overviewNav": "Resumen",
     "yourGoalsNav": "Sus metas",
-    "completenessNav": "Integridad de las pruebas",
+    "completenessNav": "Exhaustividad de la evaluación",
     "eligibilityNav": "Revisión de elegibilidad"
   },
   "overview": {
@@ -78,11 +78,12 @@
     "supported": "Respaldada",
     "unsupported": "No respaldada",
     "unknown": "—",
-    "urgentCount": "({{count}} urgentes)",
+    "urgentCount_one": "({{count}} urgente)",
+    "urgentCount_other": "({{count}} urgentes)",
     "areasOfConcern": "Áreas de preocupación ({{count}})"
   },
   "completenessView": {
-    "heading": "Integridad de las pruebas",
+    "heading": "Exhaustividad de la evaluación",
     "overall": "General",
     "ratingStrong": "Sólida",
     "ratingAdequate": "Adecuada",

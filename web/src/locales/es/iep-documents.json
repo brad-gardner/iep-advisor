@@ -125,7 +125,6 @@
     "notesPlaceholder": "Cualquier nota sobre esta reunión...",
     "creating": "Creando...",
     "create": "Crear IEP",
-    "cancel": "Cancelar",
     "createFailed": "No se pudo crear el IEP",
     "createError": "Ocurrió un error al crear el IEP"
   },
@@ -180,10 +179,14 @@
   },
   "goalsList": {
     "empty": "No hay análisis de metas disponibles.",
-    "heading": "Análisis de metas ({{count}} metas)",
-    "strongCount": "{{count}} sólidas",
-    "needsImprovementCount": "{{count}} necesitan mejorar",
-    "significantConcernsCount": "{{count}} con preocupaciones importantes"
+    "heading_one": "Análisis de metas ({{count}} meta)",
+    "heading_other": "Análisis de metas ({{count}} metas)",
+    "strongCount_one": "{{count}} sólida",
+    "strongCount_other": "{{count}} sólidas",
+    "needsImprovementCount_one": "{{count}} necesita mejorar",
+    "needsImprovementCount_other": "{{count}} necesitan mejorar",
+    "significantConcernsCount_one": "{{count}} con preocupación importante",
+    "significantConcernsCount_other": "{{count}} con preocupaciones importantes"
   },
   "sectionDetail": {
     "keyPoints": "Puntos clave",

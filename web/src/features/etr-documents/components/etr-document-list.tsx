@@ -79,7 +79,7 @@ export function EtrDocumentList({
           etr.fileName ||
           (etr.evaluationType
             ? evaluationTypeLabel(etr.evaluationType)
-            : `ETR #${etr.id}`);
+            : t("documentIdFallback", { id: etr.id }));
 
         return (
           <Card key={etr.id} className="p-3" data-testid="etr-document-card">

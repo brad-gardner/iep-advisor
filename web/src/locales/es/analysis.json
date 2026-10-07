@@ -69,6 +69,11 @@
     "iep": "IEP {{date}}{{type}}",
     "etr": "ETR {{date}}{{type}}",
     "progressReportRange": "Informe de progreso {{start}} – {{end}}",
-    "progressReport": "Informe de progreso {{date}}"
+    "progressReport": "Informe de progreso {{date}}",
+    "sourceType": {
+      "IepDocument": "IEP",
+      "EtrDocument": "ETR",
+      "ProgressReport": "Informe de progreso"
+    }
   }
 }

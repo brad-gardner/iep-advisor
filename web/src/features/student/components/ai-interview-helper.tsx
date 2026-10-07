@@ -5,12 +5,12 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
-import { GeneratedLanguageNotice } from '@/lib/i18n/generated-language-notice';
 import type { InterviewSuggestionDto, StudentWorkspaceEntryKind } from '../types';
 
 interface AiInterviewHelperProps {
-  // Returns the AI suggestion (with its generated language), or null on
-  // failure. NOT persisted.
+  // Returns the AI suggestion, or null on failure. NOT persisted. Suggestions
+  // are transient (never stored), so they're always generated — and shown —
+  // in the viewer's current language; there's no generatedLanguage to track.
   onInterview: (prompt: string) => Promise<InterviewSuggestionDto | null>;
   // Saves the suggestion as an entry (private by default). Returns success.
   onSave: (
@@ -110,7 +110,6 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
           className="space-y-3 rounded-card border border-brand-teal-100 bg-brand-teal-50 p-4"
           data-testid="ai-interview-suggestion"
         >
-          <GeneratedLanguageNotice generatedLanguage={suggestion.generatedLanguage} />
           <p className="whitespace-pre-wrap text-sm text-brand-slate-800">
             {suggestion.suggestion}
           </p>

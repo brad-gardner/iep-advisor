@@ -3,13 +3,13 @@
     "Strength": {
       "label": "Fortaleza",
       "sectionTitle": "Mis fortalezas",
-      "hint": "Cosas en las que es bueno o de las que se siente orgulloso.",
-      "placeholder": "Soy bueno en…"
+      "hint": "Cosas que hace bien o que le enorgullecen",
+      "placeholder": "Se me da bien…"
     },
     "Interest": {
       "label": "Interés",
       "sectionTitle": "Mis intereses",
-      "hint": "Cosas que disfruta o quiere aprender más sobre.",
+      "hint": "Cosas que disfruta o sobre las que quiere aprender más.",
       "placeholder": "Me interesa…"
     },
     "AccommodationRequest": {
@@ -29,7 +29,7 @@
     }
   },
   "homePage": {
-    "welcomeTitle": "Bienvenido, {{name}}",
+    "welcomeTitle": "Le damos la bienvenida, {{name}}",
     "defaultTitle": "Su espacio",
     "subtitle": "Agregue sus fortalezas, intereses y lo que quiere decir; luego elija qué compartir con su equipo.",
     "loadingWorkspace": "Cargando su espacio…",
@@ -61,7 +61,7 @@
     "heading": "Entrevista con IA",
     "description": "Dígale al asistente qué necesita ayuda para expresar. Redactará algo que podrá guardar o cambiar.",
     "promptPlaceholder": "Quiero decirle a mi equipo que…",
-    "promptAriaLabel": "¿Con qué necesita ayuda para decir?",
+    "promptAriaLabel": "¿Qué quiere decir y necesita ayuda para expresarlo?",
     "askButton": "Preguntarle al asistente",
     "errorTitle": "El asistente no pudo ayudar en este momento",
     "errorBody": "Intente de nuevo en un momento.",

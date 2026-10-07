@@ -4,13 +4,18 @@ import type { MeetingStatus, MeetingType } from '@/features/meetings/types';
 // Translated meeting type / status labels (`common:meetingType.*`,
 // `common:meetingStatus.*`). Same shape as `inviteStatusLabel`: plain functions
 // over `i18n.t`, callable from render bodies; callers re-render on language
-// change through their own `useTranslation`.
+// change through their own `useTranslation`. `type`/`status` are typed as
+// `MeetingType`/`MeetingStatus` so a typo at the call site is still a `tsc`
+// error, but the value itself comes from stored/server data that can
+// outlive the client's known set, so a lookup miss falls back to the raw
+// value via `defaultValue` rather than showing a raw
+// `common:meetingType.*`/`common:meetingStatus.*` key.
 export function meetingTypeLabel(type: MeetingType): string {
-  return i18n.t(`common:meetingType.${type}`);
+  return i18n.t(`common:meetingType.${type}`, { defaultValue: type });
 }
 
 export function meetingStatusLabel(status: MeetingStatus): string {
-  return i18n.t(`common:meetingStatus.${status}`);
+  return i18n.t(`common:meetingStatus.${status}`, { defaultValue: status });
 }
 
 // `IepDocument.meetingType` (and the identical fields on a comparison

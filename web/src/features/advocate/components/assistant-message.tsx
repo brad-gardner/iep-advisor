@@ -25,7 +25,7 @@ interface AssistantMessageProps {
   suggestions?: AdvocateSuggestion[];
   truncated?: boolean;
   /** The language this persisted answer was generated in; null/unknown = English — shown via `GeneratedLanguageNotice` when it differs from the viewer's. */
-  generatedLanguage?: string | null;
+  generatedLanguage?: 'en' | 'es' | null;
   handlers: SuggestionHandlers;
   'data-testid'?: string;
 }

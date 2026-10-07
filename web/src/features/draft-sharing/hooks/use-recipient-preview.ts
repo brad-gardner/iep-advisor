@@ -3,10 +3,13 @@ import { apiErrorMessage } from '@/lib/api-error';
 import { getSharePreview } from '../api/draft-sharing-api';
 import type { RecipientPreviewDto } from '../types';
 
+/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
+export type UseRecipientPreviewError = { kind: 'server'; message: string } | { kind: 'generic' };
+
 interface UseRecipientPreviewResult {
   preview: RecipientPreviewDto | null;
   isLoading: boolean;
-  error: string | null;
+  error: UseRecipientPreviewError | null;
   reload: () => void;
 }
 
@@ -19,7 +22,7 @@ interface UseRecipientPreviewResult {
  */
 export function useRecipientPreview(instanceId: number): UseRecipientPreviewResult {
   const [preview, setPreview] = useState<RecipientPreviewDto | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UseRecipientPreviewError | null>(null);
   const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
@@ -30,9 +33,11 @@ export function useRecipientPreview(instanceId: number): UseRecipientPreviewResu
         const res = await getSharePreview(instanceId);
         if (!active) return;
         if (res.success && res.data) setPreview(res.data);
-        else setError(res.message ?? 'Could not load the recipient preview.');
+        else setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load the recipient preview.'));
+        if (!active) return;
+        const message = apiErrorMessage(err, '');
+        setError(message ? { kind: 'server', message } : { kind: 'generic' });
       }
     })();
     return () => {
