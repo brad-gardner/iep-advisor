@@ -228,13 +228,36 @@ public class IcsBuilderTests
 
     // ----------------------------------------------------------------- Multilingual plan phase 4
     //
-    // IcsBuilder has no translatable chrome strings of its own to localize for Spanish — its only
-    // app-generated literal ("Video: " in the DESCRIPTION, built by BuildEventLines) is the same word in
-    // Spanish. Title/Location/Notes passed in are meeting CONTENT, not UI chrome, and the service that
-    // supplies them (NotificationEmailService, via IcsMeetingInputMapper) is outside this worker's
-    // ownership for this phase. What IS this component's job is correctly carrying Spanish (accented,
-    // multi-byte UTF-8) text through SUMMARY/DESCRIPTION/LOCATION without corruption — including across
-    // RFC 5545's 75-octet line folding, which must never split a multi-byte UTF-8 sequence.
+    // IcsBuilder stays dependency-free (no IStringLocalizer of its own): its one app-generated DESCRIPTION
+    // literal ("Video: ", built by BuildEventLines) now comes from IcsMeetingInput.VideoLabel instead of
+    // a hardcoded string, so a CALLER that knows the recipient's language (NotificationEmailService) can
+    // supply the localized label while every other caller (the default "Video", which happens to be the
+    // same word in Spanish too) is unaffected. Title/Location/Notes passed in are meeting CONTENT, not UI
+    // chrome, and the service that supplies them (NotificationEmailService, via IcsMeetingInputMapper) is
+    // outside this worker's ownership for this phase. What IS this component's job is correctly carrying
+    // Spanish (accented, multi-byte UTF-8) text through SUMMARY/DESCRIPTION/LOCATION without corruption —
+    // including across RFC 5545's 75-octet line folding, which must never split a multi-byte UTF-8 sequence.
+
+    [Fact]
+    public void BuildMeetingEvent_VideoLabelDefaultsToVideo_MatchingPriorHardcodedLiteral()
+    {
+        var input = Meeting();
+        input.VideoUrl = "https://meet.example.com/xyz";
+        var ics = Unfold(Text(_builder.BuildMeetingEvent(input, "REQUEST")));
+
+        Assert.Contains("DESCRIPTION:Video: https://meet.example.com/xyz", ics);
+    }
+
+    [Fact]
+    public void BuildMeetingEvent_CustomVideoLabel_IsUsedInDescription()
+    {
+        var input = Meeting();
+        input.VideoUrl = "https://meet.example.com/xyz";
+        input.VideoLabel = "Video"; // Spanish value is identical to English — see IcsBuilderTests class comment above.
+        var ics = Unfold(Text(_builder.BuildMeetingEvent(input, "REQUEST")));
+
+        Assert.Contains("DESCRIPTION:Video: https://meet.example.com/xyz", ics);
+    }
 
     [Fact]
     public void BuildMeetingEvent_SpanishAccentedTitleLocationAndNotes_RoundTripUncorrupted()

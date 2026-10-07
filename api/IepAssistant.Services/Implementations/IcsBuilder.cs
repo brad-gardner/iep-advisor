@@ -105,7 +105,7 @@ public class IcsBuilder : IIcsBuilder
 
         var descriptionParts = new List<string>();
         if (!string.IsNullOrWhiteSpace(meeting.VideoUrl))
-            descriptionParts.Add($"Video: {meeting.VideoUrl}");
+            descriptionParts.Add($"{meeting.VideoLabel}: {meeting.VideoUrl}");
         if (!string.IsNullOrWhiteSpace(meeting.Notes))
             descriptionParts.Add(meeting.Notes!);
 

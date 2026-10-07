@@ -188,15 +188,17 @@ public class DraftResponseService : IDraftResponseService
             if (string.IsNullOrWhiteSpace(studentName))
                 studentName = null;
 
-            // response.Kind is an enum-like value, kept in English for every recipient — consistent with
-            // every other status/severity/kind value in this codebase (multilingual plan, phase 3 review).
-            var kindLabel = response.Kind.ToString();
             var linkPath = $"/educator/documents/{header.DocumentInstanceId}?tab=converge";
             var dedupKey = $"draft-response-{response.Id}";
 
+            // response.Kind is a closed enum (Agree/Question/ChangeRequest/Comment), so phase 4's review
+            // fix localizes it per recipient instead of the raw English identifier — NotifyAsync already
+            // has CultureScope.For(lang) active while this delegate runs, so the indexer below resolves
+            // under that recipient's culture without needing `lang` explicitly (same as every other
+            // _notificationsLocalizer[...] call in this file).
             (string Title, string Body) BuildText(string lang) => (
                 _notificationsLocalizer["Notifications.ResponseReceived.Title"],
-                _notificationsLocalizer["Notifications.ResponseReceived.Body", kindLabel, studentName ?? _notificationsLocalizer["Notifications.ResponseReceived.UnknownStudent"]]);
+                _notificationsLocalizer["Notifications.ResponseReceived.Body", _notificationsLocalizer[$"Notifications.DraftResponseKind.{response.Kind}"], studentName ?? _notificationsLocalizer["Notifications.ResponseReceived.UnknownStudent"]]);
 
             await _notifications.NotifyAsync(recipientIds, NotificationKind.ResponseReceived, BuildText, linkPath, dedupKey, emailImmediately: true, ct);
         }

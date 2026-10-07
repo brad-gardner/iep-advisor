@@ -193,6 +193,15 @@ Accept the invitation: {2}
 
 This invitation expires in 14 days.</value>
   </data>
+  <data name="StudentInvite.ContextParent" xml:space="preserve">
+    <value>to contribute to {0}'s IEP</value>
+  </data>
+  <data name="StudentInvite.ContextEducator" xml:space="preserve">
+    <value>at {0}</value>
+  </data>
+  <data name="StudentInvite.UnknownSchool" xml:space="preserve">
+    <value>your school</value>
+  </data>
 
   <data name="StaffInvite.Subject" xml:space="preserve">
     <value>You've been invited to join {0} on IEP Advisor</value>
@@ -377,6 +386,9 @@ Your account has been deactivated in the meantime, so this link is the only way 
   <data name="Meeting.DetailsLabel" xml:space="preserve">
     <value>Details</value>
   </data>
+  <data name="Meeting.VideoLabel" xml:space="preserve">
+    <value>Video</value>
+  </data>
 
   <data name="Notification.ButtonText" xml:space="preserve">
     <value>View in IEP Advisor</value>
@@ -414,5 +426,38 @@ Your account has been deactivated in the meantime, so this link is the only way 
   </data>
   <data name="Digest.DueDateSuffix" xml:space="preserve">
     <value> (due {0})</value>
+  </data>
+  <data name="Digest.ForConnector" xml:space="preserve">
+    <value>for</value>
+  </data>
+  <data name="ObligationKind.AnnualReview" xml:space="preserve">
+    <value>Annual review</value>
+  </data>
+  <data name="ObligationKind.Reevaluation" xml:space="preserve">
+    <value>Reevaluation</value>
+  </data>
+  <data name="ObligationKind.EtrDue" xml:space="preserve">
+    <value>ETR</value>
+  </data>
+  <data name="ObligationKind.GoalObservationStale" xml:space="preserve">
+    <value>Goal progress overdue</value>
+  </data>
+  <data name="ObligationKind.EvaluationDetermination" xml:space="preserve">
+    <value>Evaluation determination</value>
+  </data>
+  <data name="ObligationKind.EvaluatorSubmission" xml:space="preserve">
+    <value>Evaluator submission</value>
+  </data>
+  <data name="ObligationStatus.Upcoming" xml:space="preserve">
+    <value>Upcoming</value>
+  </data>
+  <data name="ObligationStatus.DueSoon" xml:space="preserve">
+    <value>Due soon</value>
+  </data>
+  <data name="ObligationStatus.Overdue" xml:space="preserve">
+    <value>Overdue</value>
+  </data>
+  <data name="ObligationStatus.Unknown" xml:space="preserve">
+    <value>Unknown</value>
   </data>
 </root>

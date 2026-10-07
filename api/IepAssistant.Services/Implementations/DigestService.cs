@@ -105,11 +105,21 @@ public class DigestService : IDigestService
             // Multilingual plan (2026-10-06) phase 4: the bell title/body follow this recipient's own
             // language — one user at a time is already a single batched user-info query above, so no
             // extra per-recipient query is introduced here.
+            //
+            // Phase 4 review fix: the deadline/meeting clauses use real count==1 vs other plural resx keys
+            // instead of the English-only "(s)"/Spanish "(es)" shortcut, which showed the parenthetical
+            // literally (e.g. "1 deadline(s)") regardless of count.
             string title, body;
             using (CultureScope.For(info.PreferredLanguage))
             {
                 title = _notificationsLocalizer["Notifications.Digest.Title"];
-                body = _notificationsLocalizer["Notifications.Digest.Body", dueOrOverdue.Count, upcomingMeetings.Count, MeetingLookaheadDays];
+                string deadlineClause = dueOrOverdue.Count == 1
+                    ? _notificationsLocalizer["Notifications.Digest.DeadlineCountOne", dueOrOverdue.Count]
+                    : _notificationsLocalizer["Notifications.Digest.DeadlineCountOther", dueOrOverdue.Count];
+                string meetingClause = upcomingMeetings.Count == 1
+                    ? _notificationsLocalizer["Notifications.Digest.MeetingCountOne", upcomingMeetings.Count, MeetingLookaheadDays]
+                    : _notificationsLocalizer["Notifications.Digest.MeetingCountOther", upcomingMeetings.Count, MeetingLookaheadDays];
+                body = _notificationsLocalizer["Notifications.Digest.Body", deadlineClause, meetingClause];
             }
 
             var notification = new Notification

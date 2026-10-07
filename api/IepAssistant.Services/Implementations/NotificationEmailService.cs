@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -13,6 +15,13 @@ namespace IepAssistant.Services.Implementations;
 /// kinds (Scheduled/Updated/Cancelled) are sent with a freshly-rendered .ics via the matching
 /// <see cref="IEmailService"/> method; every other kind (including MeetingReminder, which has no dedicated
 /// "with ics" method in the plan-4 contract) uses the generic <see cref="IEmailService.SendNotificationAsync"/>.
+///
+/// Multilingual plan (2026-10-06) phase 4 review fix: this resolves the RECIPIENT's own
+/// <see cref="Domain.Entities.User.PreferredLanguage"/> (same per-recipient-record lookup EmailService
+/// itself does) and uses it to set the emailed .ics's localized <see cref="IcsMeetingInput.VideoLabel"/>
+/// before handing the bytes to EmailService — keeping <see cref="IIcsBuilder"/>/<see cref="IcsBuilder"/>
+/// dependency-free (no <c>IStringLocalizer</c> of its own) was judged the smaller change versus moving
+/// .ics construction into EmailService.
 /// </summary>
 public class NotificationEmailService : INotificationEmailService
 {
@@ -34,19 +43,22 @@ public class NotificationEmailService : INotificationEmailService
     private readonly IIcsBuilder _icsBuilder;
     private readonly IConfiguration _configuration;
     private readonly ILogger<NotificationEmailService> _logger;
+    private readonly IStringLocalizer<Emails> _localizer;
 
     public NotificationEmailService(
         ApplicationDbContext context,
         IEmailService emailService,
         IIcsBuilder icsBuilder,
         IConfiguration configuration,
-        ILogger<NotificationEmailService> logger)
+        ILogger<NotificationEmailService> logger,
+        IStringLocalizer<Emails> localizer)
     {
         _context = context;
         _emailService = emailService;
         _icsBuilder = icsBuilder;
         _configuration = configuration;
         _logger = logger;
+        _localizer = localizer;
     }
 
     public async Task<IReadOnlyList<int>> FindQueuedIdsAsync(CancellationToken ct = default)
@@ -70,11 +82,14 @@ public class NotificationEmailService : INotificationEmailService
         if (notification.EmailQueuedAt == null || notification.EmailSentAt != null || notification.EmailAttempts >= MaxAttempts)
             return;
 
-        var recipientEmail = await _context.Users.AsNoTracking()
+        // PreferredLanguage rides along with this same lookup (no extra query) so the emailed .ics's
+        // localized chrome (IcsMeetingInput.VideoLabel) can follow this recipient's own language, the
+        // same per-recipient-record lookup EmailService itself does.
+        var recipient = await _context.Users.AsNoTracking()
             .Where(u => u.Id == notification.UserId)
-            .Select(u => u.Email)
+            .Select(u => new { u.Email, u.PreferredLanguage })
             .FirstOrDefaultAsync(ct);
-        if (string.IsNullOrWhiteSpace(recipientEmail))
+        if (string.IsNullOrWhiteSpace(recipient?.Email))
         {
             notification.EmailAttempts++;
             notification.EmailError = Truncate("Recipient has no email on file.");
@@ -82,11 +97,12 @@ public class NotificationEmailService : INotificationEmailService
             await _context.SaveChangesAsync(ct);
             return;
         }
+        var recipientEmail = recipient.Email;
 
         try
         {
             var sentViaMeetingFlow = notification.Kind is NotificationKind.MeetingScheduled or NotificationKind.MeetingUpdated or NotificationKind.MeetingCancelled
-                && await TrySendMeetingEmailAsync(notification, recipientEmail, ct);
+                && await TrySendMeetingEmailAsync(notification, recipientEmail, recipient.PreferredLanguage, ct);
 
             if (!sentViaMeetingFlow)
                 await _emailService.SendNotificationAsync(recipientEmail, notification.Title, notification.Body, BuildLinkUrl(notification.LinkPath), ct);
@@ -116,7 +132,7 @@ public class NotificationEmailService : INotificationEmailService
     /// <summary>Resolves the meeting id from <see cref="Notification.LinkPath"/> (of the form
     /// "/meetings/{id}") and, if the recipient still has a participant row, sends the ICS-attached email.
     /// Returns false (caller falls back to the generic email) when either can't be resolved.</summary>
-    private async Task<bool> TrySendMeetingEmailAsync(Notification notification, string recipientEmail, CancellationToken ct)
+    private async Task<bool> TrySendMeetingEmailAsync(Notification notification, string recipientEmail, string? recipientLanguage, CancellationToken ct)
     {
         var meetingId = ParseMeetingId(notification.LinkPath);
         if (meetingId == null)
@@ -156,6 +172,11 @@ public class NotificationEmailService : INotificationEmailService
         // Shared with CalendarService's authoritative GET /api/meetings/{id}.ics mapping (todos/051,
         // todos/064) so this best-effort emailed .ics carries the real (possibly bumped) Sequence.
         var icsInput = IcsMeetingInputMapper.Map(meeting);
+        // Multilingual plan phase 4 review fix: localize the DESCRIPTION's "Video:" label for THIS
+        // recipient's language — IcsMeetingInputMapper's default ("Video", English) is left alone, so
+        // every other caller (CalendarService's own authoritative single-meeting download) is unaffected.
+        using (CultureScope.For(recipientLanguage))
+            icsInput.VideoLabel = _localizer["Meeting.VideoLabel"].Value;
         var ics = _icsBuilder.BuildMeetingEvent(icsInput, meeting.Status == MeetingStatus.Cancelled ? "CANCEL" : "REQUEST");
 
         switch (notification.Kind)

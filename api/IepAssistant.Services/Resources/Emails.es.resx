@@ -194,6 +194,15 @@ Acepte la invitación: {2}
 
 Esta invitación vence en 14 días.</value>
   </data>
+  <data name="StudentInvite.ContextParent" xml:space="preserve">
+    <value>para contribuir al IEP de {0}</value>
+  </data>
+  <data name="StudentInvite.ContextEducator" xml:space="preserve">
+    <value>en la escuela {0}</value>
+  </data>
+  <data name="StudentInvite.UnknownSchool" xml:space="preserve">
+    <value>su escuela</value>
+  </data>
 
   <data name="StaffInvite.Subject" xml:space="preserve">
     <value>Le han invitado a unirse a {0} en IEP Advisor</value>
@@ -378,6 +387,9 @@ Su cuenta ha sido desactivada mientras tanto, así que este enlace es la única 
   <data name="Meeting.DetailsLabel" xml:space="preserve">
     <value>Detalles</value>
   </data>
+  <data name="Meeting.VideoLabel" xml:space="preserve">
+    <value>Video</value>
+  </data>
 
   <data name="Notification.ButtonText" xml:space="preserve">
     <value>Ver en IEP Advisor</value>
@@ -415,5 +427,38 @@ Su cuenta ha sido desactivada mientras tanto, así que este enlace es la única 
   </data>
   <data name="Digest.DueDateSuffix" xml:space="preserve">
     <value> (vence el {0})</value>
+  </data>
+  <data name="Digest.ForConnector" xml:space="preserve">
+    <value>para</value>
+  </data>
+  <data name="ObligationKind.AnnualReview" xml:space="preserve">
+    <value>Revisión anual</value>
+  </data>
+  <data name="ObligationKind.Reevaluation" xml:space="preserve">
+    <value>Reevaluación</value>
+  </data>
+  <data name="ObligationKind.EtrDue" xml:space="preserve">
+    <value>ETR</value>
+  </data>
+  <data name="ObligationKind.GoalObservationStale" xml:space="preserve">
+    <value>Progreso de la meta vencido</value>
+  </data>
+  <data name="ObligationKind.EvaluationDetermination" xml:space="preserve">
+    <value>Determinación de la evaluación</value>
+  </data>
+  <data name="ObligationKind.EvaluatorSubmission" xml:space="preserve">
+    <value>Entrega del evaluador</value>
+  </data>
+  <data name="ObligationStatus.Upcoming" xml:space="preserve">
+    <value>Próxima</value>
+  </data>
+  <data name="ObligationStatus.DueSoon" xml:space="preserve">
+    <value>Próxima a vencer</value>
+  </data>
+  <data name="ObligationStatus.Overdue" xml:space="preserve">
+    <value>Vencida</value>
+  </data>
+  <data name="ObligationStatus.Unknown" xml:space="preserve">
+    <value>Desconocida</value>
   </data>
 </root>

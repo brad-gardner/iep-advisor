@@ -332,9 +332,14 @@ public class EvaluationCaseService : IEvaluationCaseService
         {
             var recipients = new HashSet<int> { a.UserId, a.LeadUserId ?? a.CreatedByUserId };
             var dedupKey = $"evaluator-overdue-{a.Id}-{today:yyyyMMdd}";
-            // Domain is an enum-like value, kept in English for every recipient (consistent with every
-            // other status/kind value elsewhere in this codebase).
-            var domain = a.Domain.ToString();
+            // Multilingual plan phase 4 review: re-checked whether this should localize like
+            // DraftResponseKind now does. EvaluatorAssignment.Domain is free text a staff member types
+            // when creating the assignment (AddAssignmentAsync only validates non-empty; see
+            // add-assignment-form.tsx's plain text input and demo seed values like "Cognitive ability and
+            // observation") — not a closed C# enum, so there is no fixed value set to add resx keys for.
+            // It stays in English for every recipient, same as other staff-authored free text in this
+            // codebase (StaffInvite's org-role name, DraftResponse.StaffReply, Meeting.Title).
+            var domain = a.Domain;
             var studentName = a.StudentName;
             var dueDate = a.DueDate!.Value;
 

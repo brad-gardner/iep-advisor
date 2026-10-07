@@ -129,6 +129,53 @@ public class EmailServiceRenderTests
     }
 
     [Fact]
+    public void RenderDigestHtml_English_ObligationKindAndStatusAreHumanReadableNotRawIdentifiers()
+    {
+        // Phase 4 review fix: these were previously the raw enum ToString() (e.g. "GoalObservationStale",
+        // "DueSoon") in English too — now a real display label, via Emails.resx.
+        var model = new DigestEmailModel
+        {
+            RecipientFirstName = "Pat",
+            Obligations = new List<DigestObligationItem>
+            {
+                new() { StudentName = "Sam", Kind = ObligationKind.GoalObservationStale, Status = ObligationStatus.DueSoon, DueDate = DateTime.UtcNow }
+            },
+            UpcomingMeetings = new List<DigestMeetingItem>(),
+            DetailUrl = "https://app.example.com/notifications"
+        };
+
+        var html = EmailService.RenderDigestHtml(model, "en", Localizer);
+
+        Assert.Contains("Goal progress overdue", html);
+        Assert.Contains("Due soon", html);
+        Assert.DoesNotContain("GoalObservationStale", html);
+        Assert.DoesNotContain("DueSoon", html);
+    }
+
+    [Fact]
+    public void RenderDigestHtml_Spanish_LocalizesObligationKindStatusAndForConnector()
+    {
+        var model = new DigestEmailModel
+        {
+            RecipientFirstName = "Lupe",
+            Obligations = new List<DigestObligationItem>
+            {
+                new() { StudentName = "Sam", Kind = ObligationKind.AnnualReview, Status = ObligationStatus.Overdue, DueDate = DateTime.UtcNow }
+            },
+            UpcomingMeetings = new List<DigestMeetingItem>(),
+            DetailUrl = "https://app.example.com/notifications"
+        };
+
+        var html = EmailService.RenderDigestHtml(model, "es", Localizer);
+
+        Assert.Contains("Vencida", html);
+        Assert.Contains("Revisión anual", html);
+        Assert.Contains("para Sam", html);
+        Assert.DoesNotContain("AnnualReview", html);
+        Assert.DoesNotContain("Overdue", html);
+    }
+
+    [Fact]
     public void RenderDigestHtml_Spanish_LocalizesChromeAndFormatsDates()
     {
         var model = new DigestEmailModel

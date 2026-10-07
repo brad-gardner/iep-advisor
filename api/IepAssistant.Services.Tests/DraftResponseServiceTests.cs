@@ -39,11 +39,11 @@ public sealed class DraftResponseServiceTests : IDisposable
 
     internal sealed class FakeNotifications : INotificationService
     {
-        public List<(List<int> UserIds, NotificationKind Kind, string? LinkPath)> Calls { get; } = new();
+        public List<(List<int> UserIds, NotificationKind Kind, string? LinkPath, Func<string, (string Title, string Body)> BuildText)> Calls { get; } = new();
 
         public Task NotifyAsync(IEnumerable<int> userIds, NotificationKind kind, Func<string, (string Title, string Body)> buildText, string? linkPath, string dedupKey, bool emailImmediately, CancellationToken ct = default)
         {
-            Calls.Add((userIds.ToList(), kind, linkPath));
+            Calls.Add((userIds.ToList(), kind, linkPath, buildText));
             return Task.CompletedTask;
         }
 
@@ -125,6 +125,37 @@ public sealed class DraftResponseServiceTests : IDisposable
         Assert.True(result.Success, result.Message);
         Assert.Equal(DraftResponseStatus.Open, result.Data!.Status);
         Assert.Contains(notifications.Calls, c => c.Kind == NotificationKind.ResponseReceived && c.UserIds.Contains(s.TeacherId));
+    }
+
+    // ----------------------------------------------------------------- multilingual plan phase 4 review fix
+    //
+    // response.Kind (Agree/Question/ChangeRequest/Comment) is localized per recipient instead of the raw
+    // English identifier; NotificationService.NotifyAsync already opens CultureScope.For(lang) around the
+    // buildText delegate in production, so this test mirrors that instead of relying on ambient state.
+
+    [Fact]
+    public async Task Create_ChangeRequestKind_NotificationBodyLocalizesKindPerRecipientLanguage()
+    {
+        var revisionId = SeedRevision("active-cr", SharedDraftStatus.Active, out var s);
+        using var ctx = CreateContext();
+        var (service, notifications) = CreateService(ctx);
+
+        var result = await service.CreateAsync(s.ParentId, revisionId,
+            new CreateDraftResponseModel { Kind = DraftResponseKind.ChangeRequest, Text = "Please adjust the goal." }, default);
+
+        Assert.True(result.Success, result.Message);
+        var call = Assert.Single(notifications.Calls, c => c.Kind == NotificationKind.ResponseReceived);
+
+        string enBody, esBody;
+        using (CultureScope.For("en"))
+            (_, enBody) = call.BuildText("en");
+        using (CultureScope.For("es"))
+            (_, esBody) = call.BuildText("es");
+
+        Assert.Contains("Request a change", enBody);
+        Assert.Contains("Solicitar un cambio", esBody);
+        Assert.DoesNotContain("ChangeRequest", enBody);
+        Assert.DoesNotContain("ChangeRequest", esBody);
     }
 
     [Fact]

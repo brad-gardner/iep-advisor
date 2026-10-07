@@ -149,6 +149,30 @@
     <value>Your daily IEP Advisor digest</value>
   </data>
   <data name="Notifications.Digest.Body" xml:space="preserve">
-    <value>{0} deadline(s) due soon or overdue, {1} meeting(s) in the next {2} days.</value>
+    <value>{0}, {1}.</value>
+  </data>
+  <data name="Notifications.Digest.DeadlineCountOne" xml:space="preserve">
+    <value>{0} deadline due soon or overdue</value>
+  </data>
+  <data name="Notifications.Digest.DeadlineCountOther" xml:space="preserve">
+    <value>{0} deadlines due soon or overdue</value>
+  </data>
+  <data name="Notifications.Digest.MeetingCountOne" xml:space="preserve">
+    <value>{0} meeting in the next {1} days</value>
+  </data>
+  <data name="Notifications.Digest.MeetingCountOther" xml:space="preserve">
+    <value>{0} meetings in the next {1} days</value>
+  </data>
+  <data name="Notifications.DraftResponseKind.Agree" xml:space="preserve">
+    <value>Agree</value>
+  </data>
+  <data name="Notifications.DraftResponseKind.Question" xml:space="preserve">
+    <value>Question</value>
+  </data>
+  <data name="Notifications.DraftResponseKind.ChangeRequest" xml:space="preserve">
+    <value>Request a change</value>
+  </data>
+  <data name="Notifications.DraftResponseKind.Comment" xml:space="preserve">
+    <value>Comment</value>
   </data>
 </root>

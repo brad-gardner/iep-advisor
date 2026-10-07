@@ -213,6 +213,56 @@ public sealed class EmailServicePhase4LanguageTests : IDisposable
         Assert.Equal(signedUrl, queue.LastDraft.TextBody!.Split("Cancelar eliminación: ")[1].Split('\n')[0]);
     }
 
+    // ----------------------------------------------------------------- StudentInvite: structured context clause (phase 4 review fix)
+
+    [Fact]
+    public async Task StudentInvite_ParentChildContext_SpanishRecipient_RendersSpanishClauseWithChildName()
+    {
+        SeedUser("maestra-es@example.com", "es");
+        var queue = new CapturingQueue();
+        var context = new StudentInviteContext { Kind = StudentInviteContextKind.ParentChild, ChildFirstName = "Sam" };
+
+        await CreateService(queue).SendStudentInviteEmailAsync("maestra-es@example.com", "Ana", context, "tok123");
+
+        Assert.Contains("para contribuir al IEP de Sam", queue.LastDraft!.HtmlBody);
+    }
+
+    [Fact]
+    public async Task StudentInvite_EducatorSchoolContext_SpanishRecipient_RendersSpanishClauseWithSchoolName()
+    {
+        SeedUser("maestra-es2@example.com", "es");
+        var queue = new CapturingQueue();
+        var context = new StudentInviteContext { Kind = StudentInviteContextKind.EducatorSchool, SchoolName = "Lincoln High School" };
+
+        await CreateService(queue).SendStudentInviteEmailAsync("maestra-es2@example.com", "Pat", context, "tok123");
+
+        Assert.Contains("en la escuela Lincoln High School", queue.LastDraft!.HtmlBody);
+    }
+
+    [Fact]
+    public async Task StudentInvite_EducatorSchoolContext_NoSchoolName_UsesLocalizedUnknownSchoolClause()
+    {
+        SeedUser("maestra-es3@example.com", "es");
+        var queue = new CapturingQueue();
+        var context = new StudentInviteContext { Kind = StudentInviteContextKind.EducatorSchool, SchoolName = null };
+
+        await CreateService(queue).SendStudentInviteEmailAsync("maestra-es3@example.com", "Pat", context, "tok123");
+
+        Assert.Contains("en la escuela su escuela", queue.LastDraft!.HtmlBody);
+    }
+
+    [Fact]
+    public async Task StudentInvite_EnglishDefault_ContextClauseMatchesCurrentCopy()
+    {
+        var queue = new CapturingQueue();
+        var context = new StudentInviteContext { Kind = StudentInviteContextKind.ParentChild, ChildFirstName = "Sam" };
+
+        await CreateService(queue).SendStudentInviteEmailAsync("unseeded@example.com", "Ana", context, "tok123");
+
+        // The apostrophe in "Sam's" is HTML-encoded, same as every other interpolated value in this body.
+        Assert.Contains("has invited you to set up your own student account on IEP Advisor to contribute to Sam&#39;s IEP.", queue.LastDraft!.HtmlBody);
+    }
+
     // ----------------------------------------------------------------- Meeting invitation: full send, Spanish
 
     [Fact]

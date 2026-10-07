@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
+using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
@@ -198,7 +199,7 @@ public class EmailService : IEmailService
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "SchoolLinkInvite", null, ct);
     }
 
-    public async Task SendStudentInviteEmailAsync(string toEmail, string inviterName, string context, string inviteToken, CancellationToken ct = default)
+    public async Task SendStudentInviteEmailAsync(string toEmail, string inviterName, StudentInviteContext context, string inviteToken, CancellationToken ct = default)
     {
         var (language, hasAccount) = await ResolveRecipientAsync(toEmail, ct);
         using var _ = CultureScope.For(language);
@@ -210,12 +211,11 @@ public class EmailService : IEmailService
         var safeInviteUrl = WebUtility.HtmlEncode(inviteUrl);
 
         var safeInviterName = WebUtility.HtmlEncode(inviterName);
-        // NOTE: `context` (e.g. "to contribute to Sam's IEP" / "at Lincoln High School") arrives from the
-        // caller (StudentInviteService, outside this worker's ownership) as a pre-built ENGLISH sentence
-        // fragment, not structured data. For a Spanish recipient the surrounding sentence below is
-        // Spanish but this clause stays English — see the implementation handoff notes for the fix
-        // (pass structured data instead of a pre-formatted phrase), which requires a caller-side change.
-        var safeContext = WebUtility.HtmlEncode(context);
+        // `context` is structured data (plan 2026-10-06 phase 4 review fix) — the one clause that differs
+        // by invite source is rendered here, in the recipient's own language, from Emails.resx (the
+        // caller previously built this as a pre-formatted ENGLISH sentence fragment).
+        var contextClause = BuildStudentInviteContextClause(context);
+        var safeContext = WebUtility.HtmlEncode(contextClause);
 
         var subject = string.Format(_localizer["StudentInvite.Subject"].Value, inviterName);
         var heading = _localizer["StudentInvite.Heading"].Value;
@@ -251,10 +251,24 @@ public class EmailService : IEmailService
                 </p>
             </div>";
 
-        var plainText = string.Format(_localizer["StudentInvite.PlainTextBody"].Value, inviterName, context, inviteUrl);
+        var plainText = string.Format(_localizer["StudentInvite.PlainTextBody"].Value, inviterName, contextClause, inviteUrl);
 
         await EnqueueEmailAsync(toEmail, subject, html, plainText, "StudentInvite", null, ct);
     }
+
+    /// <summary>Renders <see cref="StudentInviteContext"/>'s one varying clause from Emails.resx under
+    /// the ambient culture (the caller already opened <see cref="CultureScope"/>). A null/blank school
+    /// name (educator invite with no school on file) falls back to a localized generic clause rather than
+    /// a hardcoded English "your school".</summary>
+    private string BuildStudentInviteContextClause(StudentInviteContext context) => context.Kind switch
+    {
+        StudentInviteContextKind.ParentChild =>
+            string.Format(_localizer["StudentInvite.ContextParent"].Value, context.ChildFirstName ?? string.Empty),
+        StudentInviteContextKind.EducatorSchool => string.Format(
+            _localizer["StudentInvite.ContextEducator"].Value,
+            string.IsNullOrWhiteSpace(context.SchoolName) ? _localizer["StudentInvite.UnknownSchool"].Value : context.SchoolName),
+        _ => string.Empty
+    };
 
     public async Task SendStaffInviteEmailAsync(string toEmail, string districtName, string? schoolName, string roleName, string inviteToken, CancellationToken ct = default)
     {
@@ -757,12 +771,13 @@ IEP Advisor · iep-advisor.com
         var noMeetings = _localizer["Digest.NoMeetings"].Value;
         var dueDateSuffixFormat = _localizer["Digest.DueDateSuffix"].Value;
         var buttonText = _localizer["Digest.ButtonText"].Value;
+        var forConnector = _localizer["Digest.ForConnector"].Value;
 
         var plainText = $"{greeting}\n\n{deadlinesHeadingPlain}\n" +
             (model.Obligations.Count == 0
                 ? $"{noDeadlines}\n"
                 : string.Concat(model.Obligations.Select(o =>
-                    $"- {o.Status}: {o.Kind} for {o.StudentName}{(o.DueDate.HasValue ? string.Format(dueDateSuffixFormat, FormatShortDate(o.DueDate.Value, language)) : "")}\n"))) +
+                    $"- {ObligationStatusLabel(o.Status, _localizer)}: {ObligationKindLabel(o.Kind, _localizer)} {forConnector} {o.StudentName}{(o.DueDate.HasValue ? string.Format(dueDateSuffixFormat, FormatShortDate(o.DueDate.Value, language)) : "")}\n"))) +
             $"\n{meetingsHeadingPlain}\n" +
             (model.UpcomingMeetings.Count == 0
                 ? $"{noMeetings}\n"
@@ -774,12 +789,14 @@ IEP Advisor · iep-advisor.com
     }
 
     /// <summary>Renders <see cref="SendDigestAsync"/>'s HTML body. Obligation/meeting StudentName and
-    /// meeting Title are staff-supplied and must be HTML-encoded (todos/049); Kind/Status are enums shown
-    /// via their raw <see cref="object.ToString"/> name today (e.g. "AnnualReview") in BOTH languages —
-    /// intentionally left as-is rather than guessing a translation for pre-existing rough-edge display
-    /// text that isn't a localization regression. Dates are formatted explicitly for
-    /// <paramref name="language"/> (see <see cref="FormatShortDate"/>/<see cref="FormatShortDateTime"/>);
-    /// <paramref name="localizer"/> resolves the surrounding chrome text.</summary>
+    /// meeting Title are staff-supplied and must be HTML-encoded (todos/049). Kind/Status are closed enums
+    /// (not user content), so phase 4's review fix localizes them via <see cref="ObligationKindLabel"/>/
+    /// <see cref="ObligationStatusLabel"/> instead of their raw <see cref="object.ToString"/> name (e.g.
+    /// "AnnualReview") — unlike <c>EvaluatorAssignment.Domain</c> and <c>StaffInvite</c>'s org-role name,
+    /// which stay as written because they are free text/district content, not an enum. Dates are formatted
+    /// explicitly for <paramref name="language"/> (see <see cref="FormatShortDate"/>/
+    /// <see cref="FormatShortDateTime"/>); <paramref name="localizer"/> resolves the surrounding chrome
+    /// text.</summary>
     internal static string RenderDigestHtml(DigestEmailModel model, string language, IStringLocalizer<Emails> localizer)
     {
         // Self-contained: see RenderMeetingHtml's note on why this opens its own CultureScope.
@@ -790,11 +807,12 @@ IEP Advisor · iep-advisor.com
 
         var noDeadlinesText = $"{localizer["Digest.NoDeadlines"].Value} {localizer["Digest.NiceWork"].Value}";
         var dueDateSuffixFormat = localizer["Digest.DueDateSuffix"].Value;
+        var forConnector = localizer["Digest.ForConnector"].Value;
 
         var obligationRows = model.Obligations.Count == 0
             ? $"<p style=\"font-size: 13px; color: #A8B5B5;\">{noDeadlinesText}</p>"
             : string.Concat(model.Obligations.Select(o =>
-                $"<li style=\"font-size: 13px; color: #5A6F6F; margin-bottom: 4px;\"><strong>{o.Status}</strong> — {o.Kind} for {WebUtility.HtmlEncode(o.StudentName)}{(o.DueDate.HasValue ? string.Format(dueDateSuffixFormat, FormatShortDate(o.DueDate.Value, language)) : "")}</li>"));
+                $"<li style=\"font-size: 13px; color: #5A6F6F; margin-bottom: 4px;\"><strong>{ObligationStatusLabel(o.Status, localizer)}</strong> — {ObligationKindLabel(o.Kind, localizer)} {forConnector} {WebUtility.HtmlEncode(o.StudentName)}{(o.DueDate.HasValue ? string.Format(dueDateSuffixFormat, FormatShortDate(o.DueDate.Value, language)) : "")}</li>"));
 
         var noMeetingsText = localizer["Digest.NoMeetings"].Value;
         var meetingRows = model.UpcomingMeetings.Count == 0
@@ -829,6 +847,16 @@ IEP Advisor · iep-advisor.com
                 </p>
             </div>";
     }
+
+    /// <summary>Localized display label for a closed <see cref="ObligationKind"/> value (digest email
+    /// content, phase 4 review fix) — resolved via <c>ObligationKind.&lt;value&gt;</c> in Emails.resx
+    /// under the ambient culture.</summary>
+    private static string ObligationKindLabel(ObligationKind kind, IStringLocalizer<Emails> localizer) => localizer[$"ObligationKind.{kind}"].Value;
+
+    /// <summary>Localized display label for a closed <see cref="ObligationStatus"/> value (digest email
+    /// content, phase 4 review fix) — resolved via <c>ObligationStatus.&lt;value&gt;</c> in Emails.resx
+    /// under the ambient culture.</summary>
+    private static string ObligationStatusLabel(ObligationStatus status, IStringLocalizer<Emails> localizer) => localizer[$"ObligationStatus.{status}"].Value;
 
     // ----------------------------------------------------------------- Recipient language resolution
 

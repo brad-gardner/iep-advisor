@@ -460,6 +460,41 @@ public sealed class StudentInviteServiceTests : IDisposable
         }
     }
 
+    // ----------------------------------------------------------------- multilingual plan phase 4 review fix
+    //
+    // SendStudentInviteEmailAsync's `context` is structured data, not a pre-built English sentence
+    // fragment (see EmailModels.StudentInviteContext) — these two assert the CALLER side builds the
+    // right structured value; EmailServicePhase4LanguageTests covers the rendered Spanish/English clause.
+
+    [Fact]
+    public async Task InviteFromParentAsync_PassesStructuredParentChildContext()
+    {
+        var parentId = SeedUser("ctxparent@x.com");
+        var childId = await SeedOwnedChild(parentId, "Kid");
+        var email = new CapturingEmailService();
+
+        using var ctx = CreateContext();
+        await CreateService(ctx, email).InviteFromParentAsync(parentId, childId, "ctxstudent@x.com");
+
+        Assert.Equal(StudentInviteContextKind.ParentChild, email.LastContext!.Kind);
+        Assert.Equal("Kid", email.LastContext.ChildFirstName);
+        Assert.Null(email.LastContext.SchoolName);
+    }
+
+    [Fact]
+    public async Task InviteFromEducatorAsync_PassesStructuredEducatorSchoolContext()
+    {
+        var (educatorId, schoolStudentId) = await SeedEducatorWithStudent("ctxed@x.com", "DistCtx", "SchoolCtx", "Jordan");
+        var email = new CapturingEmailService();
+
+        using var ctx = CreateContext();
+        await CreateService(ctx, email).InviteFromEducatorAsync(educatorId, schoolStudentId, "ctxstudent2@x.com");
+
+        Assert.Equal(StudentInviteContextKind.EducatorSchool, email.LastContext!.Kind);
+        Assert.Equal("SchoolCtx", email.LastContext.SchoolName);
+        Assert.Null(email.LastContext.ChildFirstName);
+    }
+
     public void Dispose() => _connection.Dispose();
 
     /// <summary>Captures the raw token passed to the student invite email so tests can exercise accept.</summary>
@@ -467,9 +502,12 @@ public sealed class StudentInviteServiceTests : IDisposable
     {
         public string? LastRawToken { get; private set; }
 
-        public override Task SendStudentInviteEmailAsync(string toEmail, string inviterName, string context, string inviteToken, CancellationToken ct = default)
+        public StudentInviteContext? LastContext { get; private set; }
+
+        public override Task SendStudentInviteEmailAsync(string toEmail, string inviterName, StudentInviteContext context, string inviteToken, CancellationToken ct = default)
         {
             LastRawToken = inviteToken;
+            LastContext = context;
             return Task.CompletedTask;
         }
     }
