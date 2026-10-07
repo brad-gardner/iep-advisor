@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -17,14 +18,6 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 public class DraftSharingService : IDraftSharingService
 {
-    private const string PermissionMessage = "You do not have permission to access this document.";
-    private const string NotFoundMessage = "Document not found.";
-    private const string RevisionNotFoundMessage = "Shared draft revision not found.";
-    private const string PolicyDisabledMessage = "Family draft sharing is disabled for this district.";
-    private const string NotShareableStatusMessage = "This document cannot be shared in its current state.";
-    private const string NoRecipientsMessage = "This document has no family recipients to share with. Link a parent or student account first.";
-    private const string NotActiveMessage = "This revision is not currently active.";
-    private const string RaceMessage = "Another share for this document happened at the same time. Please try again.";
     private const int MaxMessageLength = 1000;
     private const int MaxShareAttempts = 3;
 
@@ -36,6 +29,7 @@ public class DraftSharingService : IDraftSharingService
     private readonly IDraftResponseService _responses;
     private readonly IAuditLogger _audit;
     private readonly ILogger<DraftSharingService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public DraftSharingService(
         ApplicationDbContext context,
@@ -45,7 +39,8 @@ public class DraftSharingService : IDraftSharingService
         INotificationService notifications,
         IDraftResponseService responses,
         IAuditLogger audit,
-        ILogger<DraftSharingService> logger)
+        ILogger<DraftSharingService> logger,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
@@ -55,7 +50,17 @@ public class DraftSharingService : IDraftSharingService
         _responses = responses;
         _audit = audit;
         _logger = logger;
+        _localizer = localizer;
     }
+
+    private LocalizedString PermissionMessage => _localizer["Documents.Permission"];
+    private LocalizedString NotFoundMessage => _localizer["Documents.NotFound"];
+    private LocalizedString RevisionNotFoundMessage => _localizer["DraftSharing.RevisionNotFound"];
+    private LocalizedString PolicyDisabledMessage => _localizer["DraftSharing.PolicyDisabled"];
+    private LocalizedString NotShareableStatusMessage => _localizer["DraftSharing.NotShareableStatus"];
+    private LocalizedString NoRecipientsMessage => _localizer["DraftSharing.NoRecipients"];
+    private LocalizedString NotActiveMessage => _localizer["DraftSharing.RevisionNotActive"];
+    private LocalizedString RaceMessage => _localizer["DraftSharing.ShareRace"];
 
     // ---------------------------------------------------------------- Staff: preview + share + withdraw
 
@@ -63,9 +68,9 @@ public class DraftSharingService : IDraftSharingService
     {
         var header = await LoadInstanceHeaderAsync(instanceId, ct);
         if (header == null)
-            return ServiceResult<RecipientPreviewModel>.FailureResult(NotFoundMessage);
+            return ServiceResult<RecipientPreviewModel>.FailureResult(ServiceErrorKind.NotFound, NotFoundMessage);
         if (!await _orgAccess.CanActOnStudentAsync(userId, header.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<RecipientPreviewModel>.FailureResult(PermissionMessage);
+            return ServiceResult<RecipientPreviewModel>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
         var policyEnabled = await GetPolicyEnabledAsync(header.SchoolStudentId, ct);
         var recipients = await LoadRecipientsAsync(header.SchoolStudentId, ct);
@@ -93,22 +98,22 @@ public class DraftSharingService : IDraftSharingService
     {
         var header = await LoadInstanceHeaderAsync(instanceId, ct);
         if (header == null)
-            return ServiceResult<SharedDraftRevisionModel>.FailureResult(NotFoundMessage);
+            return ServiceResult<SharedDraftRevisionModel>.FailureResult(ServiceErrorKind.NotFound, NotFoundMessage);
         if (!await _orgAccess.CanActOnStudentAsync(userId, header.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<SharedDraftRevisionModel>.FailureResult(PermissionMessage);
+            return ServiceResult<SharedDraftRevisionModel>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
         if (header.Status is not (DocumentInstanceStatus.Draft or DocumentInstanceStatus.Finalizing))
-            return ServiceResult<SharedDraftRevisionModel>.FailureResult(NotShareableStatusMessage);
+            return ServiceResult<SharedDraftRevisionModel>.FailureResult(ServiceErrorKind.Validation, NotShareableStatusMessage);
 
         if (!await GetPolicyEnabledAsync(header.SchoolStudentId, ct))
-            return ServiceResult<SharedDraftRevisionModel>.FailureResult(PolicyDisabledMessage);
+            return ServiceResult<SharedDraftRevisionModel>.FailureResult(ServiceErrorKind.Forbidden, PolicyDisabledMessage);
 
         var trimmedMessage = string.IsNullOrWhiteSpace(message) ? null : message.Trim();
         if (trimmedMessage != null && trimmedMessage.Length > MaxMessageLength)
-            return ServiceResult<SharedDraftRevisionModel>.FailureResult($"Message must be {MaxMessageLength} characters or fewer.");
+            return ServiceResult<SharedDraftRevisionModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DraftSharing.MessageTooLong", MaxMessageLength]);
 
         var recipients = await LoadRecipientsAsync(header.SchoolStudentId, ct);
         if (recipients.Count == 0)
-            return ServiceResult<SharedDraftRevisionModel>.FailureResult(NoRecipientsMessage);
+            return ServiceResult<SharedDraftRevisionModel>.FailureResult(ServiceErrorKind.Validation, NoRecipientsMessage);
 
         var sections = await TemplateSectionLoader.LoadAsync(_context, header.DocumentTemplateVersionId, ct);
 
@@ -168,16 +173,16 @@ public class DraftSharingService : IDraftSharingService
             }
         }
 
-        return ServiceResult<SharedDraftRevisionModel>.FailureResult(RaceMessage);
+        return ServiceResult<SharedDraftRevisionModel>.FailureResult(ServiceErrorKind.Validation, RaceMessage);
     }
 
     public async Task<ServiceResult<List<SharedDraftRevisionModel>>> ListForInstanceAsync(int userId, int instanceId, CancellationToken ct = default)
     {
         var header = await LoadInstanceHeaderAsync(instanceId, ct);
         if (header == null)
-            return ServiceResult<List<SharedDraftRevisionModel>>.FailureResult(NotFoundMessage);
+            return ServiceResult<List<SharedDraftRevisionModel>>.FailureResult(ServiceErrorKind.NotFound, NotFoundMessage);
         if (!await _orgAccess.CanActOnStudentAsync(userId, header.SchoolStudentId, AccessRole.Viewer, ct))
-            return ServiceResult<List<SharedDraftRevisionModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<SharedDraftRevisionModel>>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
         var rows = await ProjectRevisionRows(_context.SharedDraftRevisions.AsNoTracking()
                 .Where(r => r.DocumentInstanceId == instanceId)
@@ -191,16 +196,16 @@ public class DraftSharingService : IDraftSharingService
     {
         var header = await LoadInstanceHeaderAsync(instanceId, ct);
         if (header == null)
-            return ServiceResult<SharedDraftRevisionModel>.FailureResult(NotFoundMessage);
+            return ServiceResult<SharedDraftRevisionModel>.FailureResult(ServiceErrorKind.NotFound, NotFoundMessage);
         if (!await _orgAccess.CanActOnStudentAsync(userId, header.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<SharedDraftRevisionModel>.FailureResult(PermissionMessage);
+            return ServiceResult<SharedDraftRevisionModel>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
         var revision = await _context.SharedDraftRevisions
             .FirstOrDefaultAsync(r => r.Id == revisionId && r.DocumentInstanceId == instanceId, ct);
         if (revision == null)
-            return ServiceResult<SharedDraftRevisionModel>.FailureResult(RevisionNotFoundMessage);
+            return ServiceResult<SharedDraftRevisionModel>.FailureResult(ServiceErrorKind.NotFound, RevisionNotFoundMessage);
         if (revision.Status != SharedDraftStatus.Active)
-            return ServiceResult<SharedDraftRevisionModel>.FailureResult(NotActiveMessage);
+            return ServiceResult<SharedDraftRevisionModel>.FailureResult(ServiceErrorKind.Validation, NotActiveMessage);
 
         revision.Status = SharedDraftStatus.Withdrawn;
         revision.WithdrawnAt = DateTime.UtcNow;
@@ -219,9 +224,9 @@ public class DraftSharingService : IDraftSharingService
     {
         var header = await LoadInstanceHeaderAsync(instanceId, ct);
         if (header == null)
-            return ServiceResult<ConvergeModel>.FailureResult(NotFoundMessage);
+            return ServiceResult<ConvergeModel>.FailureResult(ServiceErrorKind.NotFound, NotFoundMessage);
         if (!await _orgAccess.CanActOnStudentAsync(userId, header.SchoolStudentId, AccessRole.Viewer, ct))
-            return ServiceResult<ConvergeModel>.FailureResult(PermissionMessage);
+            return ServiceResult<ConvergeModel>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
         var policyEnabled = await GetPolicyEnabledAsync(header.SchoolStudentId, ct);
         var latestRow = await ProjectRevisionRows(_context.SharedDraftRevisions.AsNoTracking()
@@ -267,7 +272,7 @@ public class DraftSharingService : IDraftSharingService
     public async Task<ServiceResult<List<SharedDraftRevisionModel>>> ListForParentAsync(int parentUserId, int childId, CancellationToken ct = default)
     {
         if (await _accessService.GetRoleAsync(childId, parentUserId, ct) == null)
-            return ServiceResult<List<SharedDraftRevisionModel>>.FailureResult("Child profile not found.");
+            return ServiceResult<List<SharedDraftRevisionModel>>.FailureResult(ServiceErrorKind.NotFound, _localizer["Children.NotFound"]);
 
         var linkedStudentIds = await _context.ChildLinks.AsNoTracking()
             .Where(l => l.ChildProfileId == childId && l.IsActive && l.AcceptedAt != null)
@@ -288,14 +293,14 @@ public class DraftSharingService : IDraftSharingService
     {
         var row = await ProjectRevisionRows(RevisionsById(revisionId)).FirstOrDefaultAsync(ct);
         if (row == null)
-            return ServiceResult<SharedDraftRevisionDetailModel>.FailureResult(RevisionNotFoundMessage);
+            return ServiceResult<SharedDraftRevisionDetailModel>.FailureResult(ServiceErrorKind.NotFound, RevisionNotFoundMessage);
 
         if (await ParentAccessResolver.ResolveChildIdAsync(_context, _accessService, parentUserId, row.SchoolStudentId, AccessRole.Viewer, ct) == null)
-            return ServiceResult<SharedDraftRevisionDetailModel>.FailureResult(PermissionMessage);
+            return ServiceResult<SharedDraftRevisionDetailModel>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
         var tree = await _authoring.GetVersionAsync(row.DocumentTemplateVersionId, ct);
         if (!tree.Success)
-            return ServiceResult<SharedDraftRevisionDetailModel>.FailureResult(tree.Message ?? "The pinned template version could not be loaded.");
+            return ServiceResult<SharedDraftRevisionDetailModel>.FailureResult(tree.Message ?? _localizer["AuthoredDocuments.TemplateVersionLoadFailed"].Value);
 
         // Role-only owners, never names (design "Resolved Questions" #1): the frozen row's raw
         // `_ownerUserId` must never reach a family-facing response.
@@ -313,10 +318,10 @@ public class DraftSharingService : IDraftSharingService
     {
         var row = await ProjectRevisionRows(RevisionsById(revisionId)).FirstOrDefaultAsync(ct);
         if (row == null)
-            return ServiceResult<SharedDraftRevisionModel>.FailureResult(RevisionNotFoundMessage);
+            return ServiceResult<SharedDraftRevisionModel>.FailureResult(ServiceErrorKind.NotFound, RevisionNotFoundMessage);
 
         if (await ParentAccessResolver.ResolveChildIdAsync(_context, _accessService, parentUserId, row.SchoolStudentId, AccessRole.Collaborator, ct) == null)
-            return ServiceResult<SharedDraftRevisionModel>.FailureResult(PermissionMessage);
+            return ServiceResult<SharedDraftRevisionModel>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
         var now = DateTime.UtcNow;
         var existing = await _context.DraftAcknowledgements

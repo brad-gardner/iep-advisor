@@ -1,11 +1,14 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Repositories;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -17,6 +20,7 @@ public class AnalysisRunService : IAnalysisRunService
     private readonly ISubscriptionService _subscriptionService;
     private readonly IParentAdvocacyGoalRepository _goalRepository;
     private readonly IClaudeClient _claudeClient;
+    private readonly IStringLocalizer<Ai> _localizer;
     private readonly ILogger<AnalysisRunService> _logger;
 
     private const string AnalysisOperation = "analysis";
@@ -25,7 +29,6 @@ public class AnalysisRunService : IAnalysisRunService
     // when 2+ complete), so an unbounded source count is an unbounded per-request bill and an
     // unbounded run duration against the stale-run sweep's threshold.
     private const int MaxSourcesPerRun = 5;
-    private const string TooManySourcesMessage = "Choose up to 5 documents for one analysis.";
 
     private static readonly JsonSerializerOptions CamelCaseOptions = new()
     {
@@ -43,6 +46,7 @@ public class AnalysisRunService : IAnalysisRunService
         ISubscriptionService subscriptionService,
         IParentAdvocacyGoalRepository goalRepository,
         IClaudeClient claudeClient,
+        IStringLocalizer<Ai> localizer,
         ILogger<AnalysisRunService> logger)
     {
         _context = context;
@@ -50,6 +54,7 @@ public class AnalysisRunService : IAnalysisRunService
         _subscriptionService = subscriptionService;
         _goalRepository = goalRepository;
         _claudeClient = claudeClient;
+        _localizer = localizer;
         _logger = logger;
     }
 
@@ -61,22 +66,22 @@ public class AnalysisRunService : IAnalysisRunService
     {
         // Validation: at least one source
         if (sources == null || sources.Count < 1)
-            return ServiceResult<AnalysisRunModel>.FailureResult("Select at least one document to analyze.");
+            return ServiceResult<AnalysisRunModel>.FailureResult(ServiceErrorKind.Validation, _localizer["AnalysisRun.SelectAtLeastOneDocument"]);
 
         // Access: caller must be Collaborator+ to create a run
         if (!await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult<AnalysisRunModel>.FailureResult("You do not have permission to run an analysis for this child.");
+            return ServiceResult<AnalysisRunModel>.Forbidden(_localizer["AnalysisRun.NoPermissionToRunAnalysis"]);
 
         var child = await _context.ChildProfiles
             .FirstOrDefaultAsync(c => c.Id == childId && c.IsActive, ct);
         if (child == null)
-            return ServiceResult<AnalysisRunModel>.FailureResult("Child not found.");
+            return ServiceResult<AnalysisRunModel>.NotFound(_localizer["AnalysisRun.ChildNotFound"]);
 
         // Billable user is the child profile owner.
         var ownerUserId = child.UserId;
 
         if (!await _subscriptionService.HasActiveSubscriptionAsync(ownerUserId, ct))
-            return ServiceResult<AnalysisRunModel>.FailureResult("Active subscription required.");
+            return ServiceResult<AnalysisRunModel>.PaymentRequired(_localizer["AnalysisRun.SubscriptionRequired"]);
 
         var warnings = new List<string>();
 
@@ -93,17 +98,17 @@ public class AnalysisRunService : IAnalysisRunService
         }
 
         if (hadDuplicates)
-            warnings.Add("Duplicate documents were selected and have been combined.");
+            warnings.Add(_localizer["AnalysisRun.DuplicateDocumentsCombined"]);
 
         if (dedupedSources.Count > MaxSourcesPerRun)
-            return ServiceResult<AnalysisRunModel>.FailureResult(TooManySourcesMessage);
+            return ServiceResult<AnalysisRunModel>.FailureResult(ServiceErrorKind.Validation, _localizer["AnalysisRun.TooManySources"]);
 
         // Atomic check-and-reserve of one quota unit (reserve on create, release on error).
         // The returned id is stored on the run so refunds are scoped to THIS run's reservation,
         // which is correct under concurrent runs on the same child.
         var reservedUsageId = await _subscriptionService.TryReserveUsageAsync(ownerUserId, childId, AnalysisOperation, AnalysisLimitPerChild, ct);
         if (reservedUsageId == null)
-            return ServiceResult<AnalysisRunModel>.FailureResult("Analysis limit reached for this child.");
+            return ServiceResult<AnalysisRunModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["AnalysisRun.AnalysisLimitReached"]);
 
         // Build snapshots for each source. Reservation is already taken, so on any
         // terminal failure below we must refund it.
@@ -113,7 +118,7 @@ public class AnalysisRunService : IAnalysisRunService
             var snapshot = await BuildSourceSnapshotAsync(childId, sourceRef, ct);
             if (snapshot == null)
             {
-                warnings.Add($"A selected {DescribeSourceType(sourceRef.SourceType)} could not be included (missing or not parsed).");
+                warnings.Add(_localizer["AnalysisRun.SourceCouldNotBeIncluded", DescribeSourceType(sourceRef.SourceType)]);
                 continue;
             }
 
@@ -130,7 +135,7 @@ public class AnalysisRunService : IAnalysisRunService
         {
             // Nothing valid to analyze — refund this run's exact reserved unit.
             await _subscriptionService.ReleaseUsageByIdAsync(reservedUsageId.Value, ct);
-            return ServiceResult<AnalysisRunModel>.FailureResult("None of the selected documents could be analyzed.");
+            return ServiceResult<AnalysisRunModel>.FailureResult(ServiceErrorKind.Validation, _localizer["AnalysisRun.NoDocumentsCouldBeAnalyzed"]);
         }
 
         var run = new AnalysisRun
@@ -138,6 +143,10 @@ public class AnalysisRunService : IAnalysisRunService
             ChildProfileId = childId,
             Status = AnalysisRunStatus.Pending,
             CreatedById = userId,
+            // Captured now — an in-request call, so CurrentUICulture already reflects the requester's
+            // saved preference/Accept-Language — because ExecuteRunAsync runs later in AnalysisRunWorker,
+            // outside any request (multilingual plan 2026-10-06 phase 3).
+            Language = SupportedLanguages.Normalize(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName) ?? SupportedLanguages.English,
             UsageRecordId = reservedUsageId.Value,
             Sources = runSources
         };
@@ -149,13 +158,6 @@ public class AnalysisRunService : IAnalysisRunService
         var message = warnings.Count > 0 ? string.Join(" ", warnings) : null;
         return ServiceResult<AnalysisRunModel>.SuccessResult(model, message);
     }
-
-    // User-safe, run-level messages for the two "all/partial" terminal outcomes that are not a
-    // single Claude failure's own UserMessage (see the completed.Count branches in ExecuteRunAsync).
-    private const string AllSourcesFailedMessage =
-        "The analysis could not be completed for any of the selected documents. Please try again.";
-    private const string SynthesisSkippedMessage =
-        "We couldn't generate a combined summary across these documents, so each document's analysis is shown separately below.";
 
     /// <summary>A source that completed its own Claude call, paired with its parsed response — the
     /// synthesis call's input, and (for a single-source run) the run's own promoted fields.</summary>
@@ -172,6 +174,12 @@ public class AnalysisRunService : IAnalysisRunService
             _logger.LogWarning("AnalysisRun {RunId} not found for execution", runId);
             return;
         }
+
+        // This whole execution runs in AnalysisRunWorker — outside the request that created the run —
+        // so CurrentUICulture has no ambient value of its own; re-apply the language captured at create
+        // time (multilingual plan 2026-10-06 phase 3) for every localized string below, including each
+        // Claude system prompt's response-language line.
+        using var _ = CultureScope.For(run.Language);
 
         run.Status = AnalysisRunStatus.Running;
         // Clear any prior failure state as the run re-enters flight, so a run that ends Completed
@@ -232,9 +240,11 @@ public class AnalysisRunService : IAnalysisRunService
                 {
                     var (systemPrompt, userText) = BuildSourcePrompt(source, hasParentGoals, parentGoals);
 
+                    // CurrentUICulture is run.Language here — the whole method is wrapped in
+                    // CultureScope.For(run.Language) above.
                     var responseText = await _claudeClient.CompleteAsync(new ClaudeCompletionRequest
                     {
-                        SystemPrompt = systemPrompt,
+                        SystemPrompt = systemPrompt + ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture),
                         UserText = userText,
                         MaxTokens = 32000,
                     }, ct);
@@ -398,7 +408,7 @@ public class AnalysisRunService : IAnalysisRunService
                 // Every source failed. Single-source runs surface that source's own specific
                 // UserMessage (preserving the pre-refactor single-call behavior parents already see);
                 // a multi-source all-failure uses a combined message since no one reason dominates.
-                var runMessage = sourceFailureMessages.Count == 1 ? sourceFailureMessages[0] : AllSourcesFailedMessage;
+                var runMessage = sourceFailureMessages.Count == 1 ? sourceFailureMessages[0] : _localizer["AnalysisRun.AllSourcesFailed"].Value;
                 // Refund rule (review pass 2, item 2 — widened from todos/P2-02's original "every
                 // failure was InvalidResponse" carve-out): keep the usage unit (refundQuota: false)
                 // whenever ANY source failed with an unparseable Claude response, not only when EVERY
@@ -491,13 +501,13 @@ public class AnalysisRunService : IAnalysisRunService
             // arm the broad catch below would relabel it "An unexpected error occurred" with a null
             // FailureKind, which is a different lie and leaves the UI nothing to branch on.
             _logger.LogWarning("AnalysisRun {RunId} interrupted by host shutdown", runId);
-            await FailRunAsync(runId, "Analysis was interrupted.", refundQuota: true, ct: CancellationToken.None);
+            await FailRunAsync(runId, _localizer["AnalysisRun.Interrupted"], refundQuota: true, ct: CancellationToken.None);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error executing AnalysisRun {RunId}", runId);
             // CancellationToken.None, not ct: see FailRunAsync's doc comment.
-            await FailRunAsync(runId, "An unexpected error occurred during analysis.", refundQuota: true, ct: CancellationToken.None);
+            await FailRunAsync(runId, _localizer["AnalysisRun.UnexpectedError"], refundQuota: true, ct: CancellationToken.None);
         }
     }
 
@@ -525,9 +535,11 @@ public class AnalysisRunService : IAnalysisRunService
         {
             var (systemPrompt, userText) = BuildSynthesisPrompt(completed, hasParentGoals, parentGoals);
 
+            // CurrentUICulture is run.Language — ExecuteRunAsync (the only caller) wraps its whole body
+            // in CultureScope.For(run.Language) before this runs.
             var responseText = await _claudeClient.CompleteAsync(new ClaudeCompletionRequest
             {
-                SystemPrompt = systemPrompt,
+                SystemPrompt = systemPrompt + ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture),
                 UserText = userText,
                 MaxTokens = 32000,
             }, ct);
@@ -576,7 +588,7 @@ public class AnalysisRunService : IAnalysisRunService
             ? completed.Select(c => c.Response.AdvocacyGapAnalysis).FirstOrDefault(g => g != null)
             : null;
         run.AdvocacyGapAnalysis = firstGap != null ? JsonSerializer.Serialize(firstGap, CamelCaseOptions) : null;
-        run.ErrorMessage = SynthesisSkippedMessage;
+        run.ErrorMessage = _localizer["AnalysisRun.SynthesisSkipped"];
     }
 
     /// <summary>
@@ -623,7 +635,7 @@ public class AnalysisRunService : IAnalysisRunService
     {
         var role = await _accessService.GetRoleAsync(childId, userId, ct);
         if (role == null)
-            return ServiceResult<List<AnalysisRunModel>>.FailureResult("You do not have access to this child.");
+            return ServiceResult<List<AnalysisRunModel>>.Forbidden(_localizer["AnalysisRun.NoAccessToChild"]);
 
         // Projected, not Include(r => r.Sources): the list view never needs SourceContentSnapshot (the
         // full extracted document text) and never needed Sections either — just metadata per run.
@@ -646,6 +658,7 @@ public class AnalysisRunService : IAnalysisRunService
                 ChildProfileId = r.ChildProfileId,
                 Status = r.Status,
                 ErrorMessage = r.ErrorMessage,
+                Language = r.Language,
                 CreatedAt = r.CreatedAt,
                 Sources = r.Sources.Select(s => new AnalysisRunSource
                 {
@@ -687,6 +700,7 @@ public class AnalysisRunService : IAnalysisRunService
                 AdvocacyGapAnalysis = r.AdvocacyGapAnalysis,
                 ParentGoalsSnapshot = r.ParentGoalsSnapshot,
                 ErrorMessage = r.ErrorMessage,
+                Language = r.Language,
                 CreatedAt = r.CreatedAt,
                 Sources = r.Sources.Select(s => new AnalysisRunSource
                 {
@@ -701,11 +715,11 @@ public class AnalysisRunService : IAnalysisRunService
             .FirstOrDefaultAsync(ct);
 
         if (run == null)
-            return ServiceResult<AnalysisRunModel>.FailureResult("Analysis run not found.");
+            return ServiceResult<AnalysisRunModel>.NotFound(_localizer["AnalysisRun.RunNotFound"]);
 
         var role = await _accessService.GetRoleAsync(run.ChildProfileId, userId, ct);
         if (role == null)
-            return ServiceResult<AnalysisRunModel>.FailureResult("Analysis run not found.");
+            return ServiceResult<AnalysisRunModel>.NotFound(_localizer["AnalysisRun.RunNotFound"]);
 
         // Loaded only after the access check passes, in its own query against ALL of this run's
         // sections (unlike GetLatestForSourceAsync, which scopes to just the matched source).
@@ -730,13 +744,13 @@ public class AnalysisRunService : IAnalysisRunService
     {
         var role = await _accessService.GetRoleAsync(childId, userId, ct);
         if (role == null)
-            return ServiceResult<AnalysisRunLatestModel>.FailureResult("Analysis run not found.");
+            return ServiceResult<AnalysisRunLatestModel>.NotFound(_localizer["AnalysisRun.RunNotFound"]);
 
         // sourceId is untrusted client input: verify it actually names a document belonging to THIS
         // child before any run is returned, so a document id from another child's record (or a
         // stranger's) can never be used to read a run across the access boundary.
         if (!await SourceBelongsToChildAsync(childId, sourceType, sourceId, ct))
-            return ServiceResult<AnalysisRunLatestModel>.FailureResult("Analysis run not found.");
+            return ServiceResult<AnalysisRunLatestModel>.NotFound(_localizer["AnalysisRun.RunNotFound"]);
 
         // Run-level fields + every source's METADATA ONLY (never SourceContentSnapshot) — see
         // GetRunAsync's comment for why Include(Sources).Include(Sections) is avoided. Sections are
@@ -758,6 +772,7 @@ public class AnalysisRunService : IAnalysisRunService
                 AdvocacyGapAnalysis = r.AdvocacyGapAnalysis,
                 ParentGoalsSnapshot = r.ParentGoalsSnapshot,
                 ErrorMessage = r.ErrorMessage,
+                Language = r.Language,
                 CreatedAt = r.CreatedAt,
                 Sources = r.Sources.Select(s => new AnalysisRunSource
                 {
@@ -772,7 +787,7 @@ public class AnalysisRunService : IAnalysisRunService
             .FirstOrDefaultAsync(ct);
 
         if (run == null)
-            return ServiceResult<AnalysisRunLatestModel>.FailureResult("No analysis found for this document.");
+            return ServiceResult<AnalysisRunLatestModel>.NotFound(_localizer["AnalysisRun.NoAnalysisForDocument"]);
 
         var matchedSource = run.Sources.First(s => s.SourceType == sourceType && s.SourceId == sourceId);
         var otherSources = run.Sources
@@ -1628,6 +1643,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
         model.AdvocacyGapAnalysis = DeserializeOrNull<AdvocacyGapAnalysisResponse>(run.AdvocacyGapAnalysis);
         model.ParentGoalsSnapshot = DeserializeOrEmpty<List<ParentGoalSnapshot>>(run.ParentGoalsSnapshot);
         model.ErrorMessage = run.ErrorMessage;
+        model.GeneratedLanguage = run.Language;
         model.CreatedAt = run.CreatedAt;
         model.Sources = run.Sources.Select(s => new AnalysisRunSourceModel
         {
@@ -1681,12 +1697,12 @@ Return ONLY valid JSON, no markdown formatting or code fences.");
         return model;
     }
 
-    private static string DescribeSourceType(AnalysisSourceType type) => type switch
+    private string DescribeSourceType(AnalysisSourceType type) => type switch
     {
-        AnalysisSourceType.IepDocument => "IEP document",
-        AnalysisSourceType.EtrDocument => "ETR document",
-        AnalysisSourceType.ProgressReport => "progress report",
-        _ => "document"
+        AnalysisSourceType.IepDocument => _localizer["AnalysisRun.SourceType.Iep"],
+        AnalysisSourceType.EtrDocument => _localizer["AnalysisRun.SourceType.Etr"],
+        AnalysisSourceType.ProgressReport => _localizer["AnalysisRun.SourceType.ProgressReport"],
+        _ => _localizer["AnalysisRun.SourceType.Generic"]
     };
 
     private static string FormatDate(DateTime? date) => date.HasValue ? date.Value.ToString("yyyy-MM-dd") : string.Empty;

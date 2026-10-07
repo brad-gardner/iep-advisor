@@ -21,6 +21,12 @@ public class AdvocateMessage : BaseEntity
     /// <summary>The tool budget or max tool rounds were hit, or the answer ran out of tokens.</summary>
     public bool Truncated { get; set; }
 
+    /// <summary>The language ("en"/"es") this message's answer was generated in (multilingual plan
+    /// 2026-10-06 phase 3, migration AddAiArtifactLanguage) — set from the requester's UI culture when an
+    /// Assistant message is persisted; left null on a User message (the parent's own text, not
+    /// AI-generated) and on any row persisted before this column existed, where null means English.</summary>
+    public string? Language { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public AdvocateThread Thread { get; set; } = null!;

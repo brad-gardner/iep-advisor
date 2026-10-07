@@ -7,11 +7,13 @@ using System.Text.RegularExpressions;
 using System.Threading.Channels;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Data.Configurations;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -24,6 +26,10 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 public class AdvocateService : IAdvocateService
 {
+    /// <summary>English resx value of <c>Advocate.DefaultTitle</c> — kept for the handful of non-DI call
+    /// sites (tests asserting a thread falls back to this exact English title under the default culture).
+    /// The actual stored title always goes through <see cref="_localizer"/> so it follows the creating
+    /// parent's language (multilingual plan 2026-10-06 phase 3).</summary>
     public const string DefaultTitle = "New conversation";
     public const string OperationType = "advocate_message";
     public const int MaxTextLength = AdvocateMessageConfiguration.UserContentMaxLength;
@@ -35,13 +41,6 @@ public class AdvocateService : IAdvocateService
     public const int MaxTokens = 8192;
     public static readonly TimeSpan TurnTimeout = TimeSpan.FromSeconds(120);
 
-    private const string ChildNotFound = "Child profile not found.";
-    private const string ThreadNotFound = "Conversation not found.";
-
-    /// <summary>Viewer-but-not-Collaborator message, shared with the controller so it can map this specific
-    /// failure to 403 (every other <see cref="ServiceResult"/> failure from this class maps to 404/400).</summary>
-    public const string CollaboratorRequired = "You can view this child but cannot ask the advocate about them.";
-
     private static readonly Regex AboutGrammar = new(@"^(iep|etr|goal|analysis|progress_report|journal):(\d{1,9})$", RegexOptions.Compiled);
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -50,15 +49,17 @@ public class AdvocateService : IAdvocateService
     private readonly IKnowledgeBaseService _knowledgeBase;
     private readonly IIepComparisonService _comparison;
     private readonly IClaudeClient _claude;
+    private readonly IStringLocalizer<Ai> _localizer;
     private readonly ILogger<AdvocateService> _logger;
 
-    public AdvocateService(ApplicationDbContext context, IAccessService access, IKnowledgeBaseService knowledgeBase, IIepComparisonService comparison, IClaudeClient claude, ILogger<AdvocateService> logger)
+    public AdvocateService(ApplicationDbContext context, IAccessService access, IKnowledgeBaseService knowledgeBase, IIepComparisonService comparison, IClaudeClient claude, IStringLocalizer<Ai> localizer, ILogger<AdvocateService> logger)
     {
         _context = context;
         _access = access;
         _knowledgeBase = knowledgeBase;
         _comparison = comparison;
         _claude = claude;
+        _localizer = localizer;
         _logger = logger;
     }
 
@@ -67,7 +68,7 @@ public class AdvocateService : IAdvocateService
     public async Task<ServiceResult<List<AdvocateThreadModel>>> ListThreadsAsync(int userId, int childId, CancellationToken ct = default)
     {
         if (!await _access.HasMinimumRoleAsync(childId, userId, AccessRole.Viewer, ct))
-            return ServiceResult<List<AdvocateThreadModel>>.FailureResult(ChildNotFound);
+            return ServiceResult<List<AdvocateThreadModel>>.NotFound(_localizer["Advocate.ChildNotFound"]);
 
         var threads = await _context.AdvocateThreads.AsNoTracking()
             .Where(t => t.ChildProfileId == childId && t.ParentUserId == userId)
@@ -79,7 +80,7 @@ public class AdvocateService : IAdvocateService
     public async Task<ServiceResult<AdvocateChildContextModel>> GetChildContextAsync(int userId, int childId, CancellationToken ct = default)
     {
         if (!await _access.HasMinimumRoleAsync(childId, userId, AccessRole.Viewer, ct))
-            return ServiceResult<AdvocateChildContextModel>.FailureResult(ChildNotFound);
+            return ServiceResult<AdvocateChildContextModel>.NotFound(_localizer["Advocate.ChildNotFound"]);
 
         var stateCode = await ChildStateResolver.ResolveAsync(_context, childId, ct);
         return ServiceResult<AdvocateChildContextModel>.SuccessResult(new AdvocateChildContextModel { StateCode = stateCode });
@@ -91,19 +92,20 @@ public class AdvocateService : IAdvocateService
         {
             // Same role-gap distinction as SendMessage: a Viewer can see the child but not ask the
             // advocate about them (403); no access at all stays a 404 "not found", never a reveal.
-            return ServiceResult<AdvocateThreadModel>.FailureResult(
-                await _access.HasMinimumRoleAsync(childId, userId, AccessRole.Viewer, ct) ? CollaboratorRequired : ChildNotFound);
+            return await _access.HasMinimumRoleAsync(childId, userId, AccessRole.Viewer, ct)
+                ? ServiceResult<AdvocateThreadModel>.Forbidden(_localizer["Advocate.CollaboratorRequired"])
+                : ServiceResult<AdvocateThreadModel>.NotFound(_localizer["Advocate.ChildNotFound"]);
         }
 
         var (cleanTitle, error) = NormalizeTitle(title, allowEmpty: true);
-        if (error != null) return ServiceResult<AdvocateThreadModel>.FailureResult(error);
+        if (error != null) return ServiceResult<AdvocateThreadModel>.FailureResult(ServiceErrorKind.Validation, error);
 
         var now = DateTime.UtcNow;
         var thread = new AdvocateThread
         {
             ChildProfileId = childId,
             ParentUserId = userId,
-            Title = cleanTitle ?? DefaultTitle,
+            Title = cleanTitle ?? _localizer["Advocate.DefaultTitle"].Value,
             CreatedAt = now,
             UpdatedAt = now,
             LastMessageAt = now
@@ -117,7 +119,7 @@ public class AdvocateService : IAdvocateService
     {
         var thread = await LoadOwnedThreadAsync(userId, threadId, AccessRole.Viewer, track: false, ct);
         if (thread == null)
-            return ServiceResult<AdvocateThreadDetailModel>.FailureResult(ThreadNotFound);
+            return ServiceResult<AdvocateThreadDetailModel>.NotFound(_localizer["Advocate.ThreadNotFound"]);
 
         var messages = await _context.AdvocateMessages.AsNoTracking()
             .Where(m => m.AdvocateThreadId == threadId)
@@ -140,10 +142,10 @@ public class AdvocateService : IAdvocateService
     public async Task<ServiceResult> RenameThreadAsync(int userId, int threadId, string title, CancellationToken ct = default)
     {
         var (cleanTitle, error) = NormalizeTitle(title, allowEmpty: false);
-        if (error != null) return ServiceResult.FailureResult(error);
+        if (error != null) return ServiceResult.FailureResult(ServiceErrorKind.Validation, error);
 
         var thread = await LoadOwnedThreadAsync(userId, threadId, AccessRole.Viewer, track: true, ct);
-        if (thread == null) return ServiceResult.FailureResult(ThreadNotFound);
+        if (thread == null) return ServiceResult.NotFound(_localizer["Advocate.ThreadNotFound"]);
 
         thread.Title = cleanTitle!;
         thread.UpdatedAt = DateTime.UtcNow;
@@ -154,7 +156,7 @@ public class AdvocateService : IAdvocateService
     public async Task<ServiceResult> DeleteThreadAsync(int userId, int threadId, CancellationToken ct = default)
     {
         var thread = await LoadOwnedThreadAsync(userId, threadId, AccessRole.Viewer, track: true, ct);
-        if (thread == null) return ServiceResult.FailureResult(ThreadNotFound);
+        if (thread == null) return ServiceResult.NotFound(_localizer["Advocate.ThreadNotFound"]);
 
         // Explicit so the delete never leans on the provider honouring the cascade.
         _context.AdvocateMessages.RemoveRange(_context.AdvocateMessages.Where(m => m.AdvocateThreadId == threadId));
@@ -171,7 +173,7 @@ public class AdvocateService : IAdvocateService
             .Where(u => u.Id == userId)
             .Select(u => new { u.SubscriptionStatus, u.SubscriptionExpiresAt })
             .FirstOrDefaultAsync(ct);
-        if (user == null) return ServiceResult<AdvocateUsageModel>.FailureResult("User not found.");
+        if (user == null) return ServiceResult<AdvocateUsageModel>.NotFound(_localizer["Advocate.UserNotFound"]);
 
         var usage = await CountUsageAsync(userId, user.SubscriptionStatus, user.SubscriptionExpiresAt, ct);
         return ServiceResult<AdvocateUsageModel>.SuccessResult(usage);
@@ -222,28 +224,34 @@ public class AdvocateService : IAdvocateService
         }
     }
 
-    private sealed record PreparedTurn(AdvocateThread Thread, ClaudeToolRequest Request, AdvocateToolset Toolset, int UsageRecordId);
+    /// <summary>
+    /// <paramref name="Language"/> is the requester's normalized UI culture ("en"/"es", never null) at the
+    /// moment this turn was prepared — persisted onto the assistant's <see cref="AdvocateMessage"/> row
+    /// (multilingual plan 2026-10-06 phase 3) so a later reader in a different language sees a "Generated
+    /// in …" notice rather than a silently mismatched answer.
+    /// </summary>
+    private sealed record PreparedTurn(AdvocateThread Thread, ClaudeToolRequest Request, AdvocateToolset Toolset, int UsageRecordId, string Language);
 
     private async Task<(PreparedTurn? Turn, AdvocateStreamEvent? Error)> PrepareTurnAsync(int userId, int threadId, string text, string? about, CancellationToken ct)
     {
         var question = (text ?? string.Empty).Trim();
         if (question.Length == 0)
-            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.Validation, "Message is required."));
+            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.Validation, _localizer["Advocate.MessageRequired"]));
         if (question.Length > MaxTextLength)
-            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.Validation, $"Message must be {MaxTextLength} characters or fewer."));
+            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.Validation, _localizer["Advocate.MessageTooLong", MaxTextLength]));
 
         var aboutSentence = RenderAbout(about);
         if (about != null && aboutSentence == null)
-            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.Validation, "about is not a recognised record reference."));
+            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.Validation, _localizer["Advocate.AboutNotRecognized"]));
 
         var thread = await _context.AdvocateThreads.FirstOrDefaultAsync(t => t.Id == threadId, ct);
         if (thread == null || thread.ParentUserId != userId)
-            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.NotFound, ThreadNotFound));
+            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.NotFound, _localizer["Advocate.ThreadNotFound"]));
         if (!await _access.HasMinimumRoleAsync(thread.ChildProfileId, userId, AccessRole.Collaborator, ct))
         {
             return (null, await _access.HasMinimumRoleAsync(thread.ChildProfileId, userId, AccessRole.Viewer, ct)
-                ? AdvocateStreamEvent.Error(AdvocateErrorCodes.Forbidden, CollaboratorRequired)
-                : AdvocateStreamEvent.Error(AdvocateErrorCodes.NotFound, ThreadNotFound));
+                ? AdvocateStreamEvent.Error(AdvocateErrorCodes.Forbidden, _localizer["Advocate.CollaboratorRequired"])
+                : AdvocateStreamEvent.Error(AdvocateErrorCodes.NotFound, _localizer["Advocate.ThreadNotFound"]));
         }
 
         var user = await _context.Users.AsNoTracking()
@@ -251,14 +259,14 @@ public class AdvocateService : IAdvocateService
             .Select(u => new { u.SubscriptionStatus, u.SubscriptionExpiresAt, u.State })
             .FirstOrDefaultAsync(ct);
         if (user == null)
-            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.NotFound, ThreadNotFound));
+            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.NotFound, _localizer["Advocate.ThreadNotFound"]));
 
         var child = await _context.ChildProfiles.AsNoTracking()
             .Where(c => c.Id == thread.ChildProfileId)
             .Select(c => new { c.FirstName, c.GradeLevel })
             .FirstOrDefaultAsync(ct);
         if (child == null)
-            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.NotFound, ThreadNotFound));
+            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.NotFound, _localizer["Advocate.ThreadNotFound"]));
 
         var stateCode = await ChildStateResolver.ResolveAsync(_context, thread.ChildProfileId, ct);
 
@@ -289,11 +297,11 @@ public class AdvocateService : IAdvocateService
             {
                 _logger.LogError(ex, "Advocate usage reservation deadlocked again for thread {ThreadId}; giving up", threadId);
                 DetachAddedEntries();
-                return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.Unavailable, AdvocatePrompts.UnavailableMessage));
+                return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.Unavailable, _localizer["Advocate.UnavailableMessage"]));
             }
         }
         if (reservation == null)
-            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.UsageCap, AdvocatePrompts.UsageCapMessage));
+            return (null, AdvocateStreamEvent.Error(AdvocateErrorCodes.UsageCap, _localizer["Advocate.UsageCapMessage"]));
 
         var (usageRecordId, history) = reservation.Value;
 
@@ -309,14 +317,17 @@ public class AdvocateService : IAdvocateService
         history.Add(new ClaudeTurn("user", context.ToString()));
 
         var toolset = new AdvocateToolset(_context, _access, _knowledgeBase, _comparison, thread.ChildProfileId, userId, stateCode, _logger);
+        // In-request call: RequestLocalization has already set CurrentUICulture from the signed-in
+        // parent's saved preference or Accept-Language by the time this controller action runs.
+        var language = SupportedLanguages.Normalize(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
         var request = new ClaudeToolRequest
         {
-            SystemPrompt = AdvocatePrompts.System,
+            SystemPrompt = AdvocatePrompts.System + ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture),
             Messages = history,
             Tools = toolset.Definitions,
             MaxTokens = MaxTokens
         };
-        return (new PreparedTurn(thread, request, toolset, usageRecordId), null);
+        return (new PreparedTurn(thread, request, toolset, usageRecordId, language), null);
     }
 
     /// <summary>
@@ -384,6 +395,12 @@ public class AdvocateService : IAdvocateService
         // call even before any text follows, so aborting right after a tool frame must not refund it. A
         // completed turn (even truncated) always keeps the reservation regardless of `hadOutput` — that is
         // the normal, billable case.
+        //
+        // This producer runs concurrently with (not awaited inline by) SendMessageAsync's consumer loop —
+        // pinning turn.Language explicitly here (rather than trusting the ambient CurrentUICulture to
+        // still be the request's by the time a tool-activity label is localized, possibly long after any
+        // thread hop during streaming) is what CultureScope exists for.
+        using var _ = CultureScope.For(turn.Language);
         var hadOutput = false;
         try
         {
@@ -401,10 +418,10 @@ public class AdvocateService : IAdvocateService
                         break;
                     case ClaudeStreamEventKind.ToolStarted:
                         hadOutput = true;
-                        await writer.WriteAsync(AdvocateStreamEvent.Tool(evt.ToolName ?? string.Empty, AdvocatePrompts.ToolLabel(evt.ToolName ?? string.Empty, evt.ToolInput), "started"), turnCt);
+                        await writer.WriteAsync(AdvocateStreamEvent.Tool(evt.ToolName ?? string.Empty, AdvocatePrompts.ToolLabel(_localizer, evt.ToolName ?? string.Empty, evt.ToolInput), "started"), turnCt);
                         break;
                     case ClaudeStreamEventKind.ToolFinished:
-                        await writer.WriteAsync(AdvocateStreamEvent.Tool(evt.ToolName ?? string.Empty, AdvocatePrompts.ToolLabel(evt.ToolName ?? string.Empty, evt.ToolInput), evt.ToolIsError ? "failed" : "finished"), turnCt);
+                        await writer.WriteAsync(AdvocateStreamEvent.Tool(evt.ToolName ?? string.Empty, AdvocatePrompts.ToolLabel(_localizer, evt.ToolName ?? string.Empty, evt.ToolInput), evt.ToolIsError ? "failed" : "finished"), turnCt);
                         break;
                     case ClaudeStreamEventKind.Completed:
                         completed = evt;
@@ -416,7 +433,7 @@ public class AdvocateService : IAdvocateService
             {
                 _logger.LogWarning("Advocate turn on thread {ThreadId}: Claude returned no content.", turn.Thread.Id);
                 if (!hadOutput) await ReleaseUsageReservationAsync(turn.UsageRecordId);
-                await writer.WriteAsync(AdvocateStreamEvent.Error(AdvocateErrorCodes.Unavailable, AdvocatePrompts.UnavailableMessage), turnCt);
+                await writer.WriteAsync(AdvocateStreamEvent.Error(AdvocateErrorCodes.Unavailable, _localizer["Advocate.UnavailableMessage"]), turnCt);
                 return;
             }
 
@@ -427,7 +444,7 @@ public class AdvocateService : IAdvocateService
         {
             _logger.LogError(ex, "Advocate turn on thread {ThreadId} failed with {Kind}", turn.Thread.Id, ex.Kind);
             if (!hadOutput) await ReleaseUsageReservationAsync(turn.UsageRecordId);
-            await TryWriteErrorAsync(writer, AdvocatePrompts.UnavailableMessage);
+            await TryWriteErrorAsync(writer, _localizer["Advocate.UnavailableMessage"]);
         }
         catch (OperationCanceledException) when (!callerCt.IsCancellationRequested)
         {
@@ -447,7 +464,7 @@ public class AdvocateService : IAdvocateService
             // released, even though nothing could be persisted.
             _logger.LogError(ex, "Advocate turn on thread {ThreadId} failed unexpectedly", turn.Thread.Id);
             if (!hadOutput) await ReleaseUsageReservationAsync(turn.UsageRecordId);
-            await TryWriteErrorAsync(writer, AdvocatePrompts.UnavailableMessage);
+            await TryWriteErrorAsync(writer, _localizer["Advocate.UnavailableMessage"]);
         }
         finally
         {
@@ -522,6 +539,9 @@ public class AdvocateService : IAdvocateService
             InputTokens = completed.InputTokens,
             OutputTokens = completed.OutputTokens,
             Truncated = truncated,
+            // The requester's language when this turn was prepared (multilingual plan 2026-10-06 phase 3)
+            // — never null for an Assistant row created through this path.
+            Language = turn.Language,
             CreatedAt = now
         };
         // Usage was already reserved up front in PrepareTurnAsync (todos/173) — a completed turn simply
@@ -531,7 +551,7 @@ public class AdvocateService : IAdvocateService
         turn.Thread.UpdatedAt = now;
         await _context.SaveChangesAsync(ct);
 
-        return AdvocateStreamEvent.Done(message.Id, markdown, parsed.Citations, parsed.Suggestions, truncated, AdvocatePrompts.Disclaimer);
+        return AdvocateStreamEvent.Done(message.Id, markdown, parsed.Citations, parsed.Suggestions, truncated, _localizer["Advocate.Disclaimer"], turn.Language);
     }
 
     /// <summary>
@@ -605,11 +625,11 @@ public class AdvocateService : IAdvocateService
         return thread;
     }
 
-    private static (string? Title, string? Error) NormalizeTitle(string? title, bool allowEmpty)
+    private (string? Title, string? Error) NormalizeTitle(string? title, bool allowEmpty)
     {
         var clean = (title ?? string.Empty).Trim();
-        if (clean.Length == 0) return allowEmpty ? (null, null) : (null, "Title is required.");
-        if (clean.Length > MaxTitleLength) return (null, $"Title must be {MaxTitleLength} characters or fewer.");
+        if (clean.Length == 0) return allowEmpty ? (null, null) : (null, _localizer["Advocate.TitleRequired"].Value);
+        if (clean.Length > MaxTitleLength) return (null, _localizer["Advocate.TitleTooLong", MaxTitleLength].Value);
         return (PromptText.OneLine(clean), null);
     }
 
@@ -631,6 +651,7 @@ public class AdvocateService : IAdvocateService
         Citations = ParseJson<AdvocateCitation>(m.CitationsJson),
         Suggestions = ParseJson<AdvocateSuggestion>(m.SuggestionsJson),
         Truncated = m.Truncated,
+        GeneratedLanguage = m.Language,
         CreatedAt = m.CreatedAt
     };
 

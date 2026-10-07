@@ -117,6 +117,9 @@ public class DraftExplanationItemDto
 
 public class DraftExplanationDto
 {
+    /// <summary>Language the AI generated this in ("en"/"es"); null = English (pre-i18n rows).</summary>
+    public string? GeneratedLanguage { get; set; }
+
     public int RevisionId { get; set; }
     public DateTime GeneratedAt { get; set; }
     public List<DraftExplanationSectionDto> Sections { get; set; } = new();
@@ -147,6 +150,9 @@ public class DraftCitationDto
 
 public class DraftAnswerDto
 {
+    /// <summary>Language the AI generated this in ("en"/"es"); null = English (pre-i18n rows).</summary>
+    public string? GeneratedLanguage { get; set; }
+
     public int NoteId { get; set; }
     public string Question { get; set; } = string.Empty;
     public string Answer { get; set; } = string.Empty;
@@ -158,6 +164,9 @@ public class DraftAnswerDto
 /// <summary>PRIVATE to the asking parent — never exposed to any staff route.</summary>
 public class ParentDraftNoteDto
 {
+    /// <summary>Language the AI generated this in ("en"/"es"); null = English (pre-i18n rows).</summary>
+    public string? GeneratedLanguage { get; set; }
+
     public int Id { get; set; }
     public int RevisionId { get; set; }
     public string Question { get; set; } = string.Empty;

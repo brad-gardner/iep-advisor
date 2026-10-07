@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
@@ -13,6 +14,7 @@ public class EtrDocumentService : IEtrDocumentService
     private readonly IAccessService _accessService;
     private readonly IBlobStorageService _blobStorage;
     private readonly ApplicationDbContext _context;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     private static readonly HashSet<string> ValidEvaluationTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -28,12 +30,14 @@ public class EtrDocumentService : IEtrDocumentService
         IEtrDocumentRepository documentRepository,
         IAccessService accessService,
         IBlobStorageService blobStorage,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        IStringLocalizer<Messages> localizer)
     {
         _documentRepository = documentRepository;
         _accessService = accessService;
         _blobStorage = blobStorage;
         _context = context;
+        _localizer = localizer;
     }
 
     public async Task<IEnumerable<EtrDocumentModel>> GetByChildIdAsync(int childProfileId, int userId, CancellationToken cancellationToken = default)
@@ -68,13 +72,13 @@ public class EtrDocumentService : IEtrDocumentService
     public async Task<ServiceResult<EtrDocumentModel>> CreateAsync(int childProfileId, int userId, CreateEtrDocumentModel model, CancellationToken cancellationToken = default)
     {
         if (!await _accessService.HasMinimumRoleAsync(childProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult<EtrDocumentModel>.FailureResult("Child profile not found.");
+            return ServiceResult<EtrDocumentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Children.NotFound"]);
 
         if (string.IsNullOrWhiteSpace(model.EvaluationType) || !ValidEvaluationTypes.Contains(model.EvaluationType))
-            return ServiceResult<EtrDocumentModel>.FailureResult("Invalid evaluation type. Must be: initial, reevaluation, transfer, or other.");
+            return ServiceResult<EtrDocumentModel>.FailureResult(ServiceErrorKind.Validation, _localizer["EtrDocuments.InvalidEvaluationTypeDetailed"]);
 
         if (string.IsNullOrWhiteSpace(model.DocumentState) || !ValidDocumentStates.Contains(model.DocumentState))
-            return ServiceResult<EtrDocumentModel>.FailureResult("Invalid document state. Must be: draft or final.");
+            return ServiceResult<EtrDocumentModel>.FailureResult(ServiceErrorKind.Validation, _localizer["EtrDocuments.InvalidDocumentStateDetailed"]);
 
         var entity = new EtrDocument
         {
@@ -91,17 +95,17 @@ public class EtrDocumentService : IEtrDocumentService
         await _documentRepository.AddAsync(entity, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult<EtrDocumentModel>.SuccessResult(MapToModel(entity), "ETR created successfully.");
+        return ServiceResult<EtrDocumentModel>.SuccessResult(MapToModel(entity), _localizer["EtrDocuments.CreatedSuccessfully"]);
     }
 
     public async Task<ServiceResult> UpdateMetadataAsync(int id, int userId, UpdateEtrMetadataModel model, CancellationToken cancellationToken = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
         if (document == null)
-            return ServiceResult.FailureResult("Document not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult.FailureResult("Document not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (model.EvaluationDate.HasValue)
             document.EvaluationDate = model.EvaluationDate.Value;
@@ -109,14 +113,14 @@ public class EtrDocumentService : IEtrDocumentService
         if (model.EvaluationType != null)
         {
             if (!ValidEvaluationTypes.Contains(model.EvaluationType))
-                return ServiceResult.FailureResult("Invalid evaluation type.");
+                return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["EtrDocuments.InvalidEvaluationType"]);
             document.EvaluationType = model.EvaluationType.ToLowerInvariant();
         }
 
         if (model.DocumentState != null)
         {
             if (!ValidDocumentStates.Contains(model.DocumentState))
-                return ServiceResult.FailureResult("Invalid document state.");
+                return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["EtrDocuments.InvalidDocumentState"]);
             document.DocumentState = model.DocumentState.ToLowerInvariant();
         }
 
@@ -127,20 +131,20 @@ public class EtrDocumentService : IEtrDocumentService
         _documentRepository.Update(document);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult("Metadata updated successfully.");
+        return ServiceResult.SuccessResult(_localizer["Documents.MetadataUpdatedSuccessfully"]);
     }
 
     public async Task<ServiceResult<EtrDocumentModel>> AttachFileAsync(int id, int userId, string fileName, Stream fileStream, long fileSize, CancellationToken cancellationToken = default)
     {
         var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
         if (document == null)
-            return ServiceResult<EtrDocumentModel>.FailureResult("Document not found.");
+            return ServiceResult<EtrDocumentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return ServiceResult<EtrDocumentModel>.FailureResult("Document not found.");
+            return ServiceResult<EtrDocumentModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (document.Status == "processing")
-            return ServiceResult<EtrDocumentModel>.FailureResult("Cannot replace file while document is being processed. Please wait for processing to complete.");
+            return ServiceResult<EtrDocumentModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["Documents.ProcessingInProgress"]);
 
         if (!string.IsNullOrEmpty(document.BlobUri))
         {
@@ -160,7 +164,7 @@ public class EtrDocumentService : IEtrDocumentService
         _documentRepository.Update(document);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult<EtrDocumentModel>.SuccessResult(MapToModel(document), "File attached successfully.");
+        return ServiceResult<EtrDocumentModel>.SuccessResult(MapToModel(document), _localizer["Documents.FileAttachedSuccessfully"]);
     }
 
     public async Task<string?> GetDownloadUrlAsync(int id, int userId, CancellationToken cancellationToken = default)
@@ -183,10 +187,10 @@ public class EtrDocumentService : IEtrDocumentService
     {
         var document = await _documentRepository.GetByIdWithChildAsync(id, cancellationToken);
         if (document == null)
-            return ServiceResult.FailureResult("Document not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Owner, cancellationToken))
-            return ServiceResult.FailureResult("Document not found.");
+            return ServiceResult.FailureResult(ServiceErrorKind.NotFound, _localizer["Documents.NotFound"]);
 
         if (!string.IsNullOrEmpty(document.BlobUri))
         {
@@ -198,7 +202,7 @@ public class EtrDocumentService : IEtrDocumentService
         _documentRepository.Update(document);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult.SuccessResult("Document deleted successfully.");
+        return ServiceResult.SuccessResult(_localizer["Documents.DeletedSuccessfully"]);
     }
 
     private static EtrDocumentListItemModel MapToListItemModel(EtrDocument entity) => new()

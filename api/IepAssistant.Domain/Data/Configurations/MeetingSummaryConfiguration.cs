@@ -12,6 +12,7 @@ public class MeetingSummaryConfiguration : IEntityTypeConfiguration<MeetingSumma
 
         builder.Property(s => s.Body).HasMaxLength(8000).IsRequired();
         builder.Property(s => s.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(s => s.Language).HasMaxLength(10);
 
         builder.HasOne(s => s.Meeting)
             .WithMany()

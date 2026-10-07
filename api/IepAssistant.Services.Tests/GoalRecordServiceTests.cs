@@ -1,12 +1,16 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Interfaces;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -41,7 +45,7 @@ public sealed class GoalRecordServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private GoalRecordService CreateGoalService(ApplicationDbContext ctx)
-        => new(ctx, new OrgAccessService(ctx), new AccessService(ctx), NullLogger<GoalRecordService>.Instance);
+        => new(ctx, new OrgAccessService(ctx), new AccessService(ctx), NullLogger<GoalRecordService>.Instance, TestSupport.TestLocalizers.Messages());
 
     private AuthoredDocumentVersionService CreateAuthoredService(ApplicationDbContext ctx)
         => new(
@@ -52,7 +56,8 @@ public sealed class GoalRecordServiceTests : IDisposable
             new NoopBlobStorageFake(),
             _audit,
             CreateGoalService(ctx),
-            NullLogger<AuthoredDocumentVersionService>.Instance);
+            NullLogger<AuthoredDocumentVersionService>.Instance,
+            TestSupport.TestLocalizers.Messages());
 
     private sealed class NoopBlobStorageFake : IBlobStorageService
     {
@@ -474,6 +479,67 @@ public sealed class GoalRecordServiceTests : IDisposable
         Assert.True(result.Success, result.Message);
         Assert.Equal(GoalRecordStatus.NotMet, result.Data!.Status);
         Assert.Equal("Progress stalled; team will revise the approach.", result.Data.StatusReason);
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 3: GetForChildAsync is the only parent-reachable path in GoalRecordService (the rest are
+    // staff/org-access methods, Phase 5); its permission failure now carries ServiceErrorKind.Forbidden
+    // explicitly, so Spanish wording never changes the controller's 403 routing — see
+    // IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure.
+
+    private int SeedChildWithNoAccessForUser(out int strangerUserId)
+    {
+        using var ctx = CreateContext();
+        var owner = new User { Email = "goalrecords-owner@example.com", PasswordHash = "x", FirstName = "Owen", LastName = "Owner", Role = UserRole.Parent };
+        var stranger = new User { Email = "goalrecords-stranger@example.com", PasswordHash = "x", FirstName = "Sam", LastName = "Stranger", Role = UserRole.Parent };
+        ctx.Users.AddRange(owner, stranger);
+        ctx.SaveChanges();
+
+        var child = new ChildProfile { UserId = owner.Id, FirstName = "Kid", IsActive = true };
+        ctx.ChildProfiles.Add(child);
+        ctx.SaveChanges();
+
+        ctx.ChildAccesses.Add(new ChildAccess { ChildProfileId = child.Id, UserId = owner.Id, Role = AccessRole.Owner, IsActive = true, AcceptedAt = DateTime.UtcNow });
+        ctx.SaveChanges();
+
+        strangerUserId = stranger.Id;
+        return child.Id;
+    }
+
+    [Fact]
+    public async Task GetForChild_ByStranger_UnderEnglishCulture_MessageIsEnglish()
+    {
+        var childId = SeedChildWithNoAccessForUser(out var strangerId);
+
+        using var _ = CultureScope.For("en");
+        using var ctx = CreateContext();
+        var result = await CreateGoalService(ctx).GetForChildAsync(strangerId, childId);
+
+        Assert.False(result.Success);
+        Assert.Equal("You do not have permission to access this student's goals.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+    }
+
+    [Fact]
+    public async Task GetForChild_ByStranger_UnderSpanishCulture_MessageIsSpanish_AndMapsTo403ViaErrorKind()
+    {
+        var childId = SeedChildWithNoAccessForUser(out var strangerId);
+
+        using var _ = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateGoalService(ctx).GetForChildAsync(strangerId, childId);
+
+        Assert.False(result.Success);
+        Assert.Equal("No tiene permiso para acceder a las metas de este estudiante.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    private sealed class TestController : ControllerBase
+    {
     }
 
     public void Dispose() => _connection.Dispose();

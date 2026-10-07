@@ -35,7 +35,12 @@ public sealed class MeetingSummaryServiceTests : IDisposable
     internal sealed class FakeClaudeClient : IClaudeClient
     {
         public string? CannedResponse { get; set; } = "The team met and discussed Jordan's reading goal.";
-        public Task<string?> CompleteAsync(ClaudeCompletionRequest request, CancellationToken cancellationToken = default) => Task.FromResult(CannedResponse);
+        public ClaudeCompletionRequest? LastRequest { get; private set; }
+        public Task<string?> CompleteAsync(ClaudeCompletionRequest request, CancellationToken cancellationToken = default)
+        {
+            LastRequest = request;
+            return Task.FromResult(CannedResponse);
+        }
     }
 
     internal sealed class FakeNotifications : INotificationService
@@ -57,7 +62,7 @@ public sealed class MeetingSummaryServiceTests : IDisposable
     private (MeetingSummaryService Service, FakeNotifications Notifications) CreateService(ApplicationDbContext ctx)
     {
         var notifications = new FakeNotifications();
-        return (new MeetingSummaryService(ctx, new OrgAccessService(ctx), _claude, notifications, _audit, NullLogger<MeetingSummaryService>.Instance), notifications);
+        return (new MeetingSummaryService(ctx, new OrgAccessService(ctx), _claude, notifications, _audit, TestSupport.TestLocalizers.Ai(), NullLogger<MeetingSummaryService>.Instance), notifications);
     }
 
     private sealed record Scenario(int MeetingId, int DistrictId, int ChildId, int TeacherId, int ParentId, int StudentId);
@@ -214,6 +219,59 @@ public sealed class MeetingSummaryServiceTests : IDisposable
             Assert.True(familyRead.Success, familyRead.Message);
             Assert.Equal(MeetingSummaryStatus.Sent, familyRead.Data!.Status);
         }
+    }
+
+    // ------------------------------------------------------------------ multilingual plan phase 3
+
+    [Fact]
+    public async Task Draft_UnderSpanishCulture_AppendsResponseLanguageLine_AndPersistsSpanish()
+    {
+        var s = Seed("lang-es", MeetingStatus.Held);
+        using var ctx = CreateContext();
+        var (service, _) = CreateService(ctx);
+
+        ServiceResult<FamilyMeetingSummaryModel> result;
+        using (IepAssistant.Services.Localization.CultureScope.For("es"))
+            result = await service.DraftAsync(s.TeacherId, s.MeetingId, default);
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal("es", result.Data!.GeneratedLanguage);
+        Assert.Contains("Spanish", _claude.LastRequest!.SystemPrompt);
+
+        var entity = ctx.MeetingSummaries.Single(m => m.MeetingId == s.MeetingId);
+        Assert.Equal("es", entity.Language);
+    }
+
+    [Fact]
+    public async Task Draft_UnderEnglishCulture_CapturesEnglish_NeverAppendsResponseLanguageLine()
+    {
+        var s = Seed("lang-en", MeetingStatus.Held);
+        using var ctx = CreateContext();
+        var (service, _) = CreateService(ctx);
+
+        var result = await service.DraftAsync(s.TeacherId, s.MeetingId, default);
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal("en", result.Data!.GeneratedLanguage);
+        Assert.DoesNotContain("RESPONSE LANGUAGE", _claude.LastRequest!.SystemPrompt, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Draft_NotHeld_UnderSpanishCulture_MessageIsSpanish_ErrorKindIsValidation()
+    {
+        var s = Seed("lang-notheld", MeetingStatus.Scheduled);
+        using var ctx = CreateContext();
+        var (service, _) = CreateService(ctx);
+
+        ServiceResult<FamilyMeetingSummaryModel> result;
+        using (IepAssistant.Services.Localization.CultureScope.For("es"))
+            result = await service.DraftAsync(s.TeacherId, s.MeetingId, default);
+
+        Assert.False(result.Success);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+        Assert.Equal(
+            "Esta reunión debe estar en estado Realizada o Continuada antes de poder crear un resumen para la familia.",
+            result.Message);
     }
 
     public void Dispose() => _connection.Dispose();

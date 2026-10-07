@@ -1,8 +1,11 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -16,10 +19,6 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 public class StudentWorkspaceService : IStudentWorkspaceService
 {
-    private const string PermissionMessage = "You do not have permission to access this workspace.";
-    private const string EntryNotFoundMessage = "Workspace entry not found.";
-    private const string UnavailableMessage = "AI interview is temporarily unavailable.";
-
     // The model comes from Anthropic:Model — no call site names one.
     private const int InterviewMaxTokens = 1024;
 
@@ -27,6 +26,7 @@ public class StudentWorkspaceService : IStudentWorkspaceService
     private readonly IAccessService _accessService;
     private readonly IOrgAccessService _orgAccess;
     private readonly IClaudeClient _claude;
+    private readonly IStringLocalizer<Ai> _localizer;
     private readonly ILogger<StudentWorkspaceService> _logger;
 
     public StudentWorkspaceService(
@@ -34,12 +34,14 @@ public class StudentWorkspaceService : IStudentWorkspaceService
         IAccessService accessService,
         IOrgAccessService orgAccess,
         IClaudeClient claude,
+        IStringLocalizer<Ai> localizer,
         ILogger<StudentWorkspaceService> logger)
     {
         _context = context;
         _accessService = accessService;
         _orgAccess = orgAccess;
         _claude = claude;
+        _localizer = localizer;
         _logger = logger;
     }
 
@@ -49,7 +51,7 @@ public class StudentWorkspaceService : IStudentWorkspaceService
     {
         var resolve = await ResolveOrCreateWorkspaceAsync(studentUserId, ct);
         if (!resolve.Success)
-            return ServiceResult<StudentWorkspaceModel>.FailureResult(resolve.Message!);
+            return ServiceResult<StudentWorkspaceModel>.FailureResult(resolve.ErrorKind, resolve.Message!);
 
         var workspaceId = resolve.Data;
 
@@ -74,11 +76,11 @@ public class StudentWorkspaceService : IStudentWorkspaceService
     public async Task<ServiceResult<StudentWorkspaceEntryModel>> AddEntryAsync(int studentUserId, StudentEntryKind kind, string content, bool isShareable, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(content))
-            return ServiceResult<StudentWorkspaceEntryModel>.FailureResult("Entry content is required.");
+            return ServiceResult<StudentWorkspaceEntryModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StudentWorkspace.ContentRequired"]);
 
         var resolve = await ResolveOrCreateWorkspaceAsync(studentUserId, ct);
         if (!resolve.Success)
-            return ServiceResult<StudentWorkspaceEntryModel>.FailureResult(resolve.Message!);
+            return ServiceResult<StudentWorkspaceEntryModel>.FailureResult(resolve.ErrorKind, resolve.Message!);
 
         var workspaceId = resolve.Data;
 
@@ -109,11 +111,11 @@ public class StudentWorkspaceService : IStudentWorkspaceService
     public async Task<ServiceResult<StudentWorkspaceEntryModel>> UpdateEntryAsync(int studentUserId, int entryId, string content, bool isShareable, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(content))
-            return ServiceResult<StudentWorkspaceEntryModel>.FailureResult("Entry content is required.");
+            return ServiceResult<StudentWorkspaceEntryModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StudentWorkspace.ContentRequired"]);
 
         var resolve = await ResolveOrCreateWorkspaceAsync(studentUserId, ct);
         if (!resolve.Success)
-            return ServiceResult<StudentWorkspaceEntryModel>.FailureResult(resolve.Message!);
+            return ServiceResult<StudentWorkspaceEntryModel>.FailureResult(resolve.ErrorKind, resolve.Message!);
 
         var workspaceId = resolve.Data;
 
@@ -121,7 +123,7 @@ public class StudentWorkspaceService : IStudentWorkspaceService
         var entry = await _context.StudentWorkspaceEntries
             .FirstOrDefaultAsync(e => e.Id == entryId && e.StudentWorkspaceId == workspaceId, ct);
         if (entry == null)
-            return ServiceResult<StudentWorkspaceEntryModel>.FailureResult(EntryNotFoundMessage);
+            return ServiceResult<StudentWorkspaceEntryModel>.NotFound(_localizer["StudentWorkspace.EntryNotFound"]);
 
         entry.Content = content;
         entry.IsShareable = isShareable;
@@ -138,14 +140,14 @@ public class StudentWorkspaceService : IStudentWorkspaceService
     {
         var resolve = await ResolveOrCreateWorkspaceAsync(studentUserId, ct);
         if (!resolve.Success)
-            return ServiceResult.FailureResult(resolve.Message!);
+            return ServiceResult.FailureResult(resolve.ErrorKind, resolve.Message!);
 
         var workspaceId = resolve.Data;
 
         var entry = await _context.StudentWorkspaceEntries
             .FirstOrDefaultAsync(e => e.Id == entryId && e.StudentWorkspaceId == workspaceId, ct);
         if (entry == null)
-            return ServiceResult.FailureResult(EntryNotFoundMessage);
+            return ServiceResult.NotFound(_localizer["StudentWorkspace.EntryNotFound"]);
 
         _context.StudentWorkspaceEntries.Remove(entry);
         await _context.SaveChangesAsync(ct);
@@ -160,7 +162,7 @@ public class StudentWorkspaceService : IStudentWorkspaceService
         // SchoolId-bound educator access guard (mirrors ChildLinkService.GetEducatorStudentAccessAsync).
         var hasAccess = await EducatorHasStudentAccessAsync(educatorUserId, schoolStudentId, ct);
         if (!hasAccess)
-            return ServiceResult<List<StudentWorkspaceEntryModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<StudentWorkspaceEntryModel>>.Forbidden(_localizer["StudentWorkspace.PermissionDenied"]);
 
         // Resolve the student account linked to this SchoolStudent; if none, no entries.
         var studentUserId = await _context.StudentProfiles
@@ -179,7 +181,7 @@ public class StudentWorkspaceService : IStudentWorkspaceService
         // Parent must have AccessService access (Viewer+) to the child.
         var hasAccess = await _accessService.HasMinimumRoleAsync(childProfileId, parentUserId, AccessRole.Viewer, ct);
         if (!hasAccess)
-            return ServiceResult<List<StudentWorkspaceEntryModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<StudentWorkspaceEntryModel>>.Forbidden(_localizer["StudentWorkspace.PermissionDenied"]);
 
         var studentUserId = await _context.StudentProfiles
             .AsNoTracking()
@@ -195,19 +197,22 @@ public class StudentWorkspaceService : IStudentWorkspaceService
     public async Task<ServiceResult<StudentInterviewSuggestionModel>> InterviewSuggestAsync(int studentUserId, string prompt, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(prompt))
-            return ServiceResult<StudentInterviewSuggestionModel>.FailureResult("A prompt is required.");
+            return ServiceResult<StudentInterviewSuggestionModel>.FailureResult(ServiceErrorKind.Validation, _localizer["StudentWorkspace.PromptRequired"]);
 
         // Caller must be a student (has a StudentProfile). No workspace mutation here — suggestion only.
         var isStudent = await _context.StudentProfiles.AnyAsync(p => p.UserId == studentUserId, ct);
         if (!isStudent)
-            return ServiceResult<StudentInterviewSuggestionModel>.FailureResult(PermissionMessage);
+            return ServiceResult<StudentInterviewSuggestionModel>.Forbidden(_localizer["StudentWorkspace.PermissionDenied"]);
 
         string? suggestion;
         try
         {
+            // Not persisted, so there is no artifact Language column here — the suggestion is only ever
+            // shown back to the SAME viewer who just asked for it, in whatever culture is already
+            // ambient (multilingual plan 2026-10-06 phase 3).
             suggestion = await _claude.CompleteAsync(new ClaudeCompletionRequest
             {
-                SystemPrompt = InterviewSystemPrompt,
+                SystemPrompt = InterviewSystemPrompt + ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture),
                 UserText = BuildInterviewUserText(prompt),
                 MaxTokens = InterviewMaxTokens
             }, ct);
@@ -217,13 +222,13 @@ public class StudentWorkspaceService : IStudentWorkspaceService
             // The student's typed prompt is not persisted here, so a failure must return a clean
             // message rather than a 500 — the client keeps the input and the student can retry.
             _logger.LogError(ex, "Student interview for user {UserId} failed with {Kind}", studentUserId, ex.Kind);
-            return ServiceResult<StudentInterviewSuggestionModel>.FailureResult(UnavailableMessage);
+            return ServiceResult<StudentInterviewSuggestionModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["StudentWorkspace.UnavailableMessage"]);
         }
 
         if (string.IsNullOrWhiteSpace(suggestion))
         {
             _logger.LogWarning("Student interview: Claude returned no content for user {UserId}.", studentUserId);
-            return ServiceResult<StudentInterviewSuggestionModel>.FailureResult(UnavailableMessage);
+            return ServiceResult<StudentInterviewSuggestionModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["StudentWorkspace.UnavailableMessage"]);
         }
 
         // Suggestion only — NOT auto-saved. The student saves it via AddEntry (AiInterviewAnswer/MeetingStatement).
@@ -254,7 +259,7 @@ public class StudentWorkspaceService : IStudentWorkspaceService
     {
         var isStudent = await _context.StudentProfiles.AnyAsync(p => p.UserId == studentUserId, ct);
         if (!isStudent)
-            return ServiceResult<int>.FailureResult(PermissionMessage);
+            return ServiceResult<int>.Forbidden(_localizer["StudentWorkspace.PermissionDenied"]);
 
         var workspaceId = await _context.StudentWorkspaces
             .Where(w => w.UserId == studentUserId)

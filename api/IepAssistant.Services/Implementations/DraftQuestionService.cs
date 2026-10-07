@@ -1,10 +1,13 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -18,10 +21,6 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 public class DraftQuestionService : IDraftQuestionService
 {
-    private const string NotFoundMessage = "Shared draft revision not found.";
-    private const string PermissionMessage = "You do not have permission to access this revision.";
-    private const string NoteNotFoundMessage = "Note not found.";
-    private const string UnavailableMessage = "This question could not be answered right now. Please try again.";
     private const int MaxQuestionLength = 1000;
     private const int MaxTargetRowIdLength = 64; // matches the ParentDraftNotes.TargetRowId column
     private const int MaxTokens = 2048;
@@ -32,34 +31,36 @@ public class DraftQuestionService : IDraftQuestionService
     private readonly ApplicationDbContext _context;
     private readonly IAccessService _accessService;
     private readonly IClaudeClient _claude;
+    private readonly IStringLocalizer<Ai> _localizer;
     private readonly ILogger<DraftQuestionService> _logger;
 
-    public DraftQuestionService(ApplicationDbContext context, IAccessService accessService, IClaudeClient claude, ILogger<DraftQuestionService> logger)
+    public DraftQuestionService(ApplicationDbContext context, IAccessService accessService, IClaudeClient claude, IStringLocalizer<Ai> localizer, ILogger<DraftQuestionService> logger)
     {
         _context = context;
         _accessService = accessService;
         _claude = claude;
+        _localizer = localizer;
         _logger = logger;
     }
 
     public async Task<ServiceResult<DraftAnswerModel>> AskAsync(int parentUserId, int revisionId, AskDraftQuestionModel model, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(model.Question))
-            return ServiceResult<DraftAnswerModel>.FailureResult("Question is required.");
+            return ServiceResult<DraftAnswerModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DraftQuestion.QuestionRequired"]);
         var question = model.Question.Trim();
         if (question.Length > MaxQuestionLength)
-            return ServiceResult<DraftAnswerModel>.FailureResult($"Question must be {MaxQuestionLength} characters or fewer.");
+            return ServiceResult<DraftAnswerModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DraftQuestion.QuestionTooLong", MaxQuestionLength]);
         if (model.TargetRowId is { Length: > MaxTargetRowIdLength })
-            return ServiceResult<DraftAnswerModel>.FailureResult($"Target row id must be {MaxTargetRowIdLength} characters or fewer.");
+            return ServiceResult<DraftAnswerModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DraftQuestion.TargetRowIdTooLong", MaxTargetRowIdLength]);
 
         var header = await LoadHeaderAsync(revisionId, ct);
         if (header == null)
-            return ServiceResult<DraftAnswerModel>.FailureResult(NotFoundMessage);
+            return ServiceResult<DraftAnswerModel>.NotFound(_localizer["DraftQuestion.RevisionNotFound"]);
 
         // Asking (and the note it creates) is a write action — Collaborator+.
         var childId = await ParentAccessResolver.ResolveChildIdAsync(_context, _accessService, parentUserId, header.SchoolStudentId, AccessRole.Collaborator, ct);
         if (childId == null)
-            return ServiceResult<DraftAnswerModel>.FailureResult(PermissionMessage);
+            return ServiceResult<DraftAnswerModel>.Forbidden(_localizer["DraftQuestion.PermissionDenied"]);
 
         var sections = await TemplateSectionLoader.LoadAsync(_context, header.DocumentTemplateVersionId, ct);
         var rendered = DraftPromptBuilder.RenderDraft(sections, ValueDocumentJson.Parse(header.ValuesJson), DraftCharBudget);
@@ -84,12 +85,16 @@ public class DraftQuestionService : IDraftQuestionService
             userText.AppendLine($"The parent is asking specifically about <target>{target.Id}</target>.");
         userText.AppendLine($"Parent's question: <question>{DraftPromptBuilder.Data(question)}</question>");
 
+        // In-request call: RequestLocalization has already set CurrentUICulture from the asking
+        // parent's saved preference/Accept-Language.
+        var language = SupportedLanguages.Normalize(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName) ?? SupportedLanguages.English;
+
         string? reply;
         try
         {
             reply = await _claude.CompleteAsync(new ClaudeCompletionRequest
             {
-                SystemPrompt = DraftPrompts.Question,
+                SystemPrompt = DraftPrompts.Question + ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture),
                 UserText = userText.ToString(),
                 MaxTokens = MaxTokens
             }, ct);
@@ -97,13 +102,13 @@ public class DraftQuestionService : IDraftQuestionService
         catch (ClaudeApiException ex)
         {
             _logger.LogError(ex, "Draft question for revision {RevisionId} failed with {Kind}", revisionId, ex.Kind);
-            return ServiceResult<DraftAnswerModel>.FailureResult(UnavailableMessage);
+            return ServiceResult<DraftAnswerModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["DraftQuestion.UnavailableMessage"]);
         }
 
         if (string.IsNullOrWhiteSpace(reply))
         {
             _logger.LogWarning("Draft question: Claude returned no content for revision {RevisionId}.", revisionId);
-            return ServiceResult<DraftAnswerModel>.FailureResult(UnavailableMessage);
+            return ServiceResult<DraftAnswerModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["DraftQuestion.UnavailableMessage"]);
         }
 
         var (answer, citations) = ParseAnswer(reply, rendered);
@@ -118,6 +123,7 @@ public class DraftQuestionService : IDraftQuestionService
             TargetFieldKey = model.TargetFieldKey,
             TargetRowId = model.TargetRowId,
             CitationsJson = citations.Count == 0 ? null : JsonSerializer.Serialize(citations, CitationJson),
+            Language = language,
             CreatedById = parentUserId,
             UpdatedById = parentUserId
         };
@@ -141,7 +147,8 @@ public class DraftQuestionService : IDraftQuestionService
             Answer = answer,
             Citations = citations,
             AnsweredAt = now,
-            Disclaimer = DraftPrompts.Disclaimer
+            Disclaimer = _localizer["Draft.Disclaimer"],
+            GeneratedLanguage = language
         });
     }
 
@@ -149,15 +156,15 @@ public class DraftQuestionService : IDraftQuestionService
     {
         var header = await LoadHeaderAsync(revisionId, ct);
         if (header == null)
-            return ServiceResult<List<ParentDraftNoteModel>>.FailureResult(NotFoundMessage);
+            return ServiceResult<List<ParentDraftNoteModel>>.NotFound(_localizer["DraftQuestion.RevisionNotFound"]);
         if (await ParentAccessResolver.ResolveChildIdAsync(_context, _accessService, parentUserId, header.SchoolStudentId, AccessRole.Viewer, ct) == null)
-            return ServiceResult<List<ParentDraftNoteModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<ParentDraftNoteModel>>.Forbidden(_localizer["DraftQuestion.PermissionDenied"]);
 
         var notes = await _context.ParentDraftNotes.AsNoTracking()
             // Scoped strictly to (revision, THIS asking parent) — never another family member's notes, never staff.
             .Where(n => n.SharedDraftRevisionId == revisionId && n.ParentUserId == parentUserId)
             .OrderByDescending(n => n.CreatedAt)
-            .Select(n => new { n.Id, n.SharedDraftRevisionId, n.Question, n.Answer, n.TargetFieldKey, n.TargetRowId, n.CitationsJson, n.CreatedAt })
+            .Select(n => new { n.Id, n.SharedDraftRevisionId, n.Question, n.Answer, n.TargetFieldKey, n.TargetRowId, n.CitationsJson, n.Language, n.CreatedAt })
             .ToListAsync(ct);
 
         return ServiceResult<List<ParentDraftNoteModel>>.SuccessResult(notes.Select(n => new ParentDraftNoteModel
@@ -169,6 +176,7 @@ public class DraftQuestionService : IDraftQuestionService
             TargetFieldKey = n.TargetFieldKey,
             TargetRowId = n.TargetRowId,
             Citations = ParseCitations(n.CitationsJson),
+            GeneratedLanguage = n.Language,
             CreatedAt = n.CreatedAt
         }).ToList());
     }
@@ -177,7 +185,7 @@ public class DraftQuestionService : IDraftQuestionService
     {
         var note = await _context.ParentDraftNotes.FirstOrDefaultAsync(n => n.Id == noteId && n.ParentUserId == parentUserId, ct);
         if (note == null)
-            return ServiceResult.FailureResult(NoteNotFoundMessage);
+            return ServiceResult.NotFound(_localizer["DraftQuestion.NoteNotFound"]);
 
         _context.ParentDraftNotes.Remove(note);
         await _context.SaveChangesAsync(ct);

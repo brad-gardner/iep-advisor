@@ -32,7 +32,7 @@ public sealed class MeetingBriefServiceTests : IDisposable
         ctx,
         new OrgAccessService(ctx),
         claude ?? new FakeClaudeClient(),
-        new DraftResponseService(ctx, new AccessService(ctx), new OrgAccessService(ctx), new NotificationService(ctx, TestSupport.TestLocalizers.Messages()), NullLogger<DraftResponseService>.Instance),
+        new DraftResponseService(ctx, new AccessService(ctx), new OrgAccessService(ctx), new NotificationService(ctx, TestSupport.TestLocalizers.Messages()), NullLogger<DraftResponseService>.Instance, TestSupport.TestLocalizers.Messages()),
         NullLogger<MeetingBriefService>.Instance);
 
     private static string Cfg<T>(T config) => JsonSerializer.Serialize(config, TemplateFieldConfigValidator.JsonOptions);

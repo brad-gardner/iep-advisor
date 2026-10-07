@@ -49,7 +49,7 @@ public class AnalysisRunController : ControllerBase
         var result = await _analysisRunService.CreateRunAsync(childId, userId, sources, cancellationToken);
 
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
 
         var run = result.Data!;
         await _queue.EnqueueAsync(run.Id, cancellationToken);
@@ -67,7 +67,7 @@ public class AnalysisRunController : ControllerBase
         var result = await _analysisRunService.GetRunsAsync(childId, userId, cancellationToken);
 
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result);
 
         var dtos = result.Data!.Select(MapToDto);
         return Ok(ApiResponse<IEnumerable<AnalysisRunDto>>.SuccessResponse(dtos));
@@ -91,7 +91,7 @@ public class AnalysisRunController : ControllerBase
         var result = await _analysisRunService.GetLatestForSourceAsync(childId, parsedType, sourceId, userId, cancellationToken);
 
         if (!result.Success)
-            return NotFound(ApiResponse<object>.Error(result.Message ?? "No analysis found for this document"));
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<AnalysisRunLatestDto>.SuccessResponse(MapToLatestDto(result.Data!)));
     }
@@ -105,22 +105,9 @@ public class AnalysisRunController : ControllerBase
         var result = await _analysisRunService.GetRunAsync(runId, userId, cancellationToken);
 
         if (!result.Success)
-            return NotFound(ApiResponse<object>.Error(result.Message ?? "Analysis run not found"));
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<AnalysisRunDto>.SuccessResponse(MapToDto(result.Data!)));
-    }
-
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("subscription", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(402, ApiResponse<object>.Error(message));
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
     }
 
     private static AnalysisRunDto MapToDto(AnalysisRunModel model)
@@ -157,6 +144,7 @@ public class AnalysisRunController : ControllerBase
         dto.AdvocacyGapAnalysis = model.AdvocacyGapAnalysis;
         dto.ParentGoalsSnapshot = model.ParentGoalsSnapshot;
         dto.ErrorMessage = model.ErrorMessage;
+        dto.GeneratedLanguage = model.GeneratedLanguage;
         dto.CreatedAt = model.CreatedAt;
         dto.Sources = model.Sources.Select(s => new AnalysisRunSourceDto
         {

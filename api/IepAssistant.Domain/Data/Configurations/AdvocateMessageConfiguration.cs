@@ -14,6 +14,7 @@ public class AdvocateMessageConfiguration : IEntityTypeConfiguration<AdvocateMes
         builder.HasKey(m => m.Id);
         builder.Property(m => m.Role).HasConversion<string>().HasMaxLength(16).IsRequired();
         builder.Property(m => m.ContentMarkdown).HasMaxLength(AssistantContentMaxLength).IsRequired();
+        builder.Property(m => m.Language).HasMaxLength(10);
 
         builder.HasIndex(m => new { m.AdvocateThreadId, m.CreatedAt });
     }

@@ -35,6 +35,8 @@ public static class ServiceFailureMapperExtensions
                 return controller.Conflict(ApiResponse<object>.Error(message));
             case ServiceErrorKind.Unavailable:
                 return controller.StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse<object>.Error(message));
+            case ServiceErrorKind.PaymentRequired:
+                return controller.StatusCode(StatusCodes.Status402PaymentRequired, ApiResponse<object>.Error(message));
             case ServiceErrorKind.Validation:
                 return controller.BadRequest(ApiResponse<object>.Error(message));
             case ServiceErrorKind.None:

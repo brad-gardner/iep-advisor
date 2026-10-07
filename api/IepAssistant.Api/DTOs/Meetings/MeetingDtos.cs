@@ -209,6 +209,9 @@ public class FamilyMeetingSummaryRecipientDto
 
 public class FamilyMeetingSummaryDto
 {
+    /// <summary>Language the AI generated this in ("en"/"es"); null = English (pre-i18n rows).</summary>
+    public string? GeneratedLanguage { get; set; }
+
     public int Id { get; set; }
     public int MeetingId { get; set; }
     public MeetingSummaryStatus Status { get; set; }

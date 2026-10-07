@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Drafts;
 using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -21,11 +23,13 @@ public class DraftSharingController : ControllerBase
 {
     private readonly IDraftSharingService _sharing;
     private readonly IDraftResponseService _responses;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public DraftSharingController(IDraftSharingService sharing, IDraftResponseService responses)
+    public DraftSharingController(IDraftSharingService sharing, IDraftResponseService responses, IStringLocalizer<Messages> localizer)
     {
         _sharing = sharing;
         _responses = responses;
+        _localizer = localizer;
     }
 
     [HttpGet("api/documents/{id:int}/share/preview")]
@@ -35,7 +39,7 @@ public class DraftSharingController : ControllerBase
     public async Task<IActionResult> PreviewRecipients(int id, CancellationToken ct)
     {
         var result = await _sharing.PreviewRecipientsAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return MapFailure<object>(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<RecipientPreviewDto>.SuccessResponse(DraftSharingMappers.MapPreview(result.Data!)));
     }
 
@@ -46,10 +50,10 @@ public class DraftSharingController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Share(int id, [FromBody] ShareDraftRequest? request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _sharing.ShareAsync(User.GetUserId(), id, request?.Message, ct);
-        if (!result.Success) return MapFailure<object>(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var dto = DraftSharingMappers.MapRevision(result.Data!);
         return CreatedAtAction(nameof(ListShares), new { id }, ApiResponse<SharedDraftRevisionDto>.SuccessResponse(dto));
@@ -61,7 +65,7 @@ public class DraftSharingController : ControllerBase
     public async Task<IActionResult> ListShares(int id, CancellationToken ct)
     {
         var result = await _sharing.ListForInstanceAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return MapFailure<object>(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<List<SharedDraftRevisionDto>>.SuccessResponse(result.Data!.Select(DraftSharingMappers.MapRevision).ToList()));
     }
 
@@ -73,7 +77,7 @@ public class DraftSharingController : ControllerBase
     public async Task<IActionResult> Withdraw(int id, int rev, CancellationToken ct)
     {
         var result = await _sharing.WithdrawAsync(User.GetUserId(), id, rev, ct);
-        if (!result.Success) return MapFailure<object>(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<SharedDraftRevisionDto>.SuccessResponse(DraftSharingMappers.MapRevision(result.Data!)));
     }
 
@@ -83,7 +87,7 @@ public class DraftSharingController : ControllerBase
     public async Task<IActionResult> Converge(int id, CancellationToken ct)
     {
         var result = await _sharing.GetConvergeAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return MapFailure<object>(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<ConvergeDto>.SuccessResponse(DraftSharingMappers.MapConverge(result.Data!)));
     }
 
@@ -97,12 +101,12 @@ public class DraftSharingController : ControllerBase
         if (!string.IsNullOrWhiteSpace(status) && !string.Equals(status, "All", StringComparison.OrdinalIgnoreCase))
         {
             if (!Enum.TryParse<DraftResponseStatus>(status, ignoreCase: true, out var parsed))
-                return BadRequest(ApiResponse<object>.Error("Invalid status filter."));
+                return BadRequest(ApiResponse<object>.Error(_localizer["DraftSharingApi.InvalidStatusFilter"]));
             parsedStatus = parsed;
         }
 
         var result = await _responses.GetForInstanceAsync(User.GetUserId(), id, parsedStatus, ct);
-        if (!result.Success) return MapFailure<object>(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<List<DraftResponseDto>>.SuccessResponse(result.Data!.Select(DraftSharingMappers.MapResponse).ToList()));
     }
 
@@ -113,28 +117,15 @@ public class DraftSharingController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Resolve(int id, [FromBody] ResolveResponseRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _responses.ResolveAsync(User.GetUserId(), id, new ResolveDraftResponseModel
         {
             StaffReply = request.StaffReply,
             ResolvedInDraft = request.ResolvedInDraft
         }, ct);
-        if (!result.Success) return MapFailure<object>(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<DraftResponseDto>.SuccessResponse(DraftSharingMappers.MapResponse(result.Data!)));
     }
 
-    private IActionResult MapFailure<T>(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("disabled for this district", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

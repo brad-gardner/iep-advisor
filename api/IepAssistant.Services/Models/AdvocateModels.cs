@@ -26,6 +26,12 @@ public class AdvocateMessageModel
     public List<AdvocateCitation> Citations { get; set; } = new();
     public List<AdvocateSuggestion> Suggestions { get; set; } = new();
     public bool Truncated { get; set; }
+
+    /// <summary>"en" | "es" | null — the language this message's answer was generated in (multilingual
+    /// plan 2026-10-06 phase 3). Null for a User-role message (the parent's own text) and for any row
+    /// persisted before the Language column existed, where it means English.</summary>
+    public string? GeneratedLanguage { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }
 
@@ -136,6 +142,10 @@ public sealed class AdvocateStreamEvent
     public bool Truncated { get; init; }
     public string? Disclaimer { get; init; }
 
+    /// <summary>"en" | "es" — the language this answer was generated in (multilingual plan 2026-10-06
+    /// phase 3). Never null for a Done event (the requester's own UI culture is always known in-request).</summary>
+    public string? GeneratedLanguage { get; init; }
+
     public static AdvocateStreamEvent Delta(string text) => new() { Kind = AdvocateStreamEventKind.Delta, Text = text };
 
     public static AdvocateStreamEvent Tool(string name, string label, string status) =>
@@ -144,7 +154,7 @@ public sealed class AdvocateStreamEvent
     public static AdvocateStreamEvent Error(string code, string message) =>
         new() { Kind = AdvocateStreamEventKind.Error, Code = code, Message = message };
 
-    public static AdvocateStreamEvent Done(int messageId, string contentMarkdown, List<AdvocateCitation> citations, List<AdvocateSuggestion> suggestions, bool truncated, string disclaimer) =>
+    public static AdvocateStreamEvent Done(int messageId, string contentMarkdown, List<AdvocateCitation> citations, List<AdvocateSuggestion> suggestions, bool truncated, string disclaimer, string generatedLanguage) =>
         new()
         {
             Kind = AdvocateStreamEventKind.Done,
@@ -153,6 +163,7 @@ public sealed class AdvocateStreamEvent
             Citations = citations,
             Suggestions = suggestions,
             Truncated = truncated,
-            Disclaimer = disclaimer
+            Disclaimer = disclaimer,
+            GeneratedLanguage = generatedLanguage
         };
 }

@@ -159,6 +159,12 @@ public class AnalysisRunModel
     public List<AnalysisRunSourceModel> Sources { get; set; } = [];
     public List<AnalysisRunSectionModel> Sections { get; set; } = [];
     public string? ErrorMessage { get; set; }
+
+    /// <summary>"en" | "es" | null — the language this run was generated in (multilingual plan
+    /// 2026-10-06 phase 3); null means English, including every run created before this was tracked and
+    /// the legacy-analysis backfill.</summary>
+    public string? GeneratedLanguage { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }
 

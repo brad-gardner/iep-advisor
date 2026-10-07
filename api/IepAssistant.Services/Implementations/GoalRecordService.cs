@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -23,14 +24,17 @@ public class GoalRecordService : IGoalRecordService
     private readonly IOrgAccessService _orgAccess;
     private readonly IAccessService _accessService;
     private readonly ILogger<GoalRecordService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public GoalRecordService(
-        ApplicationDbContext context, IOrgAccessService orgAccess, IAccessService accessService, ILogger<GoalRecordService> logger)
+        ApplicationDbContext context, IOrgAccessService orgAccess, IAccessService accessService,
+        ILogger<GoalRecordService> logger, IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
         _accessService = accessService;
         _logger = logger;
+        _localizer = localizer;
     }
 
     // ---------------------------------------------------------------- Finalize projection
@@ -178,8 +182,11 @@ public class GoalRecordService : IGoalRecordService
 
     public async Task<ServiceResult<List<GoalRecordModel>>> GetForChildAsync(int userId, int childId, CancellationToken ct = default)
     {
+        // Multilingual plan Phase 3: this is the only parent-reachable path in GoalRecordService (the
+        // others are staff/org-access methods, Phase 5) — localized directly rather than through the
+        // shared English-only PermissionMessage const used by those unconverted methods.
         if (!await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Viewer, ct))
-            return ServiceResult<List<GoalRecordModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<GoalRecordModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["GoalRecords.Permission"]);
 
         var linkedStudentIds = await _context.ChildLinks.AsNoTracking()
             .Where(l => l.ChildProfileId == childId && l.IsActive && l.AcceptedAt != null)

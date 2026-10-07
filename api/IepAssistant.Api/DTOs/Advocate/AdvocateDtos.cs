@@ -28,6 +28,8 @@ public class AdvocateMessageDto
     public List<AdvocateCitationDto> Citations { get; set; } = new();
     public List<AdvocateSuggestionDto> Suggestions { get; set; } = new();
     public bool Truncated { get; set; }
+    /// <summary>"en" | "es" | null — null for a User message, or a row from before this was tracked.</summary>
+    public string? GeneratedLanguage { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
@@ -119,6 +121,8 @@ public class AdvocateDoneFrame
     public List<AdvocateSuggestionDto> Suggestions { get; set; } = new();
     public bool Truncated { get; set; }
     public string Disclaimer { get; set; } = string.Empty;
+    /// <summary>"en" | "es" — the language this answer was generated in.</summary>
+    public string GeneratedLanguage { get; set; } = string.Empty;
 }
 
 public class AdvocateErrorFrame

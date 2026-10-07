@@ -4,6 +4,7 @@ using System.Linq.Expressions;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -29,15 +30,6 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
 {
-    private const string PermissionMessage = "You do not have permission to access this document.";
-    private const string VersionPermissionMessage = "You do not have permission to access this document version.";
-    private const string InstanceNotFoundMessage = "Document not found.";
-    private const string VersionNotFoundMessage = "Document version not found.";
-    private const string AlreadyFinalizingMessage = "This document is already being finalized.";
-    private const string NotDraftMessage = "This document cannot be finalized in its current state.";
-    private const string RaceMessage = "Another version of this document was finalized at the same time. Please try again.";
-    private const string ValidationSummaryMessage = "This document has missing or invalid required fields and cannot be finalized.";
-
     private readonly ApplicationDbContext _context;
     private readonly IOrgAccessService _orgAccess;
     private readonly IAccessService _accessService;
@@ -46,6 +38,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
     private readonly IAuditLogger _audit;
     private readonly IGoalRecordService _goalRecords;
     private readonly ILogger<AuthoredDocumentVersionService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public AuthoredDocumentVersionService(
         ApplicationDbContext context,
@@ -55,7 +48,8 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         IBlobStorageService blob,
         IAuditLogger audit,
         IGoalRecordService goalRecords,
-        ILogger<AuthoredDocumentVersionService> logger)
+        ILogger<AuthoredDocumentVersionService> logger,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
@@ -65,7 +59,17 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         _audit = audit;
         _goalRecords = goalRecords;
         _logger = logger;
+        _localizer = localizer;
     }
+
+    private LocalizedString PermissionMessage => _localizer["Documents.Permission"];
+    private LocalizedString VersionPermissionMessage => _localizer["AuthoredDocuments.VersionPermission"];
+    private LocalizedString InstanceNotFoundMessage => _localizer["Documents.NotFound"];
+    private LocalizedString VersionNotFoundMessage => _localizer["AuthoredDocuments.VersionNotFound"];
+    private LocalizedString AlreadyFinalizingMessage => _localizer["AuthoredDocuments.AlreadyFinalizing"];
+    private LocalizedString NotDraftMessage => _localizer["AuthoredDocuments.NotDraft"];
+    private LocalizedString RaceMessage => _localizer["AuthoredDocuments.FinalizeRace"];
+    private LocalizedString ValidationSummaryMessage => _localizer["AuthoredDocuments.ValidationSummary"];
 
     // ---------------------------------------------------------------- Finalize
 
@@ -75,10 +79,10 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         // 1. Collaborator+ access on the instance's student.
         var header = await LoadInstanceHeaderAsync(instanceId, ct);
         if (header == null)
-            return ServiceResult<AuthoredDocumentVersionSummaryModel>.FailureResult(InstanceNotFoundMessage);
+            return ServiceResult<AuthoredDocumentVersionSummaryModel>.FailureResult(ServiceErrorKind.NotFound, InstanceNotFoundMessage);
 
         if (!await _orgAccess.CanActOnStudentAsync(actingUserId, header.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<AuthoredDocumentVersionSummaryModel>.FailureResult(PermissionMessage);
+            return ServiceResult<AuthoredDocumentVersionSummaryModel>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
         AuthoredDocumentVersionSummaryModel summary;
 
@@ -95,19 +99,19 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             if (instance == null)
             {
                 await transaction.RollbackAsync(ct);
-                return ServiceResult<AuthoredDocumentVersionSummaryModel>.FailureResult(InstanceNotFoundMessage);
+                return ServiceResult<AuthoredDocumentVersionSummaryModel>.FailureResult(ServiceErrorKind.NotFound, InstanceNotFoundMessage);
             }
 
             if (instance.Status == DocumentInstanceStatus.Finalizing)
             {
                 await transaction.RollbackAsync(ct);
-                return ServiceResult<AuthoredDocumentVersionSummaryModel>.FailureResult(AlreadyFinalizingMessage);
+                return ServiceResult<AuthoredDocumentVersionSummaryModel>.FailureResult(ServiceErrorKind.Conflict, AlreadyFinalizingMessage);
             }
 
             if (instance.Status != DocumentInstanceStatus.Draft)
             {
                 await transaction.RollbackAsync(ct);
-                return ServiceResult<AuthoredDocumentVersionSummaryModel>.FailureResult(NotDraftMessage);
+                return ServiceResult<AuthoredDocumentVersionSummaryModel>.FailureResult(ServiceErrorKind.Conflict, NotDraftMessage);
             }
 
             // 4. Load the pinned template version tree and VALIDATE the value-document against it.
@@ -116,7 +120,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             {
                 await transaction.RollbackAsync(ct);
                 return ServiceResult<AuthoredDocumentVersionSummaryModel>.FailureResult(
-                    tree.Message ?? "The pinned template version could not be loaded.");
+                    tree.Message ?? _localizer["AuthoredDocuments.TemplateVersionLoadFailed"].Value);
             }
 
             var errors = ValidateAgainstSchema(tree.Data!, instance.ValuesJson);
@@ -214,7 +218,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
                     _logger.LogWarning(ex,
                         "Concurrent finalize race on instance {InstanceId} (version number {VersionNumber} taken); caller asked to retry.",
                         instanceId, versionNumber);
-                    return ServiceResult<AuthoredDocumentVersionSummaryModel>.FailureResult(RaceMessage);
+                    return ServiceResult<AuthoredDocumentVersionSummaryModel>.FailureResult(ServiceErrorKind.Conflict, RaceMessage);
                 }
 
                 _logger.LogError(ex, "Finalize failed persisting AuthoredDocumentVersion for instance {InstanceId}.", instanceId);
@@ -282,7 +286,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         int studentId, int actingUserId, CancellationToken ct = default)
     {
         if (!await _orgAccess.CanActOnStudentAsync(actingUserId, studentId, AccessRole.Viewer, ct))
-            return ServiceResult<List<AuthoredDocumentVersionSummaryModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<AuthoredDocumentVersionSummaryModel>>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
         var rows = await _context.AuthoredDocumentVersions
             .AsNoTracking()
@@ -299,7 +303,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
     {
         // Parent must have AccessService access to the child...
         if (!await _accessService.HasMinimumRoleAsync(childId, actingUserId, AccessRole.Viewer, ct))
-            return ServiceResult<List<AuthoredDocumentVersionSummaryModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<AuthoredDocumentVersionSummaryModel>>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
         // ...and the version's SchoolStudent must be linked via an active accepted ChildLink.
         var linkedStudentIds = _context.ChildLinks
@@ -321,7 +325,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
     {
         var header = await LoadVersionHeaderAsync(versionId, ct);
         if (header == null)
-            return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(VersionNotFoundMessage);
+            return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(ServiceErrorKind.NotFound, VersionNotFoundMessage);
 
         // Staff (org Viewer+) and a linked parent/student share this same read, but NOT the same
         // ValuesJson: only staff may see a raw `_ownerUserId` on a goals/services/accommodations/
@@ -331,7 +335,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
         // PDF status/download reads below, which never touch ValuesJson and so need no redaction branch).
         var isStaffAccess = await _orgAccess.CanActOnStudentAsync(actingUserId, header.SchoolStudentId, AccessRole.Viewer, ct);
         if (!isStaffAccess && !await ParentCanViewStudentAsync(actingUserId, header.SchoolStudentId, ct))
-            return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(VersionPermissionMessage);
+            return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(ServiceErrorKind.Forbidden, VersionPermissionMessage);
 
         var version = await _context.AuthoredDocumentVersions
             .AsNoTracking()
@@ -361,13 +365,13 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             .FirstOrDefaultAsync(ct);
 
         if (version == null)
-            return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(VersionNotFoundMessage);
+            return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(ServiceErrorKind.NotFound, VersionNotFoundMessage);
 
         // Reuse the Phase 2 tree builder for the pinned version's section/field schema.
         var tree = await _authoring.GetVersionAsync(version.DocumentTemplateVersionId, ct);
         if (!tree.Success)
             return ServiceResult<AuthoredDocumentVersionDetailModel>.FailureResult(
-                tree.Message ?? "The pinned template version could not be loaded.");
+                tree.Message ?? _localizer["AuthoredDocuments.TemplateVersionLoadFailed"].Value);
 
         var valuesJson = version.ValuesJson;
         if (!isStaffAccess)
@@ -416,20 +420,20 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
     public async Task<ServiceResult<AmendResultModel>> AmendAsync(int versionId, int actingUserId, AmendDocumentVersionModel model, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(model.Reason))
-            return ServiceResult<AmendResultModel>.FailureResult("An amendment reason is required.");
+            return ServiceResult<AmendResultModel>.FailureResult(ServiceErrorKind.Validation, _localizer["AuthoredDocuments.AmendmentReasonRequired"]);
         var reason = model.Reason.Trim();
         if (reason.Length > 1000)
-            return ServiceResult<AmendResultModel>.FailureResult("Amendment reason must be 1000 characters or fewer.");
+            return ServiceResult<AmendResultModel>.FailureResult(ServiceErrorKind.Validation, _localizer["AuthoredDocuments.AmendmentReasonTooLong"]);
 
         var version = await _context.AuthoredDocumentVersions.AsNoTracking()
             .Where(v => v.Id == versionId)
             .Select(v => new { v.Id, v.SchoolStudentId, v.DocumentTypeId, v.DocumentTemplateVersionId, v.ValuesJson })
             .FirstOrDefaultAsync(ct);
         if (version == null)
-            return ServiceResult<AmendResultModel>.FailureResult(VersionNotFoundMessage);
+            return ServiceResult<AmendResultModel>.FailureResult(ServiceErrorKind.NotFound, VersionNotFoundMessage);
 
         if (!await _orgAccess.CanActOnStudentAsync(actingUserId, version.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<AmendResultModel>.FailureResult(PermissionMessage);
+            return ServiceResult<AmendResultModel>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
         // Prefilled VERBATIM — the frozen ValuesJson is copied as-is, so every `_rowId` (goal/service/
         // accommodation lineage) is preserved exactly as it was at finalize time. This does NOT re-check
@@ -472,10 +476,10 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
     {
         var header = await LoadVersionHeaderAsync(versionId, ct);
         if (header == null)
-            return ServiceResult<AuthoredDocumentPdfStatusModel>.FailureResult(VersionNotFoundMessage);
+            return ServiceResult<AuthoredDocumentPdfStatusModel>.FailureResult(ServiceErrorKind.NotFound, VersionNotFoundMessage);
 
         if (!await CanReadStudentAsync(actingUserId, header.SchoolStudentId, ct))
-            return ServiceResult<AuthoredDocumentPdfStatusModel>.FailureResult(VersionPermissionMessage);
+            return ServiceResult<AuthoredDocumentPdfStatusModel>.FailureResult(ServiceErrorKind.Forbidden, VersionPermissionMessage);
 
         var pdf = await _context.AuthoredDocumentPdfs
             .AsNoTracking()
@@ -500,10 +504,10 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
     {
         var header = await LoadVersionHeaderAsync(versionId, ct);
         if (header == null)
-            return ServiceResult<string>.FailureResult(VersionNotFoundMessage);
+            return ServiceResult<string>.FailureResult(ServiceErrorKind.NotFound, VersionNotFoundMessage);
 
         if (!await CanReadStudentAsync(actingUserId, header.SchoolStudentId, ct))
-            return ServiceResult<string>.FailureResult(VersionPermissionMessage);
+            return ServiceResult<string>.FailureResult(ServiceErrorKind.Forbidden, VersionPermissionMessage);
 
         var renderStatus = await _context.AuthoredDocumentPdfs
             .AsNoTracking()
@@ -512,7 +516,7 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
             .FirstOrDefaultAsync(ct);
 
         if (renderStatus != PdfRenderStatus.Rendered)
-            return ServiceResult<string>.FailureResult("This version's PDF is not available for download yet.");
+            return ServiceResult<string>.FailureResult(ServiceErrorKind.Validation, _localizer["AuthoredDocuments.PdfNotAvailableYet"]);
 
         // Mint a short-lived download URL from the deterministic blob path (SAS when supported).
         var blobPath = IAuthoredDocumentPdfService.BlobPathFor(versionId, header.VersionNumber);
@@ -529,18 +533,18 @@ public class AuthoredDocumentVersionService : IAuthoredDocumentVersionService
     {
         var header = await LoadVersionHeaderAsync(versionId, ct);
         if (header == null)
-            return ServiceResult<int>.FailureResult(VersionNotFoundMessage);
+            return ServiceResult<int>.FailureResult(ServiceErrorKind.NotFound, VersionNotFoundMessage);
 
         // Retry is an authoring action — Collaborator+ educator on the student's school.
         if (!await _orgAccess.CanActOnStudentAsync(actingUserId, header.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<int>.FailureResult(PermissionMessage);
+            return ServiceResult<int>.FailureResult(ServiceErrorKind.Forbidden, PermissionMessage);
 
         var pdf = await _context.AuthoredDocumentPdfs.FirstOrDefaultAsync(p => p.AuthoredDocumentVersionId == versionId, ct);
         if (pdf == null)
-            return ServiceResult<int>.FailureResult("This version has no PDF record to retry.");
+            return ServiceResult<int>.FailureResult(ServiceErrorKind.Validation, _localizer["Pdf.NoRecordToRetry"]);
 
         if (pdf.RenderStatus == PdfRenderStatus.Rendered)
-            return ServiceResult<int>.FailureResult("This version's PDF is already rendered.");
+            return ServiceResult<int>.FailureResult(ServiceErrorKind.Validation, _localizer["Pdf.AlreadyRendered"]);
 
         // Error or Pending -> set Pending so the UI shows "generating" until the worker re-renders.
         pdf.RenderStatus = PdfRenderStatus.Pending;

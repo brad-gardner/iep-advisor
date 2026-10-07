@@ -18,6 +18,7 @@ public class AnalysisRunConfiguration : IEntityTypeConfiguration<AnalysisRun>
         builder.Property(a => a.OverallSummary).HasMaxLength(5000);
         builder.Property(a => a.ErrorMessage).HasMaxLength(2000);
         builder.Property(a => a.BackfillSourceKey).HasMaxLength(64);
+        builder.Property(a => a.Language).HasMaxLength(10);
 
         // Filtered unique index: enforces one run per legacy analysis (idempotent backfill) while
         // allowing unlimited normal runs (BackfillSourceKey == null).

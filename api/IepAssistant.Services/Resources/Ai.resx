@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Advocate -->
+  <data name="Advocate.AboutNotRecognized" xml:space="preserve">
+    <value>about is not a recognised record reference.</value>
+  </data>
+  <data name="Advocate.ChildNotFound" xml:space="preserve">
+    <value>Child profile not found.</value>
+  </data>
+  <data name="Advocate.CollaboratorRequired" xml:space="preserve">
+    <value>You can view this child but cannot ask the advocate about them.</value>
+  </data>
+  <data name="Advocate.DefaultTitle" xml:space="preserve">
+    <value>New conversation</value>
+  </data>
+  <data name="Advocate.Disclaimer" xml:space="preserve">
+    <value>The Virtual Advocate gives general information to help you understand your child's plan and your options. It is not legal advice. For decisions with legal consequences, confirm with a licensed special-education advocate or attorney.</value>
+  </data>
+  <data name="Advocate.MessageRequired" xml:space="preserve">
+    <value>Message is required.</value>
+  </data>
+  <data name="Advocate.MessageTooLong" xml:space="preserve">
+    <value>Message must be {0} characters or fewer.</value>
+  </data>
+  <data name="Advocate.ThreadNotFound" xml:space="preserve">
+    <value>Conversation not found.</value>
+  </data>
+  <data name="Advocate.TitleRequired" xml:space="preserve">
+    <value>Title is required.</value>
+  </data>
+  <data name="Advocate.TitleTooLong" xml:space="preserve">
+    <value>Title must be {0} characters or fewer.</value>
+  </data>
+  <data name="Advocate.UnavailableMessage" xml:space="preserve">
+    <value>The advocate could not answer right now. Your question was saved — please try again in a moment.</value>
+  </data>
+  <data name="Advocate.UsageCapMessage" xml:space="preserve">
+    <value>You have used all of this year's advocate messages. Upgrade your subscription to keep the conversation going.</value>
+  </data>
+  <data name="Advocate.UserNotFound" xml:space="preserve">
+    <value>User not found.</value>
+  </data>
+  <data name="Advocate.ToolLabel.SearchKnowledgeBase" xml:space="preserve">
+    <value>Checking the rules</value>
+  </data>
+  <data name="Advocate.ToolLabel.GetChildSummary" xml:space="preserve">
+    <value>Reading the child's profile</value>
+  </data>
+  <data name="Advocate.ToolLabel.ListDocuments" xml:space="preserve">
+    <value>Listing documents</value>
+  </data>
+  <data name="Advocate.ToolLabel.GetDocumentAnalysis" xml:space="preserve">
+    <value>Reading the analysis</value>
+  </data>
+  <data name="Advocate.ToolLabel.GetDocumentSection" xml:space="preserve">
+    <value>Reading the document</value>
+  </data>
+  <data name="Advocate.ToolLabel.GetGoalsAndProgress" xml:space="preserve">
+    <value>Checking goals and progress</value>
+  </data>
+  <data name="Advocate.ToolLabel.CompareIepVersions" xml:space="preserve">
+    <value>Comparing IEPs</value>
+  </data>
+  <data name="Advocate.ToolLabel.ListJournal" xml:space="preserve">
+    <value>Reading your journal</value>
+  </data>
+  <data name="Advocate.ToolLabel.ListContributions" xml:space="preserve">
+    <value>Reading your notes</value>
+  </data>
+  <data name="Advocate.ToolLabel.ListAdvocacyGoals" xml:space="preserve">
+    <value>Reading your advocacy goals</value>
+  </data>
+  <data name="Advocate.ToolLabel.GetMeetingPrep" xml:space="preserve">
+    <value>Reading your meeting prep</value>
+  </data>
+  <data name="Advocate.ToolLabel.ListMeetingsAndDeadlines" xml:space="preserve">
+    <value>Checking meetings and deadlines</value>
+  </data>
+  <data name="Advocate.ToolLabel.GetSharedDraft" xml:space="preserve">
+    <value>Reading the shared draft</value>
+  </data>
+  <data name="Advocate.ToolLabel.Default" xml:space="preserve">
+    <value>Looking something up</value>
+  </data>
+  <data name="Advocate.ToolLabel.ReadingDocument" xml:space="preserve">
+    <value>Reading the {0}</value>
+  </data>
+  <data name="Advocate.ToolLabel.ReadingDocumentAnalysis" xml:space="preserve">
+    <value>Reading the {0} analysis</value>
+  </data>
+  <data name="Advocate.DocumentType.Iep" xml:space="preserve">
+    <value>IEP</value>
+  </data>
+  <data name="Advocate.DocumentType.Etr" xml:space="preserve">
+    <value>ETR</value>
+  </data>
+  <data name="Advocate.DocumentType.ProgressReport" xml:space="preserve">
+    <value>progress report</value>
+  </data>
+
+  <!-- AnalysisRun -->
+  <data name="AnalysisRun.AllSourcesFailed" xml:space="preserve">
+    <value>The analysis could not be completed for any of the selected documents. Please try again.</value>
+  </data>
+  <data name="AnalysisRun.AnalysisLimitReached" xml:space="preserve">
+    <value>Analysis limit reached for this child.</value>
+  </data>
+  <data name="AnalysisRun.ChildNotFound" xml:space="preserve">
+    <value>Child not found.</value>
+  </data>
+  <data name="AnalysisRun.DuplicateDocumentsCombined" xml:space="preserve">
+    <value>Duplicate documents were selected and have been combined.</value>
+  </data>
+  <data name="AnalysisRun.Interrupted" xml:space="preserve">
+    <value>Analysis was interrupted.</value>
+  </data>
+  <data name="AnalysisRun.NoAccessToChild" xml:space="preserve">
+    <value>You do not have access to this child.</value>
+  </data>
+  <data name="AnalysisRun.NoAnalysisForDocument" xml:space="preserve">
+    <value>No analysis found for this document.</value>
+  </data>
+  <data name="AnalysisRun.NoDocumentsCouldBeAnalyzed" xml:space="preserve">
+    <value>None of the selected documents could be analyzed.</value>
+  </data>
+  <data name="AnalysisRun.NoPermissionToRunAnalysis" xml:space="preserve">
+    <value>You do not have permission to run an analysis for this child.</value>
+  </data>
+  <data name="AnalysisRun.RunNotFound" xml:space="preserve">
+    <value>Analysis run not found.</value>
+  </data>
+  <data name="AnalysisRun.SelectAtLeastOneDocument" xml:space="preserve">
+    <value>Select at least one document to analyze.</value>
+  </data>
+  <data name="AnalysisRun.SourceCouldNotBeIncluded" xml:space="preserve">
+    <value>A selected {0} could not be included (missing or not parsed).</value>
+  </data>
+  <data name="AnalysisRun.SourceType.Etr" xml:space="preserve">
+    <value>ETR document</value>
+  </data>
+  <data name="AnalysisRun.SourceType.Generic" xml:space="preserve">
+    <value>document</value>
+  </data>
+  <data name="AnalysisRun.SourceType.Iep" xml:space="preserve">
+    <value>IEP document</value>
+  </data>
+  <data name="AnalysisRun.SourceType.ProgressReport" xml:space="preserve">
+    <value>progress report</value>
+  </data>
+  <data name="AnalysisRun.SubscriptionRequired" xml:space="preserve">
+    <value>Active subscription required.</value>
+  </data>
+  <data name="AnalysisRun.SynthesisSkipped" xml:space="preserve">
+    <value>We couldn't generate a combined summary across these documents, so each document's analysis is shown separately below.</value>
+  </data>
+  <data name="AnalysisRun.TooManySources" xml:space="preserve">
+    <value>Choose up to 5 documents for one analysis.</value>
+  </data>
+  <data name="AnalysisRun.UnexpectedError" xml:space="preserve">
+    <value>An unexpected error occurred during analysis.</value>
+  </data>
+
+  <!-- Draft (shared by DraftQuestionService + DraftExplanationService) -->
+  <data name="Draft.Disclaimer" xml:space="preserve">
+    <value>This is a general, plain-language explanation, not legal advice. If you have questions about your child's specific plan, contact your case manager or a special-education advocate.</value>
+  </data>
+
+  <!-- DraftExplanation -->
+  <data name="DraftExplanation.PermissionDenied" xml:space="preserve">
+    <value>You do not have permission to access this revision.</value>
+  </data>
+  <data name="DraftExplanation.RevisionNotFound" xml:space="preserve">
+    <value>Shared draft revision not found.</value>
+  </data>
+  <data name="DraftExplanation.UnavailableMessage" xml:space="preserve">
+    <value>Explanations are temporarily unavailable.</value>
+  </data>
+
+  <!-- DraftQuestion -->
+  <data name="DraftQuestion.NoteNotFound" xml:space="preserve">
+    <value>Note not found.</value>
+  </data>
+  <data name="DraftQuestion.PermissionDenied" xml:space="preserve">
+    <value>You do not have permission to access this revision.</value>
+  </data>
+  <data name="DraftQuestion.QuestionRequired" xml:space="preserve">
+    <value>Question is required.</value>
+  </data>
+  <data name="DraftQuestion.QuestionTooLong" xml:space="preserve">
+    <value>Question must be {0} characters or fewer.</value>
+  </data>
+  <data name="DraftQuestion.RevisionNotFound" xml:space="preserve">
+    <value>Shared draft revision not found.</value>
+  </data>
+  <data name="DraftQuestion.TargetRowIdTooLong" xml:space="preserve">
+    <value>Target row id must be {0} characters or fewer.</value>
+  </data>
+  <data name="DraftQuestion.UnavailableMessage" xml:space="preserve">
+    <value>This question could not be answered right now. Please try again.</value>
+  </data>
+
+  <!-- MeetingPrep -->
+  <data name="MeetingPrep.AnchorAmbiguous" xml:space="preserve">
+    <value>Checklist anchor is ambiguous (both IEP and ETR are set).</value>
+  </data>
+  <data name="MeetingPrep.AnchorBothSet" xml:space="preserve">
+    <value>A meeting prep checklist cannot be anchored to both an IEP and an ETR.</value>
+  </data>
+  <data name="MeetingPrep.ChecklistDeleted" xml:space="preserve">
+    <value>Checklist deleted</value>
+  </data>
+  <data name="MeetingPrep.ChecklistNotFound" xml:space="preserve">
+    <value>Checklist not found</value>
+  </data>
+  <data name="MeetingPrep.ChildNotFound" xml:space="preserve">
+    <value>Child profile not found</value>
+  </data>
+  <data name="MeetingPrep.EtrMustBeParsed" xml:space="preserve">
+    <value>ETR document must be parsed before generating a meeting prep checklist</value>
+  </data>
+  <data name="MeetingPrep.EtrNotFound" xml:space="preserve">
+    <value>ETR document not found</value>
+  </data>
+  <data name="MeetingPrep.GenerationFailed" xml:space="preserve">
+    <value>Failed to generate meeting prep checklist.</value>
+  </data>
+  <data name="MeetingPrep.GenerationStarted" xml:space="preserve">
+    <value>Meeting prep checklist generation started</value>
+  </data>
+  <data name="MeetingPrep.IepMustBeParsed" xml:space="preserve">
+    <value>IEP document must be parsed before generating a meeting prep checklist</value>
+  </data>
+  <data name="MeetingPrep.IepNotFound" xml:space="preserve">
+    <value>IEP document not found</value>
+  </data>
+  <data name="MeetingPrep.InvalidItemIndex" xml:space="preserve">
+    <value>Invalid item index</value>
+  </data>
+  <data name="MeetingPrep.InvalidRequest" xml:space="preserve">
+    <value>Invalid request</value>
+  </data>
+  <data name="MeetingPrep.InvalidSection" xml:space="preserve">
+    <value>Invalid section</value>
+  </data>
+  <data name="MeetingPrep.ItemUpdated" xml:space="preserve">
+    <value>Item updated</value>
+  </data>
+  <data name="MeetingPrep.SectionHasNoItems" xml:space="preserve">
+    <value>Section has no items</value>
+  </data>
+  <data name="MeetingPrep.SubscriptionRequired" xml:space="preserve">
+    <value>Active subscription required</value>
+  </data>
+  <data name="MeetingPrep.UnexpectedError" xml:space="preserve">
+    <value>An unexpected error occurred during checklist generation.</value>
+  </data>
+
+  <!-- MeetingSummary -->
+  <data name="MeetingSummary.AlreadySent" xml:space="preserve">
+    <value>This summary has already been sent.</value>
+  </data>
+  <data name="MeetingSummary.BodyRequired" xml:space="preserve">
+    <value>Summary text is required.</value>
+  </data>
+  <data name="MeetingSummary.BodyTooLong" xml:space="preserve">
+    <value>Summary must be {0} characters or fewer.</value>
+  </data>
+  <data name="MeetingSummary.MeetingNotFound" xml:space="preserve">
+    <value>Meeting not found.</value>
+  </data>
+  <data name="MeetingSummary.MeetingNotHeld" xml:space="preserve">
+    <value>This meeting must be Held or Continued before a family summary can be created.</value>
+  </data>
+  <data name="MeetingSummary.NoDraftExists" xml:space="preserve">
+    <value>No draft summary exists yet. Generate one first.</value>
+  </data>
+  <data name="MeetingSummary.PermissionDenied" xml:space="preserve">
+    <value>You do not have permission to access this meeting.</value>
+  </data>
+  <data name="MeetingSummary.SummaryNotFound" xml:space="preserve">
+    <value>Meeting summary not found.</value>
+  </data>
+  <data name="MeetingSummary.UnavailableMessage" xml:space="preserve">
+    <value>The meeting summary could not be drafted right now. Please try again.</value>
+  </data>
+
+  <!-- ProgressReportAnalysis -->
+  <data name="ProgressReportAnalysis.DownloadFailed" xml:space="preserve">
+    <value>Could not download progress report file.</value>
+  </data>
+  <data name="ProgressReportAnalysis.GenerationFailed" xml:space="preserve">
+    <value>Failed to generate analysis.</value>
+  </data>
+  <data name="ProgressReportAnalysis.UnexpectedError" xml:space="preserve">
+    <value>An unexpected error occurred during analysis.</value>
+  </data>
+
+  <!-- StudentWorkspace -->
+  <data name="StudentWorkspace.ContentRequired" xml:space="preserve">
+    <value>Entry content is required.</value>
+  </data>
+  <data name="StudentWorkspace.EntryNotFound" xml:space="preserve">
+    <value>Workspace entry not found.</value>
+  </data>
+  <data name="StudentWorkspace.PermissionDenied" xml:space="preserve">
+    <value>You do not have permission to access this workspace.</value>
+  </data>
+  <data name="StudentWorkspace.PromptRequired" xml:space="preserve">
+    <value>A prompt is required.</value>
+  </data>
+  <data name="StudentWorkspace.UnavailableMessage" xml:space="preserve">
+    <value>AI interview is temporarily unavailable.</value>
+  </data>
+</root>

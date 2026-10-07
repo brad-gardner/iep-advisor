@@ -11,6 +11,7 @@ public class MeetingPrepChecklistConfiguration : IEntityTypeConfiguration<Meetin
         builder.HasKey(m => m.Id);
         builder.Property(m => m.Status).HasMaxLength(20).IsRequired();
         builder.Property(m => m.ErrorMessage).HasMaxLength(2000);
+        builder.Property(m => m.Language).HasMaxLength(10);
 
         builder.HasOne(m => m.ChildProfile)
             .WithMany()

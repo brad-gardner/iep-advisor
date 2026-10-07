@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.IepVersions;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -20,11 +22,13 @@ public class IepVersionController : ControllerBase
 {
     private readonly IIepVersionService _service;
     private readonly IepVersionPdfQueue _pdfQueue;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public IepVersionController(IIepVersionService service, IepVersionPdfQueue pdfQueue)
+    public IepVersionController(IIepVersionService service, IepVersionPdfQueue pdfQueue, IStringLocalizer<Messages> localizer)
     {
         _service = service;
         _pdfQueue = pdfQueue;
+        _localizer = localizer;
     }
 
     // ---------------------------------------------------------------- Finalize
@@ -37,7 +41,7 @@ public class IepVersionController : ControllerBase
     {
 
         var result = await _service.FinalizeAsync(User.GetUserId(), draftId, request?.EffectiveDate, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         // After-commit, failure-isolated: FinalizeAsync already committed the version (+ a Pending
         // IepVersionPdf). Enqueue the render now; a queue hiccup never rolls back the legal record.
@@ -56,7 +60,7 @@ public class IepVersionController : ControllerBase
     {
 
         var result = await _service.ListForStudentAsync(User.GetUserId(), studentId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<IEnumerable<IepVersionSummaryDto>>.SuccessResponse(result.Data!.Select(IepVersionMappers.MapSummary)));
     }
@@ -70,7 +74,7 @@ public class IepVersionController : ControllerBase
     {
 
         var result = await _service.ListForChildAsync(User.GetUserId(), childId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<IEnumerable<IepVersionSummaryDto>>.SuccessResponse(result.Data!.Select(IepVersionMappers.MapSummary)));
     }
@@ -85,7 +89,7 @@ public class IepVersionController : ControllerBase
     {
 
         var result = await _service.GetVersionAsync(User.GetUserId(), versionId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<IepVersionDto>.SuccessResponse(IepVersionMappers.MapFull(result.Data!)));
     }
@@ -100,7 +104,7 @@ public class IepVersionController : ControllerBase
     {
 
         var result = await _service.RequestPdfRetryAsync(User.GetUserId(), versionId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         // Set Pending in the service committed; now enqueue the re-render (after-commit, isolated).
         await _pdfQueue.EnqueueAsync(result.Data, ct);
@@ -116,7 +120,7 @@ public class IepVersionController : ControllerBase
     {
 
         var result = await _service.GetPdfStatusAsync(User.GetUserId(), versionId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var m = result.Data!;
         return Ok(ApiResponse<IepVersionPdfStatusDto>.SuccessResponse(new IepVersionPdfStatusDto
@@ -129,18 +133,4 @@ public class IepVersionController : ControllerBase
         }));
     }
 
-    // ---------------------------------------------------------------- Helpers
-
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

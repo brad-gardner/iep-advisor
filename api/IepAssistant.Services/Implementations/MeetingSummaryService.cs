@@ -1,9 +1,12 @@
+using System.Globalization;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -17,14 +20,6 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 public class MeetingSummaryService : IMeetingSummaryService
 {
-    private const string NotFoundMessage = "Meeting not found.";
-    private const string PermissionMessage = "You do not have permission to access this meeting.";
-    private const string NotHeldMessage = "This meeting must be Held or Continued before a family summary can be created.";
-    private const string NoDraftMessage = "No draft summary exists yet. Generate one first.";
-    private const string AlreadySentMessage = "This summary has already been sent.";
-    private const string EmptyBodyMessage = "Summary text is required.";
-    private const string UnavailableMessage = "The meeting summary could not be drafted right now. Please try again.";
-    private const string SummaryNotFoundMessage = "Meeting summary not found.";
     private const int MaxBodyLength = 8000;
     private const int MaxTokens = 2048;
     private const int DraftCharBudget = 12_000;
@@ -35,6 +30,7 @@ public class MeetingSummaryService : IMeetingSummaryService
     private readonly IClaudeClient _claude;
     private readonly INotificationService _notifications;
     private readonly IAuditLogger _audit;
+    private readonly IStringLocalizer<Ai> _localizer;
     private readonly ILogger<MeetingSummaryService> _logger;
 
     public MeetingSummaryService(
@@ -43,6 +39,7 @@ public class MeetingSummaryService : IMeetingSummaryService
         IClaudeClient claude,
         INotificationService notifications,
         IAuditLogger audit,
+        IStringLocalizer<Ai> localizer,
         ILogger<MeetingSummaryService> logger)
     {
         _context = context;
@@ -50,6 +47,7 @@ public class MeetingSummaryService : IMeetingSummaryService
         _claude = claude;
         _notifications = notifications;
         _audit = audit;
+        _localizer = localizer;
         _logger = logger;
     }
 
@@ -57,15 +55,15 @@ public class MeetingSummaryService : IMeetingSummaryService
     {
         var meeting = await LoadMeetingHeaderAsync(meetingId, ct);
         if (meeting == null)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(NotFoundMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.NotFound(_localizer["MeetingSummary.MeetingNotFound"]);
         if (!await _orgAccess.CanActOnStudentAsync(userId, meeting.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(PermissionMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.Forbidden(_localizer["MeetingSummary.PermissionDenied"]);
         if (meeting.Status is not (MeetingStatus.Held or MeetingStatus.Continued))
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(NotHeldMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingSummary.MeetingNotHeld"]);
 
         var existing = await _context.MeetingSummaries.FirstOrDefaultAsync(s => s.MeetingId == meetingId, ct);
         if (existing != null && existing.Status == MeetingSummaryStatus.Sent)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(AlreadySentMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["MeetingSummary.AlreadySent"]);
 
         var source = await ResolveSourceAsync(meeting, ct);
         var resolvedResponses = await LoadResolvedResponsesAsync(meeting.SchoolStudentId, ct);
@@ -89,12 +87,16 @@ public class MeetingSummaryService : IMeetingSummaryService
         userText.AppendLine();
         userText.AppendLine("Write the family-facing summary now.");
 
+        // In-request call: RequestLocalization has already set CurrentUICulture from the drafting
+        // staff member's saved preference/Accept-Language.
+        var language = SupportedLanguages.Normalize(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName) ?? SupportedLanguages.English;
+
         string? reply;
         try
         {
             reply = await _claude.CompleteAsync(new ClaudeCompletionRequest
             {
-                SystemPrompt = DraftPrompts.MeetingSummary,
+                SystemPrompt = DraftPrompts.MeetingSummary + ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture),
                 UserText = userText.ToString(),
                 MaxTokens = MaxTokens
             }, ct);
@@ -102,13 +104,13 @@ public class MeetingSummaryService : IMeetingSummaryService
         catch (ClaudeApiException ex)
         {
             _logger.LogError(ex, "Meeting summary draft for meeting {MeetingId} failed with {Kind}", meetingId, ex.Kind);
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(UnavailableMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["MeetingSummary.UnavailableMessage"]);
         }
 
         if (string.IsNullOrWhiteSpace(reply))
         {
             _logger.LogWarning("Meeting summary: Claude returned no content for meeting {MeetingId}.", meetingId);
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(UnavailableMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Unavailable, _localizer["MeetingSummary.UnavailableMessage"]);
         }
 
         var now = DateTime.UtcNow;
@@ -119,6 +121,7 @@ public class MeetingSummaryService : IMeetingSummaryService
             existing.Body = body;
             existing.GeneratedAt = now;
             existing.EditedAt = null;
+            existing.Language = language;
             existing.UpdatedById = userId;
             entity = existing;
         }
@@ -130,6 +133,7 @@ public class MeetingSummaryService : IMeetingSummaryService
                 Body = body,
                 Status = MeetingSummaryStatus.Draft,
                 GeneratedAt = now,
+                Language = language,
                 CreatedById = userId,
                 UpdatedById = userId
             };
@@ -168,21 +172,21 @@ public class MeetingSummaryService : IMeetingSummaryService
     {
         var meeting = await LoadMeetingHeaderAsync(meetingId, ct);
         if (meeting == null)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(NotFoundMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.NotFound(_localizer["MeetingSummary.MeetingNotFound"]);
         if (!await _orgAccess.CanActOnStudentAsync(userId, meeting.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(PermissionMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.Forbidden(_localizer["MeetingSummary.PermissionDenied"]);
 
         if (string.IsNullOrWhiteSpace(body))
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(EmptyBodyMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingSummary.BodyRequired"]);
         var trimmed = body.Trim();
         if (trimmed.Length > MaxBodyLength)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult($"Summary must be {MaxBodyLength} characters or fewer.");
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingSummary.BodyTooLong", MaxBodyLength]);
 
         var entity = await _context.MeetingSummaries.FirstOrDefaultAsync(s => s.MeetingId == meetingId, ct);
         if (entity == null)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(NoDraftMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["MeetingSummary.NoDraftExists"]);
         if (entity.Status == MeetingSummaryStatus.Sent)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(AlreadySentMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["MeetingSummary.AlreadySent"]);
 
         entity.Body = trimmed;
         entity.EditedAt = DateTime.UtcNow;
@@ -196,17 +200,17 @@ public class MeetingSummaryService : IMeetingSummaryService
     {
         var meeting = await LoadMeetingHeaderAsync(meetingId, ct);
         if (meeting == null)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(NotFoundMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.NotFound(_localizer["MeetingSummary.MeetingNotFound"]);
         if (!await _orgAccess.CanActOnStudentAsync(userId, meeting.SchoolStudentId, AccessRole.Collaborator, ct))
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(PermissionMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.Forbidden(_localizer["MeetingSummary.PermissionDenied"]);
         if (meeting.Status is not (MeetingStatus.Held or MeetingStatus.Continued))
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(NotHeldMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingSummary.MeetingNotHeld"]);
 
         var entity = await _context.MeetingSummaries.FirstOrDefaultAsync(s => s.MeetingId == meetingId, ct);
         if (entity == null || string.IsNullOrWhiteSpace(entity.Body))
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(NoDraftMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["MeetingSummary.NoDraftExists"]);
         if (entity.Status == MeetingSummaryStatus.Sent)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(AlreadySentMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(ServiceErrorKind.Conflict, _localizer["MeetingSummary.AlreadySent"]);
 
         var now = DateTime.UtcNow;
         entity.Status = MeetingSummaryStatus.Sent;
@@ -225,20 +229,20 @@ public class MeetingSummaryService : IMeetingSummaryService
     {
         var meeting = await LoadMeetingHeaderAsync(meetingId, ct);
         if (meeting == null)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(NotFoundMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.NotFound(_localizer["MeetingSummary.MeetingNotFound"]);
 
         var isStaff = await _orgAccess.CanActOnStudentAsync(userId, meeting.SchoolStudentId, AccessRole.Viewer, ct);
         var isParticipant = !isStaff && await _context.MeetingParticipants.AsNoTracking()
             .AnyAsync(p => p.MeetingId == meetingId && p.UserId == userId, ct);
         if (!isStaff && !isParticipant)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(PermissionMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.Forbidden(_localizer["MeetingSummary.PermissionDenied"]);
 
         var entity = await _context.MeetingSummaries.AsNoTracking().FirstOrDefaultAsync(s => s.MeetingId == meetingId, ct);
         if (entity == null)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(SummaryNotFoundMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.NotFound(_localizer["MeetingSummary.SummaryNotFound"]);
         // Family sees only a Sent summary — an in-progress draft reads as "not found", never leaked.
         if (!isStaff && entity.Status != MeetingSummaryStatus.Sent)
-            return ServiceResult<FamilyMeetingSummaryModel>.FailureResult(SummaryNotFoundMessage);
+            return ServiceResult<FamilyMeetingSummaryModel>.NotFound(_localizer["MeetingSummary.SummaryNotFound"]);
 
         return ServiceResult<FamilyMeetingSummaryModel>.SuccessResult(await MapAsync(entity, ct));
     }
@@ -381,6 +385,7 @@ public class MeetingSummaryService : IMeetingSummaryService
             EditedAt = entity.EditedAt,
             SentAt = entity.SentAt,
             SentByName = sentByName?.Trim(),
+            GeneratedLanguage = entity.Language,
             Recipients = familyParticipants
                 .Select(u => new FamilyMeetingSummaryRecipientModel { DisplayName = $"{u.FirstName} {u.LastName}".Trim(), Email = u.Email })
                 .ToList()

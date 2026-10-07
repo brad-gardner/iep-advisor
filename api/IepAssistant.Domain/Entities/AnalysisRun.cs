@@ -14,6 +14,16 @@ public class AnalysisRun : BaseEntity, IAuditableEntity
     // Idempotency marker for the legacy-analysis backfill, e.g. "IepAnalysis:42" / "EtrAnalysis:7".
     // Null for runs created through the normal flow; unique (filtered) when present.
     public string? BackfillSourceKey { get; set; }
+
+    /// <summary>
+    /// The requester's language ("en"/"es") when this run was CREATED (multilingual plan 2026-10-06
+    /// phase 3, migration AddAiArtifactLanguage) — captured at create time because source analysis and
+    /// synthesis run in a background worker (<c>AnalysisRunWorker</c>) with no ambient request culture of
+    /// its own; <c>AnalysisRunService.ExecuteRunAsync</c> re-applies it via <c>CultureScope.For</c> before
+    /// building any prompt. Null means English (including every run created before this column existed,
+    /// and the legacy-analysis backfill, which never had a requester language to capture).
+    /// </summary>
+    public string? Language { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public int? CreatedById { get; set; }

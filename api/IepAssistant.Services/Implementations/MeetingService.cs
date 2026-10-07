@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -34,6 +35,7 @@ public class MeetingService : IMeetingService
     private readonly INotificationService _notifications;
     private readonly IAuditLogger _audit;
     private readonly ILogger<MeetingService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public MeetingService(
         ApplicationDbContext context,
@@ -41,7 +43,8 @@ public class MeetingService : IMeetingService
         IAccessService accessService,
         INotificationService notifications,
         IAuditLogger audit,
-        ILogger<MeetingService> logger)
+        ILogger<MeetingService> logger,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
@@ -49,6 +52,7 @@ public class MeetingService : IMeetingService
         _notifications = notifications;
         _audit = audit;
         _logger = logger;
+        _localizer = localizer;
     }
 
     // ----------------------------------------------------------------- Create
@@ -179,11 +183,11 @@ public class MeetingService : IMeetingService
             .Include(m => m.Participants)
             .FirstOrDefaultAsync(m => m.Id == meetingId, ct);
         if (meeting == null)
-            return ServiceResult<MeetingModel>.FailureResult("Meeting not found.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Meetings.NotFound"]);
 
         var isParticipant = meeting.Participants.Any(p => p.UserId == userId);
         if (!isParticipant && !await _orgAccess.CanActOnStudentAsync(userId, meeting.SchoolStudentId, AccessRole.Viewer, ct))
-            return ServiceResult<MeetingModel>.FailureResult("You do not have permission to view this meeting.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Meetings.NoPermissionToView"]);
 
         return ServiceResult<MeetingModel>.SuccessResult(await LoadMeetingModelAsync(meetingId, userId, ct));
     }
@@ -207,7 +211,7 @@ public class MeetingService : IMeetingService
     public async Task<ServiceResult<List<MeetingModel>>> ListForChildAsync(int parentUserId, int childProfileId, CancellationToken ct = default)
     {
         if (!await _accessService.HasMinimumRoleAsync(childProfileId, parentUserId, AccessRole.Viewer, ct))
-            return ServiceResult<List<MeetingModel>>.FailureResult("You do not have permission to view this child's meetings.");
+            return ServiceResult<List<MeetingModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Meetings.NoPermissionToViewChildMeetings"]);
 
         var studentIds = await _context.ChildLinks.AsNoTracking()
             .Where(l => l.ChildProfileId == childProfileId && l.IsActive && l.AcceptedAt != null)
@@ -396,11 +400,11 @@ public class MeetingService : IMeetingService
     {
         var meeting = await _context.Meetings.Include(m => m.Participants).FirstOrDefaultAsync(m => m.Id == meetingId, ct);
         if (meeting == null)
-            return ServiceResult<MeetingModel>.FailureResult("Meeting not found.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["Meetings.NotFound"]);
 
         var participant = meeting.Participants.FirstOrDefault(p => p.UserId == userId);
         if (participant == null)
-            return ServiceResult<MeetingModel>.FailureResult("You do not have permission to respond to this meeting.");
+            return ServiceResult<MeetingModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Meetings.NoPermissionToRespond"]);
 
         participant.InviteStatus = status;
         participant.UpdatedById = userId;
@@ -413,7 +417,7 @@ public class MeetingService : IMeetingService
     {
         var (participant, error) = await FindValidRsvpParticipantAsync(token, ct);
         if (error != null)
-            return ServiceResult<MeetingRsvpPreviewModel>.FailureResult(error);
+            return ServiceResult<MeetingRsvpPreviewModel>.FailureResult(ServiceErrorKind.Validation, error);
 
         var summary = await LoadMeetingSummaryAsync(participant!.MeetingId, ct);
         return ServiceResult<MeetingRsvpPreviewModel>.SuccessResult(new MeetingRsvpPreviewModel
@@ -427,7 +431,7 @@ public class MeetingService : IMeetingService
     {
         var (participant, error) = await FindValidRsvpParticipantAsync(token, ct);
         if (error != null)
-            return ServiceResult<MeetingRsvpPreviewModel>.FailureResult(error);
+            return ServiceResult<MeetingRsvpPreviewModel>.FailureResult(ServiceErrorKind.Validation, error);
 
         participant!.InviteStatus = status;
         await _context.SaveChangesAsync(ct);
@@ -443,15 +447,15 @@ public class MeetingService : IMeetingService
     private async Task<(MeetingParticipant? Participant, string? Error)> FindValidRsvpParticipantAsync(string token, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(token))
-            return (null, "Invalid RSVP link.");
+            return (null, _localizer["Meetings.InvalidRsvpLink"]);
 
         var participant = await _context.MeetingParticipants
             .Include(p => p.Meeting)
             .FirstOrDefaultAsync(p => p.RsvpToken == token, ct);
         if (participant == null)
-            return (null, "Invalid RSVP link.");
+            return (null, _localizer["Meetings.InvalidRsvpLink"]);
         if (participant.Meeting.StartsAtUtc <= DateTime.UtcNow)
-            return (null, "This meeting has already started; RSVP is no longer available.");
+            return (null, _localizer["Meetings.RsvpWindowClosed"]);
 
         return (participant, null);
     }

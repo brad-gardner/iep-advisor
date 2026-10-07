@@ -15,6 +15,14 @@ public class SharedDraftExplanation : BaseEntity, IAuditableEntity
 
     public DateTime GeneratedAt { get; set; }
 
+    /// <summary>The language ("en"/"es") this explanation was generated in (multilingual plan 2026-10-06
+    /// phase 3, migration AddAiArtifactLanguage) — set from the FIRST reading parent's UI culture when
+    /// <c>DraftExplanationService.GetOrGenerateAsync</c> first populates this cached, one-time row. Since
+    /// the explanation is never regenerated, a later reader in the other language sees this value and a
+    /// "Generated in …" notice rather than a silently re-generated answer. Null means English, including
+    /// every explanation generated before this column existed.</summary>
+    public string? Language { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public int? CreatedById { get; set; }

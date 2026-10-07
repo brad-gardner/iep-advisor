@@ -37,7 +37,7 @@ public sealed class StudentWorkspaceServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private StudentWorkspaceService CreateService(ApplicationDbContext ctx)
-        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), _claude, NullLogger<StudentWorkspaceService>.Instance);
+        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), _claude, TestSupport.TestLocalizers.Ai(), NullLogger<StudentWorkspaceService>.Instance);
 
     public void Dispose() => _connection.Dispose();
 
@@ -449,6 +449,31 @@ public sealed class StudentWorkspaceServiceTests : IDisposable
         Assert.Contains("</student_input>", _claude.LastRequest.UserText);
     }
 
+    // ------------------------------------------------------------------ multilingual plan phase 3
+
+    [Fact]
+    public async Task InterviewSuggest_UnderSpanishCulture_AppendsResponseLanguageLine()
+    {
+        var studentUserId = SeedStudent("lang-es");
+
+        using var ctx = CreateContext();
+        using (IepAssistant.Services.Localization.CultureScope.For("es"))
+            await CreateService(ctx).InterviewSuggestAsync(studentUserId, "i'm good at math", default);
+
+        Assert.Contains("Spanish", _claude.LastRequest!.SystemPrompt);
+    }
+
+    [Fact]
+    public async Task InterviewSuggest_UnderEnglishCulture_NeverAppendsResponseLanguageLine()
+    {
+        var studentUserId = SeedStudent("lang-en");
+
+        using var ctx = CreateContext();
+        await CreateService(ctx).InterviewSuggestAsync(studentUserId, "i'm good at math", default);
+
+        Assert.DoesNotContain("RESPONSE LANGUAGE", _claude.LastRequest!.SystemPrompt, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task InterviewSuggest_NonStudent_ReturnsPermission()
     {
@@ -458,6 +483,9 @@ public sealed class StudentWorkspaceServiceTests : IDisposable
         var result = await CreateService(ctx).InterviewSuggestAsync(plainUserId, "hello", default);
         Assert.False(result.Success);
         Assert.Contains("permission", result.Message, StringComparison.OrdinalIgnoreCase);
+        // ErrorKind, not message text, is what the controller now switches status on (multilingual
+        // plan phase 3) — this must hold even though the message above happens to still be English.
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
     }
 
     [Fact]

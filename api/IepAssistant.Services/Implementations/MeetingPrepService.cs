@@ -1,11 +1,14 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Domain.Repositories;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 
 namespace IepAssistant.Services.Implementations;
@@ -19,6 +22,7 @@ public class MeetingPrepService : IMeetingPrepService
     private readonly ISubscriptionService _subscriptionService;
     private readonly ApplicationDbContext _context;
     private readonly IClaudeClient _claudeClient;
+    private readonly IStringLocalizer<Ai> _localizer;
     private readonly ILogger<MeetingPrepService> _logger;
 
     private static readonly JsonSerializerOptions CamelCaseOptions = new()
@@ -131,6 +135,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         ISubscriptionService subscriptionService,
         ApplicationDbContext context,
         IClaudeClient claudeClient,
+        IStringLocalizer<Ai> localizer,
         ILogger<MeetingPrepService> logger)
     {
         _documentRepository = documentRepository;
@@ -140,6 +145,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         _subscriptionService = subscriptionService;
         _context = context;
         _claudeClient = claudeClient;
+        _localizer = localizer;
         _logger = logger;
     }
 
@@ -178,7 +184,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
     public async Task<ServiceResult<int>> GenerateFromGoalsAsync(int childId, int userId, DateTime? meetingDate = null, CancellationToken ct = default)
     {
         if (!await _accessService.HasMinimumRoleAsync(childId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult<int>.FailureResult("Child profile not found");
+            return ServiceResult<int>.NotFound(_localizer["MeetingPrep.ChildNotFound"]);
 
         // The child page is the only place meeting prep is generated from, so ground it in the
         // child's most recent parsed IEP (and, through Mode A, that IEP's analysis). Goals-only is
@@ -196,6 +202,9 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             IepDocumentId = latestIepId,
             MeetingDate = meetingDate,
             Status = "pending",
+            // The requester's language, captured now because generation runs in a background worker
+            // with no request culture of its own (multilingual plan 2026-10-06 phase 3).
+            Language = CapturedLanguage(),
             CreatedById = userId,
             UpdatedById = userId
         };
@@ -210,13 +219,13 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
     {
         var document = await _documentRepository.GetByIdWithChildAsync(iepDocumentId, ct);
         if (document == null)
-            return ServiceResult<int>.FailureResult("IEP document not found");
+            return ServiceResult<int>.NotFound(_localizer["MeetingPrep.IepNotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult<int>.FailureResult("IEP document not found");
+            return ServiceResult<int>.NotFound(_localizer["MeetingPrep.IepNotFound"]);
 
         if (document.Status != "parsed")
-            return ServiceResult<int>.FailureResult("IEP document must be parsed before generating a meeting prep checklist");
+            return ServiceResult<int>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingPrep.IepMustBeParsed"]);
 
         var checklist = new MeetingPrepChecklist
         {
@@ -225,12 +234,13 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             EtrDocumentId = null,
             MeetingDate = meetingDate,
             Status = "pending",
+            Language = CapturedLanguage(),
             CreatedById = userId,
             UpdatedById = userId
         };
 
         if (!ValidateAnchorInvariant(checklist, out var invariantError))
-            return ServiceResult<int>.FailureResult(invariantError);
+            return ServiceResult<int>.FailureResult(ServiceErrorKind.Validation, invariantError);
 
         await _context.Set<MeetingPrepChecklist>().AddAsync(checklist, ct);
         await _context.SaveChangesAsync(ct);
@@ -242,13 +252,13 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
     {
         var document = await _etrDocumentRepository.GetByIdWithChildAsync(etrDocumentId, ct);
         if (document == null || !document.IsActive)
-            return ServiceResult<int>.FailureResult("ETR document not found");
+            return ServiceResult<int>.NotFound(_localizer["MeetingPrep.EtrNotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult<int>.FailureResult("ETR document not found");
+            return ServiceResult<int>.NotFound(_localizer["MeetingPrep.EtrNotFound"]);
 
         if (document.Status != "parsed")
-            return ServiceResult<int>.FailureResult("ETR document must be parsed before generating a meeting prep checklist");
+            return ServiceResult<int>.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingPrep.EtrMustBeParsed"]);
 
         var checklist = new MeetingPrepChecklist
         {
@@ -257,12 +267,13 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             EtrDocumentId = etrDocumentId,
             MeetingDate = meetingDate,
             Status = "pending",
+            Language = CapturedLanguage(),
             CreatedById = userId,
             UpdatedById = userId
         };
 
         if (!ValidateAnchorInvariant(checklist, out var invariantError))
-            return ServiceResult<int>.FailureResult(invariantError);
+            return ServiceResult<int>.FailureResult(ServiceErrorKind.Validation, invariantError);
 
         await _context.Set<MeetingPrepChecklist>().AddAsync(checklist, ct);
         await _context.SaveChangesAsync(ct);
@@ -270,15 +281,21 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         return ServiceResult<int>.SuccessResult(checklist.Id);
     }
 
+    /// <summary>The requester's normalized UI culture ("en"/"es") at checklist-creation time — an
+    /// in-request call, so <see cref="CultureInfo.CurrentUICulture"/> is already set by
+    /// RequestLocalization. Captured onto the entity rather than re-derived later, because generation
+    /// itself runs in <c>MeetingPrepWorker</c>, outside any request.</summary>
+    private static string CapturedLanguage() => SupportedLanguages.Normalize(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName) ?? SupportedLanguages.English;
+
     /// <summary>
     /// A checklist may be anchored to at most one source document (IEP or ETR) — never both.
     /// Zero (goals-only, "Mode B") is allowed.
     /// </summary>
-    private static bool ValidateAnchorInvariant(MeetingPrepChecklist checklist, out string error)
+    private bool ValidateAnchorInvariant(MeetingPrepChecklist checklist, out string error)
     {
         if (checklist.IepDocumentId.HasValue && checklist.EtrDocumentId.HasValue)
         {
-            error = "A meeting prep checklist cannot be anchored to both an IEP and an ETR.";
+            error = _localizer["MeetingPrep.AnchorBothSet"];
             return false;
         }
         error = string.Empty;
@@ -299,6 +316,12 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             return;
         }
 
+        // Generation runs here, in MeetingPrepWorker — outside the request that created the checklist —
+        // so CurrentUICulture has no ambient value of its own; re-apply the language captured at create
+        // time (multilingual plan 2026-10-06 phase 3) for every localized string below, including the
+        // Claude system prompt's response-language line.
+        using var _ = CultureScope.For(checklist.Language);
+
         // Concurrency guard: only proceed if still in "pending" status
         if (checklist.Status != "pending")
         {
@@ -312,7 +335,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         {
             _logger.LogWarning("User {UserId} does not have active subscription for meeting prep checklist {ChecklistId}", billableUserId, checklistId);
             checklist.Status = "error";
-            checklist.ErrorMessage = "Active subscription required";
+            checklist.ErrorMessage = _localizer["MeetingPrep.SubscriptionRequired"];
             await _context.SaveChangesAsync(ct);
             return;
         }
@@ -331,7 +354,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             {
                 _logger.LogError("Checklist {ChecklistId} has both IepDocumentId and EtrDocumentId set; cannot generate", checklistId);
                 checklist.Status = "error";
-                checklist.ErrorMessage = "Checklist anchor is ambiguous (both IEP and ETR are set).";
+                checklist.ErrorMessage = _localizer["MeetingPrep.AnchorAmbiguous"];
                 await _context.SaveChangesAsync(ct);
                 return;
             }
@@ -381,7 +404,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             if (result == null)
             {
                 checklist.Status = "error";
-                checklist.ErrorMessage = "Failed to generate meeting prep checklist.";
+                checklist.ErrorMessage = _localizer["MeetingPrep.GenerationFailed"];
                 await _context.SaveChangesAsync(ct);
                 return;
             }
@@ -398,7 +421,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         {
             _logger.LogError(ex, "Error generating meeting prep checklist {ChecklistId}", checklistId);
             checklist.Status = "error";
-            checklist.ErrorMessage = "An unexpected error occurred during checklist generation.";
+            checklist.ErrorMessage = _localizer["MeetingPrep.UnexpectedError"];
             await _context.SaveChangesAsync(CancellationToken.None); // Use None so error status saves even during shutdown
         }
     }
@@ -410,10 +433,10 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             .FirstOrDefaultAsync(m => m.Id == id && m.IsActive, ct);
 
         if (checklist == null)
-            return ServiceResult.FailureResult("Checklist not found");
+            return ServiceResult.NotFound(_localizer["MeetingPrep.ChecklistNotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(checklist.ChildProfileId, userId, AccessRole.Collaborator, ct))
-            return ServiceResult.FailureResult("Checklist not found");
+            return ServiceResult.NotFound(_localizer["MeetingPrep.ChecklistNotFound"]);
 
         // Single mapping: section name → (getter, setter) to avoid duplicate switch
         var sectionMap = new Dictionary<string, (Func<string?> get, Action<string?> set)>
@@ -429,21 +452,21 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
         };
 
         if (!sectionMap.TryGetValue(request.Section, out var accessor))
-            return ServiceResult.FailureResult("Invalid section");
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingPrep.InvalidSection"]);
 
         var sectionJson = accessor.get();
         if (string.IsNullOrEmpty(sectionJson))
-            return ServiceResult.FailureResult("Section has no items");
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingPrep.SectionHasNoItems"]);
 
         var items = JsonSerializer.Deserialize<List<ChecklistItem>>(sectionJson, CaseInsensitiveOptions);
         if (items == null || request.Index < 0 || request.Index >= items.Count)
-            return ServiceResult.FailureResult("Invalid item index");
+            return ServiceResult.FailureResult(ServiceErrorKind.Validation, _localizer["MeetingPrep.InvalidItemIndex"]);
 
         items[request.Index].IsChecked = request.IsChecked;
         accessor.set(JsonSerializer.Serialize(items, CamelCaseOptions));
 
         await _context.SaveChangesAsync(ct);
-        return ServiceResult.SuccessResult("Item updated");
+        return ServiceResult.SuccessResult(_localizer["MeetingPrep.ItemUpdated"]);
     }
 
     public async Task<ServiceResult> DeleteAsync(int id, int userId, CancellationToken ct = default)
@@ -453,14 +476,14 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             .FirstOrDefaultAsync(m => m.Id == id && m.IsActive, ct);
 
         if (checklist == null)
-            return ServiceResult.FailureResult("Checklist not found");
+            return ServiceResult.NotFound(_localizer["MeetingPrep.ChecklistNotFound"]);
 
         if (!await _accessService.HasMinimumRoleAsync(checklist.ChildProfileId, userId, AccessRole.Owner, ct))
-            return ServiceResult.FailureResult("Checklist not found");
+            return ServiceResult.NotFound(_localizer["MeetingPrep.ChecklistNotFound"]);
 
         checklist.IsActive = false;
         await _context.SaveChangesAsync(ct);
-        return ServiceResult.SuccessResult("Checklist deleted");
+        return ServiceResult.SuccessResult(_localizer["MeetingPrep.ChecklistDeleted"]);
     }
 
     /// <summary>
@@ -831,9 +854,11 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
 
     private async Task<MeetingPrepResponse?> CallClaudeAsync(string userPrompt, string systemPrompt, CancellationToken ct)
     {
+        // CurrentUICulture is the checklist's captured language here — GenerateChecklistAsync (the only
+        // caller) wraps its whole body in CultureScope.For(checklist.Language) before this runs.
         var responseText = await _claudeClient.CompleteAsync(new ClaudeCompletionRequest
         {
-            SystemPrompt = systemPrompt,
+            SystemPrompt = systemPrompt + ResponseLanguage.SystemLine(CultureInfo.CurrentUICulture),
             UserText = userPrompt,
             MaxTokens = 8192,
         }, ct);
@@ -886,6 +911,7 @@ Return ONLY valid JSON, no markdown formatting or code fences.";
             GoalGaps = DeserializeOrEmpty(entity.GoalGaps),
             GeneralTips = DeserializeOrEmpty(entity.GeneralTips),
             ErrorMessage = entity.ErrorMessage,
+            GeneratedLanguage = entity.Language,
             CreatedAt = entity.CreatedAt,
         };
     }

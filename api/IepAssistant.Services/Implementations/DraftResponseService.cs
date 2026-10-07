@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -15,11 +16,13 @@ namespace IepAssistant.Services.Implementations;
 /// </summary>
 public class DraftResponseService : IDraftResponseService
 {
-    private const string RevisionNotFoundMessage = "Shared draft revision not found.";
+    // Multilingual plan Phase 3: these three stay English-literal consts, used only by the staff-only
+    // methods below (GetForInstanceAsync, ResolveAsync — out of scope here, deferred to Phase 5).
+    // CreateAsync/GetForParentAsync (parent-reachable) use the localized Documents.Permission /
+    // DraftSharing.RevisionNotFound / DraftResponses.NotActiveRevision resources directly instead.
     private const string InstanceNotFoundMessage = "Document not found.";
     private const string PermissionMessage = "You do not have permission to access this document.";
     private const string ResponseNotFoundMessage = "Response not found.";
-    private const string NotActiveMessage = "You can only respond to the currently active revision.";
     private const string ResolveRequiresInputMessage = "Provide a reply or mark this resolved in the draft.";
     private const int MaxTextLength = 2000;
     private const int MaxTargetRowIdLength = 64; // matches the DraftResponses.TargetRowId column
@@ -29,43 +32,49 @@ public class DraftResponseService : IDraftResponseService
     private readonly IOrgAccessService _orgAccess;
     private readonly INotificationService _notifications;
     private readonly ILogger<DraftResponseService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public DraftResponseService(
         ApplicationDbContext context,
         IAccessService accessService,
         IOrgAccessService orgAccess,
         INotificationService notifications,
-        ILogger<DraftResponseService> logger)
+        ILogger<DraftResponseService> logger,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _accessService = accessService;
         _orgAccess = orgAccess;
         _notifications = notifications;
         _logger = logger;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<DraftResponseModel>> CreateAsync(int parentUserId, int revisionId, CreateDraftResponseModel model, CancellationToken ct = default)
     {
         if (!Enum.IsDefined(model.Kind))
-            return ServiceResult<DraftResponseModel>.FailureResult("Invalid kind.");
+            return ServiceResult<DraftResponseModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DraftResponses.InvalidKind"]);
         if (string.IsNullOrWhiteSpace(model.Text))
-            return ServiceResult<DraftResponseModel>.FailureResult("Text is required.");
+            return ServiceResult<DraftResponseModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DraftResponses.TextRequired"]);
         var text = model.Text.Trim();
         if (text.Length > MaxTextLength)
-            return ServiceResult<DraftResponseModel>.FailureResult($"Text must be {MaxTextLength} characters or fewer.");
+            return ServiceResult<DraftResponseModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DraftResponses.TextTooLong", MaxTextLength]);
         if (model.TargetRowId is { Length: > MaxTargetRowIdLength })
-            return ServiceResult<DraftResponseModel>.FailureResult($"Target row id must be {MaxTargetRowIdLength} characters or fewer.");
+            return ServiceResult<DraftResponseModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DraftResponses.TargetRowIdTooLong", MaxTargetRowIdLength]);
 
+        // Multilingual plan Phase 3: this is a parent-reachable path, localized directly rather than
+        // through the shared English-only RevisionNotFoundMessage/PermissionMessage consts, which stay
+        // untouched for the staff-only methods below (GetForInstanceAsync, ResolveAsync — Phase 5).
         var header = await LoadRevisionHeaderAsync(revisionId, ct);
         if (header == null)
-            return ServiceResult<DraftResponseModel>.FailureResult(RevisionNotFoundMessage);
+            return ServiceResult<DraftResponseModel>.FailureResult(ServiceErrorKind.NotFound, _localizer["DraftSharing.RevisionNotFound"]);
 
         var childId = await ParentAccessResolver.ResolveChildIdAsync(_context, _accessService, parentUserId, header.SchoolStudentId, AccessRole.Collaborator, ct);
         if (childId == null)
-            return ServiceResult<DraftResponseModel>.FailureResult(PermissionMessage);
+            return ServiceResult<DraftResponseModel>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Documents.Permission"]);
 
         if (header.Status != SharedDraftStatus.Active)
-            return ServiceResult<DraftResponseModel>.FailureResult(NotActiveMessage);
+            return ServiceResult<DraftResponseModel>.FailureResult(ServiceErrorKind.Validation, _localizer["DraftResponses.NotActiveRevision"]);
 
         var response = new DraftResponse
         {
@@ -91,9 +100,9 @@ public class DraftResponseService : IDraftResponseService
     {
         var header = await LoadRevisionHeaderAsync(revisionId, ct);
         if (header == null)
-            return ServiceResult<List<DraftResponseModel>>.FailureResult(RevisionNotFoundMessage);
+            return ServiceResult<List<DraftResponseModel>>.FailureResult(ServiceErrorKind.NotFound, _localizer["DraftSharing.RevisionNotFound"]);
         if (await ParentAccessResolver.ResolveChildIdAsync(_context, _accessService, parentUserId, header.SchoolStudentId, AccessRole.Viewer, ct) == null)
-            return ServiceResult<List<DraftResponseModel>>.FailureResult(PermissionMessage);
+            return ServiceResult<List<DraftResponseModel>>.FailureResult(ServiceErrorKind.Forbidden, _localizer["Documents.Permission"]);
 
         var rows = await ProjectResponseRows(_context.DraftResponses.AsNoTracking()
                 .Where(r => r.SharedDraftRevisionId == revisionId && r.ParentUserId == parentUserId)

@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Goals;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -19,10 +21,12 @@ namespace IepAssistant.Api.Controllers;
 public class GoalsController : ControllerBase
 {
     private readonly IGoalRecordService _goals;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public GoalsController(IGoalRecordService goals)
+    public GoalsController(IGoalRecordService goals, IStringLocalizer<Messages> localizer)
     {
         _goals = goals;
+        _localizer = localizer;
     }
 
     [HttpGet("api/educator/students/{id:int}/goals")]
@@ -31,7 +35,7 @@ public class GoalsController : ControllerBase
     public async Task<IActionResult> GetForStudent(int id, CancellationToken ct)
     {
         var result = await _goals.GetForStudentAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<List<GoalRecordDto>>.SuccessResponse(result.Data!.Select(GoalMappers.MapRecord).ToList()));
     }
 
@@ -41,7 +45,7 @@ public class GoalsController : ControllerBase
     public async Task<IActionResult> GetHistoryForStudent(int id, CancellationToken ct)
     {
         var result = await _goals.GetHistoryForStudentAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<List<GoalLineageDto>>.SuccessResponse(result.Data!.Select(GoalMappers.MapLineage).ToList()));
     }
 
@@ -51,7 +55,7 @@ public class GoalsController : ControllerBase
     public async Task<IActionResult> GetForChild(int childId, CancellationToken ct)
     {
         var result = await _goals.GetForChildAsync(User.GetUserId(), childId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<List<GoalRecordDto>>.SuccessResponse(result.Data!.Select(GoalMappers.MapRecord).ToList()));
     }
 
@@ -62,7 +66,7 @@ public class GoalsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AddObservation(int goalRecordId, [FromBody] CreateGoalObservationRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _goals.AddObservationAsync(User.GetUserId(), goalRecordId, new CreateGoalObservationModel
         {
@@ -71,7 +75,7 @@ public class GoalsController : ControllerBase
             Unit = request.Unit,
             Note = request.Note
         }, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var dto = GoalMappers.MapObservation(result.Data!);
         return Created($"/api/goals/{goalRecordId}/observations", ApiResponse<GoalObservationDto>.SuccessResponse(dto));
@@ -84,14 +88,14 @@ public class GoalsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateStatus(int goalRecordId, [FromBody] UpdateGoalStatusRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _goals.UpdateStatusAsync(User.GetUserId(), goalRecordId, new UpdateGoalStatusModel
         {
             Status = request.Status,
             Reason = request.Reason
         }, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<GoalRecordDto>.SuccessResponse(GoalMappers.MapRecord(result.Data!)));
     }
 
@@ -102,26 +106,14 @@ public class GoalsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RecordRetirement(int instanceId, [FromBody] CreateGoalRetirementRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _goals.RecordRetirementAsync(User.GetUserId(), instanceId, new CreateGoalRetirementModel
         {
             LineageId = request.LineageId,
             Reason = request.Reason
         }, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return StatusCode(StatusCodes.Status201Created);
-    }
-
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
     }
 }

@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Drafts;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -22,17 +24,20 @@ public class SharedDraftsController : ControllerBase
     private readonly IDraftExplanationService _explanations;
     private readonly IDraftQuestionService _questions;
     private readonly IDraftResponseService _responses;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public SharedDraftsController(
         IDraftSharingService sharing,
         IDraftExplanationService explanations,
         IDraftQuestionService questions,
-        IDraftResponseService responses)
+        IDraftResponseService responses,
+        IStringLocalizer<Messages> localizer)
     {
         _sharing = sharing;
         _explanations = explanations;
         _questions = questions;
         _responses = responses;
+        _localizer = localizer;
     }
 
     [HttpGet("api/children/{childId:int}/shared-drafts")]
@@ -41,7 +46,7 @@ public class SharedDraftsController : ControllerBase
     public async Task<IActionResult> ListForChild(int childId, CancellationToken ct)
     {
         var result = await _sharing.ListForParentAsync(User.GetUserId(), childId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<List<SharedDraftRevisionDto>>.SuccessResponse(result.Data!.Select(DraftSharingMappers.MapRevision).ToList()));
     }
 
@@ -52,7 +57,7 @@ public class SharedDraftsController : ControllerBase
     public async Task<IActionResult> Get(int rev, CancellationToken ct)
     {
         var result = await _sharing.GetForParentAsync(User.GetUserId(), rev, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<SharedDraftRevisionDetailDto>.SuccessResponse(DraftSharingMappers.MapDetail(result.Data!)));
     }
 
@@ -64,7 +69,7 @@ public class SharedDraftsController : ControllerBase
     public async Task<IActionResult> GetExplanations(int rev, CancellationToken ct)
     {
         var result = await _explanations.GetOrGenerateAsync(User.GetUserId(), rev, ct);
-        if (!result.Success) return MapExplanationFailure(result.Message);
+        if (!result.Success) return MapExplanationFailure(result);
         return Ok(ApiResponse<DraftExplanationDto>.SuccessResponse(DraftSharingMappers.MapExplanation(result.Data!)));
     }
 
@@ -75,7 +80,7 @@ public class SharedDraftsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Ask(int rev, [FromBody] AskQuestionRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _questions.AskAsync(User.GetUserId(), rev, new AskDraftQuestionModel
         {
@@ -83,7 +88,7 @@ public class SharedDraftsController : ControllerBase
             TargetFieldKey = request.TargetFieldKey,
             TargetRowId = request.TargetRowId
         }, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<DraftAnswerDto>.SuccessResponse(DraftSharingMappers.MapAnswer(result.Data!)));
     }
 
@@ -94,7 +99,7 @@ public class SharedDraftsController : ControllerBase
     public async Task<IActionResult> GetNotes(int rev, CancellationToken ct)
     {
         var result = await _questions.GetNotesAsync(User.GetUserId(), rev, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<List<ParentDraftNoteDto>>.SuccessResponse(result.Data!.Select(DraftSharingMappers.MapNote).ToList()));
     }
 
@@ -104,7 +109,7 @@ public class SharedDraftsController : ControllerBase
     public async Task<IActionResult> DeleteNote(int id, CancellationToken ct)
     {
         var result = await _questions.DeleteNoteAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return NotFound(ApiResponse<object>.Error(result.Message ?? "Not found"));
+        if (!result.Success) return NotFound(ApiResponse<object>.Error(result.Message ?? _localizer["Api.NotFound"].Value));
         return NoContent();
     }
 
@@ -115,7 +120,7 @@ public class SharedDraftsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> CreateResponse(int rev, [FromBody] CreateResponseRequest request, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
+        if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _responses.CreateAsync(User.GetUserId(), rev, new CreateDraftResponseModel
         {
@@ -124,7 +129,7 @@ public class SharedDraftsController : ControllerBase
             TargetFieldKey = request.TargetFieldKey,
             TargetRowId = request.TargetRowId
         }, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var dto = DraftSharingMappers.MapResponse(result.Data!);
         return Created($"/api/shared-drafts/{rev}/responses", ApiResponse<DraftResponseDto>.SuccessResponse(dto));
@@ -137,7 +142,7 @@ public class SharedDraftsController : ControllerBase
     public async Task<IActionResult> GetResponses(int rev, CancellationToken ct)
     {
         var result = await _responses.GetForParentAsync(User.GetUserId(), rev, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<List<DraftResponseDto>>.SuccessResponse(result.Data!.Select(DraftSharingMappers.MapResponse).ToList()));
     }
 
@@ -148,26 +153,18 @@ public class SharedDraftsController : ControllerBase
     public async Task<IActionResult> Acknowledge(int rev, CancellationToken ct)
     {
         var result = await _sharing.AcknowledgeAsync(User.GetUserId(), rev, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<SharedDraftRevisionDto>.SuccessResponse(DraftSharingMappers.MapRevision(result.Data!)));
     }
 
-    private IActionResult MapExplanationFailure(string? message)
+    // Multilingual plan Phase 3: IDraftExplanationService (AI-owned, out of scope here) is not yet
+    // converted to ServiceErrorKind, so its "temporarily unavailable" case keeps its own English-only
+    // text match ahead of the shared kind-based mapper — consistent with MapServiceFailure's own
+    // ErrorKind.None fallback for any service not yet converted.
+    private IActionResult MapExplanationFailure(ServiceResult result)
     {
-        if (message != null && message.Contains("temporarily unavailable", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse<object>.Error(message));
-        return MapFailure(message);
-    }
-
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
+        if (result.Message != null && result.Message.Contains("temporarily unavailable", StringComparison.OrdinalIgnoreCase))
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse<object>.Error(result.Message));
+        return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
     }
 }

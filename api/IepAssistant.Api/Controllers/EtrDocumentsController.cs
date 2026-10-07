@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.EtrDocuments;
 using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -19,19 +21,22 @@ public class EtrDocumentsController : ControllerBase
     private readonly IAccessService _accessService;
     private readonly ISubscriptionService _subscriptionService;
     private readonly EtrProcessingQueue _processingQueue;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public EtrDocumentsController(
         IEtrDocumentService etrDocumentService,
         IEtrProcessingService etrProcessingService,
         IAccessService accessService,
         ISubscriptionService subscriptionService,
-        EtrProcessingQueue processingQueue)
+        EtrProcessingQueue processingQueue,
+        IStringLocalizer<Messages> localizer)
     {
         _etrDocumentService = etrDocumentService;
         _etrProcessingService = etrProcessingService;
         _accessService = accessService;
         _subscriptionService = subscriptionService;
         _processingQueue = processingQueue;
+        _localizer = localizer;
     }
 
     [HttpGet("api/children/{childId}/etrs")]
@@ -63,7 +68,7 @@ public class EtrDocumentsController : ControllerBase
         var document = await _etrDocumentService.GetByIdAsync(id, userId, cancellationToken);
 
         if (document == null)
-            return NotFound(ApiResponse<object>.Error("ETR document not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["EtrDocumentsApi.NotFound"]));
 
         return Ok(ApiResponse<EtrDocumentDto>.SuccessResponse(MapToDto(document)));
     }
@@ -74,7 +79,7 @@ public class EtrDocumentsController : ControllerBase
     public async Task<IActionResult> Create(int childId, [FromBody] CreateEtrRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var userId = User.GetUserId();
         var model = new CreateEtrDocumentModel
@@ -88,10 +93,10 @@ public class EtrDocumentsController : ControllerBase
         var result = await _etrDocumentService.CreateAsync(childId, userId, model, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Creation failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["DocumentsApi.CreationFailed"].Value));
 
         var dto = MapToDto(result.Data!);
-        return CreatedAtAction(nameof(GetById), new { id = dto.Id }, ApiResponse<EtrDocumentDto>.SuccessResponse(dto, "ETR created successfully"));
+        return CreatedAtAction(nameof(GetById), new { id = dto.Id }, ApiResponse<EtrDocumentDto>.SuccessResponse(dto, _localizer["EtrDocumentsApi.Created"]));
     }
 
     [HttpPost("api/etrs/{id}/upload")]
@@ -101,17 +106,17 @@ public class EtrDocumentsController : ControllerBase
     public async Task<IActionResult> Upload(int id, IFormFile file, CancellationToken cancellationToken)
     {
         if (file == null || file.Length == 0)
-            return BadRequest(ApiResponse<object>.Error("No file provided"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["DocumentsApi.NoFileProvided"]));
 
         if (!file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-            return BadRequest(ApiResponse<object>.Error("Only PDF files are supported"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["DocumentsApi.OnlyPdfSupported"]));
 
         // Validate PDF magic bytes
         using var stream = file.OpenReadStream();
         var header = new byte[5];
         var bytesRead = await stream.ReadAsync(header, 0, 5, cancellationToken);
         if (bytesRead < 5 || System.Text.Encoding.ASCII.GetString(header) != "%PDF-")
-            return BadRequest(ApiResponse<object>.Error("File does not appear to be a valid PDF"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["DocumentsApi.InvalidPdf"]));
         stream.Position = 0;
 
         var sanitizedFileName = Path.GetFileName(file.FileName);
@@ -120,24 +125,24 @@ public class EtrDocumentsController : ControllerBase
         // Ownership + role check before subscription check (mirror IEP: service also checks, but do explicit role gate here)
         var document = await _etrDocumentService.GetByIdAsync(id, userId, cancellationToken);
         if (document == null)
-            return NotFound(ApiResponse<object>.Error("ETR document not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["EtrDocumentsApi.NotFound"]));
 
         if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return StatusCode(403, ApiResponse<object>.Error("Insufficient permissions"));
+            return StatusCode(403, ApiResponse<object>.Error(_localizer["DocumentsApi.InsufficientPermissions"]));
 
         if (!await _subscriptionService.HasActiveSubscriptionAsync(userId, cancellationToken))
-            return StatusCode(402, ApiResponse<object>.Error("Active subscription required to upload and process ETR documents"));
+            return StatusCode(402, ApiResponse<object>.Error(_localizer["EtrDocumentsApi.SubscriptionRequired"]));
 
         var result = await _etrDocumentService.AttachFileAsync(id, userId, sanitizedFileName, stream, file.Length, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Upload failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["DocumentsApi.UploadFailed"].Value));
 
         var dto = MapToDto(result.Data!);
 
         await _processingQueue.EnqueueAsync(dto.Id, cancellationToken);
 
-        return Ok(ApiResponse<EtrDocumentDto>.SuccessResponse(dto, "File attached successfully"));
+        return Ok(ApiResponse<EtrDocumentDto>.SuccessResponse(dto, _localizer["DocumentsApi.FileAttached"]));
     }
 
     [HttpPut("api/etrs/{id}/metadata")]
@@ -156,14 +161,12 @@ public class EtrDocumentsController : ControllerBase
 
         var result = await _etrDocumentService.UpdateMetadataAsync(id, userId, model, cancellationToken);
 
+        // Multilingual plan Phase 3: status came from matching translated text ("not found"); the service
+        // now sets ErrorKind.NotFound/Validation explicitly, so use the shared kind-based mapper instead.
         if (!result.Success)
-        {
-            if (result.Message?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
-                return NotFound(ApiResponse<object>.Error(result.Message));
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Update failed"));
-        }
+            return this.MapServiceFailure(result, _localizer["DocumentsApi.UpdateFailed"]);
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "Metadata updated successfully"));
+        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["Documents.MetadataUpdatedSuccessfully"]));
     }
 
     [HttpGet("api/etrs/{id}/download")]
@@ -175,7 +178,7 @@ public class EtrDocumentsController : ControllerBase
         var url = await _etrDocumentService.GetDownloadUrlAsync(id, userId, cancellationToken);
 
         if (url == null)
-            return NotFound(ApiResponse<object>.Error("Document not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["DocumentsApi.DocumentNotFound"]));
 
         return Ok(ApiResponse<object>.SuccessResponse(new { url }));
     }
@@ -200,16 +203,16 @@ public class EtrDocumentsController : ControllerBase
         var document = await _etrDocumentService.GetByIdAsync(id, userId, cancellationToken);
 
         if (document == null)
-            return NotFound(ApiResponse<object>.Error("Document not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["DocumentsApi.DocumentNotFound"]));
 
         if (!await _accessService.HasMinimumRoleAsync(document.ChildProfileId, userId, AccessRole.Collaborator, cancellationToken))
-            return StatusCode(403, ApiResponse<object>.Error("Insufficient permissions"));
+            return StatusCode(403, ApiResponse<object>.Error(_localizer["DocumentsApi.InsufficientPermissions"]));
 
         if (document.Status == "processing")
-            return Conflict(ApiResponse<object>.Error("Document is already being processed"));
+            return Conflict(ApiResponse<object>.Error(_localizer["EtrDocumentsApi.AlreadyProcessing"]));
 
         await _processingQueue.EnqueueAsync(id, cancellationToken);
-        return Accepted(ApiResponse<object>.SuccessResponse(null, "Document queued for processing"));
+        return Accepted(ApiResponse<object>.SuccessResponse(null, _localizer["DocumentsApi.QueuedForProcessing"]));
     }
 
     [HttpDelete("api/etrs/{id}")]
@@ -221,9 +224,9 @@ public class EtrDocumentsController : ControllerBase
         var result = await _etrDocumentService.DeleteAsync(id, userId, cancellationToken);
 
         if (!result.Success)
-            return NotFound(ApiResponse<object>.Error(result.Message ?? "Delete failed"));
+            return NotFound(ApiResponse<object>.Error(result.Message ?? _localizer["DocumentsApi.DeleteFailed"].Value));
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "Document deleted successfully"));
+        return Ok(ApiResponse<object>.SuccessResponse(null, _localizer["DocumentsApi.DocumentDeleted"]));
     }
 
     private static EtrDocumentListItemDto MapToListItemDto(EtrDocumentListItemModel model) => new()

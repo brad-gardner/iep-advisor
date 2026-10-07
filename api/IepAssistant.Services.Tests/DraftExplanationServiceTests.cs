@@ -51,7 +51,7 @@ public sealed class DraftExplanationServiceTests : IDisposable
     }
 
     private DraftExplanationService CreateService(ApplicationDbContext ctx) =>
-        new(ctx, new AccessService(ctx), _claude, NullLogger<DraftExplanationService>.Instance);
+        new(ctx, new AccessService(ctx), _claude, TestSupport.TestLocalizers.Ai(), NullLogger<DraftExplanationService>.Instance);
 
     private sealed record Scenario(int RevisionId, int DistrictId, int ParentId, int ChildId, Guid GoalsKey, Guid GoalCol, string RowId);
 
@@ -229,6 +229,52 @@ public sealed class DraftExplanationServiceTests : IDisposable
         Assert.Equal(3, rendered.ResolveSection("Goals and Services")!.Value.Id); // longest contained title wins
         Assert.Null(rendered.ResolveSection("Services and Supports")); // two same-length candidates — ambiguous
         Assert.Null(rendered.ResolveSection("Placement"));
+    }
+
+    // ------------------------------------------------------------------ multilingual plan phase 3
+
+    [Fact]
+    public async Task GetOrGenerate_FirstReadUnderSpanish_CachesSpanish_AndALaterEnglishReaderSeesTheCachedSpanishLanguage()
+    {
+        var s = Seed("lang-es");
+        _claude.CannedResponse = $$"""
+        {"sections": [{"title": "Annual goals", "explanation": "Esto es lo que trabajará su hijo."}], "items": []}
+        """;
+
+        using (var ctx = CreateContext())
+        {
+            ServiceResult<DraftExplanationModel> first;
+            using (IepAssistant.Services.Localization.CultureScope.For("es"))
+                first = await CreateService(ctx).GetOrGenerateAsync(s.ParentId, s.RevisionId, default);
+
+            Assert.True(first.Success, first.Message);
+            Assert.Equal("es", first.Data!.GeneratedLanguage);
+            Assert.Contains("Spanish", _claude.LastRequest!.SystemPrompt);
+        }
+
+        // A later reader under English still gets the cached (Spanish) explanation — never
+        // regenerated — and GeneratedLanguage tells the UI it was generated in Spanish.
+        using (var ctx = CreateContext())
+        {
+            var second = await CreateService(ctx).GetOrGenerateAsync(s.ParentId, s.RevisionId, default);
+            Assert.True(second.Success, second.Message);
+            Assert.Equal("es", second.Data!.GeneratedLanguage);
+            Assert.Equal(1, _claude.CallCount); // never regenerated
+        }
+    }
+
+    [Fact]
+    public async Task GetOrGenerate_UnderEnglishCulture_CapturesEnglish_NeverAppendsResponseLanguageLine()
+    {
+        var s = Seed("lang-en");
+        _claude.CannedResponse = """{"sections": [{"title": "Annual goals", "explanation": "What your child will work on."}], "items": []}""";
+
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx).GetOrGenerateAsync(s.ParentId, s.RevisionId, default);
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal("en", result.Data!.GeneratedLanguage);
+        Assert.DoesNotContain("RESPONSE LANGUAGE", _claude.LastRequest!.SystemPrompt, StringComparison.OrdinalIgnoreCase);
     }
 
     public void Dispose() => _connection.Dispose();

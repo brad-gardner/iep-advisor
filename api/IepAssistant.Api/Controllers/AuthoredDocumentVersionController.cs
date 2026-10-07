@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.BackgroundServices;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Documents;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 
 namespace IepAssistant.Api.Controllers;
@@ -23,12 +25,15 @@ public class AuthoredDocumentVersionController : ControllerBase
     private readonly IAuthoredDocumentVersionService _service;
     private readonly ISignedArtifactService _signedArtifacts;
     private readonly AuthoredDocumentPdfQueue _pdfQueue;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public AuthoredDocumentVersionController(IAuthoredDocumentVersionService service, ISignedArtifactService signedArtifacts, AuthoredDocumentPdfQueue pdfQueue)
+    public AuthoredDocumentVersionController(
+        IAuthoredDocumentVersionService service, ISignedArtifactService signedArtifacts, AuthoredDocumentPdfQueue pdfQueue, IStringLocalizer<Messages> localizer)
     {
         _service = service;
         _signedArtifacts = signedArtifacts;
         _pdfQueue = pdfQueue;
+        _localizer = localizer;
     }
 
     // ---------------------------------------------------------------- Finalize
@@ -48,7 +53,7 @@ public class AuthoredDocumentVersionController : ControllerBase
             // label + row index) so the UI can surface them all at once.
             if (result.Errors.Count > 0)
                 return UnprocessableEntity(new ApiResponse<object> { Success = false, Message = result.Message, Errors = result.Errors });
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         }
 
         // After-commit, failure-isolated: FinalizeAsync already committed the version (+ a Pending PDF row).
@@ -69,7 +74,7 @@ public class AuthoredDocumentVersionController : ControllerBase
     public async Task<IActionResult> ListForStudent(int studentId, CancellationToken ct)
     {
         var result = await _service.ListVersionsForStudentAsync(studentId, User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<IEnumerable<AuthoredDocumentVersionSummaryDto>>.SuccessResponse(
             result.Data!.Select(AuthoredDocumentVersionMappers.MapSummary)));
@@ -83,7 +88,7 @@ public class AuthoredDocumentVersionController : ControllerBase
     public async Task<IActionResult> ListForChild(int childId, CancellationToken ct)
     {
         var result = await _service.ListForChildAsync(childId, User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<IEnumerable<AuthoredDocumentVersionSummaryDto>>.SuccessResponse(
             result.Data!.Select(AuthoredDocumentVersionMappers.MapSummary)));
@@ -98,7 +103,7 @@ public class AuthoredDocumentVersionController : ControllerBase
     public async Task<IActionResult> GetVersion(int versionId, CancellationToken ct)
     {
         var result = await _service.GetVersionAsync(versionId, User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<AuthoredDocumentVersionDetailDto>.SuccessResponse(
             AuthoredDocumentVersionMappers.MapDetail(result.Data!)));
@@ -113,7 +118,7 @@ public class AuthoredDocumentVersionController : ControllerBase
     public async Task<IActionResult> GetPdf(int versionId, CancellationToken ct)
     {
         var result = await _service.GetPdfStatusAsync(versionId, User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<AuthoredDocumentPdfStatusDto>.SuccessResponse(
             AuthoredDocumentVersionMappers.MapPdfStatus(result.Data!)));
@@ -128,7 +133,7 @@ public class AuthoredDocumentVersionController : ControllerBase
         // Distinct from the status poll: this mints the SAS and records the FERPA Export audit, so it
         // is called only when the user actually downloads.
         var result = await _service.GetPdfDownloadUrlAsync(versionId, User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<AuthoredDocumentPdfDownloadDto>.SuccessResponse(
             new AuthoredDocumentPdfDownloadDto { Url = result.Data! }));
@@ -142,7 +147,7 @@ public class AuthoredDocumentVersionController : ControllerBase
     public async Task<IActionResult> RetryPdf(int versionId, CancellationToken ct)
     {
         var result = await _service.RequestPdfRetryAsync(versionId, User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         // The service committed the Pending flip; now enqueue the re-render (after-commit, isolated).
         await _pdfQueue.EnqueueAsync(result.Data, CancellationToken.None);
@@ -160,14 +165,14 @@ public class AuthoredDocumentVersionController : ControllerBase
     public async Task<IActionResult> Amend(int versionId, [FromBody] AmendDocumentVersionRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _service.AmendAsync(versionId, User.GetUserId(), new IepAssistant.Services.Models.AmendDocumentVersionModel
         {
             Reason = request.Reason,
             EffectiveDate = request.EffectiveDate
         }, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var instanceId = result.Data!.InstanceId;
         return Created($"/api/documents/{instanceId}", ApiResponse<AmendResultDto>.SuccessResponse(new AmendResultDto { InstanceId = instanceId }));
@@ -184,15 +189,15 @@ public class AuthoredDocumentVersionController : ControllerBase
     public async Task<IActionResult> UploadSignedArtifact(int versionId, CancellationToken ct)
     {
         if (!Request.HasFormContentType)
-            return BadRequest(ApiResponse<object>.Error("A multipart form with a file is required."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthoredDocumentsApi.MultipartFileRequired"]));
 
         var form = await Request.ReadFormAsync(ct);
         var file = form.Files.GetFile("file");
         if (file == null || file.Length == 0)
-            return BadRequest(ApiResponse<object>.Error("file is required."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthoredDocumentsApi.FileRequired"]));
 
         if (!Enum.TryParse<IepAssistant.Domain.Entities.SignatureStatus>(form["signatureStatus"], out var signatureStatus))
-            return BadRequest(ApiResponse<object>.Error("signatureStatus must be PartiallySigned or Signed."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthoredDocumentsApi.SignatureStatusInvalid"]));
 
         await using var stream = file.OpenReadStream();
         var result = await _signedArtifacts.UploadAsync(User.GetUserId(), versionId, new IepAssistant.Services.Models.UploadSignedArtifactModel
@@ -204,7 +209,7 @@ public class AuthoredDocumentVersionController : ControllerBase
             SignerSummary = form["signerSummary"],
             SignatureStatus = signatureStatus
         }, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var dto = AuthoredDocumentVersionMappers.MapSignedArtifact(result.Data!);
         return CreatedAtAction(nameof(ListSignedArtifacts), new { versionId }, ApiResponse<SignedArtifactDto>.SuccessResponse(dto));
@@ -217,7 +222,7 @@ public class AuthoredDocumentVersionController : ControllerBase
     public async Task<IActionResult> ListSignedArtifacts(int versionId, CancellationToken ct)
     {
         var result = await _signedArtifacts.ListAsync(User.GetUserId(), versionId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<List<SignedArtifactDto>>.SuccessResponse(result.Data!.Select(AuthoredDocumentVersionMappers.MapSignedArtifact).ToList()));
     }
 
@@ -228,28 +233,8 @@ public class AuthoredDocumentVersionController : ControllerBase
     public async Task<IActionResult> DownloadSignedArtifact(int artifactId, CancellationToken ct)
     {
         var result = await _signedArtifacts.GetDownloadUrlAsync(User.GetUserId(), artifactId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
         return Ok(ApiResponse<AuthoredDocumentPdfDownloadDto>.SuccessResponse(new AuthoredDocumentPdfDownloadDto { Url = result.Data! }));
     }
 
-    // ---------------------------------------------------------------- Helpers
-
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        // State conflicts (already finalizing, wrong state, or a concurrent-finalize race) → 409.
-        if (message.Contains("already being finalized", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("at the same time", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("cannot be finalized", StringComparison.OrdinalIgnoreCase))
-            return Conflict(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

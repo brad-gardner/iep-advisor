@@ -26,4 +26,9 @@ public class DraftExplanationModel
     public List<ExplanationSectionModel> Sections { get; set; } = new();
     public List<ExplanationItemModel> Items { get; set; } = new();
     public string Disclaimer { get; set; } = string.Empty;
+
+    /// <summary>"en" | "es" — the language this explanation was generated in (multilingual plan
+    /// 2026-10-06 phase 3). Set from the persisted <see cref="Domain.Entities.SharedDraftExplanation.Language"/>
+    /// on every read, never from this model's own serialized JSON.</summary>
+    public string GeneratedLanguage { get; set; } = string.Empty;
 }

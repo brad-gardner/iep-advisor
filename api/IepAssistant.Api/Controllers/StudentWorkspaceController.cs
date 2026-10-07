@@ -12,8 +12,8 @@ namespace IepAssistant.Api.Controllers;
 /// <summary>
 /// P8a student self-advocacy workspace. The student owns CRUD over their own entries (private until
 /// shared) plus a suggest-only AI
-/// interview. Educators and parents may read SHAREABLE entries only. Failures map permission→403,
-/// not-found→404, "temporarily unavailable"→503, else 400.
+/// interview. Educators and parents may read SHAREABLE entries only. Failures map to a status via
+/// <see cref="ServiceErrorKind"/> (<see cref="MapFailure"/>), never by matching message text.
 /// </summary>
 [ApiController]
 [Authorize]
@@ -35,7 +35,7 @@ public class StudentWorkspaceController : ControllerBase
     {
 
         var result = await _service.GetMyWorkspaceAsync(User.GetUserId(), ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return MapFailure(result);
 
         return Ok(ApiResponse<StudentWorkspaceDto>.SuccessResponse(MapWorkspace(result.Data!)));
     }
@@ -53,7 +53,7 @@ public class StudentWorkspaceController : ControllerBase
             return BadRequest(ApiResponse<object>.Error("Invalid entry kind."));
 
         var result = await _service.AddEntryAsync(User.GetUserId(), kind, request.Content, request.IsShareable, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return MapFailure(result);
 
         return Ok(ApiResponse<StudentWorkspaceEntryDto>.SuccessResponse(MapEntry(result.Data!)));
     }
@@ -70,7 +70,7 @@ public class StudentWorkspaceController : ControllerBase
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.UpdateEntryAsync(User.GetUserId(), id, request.Content, request.IsShareable, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return MapFailure(result);
 
         return Ok(ApiResponse<StudentWorkspaceEntryDto>.SuccessResponse(MapEntry(result.Data!)));
     }
@@ -85,7 +85,7 @@ public class StudentWorkspaceController : ControllerBase
     {
 
         var result = await _service.DeleteEntryAsync(User.GetUserId(), id, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return MapFailure(result);
 
         return Ok(ApiResponse<object>.SuccessResponse(null, "Entry deleted."));
     }
@@ -102,7 +102,7 @@ public class StudentWorkspaceController : ControllerBase
         if (!ModelState.IsValid) return BadRequest(ApiResponse<object>.Error("Invalid request"));
 
         var result = await _service.InterviewSuggestAsync(User.GetUserId(), request.Prompt, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return MapFailure(result);
 
         return Ok(ApiResponse<StudentInterviewSuggestionDto>.SuccessResponse(
             new StudentInterviewSuggestionDto { Suggestion = result.Data!.Suggestion }));
@@ -117,7 +117,7 @@ public class StudentWorkspaceController : ControllerBase
     {
 
         var result = await _service.GetShareableEntriesForSchoolStudentAsync(User.GetUserId(), studentId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return MapFailure(result);
 
         return Ok(ApiResponse<List<StudentWorkspaceEntryDto>>.SuccessResponse(result.Data!.Select(MapEntry).ToList()));
     }
@@ -131,7 +131,7 @@ public class StudentWorkspaceController : ControllerBase
     {
 
         var result = await _service.GetShareableEntriesForChildAsync(User.GetUserId(), childId, ct);
-        if (!result.Success) return MapFailure(result.Message);
+        if (!result.Success) return MapFailure(result);
 
         return Ok(ApiResponse<List<StudentWorkspaceEntryDto>>.SuccessResponse(result.Data!.Select(MapEntry).ToList()));
     }
@@ -159,19 +159,5 @@ public class StudentWorkspaceController : ControllerBase
         UpdatedAt = e.UpdatedAt
     };
 
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        if (message.Contains("temporarily unavailable", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(503, ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
+    private IActionResult MapFailure(ServiceResult result) => this.MapServiceFailure(result);
 }

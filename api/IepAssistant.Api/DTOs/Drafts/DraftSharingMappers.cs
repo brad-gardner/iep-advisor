@@ -91,7 +91,8 @@ internal static class DraftSharingMappers
         GeneratedAt = m.GeneratedAt,
         Sections = m.Sections.Select(s => new DraftExplanationSectionDto { SectionId = s.SectionId, Title = s.Title, Explanation = s.Explanation }).ToList(),
         Items = m.Items.Select(i => new DraftExplanationItemDto { FieldKey = i.FieldKey, RowId = i.RowId, Label = i.Label, Explanation = i.Explanation }).ToList(),
-        Disclaimer = m.Disclaimer
+        Disclaimer = m.Disclaimer,
+        GeneratedLanguage = string.IsNullOrEmpty(m.GeneratedLanguage) ? null : m.GeneratedLanguage
     };
 
     public static DraftAnswerDto MapAnswer(DraftAnswerModel m) => new()
@@ -101,7 +102,8 @@ internal static class DraftSharingMappers
         Answer = m.Answer,
         Citations = m.Citations.Select(c => new DraftCitationDto { FieldKey = c.FieldKey, RowId = c.RowId, Label = c.Label, Excerpt = c.Excerpt }).ToList(),
         AnsweredAt = m.AnsweredAt,
-        Disclaimer = m.Disclaimer
+        Disclaimer = m.Disclaimer,
+        GeneratedLanguage = string.IsNullOrEmpty(m.GeneratedLanguage) ? null : m.GeneratedLanguage
     };
 
     public static ParentDraftNoteDto MapNote(ParentDraftNoteModel m) => new()
@@ -113,7 +115,8 @@ internal static class DraftSharingMappers
         TargetFieldKey = m.TargetFieldKey,
         TargetRowId = m.TargetRowId,
         Citations = m.Citations.Select(c => new DraftCitationDto { FieldKey = c.FieldKey, RowId = c.RowId, Label = c.Label, Excerpt = c.Excerpt }).ToList(),
-        CreatedAt = m.CreatedAt
+        CreatedAt = m.CreatedAt,
+        GeneratedLanguage = m.GeneratedLanguage
     };
 
     public static DraftResponseDto MapResponse(DraftResponseModel m) => new()

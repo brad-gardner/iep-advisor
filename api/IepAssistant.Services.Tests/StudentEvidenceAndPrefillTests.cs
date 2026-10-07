@@ -48,7 +48,7 @@ public sealed class StudentEvidenceAndPrefillTests : IDisposable
     {
         var access = new AccessService(ctx);
         var org = new OrgAccessService(ctx);
-        var workspace = new StudentWorkspaceService(ctx, access, org, new NoClaude(), NullLogger<StudentWorkspaceService>.Instance);
+        var workspace = new StudentWorkspaceService(ctx, access, org, new NoClaude(), TestSupport.TestLocalizers.Ai(), NullLogger<StudentWorkspaceService>.Instance);
         var contributions = new ParentContributionService(ctx, access, org, _audit);
         var evidence = new StudentEvidenceService(ctx, org, workspace, contributions, _audit);
         var prefill = new DocumentPrefillService(ctx);
