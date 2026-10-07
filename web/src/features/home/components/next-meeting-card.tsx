@@ -1,5 +1,7 @@
 import { daysUntilFromNow } from '../lib/days-until';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -8,14 +10,14 @@ import { apiErrorMessage } from '@/lib/api-error';
 import { rsvpToMeeting } from '@/features/meetings/api/meetings-api';
 import { RsvpButtonGroup } from '@/features/meetings/components/rsvp-button-group';
 import { formatMeetingWhen } from '@/features/meetings/lib/meeting-time';
-import { INVITE_STATUS_LABELS } from '@/features/meetings/types';
 import type { InviteStatus } from '@/features/meetings/types';
+import { inviteStatusLabel } from '@/lib/invite-status-label';
 import type { HomeMeetingDto } from '../types';
 
-function countdownLabel(daysUntil: number): string {
-  if (daysUntil <= 0) return 'Today';
-  if (daysUntil === 1) return 'Tomorrow';
-  return `In ${daysUntil} days`;
+function countdownLabel(daysUntil: number, t: TFunction<'home'>): string {
+  if (daysUntil <= 0) return t('nextMeeting.today');
+  if (daysUntil === 1) return t('nextMeeting.tomorrow');
+  return t('nextMeeting.inDays', { count: daysUntil });
 }
 
 // How often the live countdown re-derives from the clock. Coarse on purpose —
@@ -48,6 +50,7 @@ export function NextMeetingCard({
   onUpdated,
   'data-testid': testId = 'next-meeting-card',
 }: NextMeetingCardProps) {
+  const { t } = useTranslation('home');
   const [pending, setPending] = useState<InviteStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   // The countdown is derived from the clock at render time; the effect only
@@ -70,10 +73,10 @@ export function NextMeetingCard({
       if (response.success && response.data) {
         onUpdated?.({ ...meeting, myInviteStatus: response.data.myInviteStatus });
       } else {
-        setError(response.message ?? 'Could not record your response');
+        setError(response.message ?? t('nextMeeting.rsvpError'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not record your response'));
+      setError(apiErrorMessage(err, t('nextMeeting.rsvpError')));
     } finally {
       setPending(null);
     }
@@ -83,9 +86,9 @@ export function NextMeetingCard({
     <Card data-testid={testId}>
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <Calendar className="h-4 w-4 text-brand-teal-500" strokeWidth={1.8} aria-hidden="true" />
-        <h2 className="font-serif text-base text-brand-slate-800">Next meeting</h2>
+        <h2 className="font-serif text-base text-brand-slate-800">{t('nextMeeting.heading')}</h2>
         {daysUntil != null && (
-          <Badge variant={daysUntil <= 3 ? 'warning' : 'neutral'}>{countdownLabel(daysUntil)}</Badge>
+          <Badge variant={daysUntil <= 3 ? 'warning' : 'neutral'}>{countdownLabel(daysUntil, t)}</Badge>
         )}
       </div>
       {subtitle && <p className="text-sm text-brand-slate-500">{subtitle}</p>}
@@ -107,7 +110,7 @@ export function NextMeetingCard({
                     : 'neutral'
             }
           >
-            {INVITE_STATUS_LABELS[meeting.myInviteStatus]}
+            {inviteStatusLabel(meeting.myInviteStatus)}
           </Badge>
         </div>
       )}

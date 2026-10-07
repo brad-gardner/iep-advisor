@@ -45,6 +45,9 @@ describe('KnowledgeBasePage deep link', () => {
     expect(target).toHaveAttribute('data-highlighted', 'true');
     expect(cards.find((c) => c.id === 'kb-entry-4')).not.toHaveAttribute('data-highlighted');
     await waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalled());
+
+    // No `lang="en"` override needed when the UI itself is already English.
+    expect(screen.getByRole('heading', { name: 'Prior written notice' })).not.toHaveAttribute('lang');
   });
 
   it('highlights nothing on the plain list', async () => {

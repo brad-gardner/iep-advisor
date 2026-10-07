@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -11,11 +12,18 @@ import { usePageTitle } from '@/hooks/use-page-title';
 import { listNotificationFailures } from '../api/notifications-api';
 import type { NotificationDto } from '../types';
 
+// A server-provided message is already resolved text and shown as-is; the
+// generic fallback is translated at RENDER time (see `error` below) rather
+// than load time, so a language switch after a failed load shows the new
+// language immediately, with no refetch (phase 2 review).
+type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
+
 /** Platform admin: notifications where the email send failed, newest first. */
 export function AdminNotificationFailuresPage() {
-  usePageTitle('Notification email failures');
+  const { t } = useTranslation(['notifications', 'common']);
+  usePageTitle(t('adminFailures.pageTitle'));
   const [items, setItems] = useState<NotificationDto[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
   // Bumped by the "Try again" button to re-run the load effect below.
   const [retryToken, setRetryToken] = useState(0);
 
@@ -27,30 +35,39 @@ export function AdminNotificationFailuresPage() {
         if (!active) return;
         if (response.success && response.data) {
           setItems(response.data);
-          setError(null);
+          setLoadError(null);
         } else {
-          setError(response.message ?? 'Could not load email failures');
+          setLoadError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load email failures'));
+        if (!active) return;
+        const serverMessage = apiErrorMessage(err, '');
+        setLoadError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
       }
     })();
     return () => {
       active = false;
     };
+    // `t` deliberately excluded — see the `LoadError` comment above.
   }, [retryToken]);
 
+  const error = loadError
+    ? loadError.kind === 'server'
+      ? loadError.message
+      : t('adminFailures.loadFailed')
+    : null;
+
   const columns: TableColumn<NotificationDto>[] = [
-    { key: 'kind', header: 'Kind', cell: (n) => n.kind, sortValue: (n) => n.kind },
-    { key: 'title', header: 'Title', cell: (n) => n.title, sortValue: (n) => n.title },
+    { key: 'kind', header: t('adminFailures.columnKind'), cell: (n) => n.kind, sortValue: (n) => n.kind },
+    { key: 'title', header: t('adminFailures.columnTitle'), cell: (n) => n.title, sortValue: (n) => n.title },
     {
       key: 'error',
-      header: 'Error',
+      header: t('adminFailures.columnError'),
       cell: (n) => <span className="text-brand-danger-700">{n.emailError}</span>,
     },
     {
       key: 'created',
-      header: 'Created',
+      header: t('adminFailures.columnCreated'),
       align: 'right',
       cell: (n) => formatDate(n.createdAt),
       sortValue: (n) => n.createdAt,
@@ -58,19 +75,19 @@ export function AdminNotificationFailuresPage() {
   ];
 
   return (
-    <PageLayout title="Notification email failures" subtitle="Notifications where the email send failed.">
+    <PageLayout title={t('adminFailures.pageTitle')} subtitle={t('adminFailures.subtitle')}>
       {error && (
         <div role="alert">
           <Notice variant="error" title={error}>
-            <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
-              Try again
+            <Button size="sm" variant="secondary" onClick={() => setRetryToken((n) => n + 1)}>
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
       )}
       {!error && (
         <Table
-          label="Email failures"
+          label={t('adminFailures.tableLabel')}
           columns={columns}
           rows={items ?? []}
           rowKey={(n) => n.id}
@@ -79,8 +96,8 @@ export function AdminNotificationFailuresPage() {
           empty={
             <EmptyState
               icon={AlertTriangle}
-              title="No email failures"
-              description="Every notification email has sent successfully."
+              title={t('adminFailures.emptyTitle')}
+              description={t('adminFailures.emptyDescription')}
             />
           }
         />

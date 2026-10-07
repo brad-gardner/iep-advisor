@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -17,17 +18,20 @@ public class PasswordResetService : IPasswordResetService
     private readonly ApplicationDbContext _context;
     private readonly IEmailService _emailService;
     private readonly ILogger<PasswordResetService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public PasswordResetService(
         IUserRepository userRepository,
         ApplicationDbContext context,
         IEmailService emailService,
-        ILogger<PasswordResetService> logger)
+        ILogger<PasswordResetService> logger,
+        IStringLocalizer<Messages> localizer)
     {
         _userRepository = userRepository;
         _context = context;
         _emailService = emailService;
         _logger = logger;
+        _localizer = localizer;
     }
 
     public async Task InitiateResetAsync(string email, CancellationToken ct = default)
@@ -77,7 +81,7 @@ public class PasswordResetService : IPasswordResetService
 
         if (resetToken == null)
         {
-            return ServiceResult.FailureResult("Invalid or expired reset token.");
+            return ServiceResult.FailureResult(_localizer["PasswordReset.InvalidOrExpiredToken"]);
         }
 
         var user = resetToken.User;
@@ -106,7 +110,7 @@ public class PasswordResetService : IPasswordResetService
 
         _logger.LogInformation("Password reset completed for user {UserId}", user.Id);
 
-        return ServiceResult.SuccessResult("Password has been reset successfully.");
+        return ServiceResult.SuccessResult(_localizer["PasswordReset.ResetSuccessfully"]);
     }
 
     private static string HashToken(string token)

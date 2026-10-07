@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import type { InviteStatus } from '../types';
 
@@ -13,6 +14,7 @@ interface RsvpButtonGroupProps {
 /** Accept / Tentative / Decline RSVP buttons, shared by every "next meeting"
  * card (parent, student, home). */
 export function RsvpButtonGroup({ onRespond, pending, testIdPrefix }: RsvpButtonGroupProps) {
+  const { t } = useTranslation('common');
   return (
     <div className="mt-3 flex flex-wrap gap-2">
       <Button
@@ -22,7 +24,7 @@ export function RsvpButtonGroup({ onRespond, pending, testIdPrefix }: RsvpButton
         disabled={pending !== null}
         data-testid={`${testIdPrefix}-accept`}
       >
-        Accept
+        {t('inviteStatus.action.accept')}
       </Button>
       <Button
         size="sm"
@@ -32,7 +34,7 @@ export function RsvpButtonGroup({ onRespond, pending, testIdPrefix }: RsvpButton
         disabled={pending !== null}
         data-testid={`${testIdPrefix}-tentative`}
       >
-        Tentative
+        {t('inviteStatus.action.tentative')}
       </Button>
       <Button
         size="sm"
@@ -42,7 +44,7 @@ export function RsvpButtonGroup({ onRespond, pending, testIdPrefix }: RsvpButton
         disabled={pending !== null}
         data-testid={`${testIdPrefix}-decline`}
       >
-        Decline
+        {t('inviteStatus.action.decline')}
       </Button>
     </div>
   );

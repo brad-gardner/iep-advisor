@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { formatDate } from '@/lib/format-date';
 import { ListSection } from './list-section';
 import { WorkItemRow } from './work-item-row';
@@ -11,16 +12,17 @@ import type { ParentProgressReportDto } from '../types';
  * exact viewer — a deliberate deviation given the fixed contract shape.
  */
 export function RecentProgressReportsSection({ items }: { items: ParentProgressReportDto[] }) {
+  const { t } = useTranslation('home');
   return (
     <ListSection
-      title="Recent progress reports"
+      title={t('progressReports.title')}
       data-testid="home-progress-reports"
       items={items}
-      emptyHint="No progress reports yet."
+      emptyHint={t('progressReports.emptyHint')}
       itemKey={(report) => report.id}
       renderRow={(report) => (
         <WorkItemRow
-          title={report.title ?? 'Untitled report'}
+          title={report.title ?? t('progressReports.untitled')}
           subtitle={`${report.childName} · ${formatDate(report.createdAt)}`}
           href={`/children/${report.childId}/ieps`}
           data-testid={`home-progress-reports-${report.id}`}

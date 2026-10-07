@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { BookOpen, FileText, Users, Shield, Calendar, Library, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -35,7 +36,8 @@ function GlossaryTerm({ term, definition }: { term: string; definition: string }
 }
 
 export function Iep101Page() {
-  usePageTitle('IEP 101');
+  const { t } = useTranslation('onboarding');
+  usePageTitle(t('iep101.pageTitle'));
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Page header */}
@@ -49,9 +51,9 @@ export function Iep101Page() {
           />
         </div>
         <div>
-          <h1 className="font-serif text-2xl text-brand-slate-800">IEP 101</h1>
+          <h1 className="font-serif text-2xl text-brand-slate-800">{t('iep101.heading')}</h1>
           <p className="text-sm text-brand-slate-500">
-            Everything you need to know, in plain language
+            {t('iep101.subtitle')}
           </p>
         </div>
       </div>
@@ -61,79 +63,68 @@ export function Iep101Page() {
         to="/knowledge-base"
         className="flex items-center gap-2 text-sm font-medium text-brand-teal-500 hover:text-brand-teal-600 transition-colors"
       >
-        Explore our full Knowledge Base
+        {t('iep101.kbLink')}
         <ArrowRight size={16} strokeWidth={1.8} />
       </Link>
 
       {/* What is an IEP? */}
       <Card>
-        <SectionHeader Icon={FileText} title="What is an IEP?" />
+        <SectionHeader Icon={FileText} title={t('iep101.whatIsHeading')} />
         <p className="text-sm text-brand-slate-600 leading-relaxed">
-          An Individualized Education Program is a legally binding document that
-          outlines the special education services your child will receive. Think
-          of it as your child's educational roadmap — it describes where they are
-          now, where they're headed, and how they'll get there.
+          {t('iep101.whatIsBody')}
         </p>
       </Card>
 
       {/* Who Gets an IEP? */}
       <Card>
-        <SectionHeader Icon={Users} title="Who Gets an IEP?" />
+        <SectionHeader Icon={Users} title={t('iep101.whoGetsHeading')} />
         <p className="text-sm text-brand-slate-600 leading-relaxed">
-          Children aged 3-21 who have a disability that affects their learning.
-          There are 13 categories under IDEA (the Individuals with Disabilities
-          Education Act), including autism, specific learning disabilities,
-          speech/language impairments, and more. Your child must be evaluated and
-          found eligible before an IEP can be created.
+          {t('iep101.whoGetsBody')}
         </p>
       </Card>
 
       {/* What's in an IEP? */}
       <Card>
-        <SectionHeader Icon={FileText} title="What's in an IEP?" />
+        <SectionHeader Icon={FileText} title={t('iep101.whatsInHeading')} />
         <ul className="space-y-3 text-sm text-brand-slate-600">
           <li className="flex gap-2">
             <span className="font-medium text-brand-slate-800 shrink-0">
-              Present Levels:
+              {t('iep101.presentLevelsLabel')}
             </span>
             <span>
-              How your child is currently doing academically and functionally
+              {t('iep101.presentLevelsText')}
             </span>
           </li>
           <li className="flex gap-2">
             <span className="font-medium text-brand-slate-800 shrink-0">
-              Annual Goals:
+              {t('iep101.annualGoalsLabel')}
             </span>
             <span>
-              Measurable targets for the year (these should be SMART — Specific,
-              Measurable, Achievable, Relevant, Time-bound)
+              {t('iep101.annualGoalsText')}
             </span>
           </li>
           <li className="flex gap-2">
             <span className="font-medium text-brand-slate-800 shrink-0">
-              Services:
+              {t('iep101.servicesLabel')}
             </span>
             <span>
-              What support your child will receive (speech therapy, OT, tutoring,
-              etc.)
+              {t('iep101.servicesText')}
             </span>
           </li>
           <li className="flex gap-2">
             <span className="font-medium text-brand-slate-800 shrink-0">
-              Accommodations:
+              {t('iep101.accommodationsLabel')}
             </span>
             <span>
-              Changes to how your child learns or is tested (extra time,
-              preferential seating, etc.)
+              {t('iep101.accommodationsText')}
             </span>
           </li>
           <li className="flex gap-2">
             <span className="font-medium text-brand-slate-800 shrink-0">
-              Placement:
+              {t('iep101.placementLabel')}
             </span>
             <span>
-              Where your child receives services (general education classroom,
-              resource room, etc.)
+              {t('iep101.placementText')}
             </span>
           </li>
         </ul>
@@ -141,28 +132,27 @@ export function Iep101Page() {
 
       {/* Your Rights as a Parent */}
       <Card>
-        <SectionHeader Icon={Shield} title="Your Rights as a Parent" />
+        <SectionHeader Icon={Shield} title={t('iep101.rightsHeading')} />
         <ul className="space-y-2 text-sm text-brand-slate-600">
           <li className="flex items-start gap-2">
             <span className="text-brand-teal-500 mt-1 shrink-0">&#8226;</span>
-            You are an equal member of the IEP team
+            {t('iep101.right1')}
           </li>
           <li className="flex items-start gap-2">
             <span className="text-brand-teal-500 mt-1 shrink-0">&#8226;</span>
-            You must give consent before evaluations and services begin
+            {t('iep101.right2')}
           </li>
           <li className="flex items-start gap-2">
             <span className="text-brand-teal-500 mt-1 shrink-0">&#8226;</span>
-            You have the right to see all records related to your child
+            {t('iep101.right3')}
           </li>
           <li className="flex items-start gap-2">
             <span className="text-brand-teal-500 mt-1 shrink-0">&#8226;</span>
-            The school must give you Prior Written Notice before making changes
+            {t('iep101.right4')}
           </li>
           <li className="flex items-start gap-2">
             <span className="text-brand-teal-500 mt-1 shrink-0">&#8226;</span>
-            You can disagree — and there are formal processes to resolve disputes
-            (mediation, due process)
+            {t('iep101.right5')}
           </li>
         </ul>
       </Card>
@@ -171,47 +161,44 @@ export function Iep101Page() {
       <Card>
         <SectionHeader
           Icon={Calendar}
-          title="What to Expect at an IEP Meeting"
+          title={t('iep101.meetingHeading')}
         />
         <p className="text-sm text-brand-slate-600 leading-relaxed">
-          The meeting typically lasts 1-2 hours. The team reviews your child's
-          progress, discusses goals for the coming year, and decides on services
-          and placement. You can bring anyone you want to support you — an
-          advocate, family member, or friend.
+          {t('iep101.meetingBody')}
         </p>
       </Card>
 
       {/* Common Terms */}
       <Card>
-        <SectionHeader Icon={Library} title="Common Terms" />
+        <SectionHeader Icon={Library} title={t('iep101.termsHeading')} />
         <dl className="divide-y-0">
           <GlossaryTerm
-            term="FAPE"
-            definition="Free Appropriate Public Education"
+            term={t('iep101.termFape')}
+            definition={t('iep101.termFapeDef')}
           />
           <GlossaryTerm
-            term="LRE"
-            definition="Least Restrictive Environment"
+            term={t('iep101.termLre')}
+            definition={t('iep101.termLreDef')}
           />
           <GlossaryTerm
-            term="IDEA"
-            definition="Individuals with Disabilities Education Act"
+            term={t('iep101.termIdea')}
+            definition={t('iep101.termIdeaDef')}
           />
           <GlossaryTerm
-            term="Related Services"
-            definition="Support services like speech, OT, PT, counseling"
+            term={t('iep101.termRelatedServices')}
+            definition={t('iep101.termRelatedServicesDef')}
           />
           <GlossaryTerm
-            term="Transition"
-            definition="Planning for life after high school (starts at age 16)"
+            term={t('iep101.termTransition')}
+            definition={t('iep101.termTransitionDef')}
           />
           <GlossaryTerm
-            term="Prior Written Notice (PWN)"
-            definition="Written notification the school must provide before changing your child's program"
+            term={t('iep101.termPwn')}
+            definition={t('iep101.termPwnDef')}
           />
           <GlossaryTerm
-            term="Due Process"
-            definition="A formal hearing to resolve disagreements"
+            term={t('iep101.termDueProcess')}
+            definition={t('iep101.termDueProcessDef')}
           />
         </dl>
       </Card>

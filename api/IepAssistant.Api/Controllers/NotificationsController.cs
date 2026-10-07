@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Notifications;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -15,10 +17,12 @@ namespace IepAssistant.Api.Controllers;
 public class NotificationsController : ControllerBase
 {
     private readonly INotificationService _notificationService;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public NotificationsController(INotificationService notificationService)
+    public NotificationsController(INotificationService notificationService, IStringLocalizer<Messages> localizer)
     {
         _notificationService = notificationService;
+        _localizer = localizer;
     }
 
     [HttpGet]
@@ -27,7 +31,7 @@ public class NotificationsController : ControllerBase
     {
         var result = await _notificationService.GetForUserAsync(User.GetUserId(), unread, limit, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var data = result.Data!;
         return Ok(ApiResponse<NotificationListDto>.SuccessResponse(new NotificationListDto
@@ -44,7 +48,7 @@ public class NotificationsController : ControllerBase
     {
         var result = await _notificationService.MarkReadAsync(User.GetUserId(), id, ct);
         if (!result.Success)
-            return MapFailure(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         return Ok(ApiResponse<object>.SuccessResponse(null));
     }
@@ -69,16 +73,4 @@ public class NotificationsController : ControllerBase
         EmailSentAt = n.EmailSentAt,
         EmailError = n.EmailError
     };
-
-    private IActionResult MapFailure(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
 }

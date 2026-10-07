@@ -1,0 +1,49 @@
+{
+  "page": {
+    "pageTitle": "Subscription",
+    "haveInviteCode": "Have an invite code?",
+    "redeemHere": "Redeem it here"
+  },
+  "status": {
+    "active": "Active",
+    "pastDue": "Past Due",
+    "canceled": "Canceled",
+    "expired": "Expired",
+    "none": "No Subscription",
+    "analysesUsed": "{{count}} of {{limit}} analyses used",
+    "manage": "Manage Subscription",
+    "manageFailed": "Could not open the billing portal. Please try again.",
+    "yourPlan": "Your plan",
+    "renews": "Renews {{date}}",
+    "usage": "Usage",
+    "loadFailedTitle": "Unable to load subscription status"
+  },
+  "subscribeButton": {
+    "label": "Subscribe — $50/year",
+    "startFailed": "Could not start checkout. Please try again."
+  },
+  "required": {
+    "title": "Subscription Required",
+    "description": "Subscribe to IEP Advisor Pro to unlock this feature."
+  },
+  "cancelPage": {
+    "heading": "Checkout Canceled",
+    "body": "No worries — you can subscribe anytime.",
+    "back": "Back to Subscription"
+  },
+  "successPage": {
+    "heading": "You're subscribed!",
+    "body": "Thank you for subscribing to IEP Advisor Pro. You now have full access to all features.",
+    "goToDashboard": "Go to Dashboard"
+  },
+  "redeemPage": {
+    "pageTitle": "Redeem invite code",
+    "pageLayoutTitle": "Redeem Invite Code",
+    "description": "Enter the 8-character invite code you received to activate your subscription.",
+    "successToast": "Invite code redeemed! Your subscription is now active.",
+    "invalidCode": "Invalid or expired invite code.",
+    "codeLabel": "Invite Code",
+    "codePlaceholder": "ABCD1234",
+    "submit": "Redeem"
+  }
+}

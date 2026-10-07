@@ -35,8 +35,26 @@ export default defineConfig([
       'src/features/staff-invites/pages/staff-accept-invite-page.tsx',
       'src/features/staff-invites/components/accept-invite-form.tsx',
       'src/features/student/components/student-accept-invite-page.tsx',
+      'src/features/children/**/*.{ts,tsx}',
+      'src/features/home/**/*.{ts,tsx}',
+      'src/features/onboarding/**/*.{ts,tsx}',
+      'src/features/notifications/**/*.{ts,tsx}',
+      'src/features/subscription/**/*.{ts,tsx}',
+      'src/features/child-links/**/*.{ts,tsx}',
+      'src/features/sharing/**/*.{ts,tsx}',
+      'src/features/knowledge-base/**/*.{ts,tsx}',
+      // Not a phase-2 feature (meetings converts in phase 3) — only this one
+      // component is in scope, because the parent-home "next meeting"/
+      // "upcoming meeting" cards (phase 2) render it (phase 2 review).
+      'src/features/meetings/components/rsvp-button-group.tsx',
     ],
-    ignores: ['**/*.test.{ts,tsx}'],
+    ignores: [
+      '**/*.test.{ts,tsx}',
+      // Out of scope for this phase — iep-documents/etr-documents convert
+      // these in Phase 3, so they stay English (and un-ratcheted) for now.
+      'src/features/children/components/child-ieps-tab.tsx',
+      'src/features/children/components/child-etrs-tab.tsx',
+    ],
     plugins: { i18next },
     rules: {
       'i18next/no-literal-string': [

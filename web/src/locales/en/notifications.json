@@ -1,0 +1,35 @@
+{
+  "bell": {
+    "ariaLabelUnread": "Notifications, {{count}} unread",
+    "ariaLabelDefault": "Notifications",
+    "menuLabel": "Notifications",
+    "empty": "No notifications yet.",
+    "unreadLive_one": "{{count}} unread notification",
+    "unreadLive_other": "{{count}} unread notifications",
+    "seeAll": "See all"
+  },
+  "notificationsPage": {
+    "pageTitle": "Notifications",
+    "markAllRead": "Mark all read",
+    "loadFailed": "Could not load notifications",
+    "markReadFailed": "Could not mark as read",
+    "markAllReadSuccess": "All notifications marked read",
+    "markAllFailed": "Could not mark all as read",
+    "emptyTitle": "No notifications yet",
+    "emptyDescription": "Meeting updates and reminders will show up here.",
+    "emailFailedPrefix": "Email failed: {{error}}",
+    "newBadge": "New"
+  },
+  "adminFailures": {
+    "pageTitle": "Notification email failures",
+    "subtitle": "Notifications where the email send failed.",
+    "loadFailed": "Could not load email failures",
+    "columnKind": "Kind",
+    "columnTitle": "Title",
+    "columnError": "Error",
+    "columnCreated": "Created",
+    "tableLabel": "Email failures",
+    "emptyTitle": "No email failures",
+    "emptyDescription": "Every notification email has sent successfully."
+  }
+}

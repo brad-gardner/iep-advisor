@@ -1,0 +1,82 @@
+{
+  "fields": {
+    "firstName": "First Name *",
+    "lastName": "Last Name",
+    "dateOfBirth": "Date of Birth",
+    "gradeLevel": "Grade Level",
+    "disabilityCategory": "Disability Category",
+    "schoolDistrict": "School District"
+  },
+  "form": {
+    "saving": "Saving..."
+  },
+  "list": {
+    "pageTitle": "Your Children",
+    "addChild": "Add Child",
+    "emptyTitle": "No child profiles yet.",
+    "addFirstChild": "Add Your First Child",
+    "gradePrefix": "Grade: {{grade}}",
+    "addChildDrawerTitle": "Add child",
+    "createProfile": "Create Profile",
+    "toastCreated": "Child profile added",
+    "createFailed": "Failed to create child profile"
+  },
+  "detail": {
+    "pageTitle": "Child profile",
+    "breadcrumbChildren": "Children",
+    "edit": "Edit",
+    "remove": "Remove",
+    "tabOverview": "Overview",
+    "tabGoals": "Goals",
+    "tabAnalysis": "Analysis",
+    "tabMeetingPrep": "Meeting Prep",
+    "tabIeps": "IEPs",
+    "tabEtrs": "ETRs",
+    "tabJournal": "Journal",
+    "tabAdvocate": "Advocate",
+    "editModalTitle": "Edit {{name}}",
+    "saveChanges": "Save Changes",
+    "toastSaved": "Changes saved",
+    "updateFailed": "Update failed",
+    "notFoundTitle": "Child profile not found.",
+    "backToChildren": "Back to children",
+    "removeDialogTitle": "Remove child profile",
+    "removeDialogMessage": "Remove {{name}}'s profile? This cannot be undone.",
+    "removeConfirm": "Remove profile",
+    "toastRemoved": "Child profile removed",
+    "loadingChild": "Loading child…"
+  },
+  "overview": {
+    "profileHeading": "Profile",
+    "sharingHeading": "Sharing & Access",
+    "inviteSomeone": "Invite Someone",
+    "shareDescription": "Share {{name}}'s IEP information with a co-parent, advocate, or attorney. They'll get their own login and can view or collaborate depending on the role you assign.",
+    "shareModalTitle": "Invite someone to {{name}}'s profile",
+    "studentAccountHeading": "Student account",
+    "inviteStudentDescription": "Invite {{name}} to activate their own account and take part in their IEP process.",
+    "inviteStudent": "Invite student",
+    "inviteStudentError": "An error occurred sending the invitation"
+  },
+  "goals": {
+    "heading": "Your Advocacy Goals"
+  },
+  "dashboard": {
+    "heading": "My Children",
+    "loadingChildren": "Loading children…",
+    "loadErrorTitle": "Couldn't load children",
+    "emptyTitle": "No child profiles yet",
+    "addFirstChild": "Add your first child profile",
+    "add": "Add",
+    "gradePrefix": "Grade: {{grade}}",
+    "viewAll": "View all ({{count}})"
+  },
+  "upcomingMeeting": {
+    "heading": "Upcoming meeting",
+    "loadError": "Could not load upcoming meetings",
+    "rsvpError": "Could not record your response"
+  },
+  "errors": {
+    "generic": "An error occurred",
+    "loadFailed": "Failed to load children"
+  }
+}

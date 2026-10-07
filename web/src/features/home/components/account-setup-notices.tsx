@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
@@ -16,14 +17,15 @@ interface AccountSetupNoticesProps {
  * per-child notices.
  */
 export function AccountSetupNotices({ user }: AccountSetupNoticesProps) {
+  const { t } = useTranslation('home');
   return (
     <>
       {user && !user.onboardingCompleted && (
         <div data-testid="onboarding-banner">
-          <Notice variant="info" title="Complete your setup to get the most out of IEP Advisor">
+          <Notice variant="info" title={t('accountSetupNotices.completeSetupTitle')}>
             <Link to="/onboarding">
               <Button variant="primary" className="mt-2 gap-1.5" data-testid="onboarding-get-started">
-                Get Started
+                {t('accountSetupNotices.getStarted')}
                 <ArrowRight size={14} strokeWidth={1.8} aria-hidden="true" />
               </Button>
             </Link>
@@ -32,11 +34,11 @@ export function AccountSetupNotices({ user }: AccountSetupNoticesProps) {
       )}
 
       {!user?.state && user?.onboardingCompleted && (
-        <Notice variant="warning" title="Set your state for better guidance">
+        <Notice variant="warning" title={t('accountSetupNotices.setStateTitle')}>
           <Link to="/profile" className="underline hover:text-brand-amber-600">
-            Update your profile
+            {t('accountSetupNotices.updateProfile')}
           </Link>{' '}
-          to get jurisdiction-specific IEP guidance.
+          {t('accountSetupNotices.setStateSuffix')}
         </Notice>
       )}
     </>

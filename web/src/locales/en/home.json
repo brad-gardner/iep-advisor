@@ -1,0 +1,133 @@
+{
+  "parentPage": {
+    "welcome": "Welcome, {{name}}",
+    "home": "Home",
+    "loadingAriaLabel": "Loading your home",
+    "noUpcomingMeetings": "No upcoming meetings scheduled."
+  },
+  "staffPage": {
+    "home": "Home",
+    "noProfileTitle": "No staff profile found",
+    "noProfileBody": "Your account is not linked to a school or district. Please contact support to finish setting up your access.",
+    "viewStudents": "View students",
+    "loadingAriaLabel": "Loading your home"
+  },
+  "accountSetupNotices": {
+    "completeSetupTitle": "Complete your setup to get the most out of IEP Advisor",
+    "getStarted": "Get Started",
+    "setStateTitle": "Set your state for better guidance",
+    "updateProfile": "Update your profile",
+    "setStateSuffix": "to get jurisdiction-specific IEP guidance."
+  },
+  "legacy": {
+    "yourAccount": "Your Account",
+    "email": "Email",
+    "state": "State",
+    "quickActions": "Quick Actions",
+    "addChildTitle": "Add Child Profile",
+    "addChildSubtitle": "Create a profile for your child",
+    "uploadIepTitle": "Upload an IEP",
+    "uploadIepSubtitle": "Select a child to upload",
+    "editProfileTitle": "Edit Profile",
+    "editProfileSubtitle": "Update your information"
+  },
+  "errors": {
+    "loadFailed": "Could not load your home",
+    "loadFailedTitle": "Couldn't load your home"
+  },
+  "adminHome": {
+    "meetingsThisWeekDistrict": "Meetings this week",
+    "meetingsThisWeekBuilding": "Meetings this week in my building"
+  },
+  "caseloadHome": {
+    "thisWeek": "This week",
+    "sharedAwaitingFamilyTitle": "Shared drafts awaiting family",
+    "sharedAwaitingFamilyEmpty": "No drafts shared with families yet.",
+    "familyResponsesTitle": "Family responses to review",
+    "familyResponsesEmpty": "No family responses waiting on your review."
+  },
+  "adoptionEngagement": {
+    "heading": "Adoption & family engagement",
+    "viewBoard": "View compliance board",
+    "loading": "Loading adoption data…",
+    "staffActive": "Staff active (14 days)",
+    "staffDenominator": "of {{count}} staff",
+    "draftsStarted": "Drafts started",
+    "draftsStartedDenominator": "Last {{days}} days",
+    "familiesLinked": "Families linked",
+    "activeStudentsDenominator": "of {{count}} active students",
+    "draftsShared": "Drafts shared with family"
+  },
+  "complianceSummary": {
+    "heading": "Compliance summary",
+    "viewBoard": "View compliance board",
+    "denominator": "of {{count}} active students"
+  },
+  "documentsToReview": {
+    "title": "Documents to review",
+    "emptyHint": "No documents waiting on your review.",
+    "finalized": "Finalized",
+    "sharedDraft": "Shared draft"
+  },
+  "drafts": {
+    "title": "Drafts in progress",
+    "emptyHint": "No drafts in progress.",
+    "editedOn": "{{docType}} · edited {{date}}",
+    "completePercent": "{{percent}}% complete"
+  },
+  "dueSoon": {
+    "title": "Due soon / overdue",
+    "emptyHint": "Nothing due soon or overdue on your caseload."
+  },
+  "nextMeeting": {
+    "heading": "Next meeting",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "inDays": "In {{count}} days",
+    "rsvpError": "Could not record your response"
+  },
+  "overdueTable": {
+    "title": "Overdue / at-risk",
+    "tableLabel": "Overdue and at-risk students",
+    "columnStudent": "Student",
+    "columnCaseManager": "Case manager",
+    "unassigned": "Unassigned",
+    "columnType": "Type",
+    "columnDueDate": "Due date",
+    "columnStatus": "Status",
+    "emptyTitle": "Nothing overdue or at risk",
+    "emptyDescription": "Every procedural deadline in scope is on track.",
+    "showingOfTotal": "Showing {{shown}} of {{total}}.",
+    "viewBoard": "View the compliance board"
+  },
+  "providerRequests": {
+    "title": "Provider requests I owe",
+    "emptyHint": "No outstanding provider requests.",
+    "due": "Due {{date}}"
+  },
+  "progressReports": {
+    "title": "Recent progress reports",
+    "emptyHint": "No progress reports yet.",
+    "untitled": "Untitled report"
+  },
+  "rosterAttention": {
+    "title": "Roster attention",
+    "asOf": "As of {{date}}",
+    "overdueAnnual": "Overdue annual reviews",
+    "overdueReeval": "Overdue reevaluations",
+    "due30": "Due within 30 days",
+    "unknownDates": "Unknown dates",
+    "noLead": "No case manager",
+    "noFamily": "No linked family"
+  },
+  "thisWeek": {
+    "emptyHint": "Nothing scheduled this week.",
+    "briefComingSoonTitle": "Meeting briefs are coming soon",
+    "briefComingSoon": "Brief · coming soon"
+  },
+  "unsignedFinalized": {
+    "title": "Unsigned finalized documents",
+    "emptyHint": "No finalized documents are waiting on a signature.",
+    "finalizedOn": "Finalized {{date}}"
+  }
+}

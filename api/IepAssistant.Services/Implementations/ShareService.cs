@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -17,19 +18,22 @@ public class ShareService : IShareService
     private readonly IUserRepository _userRepository;
     private readonly IEmailService _emailService;
     private readonly ILogger<ShareService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public ShareService(
         ApplicationDbContext context,
         IAccessService accessService,
         IUserRepository userRepository,
         IEmailService emailService,
-        ILogger<ShareService> logger)
+        ILogger<ShareService> logger,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _accessService = accessService;
         _userRepository = userRepository;
         _emailService = emailService;
         _logger = logger;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<ChildAccessModel>> InviteAsync(int childId, int userId, string email, AccessRole role, CancellationToken ct = default)
@@ -37,11 +41,11 @@ public class ShareService : IShareService
         // Verify the inviter is an owner
         var inviterRole = await _accessService.GetRoleAsync(childId, userId, ct);
         if (inviterRole != AccessRole.Owner)
-            return ServiceResult<ChildAccessModel>.FailureResult("Only owners can invite users.");
+            return ServiceResult<ChildAccessModel>.FailureResult(_localizer["Sharing.OnlyOwnersCanInvite"]);
 
         // Cannot invite as owner
         if (role == AccessRole.Owner)
-            return ServiceResult<ChildAccessModel>.FailureResult("Cannot invite as owner.");
+            return ServiceResult<ChildAccessModel>.FailureResult(_localizer["Sharing.CannotInviteAsOwner"]);
 
         // Check if invitee already has an account
         var inviteeUser = await _userRepository.GetByEmailAsync(email, ct);
@@ -54,7 +58,7 @@ public class ShareService : IShareService
                              && ca.UserId == inviteeUser.Id
                              && ca.IsActive, ct);
             if (existingAccess)
-                return ServiceResult<ChildAccessModel>.FailureResult("This user already has access to this child.");
+                return ServiceResult<ChildAccessModel>.FailureResult(_localizer["Sharing.UserAlreadyHasAccess"]);
         }
 
         // Check for existing pending invite by email
@@ -65,7 +69,7 @@ public class ShareService : IShareService
                          && ca.AcceptedAt == null
                          && ca.InviteExpiresAt > DateTime.UtcNow, ct);
         if (existingInvite)
-            return ServiceResult<ChildAccessModel>.FailureResult("A pending invite already exists for this email.");
+            return ServiceResult<ChildAccessModel>.FailureResult(_localizer["Sharing.PendingInviteExistsForEmail"]);
 
         // Generate token
         var tokenBytes = RandomNumberGenerator.GetBytes(32);
@@ -103,7 +107,7 @@ public class ShareService : IShareService
             email, childId, role);
 
         var model = MapToModel(childAccess, inviteeUser);
-        return ServiceResult<ChildAccessModel>.SuccessResult(model, "Invite sent successfully.");
+        return ServiceResult<ChildAccessModel>.SuccessResult(model, _localizer["Invites.SentSuccessfully"]);
     }
 
     public async Task<ServiceResult> AcceptInviteAsync(int userId, string token, CancellationToken ct = default)
@@ -117,16 +121,16 @@ public class ShareService : IShareService
                                     && ca.InviteExpiresAt > DateTime.UtcNow, ct);
 
         if (invite == null)
-            return ServiceResult.FailureResult("Invalid or expired invite token.");
+            return ServiceResult.FailureResult(_localizer["Invites.InvalidOrExpired"]);
 
         // Verify the accepting user's email matches the invite
         var user = await _context.Users.FindAsync(userId);
         if (user == null)
-            return ServiceResult.FailureResult("User not found.");
+            return ServiceResult.FailureResult(_localizer["Auth.UserNotFound"]);
 
         if (!string.IsNullOrEmpty(invite.InviteEmail) &&
             !string.Equals(user.Email, invite.InviteEmail, StringComparison.OrdinalIgnoreCase))
-            return ServiceResult.FailureResult("This invite was sent to a different email address.");
+            return ServiceResult.FailureResult(_localizer["Invites.SentToDifferentEmail"]);
 
         // Check if the user already has accepted access for this child
         var existingAccess = await _context.ChildAccesses
@@ -135,7 +139,7 @@ public class ShareService : IShareService
                          && ca.IsActive
                          && ca.AcceptedAt != null, ct);
         if (existingAccess)
-            return ServiceResult.FailureResult("You already have access to this child.");
+            return ServiceResult.FailureResult(_localizer["Sharing.AlreadyHaveAccess"]);
 
         invite.UserId = userId;
         invite.AcceptedAt = DateTime.UtcNow;
@@ -146,7 +150,7 @@ public class ShareService : IShareService
 
         _logger.LogInformation("User {UserId} accepted invite for child {ChildId}", userId, invite.ChildProfileId);
 
-        return ServiceResult.SuccessResult("Invite accepted successfully.");
+        return ServiceResult.SuccessResult(_localizer["Sharing.InviteAcceptedSuccessfully"]);
     }
 
     public async Task<IEnumerable<ChildAccessModel>> GetAccessListAsync(int childId, int userId, CancellationToken ct = default)
@@ -169,7 +173,7 @@ public class ShareService : IShareService
     {
         var role = await _accessService.GetRoleAsync(childId, userId, ct);
         if (role != AccessRole.Owner)
-            return ServiceResult.FailureResult("Only owners can revoke access.");
+            return ServiceResult.FailureResult(_localizer["Sharing.OnlyOwnersCanRevoke"]);
 
         var access = await _context.ChildAccesses
             .FirstOrDefaultAsync(ca => ca.Id == accessId
@@ -177,7 +181,7 @@ public class ShareService : IShareService
                                     && ca.IsActive, ct);
 
         if (access == null)
-            return ServiceResult.FailureResult("Access record not found.");
+            return ServiceResult.FailureResult(_localizer["Sharing.AccessRecordNotFound"]);
 
         // Cannot revoke the last owner
         if (access.Role == AccessRole.Owner)
@@ -188,7 +192,7 @@ public class ShareService : IShareService
                               && ca.IsActive
                               && ca.AcceptedAt != null, ct);
             if (ownerCount <= 1)
-                return ServiceResult.FailureResult("Cannot revoke the last owner.");
+                return ServiceResult.FailureResult(_localizer["Sharing.CannotRevokeLastOwner"]);
         }
 
         access.IsActive = false;
@@ -199,7 +203,7 @@ public class ShareService : IShareService
         _logger.LogInformation("User {UserId} revoked access {AccessId} for child {ChildId}",
             userId, accessId, childId);
 
-        return ServiceResult.SuccessResult("Access revoked successfully.");
+        return ServiceResult.SuccessResult(_localizer["Sharing.AccessRevokedSuccessfully"]);
     }
 
     private static ChildAccessModel MapToModel(ChildAccess access, User? user)

@@ -1,0 +1,29 @@
+{
+  "accessList": {
+    "empty": "No one else has access to this profile.",
+    "pendingBadge": "Pending",
+    "revokeAriaLabel": "Revoke access for {{name}}",
+    "revokeDialogTitle": "Revoke access",
+    "revokeDialogMessage": "They will immediately lose access to this child's profile. You can re-invite them later.",
+    "revokedToast": "Access revoked",
+    "unknownName": "Unknown"
+  },
+  "shareDialog": {
+    "heading": "Share Access",
+    "emailLabel": "Email Address",
+    "emailPlaceholder": "parent@example.com",
+    "roleLabel": "Role",
+    "sendInvite": "Send Invite",
+    "successToast": "Invite sent successfully",
+    "sendFailed": "Failed to send invite",
+    "sendError": "An error occurred while sending the invite"
+  },
+  "sharedBadge": {
+    "prefix": "Shared · {{role}}"
+  },
+  "role": {
+    "owner": "Owner",
+    "viewer": "Viewer",
+    "collaborator": "Collaborator"
+  }
+}

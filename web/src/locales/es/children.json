@@ -1,0 +1,82 @@
+{
+  "fields": {
+    "firstName": "Nombre *",
+    "lastName": "Apellido",
+    "dateOfBirth": "Fecha de nacimiento",
+    "gradeLevel": "Grado",
+    "disabilityCategory": "Categoría de discapacidad",
+    "schoolDistrict": "Distrito escolar"
+  },
+  "form": {
+    "saving": "Guardando..."
+  },
+  "list": {
+    "pageTitle": "Sus hijos",
+    "addChild": "Agregar hijo",
+    "emptyTitle": "Aún no hay perfiles de hijos.",
+    "addFirstChild": "Agregue a su primer hijo",
+    "gradePrefix": "{{grade}}",
+    "addChildDrawerTitle": "Agregar hijo",
+    "createProfile": "Crear perfil",
+    "toastCreated": "Perfil del hijo agregado",
+    "createFailed": "No se pudo crear el perfil del hijo"
+  },
+  "detail": {
+    "pageTitle": "Perfil del hijo",
+    "breadcrumbChildren": "Hijos",
+    "edit": "Editar",
+    "remove": "Eliminar",
+    "tabOverview": "Resumen",
+    "tabGoals": "Metas",
+    "tabAnalysis": "Análisis",
+    "tabMeetingPrep": "Preparación para la reunión",
+    "tabIeps": "IEP",
+    "tabEtrs": "ETR",
+    "tabJournal": "Diario",
+    "tabAdvocate": "Asesor virtual",
+    "editModalTitle": "Editar a {{name}}",
+    "saveChanges": "Guardar cambios",
+    "toastSaved": "Cambios guardados",
+    "updateFailed": "No se pudo actualizar",
+    "notFoundTitle": "No se encontró el perfil del hijo.",
+    "backToChildren": "Volver a hijos",
+    "removeDialogTitle": "Eliminar perfil del hijo",
+    "removeDialogMessage": "¿Eliminar el perfil de {{name}}? Esta acción no se puede deshacer.",
+    "removeConfirm": "Eliminar perfil",
+    "toastRemoved": "Perfil del hijo eliminado",
+    "loadingChild": "Cargando datos del hijo…"
+  },
+  "overview": {
+    "profileHeading": "Perfil",
+    "sharingHeading": "Acceso compartido",
+    "inviteSomeone": "Invitar a alguien",
+    "shareDescription": "Comparta la información del IEP de {{name}} con otro padre o madre, un defensor o un abogado. Esa persona tendrá su propio inicio de sesión y podrá ver o colaborar según el rol que usted le asigne.",
+    "shareModalTitle": "Invitar a alguien al perfil de {{name}}",
+    "studentAccountHeading": "Cuenta del estudiante",
+    "inviteStudentDescription": "Invite a {{name}} a activar su propia cuenta y participar en su proceso de IEP.",
+    "inviteStudent": "Invitar al estudiante",
+    "inviteStudentError": "Ocurrió un error al enviar la invitación"
+  },
+  "goals": {
+    "heading": "Sus metas para el IEP"
+  },
+  "dashboard": {
+    "heading": "Mis hijos",
+    "loadingChildren": "Cargando hijos…",
+    "loadErrorTitle": "No se pudieron cargar los hijos",
+    "emptyTitle": "Aún no hay perfiles de hijos",
+    "addFirstChild": "Agregue el perfil de su primer hijo",
+    "add": "Agregar",
+    "gradePrefix": "{{grade}}",
+    "viewAll": "Ver todos ({{count}})"
+  },
+  "upcomingMeeting": {
+    "heading": "Próxima reunión",
+    "loadError": "No se pudieron cargar las próximas reuniones",
+    "rsvpError": "No se pudo registrar su respuesta"
+  },
+  "errors": {
+    "generic": "Ocurrió un error",
+    "loadFailed": "No se pudieron cargar los hijos"
+  }
+}

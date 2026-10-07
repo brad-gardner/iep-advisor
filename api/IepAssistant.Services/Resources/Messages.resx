@@ -139,4 +139,261 @@
   <data name="AuthApi.FailedToCancelDeletion" xml:space="preserve">
     <value>Failed to cancel deletion</value>
   </data>
+
+  <!-- Multilingual plan (2026-10-06) phase 2: parent-core services/controllers. -->
+
+  <data name="Children.NotFound" xml:space="preserve">
+    <value>Child profile not found.</value>
+  </data>
+  <data name="Children.CreatedSuccessfully" xml:space="preserve">
+    <value>Child profile created successfully.</value>
+  </data>
+  <data name="Children.UpdatedSuccessfully" xml:space="preserve">
+    <value>Child profile updated successfully.</value>
+  </data>
+  <data name="Children.DeletedSuccessfully" xml:space="preserve">
+    <value>Child profile deleted successfully.</value>
+  </data>
+  <data name="Children.IepNotFoundForChild" xml:space="preserve">
+    <value>IEP not found for this child.</value>
+  </data>
+  <data name="Children.CurrentIepUpdated" xml:space="preserve">
+    <value>Current IEP updated.</value>
+  </data>
+
+  <data name="ChildrenApi.NotFound" xml:space="preserve">
+    <value>Child profile not found</value>
+  </data>
+  <data name="ChildrenApi.CreationFailed" xml:space="preserve">
+    <value>Creation failed</value>
+  </data>
+  <data name="ChildrenApi.UpdateFailed" xml:space="preserve">
+    <value>Update failed</value>
+  </data>
+  <data name="ChildrenApi.DeleteFailed" xml:space="preserve">
+    <value>Delete failed</value>
+  </data>
+  <data name="ChildrenApi.SetCurrentIepFailed" xml:space="preserve">
+    <value>Set current IEP failed</value>
+  </data>
+
+  <data name="ChildLinks.ParentEmailRequired" xml:space="preserve">
+    <value>Parent email is required.</value>
+  </data>
+  <data name="ChildLinks.NoPermissionToInvite" xml:space="preserve">
+    <value>You do not have permission to invite a parent for this student.</value>
+  </data>
+  <data name="ChildLinks.PendingInviteExists" xml:space="preserve">
+    <value>A pending invite already exists.</value>
+  </data>
+  <data name="ChildLinks.AlreadyLinkedToParent" xml:space="preserve">
+    <value>This student is already linked to that parent.</value>
+  </data>
+  <data name="Invites.SentSuccessfully" xml:space="preserve">
+    <value>Invite sent successfully.</value>
+  </data>
+  <data name="Invites.InvalidOrExpired" xml:space="preserve">
+    <value>Invalid or expired invite token.</value>
+  </data>
+  <data name="ChildLinks.StudentNotFound" xml:space="preserve">
+    <value>Student not found.</value>
+  </data>
+  <data name="ChildLinks.AlreadyLinked" xml:space="preserve">
+    <value>Already linked.</value>
+  </data>
+  <data name="ChildLinks.NoPermissionToLinkChild" xml:space="preserve">
+    <value>You do not have permission to link to that child.</value>
+  </data>
+  <data name="ChildLinks.LinkAcceptedSuccessfully" xml:space="preserve">
+    <value>Link accepted successfully.</value>
+  </data>
+  <data name="ChildLinks.LinkNotFound" xml:space="preserve">
+    <value>Link not found.</value>
+  </data>
+  <data name="ChildLinks.NoPermissionToRevoke" xml:space="preserve">
+    <value>You do not have permission to revoke this link.</value>
+  </data>
+  <data name="ChildLinks.LinkRevoked" xml:space="preserve">
+    <value>Link revoked. The parent keeps anything already shared; future versions stop flowing.</value>
+  </data>
+  <data name="ChildLinks.NoPermissionToViewStudentLinks" xml:space="preserve">
+    <value>You do not have permission to view this student's links.</value>
+  </data>
+  <data name="ChildLinks.NoPermissionToViewChild" xml:space="preserve">
+    <value>You do not have permission to view this child.</value>
+  </data>
+
+  <data name="ChildLinksApi.TokenRequired" xml:space="preserve">
+    <value>Token is required.</value>
+  </data>
+
+  <data name="Invites.SentToDifferentEmail" xml:space="preserve">
+    <value>This invite was sent to a different email address.</value>
+  </data>
+
+  <data name="Sharing.OnlyOwnersCanInvite" xml:space="preserve">
+    <value>Only owners can invite users.</value>
+  </data>
+  <data name="Sharing.CannotInviteAsOwner" xml:space="preserve">
+    <value>Cannot invite as owner.</value>
+  </data>
+  <data name="Sharing.UserAlreadyHasAccess" xml:space="preserve">
+    <value>This user already has access to this child.</value>
+  </data>
+  <data name="Sharing.PendingInviteExistsForEmail" xml:space="preserve">
+    <value>A pending invite already exists for this email.</value>
+  </data>
+  <data name="Sharing.AlreadyHaveAccess" xml:space="preserve">
+    <value>You already have access to this child.</value>
+  </data>
+  <data name="Sharing.InviteAcceptedSuccessfully" xml:space="preserve">
+    <value>Invite accepted successfully.</value>
+  </data>
+  <data name="Sharing.OnlyOwnersCanRevoke" xml:space="preserve">
+    <value>Only owners can revoke access.</value>
+  </data>
+  <data name="Sharing.AccessRecordNotFound" xml:space="preserve">
+    <value>Access record not found.</value>
+  </data>
+  <data name="Sharing.CannotRevokeLastOwner" xml:space="preserve">
+    <value>Cannot revoke the last owner.</value>
+  </data>
+  <data name="Sharing.AccessRevokedSuccessfully" xml:space="preserve">
+    <value>Access revoked successfully.</value>
+  </data>
+
+  <data name="SharingApi.InvalidRole" xml:space="preserve">
+    <value>Invalid role. Must be 'Viewer' or 'Collaborator'.</value>
+  </data>
+  <data name="SharingApi.InviteFailed" xml:space="preserve">
+    <value>Invite failed</value>
+  </data>
+  <data name="SharingApi.RevokeFailed" xml:space="preserve">
+    <value>Revoke failed</value>
+  </data>
+  <data name="SharingApi.AcceptFailed" xml:space="preserve">
+    <value>Accept failed</value>
+  </data>
+
+  <data name="Subscription.AlreadyActive" xml:space="preserve">
+    <value>You already have an active subscription</value>
+  </data>
+  <data name="Subscription.InvalidInviteCode" xml:space="preserve">
+    <value>Invalid invite code.</value>
+  </data>
+  <data name="Subscription.BetaCodeRedeemed" xml:space="preserve">
+    <value>Beta code redeemed successfully. Your subscription is now active.</value>
+  </data>
+  <data name="Subscription.CountOutOfRange" xml:space="preserve">
+    <value>Count must be between 1 and 100</value>
+  </data>
+
+  <data name="SubscriptionApi.InvalidRedirectUrl" xml:space="preserve">
+    <value>Invalid redirect URL</value>
+  </data>
+  <data name="SubscriptionApi.FailedToRedeemInviteCode" xml:space="preserve">
+    <value>Failed to redeem invite code</value>
+  </data>
+  <data name="SubscriptionApi.FailedToGenerateCodes" xml:space="preserve">
+    <value>Failed to generate codes</value>
+  </data>
+  <data name="SubscriptionApi.BetaCodesGenerated" xml:space="preserve">
+    <value>Beta codes generated</value>
+  </data>
+  <data name="SubscriptionApi.FailedToGenerateInviteCode" xml:space="preserve">
+    <value>Failed to generate invite code</value>
+  </data>
+  <data name="SubscriptionApi.BetaInviteSentTo" xml:space="preserve">
+    <value>Beta invite sent to {0}</value>
+  </data>
+
+  <data name="Notifications.NotFound" xml:space="preserve">
+    <value>Notification not found.</value>
+  </data>
+
+  <data name="Home.NoChildrenLinked" xml:space="preserve">
+    <value>No children linked to your account yet.</value>
+  </data>
+  <data name="Home.ChildHasNoSchoolLink" xml:space="preserve">
+    <value>{0} has no school link yet.</value>
+  </data>
+
+  <data name="KnowledgeBaseApi.NotFound" xml:space="preserve">
+    <value>Knowledge base entry not found</value>
+  </data>
+
+  <data name="AccountApi.UnableToCancelDeletion" xml:space="preserve">
+    <value>Unable to cancel deletion</value>
+  </data>
+
+  <data name="PasswordReset.InvalidOrExpiredToken" xml:space="preserve">
+    <value>Invalid or expired reset token.</value>
+  </data>
+  <data name="PasswordReset.ResetSuccessfully" xml:space="preserve">
+    <value>Password has been reset successfully.</value>
+  </data>
+
+  <data name="MagicLink.AlreadyUsed" xml:space="preserve">
+    <value>This sign-in link has already been used.</value>
+  </data>
+  <data name="MagicLink.AccountNotActive" xml:space="preserve">
+    <value>This account is not active.</value>
+  </data>
+
+  <data name="Mfa.SetupNotInitiated" xml:space="preserve">
+    <value>MFA setup has not been initiated.</value>
+  </data>
+  <data name="Mfa.AlreadyEnabled" xml:space="preserve">
+    <value>MFA is already enabled.</value>
+  </data>
+  <data name="Mfa.InvalidVerificationCode" xml:space="preserve">
+    <value>Invalid verification code.</value>
+  </data>
+  <data name="Mfa.EnabledSuccessfully" xml:space="preserve">
+    <value>MFA enabled successfully.</value>
+  </data>
+  <data name="Mfa.NotEnabled" xml:space="preserve">
+    <value>MFA is not enabled.</value>
+  </data>
+  <data name="Mfa.InvalidPassword" xml:space="preserve">
+    <value>Invalid password.</value>
+  </data>
+  <data name="Mfa.SecretNotFound" xml:space="preserve">
+    <value>MFA secret not found.</value>
+  </data>
+  <data name="Mfa.InvalidTotpCode" xml:space="preserve">
+    <value>Invalid TOTP code.</value>
+  </data>
+  <data name="Mfa.DisabledSuccessfully" xml:space="preserve">
+    <value>MFA disabled successfully.</value>
+  </data>
+
+  <data name="Account.InvalidPassword" xml:space="preserve">
+    <value>Invalid password</value>
+  </data>
+  <data name="Account.MfaCodeRequired" xml:space="preserve">
+    <value>MFA code is required</value>
+  </data>
+  <data name="Account.ScheduledForDeletion" xml:space="preserve">
+    <value>Account scheduled for deletion. You have 30 days to cancel.</value>
+  </data>
+  <data name="Account.NoPendingDeletionRequest" xml:space="preserve">
+    <value>No pending deletion request</value>
+  </data>
+  <data name="Account.GracePeriodExpired" xml:space="preserve">
+    <value>Deletion grace period has expired</value>
+  </data>
+  <data name="Account.DeletionCancelled" xml:space="preserve">
+    <value>Account deletion cancelled. Your account is active again.</value>
+  </data>
+  <data name="Account.InvalidOrExpiredCancellationLink" xml:space="preserve">
+    <value>Invalid or expired cancellation link.</value>
+  </data>
+  <data name="Account.DeletionCancelledPleaseSignIn" xml:space="preserve">
+    <value>Account deletion cancelled. Your account is active again. Please sign in.</value>
+  </data>
+
+  <data name="Api.RequestFailed" xml:space="preserve">
+    <value>Request failed</value>
+  </data>
 </root>

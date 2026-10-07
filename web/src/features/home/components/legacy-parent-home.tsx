@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Users, FileText, UserCircle } from 'lucide-react';
 import { DashboardChildrenSection } from '@/features/children/components/dashboard-children-section';
 import { Card } from '@/components/ui/card';
@@ -17,6 +18,7 @@ interface LegacyParentHomeProps {
  * children, account, and quick actions.
  */
 export function LegacyParentHome({ user }: LegacyParentHomeProps) {
+  const { t } = useTranslation(['home', 'common']);
   return (
     <div className="space-y-6" data-testid="parent-home-legacy">
       <AccountSetupNotices user={user} />
@@ -24,27 +26,27 @@ export function LegacyParentHome({ user }: LegacyParentHomeProps) {
       <DashboardChildrenSection />
 
       <Card>
-        <h2 className="font-serif mb-4">Your Account</h2>
+        <h2 className="font-serif mb-4">{t('legacy.yourAccount')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-brand-slate-50 rounded-card p-4 border border-brand-slate-200">
             <p className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold">
-              Email
+              {t('legacy.email')}
             </p>
             <p className="text-sm font-medium text-brand-slate-800 mt-1">{user?.email}</p>
           </div>
           <div className="bg-brand-slate-50 rounded-card p-4 border border-brand-slate-200">
             <p className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold">
-              State
+              {t('legacy.state')}
             </p>
             <p className="text-sm font-medium text-brand-slate-800 mt-1">
-              {user?.state || 'Not set'}
+              {user?.state || t('common:ui.notSet')}
             </p>
           </div>
         </div>
       </Card>
 
       <Card>
-        <h2 className="font-serif mb-4">Quick Actions</h2>
+        <h2 className="font-serif mb-4">{t('legacy.quickActions')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Link
             to="/children"
@@ -52,8 +54,8 @@ export function LegacyParentHome({ user }: LegacyParentHomeProps) {
           >
             <Users className="text-brand-teal-500 shrink-0" size={20} strokeWidth={1.8} aria-hidden="true" />
             <div>
-              <p className="text-sm font-medium text-brand-slate-800">Add Child Profile</p>
-              <p className="text-[11px] text-brand-slate-500">Create a profile for your child</p>
+              <p className="text-sm font-medium text-brand-slate-800">{t('legacy.addChildTitle')}</p>
+              <p className="text-[11px] text-brand-slate-500">{t('legacy.addChildSubtitle')}</p>
             </div>
           </Link>
           <Link
@@ -62,8 +64,8 @@ export function LegacyParentHome({ user }: LegacyParentHomeProps) {
           >
             <FileText className="text-brand-teal-500 shrink-0" size={20} strokeWidth={1.8} aria-hidden="true" />
             <div>
-              <p className="text-sm font-medium text-brand-slate-800">Upload an IEP</p>
-              <p className="text-[11px] text-brand-slate-500">Select a child to upload</p>
+              <p className="text-sm font-medium text-brand-slate-800">{t('legacy.uploadIepTitle')}</p>
+              <p className="text-[11px] text-brand-slate-500">{t('legacy.uploadIepSubtitle')}</p>
             </div>
           </Link>
           <Link
@@ -72,8 +74,8 @@ export function LegacyParentHome({ user }: LegacyParentHomeProps) {
           >
             <UserCircle className="text-brand-teal-500 shrink-0" size={20} strokeWidth={1.8} aria-hidden="true" />
             <div>
-              <p className="text-sm font-medium text-brand-slate-800">Edit Profile</p>
-              <p className="text-[11px] text-brand-slate-500">Update your information</p>
+              <p className="text-sm font-medium text-brand-slate-800">{t('legacy.editProfileTitle')}</p>
+              <p className="text-[11px] text-brand-slate-500">{t('legacy.editProfileSubtitle')}</p>
             </div>
           </Link>
         </div>

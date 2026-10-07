@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Ticket } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,8 @@ import { usePageTitle } from '@/hooks/use-page-title';
 import { redeemInvite } from '../api/subscription-api';
 
 export function RedeemInvitePage() {
-  usePageTitle('Redeem invite code');
+  const { t } = useTranslation('subscription');
+  usePageTitle(t('redeemPage.pageTitle'));
   const { show } = useToast();
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,29 +30,29 @@ export function RedeemInvitePage() {
       if (response.success) {
         // Transient success → toast; inline space stays for decisions/errors.
         show({
-          message: 'Invite code redeemed! Your subscription is now active.',
+          message: t('redeemPage.successToast'),
           variant: 'success',
         });
         setCode('');
       } else {
-        setError(response.message || 'Invalid or expired invite code.');
+        setError(response.message || t('redeemPage.invalidCode'));
       }
     } catch {
-      setError('Invalid or expired invite code.');
+      setError(t('redeemPage.invalidCode'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <PageLayout title="Redeem Invite Code">
+    <PageLayout title={t('redeemPage.pageLayoutTitle')}>
       <Card className="max-w-md">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-brand-teal-50 flex items-center justify-center">
             <Ticket className="w-5 h-5 text-brand-teal-500" strokeWidth={1.8} aria-hidden="true" />
           </div>
           <p className="text-sm text-brand-slate-500">
-            Enter the 8-character invite code you received to activate your subscription.
+            {t('redeemPage.description')}
           </p>
         </div>
 
@@ -62,10 +64,10 @@ export function RedeemInvitePage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
-            label="Invite Code"
+            label={t('redeemPage.codeLabel')}
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 8))}
-            placeholder="ABCD1234"
+            placeholder={t('redeemPage.codePlaceholder')}
             maxLength={8}
             required
             data-testid="redeem-code"
@@ -77,7 +79,7 @@ export function RedeemInvitePage() {
             className="w-full"
             data-testid="redeem-submit"
           >
-            Redeem
+            {t('redeemPage.submit')}
           </Button>
         </form>
       </Card>

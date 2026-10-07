@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { formatDate } from '@/lib/format-date';
 import { DueSoonSection } from './due-soon-section';
 import { DraftsSection } from './drafts-section';
@@ -12,10 +13,11 @@ import type { StaffHomeDto } from '../types';
  * week → due soon → drafts → shared-with-family sections in that order.
  */
 export function CaseloadHome({ staff }: { staff: StaffHomeDto }) {
+  const { t } = useTranslation('home');
   const thisWeek = (
     <ThisWeekSection
       key="this-week"
-      title="This week"
+      title={t('caseloadHome.thisWeek')}
       subtitle={`${formatDate(staff.weekStart)} – ${formatDate(staff.weekEnd)}`}
       meetings={staff.meetingsThisWeek}
     />
@@ -25,8 +27,8 @@ export function CaseloadHome({ staff }: { staff: StaffHomeDto }) {
   const sharedAwaitingFamily = (
     <SharedDraftListSection
       key="shared-awaiting-family"
-      title="Shared drafts awaiting family"
-      emptyHint="No drafts shared with families yet."
+      title={t('caseloadHome.sharedAwaitingFamilyTitle')}
+      emptyHint={t('caseloadHome.sharedAwaitingFamilyEmpty')}
       items={staff.sharedDraftsAwaitingFamily}
       dateField="sharedAt"
       data-testid="home-shared-awaiting-family"
@@ -35,8 +37,8 @@ export function CaseloadHome({ staff }: { staff: StaffHomeDto }) {
   const familyResponses = (
     <SharedDraftListSection
       key="family-responses"
-      title="Family responses to review"
-      emptyHint="No family responses waiting on your review."
+      title={t('caseloadHome.familyResponsesTitle')}
+      emptyHint={t('caseloadHome.familyResponsesEmpty')}
       items={staff.familyResponsesToReview}
       dateField="respondedAt"
       data-testid="home-family-responses"

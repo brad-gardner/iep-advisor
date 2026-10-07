@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
@@ -15,24 +16,25 @@ const BOARD_LINK = '/educator/admin/compliance';
  * never blocks the rest of the home.
  */
 export function AdoptionEngagementTeaser() {
+  const { t } = useTranslation(['home', 'common']);
   const { adoption, engagement, adoptionError, engagementError, isLoading, error, retry } =
     useAdoptionEngagement(null);
 
   return (
     <HomeSection
-      title="Adoption & family engagement"
+      title={t('adoptionEngagement.heading')}
       data-testid="home-adoption-engagement"
       action={
         <Link to={BOARD_LINK}>
           <Button variant="secondary" size="sm" data-testid="home-adoption-engagement-board-link">
-            View compliance board
+            {t('adoptionEngagement.viewBoard')}
           </Button>
         </Link>
       }
     >
       {isLoading && (
         <div className="flex justify-center py-4">
-          <Spinner label="Loading adoption data…" />
+          <Spinner label={t('adoptionEngagement.loading')} />
         </div>
       )}
 
@@ -45,7 +47,7 @@ export function AdoptionEngagementTeaser() {
               onClick={retry}
               data-testid="home-adoption-engagement-retry"
             >
-              Try again
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
@@ -60,7 +62,7 @@ export function AdoptionEngagementTeaser() {
               onClick={retry}
               data-testid="home-adoption-engagement-retry"
             >
-              Try again
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
@@ -71,16 +73,16 @@ export function AdoptionEngagementTeaser() {
           {adoption && (
             <>
               <StatTile
-                label="Staff active (14 days)"
+                label={t('adoptionEngagement.staffActive')}
                 value={adoption.staffActiveLast14}
-                denominator={`of ${adoption.staffTotal} staff`}
+                denominator={t('adoptionEngagement.staffDenominator', { count: adoption.staffTotal })}
                 href={BOARD_LINK}
                 data-testid="home-adoption-staff-active"
               />
               <StatTile
-                label="Drafts started"
+                label={t('adoptionEngagement.draftsStarted')}
                 value={adoption.draftsStarted}
-                denominator={`Last ${adoption.days} days`}
+                denominator={t('adoptionEngagement.draftsStartedDenominator', { days: adoption.days })}
                 href={BOARD_LINK}
                 data-testid="home-adoption-drafts-started"
               />
@@ -89,16 +91,16 @@ export function AdoptionEngagementTeaser() {
           {engagement && (
             <>
               <StatTile
-                label="Families linked"
+                label={t('adoptionEngagement.familiesLinked')}
                 value={engagement.studentsWithFamilyLink}
-                denominator={`of ${engagement.activeStudents} active students`}
+                denominator={t('adoptionEngagement.activeStudentsDenominator', { count: engagement.activeStudents })}
                 href={BOARD_LINK}
                 data-testid="home-engagement-family-linked"
               />
               <StatTile
-                label="Drafts shared with family"
+                label={t('adoptionEngagement.draftsShared')}
                 value={engagement.draftsShared}
-                denominator={`of ${engagement.activeStudents} active students`}
+                denominator={t('adoptionEngagement.activeStudentsDenominator', { count: engagement.activeStudents })}
                 href={BOARD_LINK}
                 data-testid="home-engagement-drafts-shared"
               />

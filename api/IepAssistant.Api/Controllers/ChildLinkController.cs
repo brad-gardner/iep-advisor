@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.ChildLinks;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -14,10 +16,12 @@ namespace IepAssistant.Api.Controllers;
 public class ChildLinkController : ControllerBase
 {
     private readonly IChildLinkService _childLinkService;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public ChildLinkController(IChildLinkService childLinkService)
+    public ChildLinkController(IChildLinkService childLinkService, IStringLocalizer<Messages> localizer)
     {
         _childLinkService = childLinkService;
+        _localizer = localizer;
     }
 
     [HttpGet("preview")]
@@ -26,12 +30,12 @@ public class ChildLinkController : ControllerBase
     public async Task<IActionResult> Preview([FromQuery] string token, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(token))
-            return BadRequest(ApiResponse<object>.Error("Token is required."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["ChildLinksApi.TokenRequired"]));
 
         var result = await _childLinkService.PreviewInviteAsync(User.GetUserId(), token, ct);
 
         if (!result.Success)
-            return MapFailure<ChildLinkInvitePreviewDto>(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var d = result.Data!;
         return Ok(ApiResponse<ChildLinkInvitePreviewDto>.SuccessResponse(new ChildLinkInvitePreviewDto
@@ -56,13 +60,13 @@ public class ChildLinkController : ControllerBase
     public async Task<IActionResult> Accept([FromBody] AcceptChildLinkRequest request, CancellationToken ct)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var result = await _childLinkService.AcceptInviteAsync(
             User.GetUserId(), request.Token, request.LinkToChildProfileId, ct);
 
         if (!result.Success)
-            return MapFailure<AcceptedChildLinkDto>(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var d = result.Data!;
         return Ok(ApiResponse<AcceptedChildLinkDto>.SuccessResponse(new AcceptedChildLinkDto
@@ -81,7 +85,7 @@ public class ChildLinkController : ControllerBase
     {
         var result = await _childLinkService.GetChildSchoolLinksAsync(User.GetUserId(), childId, ct);
         if (!result.Success)
-            return MapFailure<List<ChildSchoolLinkDto>>(result.Message);
+            return this.MapServiceFailure(result, _localizer["Api.RequestFailed"]);
 
         var dtos = result.Data!.Select(l => new ChildSchoolLinkDto
         {
@@ -93,19 +97,5 @@ public class ChildLinkController : ControllerBase
             LinkedAt = l.LinkedAt
         }).ToList();
         return Ok(ApiResponse<List<ChildSchoolLinkDto>>.SuccessResponse(dtos));
-    }
-
-    private IActionResult MapFailure<T>(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        // "Invalid or expired", "different email address", etc. -> 400.
-        return BadRequest(ApiResponse<object>.Error(message));
     }
 }

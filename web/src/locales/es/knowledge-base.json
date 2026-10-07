@@ -1,0 +1,23 @@
+{
+  "page": {
+    "pageTitle": "Centro de recursos",
+    "subtitle": "Guías en lenguaje sencillo sobre las leyes del IEP, sus derechos y los términos de educación especial",
+    "noResults": "Ningún artículo coincide con su búsqueda",
+    "disclaimer": "Esta información se ofrece con fines educativos. No constituye asesoría legal."
+  },
+  "search": {
+    "placeholder": "Buscar en el centro de recursos...",
+    "ariaLabel": "Buscar en el centro de recursos"
+  },
+  "categories": {
+    "all": "Todos",
+    "rights": "Derechos",
+    "provisions": "Disposiciones",
+    "glossary": "Glosario",
+    "process": "Proceso",
+    "tips": "Consejos"
+  },
+  "entryCard": {
+    "availableInEnglish": "Disponible en inglés"
+  }
+}

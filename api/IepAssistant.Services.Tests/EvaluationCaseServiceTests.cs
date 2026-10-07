@@ -89,7 +89,7 @@ public sealed class EvaluationCaseServiceTests : IDisposable
         ctx,
         new OrgAccessService(ctx),
         new NoopBlobStorageFake(),
-        new NotificationService(ctx),
+        new NotificationService(ctx, TestSupport.TestLocalizers.Messages()),
         CreateDocumentInstanceService(ctx),
         NullLogger<EvaluationCaseService>.Instance);
 

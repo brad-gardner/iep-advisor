@@ -1,7 +1,11 @@
 using System.Linq;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
+using IepAssistant.Services.Models;
 using Xunit;
 
 namespace IepAssistant.Services.Tests;
@@ -11,7 +15,7 @@ public sealed class NotificationServiceTests : IDisposable
 {
     private readonly RosterTestDb _db = new();
 
-    private NotificationService CreateService() => new(_db.Context());
+    private NotificationService CreateService() => new(_db.Context(), TestSupport.TestLocalizers.Messages());
 
     [Fact]
     public async Task NotifyAsync_SecondCallSameKeyWithin24h_IsDeduped()
@@ -162,6 +166,51 @@ public sealed class NotificationServiceTests : IDisposable
         var failures = await service.GetFailuresAsync(200);
         Assert.Single(failures.Data!);
         Assert.Equal("boom", failures.Data![0].EmailError);
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 2: Notifications.NotFound renders in the UI culture — English under "en", Spanish under
+    // "es". Review fix P2-A: NotificationsController's 404 routing now switches on
+    // ServiceResult.ErrorKind (asserted below), never on message-text substrings — see
+    // IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure.
+
+    [Fact]
+    public async Task MarkReadAsync_UnknownNotification_UnderEnglishCulture_MessageIsEnglish()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var (userId, _) = _db.Staff("staff-en@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+
+        using var _ = CultureScope.For("en");
+        var result = await CreateService().MarkReadAsync(userId, notificationId: -1);
+
+        Assert.False(result.Success);
+        Assert.Equal("Notification not found.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+    }
+
+    [Fact]
+    public async Task MarkReadAsync_UnknownNotification_UnderSpanishCulture_MessageIsSpanish()
+    {
+        var districtId = _db.District();
+        var schoolId = _db.School(districtId, "School A");
+        var (userId, _) = _db.Staff("staff-es@example.com", districtId, schoolId, Models.OrgRoleIds.Teacher);
+
+        using var _ = CultureScope.For("es");
+        var result = await CreateService().MarkReadAsync(userId, notificationId: -1);
+
+        Assert.False(result.Success);
+        Assert.Equal("Notificación no encontrada.", result.Message);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    /// <summary>Minimal concrete <see cref="ControllerBase"/> for exercising the
+    /// <see cref="ServiceFailureMapperExtensions.MapServiceFailure"/> extension outside a real controller.</summary>
+    private sealed class TestController : ControllerBase
+    {
     }
 
     public void Dispose() => _db.Dispose();

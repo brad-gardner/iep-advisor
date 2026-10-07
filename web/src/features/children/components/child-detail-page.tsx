@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link, Outlet } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { UserX } from "lucide-react";
 import type { ChildProfile, CreateChildProfileRequest } from "@/types/api";
 import { getChild, updateChild, deleteChild } from "../api/children-api";
@@ -19,6 +20,7 @@ import { TabsNav, TabLink } from "@/components/ui/tabs";
 import { usePageTitle } from "@/hooks/use-page-title";
 
 export function ChildDetailPage() {
+  const { t } = useTranslation("children");
   const { childId: childIdParam } = useParams<{ childId: string }>();
   const childId = Number(childIdParam);
   const navigate = useNavigate();
@@ -28,7 +30,7 @@ export function ChildDetailPage() {
   // OS taskbar/Alt-Tab previews, and screen-share tab pickers, all reachable
   // by a bystander who never authenticated to the app. The full name stays in
   // the in-page heading only (see `PageLayout title=...` below).
-  usePageTitle("Child profile");
+  usePageTitle(t("detail.pageTitle"));
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);
@@ -82,12 +84,12 @@ export function ChildDetailPage() {
           setChild(refreshed.data);
         }
         setIsEditing(false);
-        showToast({ message: "Changes saved", variant: "success" });
+        showToast({ message: t("detail.toastSaved"), variant: "success" });
         return { success: true };
       }
-      return { success: false, error: response.message || "Update failed" };
+      return { success: false, error: response.message || t("detail.updateFailed") };
     } catch {
-      return { success: false, error: "An error occurred" };
+      return { success: false, error: t("errors.generic") };
     }
   };
 
@@ -96,7 +98,7 @@ export function ChildDetailPage() {
     try {
       const response = await deleteChild(childId);
       if (response.success) {
-        showToast({ message: "Child profile removed", variant: "success" });
+        showToast({ message: t("detail.toastRemoved"), variant: "success" });
         navigate("/children");
       }
     } catch {
@@ -109,7 +111,7 @@ export function ChildDetailPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading child…" />
+        <Spinner label={t("detail.loadingChild")} />
       </div>
     );
   }
@@ -118,10 +120,10 @@ export function ChildDetailPage() {
     return (
       <EmptyState
         icon={UserX}
-        title="Child profile not found."
+        title={t("detail.notFoundTitle")}
         action={
           <Link to="/children">
-            <Button variant="secondary">Back to children</Button>
+            <Button variant="secondary">{t("detail.backToChildren")}</Button>
           </Link>
         }
       />
@@ -135,7 +137,7 @@ export function ChildDetailPage() {
     <PageLayout
       title={`${child.firstName} ${child.lastName ?? ""}`.trim()}
       breadcrumb={[
-        { label: "Children", to: "/children" },
+        { label: t("detail.breadcrumbChildren"), to: "/children" },
         { label: `${child.firstName} ${child.lastName ?? ""}`.trim() },
       ]}
       actions={
@@ -146,14 +148,14 @@ export function ChildDetailPage() {
               onClick={() => setIsEditing(true)}
               data-testid="child-edit-button"
             >
-              Edit
+              {t("detail.edit")}
             </Button>
             <Button
               variant="danger"
               onClick={() => setIsConfirmingRemove(true)}
               data-testid="child-remove-button"
             >
-              Remove
+              {t("detail.remove")}
             </Button>
           </>
         ) : undefined
@@ -168,28 +170,28 @@ export function ChildDetailPage() {
 
       <TabsNav>
         <TabLink to={`${base}/overview`} testId="tab-overview">
-          Overview
+          {t("detail.tabOverview")}
         </TabLink>
         <TabLink to={`${base}/goals`} testId="tab-goals">
-          Goals
+          {t("detail.tabGoals")}
         </TabLink>
         <TabLink to={`${base}/analysis`} testId="tab-analysis">
-          Analysis
+          {t("detail.tabAnalysis")}
         </TabLink>
         <TabLink to={`${base}/meeting-prep`} testId="tab-meeting-prep">
-          Meeting Prep
+          {t("detail.tabMeetingPrep")}
         </TabLink>
         <TabLink to={`${base}/ieps`} testId="tab-ieps">
-          IEPs
+          {t("detail.tabIeps")}
         </TabLink>
         <TabLink to={`${base}/etrs`} testId="tab-etrs">
-          ETRs
+          {t("detail.tabEtrs")}
         </TabLink>
         <TabLink to={`${base}/journal`} testId="tab-journal">
-          Journal
+          {t("detail.tabJournal")}
         </TabLink>
         <TabLink to={`${base}/advocate`} testId="tab-advocate">
-          Advocate
+          {t("detail.tabAdvocate")}
         </TabLink>
       </TabsNav>
 
@@ -200,7 +202,7 @@ export function ChildDetailPage() {
       <Modal
         open={isEditing}
         onClose={() => setIsEditing(false)}
-        title={`Edit ${child.firstName}`}
+        title={t("detail.editModalTitle", { name: child.firstName })}
         data-testid="child-edit-modal"
       >
         <ChildForm
@@ -214,15 +216,15 @@ export function ChildDetailPage() {
             schoolDistrict: child.schoolDistrict ?? "",
           }}
           onSubmit={handleUpdate}
-          submitLabel="Save Changes"
+          submitLabel={t("detail.saveChanges")}
         />
       </Modal>
 
       <ConfirmDialog
         open={isConfirmingRemove}
-        title="Remove child profile"
-        message={`Remove ${child.firstName}'s profile? This cannot be undone.`}
-        confirmLabel="Remove profile"
+        title={t("detail.removeDialogTitle")}
+        message={t("detail.removeDialogMessage", { name: child.firstName })}
+        confirmLabel={t("detail.removeConfirm")}
         loading={isDeleting}
         onConfirm={handleDelete}
         onCancel={() => setIsConfirmingRemove(false)}

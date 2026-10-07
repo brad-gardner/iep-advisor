@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -16,20 +17,21 @@ import { StaffHomeBody } from '../components/staff-home-body';
  * guards (unchanged from the previous `EducatorHomePage`) plus the page chrome.
  */
 export function StaffHomePage() {
+  const { t } = useTranslation(['home', 'common']);
   const { profile, isLoading } = useEducatorProfile();
   // Title upgrades from a generic "Home" to the org name once the profile
   // resolves — called unconditionally so every guard state below gets a title.
-  usePageTitle(profile ? profile.schoolName || profile.districtName : 'Home');
+  usePageTitle(profile ? profile.schoolName || profile.districtName : t('staffPage.home'));
 
   if (isLoading) {
     return (
-      <div className="space-y-6" role="status" aria-label="Loading your home">
+      <div className="space-y-6" role="status" aria-label={t('staffPage.loadingAriaLabel')}>
         <div className="space-y-2">
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-4 w-40" />
         </div>
         <Skeleton className="h-44 w-full max-w-lg" />
-        <span className="sr-only">Loading…</span>
+        <span className="sr-only">{t('common:ui.loading')}</span>
       </div>
     );
   }
@@ -40,11 +42,10 @@ export function StaffHomePage() {
   // show a clear support notice rather than any onboarding flow.
   if (profile == null) {
     return (
-      <PageLayout title="Home">
+      <PageLayout title={t('staffPage.home')}>
         <div data-testid="educator-no-profile">
-          <Notice variant="warning" title="No staff profile found">
-            Your account is not linked to a school or district. Please contact
-            support to finish setting up your access.
+          <Notice variant="warning" title={t('staffPage.noProfileTitle')}>
+            {t('staffPage.noProfileBody')}
           </Notice>
         </div>
       </PageLayout>
@@ -53,7 +54,7 @@ export function StaffHomePage() {
 
   if (!profile.isActive) {
     return (
-      <PageLayout title="Home">
+      <PageLayout title={t('staffPage.home')}>
         <DeactivatedAccessNotice />
       </PageLayout>
     );
@@ -70,7 +71,7 @@ export function StaffHomePage() {
       actions={
         <Link to="/educator/students">
           <Button variant="secondary" data-testid="educator-students-link">
-            View students
+            {t('staffPage.viewStudents')}
           </Button>
         </Link>
       }

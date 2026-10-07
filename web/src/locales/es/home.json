@@ -1,0 +1,133 @@
+{
+  "parentPage": {
+    "welcome": "Le damos la bienvenida, {{name}}",
+    "home": "Inicio",
+    "loadingAriaLabel": "Cargando su inicio",
+    "noUpcomingMeetings": "No hay reuniones próximas programadas."
+  },
+  "staffPage": {
+    "home": "Inicio",
+    "noProfileTitle": "No se encontró un perfil de personal",
+    "noProfileBody": "Su cuenta no está vinculada a una escuela o distrito. Comuníquese con soporte para terminar de configurar su acceso.",
+    "viewStudents": "Ver estudiantes",
+    "loadingAriaLabel": "Cargando su inicio"
+  },
+  "accountSetupNotices": {
+    "completeSetupTitle": "Complete su configuración para aprovechar al máximo IEP Advisor",
+    "getStarted": "Comenzar",
+    "setStateTitle": "Indique su estado para obtener mejor orientación",
+    "updateProfile": "Actualice su perfil",
+    "setStateSuffix": "para obtener orientación específica de su jurisdicción sobre el IEP."
+  },
+  "legacy": {
+    "yourAccount": "Su cuenta",
+    "email": "Correo electrónico",
+    "state": "Estado",
+    "quickActions": "Acciones rápidas",
+    "addChildTitle": "Agregar perfil de hijo",
+    "addChildSubtitle": "Cree un perfil para su hijo",
+    "uploadIepTitle": "Subir un IEP",
+    "uploadIepSubtitle": "Seleccione un hijo para subir",
+    "editProfileTitle": "Editar perfil",
+    "editProfileSubtitle": "Actualice su información"
+  },
+  "errors": {
+    "loadFailed": "No se pudo cargar su inicio",
+    "loadFailedTitle": "No se pudo cargar su inicio"
+  },
+  "adminHome": {
+    "meetingsThisWeekDistrict": "Reuniones esta semana",
+    "meetingsThisWeekBuilding": "Reuniones esta semana en mi escuela"
+  },
+  "caseloadHome": {
+    "thisWeek": "Esta semana",
+    "sharedAwaitingFamilyTitle": "Borradores compartidos en espera de la familia",
+    "sharedAwaitingFamilyEmpty": "Aún no se han compartido borradores con las familias.",
+    "familyResponsesTitle": "Respuestas de la familia por revisar",
+    "familyResponsesEmpty": "No hay respuestas de la familia pendientes de revisión."
+  },
+  "adoptionEngagement": {
+    "heading": "Adopción y participación familiar",
+    "viewBoard": "Ver panel de cumplimiento",
+    "loading": "Cargando datos de adopción…",
+    "staffActive": "Personal activo (14 días)",
+    "staffDenominator": "de {{count}} miembros del personal",
+    "draftsStarted": "Borradores iniciados",
+    "draftsStartedDenominator": "Últimos {{days}} días",
+    "familiesLinked": "Familias vinculadas",
+    "activeStudentsDenominator": "de {{count}} estudiantes activos",
+    "draftsShared": "Borradores compartidos con la familia"
+  },
+  "complianceSummary": {
+    "heading": "Resumen de cumplimiento",
+    "viewBoard": "Ver panel de cumplimiento",
+    "denominator": "de {{count}} estudiantes activos"
+  },
+  "documentsToReview": {
+    "title": "Documentos por revisar",
+    "emptyHint": "No hay documentos en espera de su revisión.",
+    "finalized": "Finalizado",
+    "sharedDraft": "Borrador compartido"
+  },
+  "drafts": {
+    "title": "Borradores en progreso",
+    "emptyHint": "No hay borradores en progreso.",
+    "editedOn": "{{docType}} · editado el {{date}}",
+    "completePercent": "{{percent}}% completo"
+  },
+  "dueSoon": {
+    "title": "Por vencer o vencido",
+    "emptyHint": "Nada por vencer o vencido en su lista de casos."
+  },
+  "nextMeeting": {
+    "heading": "Próxima reunión",
+    "today": "Hoy",
+    "tomorrow": "Mañana",
+    "inDays": "En {{count}} días",
+    "rsvpError": "No se pudo registrar su respuesta"
+  },
+  "overdueTable": {
+    "title": "Vencidos / en riesgo",
+    "tableLabel": "Estudiantes vencidos y en riesgo",
+    "columnStudent": "Estudiante",
+    "columnCaseManager": "Administrador de caso",
+    "unassigned": "Sin asignar",
+    "columnType": "Tipo",
+    "columnDueDate": "Fecha de vencimiento",
+    "columnStatus": "Estado",
+    "emptyTitle": "Nada vencido ni en riesgo",
+    "emptyDescription": "Todos los plazos del proceso están al día.",
+    "showingOfTotal": "Mostrando {{shown}} de {{total}}.",
+    "viewBoard": "Ver el panel de cumplimiento"
+  },
+  "providerRequests": {
+    "title": "Solicitudes de proveedores pendientes",
+    "emptyHint": "No hay solicitudes de proveedores pendientes.",
+    "due": "Vence el {{date}}"
+  },
+  "progressReports": {
+    "title": "Informes de progreso recientes",
+    "emptyHint": "Aún no hay informes de progreso.",
+    "untitled": "Informe sin título"
+  },
+  "rosterAttention": {
+    "title": "Atención de la lista de estudiantes",
+    "asOf": "Al {{date}}",
+    "overdueAnnual": "Revisiones anuales vencidas",
+    "overdueReeval": "Reevaluaciones vencidas",
+    "due30": "Vence dentro de 30 días",
+    "unknownDates": "Fechas desconocidas",
+    "noLead": "Sin administrador de caso",
+    "noFamily": "Sin familia vinculada"
+  },
+  "thisWeek": {
+    "emptyHint": "Nada programado esta semana.",
+    "briefComingSoonTitle": "Los resúmenes de reunión estarán disponibles próximamente",
+    "briefComingSoon": "Resumen · próximamente"
+  },
+  "unsignedFinalized": {
+    "title": "Documentos finalizados sin firmar",
+    "emptyHint": "No hay documentos finalizados en espera de firma.",
+    "finalizedOn": "Finalizado el {{date}}"
+  }
+}

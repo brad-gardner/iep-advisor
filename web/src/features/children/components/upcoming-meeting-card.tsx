@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,8 +9,8 @@ import { apiErrorMessage } from '@/lib/api-error';
 import { listChildMeetings, rsvpToMeeting } from '@/features/meetings/api/meetings-api';
 import { formatMeetingWhen } from '@/features/meetings/lib/meeting-time';
 import { RsvpButtonGroup } from '@/features/meetings/components/rsvp-button-group';
-import { INVITE_STATUS_LABELS } from '@/features/meetings/types';
 import type { InviteStatus, MeetingDto } from '@/features/meetings/types';
+import { inviteStatusLabel } from '@/lib/invite-status-label';
 
 function nextUpcoming(meetings: MeetingDto[]): MeetingDto | null {
   const now = Date.now();
@@ -29,12 +30,19 @@ const inviteBadgeVariant: Record<InviteStatus, 'success' | 'error' | 'warning' |
   Pending: 'neutral',
 };
 
+// A server-provided message is already resolved text and shown as-is; the
+// generic fallback is translated at RENDER time (see `error` below) rather
+// than load time, so a language switch after a failed load shows the new
+// language immediately, with no refetch (phase 2 review).
+type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
+
 /** Parent child-overview card: the child's next scheduled meeting with
  * Accept/Decline/Tentative RSVP buttons. Renders nothing if there is none. */
 export function UpcomingMeetingCard({ childId }: { childId: number }) {
+  const { t } = useTranslation(['children', 'common']);
   // `undefined` = loading, `null` = loaded with nothing upcoming.
   const [meeting, setMeeting] = useState<MeetingDto | null | undefined>(undefined);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
   // A failed RSVP is shown inline under the buttons; the card (and the meeting)
   // stays visible so the family can simply try the response again.
   const [rsvpError, setRsvpError] = useState<string | null>(null);
@@ -58,18 +66,23 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
         if (!active) return;
         if (response.success && response.data) {
           setMeeting(nextUpcoming(response.data));
-          setError(null);
+          setLoadError(null);
         } else {
-          setError(response.message ?? 'Could not load upcoming meetings');
+          setLoadError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load upcoming meetings'));
+        if (!active) return;
+        const serverMessage = apiErrorMessage(err, '');
+        setLoadError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
       }
     })();
     return () => {
       active = false;
     };
+    // `t` deliberately excluded — see the `LoadError` comment above.
   }, [childId, retryToken]);
+
+  const error = loadError ? (loadError.kind === 'server' ? loadError.message : t('upcomingMeeting.loadError')) : null;
 
   const handleRsvp = async (status: InviteStatus) => {
     if (!meeting) return;
@@ -78,9 +91,9 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
     try {
       const response = await rsvpToMeeting(meeting.id, { status });
       if (response.success && response.data) setMeeting(response.data);
-      else setRsvpError(response.message ?? 'Could not record your response');
+      else setRsvpError(response.message ?? t('upcomingMeeting.rsvpError'));
     } catch (err) {
-      setRsvpError(apiErrorMessage(err, 'Could not record your response'));
+      setRsvpError(apiErrorMessage(err, t('upcomingMeeting.rsvpError')));
     } finally {
       setResponding(null);
     }
@@ -91,8 +104,8 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
       <Card data-testid="upcoming-meeting-error">
         <div role="alert">
           <Notice variant="error" title={error}>
-            <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
-              Try again
+            <Button size="sm" variant="secondary" onClick={() => setRetryToken((n) => n + 1)}>
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>
@@ -106,7 +119,7 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
     <Card data-testid="upcoming-meeting-card">
       <div className="mb-2 flex items-center gap-2">
         <Calendar className="h-4 w-4 text-brand-teal-500" strokeWidth={1.8} aria-hidden="true" />
-        <h2 className="font-serif text-base text-brand-slate-800">Upcoming meeting</h2>
+        <h2 className="font-serif text-base text-brand-slate-800">{t('upcomingMeeting.heading')}</h2>
       </div>
       <p className="font-medium text-brand-slate-800">{meeting.title || meeting.type}</p>
       <p className="text-sm text-brand-slate-600">{formatMeetingWhen(meeting.startsAtUtc, meeting.durationMinutes)}</p>
@@ -115,7 +128,7 @@ export function UpcomingMeetingCard({ childId }: { childId: number }) {
       {meeting.myInviteStatus && (
         <div className="mt-3">
           <Badge variant={inviteBadgeVariant[meeting.myInviteStatus]}>
-            {INVITE_STATUS_LABELS[meeting.myInviteStatus]}
+            {inviteStatusLabel(meeting.myInviteStatus)}
           </Badge>
         </div>
       )}

@@ -1,0 +1,29 @@
+{
+  "acceptLink": {
+    "pageTitle": "Aceptar vínculo escolar",
+    "heading": "Vincúlese a su escuela",
+    "loadingLink": "Cargando enlace…",
+    "invalidLink": "Este enlace no es válido o ha vencido.",
+    "loadError": "Ocurrió un error al cargar este enlace.",
+    "invitedWithSchool": "<school>{{school}}</school> le invitó a conectarse con <student>{{student}}</student>.",
+    "invitedWithoutSchool": "Le invitaron a conectarse con <student>{{student}}</student>.",
+    "acceptAndLink": "Aceptar y vincular",
+    "linkedTitle": "¡Vinculado!",
+    "linkedNamed": "{{name}} ya está vinculado a su cuenta.",
+    "linkedGeneric": "El estudiante ya está vinculado a su cuenta.",
+    "viewChild": "Ver hijo",
+    "goToDashboard": "Ir al panel",
+    "noToken": "No se proporcionó un token de enlace.",
+    "acceptFailed": "No se pudo aceptar este enlace.",
+    "acceptError": "Ocurrió un error al aceptar este enlace."
+  },
+  "choice": {
+    "legend": "¿Cómo debemos vincular a este estudiante?",
+    "linkTo": "Vincular con {{name}}",
+    "createNew": "Crear un nuevo perfil de hijo"
+  },
+  "badge": {
+    "linkedToSchool": "Vinculado a {{school}}",
+    "linkedToSchoolGeneric": "Vinculado a la escuela"
+  }
+}

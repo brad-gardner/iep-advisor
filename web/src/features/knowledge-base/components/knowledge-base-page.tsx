@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Search as SearchIcon } from 'lucide-react';
 import { PageLayout } from '@/components/ui/page-layout';
 import { Spinner } from '@/components/ui/spinner';
@@ -14,7 +15,8 @@ import { KnowledgeBaseEntryCard } from './knowledge-base-entry-card';
 const entryElementId = (id: number) => `kb-entry-${id}`;
 
 export function KnowledgeBasePage() {
-  usePageTitle('Knowledge Base');
+  const { t } = useTranslation('knowledge-base');
+  usePageTitle(t('page.pageTitle'));
   // `/knowledge-base/:entryId` (e.g. from an advocate citation) opens the
   // same list and brings that entry into view; an id the list doesn't hold
   // (inactive, another state) simply shows the list.
@@ -30,8 +32,8 @@ export function KnowledgeBasePage() {
 
   return (
     <PageLayout
-      title="Knowledge Base"
-      subtitle="Plain-language guides to IEP laws, your rights, and special education terms"
+      title={t('page.pageTitle')}
+      subtitle={t('page.subtitle')}
       className="max-w-3xl"
     >
       {/* Search */}
@@ -46,7 +48,7 @@ export function KnowledgeBasePage() {
           <Spinner />
         </div>
       ) : entries.length === 0 ? (
-        <EmptyState icon={SearchIcon} title="No entries match your search" />
+        <EmptyState icon={SearchIcon} title={t('page.noResults')} />
       ) : (
         <div className="space-y-4" data-testid="kb-results">
           {entries.map((entry) => (
@@ -57,7 +59,7 @@ export function KnowledgeBasePage() {
 
       {/* Legal disclaimer */}
       <p className="text-xs text-brand-slate-500 border-t border-brand-slate-100 pt-4">
-        This information is provided for educational purposes. It is not legal advice.
+        {t('page.disclaimer')}
       </p>
     </PageLayout>
   );

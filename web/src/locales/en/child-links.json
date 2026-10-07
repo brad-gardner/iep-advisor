@@ -1,0 +1,29 @@
+{
+  "acceptLink": {
+    "pageTitle": "Accept school link",
+    "heading": "Link to Your School",
+    "loadingLink": "Loading link…",
+    "invalidLink": "This link is invalid or has expired.",
+    "loadError": "An error occurred while loading this link.",
+    "invitedWithSchool": "<school>{{school}}</school> invited you to connect <student>{{student}}</student>.",
+    "invitedWithoutSchool": "You were invited to connect <student>{{student}}</student>.",
+    "acceptAndLink": "Accept & Link",
+    "linkedTitle": "Linked!",
+    "linkedNamed": "{{name}} is now linked to your account.",
+    "linkedGeneric": "The student is now linked to your account.",
+    "viewChild": "View Child",
+    "goToDashboard": "Go to Dashboard",
+    "noToken": "No link token provided.",
+    "acceptFailed": "Failed to accept this link.",
+    "acceptError": "An error occurred while accepting this link."
+  },
+  "choice": {
+    "legend": "How should we link this student?",
+    "linkTo": "Link to {{name}}",
+    "createNew": "Create a new child profile"
+  },
+  "badge": {
+    "linkedToSchool": "Linked to {{school}}",
+    "linkedToSchoolGeneric": "Linked to school"
+  }
+}

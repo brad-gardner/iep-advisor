@@ -1,0 +1,29 @@
+{
+  "accessList": {
+    "empty": "Nadie más tiene acceso a este perfil.",
+    "pendingBadge": "Pendiente",
+    "revokeAriaLabel": "Revocar el acceso de {{name}}",
+    "revokeDialogTitle": "Revocar acceso",
+    "revokeDialogMessage": "Esa persona perderá el acceso al perfil del hijo de inmediato. Puede volver a invitarla más tarde.",
+    "revokedToast": "Acceso revocado",
+    "unknownName": "Desconocido"
+  },
+  "shareDialog": {
+    "heading": "Compartir acceso",
+    "emailLabel": "Correo electrónico",
+    "emailPlaceholder": "padre@ejemplo.com",
+    "roleLabel": "Rol",
+    "sendInvite": "Enviar invitación",
+    "successToast": "Invitación enviada correctamente",
+    "sendFailed": "No se pudo enviar la invitación",
+    "sendError": "Ocurrió un error al enviar la invitación"
+  },
+  "sharedBadge": {
+    "prefix": "Compartido · {{role}}"
+  },
+  "role": {
+    "owner": "Propietario",
+    "viewer": "Observador",
+    "collaborator": "Colaborador"
+  }
+}

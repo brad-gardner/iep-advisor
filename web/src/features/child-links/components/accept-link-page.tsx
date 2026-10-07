@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
@@ -11,13 +12,25 @@ import { usePageTitle } from '@/hooks/use-page-title';
 
 type Status = 'loading' | 'ready' | 'submitting' | 'success' | 'error';
 
+// A server-provided message is already resolved text and shown as-is;
+// `invalidLink`/`loadError` name a namespace key, translated at RENDER time
+// (see `errorMessage` below) rather than load time, so a language switch
+// after a failed load shows the new language immediately with no refetch
+// (phase 2 review).
+type LoadError = { kind: 'server'; message: string } | { kind: 'invalidLink' } | { kind: 'loadError' };
+
 export function AcceptLinkPage() {
-  usePageTitle('Accept school link');
+  const { t } = useTranslation(['child-links', 'common']);
+  usePageTitle(t('acceptLink.pageTitle'));
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
 
   const [status, setStatus] = useState<Status>('loading');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
+  // Set by `handleAccept`, an event handler (not an effect) — translated
+  // immediately with whatever `t` is current at submit time, so it's never
+  // subject to the same staleness concern as the load effect's error below.
+  const [acceptErrorMessage, setAcceptErrorMessage] = useState<string | null>(null);
   const [preview, setPreview] = useState<ChildLinkInvitePreview | null>(null);
   const [accepted, setAccepted] = useState<AcceptedChildLink | null>(null);
   const [choice, setChoice] = useState<string>(CREATE_NEW);
@@ -35,12 +48,12 @@ export function AcceptLinkPage() {
           setStatus('ready');
         } else {
           setStatus('error');
-          setErrorMessage(response.message || 'This link is invalid or has expired.');
+          setLoadError(response.message ? { kind: 'server', message: response.message } : { kind: 'invalidLink' });
         }
       } catch {
         if (active) {
           setStatus('error');
-          setErrorMessage('An error occurred while loading this link.');
+          setLoadError({ kind: 'loadError' });
         }
       }
     }
@@ -49,7 +62,14 @@ export function AcceptLinkPage() {
     return () => {
       active = false;
     };
+    // `t` deliberately excluded — see the `LoadError` comment above.
   }, [token]);
+
+  const errorMessage = loadError
+    ? loadError.kind === 'server'
+      ? loadError.message
+      : t(`acceptLink.${loadError.kind}`)
+    : acceptErrorMessage;
 
   // Missing token is derived at render time (no setState-in-effect needed).
   const isMissingToken = !token;
@@ -57,7 +77,7 @@ export function AcceptLinkPage() {
   const handleAccept = async () => {
     if (!token) return;
     setStatus('submitting');
-    setErrorMessage(null);
+    setAcceptErrorMessage(null);
 
     const linkToChildProfileId = choice === CREATE_NEW ? undefined : Number(choice);
 
@@ -68,11 +88,11 @@ export function AcceptLinkPage() {
         setStatus('success');
       } else {
         setStatus('error');
-        setErrorMessage(response.message || 'Failed to accept this link.');
+        setAcceptErrorMessage(response.message || t('acceptLink.acceptFailed'));
       }
     } catch {
       setStatus('error');
-      setErrorMessage('An error occurred while accepting this link.');
+      setAcceptErrorMessage(t('acceptLink.acceptError'));
     }
   };
 
@@ -87,11 +107,11 @@ export function AcceptLinkPage() {
   return (
     <div className="max-w-md mx-auto py-12">
       <Card className="text-center">
-        <h1 className="font-serif mb-4">Link to Your School</h1>
+        <h1 className="font-serif mb-4">{t('acceptLink.heading')}</h1>
 
         {status === 'loading' && !isMissingToken && (
           <div className="flex justify-center py-6">
-            <Spinner label="Loading link…" />
+            <Spinner label={t('acceptLink.loadingLink')} />
           </div>
         )}
 
@@ -99,14 +119,29 @@ export function AcceptLinkPage() {
           <div className="space-y-5">
             <p className="text-sm text-brand-slate-600">
               {preview.schoolName ? (
-                <>
-                  <span className="font-medium text-brand-slate-800">{preview.schoolName}</span>{' '}
-                  invited you to connect{' '}
-                </>
+                <Trans
+                  t={t}
+                  i18nKey="acceptLink.invitedWithSchool"
+                  values={{ school: preview.schoolName, student: studentName }}
+                  tOptions={{ interpolation: { escapeValue: true } }}
+                  shouldUnescape
+                  components={{
+                    school: <span className="font-medium text-brand-slate-800" />,
+                    student: <span className="font-medium text-brand-slate-800" />,
+                  }}
+                />
               ) : (
-                'You were invited to connect '
+                <Trans
+                  t={t}
+                  i18nKey="acceptLink.invitedWithoutSchool"
+                  values={{ student: studentName }}
+                  tOptions={{ interpolation: { escapeValue: true } }}
+                  shouldUnescape
+                  components={{
+                    student: <span className="font-medium text-brand-slate-800" />,
+                  }}
+                />
               )}
-              <span className="font-medium text-brand-slate-800">{studentName}</span>.
             </p>
 
             <ChildLinkChoice
@@ -121,19 +156,21 @@ export function AcceptLinkPage() {
               className="w-full"
               data-testid="accept-link-submit"
             >
-              Accept &amp; Link
+              {t('acceptLink.acceptAndLink')}
             </Button>
           </div>
         )}
 
         {status === 'success' && (
           <div className="space-y-4">
-            <Notice variant="success" title="Linked!">
-              {studentName ? `${studentName} is now linked to your account.` : 'The student is now linked to your account.'}
+            <Notice variant="success" title={t('acceptLink.linkedTitle')}>
+              {studentName
+                ? t('acceptLink.linkedNamed', { name: studentName })
+                : t('acceptLink.linkedGeneric')}
             </Notice>
             <Link to={childHref}>
               <Button data-testid="accept-link-continue">
-                {accepted?.childProfileId ? 'View Child' : 'Go to Dashboard'}
+                {accepted?.childProfileId ? t('acceptLink.viewChild') : t('acceptLink.goToDashboard')}
               </Button>
             </Link>
           </div>
@@ -145,12 +182,12 @@ export function AcceptLinkPage() {
               variant="error"
               title={
                 isMissingToken
-                  ? 'No link token provided.'
-                  : errorMessage || 'Something went wrong'
+                  ? t('acceptLink.noToken')
+                  : errorMessage || t('common:ui.genericError')
               }
             />
             <Link to="/dashboard">
-              <Button variant="secondary">Go to Dashboard</Button>
+              <Button variant="secondary">{t('acceptLink.goToDashboard')}</Button>
             </Link>
           </div>
         )}

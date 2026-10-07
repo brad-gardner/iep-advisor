@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -10,10 +12,12 @@ namespace IepAssistant.Api.Controllers;
 public class KnowledgeBaseController : ControllerBase
 {
     private readonly IKnowledgeBaseService _knowledgeBaseService;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public KnowledgeBaseController(IKnowledgeBaseService knowledgeBaseService)
+    public KnowledgeBaseController(IKnowledgeBaseService knowledgeBaseService, IStringLocalizer<Messages> localizer)
     {
         _knowledgeBaseService = knowledgeBaseService;
+        _localizer = localizer;
     }
 
     /// <summary>
@@ -42,7 +46,7 @@ public class KnowledgeBaseController : ControllerBase
         var entry = await _knowledgeBaseService.GetByIdAsync(id, cancellationToken);
 
         if (entry == null)
-            return NotFound(ApiResponse<object>.Error("Knowledge base entry not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["KnowledgeBaseApi.NotFound"]));
 
         return Ok(ApiResponse<KnowledgeBaseEntryModel>.SuccessResponse(entry));
     }

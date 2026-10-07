@@ -33,7 +33,7 @@ public class EducatorController : ControllerBase
         var result = await _educatorService.GetMeAsync(User.GetUserId(), ct);
 
         if (!result.Success)
-            return MapFailure<EducatorProfileDto>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<EducatorProfileDto>.SuccessResponse(MapProfile(result.Data!)));
     }
@@ -96,7 +96,7 @@ public class EducatorController : ControllerBase
         }, ct);
 
         if (!result.Success)
-            return MapFailure<PagedResultDto<SchoolStudentDto>>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<PagedResultDto<SchoolStudentDto>>.SuccessResponse(new PagedResultDto<SchoolStudentDto>
         {
@@ -133,7 +133,7 @@ public class EducatorController : ControllerBase
         }, ct);
 
         if (!result.Success)
-            return MapFailure<SchoolStudentDto>(result.Message);
+            return this.MapServiceFailure(result);
 
         var dto = MapStudent(result.Data!);
         return CreatedAtAction(nameof(GetStudent), new { studentId = dto.Id },
@@ -149,7 +149,7 @@ public class EducatorController : ControllerBase
         var result = await _educatorService.GetStudentAsync(User.GetUserId(), studentId, ct);
 
         if (!result.Success)
-            return MapFailure<SchoolStudentDto>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<SchoolStudentDto>.SuccessResponse(MapStudent(result.Data!)));
     }
@@ -239,7 +239,7 @@ public class EducatorController : ControllerBase
         var result = await _educatorService.AssignCaseManagerBulkAsync(User.GetUserId(),
             new BulkAssignCaseManagerModel { StudentIds = request.StudentIds, UserId = request.UserId }, ct);
         if (!result.Success)
-            return MapFailure<BulkAssignResultDto>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<BulkAssignResultDto>.SuccessResponse(new BulkAssignResultDto { Updated = result.Data!.Updated }));
     }
@@ -253,7 +253,7 @@ public class EducatorController : ControllerBase
     {
         var result = await _teamService.GetTeamAsync(User.GetUserId(), studentId, ct);
         if (!result.Success)
-            return MapFailure<IEnumerable<StudentTeamMemberDto>>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<IEnumerable<StudentTeamMemberDto>>.SuccessResponse(result.Data!.Select(MapTeamMember)));
     }
@@ -267,7 +267,7 @@ public class EducatorController : ControllerBase
     {
         var result = await _teamService.GetEligibleStaffAsync(User.GetUserId(), studentId, ct);
         if (!result.Success)
-            return MapFailure<IEnumerable<EligibleStaffDto>>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<IEnumerable<EligibleStaffDto>>.SuccessResponse(result.Data!.Select(m => new EligibleStaffDto
         {
@@ -335,7 +335,7 @@ public class EducatorController : ControllerBase
     {
         var result = await _teamService.RemoveMemberAsync(User.GetUserId(), studentId, memberId, ct);
         if (!result.Success)
-            return MapFailure<object>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
@@ -352,7 +352,7 @@ public class EducatorController : ControllerBase
         var result = await _childLinkService.InviteParentAsync(User.GetUserId(), studentId, request.ParentEmail, ct);
 
         if (!result.Success)
-            return MapFailure<ChildLinkDto>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<ChildLinkDto>.SuccessResponse(MapLink(result.Data!), result.Message));
     }
@@ -365,7 +365,7 @@ public class EducatorController : ControllerBase
         var result = await _childLinkService.GetLinksForStudentAsync(User.GetUserId(), studentId, ct);
 
         if (!result.Success)
-            return MapFailure<IEnumerable<ChildLinkDto>>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<IEnumerable<ChildLinkDto>>.SuccessResponse(result.Data!.Select(MapLink)));
     }
@@ -379,7 +379,7 @@ public class EducatorController : ControllerBase
         var result = await _childLinkService.RevokeLinkAsync(User.GetUserId(), studentId, linkId, ct);
 
         if (!result.Success)
-            return MapFailure<object>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
@@ -393,7 +393,7 @@ public class EducatorController : ControllerBase
     {
         var result = await _educatorService.GetStudentStaffAccessAsync(User.GetUserId(), studentId, ct);
         if (!result.Success)
-            return MapFailure<IEnumerable<StudentStaffAccessDto>>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<IEnumerable<StudentStaffAccessDto>>.SuccessResponse(result.Data!.Select(MapStaffAccess)));
     }
@@ -415,7 +415,7 @@ public class EducatorController : ControllerBase
         var result = await _educatorService.GrantStudentStaffAccessAsync(User.GetUserId(), studentId,
             new GrantStudentStaffAccessModel { StaffProfileId = request.StaffProfileId, AccessRole = accessRole }, ct);
         if (!result.Success)
-            return MapFailure<StudentStaffAccessDto>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<StudentStaffAccessDto>.SuccessResponse(MapStaffAccess(result.Data!)));
     }
@@ -428,7 +428,7 @@ public class EducatorController : ControllerBase
     {
         var result = await _educatorService.RevokeStudentStaffAccessAsync(User.GetUserId(), studentId, accessId, ct);
         if (!result.Success)
-            return MapFailure<object>(result.Message);
+            return this.MapServiceFailure(result);
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
@@ -460,19 +460,6 @@ public class EducatorController : ControllerBase
         CreatedAt = m.CreatedAt
     };
 
-    private IActionResult MapFailure<T>(string? message)
-    {
-        message ??= "Request failed";
-
-        if (message.Contains("permission", StringComparison.OrdinalIgnoreCase))
-            return StatusCode(403, ApiResponse<object>.Error(message));
-
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(ApiResponse<object>.Error(message));
-
-        return BadRequest(ApiResponse<object>.Error(message));
-    }
-
     private static EducatorProfileDto MapProfile(EducatorProfileModel m) => new()
     {
         StaffProfileId = m.StaffProfileId,
@@ -492,14 +479,14 @@ public class EducatorController : ControllerBase
     private IActionResult StudentResult(ServiceResult<SchoolStudentModel> result)
     {
         if (!result.Success)
-            return MapFailure<SchoolStudentDto>(result.Message);
+            return this.MapServiceFailure(result);
         return Ok(ApiResponse<SchoolStudentDto>.SuccessResponse(MapStudent(result.Data!)));
     }
 
     private IActionResult TeamMemberResult(ServiceResult<StudentTeamMemberModel> result)
     {
         if (!result.Success)
-            return MapFailure<StudentTeamMemberDto>(result.Message);
+            return this.MapServiceFailure(result);
         return Ok(ApiResponse<StudentTeamMemberDto>.SuccessResponse(MapTeamMember(result.Data!)));
     }
 

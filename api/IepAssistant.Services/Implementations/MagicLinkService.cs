@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
@@ -29,19 +30,22 @@ public class MagicLinkService : IMagicLinkService
     private readonly JwtTokenFactory _jwtTokenFactory;
     private readonly string _frontendUrl;
     private readonly ILogger<MagicLinkService> _logger;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public MagicLinkService(
         ApplicationDbContext context,
         IEmailService emailService,
         JwtTokenFactory jwtTokenFactory,
         IConfiguration configuration,
-        ILogger<MagicLinkService> logger)
+        ILogger<MagicLinkService> logger,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _emailService = emailService;
         _jwtTokenFactory = jwtTokenFactory;
         _frontendUrl = configuration["App:FrontendUrl"] ?? "http://localhost:5173";
         _logger = logger;
+        _localizer = localizer;
     }
 
     public async Task RequestAsync(string email, CancellationToken ct = default)
@@ -96,7 +100,7 @@ public class MagicLinkService : IMagicLinkService
     public async Task<MagicLinkConsumeResult> ConsumeAsync(string token, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(token))
-            return MagicLinkConsumeResult.Failure("Invalid or expired sign-in link.");
+            return MagicLinkConsumeResult.Failure(_localizer["AuthApi.InvalidOrExpiredSignInLink"]);
 
         var tokenHash = InviteTokenHelper.Hash(token);
         var record = await _context.MagicLinkTokens
@@ -104,18 +108,18 @@ public class MagicLinkService : IMagicLinkService
             .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
 
         if (record == null || record.UsedAt != null || record.ExpiresAt <= DateTime.UtcNow)
-            return MagicLinkConsumeResult.Failure("Invalid or expired sign-in link.");
+            return MagicLinkConsumeResult.Failure(_localizer["AuthApi.InvalidOrExpiredSignInLink"]);
 
         // Claim-first: atomic guarded update is the race-loser gate (mirrors StaffInviteService.AcceptAsync).
         var claimed = await _context.MagicLinkTokens
             .Where(t => t.Id == record.Id && t.UsedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, DateTime.UtcNow), ct);
         if (claimed == 0)
-            return MagicLinkConsumeResult.Failure("This sign-in link has already been used.");
+            return MagicLinkConsumeResult.Failure(_localizer["MagicLink.AlreadyUsed"]);
 
         var user = record.User;
         if (!user.IsActive)
-            return MagicLinkConsumeResult.Failure("This account is not active.");
+            return MagicLinkConsumeResult.Failure(_localizer["MagicLink.AccountNotActive"]);
 
         // Same branch a password login takes when MFA is already enrolled — identical next step
         // (POST /api/auth/mfa/verify) for either entry point.

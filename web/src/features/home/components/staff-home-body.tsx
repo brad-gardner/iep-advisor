@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
@@ -10,6 +11,7 @@ import { CaseloadHome } from './caseload-home';
  * variant body. A load failure always renders an error notice with retry —
  * never an empty state. */
 export function StaffHomeBody() {
+  const { t } = useTranslation(['home', 'common']);
   const { home, isLoading, error, retry } = useHome();
 
   if (isLoading) {
@@ -26,9 +28,9 @@ export function StaffHomeBody() {
     return (
       <Card data-testid="staff-home-error">
         <div role="alert">
-          <Notice variant="error" title={error ?? "Couldn't load your home"}>
+          <Notice variant="error" title={error ?? t('errors.loadFailedTitle')}>
             <Button variant="secondary" className="mt-2" onClick={retry} data-testid="staff-home-retry">
-              Try again
+              {t('common:ui.tryAgain')}
             </Button>
           </Notice>
         </div>

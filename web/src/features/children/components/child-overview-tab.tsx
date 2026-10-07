@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Share2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,9 +15,13 @@ import { ChildProgressCard } from "@/features/goals/components/child-progress-ca
 import { UpcomingMeetingCard } from "./upcoming-meeting-card";
 import { InviteStudentForm } from "@/features/student/components/invite-student-form";
 import { inviteStudentFromParent } from "@/features/student/api/student-invite-api";
+import { gradeLevelLabel } from "@/lib/grade-level-label";
+import { disabilityCategoryLabel } from "@/lib/disability-category-label";
+import { formatDate } from "@/lib/format-date";
 import type { ChildOutletContext } from "./child-detail-page";
 
 export function ChildOverviewTab() {
+  const { t } = useTranslation("children");
   const { child, childId } = useOutletContext<ChildOutletContext>();
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showInviteStudent, setShowInviteStudent] = useState(false);
@@ -31,7 +36,7 @@ export function ChildOverviewTab() {
     } catch {
       return {
         success: false,
-        message: "An error occurred sending the invitation",
+        message: t("overview.inviteStudentError"),
       };
     }
   };
@@ -39,26 +44,26 @@ export function ChildOverviewTab() {
   return (
     <div className="space-y-6">
       <Card data-testid="child-profile-section">
-        <h2 className="font-serif mb-4">Profile</h2>
+        <h2 className="font-serif mb-4">{t("overview.profileHeading")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {child.dateOfBirth && (
             <ProfileField
-              label="Date of Birth"
-              value={new Date(child.dateOfBirth).toLocaleDateString()}
+              label={t("fields.dateOfBirth")}
+              value={formatDate(child.dateOfBirth)}
             />
           )}
           {child.gradeLevel && (
-            <ProfileField label="Grade Level" value={child.gradeLevel} />
+            <ProfileField label={t("fields.gradeLevel")} value={gradeLevelLabel(child.gradeLevel)} />
           )}
           {child.disabilityCategory && (
             <ProfileField
-              label="Disability Category"
-              value={child.disabilityCategory}
+              label={t("fields.disabilityCategory")}
+              value={disabilityCategoryLabel(child.disabilityCategory)}
             />
           )}
           {child.schoolDistrict && (
             <ProfileField
-              label="School District"
+              label={t("fields.schoolDistrict")}
               value={child.schoolDistrict}
             />
           )}
@@ -80,7 +85,7 @@ export function ChildOverviewTab() {
       {isOwner && (
         <Card data-testid="sharing-section">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-serif">Sharing & Access</h2>
+            <h2 className="font-serif">{t("overview.sharingHeading")}</h2>
             <Button
               onClick={() => setShowShareDialog(true)}
               data-testid="share-invite-button"
@@ -90,20 +95,18 @@ export function ChildOverviewTab() {
                 strokeWidth={1.8}
                 aria-hidden="true"
               />
-              Invite Someone
+              {t("overview.inviteSomeone")}
             </Button>
           </div>
           <p className="text-sm text-brand-slate-500 mb-4">
-            Share {child.firstName}'s IEP information with a co-parent,
-            advocate, or attorney. They'll get their own login and can view or
-            collaborate depending on the role you assign.
+            {t("overview.shareDescription", { name: child.firstName })}
           </p>
           <AccessList key={accessListKey} childId={childId} isOwner={isOwner} />
 
           <Modal
             open={showShareDialog}
             onClose={() => setShowShareDialog(false)}
-            title={`Invite someone to ${child.firstName}'s profile`}
+            title={t("overview.shareModalTitle", { name: child.firstName })}
             data-testid="share-child-modal"
           >
             <ShareChildDialog
@@ -122,10 +125,9 @@ export function ChildOverviewTab() {
         <Card>
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="font-serif">Student account</h2>
+              <h2 className="font-serif">{t("overview.studentAccountHeading")}</h2>
               <p className="mt-1 max-w-prose text-sm text-brand-slate-500">
-                Invite {child.firstName} to activate their own account and take
-                part in their IEP process.
+                {t("overview.inviteStudentDescription", { name: child.firstName })}
               </p>
             </div>
             <Button
@@ -134,7 +136,7 @@ export function ChildOverviewTab() {
               onClick={() => setShowInviteStudent(true)}
               data-testid="invite-student-open"
             >
-              Invite student
+              {t("overview.inviteStudent")}
             </Button>
           </div>
         </Card>
@@ -143,7 +145,7 @@ export function ChildOverviewTab() {
       <Modal
         open={showInviteStudent}
         onClose={() => setShowInviteStudent(false)}
-        title="Invite student"
+        title={t("overview.inviteStudent")}
         data-testid="invite-student-modal"
       >
         <InviteStudentForm
@@ -153,7 +155,7 @@ export function ChildOverviewTab() {
             if (result.success) setShowInviteStudent(false);
             return result;
           }}
-          description={`Invite ${child.firstName} to activate their own account and take part in their IEP process.`}
+          description={t("overview.inviteStudentDescription", { name: child.firstName })}
         />
       </Modal>
     </div>

@@ -1,10 +1,14 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
 using IepAssistant.Services.Interfaces;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using Xunit;
 
@@ -36,7 +40,7 @@ public sealed class ChildLinkServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private static ChildLinkService CreateService(ApplicationDbContext ctx, CapturingEmailService email)
-        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), email, new CapturingAuditLogger(), NullLogger<ChildLinkService>.Instance);
+        => new(ctx, new AccessService(ctx), new OrgAccessService(ctx), email, new CapturingAuditLogger(), NullLogger<ChildLinkService>.Instance, TestSupport.TestLocalizers.Messages());
 
     private static EducatorService CreateEducator(ApplicationDbContext ctx)
         => new(ctx, new OrgAccessService(ctx), new CapturingAuditLogger(), NullLogger<EducatorService>.Instance);
@@ -487,7 +491,94 @@ public sealed class ChildLinkServiceTests : IDisposable
         }
     }
 
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 2: ChildLinks.NoPermissionToInvite renders in the UI culture — English under "en", Spanish
+    // under "es". Review fix P2-A: the controller's 403 routing now switches on
+    // ServiceResult.ErrorKind (set below), never on message-text substrings, so the Spanish wording
+    // here is free to change without breaking status-code routing — see
+    // IepAssistant.Api.Extensions.ServiceFailureMapperExtensions.MapServiceFailure.
+
+    [Fact]
+    public async Task Invite_FromEducatorInAnotherSchool_UnderEnglishCulture_MessageIsEnglish()
+    {
+        var (educatorA, studentInA) = await SeedEducatorWithStudent("edEn@x.com", "DistrictEn", "SchoolEn");
+        var educatorB = SeedEducator("edEnB@x.com", "DistrictEnB", "SchoolEnB");
+        var email = new CapturingEmailService();
+
+        using var _ = CultureScope.For("en");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx, email).InviteParentAsync(educatorB, studentInA, "parent@x.com");
+
+        Assert.False(result.Success);
+        Assert.Equal("You do not have permission to invite a parent for this student.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+    }
+
+    [Fact]
+    public async Task Invite_FromEducatorInAnotherSchool_UnderSpanishCulture_MessageIsSpanish()
+    {
+        var (educatorA, studentInA) = await SeedEducatorWithStudent("edEs@x.com", "DistrictEs", "SchoolEs");
+        var educatorB = SeedEducator("edEsB@x.com", "DistrictEsB", "SchoolEsB");
+        var email = new CapturingEmailService();
+
+        using var _ = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx, email).InviteParentAsync(educatorB, studentInA, "parent@x.com");
+
+        Assert.False(result.Success);
+        Assert.Equal("No tiene permiso para invitar a un padre, madre o tutor para este estudiante.", result.Message);
+        Assert.Equal(ServiceErrorKind.Forbidden, result.ErrorKind);
+
+        // P2-A end-to-end: the shared mapper reads ErrorKind, not the (Spanish) message text, to
+        // reach 403 — the exact case this fix targets.
+        var action = new TestController().MapServiceFailure(result);
+        var objectResult = Assert.IsType<ObjectResult>(action);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task RevokeLink_UnknownLink_UnderSpanishCulture_MapsTo404ViaErrorKind()
+    {
+        var (educatorId, studentId) = await SeedEducatorWithStudent("edRevokeEs@x.com", "DistrictRevokeEs", "SchoolRevokeEs");
+        var email = new CapturingEmailService();
+
+        using var _ = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx, email).RevokeLinkAsync(educatorId, studentId, linkId: -1);
+
+        Assert.False(result.Success);
+        Assert.Equal(ServiceErrorKind.NotFound, result.ErrorKind);
+
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<NotFoundObjectResult>(action);
+    }
+
+    [Fact]
+    public async Task Accept_InvalidToken_UnderSpanishCulture_MapsTo400ViaErrorKind_NotByMessageText()
+    {
+        var parentId = SeedUser("parentAcceptEs@x.com");
+
+        using var _ = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var email = new CapturingEmailService();
+        var result = await CreateService(ctx, email).AcceptInviteAsync(parentId, "not-a-real-token", linkToChildProfileId: null);
+
+        Assert.False(result.Success);
+        Assert.Equal(ServiceErrorKind.Validation, result.ErrorKind);
+
+        // This message happens to contain neither "permiso" nor "no encontrad", but the point of
+        // P2-A is that it wouldn't matter if it did — Validation always maps to 400.
+        var action = new TestController().MapServiceFailure(result);
+        Assert.IsType<BadRequestObjectResult>(action);
+    }
+
     public void Dispose() => _connection.Dispose();
+
+    /// <summary>Minimal concrete <see cref="ControllerBase"/> for exercising the
+    /// <see cref="ServiceFailureMapperExtensions.MapServiceFailure"/> extension outside a real controller.</summary>
+    private sealed class TestController : ControllerBase
+    {
+    }
 
     /// <summary>Captures the raw token passed to the email so tests can exercise the accept path.</summary>
     private sealed class CapturingEmailService : TestSupport.TestEmailServiceBase

@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.DTOs.Share;
 using IepAssistant.Api.Extensions;
 using IepAssistant.Domain.Entities;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -14,10 +16,12 @@ namespace IepAssistant.Api.Controllers;
 public class ShareController : ControllerBase
 {
     private readonly IShareService _shareService;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public ShareController(IShareService shareService)
+    public ShareController(IShareService shareService, IStringLocalizer<Messages> localizer)
     {
         _shareService = shareService;
+        _localizer = localizer;
     }
 
     [HttpPost("api/children/{childId}/share")]
@@ -27,16 +31,16 @@ public class ShareController : ControllerBase
     public async Task<IActionResult> Invite(int childId, [FromBody] CreateInviteRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         if (!Enum.TryParse<AccessRole>(request.Role, ignoreCase: true, out var role))
-            return BadRequest(ApiResponse<object>.Error("Invalid role. Must be 'Viewer' or 'Collaborator'."));
+            return BadRequest(ApiResponse<object>.Error(_localizer["SharingApi.InvalidRole"]));
 
         var userId = User.GetUserId();
         var result = await _shareService.InviteAsync(childId, userId, request.Email, role, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Invite failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["SharingApi.InviteFailed"].Value));
 
         var dto = MapToDto(result.Data!);
         return Ok(ApiResponse<ChildAccessDto>.SuccessResponse(dto, result.Message));
@@ -61,7 +65,7 @@ public class ShareController : ControllerBase
         var result = await _shareService.RevokeAccessAsync(childId, accessId, userId, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Revoke failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["SharingApi.RevokeFailed"].Value));
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
@@ -72,13 +76,13 @@ public class ShareController : ControllerBase
     public async Task<IActionResult> AcceptInvite([FromBody] AcceptInviteRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var userId = User.GetUserId();
         var result = await _shareService.AcceptInviteAsync(userId, request.Token, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Accept failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["SharingApi.AcceptFailed"].Value));
 
         return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }

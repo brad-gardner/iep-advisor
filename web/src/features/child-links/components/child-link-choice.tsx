@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { LinkableChild } from '../types';
 
 // Sentinel value for the "create a new child profile" radio option.
@@ -10,10 +11,11 @@ interface ChildLinkChoiceProps {
 }
 
 export function ChildLinkChoice({ existingChildren, value, onChange }: ChildLinkChoiceProps) {
+  const { t } = useTranslation('child-links');
   return (
     <fieldset className="space-y-2 text-left" data-testid="child-link-choice">
       <legend className="text-[13px] font-medium text-brand-slate-600 mb-1">
-        How should we link this student?
+        {t('choice.legend')}
       </legend>
 
       {existingChildren.map((child) => {
@@ -32,7 +34,7 @@ export function ChildLinkChoice({ existingChildren, value, onChange }: ChildLink
               data-testid={`child-link-option-${child.childProfileId}`}
             />
             <span className="text-sm text-brand-slate-800">
-              Link to {child.firstName} {child.lastName ?? ''}
+              {t('choice.linkTo', { name: `${child.firstName} ${child.lastName ?? ''}`.trim() })}
             </span>
           </label>
         );
@@ -47,7 +49,7 @@ export function ChildLinkChoice({ existingChildren, value, onChange }: ChildLink
           onChange={() => onChange(CREATE_NEW)}
           data-testid="child-link-option-create-new"
         />
-        <span className="text-sm text-brand-slate-800">Create a new child profile</span>
+        <span className="text-sm text-brand-slate-800">{t('choice.createNew')}</span>
       </label>
     </fieldset>
   );

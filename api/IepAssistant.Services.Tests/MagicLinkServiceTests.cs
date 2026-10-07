@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Implementations;
+using IepAssistant.Services.Localization;
 using IepAssistant.Services.Models;
 using IepAssistant.Services.Security;
 using Xunit;
@@ -49,7 +50,7 @@ public sealed class MagicLinkServiceTests : IDisposable
     private ApplicationDbContext CreateContext() => new(_options);
 
     private MagicLinkService CreateService(ApplicationDbContext ctx, CapturingEmailService email)
-        => new(ctx, email, new JwtTokenFactory(_configuration), _configuration, NullLogger<MagicLinkService>.Instance);
+        => new(ctx, email, new JwtTokenFactory(_configuration), _configuration, NullLogger<MagicLinkService>.Instance, TestSupport.TestLocalizers.Messages());
 
     // ----------------------------------------------------------------- seed helpers
 
@@ -290,6 +291,34 @@ public sealed class MagicLinkServiceTests : IDisposable
         var result = await CreateService(ctx, new CapturingEmailService()).ConsumeAsync("not-a-real-token");
 
         Assert.False(result.Success);
+    }
+
+    // ----------------------------------------------------------------- multilingual plan (2026-10-06)
+    // phase 2, carry-over P3: ConsumeAsync's failure message renders in the UI culture — English under
+    // "en", Spanish under "es". Reuses AuthApi.InvalidOrExpiredSignInLink (identical English text to
+    // AuthController's own fallback), so previously this silently overrode that fallback with English
+    // regardless of culture.
+
+    [Fact]
+    public async Task ConsumeAsync_UnknownToken_UnderEnglishCulture_MessageIsEnglish()
+    {
+        using var _ = CultureScope.For("en");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx, new CapturingEmailService()).ConsumeAsync("not-a-real-token");
+
+        Assert.False(result.Success);
+        Assert.Equal("Invalid or expired sign-in link.", result.Message);
+    }
+
+    [Fact]
+    public async Task ConsumeAsync_UnknownToken_UnderSpanishCulture_MessageIsSpanish()
+    {
+        using var _ = CultureScope.For("es");
+        using var ctx = CreateContext();
+        var result = await CreateService(ctx, new CapturingEmailService()).ConsumeAsync("not-a-real-token");
+
+        Assert.False(result.Success);
+        Assert.Equal("El enlace de inicio de sesión no es válido o ha vencido.", result.Message);
     }
 
     [Fact]

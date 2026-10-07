@@ -59,7 +59,7 @@ public class MeetingPrepModeCTests
             null!,
             new ParentAdvocacyGoalRepository(context),
             new AllowAll(),
-            new SubscriptionService(context, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), NullLogger<SubscriptionService>.Instance),
+            new SubscriptionService(context, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), NullLogger<SubscriptionService>.Instance, TestSupport.TestLocalizers.Messages()),
             context,
             claudeClient,
             NullLogger<MeetingPrepService>.Instance);

@@ -21,7 +21,7 @@ public sealed class MeetingServiceTests : IDisposable
         ctx,
         new OrgAccessService(ctx),
         new AccessService(ctx),
-        new NotificationService(ctx),
+        new NotificationService(ctx, TestSupport.TestLocalizers.Messages()),
         new CapturingAuditLogger(),
         NullLogger<MeetingService>.Instance);
 

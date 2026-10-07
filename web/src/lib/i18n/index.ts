@@ -2,22 +2,55 @@ import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import resourcesToBackend from 'i18next-resources-to-backend';
 import * as Sentry from '@sentry/react';
-import enCommon from '@/locales/en/common.json';
-import enAuth from '@/locales/en/auth.json';
 import { detectInitialLanguage, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from './detect';
 
 export const defaultNS = 'common';
 
-// English is bundled (no network round-trip, no flash of missing text on the
-// very first paint). Spanish is lazy — loaded per namespace, on demand, by
-// the resourcesToBackend plugin below.
+// Every English namespace is bundled eagerly, with no network round-trip and
+// no flash of raw `ns:key` text on first paint — and, just as importantly, no
+// way to get permanently STUCK on raw keys if a lazy chunk fails to load over
+// a flaky connection, since English never depends on one loading at all (see
+// the plan's "Decisions added during implementation": lazy English namespaces
+// showed raw keys before load and got stuck on them when a chunk failed).
+// `import.meta.glob(..., { eager: true })` discovers every `en/*.json` file
+// on disk and inlines its content directly into this module — a new
+// namespace file added in a later phase needs no corresponding line here.
+const enModules = import.meta.glob('/src/locales/en/*.json', { eager: true }) as Record<
+  string,
+  { default: Record<string, unknown> }
+>;
+
+function namespaceOf(path: string, root: string): string {
+  return path.slice(root.length, -'.json'.length);
+}
+
+// The runtime value, discovered automatically by the glob above — adding a
+// namespace file is enough; nothing here needs updating. Its literal,
+// per-namespace TYPE can't come from a dynamic glob (Vite's `import.meta.glob`
+// types every match as the same generic module shape, not a literal path-to-
+// shape map — see `types.d.ts`), so `types.d.ts` derives `CustomTypeOptions`
+// from a small, parallel set of `import type` lines instead — those cost
+// nothing at runtime (erased by `tsc`) and are the one thing that still needs
+// a line added per new namespace.
 export const resources = {
-  en: { common: enCommon, auth: enAuth },
+  en: Object.fromEntries(
+    Object.entries(enModules).map(([path, mod]) => [namespaceOf(path, '/src/locales/en/'), mod.default])
+  ),
 } as const;
 
-// Every Spanish namespace file, eagerly discovered but lazily IMPORTED
-// (import.meta.glob without `eager: true` yields loader functions, not the
-// modules themselves) — Vite code-splits each into its own chunk.
+// Every namespace name, derived from the `en/*.json` files on disk — so this
+// list updates itself as phases add namespaces, with nothing to hand-
+// maintain here. Exported for `test/setup.ts` (asserting every namespace
+// is bundled) and `test/i18n-test-utils.tsx`'s `renderInSpanish` (preloading
+// every namespace in Spanish before render — Spanish is still lazy; see
+// `esLoaders` below).
+export const featureNamespaces = Object.keys(resources.en);
+
+// Spanish, discovered eagerly but imported LAZILY (import.meta.glob without
+// `eager: true` yields loader functions, not the modules themselves) — Vite
+// code-splits each namespace into its own chunk, fetched only once a
+// Spanish-reading visitor actually needs it. English never goes through this
+// backend at all now; every `en/*.json` file is already in `resources` above.
 const esLoaders = import.meta.glob('/src/locales/es/*.json') as Record<
   string,
   () => Promise<{ default: Record<string, unknown> }>
@@ -43,8 +76,9 @@ export const i18nReady = i18next
   .use(initReactI18next)
   .init({
     resources,
-    // English namespaces above are used directly; the backend is only
-    // consulted for languages/namespaces not already bundled (i.e. es/*).
+    // English is fully bundled in `resources` above; the backend is only
+    // ever actually consulted for Spanish, the one language NOT present
+    // there.
     partialBundledLanguages: true,
     // Resolved once, synchronously, by `detectInitialLanguage` (cached
     // account language, else a pre-login choice, else the browser, else
@@ -56,6 +90,16 @@ export const i18nReady = i18next
     fallbackLng: DEFAULT_LANGUAGE,
     supportedLngs: SUPPORTED_LANGUAGES,
     load: 'languageOnly',
+    // Only the two shell namespaces are EAGERLY loaded at init (so the
+    // layout, sidebar, switcher, and auth pages never wait on anything
+    // before first paint). Every other namespace's ENGLISH data already
+    // sits in `resources` above — `useTranslation('<namespace>')` sees it as
+    // already loaded with no network call, for any namespace, the instant a
+    // component first asks for it. Its SPANISH data is not preseeded, so the
+    // same first call lazily fetches just that one namespace's `es` chunk
+    // via `esLoaders` above. Listing every namespace here instead would
+    // force Spanish to eagerly fetch every chunk up front, defeating the
+    // whole point of lazy-loading Spanish per namespace.
     ns: ['common', 'auth'],
     defaultNS,
     interpolation: { escapeValue: false },
@@ -79,10 +123,12 @@ i18next.on('languageChanged', () => {
   }
 });
 
-// A namespace fails to load (e.g. the network drops mid-way through
-// fetching the lazy Spanish chunk): never leave the UI showing raw
-// `ns:key` strings indefinitely. Log it and fall back to English, which is
-// always bundled and therefore always available.
+// A namespace fails to load: since Spanish is the only language that ever
+// loads through the network backend above (English is always already in
+// `resources`), this can only mean a Spanish chunk failed mid-fetch (e.g. the
+// network drops). Never leave the UI showing raw `ns:key` strings
+// indefinitely — log it and fall back to English, which needs no load at all
+// and is therefore always available immediately.
 i18next.on('failedLoading', (lng, ns, msg) => {
   Sentry.captureException(new Error(`[i18n] failed loading ${lng}/${ns}: ${msg}`));
   if (lng !== DEFAULT_LANGUAGE) {

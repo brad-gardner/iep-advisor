@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { formatMeetingWhen } from '@/features/meetings/lib/meeting-time';
 import { MEETING_STATUS_LABELS } from '@/features/meetings/types';
@@ -35,10 +36,11 @@ export function ThisWeekSection({
   showBriefNote = false,
   'data-testid': testId = 'home-this-week',
 }: ThisWeekSectionProps) {
+  const { t } = useTranslation('home');
   return (
     <HomeSection title={title} subtitle={subtitle} data-testid={testId}>
       {meetings.length === 0 ? (
-        <EmptyHint data-testid={`${testId}-empty`}>Nothing scheduled this week.</EmptyHint>
+        <EmptyHint data-testid={`${testId}-empty`}>{t('thisWeek.emptyHint')}</EmptyHint>
       ) : (
         <ul className="divide-y divide-brand-slate-100">
           {meetings.map((meeting) => (
@@ -54,8 +56,8 @@ export function ThisWeekSection({
                     {MEETING_STATUS_LABELS[meeting.status]}
                   </Badge>
                   {showBriefNote && (
-                    <Badge variant="neutral" title="Meeting briefs are coming soon">
-                      Brief · coming soon
+                    <Badge variant="neutral" title={t('thisWeek.briefComingSoonTitle')}>
+                      {t('thisWeek.briefComingSoon')}
                     </Badge>
                   )}
                 </>

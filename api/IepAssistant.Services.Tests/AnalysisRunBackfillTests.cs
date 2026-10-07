@@ -27,7 +27,7 @@ public class AnalysisRunBackfillTests
     private static AnalysisRunService BuildAnalysisRunService(ApplicationDbContext context) => new(
         context,
         new AccessService(context),
-        new SubscriptionService(context, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), NullLogger<SubscriptionService>.Instance),
+        new SubscriptionService(context, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), NullLogger<SubscriptionService>.Instance, TestSupport.TestLocalizers.Messages()),
         new ParentAdvocacyGoalRepository(context),
         new NullClaudeClient(),
         NullLogger<AnalysisRunService>.Instance);

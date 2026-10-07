@@ -181,7 +181,8 @@ public sealed class UserRoleAndCoParentTests : IDisposable
                 protector: null!,
                 emailService: new TestEmailServiceBase(),
                 dataProtectionProvider: DataProtectionProvider.Create("test"),
-                configuration: new ConfigurationBuilder().Build());
+                configuration: new ConfigurationBuilder().Build(),
+                localizer: TestLocalizers.Messages());
 
             var export = await service.ExportDataAsync(userBId);
 

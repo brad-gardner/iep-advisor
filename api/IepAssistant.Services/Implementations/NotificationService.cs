@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
@@ -14,10 +15,12 @@ public class NotificationService : INotificationService
     public static readonly TimeSpan DedupWindow = TimeSpan.FromHours(24);
 
     private readonly ApplicationDbContext _context;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public NotificationService(ApplicationDbContext context)
+    public NotificationService(ApplicationDbContext context, IStringLocalizer<Messages> localizer)
     {
         _context = context;
+        _localizer = localizer;
     }
 
     public async Task NotifyAsync(IEnumerable<int> userIds, NotificationKind kind, string title, string body,
@@ -78,7 +81,7 @@ public class NotificationService : INotificationService
     {
         var notification = await _context.Notifications.FirstOrDefaultAsync(n => n.Id == notificationId && n.UserId == userId, ct);
         if (notification == null)
-            return ServiceResult.FailureResult("Notification not found.");
+            return ServiceResult.NotFound(_localizer["Notifications.NotFound"]);
 
         if (notification.ReadAt == null)
         {

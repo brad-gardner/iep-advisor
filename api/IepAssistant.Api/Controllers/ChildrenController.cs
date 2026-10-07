@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Api.DTOs.Children;
 using IepAssistant.Api.DTOs.Common;
 using IepAssistant.Api.Extensions;
+using IepAssistant.Services;
 using IepAssistant.Services.Interfaces;
 using IepAssistant.Services.Models;
 
@@ -15,11 +17,13 @@ public class ChildrenController : ControllerBase
 {
     private readonly IChildProfileService _childProfileService;
     private readonly IAccessService _accessService;
+    private readonly IStringLocalizer<Messages> _localizer;
 
-    public ChildrenController(IChildProfileService childProfileService, IAccessService accessService)
+    public ChildrenController(IChildProfileService childProfileService, IAccessService accessService, IStringLocalizer<Messages> localizer)
     {
         _childProfileService = childProfileService;
         _accessService = accessService;
+        _localizer = localizer;
     }
 
     [HttpGet]
@@ -46,7 +50,7 @@ public class ChildrenController : ControllerBase
         var profile = await _childProfileService.GetByIdForUserAsync(id, userId, cancellationToken);
 
         if (profile == null)
-            return NotFound(ApiResponse<object>.Error("Child profile not found"));
+            return NotFound(ApiResponse<object>.Error(_localizer["ChildrenApi.NotFound"]));
 
         var role = await _accessService.GetRoleAsync(id, userId, cancellationToken);
         return Ok(ApiResponse<ChildProfileDto>.SuccessResponse(MapToDto(profile, role?.ToString().ToLowerInvariant())));
@@ -58,7 +62,7 @@ public class ChildrenController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateChildProfileRequest request, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ApiResponse<object>.Error("Invalid request"));
+            return BadRequest(ApiResponse<object>.Error(_localizer["AuthApi.InvalidRequest"]));
 
         var userId = User.GetUserId();
         var model = new CreateChildProfileModel
@@ -74,10 +78,10 @@ public class ChildrenController : ControllerBase
         var result = await _childProfileService.CreateAsync(userId, model, cancellationToken);
 
         if (!result.Success)
-            return BadRequest(ApiResponse<object>.Error(result.Message ?? "Creation failed"));
+            return BadRequest(ApiResponse<object>.Error(result.Message ?? _localizer["ChildrenApi.CreationFailed"].Value));
 
         var dto = MapToDto(result.Data!);
-        return CreatedAtAction(nameof(GetById), new { id = dto.Id }, ApiResponse<ChildProfileDto>.SuccessResponse(dto, "Child profile created successfully"));
+        return CreatedAtAction(nameof(GetById), new { id = dto.Id }, ApiResponse<ChildProfileDto>.SuccessResponse(dto, result.Message));
     }
 
     [HttpPut("{id}")]
@@ -99,9 +103,9 @@ public class ChildrenController : ControllerBase
         var result = await _childProfileService.UpdateAsync(id, userId, model, cancellationToken);
 
         if (!result.Success)
-            return NotFound(ApiResponse<object>.Error(result.Message ?? "Update failed"));
+            return NotFound(ApiResponse<object>.Error(result.Message ?? _localizer["ChildrenApi.UpdateFailed"].Value));
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "Child profile updated successfully"));
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 
     [HttpDelete("{id}")]
@@ -113,9 +117,9 @@ public class ChildrenController : ControllerBase
         var result = await _childProfileService.DeleteAsync(id, userId, cancellationToken);
 
         if (!result.Success)
-            return NotFound(ApiResponse<object>.Error(result.Message ?? "Delete failed"));
+            return NotFound(ApiResponse<object>.Error(result.Message ?? _localizer["ChildrenApi.DeleteFailed"].Value));
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, "Child profile deleted successfully"));
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 
     [HttpPut("{childId}/current-iep/{iepId}")]
@@ -127,9 +131,9 @@ public class ChildrenController : ControllerBase
         var result = await _childProfileService.SetCurrentIepAsync(childId, iepId, userId, cancellationToken);
 
         if (!result.Success)
-            return NotFound(ApiResponse<object>.Error(result.Message ?? "Set current IEP failed"));
+            return NotFound(ApiResponse<object>.Error(result.Message ?? _localizer["ChildrenApi.SetCurrentIepFailed"].Value));
 
-        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message ?? "Current IEP updated"));
+        return Ok(ApiResponse<object>.SuccessResponse(null, result.Message));
     }
 
     private static ChildProfileDto MapToDto(ChildProfileModel model, string? role = null) => new()

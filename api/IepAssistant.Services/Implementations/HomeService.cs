@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Localization;
 using IepAssistant.Domain.Data;
 using IepAssistant.Domain.Entities;
 using IepAssistant.Services.Interfaces;
@@ -45,19 +46,22 @@ public class HomeService : IHomeService
     private readonly IObligationService _obligationService;
     private readonly IDocumentCompletenessService _completeness;
     private readonly IDistrictService _districtService;
+    private readonly IStringLocalizer<Messages> _localizer;
 
     public HomeService(
         ApplicationDbContext context,
         IOrgAccessService orgAccess,
         IObligationService obligationService,
         IDocumentCompletenessService completeness,
-        IDistrictService districtService)
+        IDistrictService districtService,
+        IStringLocalizer<Messages> localizer)
     {
         _context = context;
         _orgAccess = orgAccess;
         _obligationService = obligationService;
         _completeness = completeness;
         _districtService = districtService;
+        _localizer = localizer;
     }
 
     public async Task<ServiceResult<HomeModel>> GetForUserAsync(int userId, CancellationToken ct = default)
@@ -499,12 +503,12 @@ public class HomeService : IHomeService
 
         if (children.Count == 0)
         {
-            home.SetupNotices.Add("No children linked to your account yet.");
+            home.SetupNotices.Add(_localizer["Home.NoChildrenLinked"]);
             return home;
         }
 
         foreach (var c in children.Where(c => !c.StudentId.HasValue))
-            home.SetupNotices.Add($"{c.ChildFirstName} has no school link yet.");
+            home.SetupNotices.Add(_localizer["Home.ChildHasNoSchoolLink", c.ChildFirstName]);
 
         var linkedStudentIds = children.Where(c => c.StudentId.HasValue).Select(c => c.StudentId!.Value).Distinct().ToList();
         var childInfoByStudentId = children

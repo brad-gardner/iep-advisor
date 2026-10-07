@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { CategoryCount } from '@/types/api';
 
 interface CategoryTabsProps {
@@ -6,19 +8,30 @@ interface CategoryTabsProps {
   onChange: (category: string | null) => void;
 }
 
-const categoryLabels: Record<string, string> = {
-  rights: 'Rights',
-  provisions: 'Provisions',
-  glossary: 'Glossary',
-  process: 'Process',
-  tips: 'Tips',
-};
-
-function labelFor(category: string): string {
-  return categoryLabels[category] ?? category;
+// Known categories get a translated label (`knowledge-base:categories.<key>`);
+// an unrecognized one (new DB category this UI hasn't been taught yet) falls
+// back to its own raw name rather than a blank or missing-key error. A
+// `switch` over literal keys, not a template-literal lookup, so each call
+// resolves against a real key `tsc` can check.
+function labelFor(category: string, t: TFunction<'knowledge-base'>): string {
+  switch (category) {
+    case 'rights':
+      return t('categories.rights');
+    case 'provisions':
+      return t('categories.provisions');
+    case 'glossary':
+      return t('categories.glossary');
+    case 'process':
+      return t('categories.process');
+    case 'tips':
+      return t('categories.tips');
+    default:
+      return category;
+  }
 }
 
 export function CategoryTabs({ categories, active, onChange }: CategoryTabsProps) {
+  const { t } = useTranslation('knowledge-base');
   const totalCount = categories.reduce((sum, c) => sum + c.count, 0);
 
   return (
@@ -32,7 +45,7 @@ export function CategoryTabs({ categories, active, onChange }: CategoryTabsProps
             : 'text-brand-slate-500 hover:text-brand-slate-700 hover:bg-brand-slate-50 border border-transparent'
         }`}
       >
-        All
+        {t('categories.all')}
         <span className="ml-1.5 text-xs opacity-70">{totalCount}</span>
       </button>
 
@@ -47,7 +60,7 @@ export function CategoryTabs({ categories, active, onChange }: CategoryTabsProps
               : 'text-brand-slate-500 hover:text-brand-slate-700 hover:bg-brand-slate-50 border border-transparent'
           }`}
         >
-          {labelFor(category)}
+          {labelFor(category, t)}
           <span className="ml-1.5 text-xs opacity-70">{count}</span>
         </button>
       ))}

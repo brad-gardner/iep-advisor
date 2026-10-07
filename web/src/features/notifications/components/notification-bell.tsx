@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Bell } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format-date';
@@ -20,6 +21,7 @@ import type { NotificationDto } from '../types';
  * item shape).
  */
 export function NotificationBell() {
+  const { t } = useTranslation(['notifications', 'common']);
   const { unreadCount, refresh } = useNotificationsContext();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationDto[] | null>(null);
@@ -162,7 +164,7 @@ export function NotificationBell() {
       <button
         ref={triggerRef}
         type="button"
-        aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+        aria-label={unreadCount ? t('bell.ariaLabelUnread', { count: unreadCount }) : t('bell.ariaLabelDefault')}
         aria-haspopup="menu"
         aria-expanded={open}
         data-testid="notification-bell"
@@ -181,7 +183,7 @@ export function NotificationBell() {
         )}
       </button>
       <span className="sr-only" role="status" aria-live="polite" data-testid="notification-unread-live">
-        {unreadCount ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}` : ''}
+        {unreadCount ? t('bell.unreadLive', { count: unreadCount }) : ''}
       </span>
 
       {open &&
@@ -189,16 +191,16 @@ export function NotificationBell() {
           <div
             ref={menuRef}
             role="menu"
-            aria-label="Notifications"
+            aria-label={t('bell.menuLabel')}
             onKeyDown={handleMenuKeyDown}
             style={{ position: 'fixed', top: coords?.top ?? 0, left: coords?.left ?? 0 }}
             className="z-50 w-80 overflow-hidden rounded-card border border-brand-slate-200 bg-white py-1 text-left shadow-lg"
             data-testid="notification-bell-menu"
           >
             {items === null ? (
-              <p className="px-4 py-3 text-sm text-brand-slate-500">Loading…</p>
+              <p className="px-4 py-3 text-sm text-brand-slate-500">{t('common:ui.loading')}</p>
             ) : items.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-brand-slate-500">No notifications yet.</p>
+              <p className="px-4 py-3 text-sm text-brand-slate-500">{t('bell.empty')}</p>
             ) : (
               items.map((n, index) => (
                 <Link
@@ -234,7 +236,7 @@ export function NotificationBell() {
               onClick={() => setTimeout(() => setOpen(false), 0)}
               className="block border-t border-brand-slate-100 px-4 py-2 text-center text-sm font-medium text-brand-teal-600 hover:bg-brand-slate-50"
             >
-              See all
+              {t('bell.seeAll')}
             </Link>
           </div>,
           document.body
