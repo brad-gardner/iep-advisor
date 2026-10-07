@@ -1,4 +1,5 @@
 import { FileText } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui/spinner';
 import { Notice } from '@/components/ui/notice';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -12,10 +13,11 @@ interface EtrSectionsListProps {
 }
 
 export function EtrSectionsList({ sections, isLoading, error }: EtrSectionsListProps) {
+  const { t } = useTranslation('etr-documents');
   if (isLoading) {
     return (
       <div className="flex justify-center py-8" data-testid="etr-sections-loading">
-        <Spinner size="sm" label="Loading sections…" />
+        <Spinner size="sm" label={t('sectionsList.loading')} />
       </div>
     );
   }
@@ -28,7 +30,7 @@ export function EtrSectionsList({ sections, isLoading, error }: EtrSectionsListP
     return (
       <EmptyState
         icon={FileText}
-        title="No sections parsed yet."
+        title={t('sectionsList.empty')}
         data-testid="etr-sections-empty"
       />
     );

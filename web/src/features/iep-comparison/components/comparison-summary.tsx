@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { ComparisonSummary as ComparisonSummaryType } from '@/types/api';
 
 function StatBox({
@@ -27,17 +28,18 @@ function StatBox({
 }
 
 export function ComparisonSummary({ summary }: { summary: ComparisonSummaryType }) {
+  const { t } = useTranslation('iep-comparison');
   return (
     <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-9 gap-2">
-      <StatBox label="Goals Added" value={summary.goalsAdded} variant="teal" />
-      <StatBox label="Goals Removed" value={summary.goalsRemoved} variant="red" />
-      <StatBox label="Goals Modified" value={summary.goalsModified} variant="amber" />
-      <StatBox label="Goals Unchanged" value={summary.goalsUnchanged} variant="neutral" />
-      <StatBox label="Sections Added" value={summary.sectionsAdded} variant="teal" />
-      <StatBox label="Sections Removed" value={summary.sectionsRemoved} variant="red" />
-      <StatBox label="Flags Resolved" value={summary.redFlagsResolved} variant="teal" />
-      <StatBox label="Flags Persisting" value={summary.redFlagsPersisting} variant="amber" />
-      <StatBox label="New Flags" value={summary.newRedFlags} variant="red" />
+      <StatBox label={t('summary.goalsAdded')} value={summary.goalsAdded} variant="teal" />
+      <StatBox label={t('summary.goalsRemoved')} value={summary.goalsRemoved} variant="red" />
+      <StatBox label={t('summary.goalsModified')} value={summary.goalsModified} variant="amber" />
+      <StatBox label={t('summary.goalsUnchanged')} value={summary.goalsUnchanged} variant="neutral" />
+      <StatBox label={t('summary.sectionsAdded')} value={summary.sectionsAdded} variant="teal" />
+      <StatBox label={t('summary.sectionsRemoved')} value={summary.sectionsRemoved} variant="red" />
+      <StatBox label={t('summary.flagsResolved')} value={summary.redFlagsResolved} variant="teal" />
+      <StatBox label={t('summary.flagsPersisting')} value={summary.redFlagsPersisting} variant="amber" />
+      <StatBox label={t('summary.newFlags')} value={summary.newRedFlags} variant="red" />
     </div>
   );
 }

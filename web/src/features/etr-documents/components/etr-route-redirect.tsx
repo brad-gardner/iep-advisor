@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { getById } from "../api/etr-documents-api";
 import { Spinner } from "@/components/ui/spinner";
 
 export function EtrRouteRedirect() {
+  const { t } = useTranslation("etr-documents");
   const { id } = useParams<{ id: string }>();
   const [childId, setChildId] = useState<number | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -27,7 +29,7 @@ export function EtrRouteRedirect() {
   if (childId == null) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading evaluation…" />
+        <Spinner label={t("loadingEvaluation")} />
       </div>
     );
   }

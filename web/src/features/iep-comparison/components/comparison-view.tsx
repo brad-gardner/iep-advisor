@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useIepComparison } from '../hooks/use-iep-comparison';
 import { ComparisonSummary } from './comparison-summary';
@@ -28,12 +29,13 @@ export function ComparisonView({
   otherId: number;
   childId: number;
 }) {
+  const { t } = useTranslation('iep-comparison');
   const { comparison, isLoading, error } = useIepComparison(iepId, otherId);
 
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading comparison…" />
+        <Spinner label={t('loading')} />
       </div>
     );
   }
@@ -46,10 +48,10 @@ export function ComparisonView({
           className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-slate-500 hover:text-brand-teal-500 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" strokeWidth={1.8} />
-          Back to child
+          {t('backToChild')}
         </Link>
-        <Notice variant="error" title="Comparison failed">
-          {error || 'Unable to load the comparison. Please try again.'}
+        <Notice variant="error" title={t('failedTitle')}>
+          {error || t('failedGeneric')}
         </Notice>
       </div>
     );
@@ -63,11 +65,11 @@ export function ComparisonView({
 
   return (
     <PageLayout
-      title="IEP Comparison"
+      title={t('title')}
       className="max-w-5xl"
       breadcrumb={[
-        { label: 'Back to child', to: `/children/${childId}` },
-        { label: 'Comparison' },
+        { label: t('backToChild'), to: `/children/${childId}` },
+        { label: t('comparisonBreadcrumb') },
       ]}
     >
       {/* Date range */}
@@ -84,7 +86,7 @@ export function ComparisonView({
       {hasGoalChanges ? (
         <Card>
           <h3 className="font-serif text-[17px] font-semibold text-brand-slate-800 mb-4">
-            Goal Changes
+            {t('goalChanges.heading')}
           </h3>
           <div className="space-y-3">
             {goalChanges.added.map((goal, i) => (
@@ -101,9 +103,9 @@ export function ComparisonView({
       ) : (
         <Card>
           <h3 className="font-serif text-[17px] font-semibold text-brand-slate-800 mb-2">
-            Goal Changes
+            {t('goalChanges.heading')}
           </h3>
-          <p className="text-[13px] text-brand-slate-500">No goal changes detected between these IEPs.</p>
+          <p className="text-[13px] text-brand-slate-500">{t('goalChanges.empty')}</p>
         </Card>
       )}
 

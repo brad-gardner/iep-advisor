@@ -4,8 +4,7 @@ import { MemoryRouter, Outlet, Route, Routes, useLocation, useNavigate } from 'r
 import type { ChildProfile, User } from '@/types/api';
 import type { StreamAdvocateMessageHandlers } from '../api/advocate-api';
 import type { AdvocateMessageDto, AdvocateThreadDto, SendAdvocateMessageRequest } from '../types/advocate';
-import { EXAMPLE_QUESTIONS, JOURNAL_EXAMPLE_QUESTION, PREP_QUESTION_COPIED_TOAST, TRUNCATED_NOTICE_COPY } from '../lib/copy';
-import { STATE_HINT_COPY } from './state-hint';
+import { exampleQuestions, journalExampleQuestion, prepQuestionCopiedToast, stateHintCopy, truncatedNoticeCopy } from '../lib/copy';
 
 interface FakeStream {
   threadId: number;
@@ -213,7 +212,7 @@ describe('AdvocatePage', () => {
     await screen.findByTestId('advocate-empty');
     expect(screen.getByTestId('advocate-privacy-banner')).toHaveTextContent('Private — only you can see this.');
     const examples = screen.getAllByTestId('advocate-example');
-    expect(examples.map((b) => b.textContent)).toEqual(EXAMPLE_QUESTIONS);
+    expect(examples.map((b) => b.textContent)).toEqual(exampleQuestions());
     fireEvent.click(examples[0]);
     expect(composer().value).toBe('What is prior written notice?');
     expect(api.streamAdvocateMessage).not.toHaveBeenCalled();
@@ -563,7 +562,7 @@ describe('AdvocatePage', () => {
       ['Child profile', '/children/4/overview'],
     ]);
     expect(within(assistant).queryByTestId('advocate-source-chip')).not.toBeInTheDocument();
-    expect(within(assistant).getByTestId('advocate-assistant-message-truncated')).toHaveTextContent(TRUNCATED_NOTICE_COPY);
+    expect(within(assistant).getByTestId('advocate-assistant-message-truncated')).toHaveTextContent(truncatedNoticeCopy());
     expect(within(assistant).getByTestId('advocate-suggestion-prep_question')).toBeInTheDocument();
     expect(within(assistant).getByTestId('advocate-suggestion-journal_entry')).toBeInTheDocument();
     expect(within(assistant).getByRole('link', { name: 'Open the guide' })).toHaveAttribute('href', '/knowledge-base/3');
@@ -832,7 +831,7 @@ describe('AdvocatePage', () => {
 
     fireEvent.click(within(assistant).getByRole('button', { name: 'Copy' }));
     expect(writeText).toHaveBeenCalledWith('When will I get prior written notice about this change?');
-    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: PREP_QUESTION_COPIED_TOAST, variant: 'success' }));
+    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: prepQuestionCopiedToast(), variant: 'success' }));
   });
 
   it('hands a prep question to meeting prep through ?addQuestion=', async () => {
@@ -934,7 +933,7 @@ describe('AdvocatePage', () => {
     api.getAdvocateChildContext.mockResolvedValue({ success: true, data: { stateCode: null } });
     const first = renderPage();
     const hint = await screen.findByTestId('advocate-state-hint');
-    expect(within(hint).getByRole('link', { name: STATE_HINT_COPY })).toHaveAttribute('href', '/profile');
+    expect(within(hint).getByRole('link', { name: stateHintCopy() })).toHaveAttribute('href', '/profile');
     fireEvent.click(within(hint).getByRole('button', { name: 'Dismiss this hint' }));
     expect(screen.queryByTestId('advocate-state-hint')).not.toBeInTheDocument();
     first.unmount();
@@ -965,7 +964,7 @@ describe('AdvocatePage', () => {
     journalApi.listJournalEntries.mockResolvedValue({ success: true, data: [{ id: 1 }] });
     renderPage();
     await waitFor(() =>
-      expect(screen.getAllByTestId('advocate-example').map((b) => b.textContent)).toEqual([...EXAMPLE_QUESTIONS, JOURNAL_EXAMPLE_QUESTION]),
+      expect(screen.getAllByTestId('advocate-example').map((b) => b.textContent)).toEqual([...exampleQuestions(), journalExampleQuestion()]),
     );
     expect(journalApi.listJournalEntries).toHaveBeenCalledWith(4, { take: 1 });
   });

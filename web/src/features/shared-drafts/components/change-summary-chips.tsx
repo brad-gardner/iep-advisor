@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import type { ChangeSummaryDto } from '../types';
 
@@ -13,6 +14,7 @@ interface ChangeSummaryChipsProps {
  * either way (a semantic diff keyed by `_rowId`).
  */
 export function ChangeSummaryChips({ summary, 'data-testid': testId }: ChangeSummaryChipsProps) {
+  const { t } = useTranslation('shared-drafts');
   const { addedRows, changedRows, removedRows, changedFields } = summary;
   const hasAny =
     addedRows.length > 0 || changedRows.length > 0 || removedRows.length > 0 || changedFields.length > 0;
@@ -20,7 +22,7 @@ export function ChangeSummaryChips({ summary, 'data-testid': testId }: ChangeSum
   if (!hasAny) {
     return (
       <p className="text-sm text-brand-slate-500" data-testid={testId}>
-        {summary.summaryText || 'No changes since the last share.'}
+        {summary.summaryText || t('changeSummary.noChanges')}
       </p>
     );
   }
@@ -30,22 +32,22 @@ export function ChangeSummaryChips({ summary, 'data-testid': testId }: ChangeSum
       <div className="flex flex-wrap gap-2">
         {addedRows.length > 0 && (
           <Badge variant="success" data-testid={testId ? `${testId}-added` : undefined}>
-            {addedRows.length} added
+            {t('changeSummary.added', { count: addedRows.length })}
           </Badge>
         )}
         {changedRows.length > 0 && (
           <Badge variant="warning" data-testid={testId ? `${testId}-changed` : undefined}>
-            {changedRows.length} changed
+            {t('changeSummary.changed', { count: changedRows.length })}
           </Badge>
         )}
         {removedRows.length > 0 && (
           <Badge variant="error" data-testid={testId ? `${testId}-removed` : undefined}>
-            {removedRows.length} removed
+            {t('changeSummary.removed', { count: removedRows.length })}
           </Badge>
         )}
         {changedFields.length > 0 && (
           <Badge variant="info" data-testid={testId ? `${testId}-fields` : undefined}>
-            {changedFields.length} {changedFields.length === 1 ? 'field' : 'fields'} updated
+            {t('changeSummary.fieldsUpdated', { count: changedFields.length })}
           </Badge>
         )}
       </div>

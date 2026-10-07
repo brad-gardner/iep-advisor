@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { MessagesSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,7 @@ import { useAdvocateUsage } from '../hooks/use-advocate-usage';
 import { useAdvocateChildContext } from '../hooks/use-advocate-child-context';
 import { useHasJournalEntries } from '../hooks/use-has-journal-entries';
 import { parseAbout, readAboutLabel } from '../lib/about';
-import { PREP_QUESTION_COPIED_TOAST, STOPPED_COPY, VIEWER_NOTICE_COPY } from '../lib/copy';
+import { prepQuestionCopiedToast, stoppedCopy, viewerNoticeCopy } from '../lib/copy';
 import { isUsageCapped } from '../lib/usage';
 import { ADVOCATE_TITLE_MAX_LENGTH } from '../types/advocate';
 import { AboutContextPill } from './about-context-pill';
@@ -30,6 +31,10 @@ import { PrivacyBanner } from './privacy-banner';
 import { StateHint } from './state-hint';
 import { ThreadList } from './thread-list';
 import { UsageNotice } from './usage-notice';
+
+// Rail layout variants (code values, not UI copy).
+const RAIL_PANEL = 'panel' as const;
+const RAIL_PLAIN = 'plain' as const;
 
 const THREAD_PARAM = 'thread';
 const ABOUT_PARAM = 'about';
@@ -57,9 +62,10 @@ function parseThreadParam(value: string | null): number | null {
  * the already-mounted page starts another conversation.
  */
 export function AdvocatePage() {
+  const { t } = useTranslation(['advocate', 'journal', 'common']);
   const { child, childId } = useOutletContext<ChildOutletContext>();
   const canAsk = child.role === 'owner' || child.role === 'collaborator';
-  usePageTitle('Advocate');
+  usePageTitle(t('advocate:pageTitle'));
   const { show } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -145,7 +151,7 @@ export function AdvocatePage() {
         target = (await threadsApi.create(titleFromQuestion(text))).id;
         created = true;
       } catch (err) {
-        setCreateError(err instanceof Error ? err.message : 'Could not start a conversation.');
+        setCreateError(err instanceof Error ? err.message : t('advocate:threads.createFailed'));
         return;
       } finally {
         setCreating(false);
@@ -177,13 +183,13 @@ export function AdvocatePage() {
     onCopyPrepQuestion: (text) => {
       const clipboard = typeof navigator !== 'undefined' ? navigator.clipboard : undefined;
       if (!clipboard?.writeText) {
-        show({ message: 'Couldn’t copy — select the question and copy it yourself.', variant: 'error' });
+        show({ message: t('advocate:page.copyFailed'), variant: 'error' });
         return;
       }
       clipboard
         .writeText(text)
-        .then(() => show({ message: PREP_QUESTION_COPIED_TOAST, variant: 'success' }))
-        .catch(() => show({ message: 'Couldn’t copy — select the question and copy it yourself.', variant: 'error' }));
+        .then(() => show({ message: prepQuestionCopiedToast(), variant: 'success' }))
+        .catch(() => show({ message: t('advocate:page.copyFailed'), variant: 'error' }));
     },
     onJournalEntry: (text, date) => {
       const today = todayInputValue();
@@ -247,12 +253,18 @@ export function AdvocatePage() {
     />
   );
 
+  const loadErrorMessage = thread.loadError
+    ? thread.loadError.kind === 'server'
+      ? thread.loadError.message
+      : t('advocate:thread.loadError')
+    : null;
+
   return (
     <div className="space-y-3" data-testid="advocate-page">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-serif">Ask the advocate about {child.firstName}</h2>
-          <p className="mt-1 text-sm text-brand-slate-500">Plain answers about the plan, your rights, and what to do next.</p>
+          <h2 className="font-serif">{t('advocate:page.heading', { name: child.firstName })}</h2>
+          <p className="mt-1 text-sm text-brand-slate-500">{t('advocate:page.subheading')}</p>
         </div>
         <Button
           variant="secondary"
@@ -262,21 +274,21 @@ export function AdvocatePage() {
           data-testid="advocate-open-rail"
         >
           <MessagesSquare className="mr-1 h-4 w-4" aria-hidden="true" />
-          Conversations{threadCount > 0 ? ` (${threadCount})` : ''}
+          {threadCount > 0 ? t('advocate:page.conversationsWithCount', { count: threadCount }) : t('advocate:page.conversations')}
         </Button>
       </div>
 
       <PrivacyBanner />
       <UsageNotice usage={usageApi.usage} />
       {!canAsk && (
-        <Notice variant="info" title={VIEWER_NOTICE_COPY} data-testid="advocate-viewer-notice">
-          Only the parents who manage {child.firstName}'s profile can start a conversation.
+        <Notice variant="info" title={viewerNoticeCopy()} data-testid="advocate-viewer-notice">
+          {t('advocate:page.viewerNoticeBody', { name: child.firstName })}
         </Notice>
       )}
 
       <div className="items-start gap-4 md:grid md:grid-cols-[16rem_minmax(0,1fr)]">
-        <aside className="hidden md:block" aria-label="Conversations">
-          {renderRail('panel')}
+        <aside className="hidden md:block" aria-label={t('advocate:page.conversations')}>
+          {renderRail(RAIL_PANEL)}
         </aside>
 
         <section
@@ -292,7 +304,7 @@ export function AdvocatePage() {
           // is scoped to `md:` — an unconditional min-height here made the panel taller than short
           // phone viewports and let the sticky dock paint over the panel's own content.
           className="flex flex-col rounded-card border border-brand-slate-200 bg-white shadow-sm md:h-[calc(100vh-22rem)] md:min-h-[26rem] md:overflow-hidden"
-          aria-label="Conversation"
+          aria-label={t('advocate:page.conversationLabel')}
           data-testid="advocate-conversation"
         >
           {/*
@@ -307,15 +319,15 @@ export function AdvocatePage() {
           <div className="flex min-h-0 flex-1 flex-col">
             {showLoading && (
               <div className="flex flex-1 items-center justify-center">
-                <Spinner label="Loading conversation…" />
+                <Spinner label={t('advocate:page.loadingConversation')} />
               </div>
             )}
 
-            {thread.loadError && (
+            {loadErrorMessage && (
               <div role="alert" className="p-4">
-                <Notice variant="error" title={thread.loadError}>
+                <Notice variant="error" title={loadErrorMessage}>
                   <Button variant="secondary" size="sm" className="mt-2" onClick={thread.reload}>
-                    Try again
+                    {t('common:ui.tryAgain')}
                   </Button>
                 </Notice>
               </div>
@@ -344,6 +356,7 @@ export function AdvocatePage() {
                 pending={thread.pending}
                 streaming={thread.streaming}
                 announcement={thread.announcement}
+                threadGeneratedLanguage={thread.threadGeneratedLanguage}
                 handlers={suggestionHandlers}
               />
             )}
@@ -353,7 +366,7 @@ export function AdvocatePage() {
             <div ref={noticesRef} className="space-y-2 border-t border-brand-slate-100 px-3 py-2">
               {thread.stopped && (
                 <p className="text-xs text-brand-slate-500" role="status" data-testid="advocate-stopped">
-                  {STOPPED_COPY}
+                  {stoppedCopy()}
                 </p>
               )}
 
@@ -362,7 +375,7 @@ export function AdvocatePage() {
                   <Notice variant="error" title={thread.failure.message}>
                     {thread.failure.retryable && (
                       <Button variant="secondary" size="sm" className="mt-2" onClick={thread.retry} data-testid="advocate-retry">
-                        Retry
+                        {t('advocate:page.retry')}
                       </Button>
                     )}
                   </Notice>
@@ -401,7 +414,7 @@ export function AdvocatePage() {
                 streaming={thread.isStreaming}
                 creating={creating}
                 disabled={capped}
-                disabledReason={capped ? 'You’ve used this year’s advocate messages.' : undefined}
+                disabledReason={capped ? t('advocate:page.composerDisabledReason') : undefined}
                 childFirstName={child.firstName}
               />
             </div>
@@ -409,8 +422,8 @@ export function AdvocatePage() {
         </section>
       </div>
 
-      <Drawer open={railOpen} onClose={() => setRailOpen(false)} title="Conversations" data-testid="advocate-rail-drawer">
-        {renderRail('plain')}
+      <Drawer open={railOpen} onClose={() => setRailOpen(false)} title={t('advocate:page.conversations')} data-testid="advocate-rail-drawer">
+        {renderRail(RAIL_PLAIN)}
       </Drawer>
 
       {canAsk && (
@@ -421,7 +434,7 @@ export function AdvocatePage() {
           initial={journalDraft ?? undefined}
           onSaved={() => {
             setJournalDraft(null);
-            show({ message: 'Update added to the journal', variant: 'success' });
+            show({ message: t('journal:card.savedCreated'), variant: 'success' });
           }}
           data-testid="advocate-journal-drawer"
         />

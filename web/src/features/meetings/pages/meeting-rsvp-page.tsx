@@ -1,16 +1,24 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { CheckCircle2, HelpCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
 import { apiErrorMessage } from '@/lib/api-error';
+import { inviteStatusLabel } from '@/lib/invite-status-label';
 import { usePageTitle } from '@/hooks/use-page-title';
+import { useLanguageQueryParam } from '@/lib/i18n/use-language-query-param';
 import { getMeetingByToken, submitTokenRsvp } from '../api/meetings-api';
 import { formatMeetingWhen } from '../lib/meeting-time';
-import { INVITE_STATUS_LABELS } from '../types';
 import type { InviteStatus, TokenRsvpResult } from '../types';
+
+// A server-provided message is already resolved text and is shown as-is;
+// the generic fallback is translated at RENDER time (see `displayError`
+// below), not stored pre-translated here, so the mount effect never needs
+// `t` in its dependency array (same idiom as `useHome`).
+type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 /**
  * Public, unauthenticated page linked from the meeting invitation email
@@ -18,11 +26,17 @@ import type { InviteStatus, TokenRsvpResult } from '../types';
  * Accept/Decline/mark Tentative without logging in.
  */
 export function MeetingRsvpPage() {
-  usePageTitle('Meeting RSVP');
+  const { t } = useTranslation(['meetings', 'common']);
+  usePageTitle(t('rsvpPage.pageTitle'));
+  // This page owns its own chrome (no AuthLayout), so it honors `?lang=`
+  // itself rather than inheriting the layout's handling — same as
+  // `CancelDeletionPage` (also a public, token-linked page outside any
+  // layout). The plan's Phase 4 email work sends this link with `?lang=`.
+  useLanguageQueryParam();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
   const [result, setResult] = useState<TokenRsvpResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [submitting, setSubmitting] = useState<InviteStatus | null>(null);
   // A failed submit is shown inline next to the buttons; it never replaces the
   // invitation (the load error above does that, with its own retry).
@@ -50,7 +64,7 @@ export function MeetingRsvpPage() {
 
   // A missing token is a pure function of the URL — derived directly rather
   // than written into `error` state from an effect.
-  const missingTokenError = token ? null : 'This link is missing its invitation token.';
+  const missingTokenError = token ? null : t('rsvpPage.missingToken');
 
   useEffect(() => {
     if (!token) return;
@@ -63,19 +77,28 @@ export function MeetingRsvpPage() {
           setResult(response.data);
           setError(null);
         } else {
-          setError(response.message ?? 'This invitation link is no longer valid.');
+          setError(response.message ? { kind: 'server', message: response.message } : { kind: 'generic' });
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'This invitation link is no longer valid.'));
+        if (!active) return;
+        const serverMessage = apiErrorMessage(err, '');
+        setError(serverMessage ? { kind: 'server', message: serverMessage } : { kind: 'generic' });
       }
     })();
     return () => {
       active = false;
     };
+    // `t` deliberately excluded (see `use-home.ts`): re-running this fetch on
+    // a plain language switch would be wasteful. The generic fallback is
+    // translated below, at render, from `error`'s stored KIND rather than a
+    // snapshot string, so it already follows the active language.
   }, [token, retryToken]);
 
-  const displayError = missingTokenError ?? error;
+  const displayError =
+    missingTokenError ?? (error ? (error.kind === 'server' ? error.message : t('rsvpPage.invalidLink')) : null);
 
+  // Click-triggered (never a mount effect), so translating inline here is
+  // safe — see `AcknowledgeControl` (shared-drafts) for the same reasoning.
   const handleRespond = async (status: InviteStatus) => {
     setSubmitting(status);
     setRespondError(null);
@@ -85,10 +108,10 @@ export function MeetingRsvpPage() {
         setResult(response.data);
         setChanging(false);
       } else {
-        setRespondError(response.message ?? 'Could not record your response.');
+        setRespondError(response.message || t('rsvpPage.submitFailed'));
       }
     } catch (err) {
-      setRespondError(apiErrorMessage(err, 'Could not record your response.'));
+      setRespondError(apiErrorMessage(err, t('rsvpPage.submitFailed')));
     } finally {
       setSubmitting(null);
     }
@@ -97,14 +120,14 @@ export function MeetingRsvpPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-brand-slate-50 px-4 py-12">
       <Card className="w-full max-w-md" data-testid="meeting-rsvp-card">
-        <h1 className="mb-4 font-serif text-lg text-brand-slate-800">Meeting invitation</h1>
+        <h1 className="mb-4 font-serif text-lg text-brand-slate-800">{t('rsvpPage.heading')}</h1>
 
         {displayError && (
           <div role="alert">
             <Notice variant="error" title={displayError}>
               {!missingTokenError && (
-                <Button size="sm" variant="secondary" onClick={() => setRetryToken((t) => t + 1)}>
-                  Try again
+                <Button size="sm" variant="secondary" onClick={() => setRetryToken((n) => n + 1)}>
+                  {t('common:ui.tryAgain')}
                 </Button>
               )}
             </Notice>
@@ -113,7 +136,7 @@ export function MeetingRsvpPage() {
 
         {!displayError && !result && (
           <div className="flex justify-center py-8">
-            <Spinner label="Loading invitation…" />
+            <Spinner label={t('rsvpPage.loadingInvitation')} />
           </div>
         )}
 
@@ -132,8 +155,8 @@ export function MeetingRsvpPage() {
             </div>
 
             {!showPrompt && respondedStatus ? (
-              <Notice variant="success" title="Thanks — your response was recorded">
-                <p>You responded: {INVITE_STATUS_LABELS[respondedStatus]}.</p>
+              <Notice variant="success" title={t('rsvpPage.respondedTitle')}>
+                <p>{t('rsvpPage.respondedBody', { status: inviteStatusLabel(respondedStatus) })}</p>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -141,7 +164,7 @@ export function MeetingRsvpPage() {
                   onClick={() => setChanging(true)}
                   data-testid="rsvp-change-response"
                 >
-                  Change response
+                  {t('rsvpPage.changeResponse')}
                 </Button>
               </Notice>
             ) : (
@@ -159,7 +182,7 @@ export function MeetingRsvpPage() {
                   data-testid="rsvp-accept"
                 >
                   <CheckCircle2 className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                  Accept
+                  {t('common:inviteStatus.action.accept')}
                 </Button>
                 <Button
                   variant="secondary"
@@ -169,7 +192,7 @@ export function MeetingRsvpPage() {
                   data-testid="rsvp-tentative"
                 >
                   <HelpCircle className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                  Tentative
+                  {t('common:inviteStatus.action.tentative')}
                 </Button>
                 <Button
                   variant="danger"
@@ -179,7 +202,7 @@ export function MeetingRsvpPage() {
                   data-testid="rsvp-decline"
                 >
                   <XCircle className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                  Decline
+                  {t('common:inviteStatus.action.decline')}
                 </Button>
               </div>
               </div>

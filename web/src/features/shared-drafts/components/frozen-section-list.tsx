@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { FieldValueDisplay } from '@/features/document-authoring/components/authored-version-snapshot';
@@ -9,6 +10,7 @@ import {
   coerceRows,
   isCardRowField,
   primaryColumnKey,
+  rowChangeState,
   rowId as readRowId,
   rowLabel,
   tableColumns,
@@ -40,9 +42,10 @@ export const FrozenSectionList = memo(function FrozenSectionList({
   values,
   changeSummary,
 }: FrozenSectionListProps) {
+  const { t } = useTranslation('shared-drafts');
   const sections = [...templateVersion.sections].sort((a, b) => a.displayOrder - b.displayOrder);
   if (sections.length === 0) {
-    return <p className="text-sm text-brand-slate-500">This document has no sections.</p>;
+    return <p className="text-sm text-brand-slate-500">{t('frozenSections.noSections')}</p>;
   }
 
   const changedFieldKeys = new Set((changeSummary?.changedFields ?? []).map((f) => f.fieldKey));
@@ -59,7 +62,9 @@ export const FrozenSectionList = memo(function FrozenSectionList({
 
         return (
           <section key={section.id} data-testid={`frozen-section-${section.id}`}>
-            <h2 className="mb-1 font-serif text-lg text-brand-slate-800">{section.title || 'Untitled section'}</h2>
+            <h2 className="mb-1 font-serif text-lg text-brand-slate-800">
+              {section.title || t('frozenSections.untitledSection')}
+            </h2>
             {/* Section-level plain-language explanation — the only Explain affordance for
                 narrative fields (Present Levels etc.), which have no per-item cards. */}
             <div className="mb-3">
@@ -72,7 +77,7 @@ export const FrozenSectionList = memo(function FrozenSectionList({
                   <div key={field.id}>
                     {changedFieldKeys.has(field.fieldKey) && (
                       <Badge variant="warning" className="mb-1">
-                        Updated since last revision
+                        {t('frozenSections.updatedBadge')}
                       </Badge>
                     )}
                     <FieldValueDisplay field={field} value={values[field.fieldKey]} />
@@ -117,6 +122,7 @@ function RowBlockGroup({
   addedRowKeys: Set<string>;
   changedRowKeys: Set<string>;
 }) {
+  const { t } = useTranslation('shared-drafts');
   const semantic = isCardRowField(field);
   if (!semantic) return null;
   const rows = coerceRows(value);
@@ -125,28 +131,24 @@ function RowBlockGroup({
 
   return (
     <div className="mb-4 space-y-3">
-      <h3 className="text-sm font-medium text-brand-slate-600">{field.label || 'Untitled field'}</h3>
+      <h3 className="text-sm font-medium text-brand-slate-600">{field.label || t('frozenSections.untitledField')}</h3>
 
       {removedRows.length > 0 && (
         <ul className="space-y-1 text-sm text-brand-slate-500" data-testid={`removed-rows-${field.fieldKey}`}>
           {removedRows.map((r) => (
-            <li key={r.rowId}>Removed since last revision: {r.label}</li>
+            <li key={r.rowId}>{t('frozenSections.removedSince', { label: r.label })}</li>
           ))}
         </ul>
       )}
 
       {rows.length === 0 ? (
-        <p className="text-sm text-brand-slate-500">Nothing here yet.</p>
+        <p className="text-sm text-brand-slate-500">{t('frozenSections.nothingHere')}</p>
       ) : (
         <div className="space-y-3">
           {rows.map((row, i) => {
             const id = readRowId(row);
             const key = `${field.fieldKey}:${id ?? i}`;
-            const changeState = id && addedRowKeys.has(`${field.fieldKey}:${id}`)
-              ? 'added'
-              : id && changedRowKeys.has(`${field.fieldKey}:${id}`)
-                ? 'changed'
-                : null;
+            const changeState = rowChangeState(id, field.fieldKey, addedRowKeys, changedRowKeys);
             const otherColumns = columns
               .filter((c) => c.columnKey !== pKey)
               .map((c) => ({ column: c, value: row[c.columnKey] }));

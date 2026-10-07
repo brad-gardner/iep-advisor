@@ -1,0 +1,74 @@
+{
+  "createError": {
+    "subscriptionRequired": "Se requiere una suscripción activa",
+    "noPermission": "No tiene permiso",
+    "generic": "No se pudo iniciar el análisis"
+  },
+  "sourceAnalysis": {
+    "loadError": "No se pudo cargar este análisis."
+  },
+  "childTab": {
+    "triggerErrorTitle": "No se pudo ejecutar el análisis",
+    "headsUp": "Aviso",
+    "runNotFound": "No se pudo encontrar ese análisis; se muestra el más reciente.",
+    "stillWorkingTitle": "Aún en proceso…",
+    "stillWorkingBody": "Un análisis está tardando más de lo habitual. Aparecerá aquí cuando termine.",
+    "noneSelectedTitle": "Ningún análisis seleccionado",
+    "noneSelectedBody": "Seleccione un análisis anterior o ejecute uno nuevo para ver los resultados aquí.",
+    "startedToast": "Análisis iniciado"
+  },
+  "runDetail": {
+    "loading": "Cargando análisis…",
+    "selectPrompt": "Seleccione un análisis para verlo.",
+    "heading": "Análisis",
+    "askAbout": "análisis del {{date}}",
+    "failedTitle": "El análisis falló",
+    "failedGeneric": "Algo salió mal al ejecutar este análisis.",
+    "stillWorkingTitle": "Aún en proceso…",
+    "stillWorkingBody": "Este análisis está tardando más de lo habitual. Vuelva a verificar en breve.{{progress}}",
+    "inProgressTitle": "Análisis en curso",
+    "inProgressWithProgress": "{{progress}} Esta página se actualiza automáticamente.",
+    "inProgressGeneric": "Estamos analizando sus documentos. Esta página se actualiza automáticamente.",
+    "completedWithNoteTitle": "Análisis completado con una nota",
+    "summary": "Resumen",
+    "overallConcerns": "Preocupaciones generales",
+    "sourcesProgress": "{{completed}} de {{total}} documentos analizados."
+  },
+  "historyList": {
+    "heading": "Análisis anteriores",
+    "empty": "Aún no hay análisis.",
+    "sourceCount_one": "{{count}} fuente",
+    "sourceCount_other": "{{count}} fuentes"
+  },
+  "sourceSections": {
+    "failedTitle": "No se pudo analizar este documento; inicie un nuevo análisis para intentarlo de nuevo."
+  },
+  "synthesis": {
+    "heading": "Síntesis entre documentos",
+    "progression": "Progresión",
+    "timeline": "Cronología",
+    "contradictions": "Contradicciones"
+  },
+  "runStatus": {
+    "pending": "Pendiente",
+    "running": "En curso",
+    "completed": "Completado",
+    "error": "Error"
+  },
+  "sourcePicker": {
+    "heading": "Nuevo análisis",
+    "body": "Seleccione uno o más documentos para analizarlos juntos.",
+    "loading": "Cargando documentos…",
+    "empty": "Aún no hay documentos disponibles. Agregue primero un IEP, ETR o informe de progreso.",
+    "iepsGroup": "IEP",
+    "etrsGroup": "ETR",
+    "progressReportsGroup": "Informes de progreso",
+    "run": "Ejecutar análisis"
+  },
+  "sourceLabel": {
+    "iep": "IEP {{date}}{{type}}",
+    "etr": "ETR {{date}}{{type}}",
+    "progressReportRange": "Informe de progreso {{start}} – {{end}}",
+    "progressReport": "Informe de progreso {{date}}"
+  }
+}

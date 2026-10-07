@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Drawer } from '@/components/ui/drawer';
 import { Markdown } from '@/components/ui/markdown';
 import { Notice } from '@/components/ui/notice';
@@ -20,9 +21,13 @@ interface GoalHistoryDrawerProps {
 /** One goal lineage's full record history across finalizes/amendments —
  *  every prior "version" of the same goal row (Carried/Retired/Met/NotMet),
  *  newest first. Loaded lazily on open. */
+/** A server-provided message is already resolved text; the generic case is translated at render time. */
+type LoadError = { kind: 'server'; message: string } | { kind: 'generic' };
+
 export function GoalHistoryDrawer({ open, onClose, studentId, lineageId, goalText }: GoalHistoryDrawerProps) {
+  const { t } = useTranslation('goals');
   const [records, setRecords] = useState<GoalRecordDto[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
 
   // Reset to a fresh loading state exactly when the drawer transitions to
   // open — adjusted during render (the idiom `useSharedDraftDetail` uses for
@@ -49,10 +54,14 @@ export function GoalHistoryDrawer({ open, onClose, studentId, lineageId, goalTex
           setRecords(lineage?.records ?? []);
           setError(null);
         } else {
-          setError(res.message ?? 'Could not load this goal’s history.');
+          setError(res.message ? { kind: 'server', message: res.message } : { kind: 'generic' });
         }
       } catch (err) {
-        if (active) setError(apiErrorMessage(err, 'Could not load this goal’s history.'));
+        if (!active) return;
+        // `apiErrorMessage`'s own fallback is discarded here (never shown) — the generic case is
+        // translated at render time below, not captured into state at the wrong language.
+        const message = apiErrorMessage(err, '');
+        setError(message ? { kind: 'server', message } : { kind: 'generic' });
       }
     })();
     return () => {
@@ -60,13 +69,15 @@ export function GoalHistoryDrawer({ open, onClose, studentId, lineageId, goalTex
     };
   }, [open, studentId, lineageId]);
 
+  const errorMessage = error ? (error.kind === 'server' ? error.message : t('historyDrawer.loadError')) : null;
+
   return (
-    <Drawer open={open} onClose={onClose} title="Goal history" data-testid="goal-history-drawer">
+    <Drawer open={open} onClose={onClose} title={t('historyDrawer.title')} data-testid="goal-history-drawer">
       <p className="mb-4 text-sm text-brand-slate-600">{goalText}</p>
 
-      {error && (
+      {errorMessage && (
         <div role="alert">
-          <Notice variant="error" title={error} />
+          <Notice variant="error" title={errorMessage} />
         </div>
       )}
 
@@ -78,7 +89,7 @@ export function GoalHistoryDrawer({ open, onClose, studentId, lineageId, goalTex
       )}
 
       {!error && records !== null && records.length === 0 && (
-        <p className="text-sm text-brand-slate-500">No history recorded yet.</p>
+        <p className="text-sm text-brand-slate-500">{t('historyDrawer.noHistory')}</p>
       )}
 
       {!error && records !== null && records.length > 0 && (
@@ -91,7 +102,7 @@ export function GoalHistoryDrawer({ open, onClose, studentId, lineageId, goalTex
             >
               <div className="mb-1 flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-brand-slate-500">
-                  Version {r.versionNumber} · {formatDate(r.projectedAt)}
+                  {t('historyDrawer.versionLabel', { number: r.versionNumber, date: formatDate(r.projectedAt) })}
                 </span>
                 <GoalStatusBadge status={r.status} />
               </div>

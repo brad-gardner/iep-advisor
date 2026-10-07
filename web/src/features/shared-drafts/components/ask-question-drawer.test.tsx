@@ -26,6 +26,7 @@ function renderDrawer(contextOverrides: Partial<DraftReviewContextValue> = {}) {
       getItemExplanation: () => null,
       getSectionExplanation: () => null,
       disclaimer: null,
+      generatedLanguage: null,
     },
     ...contextOverrides,
   };

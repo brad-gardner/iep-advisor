@@ -74,4 +74,9 @@ export interface ProgressReportAnalysis {
   iepGoalsSnapshot: IepGoalSnapshot[];
   errorMessage: string | null;
   createdAt: string;
+  /** Language the AI generated this analysis in; null (an analysis created
+   * before this column existed) means English. Drives `GeneratedLanguageNotice`
+   * on `ProgressReportAnalysisTab` when it differs from the viewer's active
+   * language. */
+  generatedLanguage?: 'en' | 'es' | null;
 }

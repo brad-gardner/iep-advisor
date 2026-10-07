@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { GoalAnalysis } from '@/types/api';
 import type {
   AnalysisRunLatest,
@@ -17,6 +18,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/spinner';
+import { sectionTypeLabel } from '@/lib/section-type-label';
+import { GeneratedLanguageNotice } from '@/lib/i18n/generated-language-notice';
 
 interface AnalysisTabProps {
   childId: number;
@@ -40,21 +43,6 @@ interface AnalysisTabProps {
   canAsk?: boolean;
 }
 
-const SECTION_LABELS: Record<string, string> = {
-  student_profile: 'Student Profile',
-  present_levels: 'Present Levels',
-  evaluations: 'Evaluations',
-  assessments: 'Assessments',
-  eligibility: 'Eligibility',
-  annual_goals: 'Annual Goals',
-  services: 'Services',
-  accommodations: 'Accommodations',
-  placement: 'Placement',
-  transition: 'Transition',
-  progress_monitoring: 'Progress Monitoring',
-  other: 'Other',
-};
-
 function otherSourceLabel(source: AnalysisRunOtherSource): string {
   return source.label ?? `${source.sourceType} #${source.sourceId}`;
 }
@@ -76,6 +64,7 @@ export function AnalysisTab({
   initialView = 'overview',
   canAsk,
 }: AnalysisTabProps) {
+  const { t } = useTranslation(['iep-documents', 'common']);
   const [activeView, setActiveView] = useState<string>(initialView);
 
   // Ordinary (non-`iep_goals`) sections for this document, in display order.
@@ -87,7 +76,7 @@ export function AnalysisTab({
   const triggerErrorNotice = triggerError && (
     <Notice
       variant="error"
-      title="Unable to run analysis"
+      title={t('analysisTab.triggerErrorTitle')}
       role="alert"
       data-testid="analysis-trigger-error"
     >
@@ -98,7 +87,7 @@ export function AnalysisTab({
   const loadErrorNotice = loadError && (
     <Notice
       variant="error"
-      title="Unable to load analysis"
+      title={t('analysisTab.loadErrorTitle')}
       role="alert"
       data-testid="analysis-load-error"
     >
@@ -111,7 +100,7 @@ export function AnalysisTab({
           loading={isLoading}
           data-testid="analysis-load-retry"
         >
-          Try again
+          {t('common:ui.tryAgain')}
         </Button>
       </div>
     </Notice>
@@ -125,7 +114,7 @@ export function AnalysisTab({
   if (isLoading && !run && !loadError) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading analysis…" />
+        <Spinner label={t('analysisTab.loadingAnalysis')} />
       </div>
     );
   }
@@ -161,12 +150,12 @@ export function AnalysisTab({
         {loadErrorNotice}
         <div className="flex flex-col items-center justify-center py-16 px-4">
           <Card className="max-w-md text-center">
-            <Notice variant="error" title="Analysis Failed">
-              {run.errorMessage || 'An error occurred during analysis.'}
+            <Notice variant="error" title={t('analysisTab.analysisFailedTitle')}>
+              {run.errorMessage || t('analysisTab.analysisErrorGeneric')}
             </Notice>
             <div className="mt-4">
               <Button onClick={onTrigger} loading={isTriggering} data-testid="analyze-button">
-                Retry Analysis
+                {t('analysisTab.retryAnalysis')}
               </Button>
             </div>
           </Card>
@@ -183,12 +172,12 @@ export function AnalysisTab({
         {loadErrorNotice}
         <div className="flex flex-col items-center justify-center py-16 px-4">
           <Card className="max-w-md text-center">
-            <Notice variant="warning" title="Couldn't analyze this document">
-              {source.errorMessage || 'Something went wrong while analyzing this document.'}
+            <Notice variant="warning" title={t('analysisTab.sourceFailedTitle')}>
+              {source.errorMessage || t('analysisTab.sourceErrorGeneric')}
             </Notice>
             <div className="mt-4">
               <Button onClick={onTrigger} loading={isTriggering} data-testid="analyze-button">
-                Analyze this IEP
+                {t('analysisTab.analyzeThisIep')}
               </Button>
             </div>
           </Card>
@@ -231,6 +220,26 @@ export function AnalysisTab({
     </button>
   );
 
+  // Built here, outside any JSX expression container, so the literal nav
+  // keys ('overview', 'gap-analysis', …) and `sectionTypeLabel`'s 'short'
+  // style argument don't trip `i18next/no-literal-string` — the rule's
+  // `jsx-only` mode still flags a literal nested inside a JSX child's
+  // expression, even one that is plainly a lookup key, not rendered text.
+  const sidebarButtons = [
+    sidebarButton('overview', t('analysisTab.overviewNav')),
+    hasGapAnalysis
+      ? sidebarButton(
+          'gap-analysis',
+          t('analysisTab.yourGoalsNav'),
+          run.advocacyGapAnalysis?.goalAlignments.length ?? 0,
+        )
+      : null,
+    hasGoals ? sidebarButton('goals', t('analysisTab.goalAnalysisNav'), goalAnalyses?.length ?? 0) : null,
+  ];
+  const sectionSidebarButtons = sectionKinds.map((kind) =>
+    sidebarButton(kind, sectionTypeLabel(kind, 'short')),
+  );
+
   const renderContent = () => {
     if (activeView === 'overview') {
       return (
@@ -261,17 +270,19 @@ export function AnalysisTab({
       {triggerErrorNotice}
       {loadErrorNotice}
 
+      <GeneratedLanguageNotice generatedLanguage={run.generatedLanguage} />
+
       {isMultiSource && (
         <Notice
           variant="info"
-          title={`Part of an analysis with ${otherSources.map(otherSourceLabel).join(', ')}`}
+          title={t('analysisTab.multiSourceInfo', { sources: otherSources.map(otherSourceLabel).join(', ') })}
           data-testid="analysis-multi-source-info"
         >
           <Link
             to={`/children/${childId}/analysis?run=${run.id}`}
             className="font-medium text-brand-teal-600 underline underline-offset-2 hover:text-brand-teal-700 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal-500"
           >
-            View full analysis →
+            {t('analysisTab.viewFullAnalysis')}
           </Link>
         </Notice>
       )}
@@ -279,8 +290,8 @@ export function AnalysisTab({
       {stale && (
         <div className="flex flex-wrap items-center justify-between gap-4" data-testid="analysis-stale-banner">
           <div className="min-w-[16rem] flex-1">
-            <Notice variant="warning" title="Analysis may be outdated">
-              This analysis was made before the IEP was last updated. Re-analyze to refresh it.
+            <Notice variant="warning" title={t('analysisTab.staleTitle')}>
+              {t('analysisTab.staleBody')}
             </Notice>
           </div>
           <Button
@@ -290,29 +301,18 @@ export function AnalysisTab({
             data-testid="reanalyze-button"
             className="shrink-0"
           >
-            Re-analyze
+            {t('analysisTab.reanalyze')}
           </Button>
         </div>
       )}
 
       <div className="flex gap-4 min-h-[500px]">
         <nav className="w-56 shrink-0 space-y-0.5">
-          {sidebarButton('overview', 'Overview')}
-
-          {hasGapAnalysis &&
-            sidebarButton(
-              'gap-analysis',
-              'Your Goals',
-              run.advocacyGapAnalysis?.goalAlignments.length ?? 0,
-            )}
-
-          {hasGoals && sidebarButton('goals', 'Goal Analysis', goalAnalyses?.length ?? 0)}
+          {sidebarButtons}
 
           <div className="border-t border-brand-slate-200 my-2" />
 
-          {sectionKinds.map((kind) =>
-            sidebarButton(kind, SECTION_LABELS[kind] || kind),
-          )}
+          {sectionSidebarButtons}
         </nav>
 
         <Card className="flex-1 overflow-y-auto">{renderContent()}</Card>

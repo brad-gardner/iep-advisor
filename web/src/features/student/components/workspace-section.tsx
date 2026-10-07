@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { EntryKindMeta } from '../lib/entry-kinds';
@@ -25,6 +26,7 @@ export function WorkspaceSection({
   onSetShareable,
   onDelete,
 }: WorkspaceSectionProps) {
+  const { t } = useTranslation('student');
   const [adding, setAdding] = useState(false);
   const testId = `section-${meta.kind}`;
 
@@ -39,7 +41,7 @@ export function WorkspaceSection({
 
       {entries.length === 0 && !adding && (
         <p className="text-sm italic text-brand-slate-500" data-testid={`${testId}-empty`}>
-          Nothing here yet.
+          {t('workspaceSection.empty')}
         </p>
       )}
 
@@ -56,7 +58,7 @@ export function WorkspaceSection({
       {adding ? (
         <EntryEditor
           placeholder={meta.placeholder}
-          submitLabel="Add"
+          submitLabel={t('workspaceSection.add')}
           testIdPrefix={`${testId}-add`}
           onCancel={() => setAdding(false)}
           onSubmit={async (content, isShareable) => {
@@ -71,7 +73,7 @@ export function WorkspaceSection({
           data-testid={`${testId}-add-button`}
         >
           <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-          Add
+          {t('workspaceSection.add')}
         </Button>
       )}
     </section>

@@ -1,0 +1,66 @@
+{
+  "downloadButton": {
+    "checking": "Verificando PDF…",
+    "download": "Descargar PDF",
+    "failedTitle": "No se pudo generar el PDF",
+    "failedGeneric": "Falló la generación del PDF.",
+    "retrying": "Reintentando…",
+    "retry": "Reintentar",
+    "timedOut": "Aún generando — vuelva a verificar en breve.",
+    "generating": "Generando PDF…"
+  },
+  "statusBadge": {
+    "ready": "PDF listo",
+    "failed": "Error en el PDF",
+    "generating": "Generando PDF…"
+  },
+  "historyList": {
+    "loading": "Cargando versiones…",
+    "empty": "Aún no hay versiones finalizadas del IEP.",
+    "finalized": "Finalizado el {{date}}",
+    "titleFallback": "IEP v{{number}}",
+    "versionBadge": "v{{number}}"
+  },
+  "snapshot": {
+    "goals": "Metas",
+    "services": "Servicios",
+    "accommodations": "Adaptaciones",
+    "transition": "Transición",
+    "serviceColumn": "Servicio",
+    "frequencyColumn": "Frecuencia",
+    "durationColumn": "Duración",
+    "locationColumn": "Lugar",
+    "providerColumn": "Proveedor",
+    "datesColumn": "Fechas",
+    "baseline": "Línea de base",
+    "targetCriteria": "Criterios de la meta",
+    "measurement": "Medición",
+    "timeframe": "Plazo"
+  },
+  "detailPage": {
+    "backToStudent": "Volver al estudiante",
+    "backToChild": "Volver al hijo",
+    "loading": "Cargando versión del IEP…",
+    "loadErrorTitle": "No se pudo cargar esta versión del IEP",
+    "loadErrorGeneric": "La versión no está disponible.",
+    "titleFallback": "IEP",
+    "finalized": "Finalizado el {{date}}",
+    "effective": " · Vigente desde el {{date}}"
+  },
+  "schoolCard": {
+    "heading": "Documentos de la escuela",
+    "body": "Documentos finalizados compartidos por la escuela de su hijo.",
+    "finalized": "Finalizado el {{date}}",
+    "titleFallback": "IEP v{{number}}"
+  },
+  "authoredVersion": {
+    "loading": "Cargando documento…",
+    "unavailableTitle": "Documento no disponible",
+    "loadErrorTitle": "No se pudo cargar este documento",
+    "loadErrorGeneric": "Este documento no está disponible.",
+    "overviewBreadcrumb": "Resumen",
+    "finalizedBySchool": "Finalizado por la escuela el {{date}}",
+    "readOnlyTitle": "Este es el documento finalizado de la escuela",
+    "readOnlyBody": "Es de solo lectura. Sus notas privadas y análisis nunca son visibles para la escuela."
+  }
+}

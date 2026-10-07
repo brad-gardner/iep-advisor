@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Notice } from '@/components/ui/notice';
 import { ChangeSummaryChips } from '@/features/shared-drafts/components/change-summary-chips';
 import { formatDate } from '@/lib/format-date';
@@ -10,6 +11,9 @@ interface SharedBannerProps {
 /** "Shared as revision N on {date}" plus "Changes since last share" — renders
  *  nothing until there is an Active shared revision to summarize. */
 export function SharedBanner({ instanceId }: SharedBannerProps) {
+  // `shared-drafts` reached for `ChangeSummaryChips`'s own `t()` calls — see
+  // the README's "reach another namespace" gotcha.
+  const { t } = useTranslation(['draft-sharing', 'shared-drafts']);
   const { latestActive, isLoading, error } = useDraftShares(instanceId);
 
   if (isLoading || error || !latestActive) return null;
@@ -17,18 +21,18 @@ export function SharedBanner({ instanceId }: SharedBannerProps) {
   return (
     <Notice
       variant="info"
-      title={`Shared as revision ${latestActive.revisionNumber} on ${formatDate(latestActive.sharedAt)}`}
+      title={t('sharedBanner.titleLine', { number: latestActive.revisionNumber, date: formatDate(latestActive.sharedAt) })}
       data-testid="shared-banner"
     >
       <div className="space-y-2">
         <p>
           {latestActive.openResponseCount > 0
-            ? `${latestActive.openResponseCount} open ${latestActive.openResponseCount === 1 ? 'response' : 'responses'} from the family.`
-            : 'No open responses yet.'}
+            ? t('sharedBanner.openResponses', { count: latestActive.openResponseCount })
+            : t('sharedBanner.noOpenResponses')}
         </p>
         {latestActive.changeSummary && (
           <div>
-            <p className="text-xs font-medium text-brand-slate-500">Changes since last share</p>
+            <p className="text-xs font-medium text-brand-slate-500">{t('converge.changesSinceLastShare')}</p>
             <ChangeSummaryChips summary={latestActive.changeSummary} data-testid="shared-banner-changes" />
           </div>
         )}

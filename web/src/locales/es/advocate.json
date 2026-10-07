@@ -1,0 +1,141 @@
+{
+  "pageTitle": "Asesor virtual",
+  "copy": {
+    "privacyBanner": "Privado — solo usted puede ver esto. El asesor virtual puede leer los documentos y el diario de su hijo o hija; no puede cambiar nada ni comunicarse con la escuela.",
+    "truncatedNotice": "No pude revisarlo todo — pídame que revise un documento específico si falta algo.",
+    "stopped": "Se detuvo antes de que el asesor virtual terminara. Pregunte de nuevo cuando quiera.",
+    "prepQuestionCopiedToast": "Copiada — péguela en su preparación para la reunión",
+    "viewerNotice": "Puede ver a este hijo o hija, pero no puede preguntarle al asesor virtual sobre él o ella.",
+    "example1": "¿Qué es el aviso previo por escrito?",
+    "example2": "¿Qué debe incluir un ETR?",
+    "example3": "¿Cómo solicito una evaluación?",
+    "journalExample": "¿Qué debería plantear de mi diario este mes?"
+  },
+  "about": {
+    "genericNoun": {
+      "iep": "este IEP",
+      "etr": "este ETR",
+      "goal": "esta meta",
+      "analysis": "este análisis",
+      "progress_report": "este informe de progreso",
+      "journal": "esta entrada del diario"
+    },
+    "pill": "Sobre: {{value}}"
+  },
+  "citation": {
+    "kb": "Centro de recursos n.º {{id}}",
+    "child": "Perfil del hijo o hija",
+    "comparison": "Comparación de IEP",
+    "source": "Fuente n.º {{id}}"
+  },
+  "api": {
+    "unavailable": "El asesor virtual no pudo responder en este momento. Intente de nuevo en un momento.",
+    "rateLimited": "Está enviando mensajes muy rápido — espere un momento e intente de nuevo.",
+    "validationFallback": "No se pudo enviar ese mensaje.",
+    "forbiddenFallback": "No puede preguntarle al asesor virtual sobre este hijo o hija.",
+    "notFoundFallback": "Esta conversación ya no está disponible.",
+    "usageCapFallback": "Ha usado todos los mensajes del asesor virtual de este año.",
+    "signInAgain": "Inicie sesión de nuevo."
+  },
+  "thread": {
+    "loadError": "No se pudo cargar esta conversación."
+  },
+  "threads": {
+    "loadError": "No se pudieron cargar sus conversaciones.",
+    "createFailed": "No se pudo iniciar una conversación.",
+    "renameFailed": "No se pudo renombrar esta conversación.",
+    "deleteFailed": "No se pudo eliminar esta conversación."
+  },
+  "page": {
+    "heading": "Pregúntele al asesor virtual sobre {{name}}",
+    "subheading": "Respuestas claras sobre el plan, sus derechos y qué hacer a continuación.",
+    "conversations": "Conversaciones",
+    "conversationsWithCount": "Conversaciones ({{count}})",
+    "conversationLabel": "Conversación",
+    "viewerNoticeBody": "Solo los padres que administran el perfil de {{name}} pueden iniciar una conversación.",
+    "loadingConversation": "Cargando conversación…",
+    "retry": "Reintentar",
+    "composerDisabledReason": "Ha usado los mensajes del asesor virtual de este año.",
+    "copyFailed": "No se pudo copiar — seleccione la pregunta y cópiela usted mismo."
+  },
+  "composer": {
+    "ariaLabel": "Pregúntele al asesor virtual sobre {{name}}",
+    "disabledPlaceholder": "El envío está en pausa.",
+    "placeholder": "Pregunte sobre el plan de {{name}}, un documento o qué hacer a continuación…",
+    "srHint": ". Entrar envía el mensaje; Mayús+Entrar inicia una nueva línea.",
+    "overLimit": " — demasiado largo",
+    "stop": "Detener",
+    "send": "Enviar"
+  },
+  "stateHint": {
+    "copy": "Configure su estado en Perfil para que el asesor virtual pueda incluir reglas específicas de su estado",
+    "body": ". Hasta entonces, las respuestas cubren solo las reglas federales.",
+    "dismissAria": "Descartar este aviso"
+  },
+  "pill": {
+    "clearAria": "Borrar el contexto de la conversación",
+    "hint": "Su primera pregunta inicia una nueva conversación sobre esto."
+  },
+  "askButton": {
+    "helperText": "Abre una conversación privada con el Asesor virtual sobre este elemento.",
+    "label": "Preguntarle al asesor virtual"
+  },
+  "message": {
+    "srPrefix": "Asesor virtual: ",
+    "sourcesLabel": "Fuentes:",
+    "suggestionsAria": "Próximos pasos sugeridos"
+  },
+  "suggestion": {
+    "prepQuestionTitle": "Pregunta para la reunión",
+    "addToPrep": "Agregar a la preparación para la reunión",
+    "copy": "Copiar",
+    "journalTitle": "Nota para el diario",
+    "addToJournal": "Agregar al diario",
+    "readMoreTitle": "Leer más",
+    "openGuide": "Abrir la guía",
+    "goalsTitle": "Ver las metas",
+    "openGoal": "Abrir la meta",
+    "seeGoals": "Ver metas"
+  },
+  "emptyState": {
+    "intro": "Respuestas claras que remiten a las reglas y a lo que realmente dicen los documentos.",
+    "notLegalAdvice": "No es asesoría legal.",
+    "notSure": "¿No sabe por dónde empezar?",
+    "examplesAria": "Preguntas de ejemplo"
+  },
+  "messageList": {
+    "thinking": "El asesor virtual está pensando…",
+    "newAnswer": "Nueva respuesta",
+    "youSaid": "Usted dijo: "
+  },
+  "toolActivity": {
+    "ariaLabel": "Lo que el asesor virtual está revisando",
+    "failedSuffix": " — no se pudo revisar esto"
+  },
+  "threadList": {
+    "caption": "Conversaciones",
+    "newAria": "Nueva conversación",
+    "new": "Nueva",
+    "empty": "Aún no hay conversaciones.",
+    "loading": "Cargando conversaciones…",
+    "actionsFor": "Acciones para {{title}}",
+    "rename": "Renombrar",
+    "delete": "Eliminar",
+    "renameModalTitle": "Renombrar conversación",
+    "renameLabel": "Título",
+    "save": "Guardar",
+    "deleteDialogTitle": "Eliminar conversación",
+    "deleteDialogMessage": "¿Eliminar \"{{title}}\"? Las respuestas del asesor virtual en ella se perderán. Esto no se puede deshacer.",
+    "deleteConfirm": "Eliminar conversación"
+  },
+  "usage": {
+    "warningTitle": "Ha usado {{used}} de {{limit}} mensajes del asesor virtual este año",
+    "resetsNextYear": "El límite se reinicia al comienzo del próximo año.",
+    "subscribingRaises": "Suscribirse aumenta el límite anual.",
+    "seePlans": "Ver planes",
+    "cappedTitle": "Ha usado los {{limit}} mensajes del asesor virtual de este año",
+    "manageSubscription": "Administrar suscripción",
+    "subscribeCta": "Suscríbase a IEP Advisor Pro para continuar la conversación.",
+    "inviteCode": "¿Tiene un código de invitación?"
+  }
+}

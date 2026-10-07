@@ -30,6 +30,20 @@ import {
   type SupportedLanguage,
 } from '@/lib/i18n/detect';
 
+/**
+ * Whether i18next has a `changeLanguage` call in flight right now
+ * (`isLanguageChangingTo`, set synchronously at the start of the call and
+ * cleared once it settles — see `node_modules/i18next/dist/cjs/i18next.js`).
+ * Not part of i18next's public TS surface (`node_modules/i18next/index.d.ts`'s
+ * `i18n` interface), so this reads it through a narrow, read-only cast
+ * instead of widening to `any`. Used to decide whether a NEW
+ * `changeLanguage` call is needed to supersede one already pending to a
+ * different language — see `syncLanguagePreference` below (todos/248 P2).
+ */
+function pendingI18nLanguageChange(): string | undefined {
+  return (i18n as unknown as { isLanguageChangingTo?: string }).isLanguageChangingTo;
+}
+
 interface LoginResult {
   success: boolean;
   error?: string;
@@ -93,6 +107,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // sees, even if both requests happen to be in flight at once.
   const pendingBackfillRef = useRef<Promise<void> | null>(null);
 
+  // An explicit pre-login choice (the switcher, or a `?lang=` visit, while
+  // signed out), set SYNCHRONOUSLY by `setLanguage` below — before it even
+  // calls `i18n.changeLanguage`, let alone awaits it. `setPreLoginLanguage`
+  // only writes `localStorage`'s pre-login key once that `changeLanguage`
+  // call actually resolves (which, for Spanish, waits on a lazy chunk), so a
+  // brand-new account signing in on this same, still-signed-out browser
+  // WHILE that chunk is still loading would otherwise see nothing there yet
+  // and fall through to the browser's own language for its backfill — even
+  // though this visitor had already, explicitly, chosen something else
+  // (todos/248 P3). `syncLanguagePreference`'s backfill branch below reads
+  // this ref first, ahead of `getPreLoginLanguage()`. Paired with a
+  // `generation` so a call that finishes after being superseded by a
+  // second, later switch clears only its OWN entry, never a newer one's.
+  const pendingExplicitChoiceRef = useRef<{ language: SupportedLanguage; generation: number } | null>(null);
+
   // Applies the account's saved language once a user is known. When there is
   // no saved preference yet (a first sign-in, or an account created before
   // this field existed), this persists a resolved language so future
@@ -103,8 +132,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (languageGenerationRef.current !== generation) return; // superseded — see languageGenerationRef
 
     if (isSupportedLanguage(userData.preferredLanguage)) {
-      if (i18n.language !== userData.preferredLanguage) {
-        void i18n.changeLanguage(userData.preferredLanguage);
+      const target = userData.preferredLanguage;
+      // Compare against `resolvedLanguage` (what's actually active), not
+      // `language` (i18next sets `language` only once a `changeLanguage`
+      // call's own load resolves — see `node_modules/i18next`'s
+      // `changeLanguage`/`setLngProps` — so while a lazy Spanish chunk is
+      // still loading, `language` still reads the OLD value even though a
+      // switch is already under way). Also re-issue the call whenever one is
+      // already pending (`isLanguageChangingTo`, i18next's own in-flight
+      // marker — not in its public TS surface, hence the narrow cast below):
+      // i18next only applies a `changeLanguage` call if ITS OWN target is
+      // still the one in progress once its load resolves, so calling
+      // `changeLanguage(target)` here always supersedes a pending call to a
+      // DIFFERENT language, even while `resolvedLanguage` still reads the
+      // old value too (todos/248 P2 — signing in while a pre-login Spanish
+      // switch was still loading otherwise left the screen in Spanish
+      // against an English account, because comparing only `i18n.language`
+      // skipped this call entirely).
+      if (i18n.resolvedLanguage !== target || pendingI18nLanguageChange()) {
+        void i18n.changeLanguage(target);
       }
       return;
     }
@@ -113,17 +159,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // device, the language currently active could be nothing more than the
     // previous user's sign-out carry-over (`getLastDisplayLanguage`, applied
     // for *display* only — see `lib/i18n/detect.ts`), which must never leak
-    // into this account's saved preference. Only an explicit pre-login
-    // choice counts as this visitor's own; otherwise fall back to the
-    // browser's own languages, then `en`.
-    const resolved: SupportedLanguage = getPreLoginLanguage() ?? detectBrowserLanguage();
+    // into this account's saved preference. An explicit pre-login choice
+    // still mid-flight (`pendingExplicitChoiceRef` — its own
+    // `setPreLoginLanguage` write hasn't landed yet, e.g. its Spanish chunk
+    // is still loading) counts as this visitor's own choice just as much as
+    // one already in `localStorage`, and takes priority over it (todos/248
+    // P3); otherwise fall back to the browser's own languages, then `en`.
+    const resolved: SupportedLanguage =
+      pendingExplicitChoiceRef.current?.language ?? getPreLoginLanguage() ?? detectBrowserLanguage();
 
     // Apply on screen too — not just persisted. Without this, a visitor whose
     // browser language differed from whatever i18next happened to initialize
     // with (e.g. the sign-out carry-over from a previous account on this
     // device) would have the right language saved to their new account but
-    // see the wrong one until their next reload.
-    if (i18n.language !== resolved) {
+    // see the wrong one until their next reload. Same `resolvedLanguage` +
+    // pending-switch comparison as above, for the same reason.
+    if (i18n.resolvedLanguage !== resolved || pendingI18nLanguageChange()) {
       void i18n.changeLanguage(resolved);
     }
 
@@ -147,6 +198,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     pendingBackfillRef.current = backfillPromise;
   }, []);
+
+  // Applies a freshly fetched `/me` response (shared by `loadUser` and
+  // `refreshUser` below — the two places a `/me` GET can resolve late). If a
+  // newer language change (an explicit `setLanguage`, a backfill PUT, or
+  // another `/me`) has landed since THIS request started —
+  // `languageGenerationRef` has moved past the `generation` it captured
+  // before its own fetch — this response's OWN `preferredLanguage` field is
+  // therefore stale: the server hadn't seen, or this client hasn't yet
+  // applied, that newer change when this response was produced. Every OTHER
+  // field is still the latest (name, subscription status, etc. — nothing
+  // else races this way), so keep those, but keep the CURRENT, newer
+  // `preferredLanguage` rather than reverting it (todos/248 P3 — a slow
+  // `/me` landing after a newer language PUT was overwriting the just-saved
+  // preference back to its old value, even though `syncLanguagePreference`
+  // already refused to re-apply it on SCREEN thanks to the same generation
+  // check).
+  const applyUserResponse = useCallback(
+    (data: User, generation: number) => {
+      if (languageGenerationRef.current !== generation) {
+        setUser((prev) => {
+          const merged = prev ? { ...data, preferredLanguage: prev.preferredLanguage } : data;
+          setStoredUser(JSON.stringify(merged));
+          return merged;
+        });
+        return;
+      }
+      setUser(data);
+      setStoredUser(JSON.stringify(data));
+      syncLanguagePreference(data, generation);
+    },
+    [syncLanguagePreference]
+  );
 
   const loadUser = useCallback(async () => {
     // Captured before the `/me` request starts: if `logout()` runs while it
@@ -184,9 +267,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       if (response.success && response.data) {
-        setUser(response.data);
-        setStoredUser(JSON.stringify(response.data));
-        syncLanguagePreference(response.data, generation);
+        applyUserResponse(response.data, generation);
       } else {
         removeToken();
         setUser(null);
@@ -198,7 +279,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [syncLanguagePreference]);
+  }, [applyUserResponse]);
 
   useEffect(() => {
     loadUser();
@@ -342,9 +423,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await getCurrentUser();
       if (getToken() !== tokenAtStart) return;
       if (response.success && response.data) {
-        setUser(response.data);
-        setStoredUser(JSON.stringify(response.data));
-        syncLanguagePreference(response.data, generation);
+        applyUserResponse(response.data, generation);
       }
     } catch {
       // Keep the existing user on a transient failure.
@@ -375,7 +454,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const setLanguage = async (language: SupportedLanguage) => {
     const generation = ++languageGenerationRef.current; // claims this attempt — see languageGenerationRef
+    const signedOutAtCallTime = !user;
+    if (signedOutAtCallTime) {
+      // Set synchronously, before `changeLanguage` below is even called —
+      // see `pendingExplicitChoiceRef`'s declaration for why a backfill
+      // racing this call needs to see the choice this early.
+      pendingExplicitChoiceRef.current = { language, generation };
+    }
     await i18n.changeLanguage(language);
+    if (signedOutAtCallTime && pendingExplicitChoiceRef.current?.generation === generation) {
+      // This attempt's own window has closed — `changeLanguage` has settled
+      // (whether it actually took or reverted, checked next). Clear only
+      // OUR entry: a second, later `setLanguage` call made before this one
+      // finished already overwrote it with its own, newer choice, which
+      // must survive this cleanup.
+      pendingExplicitChoiceRef.current = null;
+    }
 
     if (languageGenerationRef.current !== generation) {
       // superseded while `changeLanguage` was resolving — see languageGenerationRef

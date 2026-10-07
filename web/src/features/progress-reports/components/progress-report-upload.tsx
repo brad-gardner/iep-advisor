@@ -1,5 +1,7 @@
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Upload } from "lucide-react";
+import i18n from "@/lib/i18n";
 import { uploadFile } from "../api/progress-reports-api";
 import { Notice } from "@/components/ui/notice";
 import { Spinner } from "@/components/ui/spinner";
@@ -14,20 +16,24 @@ export function ProgressReportUpload({
   progressReportId,
   onUploaded,
 }: ProgressReportUploadProps) {
+  const { t } = useTranslation("progress-reports");
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { show } = useToast();
 
+  // `i18n.t` directly: same reasoning as iep-upload.tsx/etr-upload.tsx — a
+  // stable callback reference matters more here than reacting to `t`'s
+  // identity (see docs/i18n/README.md).
   const handleFile = useCallback(
     async (file: File) => {
       if (!file.name.toLowerCase().endsWith(".pdf")) {
-        setError("Only PDF files are supported");
+        setError(i18n.t("progress-reports:upload.onlyPdf"));
         return;
       }
 
       if (file.size > 50 * 1024 * 1024) {
-        setError("File is too large. Maximum size is 50MB.");
+        setError(i18n.t("progress-reports:upload.tooLarge"));
         return;
       }
 
@@ -37,13 +43,13 @@ export function ProgressReportUpload({
       try {
         const response = await uploadFile(progressReportId, file);
         if (response.success) {
-          show({ message: "File uploaded", variant: "success" });
+          show({ message: i18n.t("progress-reports:upload.uploadedToast"), variant: "success" });
           onUploaded();
         } else {
-          setError(response.message || "Upload failed");
+          setError(response.message || i18n.t("progress-reports:upload.uploadFailed"));
         }
       } catch {
-        setError("An error occurred during upload");
+        setError(i18n.t("progress-reports:upload.uploadError"));
       } finally {
         setIsUploading(false);
       }
@@ -92,8 +98,8 @@ export function ProgressReportUpload({
         />
         {isUploading ? (
           <div className="flex flex-col items-center gap-2">
-            <Spinner size="sm" label="Uploading…" />
-            <p className="text-brand-slate-500 text-sm">Uploading...</p>
+            <Spinner size="sm" label={t("upload.uploadingLabel")} />
+            <p className="text-brand-slate-500 text-sm">{t("upload.uploadingEllipsis")}</p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1">
@@ -102,9 +108,9 @@ export function ProgressReportUpload({
               strokeWidth={1.8}
               aria-hidden="true"
             />
-            <p className="text-brand-slate-600 text-sm">Attach PDF</p>
+            <p className="text-brand-slate-600 text-sm">{t("upload.attachPdf")}</p>
             <p className="text-brand-slate-500 text-[11px]">
-              Drop a PDF here or click to browse
+              {t("upload.dropHint")}
             </p>
           </div>
         )}

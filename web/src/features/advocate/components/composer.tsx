@@ -1,4 +1,5 @@
 import { useId, useState, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Send, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
@@ -43,6 +44,7 @@ export function Composer({
   disabledReason,
   childFirstName,
 }: ComposerProps) {
+  const { t } = useTranslation('advocate');
   const id = useId();
   const counterId = `${id}-count`;
   const [composing, setComposing] = useState(false);
@@ -77,7 +79,7 @@ export function Composer({
       data-testid="advocate-composer"
     >
       <label htmlFor={id} className="sr-only">
-        Ask the advocate about {childFirstName}
+        {t('composer.ariaLabel', { name: childFirstName })}
       </label>
       <div
         // `cn` is a plain join, so two conflicting utilities would be decided by CSS source order,
@@ -105,8 +107,8 @@ export function Composer({
           aria-invalid={overLimit || undefined}
           placeholder={
             disabled
-              ? (disabledReason ?? 'Sending is paused.')
-              : `Ask about ${childFirstName}'s plan, a document, or what to do next…`
+              ? (disabledReason ?? t('composer.disabledPlaceholder'))
+              : t('composer.placeholder', { name: childFirstName })
           }
           className={cn(
             'w-full max-h-[40vh] resize-y rounded-t-card bg-transparent px-3 py-2 text-sm text-brand-slate-800 placeholder:text-brand-slate-500',
@@ -122,18 +124,18 @@ export function Composer({
             data-testid="advocate-composer-count"
           >
             {length.toLocaleString()} / {ADVOCATE_MESSAGE_MAX_LENGTH.toLocaleString()}
-            {overLimit && ' — too long'}
-            <span className="sr-only">. Enter sends, Shift+Enter starts a new line.</span>
+            {overLimit && t('composer.overLimit')}
+            <span className="sr-only">{t('composer.srHint')}</span>
           </p>
           {streaming ? (
             <Button type="button" variant="secondary" size="sm" onClick={onStop} data-testid="advocate-stop">
               <Square className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-              Stop
+              {t('composer.stop')}
             </Button>
           ) : (
             <Button type="submit" size="sm" disabled={!canSend} data-testid="advocate-send">
               <Send className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-              Send
+              {t('composer.send')}
             </Button>
           )}
         </div>

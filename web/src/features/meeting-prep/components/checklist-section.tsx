@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { ChecklistItem } from '@/types/api';
 import { ChecklistItemRow } from './checklist-item-row';
 
@@ -11,6 +12,7 @@ interface ChecklistSectionProps {
 }
 
 export function ChecklistSection({ title, icon: Icon, items, section: _section, onCheck }: ChecklistSectionProps) {
+  const { t } = useTranslation('meeting-prep');
   if (items.length === 0) return null;
 
   const checkedCount = items.filter((i) => i.isChecked).length;
@@ -25,7 +27,7 @@ export function ChecklistSection({ title, icon: Icon, items, section: _section, 
           </h3>
         </div>
         <span className="text-[12px] text-brand-slate-500 font-medium">
-          {checkedCount} of {items.length} completed
+          {t('checklistSection.completedCount', { checked: checkedCount, total: items.length })}
         </span>
       </div>
 

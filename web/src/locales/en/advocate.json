@@ -1,0 +1,141 @@
+{
+  "pageTitle": "Advocate",
+  "copy": {
+    "privacyBanner": "Private — only you can see this. The advocate can read your child's documents and journal; it can't change anything or contact the school.",
+    "truncatedNotice": "I couldn't check everything — ask me to look at a specific document if something's missing.",
+    "stopped": "Stopped before the advocate finished. Ask again whenever you like.",
+    "prepQuestionCopiedToast": "Copied — paste it into your meeting prep",
+    "viewerNotice": "You can view this child but can’t ask the advocate about them.",
+    "example1": "What is prior written notice?",
+    "example2": "What should an ETR include?",
+    "example3": "How do I ask for an evaluation?",
+    "journalExample": "What should I raise from my journal this month?"
+  },
+  "about": {
+    "genericNoun": {
+      "iep": "this IEP",
+      "etr": "this ETR",
+      "goal": "this goal",
+      "analysis": "this analysis",
+      "progress_report": "this progress report",
+      "journal": "this journal entry"
+    },
+    "pill": "About: {{value}}"
+  },
+  "citation": {
+    "kb": "Knowledge base #{{id}}",
+    "child": "Child profile",
+    "comparison": "IEP comparison",
+    "source": "Source #{{id}}"
+  },
+  "api": {
+    "unavailable": "The advocate could not answer right now. Please try again in a moment.",
+    "rateLimited": "You're sending messages quickly — wait a moment and try again.",
+    "validationFallback": "That message could not be sent.",
+    "forbiddenFallback": "You can't ask the advocate about this child.",
+    "notFoundFallback": "This conversation is no longer available.",
+    "usageCapFallback": "You've used all of this year's advocate messages.",
+    "signInAgain": "Please sign in again."
+  },
+  "thread": {
+    "loadError": "Could not load this conversation."
+  },
+  "threads": {
+    "loadError": "Could not load your conversations.",
+    "createFailed": "Could not start a conversation.",
+    "renameFailed": "Could not rename this conversation.",
+    "deleteFailed": "Could not delete this conversation."
+  },
+  "page": {
+    "heading": "Ask the advocate about {{name}}",
+    "subheading": "Plain answers about the plan, your rights, and what to do next.",
+    "conversations": "Conversations",
+    "conversationsWithCount": "Conversations ({{count}})",
+    "conversationLabel": "Conversation",
+    "viewerNoticeBody": "Only the parents who manage {{name}}'s profile can start a conversation.",
+    "loadingConversation": "Loading conversation…",
+    "retry": "Retry",
+    "composerDisabledReason": "You’ve used this year’s advocate messages.",
+    "copyFailed": "Couldn’t copy — select the question and copy it yourself."
+  },
+  "composer": {
+    "ariaLabel": "Ask the advocate about {{name}}",
+    "disabledPlaceholder": "Sending is paused.",
+    "placeholder": "Ask about {{name}}'s plan, a document, or what to do next…",
+    "srHint": ". Enter sends, Shift+Enter starts a new line.",
+    "overLimit": " — too long",
+    "stop": "Stop",
+    "send": "Send"
+  },
+  "stateHint": {
+    "copy": "Set your state in Profile so the advocate can include state-specific rules",
+    "body": ". Until then, answers cover the federal rules only.",
+    "dismissAria": "Dismiss this hint"
+  },
+  "pill": {
+    "clearAria": "Clear the conversation context",
+    "hint": "Your first question starts a new conversation about it."
+  },
+  "askButton": {
+    "helperText": "Opens a private conversation with the Virtual Advocate about this item.",
+    "label": "Ask the advocate"
+  },
+  "message": {
+    "srPrefix": "Advocate: ",
+    "sourcesLabel": "Sources:",
+    "suggestionsAria": "Suggested next steps"
+  },
+  "suggestion": {
+    "prepQuestionTitle": "Question for the meeting",
+    "addToPrep": "Add to meeting prep",
+    "copy": "Copy",
+    "journalTitle": "Note for the journal",
+    "addToJournal": "Add to journal",
+    "readMoreTitle": "Read more",
+    "openGuide": "Open the guide",
+    "goalsTitle": "Look at the goals",
+    "openGoal": "Open the goal",
+    "seeGoals": "See goals"
+  },
+  "emptyState": {
+    "intro": "Plain answers that point back to the rules and to what's actually in the documents.",
+    "notLegalAdvice": "Not legal advice.",
+    "notSure": "Not sure where to start?",
+    "examplesAria": "Example questions"
+  },
+  "messageList": {
+    "thinking": "The advocate is thinking…",
+    "newAnswer": "New answer",
+    "youSaid": "You said: "
+  },
+  "toolActivity": {
+    "ariaLabel": "What the advocate is checking",
+    "failedSuffix": " — couldn’t check this"
+  },
+  "threadList": {
+    "caption": "Conversations",
+    "newAria": "New conversation",
+    "new": "New",
+    "empty": "No conversations yet.",
+    "loading": "Loading conversations…",
+    "actionsFor": "Actions for {{title}}",
+    "rename": "Rename",
+    "delete": "Delete",
+    "renameModalTitle": "Rename conversation",
+    "renameLabel": "Title",
+    "save": "Save",
+    "deleteDialogTitle": "Delete conversation",
+    "deleteDialogMessage": "Delete \"{{title}}\"? The advocate's answers in it will be gone. This cannot be undone.",
+    "deleteConfirm": "Delete conversation"
+  },
+  "usage": {
+    "warningTitle": "You've used {{used}} of {{limit}} advocate messages this year",
+    "resetsNextYear": "The allowance resets at the start of next year.",
+    "subscribingRaises": "Subscribing raises the yearly allowance.",
+    "seePlans": "See plans",
+    "cappedTitle": "You've used all {{limit}} advocate messages for this year",
+    "manageSubscription": "Manage subscription",
+    "subscribeCta": "Subscribe to IEP Advisor Pro to keep the conversation going.",
+    "inviteCode": "Have an invite code?"
+  }
+}

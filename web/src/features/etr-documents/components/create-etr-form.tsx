@@ -1,22 +1,15 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input, Select } from '@/components/ui/input';
 import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-editor';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { create as createEtr } from '../api/etr-documents-api';
+import { evaluationTypeLabel, documentStateLabel } from '../lib/document-labels';
 import type { DocumentState, EvaluationType } from '../types';
 
-const EVALUATION_TYPES: { value: EvaluationType; label: string }[] = [
-  { value: 'initial', label: 'Initial Evaluation' },
-  { value: 'reevaluation', label: 'Reevaluation' },
-  { value: 'transfer', label: 'Transfer' },
-  { value: 'other', label: 'Other' },
-];
-
-const DOCUMENT_STATES: { value: DocumentState; label: string }[] = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'final', label: 'Final' },
-];
+const EVALUATION_TYPE_VALUES: EvaluationType[] = ['initial', 'reevaluation', 'transfer', 'other'];
+const DOCUMENT_STATE_VALUES: DocumentState[] = ['draft', 'final'];
 
 interface CreateEtrFormProps {
   childId: number;
@@ -27,6 +20,7 @@ interface CreateEtrFormProps {
 const NOTES_MAX_LENGTH = 2000;
 
 export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormProps) {
+  const { t } = useTranslation(['etr-documents', 'common']);
   const [evaluationDate, setEvaluationDate] = useState('');
   const [evaluationType, setEvaluationType] = useState<EvaluationType | ''>('');
   const [documentState, setDocumentState] = useState<DocumentState>('draft');
@@ -52,10 +46,10 @@ export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormPro
       if (response.success) {
         onCreated();
       } else {
-        setError(response.message || 'Failed to create ETR');
+        setError(response.message || t('createForm.createFailed'));
       }
     } catch {
-      setError('An error occurred while creating the ETR');
+      setError(t('createForm.createError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -66,13 +60,12 @@ export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormPro
       {error && <Notice variant="error" title={error} />}
 
       <p className="text-[12px] text-brand-slate-500">
-        An ETR (Evaluation Team Report) documents the team&rsquo;s assessment findings
-        and eligibility determination for special education.
+        {t('createForm.description')}
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
-          label="Evaluation Date"
+          label={t('createForm.evaluationDate')}
           type="date"
           value={evaluationDate}
           onChange={(e) => setEvaluationDate(e.target.value)}
@@ -80,16 +73,16 @@ export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormPro
           data-testid="etr-evaluation-date"
         />
         <Select
-          label="Evaluation Type"
+          label={t('createForm.evaluationType')}
           value={evaluationType}
           onChange={(e) => setEvaluationType(e.target.value as EvaluationType)}
           required
           data-testid="etr-evaluation-type"
         >
-          <option value="">Select type...</option>
-          {EVALUATION_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
+          <option value="">{t('createForm.selectType')}</option>
+          {EVALUATION_TYPE_VALUES.map((value) => (
+            <option key={value} value={value}>
+              {evaluationTypeLabel(value)}
             </option>
           ))}
         </Select>
@@ -97,26 +90,26 @@ export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormPro
 
       <div>
         <label className="block text-[13px] font-medium text-brand-slate-600 mb-1">
-          Document State
+          {t('createForm.documentState')}
         </label>
-        <div className="flex gap-2" role="radiogroup" aria-label="Document state">
-          {DOCUMENT_STATES.map((s) => {
-            const isActive = documentState === s.value;
+        <div className="flex gap-2" role="radiogroup" aria-label={t('createForm.documentState')}>
+          {DOCUMENT_STATE_VALUES.map((value) => {
+            const isActive = documentState === value;
             return (
               <button
-                key={s.value}
+                key={value}
                 type="button"
                 role="radio"
                 aria-checked={isActive}
-                onClick={() => setDocumentState(s.value)}
-                data-testid={`etr-document-state-${s.value}`}
+                onClick={() => setDocumentState(value)}
+                data-testid={`etr-document-state-${value}`}
                 className={`px-3 py-1.5 text-[13px] font-medium rounded-button border transition-colors ${
                   isActive
                     ? 'bg-brand-teal-50 text-brand-teal-600 border-brand-teal-200'
                     : 'bg-white text-brand-slate-600 border-brand-slate-200 hover:border-brand-teal-200'
                 }`}
               >
-                {s.label}
+                {documentStateLabel(value)}
               </button>
             );
           })}
@@ -124,8 +117,8 @@ export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormPro
       </div>
 
       <RichTextEditor
-        label="Notes"
-        placeholder="Any notes about this evaluation..."
+        label={t('createForm.notes')}
+        placeholder={t('createForm.notesPlaceholder')}
         value={notes}
         onChange={setNotes}
         minRows={3}
@@ -140,10 +133,10 @@ export function CreateEtrForm({ childId, onCreated, onCancel }: CreateEtrFormPro
           disabled={!evaluationDate || !evaluationType || isMarkdownOverLimit(notes, NOTES_MAX_LENGTH)}
           data-testid="etr-create-submit"
         >
-          Create ETR
+          {t('createForm.create')}
         </Button>
         <Button type="button" variant="ghost" onClick={onCancel} data-testid="etr-create-cancel">
-          Cancel
+          {t('common:ui.cancel')}
         </Button>
       </div>
     </form>

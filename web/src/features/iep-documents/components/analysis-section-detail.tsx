@@ -1,32 +1,24 @@
 import { CheckCircle, HelpCircle, Scale } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { SectionAnalysis } from '@/types/api';
+import { sectionTypeLabel } from '@/lib/section-type-label';
 import { RedFlagCard } from './red-flag-card';
 
 interface AnalysisSectionDetailProps {
   sectionAnalysis: SectionAnalysis;
 }
 
-const SECTION_LABELS: Record<string, string> = {
-  student_profile: 'Student Profile',
-  present_levels: 'Present Levels of Performance',
-  evaluations: 'Evaluations',
-  assessments: 'Assessments & Test Scores',
-  eligibility: 'Eligibility',
-  annual_goals: 'Annual Goals',
-  services: 'Services',
-  accommodations: 'Accommodations',
-  placement: 'Placement',
-  transition: 'Transition Planning',
-  progress_monitoring: 'Progress Monitoring',
-  other: 'Other',
-};
-
 export function AnalysisSectionDetail({ sectionAnalysis }: AnalysisSectionDetailProps) {
+  const { t } = useTranslation('iep-documents');
+  // Computed outside the JSX expression so the 'full' style argument
+  // doesn't trip `i18next/no-literal-string` (jsx-only mode still flags a
+  // literal nested inside a JSX child's expression).
+  const sectionLabel = sectionTypeLabel(sectionAnalysis.sectionType, 'full');
   return (
     <div className="space-y-6">
       <div>
         <h2 className="font-serif text-[22px] font-semibold mb-3 text-brand-slate-800">
-          {SECTION_LABELS[sectionAnalysis.sectionType] || sectionAnalysis.sectionType}
+          {sectionLabel}
         </h2>
         <p className="text-brand-slate-600 text-sm leading-relaxed">
           {sectionAnalysis.plainLanguageSummary}
@@ -36,7 +28,7 @@ export function AnalysisSectionDetail({ sectionAnalysis }: AnalysisSectionDetail
       {sectionAnalysis.keyPoints.length > 0 && (
         <div>
           <h3 className="text-[10px] font-semibold text-brand-teal-500 uppercase tracking-wide mb-2">
-            Key Points
+            {t('sectionDetail.keyPoints')}
           </h3>
           <ul className="space-y-1.5">
             {sectionAnalysis.keyPoints.map((point, i) => (
@@ -52,7 +44,7 @@ export function AnalysisSectionDetail({ sectionAnalysis }: AnalysisSectionDetail
       {sectionAnalysis.redFlags.length > 0 && (
         <div>
           <h3 className="text-[10px] font-semibold text-brand-teal-500 uppercase tracking-wide mb-2">
-            Concerns
+            {t('goalCard.concerns')}
           </h3>
           <div className="space-y-2">
             {sectionAnalysis.redFlags.map((flag, i) => (
@@ -65,7 +57,7 @@ export function AnalysisSectionDetail({ sectionAnalysis }: AnalysisSectionDetail
       {sectionAnalysis.suggestedQuestions.length > 0 && (
         <div>
           <h3 className="text-[10px] font-semibold text-brand-teal-500 uppercase tracking-wide mb-2">
-            Questions to Ask
+            {t('sectionDetail.questionsToAsk')}
           </h3>
           <ul className="space-y-1.5">
             {sectionAnalysis.suggestedQuestions.map((q, i) => (
@@ -81,7 +73,7 @@ export function AnalysisSectionDetail({ sectionAnalysis }: AnalysisSectionDetail
       {sectionAnalysis.legalReferences.length > 0 && (
         <div>
           <h3 className="text-[10px] font-semibold text-brand-teal-500 uppercase tracking-wide mb-2">
-            Related Legal Provisions
+            {t('sectionDetail.relatedLegalProvisions')}
           </h3>
           <div className="space-y-2">
             {sectionAnalysis.legalReferences.map((ref, i) => (

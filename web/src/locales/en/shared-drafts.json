@@ -1,0 +1,135 @@
+{
+  "responseKind": {
+    "Agree": "Agree",
+    "Question": "Question",
+    "ChangeRequest": "Request a change",
+    "Comment": "Comment"
+  },
+  "status": {
+    "Active": "Active",
+    "Superseded": "Superseded",
+    "Withdrawn": "Withdrawn"
+  },
+  "listPage": {
+    "pageTitle": "Shared drafts",
+    "breadcrumbOverview": "Overview",
+    "breadcrumbSelf": "Shared drafts",
+    "loading": "Loading shared drafts…",
+    "loadError": "Could not load shared drafts.",
+    "emptyTitle": "No shared drafts yet",
+    "emptyDescription": "When your child's school shares a draft IEP or ETR, it will show up here.",
+    "revisionLine": "{{documentType}} · Revision {{number}}",
+    "sharedByLine": "Shared {{date}} by {{name}}"
+  },
+  "card": {
+    "heading": "Shared drafts",
+    "description": "Drafts your child's school has shared for your review.",
+    "sharedLine": "Shared {{date}}",
+    "viewAll": "View all shared drafts"
+  },
+  "reviewPage": {
+    "loading": "Loading shared draft…",
+    "unavailableTitle": "Shared draft unavailable",
+    "unavailableDefault": "This shared draft is unavailable.",
+    "revisionCrumb": "Revision {{number}}",
+    "titleLine": "{{documentType}} · Revision {{number}}",
+    "subtitleLine": "Shared {{date}} by {{name}}",
+    "noteFromSchool": "Note from the school",
+    "whatsNew": "What's new in this revision"
+  },
+  "statusBanner": {
+    "withdrawnTitle": "This draft was withdrawn",
+    "withdrawnBodyDated": "The school withdrew this shared draft on {{date}}. It's kept here for your records, but it no longer reflects the current plan.",
+    "withdrawnBody": "The school withdrew this shared draft. It's kept here for your records, but it no longer reflects the current plan.",
+    "supersededTitle": "This is a past revision",
+    "supersededBody": "A newer revision has since been shared. Use the revision list below to see the latest."
+  },
+  "revisionSwitcher": {
+    "navLabel": "Revision history",
+    "item": "Revision {{number}} · {{date}}",
+    "itemWithStatus": "Revision {{number}} · {{date}} ({{status}})"
+  },
+  "acknowledge": {
+    "stamp": "You reviewed this on {{date}}",
+    "button": "Mark as reviewed",
+    "disclaimer": "This is not consent or a signature.",
+    "toast": "Marked as reviewed",
+    "error": "Could not mark this as reviewed."
+  },
+  "changeSummary": {
+    "noChanges": "No changes since the last share.",
+    "added": "{{count}} added",
+    "changed": "{{count}} changed",
+    "removed": "{{count}} removed",
+    "fieldsUpdated_one": "{{count}} field updated",
+    "fieldsUpdated_other": "{{count}} fields updated"
+  },
+  "frozenSections": {
+    "noSections": "This document has no sections.",
+    "untitledSection": "Untitled section",
+    "untitledField": "Untitled field",
+    "updatedBadge": "Updated since last revision",
+    "removedSince": "Removed since last revision: {{label}}",
+    "nothingHere": "Nothing here yet.",
+    "detailFallback": "Detail",
+    "rowFallback": "Row {{number}}"
+  },
+  "itemCard": {
+    "addedBadge": "Added",
+    "changedBadge": "Changed",
+    "alreadyResponded": "You already responded to this — see \"My responses\" below.",
+    "askQuestionButton": "Ask a question",
+    "respondButton": "Respond"
+  },
+  "explainPanel": {
+    "explain": "Explain",
+    "explainSection": "Explain this section",
+    "hideExplanation": "Hide explanation",
+    "explaining": "Explaining…",
+    "noExplanationItem": "No explanation available for this item.",
+    "noExplanationSection": "No explanation available for this section.",
+    "loadError": "Explanations are temporarily unavailable."
+  },
+  "askQuestion": {
+    "drawerTitle": "Ask about: {{label}}",
+    "privateTitle": "Private — only you can see this",
+    "privateBody": "Your questions and answers here are never visible to the school team.",
+    "empty": "No questions yet.",
+    "thinking": "Finding an answer in the draft…",
+    "basedOn": "Based on: {{label}}",
+    "excerptQuote": " — “{{excerpt}}”",
+    "deleteAriaLabel": "Delete this question",
+    "questionLabel": "Your question",
+    "submit": "Ask",
+    "submitError": "Could not get an answer right now.",
+    "deleteError": "Could not delete this note."
+  },
+  "respondDialog": {
+    "title": "Respond: {{label}}",
+    "sentToSchoolTitle": "Sent to the school team",
+    "sentToSchoolBody": "Your response is visible to your child's whole school team, not just one person.",
+    "responseTypeLegend": "Response type",
+    "messageLabel": "Message",
+    "send": "Send",
+    "submitError": "Could not send your response."
+  },
+  "myResponses": {
+    "heading": "My responses",
+    "schoolReply": "School reply",
+    "repliedBy": "{{name}} replied",
+    "resolvedNoReply": "Marked resolved in the updated draft."
+  },
+  "meetingSummaryPage": {
+    "pageTitle": "Meeting summary",
+    "loading": "Loading meeting summary…",
+    "unavailableTitle": "Meeting summary unavailable",
+    "loadError": "Could not load this meeting summary.",
+    "breadcrumbOverview": "Overview",
+    "emptyTitle": "No summary yet",
+    "emptyDescription": "Your child's school hasn't sent a summary for this meeting yet.",
+    "sentLine": "Sent {{date}}",
+    "sentLineByName": "Sent {{date}} by {{name}}"
+  },
+  "notesLoadError": "Could not load your private notes.",
+  "responsesLoadError": "Could not load your responses."
+}

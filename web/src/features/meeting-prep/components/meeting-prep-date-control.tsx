@@ -1,14 +1,7 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-// Format a date-only or ISO datetime string as a local calendar date without
-// the UTC-parse off-by-one that `new Date("YYYY-MM-DD")` causes in negative
-// timezone offsets.
-function formatMeetingDate(value: string): string {
-  const [y, m, d] = value.slice(0, 10).split("-").map(Number);
-  if (!y || !m || !d) return value;
-  return new Date(y, m - 1, d).toLocaleDateString();
-}
+import { formatDate } from "@/lib/format-date";
 
 interface MeetingPrepDateControlProps {
   meetingDate: string;
@@ -30,12 +23,13 @@ export function MeetingPrepDateControl({
   isGenerating,
   onGenerate,
 }: MeetingPrepDateControlProps) {
+  const { t } = useTranslation('meeting-prep');
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="w-52">
         <Input
           id="meeting-prep-date"
-          label="Meeting date (optional)"
+          label={t('dateControl.label')}
           type="date"
           value={meetingDate}
           onChange={(e) => onMeetingDateChange(e.target.value)}
@@ -47,14 +41,14 @@ export function MeetingPrepDateControl({
         loading={isGenerating}
         data-testid="meeting-prep-generate-button"
       >
-        Generate
+        {t('dateControl.generate')}
       </Button>
       {savedMeetingDate && (
         <p
           className="text-[12px] text-brand-slate-500"
           data-testid="meeting-prep-saved-date"
         >
-          Current checklist meeting date: {formatMeetingDate(savedMeetingDate)}
+          {t('dateControl.savedDate', { date: formatDate(savedMeetingDate) })}
         </p>
       )}
     </div>

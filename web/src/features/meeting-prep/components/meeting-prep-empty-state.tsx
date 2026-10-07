@@ -1,4 +1,5 @@
 import { ClipboardCheck } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 
@@ -17,19 +18,17 @@ export function MeetingPrepEmptyState({
   contextLabel = 'IEP',
   hideCta = false,
 }: MeetingPrepEmptyStateProps) {
-  const sourceSentence =
-    contextLabel === 'ETR'
-      ? "on your child's ETR."
-      : "on your child's IEP.";
+  const { t } = useTranslation('meeting-prep');
+  const source = contextLabel === 'ETR' ? t('emptyState.descriptionEtr') : t('emptyState.descriptionIep');
   return (
     <EmptyState
       icon={ClipboardCheck}
-      title="Prepare for Your Meeting"
-      description={`Generate a personalized meeting prep checklist with questions to ask, documents to bring, rights to reference, and potential red flags based ${sourceSentence}`}
+      title={t('emptyState.title')}
+      description={t('emptyState.description', { source })}
       action={
         hideCta ? undefined : (
           <Button onClick={onGenerate} loading={isGenerating} data-testid="generate-meeting-prep">
-            Generate Meeting Prep
+            {t('emptyState.generate')}
           </Button>
         )
       }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Markdown } from "@/components/ui/markdown";
 import { Notice } from "@/components/ui/notice";
@@ -8,6 +9,9 @@ import { PageLayout } from "@/components/ui/page-layout";
 import { PdfViewer } from "@/components/ui/pdf-viewer";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { AskAdvocateButton } from "@/features/advocate/components/ask-advocate-button";
+import { formatDate } from "@/lib/format-date";
+import { documentStatusLabel } from "@/lib/document-status-label";
+import i18n from "@/lib/i18n";
 import { getById, getDownloadUrl } from "../api/progress-reports-api";
 import { ProgressReportAnalysisTab } from "./progress-report-analysis-tab";
 import type { ProgressReport } from "../types";
@@ -23,22 +27,18 @@ const STATUS_VARIANTS: Record<
   error: "error",
 };
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "";
-  return new Date(dateStr).toLocaleDateString();
-}
-
 function formatPeriod(
   start: string | null,
   end: string | null
 ): string {
-  if (!start && !end) return "Reporting period not set";
+  if (!start && !end) return i18n.t("progress-reports:list.periodNotSet");
   if (start && end) return `${formatDate(start)} – ${formatDate(end)}`;
   return formatDate(start || end);
 }
 
 export function ProgressReportViewerPage() {
-  usePageTitle("Progress report");
+  const { t } = useTranslation(["progress-reports", "iep-documents"]);
+  usePageTitle(t("viewerPage.breadcrumbTitle"));
   const { childId, id, prId } = useParams<{
     childId: string;
     id: string;
@@ -70,7 +70,7 @@ export function ProgressReportViewerPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner label="Loading progress report…" />
+        <Spinner label={t("viewerPage.loading")} />
       </div>
     );
   }
@@ -78,12 +78,12 @@ export function ProgressReportViewerPage() {
   if (!report) {
     return (
       <div className="text-center py-12">
-        <p className="text-brand-slate-500">Progress report not found.</p>
+        <p className="text-brand-slate-500">{t("viewerPage.notFound")}</p>
         <Link
           to={`/children/${childId}/ieps/${id}`}
           className="text-brand-teal-500 hover:underline mt-2 inline-block"
         >
-          Back to IEP
+          {t("viewerPage.backToIep")}
         </Link>
       </div>
     );
@@ -92,22 +92,24 @@ export function ProgressReportViewerPage() {
   const title =
     report.fileName ||
     formatPeriod(report.reportingPeriodStart, report.reportingPeriodEnd) ||
-    `Progress Report #${report.id}`;
+    t("viewerPage.idFallback", { id: report.id });
 
   return (
     <PageLayout
       title={title}
       className="max-w-5xl"
       breadcrumb={[
-        { label: "Back to IEP", to: `/children/${childId}/ieps/${id}` },
-        { label: "Progress Report" },
+        { label: t("viewerPage.backToIep"), to: `/children/${childId}/ieps/${id}` },
+        { label: t("viewerPage.breadcrumbTitle") },
       ]}
       actions={
         childIdNumber != null ? (
           <AskAdvocateButton
             childId={childIdNumber}
             about={{ kind: "progress_report", id: report.id }}
-            label={`progress report for ${formatPeriod(report.reportingPeriodStart, report.reportingPeriodEnd)}`}
+            label={t("viewerPage.askAbout", {
+              period: formatPeriod(report.reportingPeriodStart, report.reportingPeriodEnd),
+            })}
             data-testid="progress-report-ask-advocate"
           />
         ) : undefined
@@ -116,7 +118,7 @@ export function ProgressReportViewerPage() {
       <div className="space-y-3">
         <div className="flex items-center gap-3 flex-wrap">
           <Badge variant={STATUS_VARIANTS[report.status] || "neutral"}>
-            {report.status}
+            {documentStatusLabel(report.status)}
           </Badge>
           <span className="text-[13px] text-brand-slate-500">
             {formatPeriod(
@@ -134,15 +136,14 @@ export function ProgressReportViewerPage() {
       </div>
 
       {report.status === "error" && report.errorMessage && (
-        <Notice variant="error" title="Processing failed">
+        <Notice variant="error" title={t("viewerPage.processingFailedTitle")}>
           {report.errorMessage}
         </Notice>
       )}
 
       {report.status === "created" && (
-        <Notice variant="info" title="No file attached">
-          Upload the progress report PDF from the IEP's Progress Reports tab to
-          continue.
+        <Notice variant="info" title={t("viewerPage.noFileTitle")}>
+          {t("viewerPage.noFileBody")}
         </Notice>
       )}
 
@@ -158,7 +159,7 @@ export function ProgressReportViewerPage() {
                   : "text-brand-slate-500 hover:text-brand-slate-800"
               }`}
             >
-              Document
+              {t("viewerPage.tabDocument")}
             </button>
             <button
               onClick={() => setActiveTab("analysis")}
@@ -169,7 +170,7 @@ export function ProgressReportViewerPage() {
                   : "text-brand-slate-500 hover:text-brand-slate-800"
               }`}
             >
-              Analysis
+              {t("viewerPage.tabAnalysis")}
             </button>
           </div>
 

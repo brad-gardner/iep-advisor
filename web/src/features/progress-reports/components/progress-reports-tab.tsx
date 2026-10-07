@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -17,6 +18,7 @@ export function ProgressReportsTab({
   childId,
   canEdit,
 }: ProgressReportsTabProps) {
+  const { t } = useTranslation("progress-reports");
   const [showCreate, setShowCreate] = useState(false);
   const { reports, isLoading, reload } = useProgressReports(iepId);
 
@@ -25,10 +27,10 @@ export function ProgressReportsTab({
       <div className="flex justify-between items-center mb-4">
         <div>
           <h2 className="font-serif text-[22px] font-semibold text-brand-slate-800">
-            Progress Reports
+            {t("tab.heading")}
           </h2>
           <p className="text-sm text-brand-slate-500 mt-1">
-            School-issued reports tracking progress against this IEP's goals.
+            {t("tab.body")}
           </p>
         </div>
         {canEdit && (
@@ -37,7 +39,7 @@ export function ProgressReportsTab({
             onClick={() => setShowCreate(true)}
             data-testid="new-progress-report-button"
           >
-            New Report
+            {t("tab.newReport")}
           </Button>
         )}
       </div>
@@ -54,7 +56,7 @@ export function ProgressReportsTab({
       <Modal
         open={showCreate}
         onClose={() => setShowCreate(false)}
-        title="New progress report"
+        title={t("tab.newReportModalTitle")}
         data-testid="new-progress-report-modal"
       >
         <CreateProgressReportForm

@@ -4,6 +4,7 @@ import { useToast } from "@/components/ui/toast";
 import type { ChildOutletContext } from "@/features/children/components/child-detail-page";
 import { useMeetingPrep } from "../hooks/use-meeting-prep";
 import { useParentQuestions } from "../hooks/use-parent-questions";
+import { questionAddedToast, questionExistsToast, questionFailedToast } from "../lib/copy";
 import { MeetingPrepTab } from "./meeting-prep-tab";
 import { MeetingPrepDateControl } from "./meeting-prep-date-control";
 import { ParentQuestions } from "./parent-questions";
@@ -11,10 +12,6 @@ import { StudentSharedEntries } from "./student-shared-entries";
 
 /** `?addQuestion=<text>` — an advocate suggestion handed to the parent's own question list. */
 export const ADD_QUESTION_PARAM = "addQuestion";
-
-export const QUESTION_ADDED_TOAST = "Added to your questions";
-export const QUESTION_EXISTS_TOAST = "Already in your questions";
-export const QUESTION_FAILED_TOAST = "Could not add that question";
 
 /**
  * Child-level (standalone) Meeting Prep tab, gated behind the
@@ -53,9 +50,9 @@ export function ChildMeetingPrepTab() {
     consumedRef.current = incoming;
     if (canEditQuestions) {
       void addQuestion(incoming, "advocate").then((result) => {
-        if (result === "added") show({ message: QUESTION_ADDED_TOAST, variant: "success" });
-        else if (result === "duplicate") show({ message: QUESTION_EXISTS_TOAST, variant: "info" });
-        else if (result === "failed") show({ message: QUESTION_FAILED_TOAST, variant: "error" });
+        if (result === "added") show({ message: questionAddedToast(), variant: "success" });
+        else if (result === "duplicate") show({ message: questionExistsToast(), variant: "info" });
+        else if (result === "failed") show({ message: questionFailedToast(), variant: "error" });
       });
     }
     setSearchParams(
@@ -70,7 +67,7 @@ export function ChildMeetingPrepTab() {
 
   const addTyped = async (text: string) => {
     const result = await addQuestion(text, "parent");
-    if (result === "added") show({ message: QUESTION_ADDED_TOAST, variant: "success" });
+    if (result === "added") show({ message: questionAddedToast(), variant: "success" });
     return result;
   };
 

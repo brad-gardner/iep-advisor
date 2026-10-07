@@ -1,22 +1,44 @@
-/** User-facing copy shared across the advocate feature (kept together so tests and components agree). */
+import i18n from '@/lib/i18n';
 
-export const PRIVACY_BANNER_COPY =
-  "Private — only you can see this. The advocate can read your child's documents and journal; it can't change anything or contact the school.";
+/**
+ * User-facing copy shared across the advocate feature (kept together so
+ * tests and components agree). Each is a live `i18n.t()` call, not a frozen
+ * constant, so a language switch mid-session is reflected immediately — see
+ * `docs/i18n/README.md`'s "Display-label helpers" pattern. Tests call the
+ * same function the components do, rather than asserting against a value
+ * frozen at module-load time.
+ */
+export function privacyBannerCopy(): string {
+  return i18n.t('advocate:copy.privacyBanner');
+}
 
-export const TRUNCATED_NOTICE_COPY =
-  "I couldn't check everything — ask me to look at a specific document if something's missing.";
+export function truncatedNoticeCopy(): string {
+  return i18n.t('advocate:copy.truncatedNotice');
+}
 
-export const STOPPED_COPY = 'Stopped before the advocate finished. Ask again whenever you like.';
+export function stoppedCopy(): string {
+  return i18n.t('advocate:copy.stopped');
+}
 
-export const PREP_QUESTION_COPIED_TOAST = 'Copied — paste it into your meeting prep';
+export function prepQuestionCopiedToast(): string {
+  return i18n.t('advocate:copy.prepQuestionCopiedToast');
+}
 
-export const VIEWER_NOTICE_COPY = 'You can view this child but can’t ask the advocate about them.';
+export function viewerNoticeCopy(): string {
+  return i18n.t('advocate:copy.viewerNotice');
+}
 
-export const EXAMPLE_QUESTIONS = [
-  'What is prior written notice?',
-  'What should an ETR include?',
-  'How do I ask for an evaluation?',
-];
+/** Three starter questions shown on a blank conversation. */
+export function exampleQuestions(): string[] {
+  return [i18n.t('advocate:copy.example1'), i18n.t('advocate:copy.example2'), i18n.t('advocate:copy.example3')];
+}
 
 /** Offered as a fourth example only when the child's journal has entries. */
-export const JOURNAL_EXAMPLE_QUESTION = 'What should I raise from my journal this month?';
+export function journalExampleQuestion(): string {
+  return i18n.t('advocate:copy.journalExample');
+}
+
+/** The "set your state" link text in `StateHint` — kept here (not in that component file) so the file keeps exporting only the component (`react-refresh/only-export-components`). */
+export function stateHintCopy(): string {
+  return i18n.t('advocate:stateHint.copy');
+}

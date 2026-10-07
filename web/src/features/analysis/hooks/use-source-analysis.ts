@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePolling, ANALYSIS_MAX_POLLS } from "@/hooks/use-polling";
+import i18n from "@/lib/i18n";
 import { createRun, getLatestForSource } from "../api/analysis-runs-api";
 import { mapCreateError } from "../lib/map-create-error";
 import {
@@ -107,7 +108,7 @@ export function useSourceAnalysis(
     // Any other failure (network blip, 5xx, etc.): keep showing the last
     // known run instead of dropping back to an empty/"never analyzed" state,
     // and surface a retry affordance instead.
-    setLoadError(axiosErr.response?.data?.message || "Could not load this analysis.");
+    setLoadError(axiosErr.response?.data?.message || i18n.t("analysis:sourceAnalysis.loadError"));
   }, []);
 
   const load = useCallback(async () => {
@@ -184,7 +185,7 @@ export function useSourceAnalysis(
         setLoadError(null);
         await load();
       } else {
-        setTriggerError(res.message || "Could not start analysis");
+        setTriggerError(res.message || i18n.t("analysis:createError.generic"));
       }
     } catch (err) {
       const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };

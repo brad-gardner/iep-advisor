@@ -1,3 +1,4 @@
+import i18n from '@/lib/i18n';
 import { ABOUT_PATTERN } from '../types/advocate';
 
 /** The record kinds a launcher can open a conversation about — the server grammar. */
@@ -26,15 +27,6 @@ export function parseAbout(value: string | null | undefined): AboutRef | null {
   return n > 0 ? { kind: kind as AboutKind, id: n } : null;
 }
 
-const GENERIC_NOUN: Record<AboutKind, string> = {
-  iep: 'this IEP',
-  etr: 'this ETR',
-  goal: 'this goal',
-  analysis: 'this analysis',
-  progress_report: 'this progress report',
-  journal: 'this journal entry',
-};
-
 /**
  * The context pill text. A launcher may pass a human label through router
  * state ("IEP from March 2026"); without one the pill names the kind. The raw
@@ -42,7 +34,8 @@ const GENERIC_NOUN: Record<AboutKind, string> = {
  */
 export function aboutContextLabel(about: AboutRef, label?: string | null): string {
   const clean = label?.replace(/\s+/g, ' ').trim();
-  return `About: ${clean ? clean : GENERIC_NOUN[about.kind]}`;
+  const value = clean ? clean : i18n.t(`advocate:about.genericNoun.${about.kind}`);
+  return i18n.t('advocate:about.pill', { value });
 }
 
 /** Router `state` shape a launcher attaches so the advocate page can name the record. */

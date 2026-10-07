@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { GoalAnalysis } from '@/types/api';
 import { AnalysisGoalCard } from './analysis-goal-card';
 
@@ -17,10 +18,11 @@ export function AnalysisGoalsList({
   canAsk,
   headingLevel = 2,
 }: AnalysisGoalsListProps) {
+  const { t } = useTranslation('iep-documents');
   if (goalAnalyses.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-brand-slate-500">No goal analyses available.</p>
+        <p className="text-brand-slate-500">{t('goalsList.empty')}</p>
       </div>
     );
   }
@@ -34,17 +36,17 @@ export function AnalysisGoalsList({
     <div className="space-y-6">
       <div>
         <Heading className="font-serif text-[22px] font-semibold mb-2 text-brand-slate-800">
-          Goal Analysis ({goalAnalyses.length} goals)
+          {t('goalsList.heading', { count: goalAnalyses.length })}
         </Heading>
         <div className="flex gap-4 text-[13px] font-medium">
           {greenCount > 0 && (
-            <span className="text-brand-teal-600">{greenCount} strong</span>
+            <span className="text-brand-teal-600">{t('goalsList.strongCount', { count: greenCount })}</span>
           )}
           {yellowCount > 0 && (
-            <span className="text-brand-amber-500">{yellowCount} need improvement</span>
+            <span className="text-brand-amber-500">{t('goalsList.needsImprovementCount', { count: yellowCount })}</span>
           )}
           {redCount > 0 && (
-            <span className="text-brand-danger-700">{redCount} significant concerns</span>
+            <span className="text-brand-danger-700">{t('goalsList.significantConcernsCount', { count: redCount })}</span>
           )}
         </div>
       </div>

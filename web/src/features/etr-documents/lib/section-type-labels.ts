@@ -1,26 +1,14 @@
-export const ETR_SECTION_TYPE_LABELS: Record<string, string> = {
-  referral_reason: 'Referral Reason',
-  background_information: 'Background Information',
-  parent_input: 'Parent Input',
-  teacher_input: 'Teacher Input',
-  student_input: 'Student Input',
-  health_vision_hearing: 'Health, Vision & Hearing',
-  cognitive_assessment: 'Cognitive Assessment',
-  academic_assessment: 'Academic Assessment',
-  behavioral_social_emotional: 'Behavioral / Social-Emotional',
-  speech_language: 'Speech & Language',
-  occupational_physical_therapy: 'Occupational / Physical Therapy',
-  adaptive_functional: 'Adaptive / Functional',
-  eligibility_determination: 'Eligibility Determination',
-  other: 'Other',
-};
+import { sectionTypeLabel } from '@/lib/section-type-label';
 
+/**
+ * Translated label for an ETR section's `sectionType` — delegates to the
+ * shared `sectionTypeLabel` helper (`iep-documents:sectionType.*`), which
+ * collapsed this file's own former `ETR_SECTION_TYPE_LABELS` map together
+ * with the 3 other `SECTION_LABELS` copies (iep-documents, iep-comparison,
+ * and this feature's own `etr-analysis-tab.tsx` sidebar). Kept as a thin
+ * wrapper so existing imports of `formatSectionTypeLabel` from this module
+ * don't need to change.
+ */
 export function formatSectionTypeLabel(sectionType: string): string {
-  return (
-    ETR_SECTION_TYPE_LABELS[sectionType] ||
-    sectionType
-      .split('_')
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ')
-  );
+  return sectionTypeLabel(sectionType, 'full');
 }

@@ -1,0 +1,91 @@
+{
+  "createForm": {
+    "createdToast": "Informe de progreso creado",
+    "createFailed": "No se pudo crear el informe de progreso",
+    "createError": "Ocurrió un error al crear el informe de progreso",
+    "periodStart": "Inicio del período del informe",
+    "periodEnd": "Fin del período del informe",
+    "notes": "Notas (opcional)",
+    "notesPlaceholder": "Cualquier cosa que valga la pena señalar sobre este informe...",
+    "cancel": "Cancelar",
+    "create": "Crear"
+  },
+  "goalProgressCard": {
+    "ratingMet": "Cumplida",
+    "ratingOnTrack": "En buen camino",
+    "ratingConcerning": "Preocupante",
+    "ratingRegressing": "En retroceso",
+    "ratingInsufficientData": "Datos insuficientes",
+    "evidenceStrong": "Evidencia sólida",
+    "evidenceAdequate": "Evidencia adecuada",
+    "evidenceWeak": "Evidencia débil",
+    "whatReportSays": "Lo que dice el informe",
+    "concerns": "Preocupaciones",
+    "whatYouCanAsk": "Lo que puede preguntar"
+  },
+  "analysisTab": {
+    "loading": "Cargando análisis…",
+    "loadErrorTitle": "No se pudo cargar el análisis",
+    "loadErrorGeneric": "No se pudo cargar el análisis",
+    "startErrorGeneric": "No se pudo iniciar el análisis",
+    "readyToast": "Análisis listo",
+    "startHeading": "Analice este informe de progreso",
+    "startBody": "Revisaremos el informe según las metas de este IEP y cualquier meta que haya establecido. Obtendrá hallazgos de progreso por meta, señales de alerta y preguntas concretas para la próxima reunión.",
+    "runAnalysis": "Ejecutar análisis",
+    "analyzingLabel": "Analizando informe de progreso…",
+    "analyzingBody": "Analizando el informe de progreso. Esto generalmente toma de 1 a 3 minutos.",
+    "failedTitle": "El análisis falló",
+    "failedGeneric": "Ocurrió un error al analizar este informe.",
+    "retryAnalysis": "Reintentar análisis",
+    "summary": "Resumen",
+    "goalProgress": "Progreso de metas ({{count}})",
+    "redFlags": "Señales de alerta ({{count}})",
+    "severityHigh": "Alta",
+    "severityMedium": "Media",
+    "severityLow": "Baja"
+  },
+  "list": {
+    "periodNotSet": "Período del informe no establecido",
+    "empty": "Aún no hay informes de progreso para este IEP.",
+    "view": "Ver",
+    "download": "Descargar",
+    "delete": "Eliminar",
+    "deletingEllipsis": "...",
+    "idFallback": "Informe de progreso n.º {{id}}",
+    "created": "Creado el {{date}}",
+    "deletedToast": "Informe de progreso eliminado",
+    "deleteDialogTitle": "Eliminar informe de progreso",
+    "deleteDialogMessage": "¿Eliminar este informe de progreso? Esta acción no se puede deshacer.",
+    "deleteConfirmLabel": "Eliminar informe"
+  },
+  "upload": {
+    "onlyPdf": "Solo se admiten archivos PDF",
+    "tooLarge": "El archivo es demasiado grande. El tamaño máximo es 50 MB.",
+    "uploadedToast": "Archivo subido",
+    "uploadFailed": "Error al subir el archivo",
+    "uploadError": "Ocurrió un error al subir el archivo",
+    "uploadingLabel": "Subiendo…",
+    "uploadingEllipsis": "Subiendo...",
+    "attachPdf": "Adjuntar PDF",
+    "dropHint": "Suelte un PDF aquí o haga clic para buscarlo"
+  },
+  "viewerPage": {
+    "loading": "Cargando informe de progreso…",
+    "notFound": "No se encontró el informe de progreso.",
+    "backToIep": "Volver al IEP",
+    "idFallback": "Informe de progreso n.º {{id}}",
+    "breadcrumbTitle": "Informe de progreso",
+    "askAbout": "informe de progreso de {{period}}",
+    "processingFailedTitle": "Error en el procesamiento",
+    "noFileTitle": "Sin archivo adjunto",
+    "noFileBody": "Suba el PDF del informe de progreso desde la pestaña Informes de progreso del IEP para continuar.",
+    "tabDocument": "Documento",
+    "tabAnalysis": "Análisis"
+  },
+  "tab": {
+    "heading": "Informes de progreso",
+    "body": "Informes emitidos por la escuela que registran el progreso respecto a las metas de este IEP.",
+    "newReport": "Nuevo informe",
+    "newReportModalTitle": "Nuevo informe de progreso"
+  }
+}

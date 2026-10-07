@@ -1,4 +1,5 @@
 import { CheckCircle2, XCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import type { EtrEligibilityPayload } from '@/features/analysis/types';
 
@@ -27,7 +28,7 @@ function EvidenceList({
       <h4
         className={`text-[11px] uppercase tracking-wide font-semibold mb-2 ${colorClass}`}
       >
-        {title} ({items.length})
+        {title}
       </h4>
       <ul className="space-y-1.5 list-disc list-outside pl-5">
         {items.map((item, i) => (
@@ -41,19 +42,20 @@ function EvidenceList({
 }
 
 export function EtrEligibilityReviewView({ data }: EtrEligibilityReviewViewProps) {
+  const { t } = useTranslation('etr-documents');
   const supported = data.dataSupportsConclusion;
 
   return (
     <div className="space-y-6" data-testid="etr-eligibility-review">
       <section>
         <h2 className="font-serif text-[22px] font-semibold text-brand-slate-800 mb-3">
-          Eligibility Review
+          {t('eligibilityReview.heading')}
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200">
             <dt className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold">
-              Stated Category
+              {t('eligibilityReview.statedCategory')}
             </dt>
             <dd className="text-sm font-medium text-brand-slate-800 mt-1">
               {data.statedCategory || '—'}
@@ -61,7 +63,7 @@ export function EtrEligibilityReviewView({ data }: EtrEligibilityReviewViewProps
           </div>
           <div className="bg-brand-slate-50 rounded-card p-3 border border-brand-slate-200">
             <dt className="text-[11px] text-brand-slate-500 uppercase tracking-wide font-semibold">
-              Stated Conclusion
+              {t('eligibilityReview.statedConclusion')}
             </dt>
             <dd className="text-sm font-medium text-brand-slate-800 mt-1">
               {data.statedConclusion || '—'}
@@ -97,11 +99,11 @@ export function EtrEligibilityReviewView({ data }: EtrEligibilityReviewViewProps
                 }`}
               >
                 {supported
-                  ? 'Data supports the stated conclusion'
-                  : 'Data does NOT clearly support the stated conclusion'}
+                  ? t('eligibilityReview.dataSupports')
+                  : t('eligibilityReview.dataDoesNotSupport')}
               </p>
               <Badge variant={supported ? 'success' : 'error'}>
-                {supported ? 'Supported' : 'Not Supported'}
+                {supported ? t('eligibilityReview.supported') : t('eligibilityReview.notSupported')}
               </Badge>
             </div>
             {data.notes && (
@@ -113,17 +115,17 @@ export function EtrEligibilityReviewView({ data }: EtrEligibilityReviewViewProps
 
       <section className="space-y-5">
         <EvidenceList
-          title="Supporting Evidence"
+          title={t('eligibilityReview.supportingEvidence', { count: data.supportingEvidence.length })}
           items={data.supportingEvidence}
           tone="support"
         />
         <EvidenceList
-          title="Contradicting Evidence"
+          title={t('eligibilityReview.contradictingEvidence', { count: data.contradictingEvidence.length })}
           items={data.contradictingEvidence}
           tone="contra"
         />
         <EvidenceList
-          title="Alternative Considerations"
+          title={t('eligibilityReview.alternativeConsiderations', { count: data.alternativeConsiderations.length })}
           items={data.alternativeConsiderations}
           tone="neutral"
         />

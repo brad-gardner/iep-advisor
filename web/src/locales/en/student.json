@@ -1,0 +1,81 @@
+{
+  "entryKinds": {
+    "Strength": {
+      "label": "Strength",
+      "sectionTitle": "My Strengths",
+      "hint": "Things you are good at or proud of.",
+      "placeholder": "I am good at…"
+    },
+    "Interest": {
+      "label": "Interest",
+      "sectionTitle": "My Interests",
+      "hint": "Things you enjoy or want to learn more about.",
+      "placeholder": "I am interested in…"
+    },
+    "AccommodationRequest": {
+      "label": "Accommodation request",
+      "sectionTitle": "Accommodations I Want",
+      "hint": "Supports that help you learn best.",
+      "placeholder": "It helps me when…"
+    },
+    "MeetingStatement": {
+      "label": "Meeting statement",
+      "sectionTitle": "What I Want to Say in My Meeting",
+      "hint": "Things you want your team to hear.",
+      "placeholder": "At my meeting, I want to say…"
+    },
+    "AiInterviewAnswer": {
+      "label": "AI interview answer"
+    }
+  },
+  "homePage": {
+    "welcomeTitle": "Welcome, {{name}}",
+    "defaultTitle": "Your space",
+    "subtitle": "Add your strengths, interests, and what you want to say — then choose what to share with your team.",
+    "loadingWorkspace": "Loading your workspace…",
+    "workspaceLoadErrorTitle": "We could not load your workspace",
+    "addedToast": "Added to your space",
+    "savedToast": "Changes saved",
+    "deletedToast": "Entry deleted",
+    "deleteDialogTitle": "Delete entry",
+    "deleteDialogMessage": "Delete this? This cannot be undone."
+  },
+  "workspaceSection": {
+    "empty": "Nothing here yet.",
+    "add": "Add"
+  },
+  "entryEditor": {
+    "shareLabel": "Share this with my team",
+    "contentAriaLabel": "Entry content",
+    "saveLabel": "Save"
+  },
+  "entryCard": {
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "shareToggle": {
+    "shared": "Shared with your team",
+    "private": "Only you can see this"
+  },
+  "aiInterview": {
+    "heading": "AI Interview",
+    "description": "Tell the assistant what you want help saying. It will draft something you can save or change.",
+    "promptPlaceholder": "I want to tell my team that…",
+    "promptAriaLabel": "What do you want help saying?",
+    "askButton": "Ask the assistant",
+    "errorTitle": "The assistant could not help right now",
+    "errorBody": "Please try again in a moment.",
+    "saveAsStatement": "Save as meeting statement",
+    "saveAsAnswer": "Save as interview answer",
+    "dismiss": "Dismiss",
+    "privacyNote": "Saved entries are private until you choose to share them."
+  },
+  "inviteForm": {
+    "emailLabel": "Student Email *",
+    "submit": "Send Invite",
+    "successDefault": "Invitation sent. The student has a pending invite.",
+    "failureDefault": "Failed to send invitation",
+    "cardHeading": "Invite student",
+    "cardDescriptionDefault": "Invite the student to activate their own account and participate in their IEP process."
+  }
+}

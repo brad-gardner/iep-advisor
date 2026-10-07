@@ -13,7 +13,9 @@ export type {
   SharedDraftRevisionDto,
   SharedDraftStatus,
 } from '@/features/shared-drafts/types';
-export { DRAFT_RESPONSE_KIND_LABELS } from '@/features/shared-drafts/types';
+// Label helper (not a DTO) lives at `@/features/shared-drafts/lib/draft-response-kind-label` —
+// callers here import `draftResponseKindLabel` directly from there, same as
+// they already import `ChangeSummaryChips`.
 
 import type { ChangeSummaryDto, DraftResponseDto, RevisionAcknowledgementDto, SharedDraftRevisionDto } from '@/features/shared-drafts/types';
 

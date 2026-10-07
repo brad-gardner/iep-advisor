@@ -1,0 +1,60 @@
+{
+  "pageTitle": "Compare IEPs",
+  "loading": "Loading comparison…",
+  "backToChild": "Back to child",
+  "failedTitle": "Comparison failed",
+  "failedGeneric": "Unable to load the comparison. Please try again.",
+  "title": "IEP Comparison",
+  "comparisonBreadcrumb": "Comparison",
+  "summary": {
+    "goalsAdded": "Goals Added",
+    "goalsRemoved": "Goals Removed",
+    "goalsModified": "Goals Modified",
+    "goalsUnchanged": "Goals Unchanged",
+    "sectionsAdded": "Sections Added",
+    "sectionsRemoved": "Sections Removed",
+    "flagsResolved": "Flags Resolved",
+    "flagsPersisting": "Flags Persisting",
+    "newFlags": "New Flags"
+  },
+  "goalChanges": {
+    "heading": "Goal Changes",
+    "empty": "No goal changes detected between these IEPs."
+  },
+  "goalDiff": {
+    "fieldTargetCriteria": "Target Criteria",
+    "fieldBaseline": "Baseline",
+    "fieldMeasurementMethod": "Measurement Method",
+    "fieldTimeframe": "Timeframe",
+    "fieldGoalText": "Goal Text",
+    "added": "Added",
+    "removed": "Removed",
+    "modified": "Modified",
+    "changes": "Changes",
+    "none": "(none)"
+  },
+  "sectionDiff": {
+    "heading": "Section Changes"
+  },
+  "timeline": {
+    "noDate": "No date",
+    "goalsSuffix": "goals",
+    "sectionsSuffix": "sections",
+    "redFlagsSuffix": "red flags",
+    "compare": "Compare",
+    "empty": "No IEPs found. Upload at least two IEPs to see a timeline and compare versions."
+  },
+  "redFlagResolution": {
+    "heading": "Red Flag Resolution",
+    "resolvedTitle": "Resolved",
+    "resolvedDescription": "These issues were addressed",
+    "persistingTitle": "Persisting",
+    "persistingDescription": "These issues remain",
+    "newTitle": "New",
+    "newDescription": "New concerns found"
+  },
+  "loadErrors": {
+    "loadFailed": "Failed to load comparison",
+    "loadError": "An error occurred loading the comparison"
+  }
+}

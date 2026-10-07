@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { RedFlag } from '@/types/api';
 import { RedFlagCard } from './red-flag-card';
 
@@ -10,11 +11,12 @@ export function AnalysisOverview({
   overallSummary,
   overallRedFlags,
 }: AnalysisOverviewProps) {
+  const { t } = useTranslation('iep-documents');
   return (
     <div className="space-y-8">
       <section>
         <h2 className="font-serif text-[22px] font-semibold mb-3 text-brand-slate-800">
-          Overview
+          {t('overview.heading')}
         </h2>
         <div className="text-brand-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
           {overallSummary}
@@ -24,7 +26,7 @@ export function AnalysisOverview({
       {overallRedFlags.length > 0 && (
         <section>
           <h2 className="font-serif text-[22px] font-semibold mb-3 text-brand-slate-800">
-            Areas of Concern ({overallRedFlags.length})
+            {t('overview.areasOfConcern', { count: overallRedFlags.length })}
           </h2>
           <div className="space-y-3">
             {overallRedFlags.map((flag, i) => (

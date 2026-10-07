@@ -7,6 +7,8 @@ export interface AdvocateThreadDto {
   createdAt: string;
   updatedAt: string;
   lastMessageAt: string;
+  /** The language this thread's most recent AI answer was written in; null/unknown = English. Whether this lives on the thread or the message is unconfirmed, so both carry it optionally — see `AdvocateMessageDto`. */
+  generatedLanguage?: 'en' | 'es' | null;
 }
 
 export type AdvocateRole = 'User' | 'Assistant';
@@ -77,6 +79,8 @@ export interface AdvocateMessageDto {
   suggestions: AdvocateSuggestion[];
   truncated: boolean;
   createdAt: string;
+  /** The language this AI-generated assistant message was written in (`AddAiArtifactLanguage`); null/unknown = English. Not meaningful on a `User` message. */
+  generatedLanguage?: 'en' | 'es' | null;
 }
 
 export interface AdvocateThreadDetailDto extends AdvocateThreadDto {

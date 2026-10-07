@@ -1,4 +1,5 @@
 import { AlertTriangle, AlertOctagon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { RedFlag } from '@/types/api';
 
 interface RedFlagCardProps {
@@ -6,6 +7,7 @@ interface RedFlagCardProps {
 }
 
 export function RedFlagCard({ redFlag }: RedFlagCardProps) {
+  const { t } = useTranslation('iep-documents');
   const isRed = redFlag.severity === 'red';
 
   return (
@@ -29,7 +31,7 @@ export function RedFlagCard({ redFlag }: RedFlagCardProps) {
           <p className="text-sm text-brand-slate-600 mt-1">{redFlag.description}</p>
           {redFlag.legalBasis && (
             <p className="text-[11px] text-brand-slate-500 mt-2 italic">
-              Legal basis: {redFlag.legalBasis}
+              {t('redFlagCard.legalBasis', { basis: redFlag.legalBasis })}
             </p>
           )}
         </div>

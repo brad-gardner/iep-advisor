@@ -1,0 +1,186 @@
+{
+  "evaluationType": {
+    "initial": "Evaluación inicial",
+    "reevaluation": "Reevaluación",
+    "transfer": "Transferencia",
+    "other": "Otra"
+  },
+  "documentState": {
+    "draft": "Borrador",
+    "final": "Final"
+  },
+  "loadingEvaluation": "Cargando evaluación…",
+  "backToChild": "Volver al hijo",
+  "evaluationTeamReport": "Informe del Equipo de Evaluación",
+  "askAbout": {
+    "etr": "ETR del {{date}}"
+  },
+  "createForm": {
+    "description": "Un ETR (Informe del Equipo de Evaluación) documenta los hallazgos de la evaluación del equipo y la determinación de elegibilidad para educación especial.",
+    "evaluationDate": "Fecha de la evaluación",
+    "evaluationType": "Tipo de evaluación",
+    "selectType": "Seleccione un tipo...",
+    "documentState": "Estado del documento",
+    "notes": "Notas",
+    "notesPlaceholder": "Cualquier nota sobre esta evaluación...",
+    "create": "Crear ETR",
+    "cancel": "Cancelar",
+    "createFailed": "No se pudo crear el ETR",
+    "createError": "Ocurrió un error al crear el ETR"
+  },
+  "upload": {
+    "onlyPdf": "Solo se admiten archivos PDF",
+    "tooLarge": "El archivo es demasiado grande. El tamaño máximo es 50 MB.",
+    "uploadedToast": "ETR subido",
+    "uploadFailed": "Error al subir el archivo",
+    "uploadError": "Ocurrió un error al subir el archivo",
+    "uploadingLabel": "Subiendo…",
+    "uploadingProgress": "Subiendo... {{progress}}%",
+    "attachPdf": "Adjuntar PDF",
+    "dropHint": "Suelte un PDF aquí o haga clic para buscarlo (máx. 50 MB)"
+  },
+  "emptyState": {
+    "heading": "Analice este ETR",
+    "body": "Obtenga un análisis completo de esta evaluación, incluida la integridad de las pruebas, la revisión de elegibilidad y posibles inquietudes.",
+    "analyze": "Analizar ETR"
+  },
+  "processing": {
+    "label": "Analizando…",
+    "heading": "Analizando el ETR",
+    "body": "Esto generalmente toma unos minutos. Estamos revisando la integridad de las pruebas, la determinación de elegibilidad e identificando áreas que pueden necesitar atención.",
+    "checkStatus": "Verificar estado"
+  },
+  "analysisTab": {
+    "triggerErrorTitle": "No se pudo ejecutar el análisis",
+    "loadErrorTitle": "No se pudo cargar el análisis",
+    "loadingAnalysis": "Cargando análisis…",
+    "analysisFailedTitle": "El análisis falló",
+    "analysisErrorGeneric": "Ocurrió un error durante el análisis.",
+    "retryAnalysis": "Reintentar análisis",
+    "sourceFailedTitle": "No se pudo analizar este documento",
+    "sourceErrorGeneric": "Algo salió mal al analizar este documento.",
+    "analyzeThisEtr": "Analizar este ETR",
+    "multiSourceInfo": "Parte de un análisis con {{sources}}",
+    "viewFullAnalysis": "Ver análisis completo →",
+    "staleTitle": "El análisis puede estar desactualizado",
+    "staleBody": "Este análisis se hizo antes de la última actualización del ETR. Vuelva a analizarlo para actualizarlo.",
+    "reanalyze": "Volver a analizar",
+    "overviewNav": "Resumen",
+    "yourGoalsNav": "Sus metas",
+    "completenessNav": "Integridad de las pruebas",
+    "eligibilityNav": "Revisión de elegibilidad"
+  },
+  "overview": {
+    "heading": "Resumen",
+    "redFlags": "Señales de alerta",
+    "missingDomains": "Dominios faltantes",
+    "eligibility": "Elegibilidad",
+    "supported": "Respaldada",
+    "unsupported": "No respaldada",
+    "unknown": "—",
+    "urgentCount": "({{count}} urgentes)",
+    "areasOfConcern": "Áreas de preocupación ({{count}})"
+  },
+  "completenessView": {
+    "heading": "Integridad de las pruebas",
+    "overall": "General",
+    "ratingStrong": "Sólida",
+    "ratingAdequate": "Adecuada",
+    "ratingThin": "Limitada",
+    "ratingMissing": "Faltante",
+    "ratingConcerning": "Preocupante",
+    "ratingUnknown": "Desconocida",
+    "evaluatedDomains": "Dominios evaluados ({{count}})",
+    "noEvaluatedDomains": "No se informaron dominios evaluados.",
+    "tools": "Herramientas: {{tools}}",
+    "missingDomains": "Dominios faltantes o insuficientemente evaluados ({{count}})",
+    "noMissingDomains": "No se identificaron dominios faltantes."
+  },
+  "eligibilityReview": {
+    "heading": "Revisión de elegibilidad",
+    "statedCategory": "Categoría indicada",
+    "statedConclusion": "Conclusión indicada",
+    "dataSupports": "Los datos respaldan la conclusión indicada",
+    "dataDoesNotSupport": "Los datos NO respaldan claramente la conclusión indicada",
+    "supported": "Respaldada",
+    "notSupported": "No respaldada",
+    "supportingEvidence": "Evidencia de respaldo ({{count}})",
+    "contradictingEvidence": "Evidencia contradictoria ({{count}})",
+    "alternativeConsiderations": "Consideraciones alternativas ({{count}})"
+  },
+  "errorBanner": {
+    "title": "Error en el procesamiento",
+    "body": "No pudimos terminar de analizar su ETR. Esto puede ocurrir cuando el PDF está escaneado o tiene un formato inusual. Puede volver a intentar el procesamiento abajo.",
+    "retryFailed": "No se pudo poner en cola el reprocesamiento",
+    "retry": "Reintentar procesamiento"
+  },
+  "listGroup": {
+    "viewProfile": "Ver perfil"
+  },
+  "listPage": {
+    "title": "Evaluaciones (ETR)",
+    "subtitle": "Un Informe del Equipo de Evaluación (ETR) es la evaluación escrita de la escuela que determina si su hijo califica para educación especial y qué apoyos necesita. Revise las evaluaciones anteriores y prepárese para las próximas reuniones aquí.",
+    "loading": "Cargando evaluaciones…",
+    "loadErrorTitle": "No se pudieron cargar las evaluaciones",
+    "empty": "Aún no hay evaluaciones.",
+    "emptyDescription": "Abra el perfil de un hijo para agregar o subir un ETR.",
+    "goToChildren": "Ir a Mis hijos"
+  },
+  "listRow": {
+    "evaluationFallback": "Evaluación",
+    "uploaded": "Subido el {{date}}"
+  },
+  "sectionCard": {
+    "noContent": "No se capturó contenido para esta sección.",
+    "none": "Ninguno",
+    "noDetails": "Sin detalles"
+  },
+  "sectionsList": {
+    "loading": "Cargando secciones…",
+    "empty": "Aún no se han procesado secciones."
+  },
+  "documentList": {
+    "loading": "Cargando documentos del ETR…",
+    "empty": "Aún no hay documentos del ETR.",
+    "deletedToast": "ETR eliminado",
+    "view": "Ver",
+    "delete": "Eliminar",
+    "deleteDialogTitle": "Eliminar documento del ETR",
+    "deleteDialogMessage": "¿Eliminar este documento del ETR? Esta acción no se puede deshacer.",
+    "deleteConfirmLabel": "Eliminar ETR",
+    "evaluated": "Evaluado: {{date}}",
+    "created": "Creado el {{date}}"
+  },
+  "viewerPage": {
+    "refreshing": "Actualizando...",
+    "notes": "Notas",
+    "tabOverview": "Resumen",
+    "tabSections": "Secciones",
+    "tabAnalysis": "Análisis",
+    "hintUploadFirst": "Suba un documento para ver las secciones",
+    "hintUploadFirstAnalysis": "Suba un documento primero",
+    "hintProcessingFailed": "Error en el procesamiento",
+    "hintProcessing": "Procesando...",
+    "evaluated": "Evaluado: {{date}}",
+    "evaluationDate": "Fecha de la evaluación",
+    "evaluationType": "Tipo de evaluación",
+    "documentState": "Estado del documento",
+    "status": "Estado",
+    "created": "Creado",
+    "file": "Archivo",
+    "uploadHeading": "Suba el documento del ETR",
+    "uploadBody": "Adjunte un PDF para comenzar a procesarlo. Una vez subido, extraeremos las secciones y las prepararemos para el análisis.",
+    "uploadedDocument": "Documento subido",
+    "viewDocument": "Ver documento",
+    "comingSoonTitle": "Análisis y preparación para la reunión próximamente",
+    "comingSoonBody": "Una vez que termine el procesamiento, verá las secciones procesadas. Las pestañas de análisis y preparación para la reunión están en desarrollo.",
+    "notFound": "No se encontró el documento del ETR."
+  },
+  "processingBanner": {
+    "queuedTitle": "En cola para análisis",
+    "analyzingTitle": "Estamos analizando su ETR...",
+    "queuedBody": "Su documento se subió y se procesará en breve.",
+    "analyzingBody": "Extrayendo secciones y organizando el contenido. Esto generalmente toma menos de dos minutos.",
+    "processingLabel": "Procesando…"
+  }
+}

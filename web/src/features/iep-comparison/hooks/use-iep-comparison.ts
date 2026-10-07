@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import i18n from '@/lib/i18n';
 import type { ComparisonResult } from '@/types/api';
 import { compareIeps } from '../api/iep-comparison-api';
 
@@ -15,10 +16,10 @@ export function useIepComparison(iepId: number, otherId: number) {
       if (response.success && response.data) {
         setComparison(response.data);
       } else {
-        setError(response.message || 'Failed to load comparison');
+        setError(response.message || i18n.t('iep-comparison:loadErrors.loadFailed'));
       }
     } catch {
-      setError('An error occurred loading the comparison');
+      setError(i18n.t('iep-comparison:loadErrors.loadError'));
     } finally {
       setIsLoading(false);
     }

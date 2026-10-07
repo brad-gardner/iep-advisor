@@ -1,0 +1,65 @@
+{
+  "pageTitle": "Diario",
+  "tag": {
+    "Incident": "Incidente",
+    "Communication": "Comunicación",
+    "Medical": "Médico",
+    "Progress": "Progreso",
+    "Other": "Otro"
+  },
+  "emptyCopy": "Lleve un registro con fecha de lo que ocurre: incidentes, llamadas con la escuela, actualizaciones médicas, progreso que note. Privado para su familia.",
+  "card": {
+    "heading": "Diario de {{name}}",
+    "description": "Un registro con fecha de lo que ocurre — privado para su familia, nunca compartido con el equipo escolar.",
+    "addUpdate": "Agregar actualización",
+    "loadingLabel": "Cargando diario",
+    "loading": "Cargando…",
+    "loadError": "No se pudo cargar el diario",
+    "loadFailed": "No se pudo cargar el diario.",
+    "seeAll": "Ver todas las actualizaciones",
+    "savedCreated": "Actualización agregada al diario",
+    "savedUpdated": "Actualización guardada",
+    "deleted": "Actualización eliminada"
+  },
+  "page": {
+    "heading": "Diario de {{name}}",
+    "description": "Privado para su familia — nunca compartido con el equipo escolar.",
+    "showLabel": "Mostrar",
+    "allUpdates": "Todas las actualizaciones",
+    "loading": "Cargando diario…",
+    "loadFailed": "No se pudo cargar el diario.",
+    "emptyTitleFiltered": "Aún no hay actualizaciones de {{tag}}",
+    "emptyTitleAll": "Aún no hay nada en el diario",
+    "addFirstUpdate": "Agregar la primera actualización",
+    "showingMostRecent": "Mostrando las {{count}} actualizaciones más recientes."
+  },
+  "drawer": {
+    "editTitle": "Editar actualización",
+    "addTitle": "Agregar una actualización",
+    "dateLabel": "Fecha",
+    "kindLabel": "Tipo de actualización",
+    "contentLabel": "Qué pasó",
+    "contentPlaceholder": "Lo enviaron temprano a casa después de una crisis en el recreo. Llamé a la Sra. Rivera — dijo que…",
+    "linkLegend": "Vincular con (opcional)",
+    "undated": "sin fecha",
+    "linkIep": "IEP",
+    "linkEtr": "ETR",
+    "linkMeeting": "Reunión",
+    "notLinked": "Sin vincular",
+    "linkedItem": "Elemento vinculado #{{id}}",
+    "dateFutureError": "La fecha no puede ser en el futuro.",
+    "saveFailed": "No se pudo guardar esta actualización.",
+    "deleteFailed": "No se pudo eliminar esta actualización.",
+    "delete": "Eliminar",
+    "saveChanges": "Guardar cambios",
+    "saveNew": "Guardar actualización",
+    "deleteDialogTitle": "Eliminar actualización",
+    "deleteDialogMessage": "¿Eliminar esta actualización del diario? Esto no se puede deshacer.",
+    "deleteConfirm": "Eliminar"
+  },
+  "entryItem": {
+    "askLabel": "entrada del diario del {{day}}",
+    "askAria": "Preguntarle al asesor virtual sobre la actualización del {{day}}",
+    "editAria": "Editar actualización del {{day}}"
+  }
+}

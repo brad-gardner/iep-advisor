@@ -1,14 +1,17 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Sparkles } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
-import type { StudentWorkspaceEntryKind } from '../types';
+import { GeneratedLanguageNotice } from '@/lib/i18n/generated-language-notice';
+import type { InterviewSuggestionDto, StudentWorkspaceEntryKind } from '../types';
 
 interface AiInterviewHelperProps {
-  // Returns the AI suggestion text, or null on failure. NOT persisted.
-  onInterview: (prompt: string) => Promise<string | null>;
+  // Returns the AI suggestion (with its generated language), or null on
+  // failure. NOT persisted.
+  onInterview: (prompt: string) => Promise<InterviewSuggestionDto | null>;
   // Saves the suggestion as an entry (private by default). Returns success.
   onSave: (
     content: string,
@@ -21,13 +24,16 @@ type Phase = 'idle' | 'loading' | 'suggested' | 'error';
 // Prompt → AI suggestion → the student chooses to save it as an entry or
 // dismiss it. The suggestion is never auto-saved.
 export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProps) {
+  const { t } = useTranslation('student');
   const [prompt, setPrompt] = useState('');
   const [phase, setPhase] = useState<Phase>('idle');
-  const [suggestion, setSuggestion] = useState('');
+  const [suggestion, setSuggestion] = useState<InterviewSuggestionDto | null>(null);
   const [saving, setSaving] = useState(false);
 
   const trimmed = prompt.trim();
 
+  // Click-triggered (never a mount effect), so no `t`-dependency concern —
+  // see `AcknowledgeControl` (shared-drafts) for the same reasoning.
   const handleAsk = async () => {
     if (!trimmed || phase === 'loading') return;
     setPhase('loading');
@@ -41,12 +47,12 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
   };
 
   const handleSave = async (entryKind: StudentWorkspaceEntryKind) => {
-    if (saving) return;
+    if (saving || !suggestion) return;
     setSaving(true);
     try {
-      const ok = await onSave(suggestion, entryKind);
+      const ok = await onSave(suggestion.suggestion, entryKind);
       if (ok) {
-        setSuggestion('');
+        setSuggestion(null);
         setPrompt('');
         setPhase('idle');
       }
@@ -56,7 +62,7 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
   };
 
   const handleDismiss = () => {
-    setSuggestion('');
+    setSuggestion(null);
     setPhase('idle');
   };
 
@@ -69,11 +75,8 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
           aria-hidden="true"
         />
         <div>
-          <h2 className="font-serif text-lg">AI Interview</h2>
-          <p className="text-sm text-brand-slate-500">
-            Tell the assistant what you want help saying. It will draft something
-            you can save or change.
-          </p>
+          <h2 className="font-serif text-lg">{t('aiInterview.heading')}</h2>
+          <p className="text-sm text-brand-slate-500">{t('aiInterview.description')}</p>
         </div>
       </div>
 
@@ -81,8 +84,8 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
         rows={3}
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        placeholder="I want to tell my team that…"
-        aria-label="What do you want help saying?"
+        placeholder={t('aiInterview.promptPlaceholder')}
+        aria-label={t('aiInterview.promptAriaLabel')}
         data-testid="ai-interview-prompt"
       />
       <Button
@@ -91,13 +94,13 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
         loading={phase === 'loading'}
         data-testid="ai-interview-ask"
       >
-        Ask the assistant
+        {t('aiInterview.askButton')}
       </Button>
 
       {phase === 'error' && (
         <div data-testid="ai-interview-error">
-          <Notice variant="error" title="The assistant could not help right now">
-            Please try again in a moment.
+          <Notice variant="error" title={t('aiInterview.errorTitle')}>
+            {t('aiInterview.errorBody')}
           </Notice>
         </div>
       )}
@@ -107,8 +110,9 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
           className="space-y-3 rounded-card border border-brand-teal-100 bg-brand-teal-50 p-4"
           data-testid="ai-interview-suggestion"
         >
+          <GeneratedLanguageNotice generatedLanguage={suggestion.generatedLanguage} />
           <p className="whitespace-pre-wrap text-sm text-brand-slate-800">
-            {suggestion}
+            {suggestion.suggestion}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -116,7 +120,7 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
               loading={saving}
               data-testid="ai-interview-save-statement"
             >
-              Save as meeting statement
+              {t('aiInterview.saveAsStatement')}
             </Button>
             <Button
               variant="secondary"
@@ -124,7 +128,7 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
               disabled={saving}
               data-testid="ai-interview-save-answer"
             >
-              Save as interview answer
+              {t('aiInterview.saveAsAnswer')}
             </Button>
             <Button
               variant="ghost"
@@ -132,12 +136,10 @@ export function AiInterviewHelper({ onInterview, onSave }: AiInterviewHelperProp
               disabled={saving}
               data-testid="ai-interview-dismiss"
             >
-              Dismiss
+              {t('aiInterview.dismiss')}
             </Button>
           </div>
-          <p className="text-xs text-brand-slate-500">
-            Saved entries are private until you choose to share them.
-          </p>
+          <p className="text-xs text-brand-slate-500">{t('aiInterview.privacyNote')}</p>
         </div>
       )}
     </Card>

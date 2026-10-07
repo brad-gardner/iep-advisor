@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
@@ -24,6 +25,7 @@ const NOTE_MAX_LENGTH = 2000;
  * submission never round-trips.
  */
 export function LogProgressForm({ goalRecordId, onLogged, onCancel, 'data-testid': testId }: LogProgressFormProps) {
+  const { t } = useTranslation(['goals', 'common']);
   const { show: showToast } = useToast();
   const [value, setValue] = useState('');
   const [unit, setUnit] = useState('');
@@ -36,16 +38,16 @@ export function LogProgressForm({ goalRecordId, onLogged, onCancel, 'data-testid
     const trimmedValue = value.trim();
     const trimmedNote = note.trim();
     if (!trimmedValue && !trimmedNote) {
-      setError('Enter a value or a note.');
+      setError(t('goals:logProgressForm.valueOrNoteRequired'));
       return;
     }
     if (isMarkdownOverLimit(note, NOTE_MAX_LENGTH)) {
-      setError(`Note must be ${NOTE_MAX_LENGTH} characters or fewer.`);
+      setError(t('goals:logProgressForm.noteMaxLength', { max: NOTE_MAX_LENGTH }));
       return;
     }
     const parsedValue = trimmedValue ? Number(trimmedValue) : undefined;
     if (trimmedValue && Number.isNaN(parsedValue)) {
-      setError('Value must be a number.');
+      setError(t('goals:logProgressForm.valueMustBeNumber'));
       return;
     }
     setIsSubmitting(true);
@@ -58,12 +60,12 @@ export function LogProgressForm({ goalRecordId, onLogged, onCancel, 'data-testid
       });
       if (res.success && res.data) {
         onLogged(res.data);
-        showToast({ message: 'Progress logged', variant: 'success' });
+        showToast({ message: t('goals:logProgressForm.toastLogged'), variant: 'success' });
       } else {
-        setError(res.message ?? 'Could not log progress.');
+        setError(res.message ?? t('goals:logProgressForm.logFailed'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not log progress.'));
+      setError(apiErrorMessage(err, t('goals:logProgressForm.logFailed')));
     } finally {
       setIsSubmitting(false);
     }
@@ -78,15 +80,15 @@ export function LogProgressForm({ goalRecordId, onLogged, onCancel, 'data-testid
       )}
       <div className="grid grid-cols-2 gap-3">
         <Input
-          label="Value"
+          label={t('goals:logProgressForm.valueLabel')}
           inputMode="decimal"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           data-testid={testId ? `${testId}-value` : undefined}
         />
         <Input
-          label="Unit"
-          placeholder="e.g. % correct"
+          label={t('goals:logProgressForm.unitLabel')}
+          placeholder={t('goals:logProgressForm.unitPlaceholder')}
           maxLength={32}
           value={unit}
           onChange={(e) => setUnit(e.target.value)}
@@ -94,7 +96,7 @@ export function LogProgressForm({ goalRecordId, onLogged, onCancel, 'data-testid
         />
       </div>
       <RichTextEditor
-        label="Note"
+        label={t('goals:logProgressForm.noteLabel')}
         minRows={2}
         maxLength={NOTE_MAX_LENGTH}
         value={note}
@@ -103,7 +105,7 @@ export function LogProgressForm({ goalRecordId, onLogged, onCancel, 'data-testid
       />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={isSubmitting}>
-          Cancel
+          {t('common:ui.cancel')}
         </Button>
         <Button
           type="submit"
@@ -112,7 +114,7 @@ export function LogProgressForm({ goalRecordId, onLogged, onCancel, 'data-testid
           disabled={isMarkdownOverLimit(note, NOTE_MAX_LENGTH)}
           data-testid={testId ? `${testId}-submit` : undefined}
         >
-          Log progress
+          {t('goals:logProgressForm.submit')}
         </Button>
       </div>
     </form>

@@ -1,0 +1,135 @@
+{
+  "responseKind": {
+    "Agree": "Estoy de acuerdo",
+    "Question": "Pregunta",
+    "ChangeRequest": "Solicitar un cambio",
+    "Comment": "Comentario"
+  },
+  "status": {
+    "Active": "Activa",
+    "Superseded": "Reemplazada",
+    "Withdrawn": "Retirada"
+  },
+  "listPage": {
+    "pageTitle": "Borradores compartidos",
+    "breadcrumbOverview": "Resumen",
+    "breadcrumbSelf": "Borradores compartidos",
+    "loading": "Cargando borradores compartidos…",
+    "loadError": "No se pudieron cargar los borradores compartidos.",
+    "emptyTitle": "Aún no hay borradores compartidos",
+    "emptyDescription": "Cuando la escuela de su hijo comparta un borrador de IEP o ETR, aparecerá aquí.",
+    "revisionLine": "{{documentType}} · Revisión {{number}}",
+    "sharedByLine": "Compartido el {{date}} por {{name}}"
+  },
+  "card": {
+    "heading": "Borradores compartidos",
+    "description": "Borradores que la escuela de su hijo ha compartido para que los revise.",
+    "sharedLine": "Compartido el {{date}}",
+    "viewAll": "Ver todos los borradores compartidos"
+  },
+  "reviewPage": {
+    "loading": "Cargando borrador compartido…",
+    "unavailableTitle": "Borrador compartido no disponible",
+    "unavailableDefault": "Este borrador compartido no está disponible.",
+    "revisionCrumb": "Revisión {{number}}",
+    "titleLine": "{{documentType}} · Revisión {{number}}",
+    "subtitleLine": "Compartido el {{date}} por {{name}}",
+    "noteFromSchool": "Nota de la escuela",
+    "whatsNew": "Qué hay de nuevo en esta revisión"
+  },
+  "statusBanner": {
+    "withdrawnTitle": "Este borrador fue retirado",
+    "withdrawnBodyDated": "La escuela retiró este borrador compartido el {{date}}. Se conserva aquí para su registro, pero ya no refleja el plan actual.",
+    "withdrawnBody": "La escuela retiró este borrador compartido. Se conserva aquí para su registro, pero ya no refleja el plan actual.",
+    "supersededTitle": "Esta es una revisión anterior",
+    "supersededBody": "Desde entonces se ha compartido una revisión más reciente. Use la lista de revisiones a continuación para ver la más reciente."
+  },
+  "revisionSwitcher": {
+    "navLabel": "Historial de revisiones",
+    "item": "Revisión {{number}} · {{date}}",
+    "itemWithStatus": "Revisión {{number}} · {{date}} ({{status}})"
+  },
+  "acknowledge": {
+    "stamp": "Revisó esto el {{date}}",
+    "button": "Marcar como revisado",
+    "disclaimer": "Esto no es un consentimiento ni una firma.",
+    "toast": "Marcado como revisado",
+    "error": "No se pudo marcar esto como revisado."
+  },
+  "changeSummary": {
+    "noChanges": "No hay cambios desde la última vez que se compartió.",
+    "added": "{{count}} agregados",
+    "changed": "{{count}} modificados",
+    "removed": "{{count}} eliminados",
+    "fieldsUpdated_one": "{{count}} campo actualizado",
+    "fieldsUpdated_other": "{{count}} campos actualizados"
+  },
+  "frozenSections": {
+    "noSections": "Este documento no tiene secciones.",
+    "untitledSection": "Sección sin título",
+    "untitledField": "Campo sin título",
+    "updatedBadge": "Actualizado desde la última revisión",
+    "removedSince": "Eliminado desde la última revisión: {{label}}",
+    "nothingHere": "Aún no hay nada aquí.",
+    "detailFallback": "Detalle",
+    "rowFallback": "Fila {{number}}"
+  },
+  "itemCard": {
+    "addedBadge": "Agregado",
+    "changedBadge": "Modificado",
+    "alreadyResponded": "Ya respondió a esto; consulte \"Mis respuestas\" más abajo.",
+    "askQuestionButton": "Hacer una pregunta",
+    "respondButton": "Responder"
+  },
+  "explainPanel": {
+    "explain": "Explicar",
+    "explainSection": "Explicar esta sección",
+    "hideExplanation": "Ocultar explicación",
+    "explaining": "Explicando…",
+    "noExplanationItem": "No hay explicación disponible para este elemento.",
+    "noExplanationSection": "No hay explicación disponible para esta sección.",
+    "loadError": "Las explicaciones no están disponibles por el momento."
+  },
+  "askQuestion": {
+    "drawerTitle": "Preguntar sobre: {{label}}",
+    "privateTitle": "Privado: solo usted puede ver esto",
+    "privateBody": "Sus preguntas y respuestas aquí nunca son visibles para el equipo escolar.",
+    "empty": "Aún no hay preguntas.",
+    "thinking": "Buscando una respuesta en el borrador…",
+    "basedOn": "Basado en: {{label}}",
+    "excerptQuote": " — “{{excerpt}}”",
+    "deleteAriaLabel": "Eliminar esta pregunta",
+    "questionLabel": "Su pregunta",
+    "submit": "Preguntar",
+    "submitError": "No se pudo obtener una respuesta en este momento.",
+    "deleteError": "No se pudo eliminar esta nota."
+  },
+  "respondDialog": {
+    "title": "Responder: {{label}}",
+    "sentToSchoolTitle": "Enviado al equipo escolar",
+    "sentToSchoolBody": "Su respuesta es visible para todo el equipo escolar de su hijo, no solo para una persona.",
+    "responseTypeLegend": "Tipo de respuesta",
+    "messageLabel": "Mensaje",
+    "send": "Enviar",
+    "submitError": "No se pudo enviar su respuesta."
+  },
+  "myResponses": {
+    "heading": "Mis respuestas",
+    "schoolReply": "Respuesta de la escuela",
+    "repliedBy": "{{name}} respondió",
+    "resolvedNoReply": "Marcado como resuelto en el borrador actualizado."
+  },
+  "meetingSummaryPage": {
+    "pageTitle": "Resumen de la reunión",
+    "loading": "Cargando resumen de la reunión…",
+    "unavailableTitle": "Resumen de la reunión no disponible",
+    "loadError": "No se pudo cargar este resumen de la reunión.",
+    "breadcrumbOverview": "Resumen",
+    "emptyTitle": "Aún no hay resumen",
+    "emptyDescription": "La escuela de su hijo aún no ha enviado un resumen de esta reunión.",
+    "sentLine": "Enviado el {{date}}",
+    "sentLineByName": "Enviado el {{date}} por {{name}}"
+  },
+  "notesLoadError": "No se pudieron cargar sus notas privadas.",
+  "responsesLoadError": "No se pudieron cargar sus respuestas."
+}

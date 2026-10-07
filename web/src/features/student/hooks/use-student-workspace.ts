@@ -7,6 +7,7 @@ import {
   updateWorkspaceEntry,
 } from '../api/student-workspace-api';
 import type {
+  InterviewSuggestionDto,
   StudentWorkspaceEntryDto,
   StudentWorkspaceEntryKind,
 } from '../types';
@@ -129,13 +130,14 @@ export function useStudentWorkspace() {
     return false;
   }, []);
 
-  // Returns the AI suggestion text (not persisted). The caller decides whether
-  // to save it as an entry via addEntry.
+  // Returns the AI suggestion (not persisted), including its generated
+  // language for `GeneratedLanguageNotice`. The caller decides whether to
+  // save it as an entry via addEntry.
   const interview = useCallback(
-    async (prompt: string): Promise<string | null> => {
+    async (prompt: string): Promise<InterviewSuggestionDto | null> => {
       const response = await requestInterviewSuggestion(prompt);
       if (response.success && response.data) {
-        return response.data.suggestion;
+        return response.data;
       }
       return null;
     },

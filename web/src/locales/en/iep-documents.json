@@ -1,0 +1,214 @@
+{
+  "sectionType": {
+    "full": {
+      "student_profile": "Student Profile",
+      "present_levels": "Present Levels of Performance",
+      "evaluations": "Evaluations",
+      "assessments": "Assessments & Test Scores",
+      "eligibility": "Eligibility",
+      "annual_goals": "Annual Goals",
+      "services": "Services",
+      "accommodations": "Accommodations",
+      "placement": "Placement",
+      "transition": "Transition Planning",
+      "progress_monitoring": "Progress Monitoring",
+      "other": "Other",
+      "referral_reason": "Referral Reason",
+      "background_information": "Background Information",
+      "parent_input": "Parent Input",
+      "teacher_input": "Teacher Input",
+      "student_input": "Student Input",
+      "health_vision_hearing": "Health, Vision & Hearing",
+      "cognitive_assessment": "Cognitive Assessment",
+      "academic_assessment": "Academic Assessment",
+      "behavioral_social_emotional": "Behavioral/Social-Emotional",
+      "speech_language": "Speech & Language",
+      "occupational_physical_therapy": "Occupational/Physical Therapy",
+      "adaptive_functional": "Adaptive/Functional",
+      "eligibility_determination": "Eligibility Determination"
+    },
+    "short": {
+      "student_profile": "Student Profile",
+      "present_levels": "Present Levels",
+      "evaluations": "Evaluations",
+      "assessments": "Assessments",
+      "eligibility": "Eligibility",
+      "annual_goals": "Annual Goals",
+      "services": "Services",
+      "accommodations": "Accommodations",
+      "placement": "Placement",
+      "transition": "Transition",
+      "progress_monitoring": "Progress Monitoring",
+      "other": "Other",
+      "referral_reason": "Referral Reason",
+      "background_information": "Background Information",
+      "parent_input": "Parent Input",
+      "teacher_input": "Teacher Input",
+      "student_input": "Student Input",
+      "health_vision_hearing": "Health, Vision & Hearing",
+      "cognitive_assessment": "Cognitive Assessment",
+      "academic_assessment": "Academic Assessment",
+      "behavioral_social_emotional": "Behavioral/Social-Emotional",
+      "speech_language": "Speech & Language",
+      "occupational_physical_therapy": "OT/PT",
+      "adaptive_functional": "Adaptive/Functional",
+      "eligibility_determination": "Eligibility Determination"
+    }
+  },
+  "documentStatus": {
+    "created": "Created",
+    "uploaded": "Uploaded",
+    "processing": "Processing",
+    "parsed": "Parsed",
+    "error": "Error"
+  },
+  "loadingDocument": "Loading document…",
+  "documentNotFound": "Document not found.",
+  "backToChild": "Back to child",
+  "askAbout": {
+    "iep": "IEP from {{date}}"
+  },
+  "viewer": {
+    "compare": "Compare",
+    "compareWith": "Compare with…",
+    "downloadPdf": "Download PDF",
+    "process": "Process",
+    "currentIep": "Current IEP",
+    "makeCurrent": "Make current",
+    "attendees": "Attendees: {{attendees}}",
+    "notes": "Notes",
+    "processingTitle": "Processing",
+    "processingBody": "Document is being processed. This may take a minute...",
+    "processingFailedTitle": "Processing failed",
+    "processingFailedBody": "Try re-uploading or click Process to retry.",
+    "notProcessedTitle": "Not yet processed",
+    "notProcessedBody": "Document uploaded but not yet processed. Click Process to extract and analyze.",
+    "tabDocument": "Document",
+    "tabAnalysis": "Analysis",
+    "tabProgressReports": "Progress Reports",
+    "parsedNote": "We've already parsed this IEP. Head to the Analysis tab for findings, goal review, and advocacy alignment.",
+    "documentIdFallback": "IEP #{{id}}"
+  },
+  "documentList": {
+    "loading": "Loading IEP documents…",
+    "empty": "No IEP documents yet.",
+    "setCurrent": "Set as current",
+    "current": "Current",
+    "view": "View",
+    "download": "Download",
+    "delete": "Delete",
+    "deleteDialogTitle": "Delete IEP document",
+    "deleteDialogMessage": "Delete this IEP document? This cannot be undone.",
+    "deleteConfirmLabel": "Delete IEP",
+    "deletedToast": "IEP deleted",
+    "meeting": "Meeting: {{date}}",
+    "created": "Created {{date}}"
+  },
+  "upload": {
+    "onlyPdf": "Only PDF files are supported",
+    "tooLarge": "File is too large. Maximum size is 50MB.",
+    "uploadedToast": "IEP uploaded",
+    "uploadFailed": "Upload failed",
+    "uploadError": "An error occurred during upload",
+    "uploadingLabel": "Uploading…",
+    "uploadingEllipsis": "Uploading...",
+    "attachPdf": "Attach PDF",
+    "dropHint": "Drop a PDF here or click to browse"
+  },
+  "createForm": {
+    "meetingDate": "Meeting Date",
+    "meetingType": "Meeting Type",
+    "selectType": "Select type...",
+    "attendees": "Attendees",
+    "attendeesPlaceholder": "e.g. Teachers, therapists, parents present...",
+    "notes": "Notes",
+    "notesPlaceholder": "Any notes about this meeting...",
+    "creating": "Creating...",
+    "create": "Create IEP",
+    "cancel": "Cancel",
+    "createFailed": "Failed to create IEP",
+    "createError": "An error occurred while creating the IEP"
+  },
+  "analysisTab": {
+    "triggerErrorTitle": "Unable to run analysis",
+    "loadErrorTitle": "Unable to load analysis",
+    "loadingAnalysis": "Loading analysis…",
+    "analysisFailedTitle": "Analysis Failed",
+    "analysisErrorGeneric": "An error occurred during analysis.",
+    "retryAnalysis": "Retry Analysis",
+    "sourceFailedTitle": "Couldn't analyze this document",
+    "sourceErrorGeneric": "Something went wrong while analyzing this document.",
+    "analyzeThisIep": "Analyze this IEP",
+    "multiSourceInfo": "Part of an analysis with {{sources}}",
+    "viewFullAnalysis": "View full analysis →",
+    "staleTitle": "Analysis may be outdated",
+    "staleBody": "This analysis was made before the IEP was last updated. Re-analyze to refresh it.",
+    "reanalyze": "Re-analyze",
+    "overviewNav": "Overview",
+    "yourGoalsNav": "Your Goals",
+    "goalAnalysisNav": "Goal Analysis"
+  },
+  "emptyState": {
+    "heading": "Analyze Your IEP",
+    "body": "Get a comprehensive analysis of your child's IEP, including plain-language explanations, goal evaluations, potential concerns, and suggested questions for your next IEP meeting.",
+    "subscribeTitle": "Subscribe to analyze this IEP",
+    "starting": "Starting Analysis...",
+    "analyze": "Analyze IEP"
+  },
+  "processing": {
+    "label": "Analyzing…",
+    "heading": "Analyzing Your IEP",
+    "body": "This usually takes a few minutes. We're reviewing each section, evaluating goals against SMART criteria, and identifying areas that may need attention.",
+    "checkStatus": "Check Status"
+  },
+  "overview": {
+    "heading": "Overview",
+    "areasOfConcern": "Areas of Concern ({{count}})"
+  },
+  "goalCard": {
+    "ratingStrong": "Strong",
+    "ratingNeedsImprovement": "Needs Improvement",
+    "ratingSignificantConcerns": "Significant Concerns",
+    "eyebrow": "GOAL · {{domain}}",
+    "domainGoal": "{{domain}} goal",
+    "goalFallback": "goal",
+    "askAriaLabel": "Ask the advocate about this {{goalName}}",
+    "askLabel": "the {{goalName}}",
+    "strengths": "Strengths",
+    "concerns": "Concerns",
+    "suggestedImprovements": "Suggested Improvements"
+  },
+  "goalsList": {
+    "empty": "No goal analyses available.",
+    "heading": "Goal Analysis ({{count}} goals)",
+    "strongCount": "{{count}} strong",
+    "needsImprovementCount": "{{count}} need improvement",
+    "significantConcernsCount": "{{count}} significant concerns"
+  },
+  "sectionDetail": {
+    "keyPoints": "Key Points",
+    "questionsToAsk": "Questions to Ask",
+    "relatedLegalProvisions": "Related Legal Provisions"
+  },
+  "redFlagCard": {
+    "legalBasis": "Legal basis: {{basis}}"
+  },
+  "smartGrid": {
+    "heading": "SMART Analysis",
+    "specific": "Specific",
+    "measurable": "Measurable",
+    "achievable": "Achievable",
+    "relevant": "Relevant",
+    "timeBound": "Time-bound"
+  },
+  "gapAnalysis": {
+    "heading": "Your Advocacy Goals ({{addressed}}/{{total}} addressed)"
+  },
+  "goalAlignmentCard": {
+    "statusAddressed": "Addressed",
+    "statusPartiallyAddressed": "Partially Addressed",
+    "statusNotAddressed": "Not Addressed",
+    "alignedIepGoals": "Aligned IEP Goals",
+    "recommendedAction": "Recommended Action"
+  }
+}

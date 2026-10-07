@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Download, Trash2, Eye, FileText } from "lucide-react";
 import type { IepDocument } from "@/types/api";
 import { deleteIepDocument, getDownloadUrl } from "../api/iep-documents-api";
@@ -12,6 +13,9 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
+import { formatDate } from "@/lib/format-date";
+import { documentMeetingTypeLabel } from "@/lib/meeting-labels";
+import { documentStatusLabel } from "@/lib/document-status-label";
 
 interface IepDocumentListProps {
   documents: IepDocument[];
@@ -40,18 +44,6 @@ const STATUS_VARIANTS: Record<
   error: "error",
 };
 
-const MEETING_TYPE_LABELS: Record<string, string> = {
-  initial: "Initial IEP",
-  annual_review: "Annual Review",
-  amendment: "Amendment",
-  reevaluation: "Reevaluation",
-};
-
-function formatMeetingDate(dateStr: string | null): string {
-  if (!dateStr) return "";
-  return new Date(dateStr).toLocaleDateString();
-}
-
 export function IepDocumentList({
   documents,
   isLoading,
@@ -60,6 +52,7 @@ export function IepDocumentList({
   canSetCurrent,
   onCurrentChanged,
 }: IepDocumentListProps) {
+  const { t } = useTranslation(["iep-documents", "common"]);
   const { show: showToast } = useToast();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<IepDocument | null>(null);
@@ -80,13 +73,13 @@ export function IepDocumentList({
   if (isLoading) {
     return (
       <div className="flex justify-center py-4">
-        <Spinner size="sm" label="Loading IEP documents…" />
+        <Spinner size="sm" label={t("documentList.loading")} />
       </div>
     );
   }
 
   if (documents.length === 0) {
-    return <EmptyState icon={FileText} title="No IEP documents yet." />;
+    return <EmptyState icon={FileText} title={t("documentList.empty")} />;
   }
 
   const handleDownload = async (id: number) => {
@@ -103,7 +96,7 @@ export function IepDocumentList({
     try {
       const response = await deleteIepDocument(id);
       if (response.success) {
-        showToast({ message: "IEP deleted", variant: "success" });
+        showToast({ message: t("documentList.deletedToast"), variant: "success" });
         setPendingDelete(null);
         onDeleted();
       }
@@ -127,32 +120,32 @@ export function IepDocumentList({
                 >
                   {doc.fileName ||
                     (doc.meetingType
-                      ? MEETING_TYPE_LABELS[doc.meetingType] || doc.meetingType
-                      : `IEP #${doc.id}`)}
+                      ? documentMeetingTypeLabel(doc.meetingType)
+                      : t("viewer.documentIdFallback", { id: doc.id }))}
                 </Link>
                 {doc.meetingType && (
                   <Badge variant="neutral">
-                    {MEETING_TYPE_LABELS[doc.meetingType] || doc.meetingType}
+                    {documentMeetingTypeLabel(doc.meetingType)}
                   </Badge>
                 )}
                 <Badge variant={STATUS_VARIANTS[doc.status] || "neutral"}>
-                  {doc.status}
+                  {documentStatusLabel(doc.status)}
                 </Badge>
                 {currentIepId === doc.id && (
                   <Badge variant="success" data-testid="current-iep-badge">
-                    Current
+                    {t("documentList.current")}
                   </Badge>
                 )}
               </div>
               <div className="flex gap-3 text-[11px] text-brand-slate-500 mt-1">
                 {doc.iepDate && (
-                  <span>Meeting: {formatMeetingDate(doc.iepDate)}</span>
+                  <span>{t("documentList.meeting", { date: formatDate(doc.iepDate) })}</span>
                 )}
                 {doc.fileSizeBytes > 0 && (
                   <span>{formatFileSize(doc.fileSizeBytes)}</span>
                 )}
                 <span>
-                  Created {new Date(doc.createdAt).toLocaleDateString()}
+                  {t("documentList.created", { date: formatDate(doc.createdAt) })}
                 </span>
               </div>
             </div>
@@ -165,7 +158,7 @@ export function IepDocumentList({
                   loading={settingCurrentId === doc.id}
                   data-testid="set-current-iep-button"
                 >
-                  Set as current
+                  {t("documentList.setCurrent")}
                 </Button>
               )}
               {doc.status === "parsed" && (
@@ -178,7 +171,7 @@ export function IepDocumentList({
                     strokeWidth={1.8}
                     aria-hidden="true"
                   />
-                  View
+                  {t("documentList.view")}
                 </Link>
               )}
               {doc.fileSizeBytes > 0 && (
@@ -192,7 +185,7 @@ export function IepDocumentList({
                     strokeWidth={1.8}
                     aria-hidden="true"
                   />
-                  Download
+                  {t("documentList.download")}
                 </Button>
               )}
               <Button
@@ -206,7 +199,7 @@ export function IepDocumentList({
                   strokeWidth={1.8}
                   aria-hidden="true"
                 />
-                Delete
+                {t("documentList.delete")}
               </Button>
             </div>
           </div>
@@ -221,9 +214,9 @@ export function IepDocumentList({
 
       <ConfirmDialog
         open={pendingDelete !== null}
-        title="Delete IEP document"
-        message="Delete this IEP document? This cannot be undone."
-        confirmLabel="Delete IEP"
+        title={t("documentList.deleteDialogTitle")}
+        message={t("documentList.deleteDialogMessage")}
+        confirmLabel={t("documentList.deleteConfirmLabel")}
         loading={deletingId !== null}
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}

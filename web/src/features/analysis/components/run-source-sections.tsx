@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { AnalysisGoalsList } from "@/features/iep-documents/components/analysis-goals-list";
@@ -37,6 +38,7 @@ export function RunSourceSections({
   sections,
   canAsk = false,
 }: RunSourceSectionsProps) {
+  const { t } = useTranslation("analysis");
   const ordered = [...sections].sort((a, b) => a.displayOrder - b.displayOrder);
   const label = source.sourceLabel ?? `${source.sourceType} #${source.sourceId}`;
   const href = sourceDocumentHref(childId, source);
@@ -65,7 +67,7 @@ export function RunSourceSections({
       {isFailed && (
         <Notice
           variant="warning"
-          title="Couldn't analyze this document — start a new analysis to try again."
+          title={t("sourceSections.failedTitle")}
         >
           {source.errorMessage}
         </Notice>

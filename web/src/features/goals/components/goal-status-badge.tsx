@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge';
-import { GOAL_RECORD_STATUS_LABELS } from '../types';
+import { goalStatusLabel } from '../lib/status-label';
 import type { GoalRecordStatus } from '../types';
 
 const variantByStatus: Record<GoalRecordStatus, 'success' | 'warning' | 'error' | 'neutral'> = {
@@ -13,7 +13,7 @@ const variantByStatus: Record<GoalRecordStatus, 'success' | 'warning' | 'error' 
 export function GoalStatusBadge({ status }: { status: GoalRecordStatus }) {
   return (
     <Badge variant={variantByStatus[status]} data-testid={`goal-status-${status}`}>
-      {GOAL_RECORD_STATUS_LABELS[status]}
+      {goalStatusLabel(status)}
     </Badge>
   );
 }

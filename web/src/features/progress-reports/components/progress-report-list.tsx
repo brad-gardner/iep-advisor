@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Trash2, Eye, Download } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
+import { formatDate } from "@/lib/format-date";
+import { documentStatusLabel } from "@/lib/document-status-label";
+import i18n from "@/lib/i18n";
 import { remove, getDownloadUrl } from "../api/progress-reports-api";
 import { ProgressReportUpload } from "./progress-report-upload";
 import type { ProgressReport } from "../types";
@@ -30,13 +34,8 @@ interface ProgressReportListProps {
   onChanged: () => void;
 }
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "";
-  return new Date(dateStr).toLocaleDateString();
-}
-
 function formatPeriod(start: string | null, end: string | null): string {
-  if (!start && !end) return "Reporting period not set";
+  if (!start && !end) return i18n.t("progress-reports:list.periodNotSet");
   if (start && end) return `${formatDate(start)} – ${formatDate(end)}`;
   return formatDate(start || end);
 }
@@ -56,6 +55,7 @@ export function ProgressReportList({
   canEdit,
   onChanged,
 }: ProgressReportListProps) {
+  const { t } = useTranslation(["progress-reports", "iep-documents"]);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const { show } = useToast();
@@ -72,7 +72,7 @@ export function ProgressReportList({
     try {
       const res = await remove(id);
       if (res.success) {
-        show({ message: "Progress report deleted", variant: "success" });
+        show({ message: t("list.deletedToast"), variant: "success" });
         setPendingDeleteId(null);
         onChanged();
       }
@@ -94,7 +94,7 @@ export function ProgressReportList({
   if (reports.length === 0) {
     return (
       <p className="text-brand-slate-500 text-sm">
-        No progress reports yet for this IEP.
+        {t("list.empty")}
       </p>
     );
   }
@@ -115,10 +115,10 @@ export function ProgressReportList({
                       r.reportingPeriodStart,
                       r.reportingPeriodEnd,
                     ) ||
-                    `Progress Report #${r.id}`}
+                    t("list.idFallback", { id: r.id })}
                 </Link>
                 <Badge variant={STATUS_VARIANTS[r.status] || "neutral"}>
-                  {r.status}
+                  {documentStatusLabel(r.status)}
                 </Badge>
               </div>
               <div className="flex gap-3 text-[11px] text-brand-slate-500 mt-1">
@@ -128,7 +128,7 @@ export function ProgressReportList({
                 {r.fileSizeBytes > 0 && (
                   <span>{formatFileSize(r.fileSizeBytes)}</span>
                 )}
-                <span>Created {formatDate(r.createdAt)}</span>
+                <span>{t("list.created", { date: formatDate(r.createdAt) })}</span>
               </div>
             </div>
             <div className="flex gap-2 ml-3 shrink-0">
@@ -142,7 +142,7 @@ export function ProgressReportList({
                     strokeWidth={1.8}
                     aria-hidden="true"
                   />
-                  View
+                  {t("list.view")}
                 </Link>
               )}
               {r.fileSizeBytes > 0 && (
@@ -155,7 +155,7 @@ export function ProgressReportList({
                     strokeWidth={1.8}
                     aria-hidden="true"
                   />
-                  Download
+                  {t("list.download")}
                 </button>
               )}
               {canEdit && (
@@ -169,7 +169,7 @@ export function ProgressReportList({
                     strokeWidth={1.8}
                     aria-hidden="true"
                   />
-                  {deletingId === r.id ? "..." : "Delete"}
+                  {deletingId === r.id ? t("list.deletingEllipsis") : t("list.delete")}
                 </button>
               )}
             </div>
@@ -188,9 +188,9 @@ export function ProgressReportList({
 
       <ConfirmDialog
         open={pendingDeleteId !== null}
-        title="Delete progress report"
-        message="Delete this progress report? This cannot be undone."
-        confirmLabel="Delete report"
+        title={t("list.deleteDialogTitle")}
+        message={t("list.deleteDialogMessage")}
+        confirmLabel={t("list.deleteConfirmLabel")}
         loading={deletingId !== null}
         onConfirm={confirmDelete}
         onCancel={() => setPendingDeleteId(null)}

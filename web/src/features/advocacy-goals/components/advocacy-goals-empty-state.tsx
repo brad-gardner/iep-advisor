@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -8,14 +9,15 @@ interface AdvocacyGoalsEmptyStateProps {
 }
 
 export function AdvocacyGoalsEmptyState({ childName, onAdd }: AdvocacyGoalsEmptyStateProps) {
+  const { t } = useTranslation('advocacy-goals');
   return (
     <EmptyState
       icon={Target}
-      title={`Define your priorities for ${childName}`}
-      description="When you analyze an IEP, we'll check whether these goals are addressed and flag any gaps."
+      title={t('emptyState.title', { childName })}
+      description={t('emptyState.description')}
       action={
         <Button onClick={onAdd} data-testid="add-goal-button">
-          Add Your First Goal
+          {t('emptyState.addFirst')}
         </Button>
       }
     />

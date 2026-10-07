@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { AdvocacyGoal } from "@/types/api";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ export function AdvocacyGoalsList({
   onReload,
   readOnly = false,
 }: AdvocacyGoalsListProps) {
+  const { t } = useTranslation(['advocacy-goals', 'common']);
   // `formOpen` with a null `editingGoal` = add mode; a set goal = edit mode.
   const [formOpen, setFormOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<AdvocacyGoal | null>(null);
@@ -57,15 +59,15 @@ export function AdvocacyGoalsList({
       if (response.success) {
         onReload();
         setFormOpen(false);
-        show({ message: "Goal added", variant: "success" });
+        show({ message: t('advocacy-goals:list.createToast'), variant: "success" });
         return { success: true };
       }
       return {
         success: false,
-        error: response.message || "Failed to create goal",
+        error: response.message || t('advocacy-goals:list.createFailed'),
       };
     } catch {
-      return { success: false, error: "An error occurred" };
+      return { success: false, error: t('common:ui.genericError') };
     }
   };
 
@@ -81,15 +83,15 @@ export function AdvocacyGoalsList({
       if (response.success) {
         onReload();
         setFormOpen(false);
-        show({ message: "Goal updated", variant: "success" });
+        show({ message: t('advocacy-goals:list.updateToast'), variant: "success" });
         return { success: true };
       }
       return {
         success: false,
-        error: response.message || "Failed to update goal",
+        error: response.message || t('advocacy-goals:list.updateFailed'),
       };
     } catch {
-      return { success: false, error: "An error occurred" };
+      return { success: false, error: t('common:ui.genericError') };
     }
   };
 
@@ -101,7 +103,7 @@ export function AdvocacyGoalsList({
       if (response.success) {
         onReload();
         setDeletingGoal(null);
-        show({ message: "Goal removed", variant: "success" });
+        show({ message: t('advocacy-goals:list.deleteToast'), variant: "success" });
       }
     } catch {
       // handled by interceptor
@@ -137,7 +139,7 @@ export function AdvocacyGoalsList({
     <Modal
       open={formOpen}
       onClose={() => setFormOpen(false)}
-      title={editingGoal ? "Edit goal" : "Add advocacy goal"}
+      title={editingGoal ? t('advocacy-goals:list.editTitle') : t('advocacy-goals:list.addTitle')}
       data-testid="goal-form-modal"
     >
       <AdvocacyGoalForm
@@ -155,7 +157,7 @@ export function AdvocacyGoalsList({
             : handleCreate
         }
         onCancel={() => setFormOpen(false)}
-        submitLabel={editingGoal ? "Save Changes" : "Add Goal"}
+        submitLabel={editingGoal ? t('advocacy-goals:form.saveChanges') : t('advocacy-goals:form.addGoal')}
       />
     </Modal>
   );
@@ -172,7 +174,7 @@ export function AdvocacyGoalsList({
     if (readOnly) {
       return (
         <p className="text-sm text-brand-slate-500 py-4 text-center">
-          No advocacy goals have been set yet.
+          {t('advocacy-goals:list.readOnlyEmpty')}
         </p>
       );
     }
@@ -191,9 +193,8 @@ export function AdvocacyGoalsList({
           className="text-[11px] text-brand-slate-500"
           data-testid="goal-count"
         >
-          {goals.length}/10 goals
-          {goals.length >= 10 &&
-            " — Focused goals produce better analysis. Consider consolidating."}
+          {t('advocacy-goals:list.countOfTen', { count: goals.length })}
+          {goals.length >= 10 && t('advocacy-goals:list.limitHint')}
         </p>
         {!readOnly && goals.length < 10 && (
           <Button
@@ -203,7 +204,7 @@ export function AdvocacyGoalsList({
             className="text-brand-teal-500 hover:bg-brand-teal-50"
             data-testid="add-goal-button"
           >
-            + Add Goal
+            {t('advocacy-goals:list.addGoal')}
           </Button>
         )}
       </div>
@@ -227,9 +228,9 @@ export function AdvocacyGoalsList({
 
       <ConfirmDialog
         open={deletingGoal !== null}
-        title="Remove advocacy goal"
-        message="Are you sure you want to remove this advocacy goal?"
-        confirmLabel="Remove goal"
+        title={t('advocacy-goals:list.removeDialogTitle')}
+        message={t('advocacy-goals:list.removeDialogMessage')}
+        confirmLabel={t('advocacy-goals:list.removeConfirm')}
         loading={isDeleting}
         onConfirm={confirmDelete}
         onCancel={() => setDeletingGoal(null)}

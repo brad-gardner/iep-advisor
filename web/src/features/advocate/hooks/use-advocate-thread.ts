@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiErrorMessage } from '@/lib/api-error';
 import {
-  ADVOCATE_UNAVAILABLE_MESSAGE,
   AdvocateRequestError,
+  advocateUnavailableMessage,
   getAdvocateThread,
   streamAdvocateMessage,
   type AdvocateRequestErrorCode,
 } from '../api/advocate-api';
 import type { AdvocateDoneFrame, AdvocateMessageDto, AdvocateToolFrame, AdvocateToolStatus } from '../types/advocate';
+
+/** A server-provided message is already resolved text; the generic case is translated at render time by the caller. */
+export type ThreadLoadError = { kind: 'server'; message: string } | { kind: 'generic' };
 
 export interface ToolActivity {
   key: number;
@@ -67,14 +70,14 @@ interface LoadedThread {
   threadId: number;
   messages: AdvocateMessageDto[];
   disclaimer: string;
+  /** Thread-level fallback for a message with no `generatedLanguage` of its own (API shape still settling — see `AdvocateThreadDto`). */
+  generatedLanguage?: string | null;
 }
 
 interface Keyed<T> {
   threadId: number;
   value: T;
 }
-
-const LOAD_ERROR = 'Could not load this conversation.';
 
 /** Codes for which the server never stored the message, so the pending bubble is dropped. */
 const DROP_PENDING: ReadonlySet<SendFailureCode> = new Set(['validation', 'forbidden', 'not_found', 'usage_cap', 'unauthorized']);
@@ -87,7 +90,7 @@ function toFailure(err: unknown): SendFailure {
   if (err instanceof AdvocateRequestError) {
     return { code: err.code, message: err.message, retryable: err.code === 'rate_limited' || err.code === 'unavailable' };
   }
-  return { code: 'network', message: apiErrorMessage(err, ADVOCATE_UNAVAILABLE_MESSAGE), retryable: true };
+  return { code: 'network', message: apiErrorMessage(err, advocateUnavailableMessage()), retryable: true };
 }
 
 function syntheticUserMessage(text: string): AdvocateMessageDto {
@@ -122,7 +125,7 @@ function forThread<T>(keyed: Keyed<T> | null, threadId: number | null): T | null
  */
 export function useAdvocateThread(threadId: number | null, { onAnswered, onFailure }: Options = {}) {
   const [loaded, setLoaded] = useState<LoadedThread | null>(null);
-  const [loadFailure, setLoadFailure] = useState<Keyed<string> | null>(null);
+  const [loadFailure, setLoadFailure] = useState<Keyed<ThreadLoadError> | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
   const [pending, setPending] = useState<PendingMessage | null>(null);
@@ -186,14 +189,16 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
       .then((res) => {
         if (!active) return;
         if (res.success && res.data) {
-          setLoaded({ threadId, messages: res.data.messages, disclaimer: res.data.disclaimer });
+          setLoaded({ threadId, messages: res.data.messages, disclaimer: res.data.disclaimer, generatedLanguage: res.data.generatedLanguage });
           setLoadFailure(null);
         } else {
-          setLoadFailure({ threadId, value: res.message ?? LOAD_ERROR });
+          setLoadFailure({ threadId, value: res.message ? { kind: 'server', message: res.message } : { kind: 'generic' } });
         }
       })
       .catch((err) => {
-        if (active) setLoadFailure({ threadId, value: apiErrorMessage(err, LOAD_ERROR) });
+        if (!active) return;
+        const message = apiErrorMessage(err, '');
+        setLoadFailure({ threadId, value: message ? { kind: 'server', message } : { kind: 'generic' } });
       });
     return () => {
       active = false;
@@ -213,7 +218,7 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
       const res = await getAdvocateThread(run.threadId);
       if (res.success && res.data) {
         if (runRef.current !== run) return;
-        setLoaded({ threadId: run.threadId, messages: res.data.messages, disclaimer: res.data.disclaimer || done.disclaimer });
+        setLoaded({ threadId: run.threadId, messages: res.data.messages, disclaimer: res.data.disclaimer || done.disclaimer, generatedLanguage: res.data.generatedLanguage });
         synced = true;
       }
     } catch {
@@ -355,6 +360,7 @@ export function useAdvocateThread(threadId: number | null, { onAnswered, onFailu
   return {
     messages: current?.messages ?? [],
     disclaimer: current?.disclaimer ?? '',
+    threadGeneratedLanguage: current?.generatedLanguage ?? null,
     loading: threadId != null && current === null && loadError === null,
     loadError,
     reload,

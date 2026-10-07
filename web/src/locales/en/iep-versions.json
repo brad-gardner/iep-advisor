@@ -1,0 +1,66 @@
+{
+  "downloadButton": {
+    "checking": "Checking PDF…",
+    "download": "Download PDF",
+    "failedTitle": "PDF could not be generated",
+    "failedGeneric": "The PDF render failed.",
+    "retrying": "Retrying…",
+    "retry": "Retry",
+    "timedOut": "Still generating — check back shortly.",
+    "generating": "Generating PDF…"
+  },
+  "statusBadge": {
+    "ready": "PDF ready",
+    "failed": "PDF failed",
+    "generating": "Generating PDF…"
+  },
+  "historyList": {
+    "loading": "Loading versions…",
+    "empty": "No finalized IEP versions yet.",
+    "finalized": "Finalized {{date}}",
+    "titleFallback": "IEP v{{number}}",
+    "versionBadge": "v{{number}}"
+  },
+  "snapshot": {
+    "goals": "Goals",
+    "services": "Services",
+    "accommodations": "Accommodations",
+    "transition": "Transition",
+    "serviceColumn": "Service",
+    "frequencyColumn": "Frequency",
+    "durationColumn": "Duration",
+    "locationColumn": "Location",
+    "providerColumn": "Provider",
+    "datesColumn": "Dates",
+    "baseline": "Baseline",
+    "targetCriteria": "Target criteria",
+    "measurement": "Measurement",
+    "timeframe": "Timeframe"
+  },
+  "detailPage": {
+    "backToStudent": "Back to student",
+    "backToChild": "Back to child",
+    "loading": "Loading IEP version…",
+    "loadErrorTitle": "Could not load this IEP version",
+    "loadErrorGeneric": "The version is unavailable.",
+    "titleFallback": "IEP",
+    "finalized": "Finalized {{date}}",
+    "effective": " · Effective {{date}}"
+  },
+  "schoolCard": {
+    "heading": "School documents",
+    "body": "Finalized documents shared by your child's school.",
+    "finalized": "Finalized {{date}}",
+    "titleFallback": "IEP v{{number}}"
+  },
+  "authoredVersion": {
+    "loading": "Loading document…",
+    "unavailableTitle": "Document unavailable",
+    "loadErrorTitle": "Could not load this document",
+    "loadErrorGeneric": "This document is unavailable.",
+    "overviewBreadcrumb": "Overview",
+    "finalizedBySchool": "Finalized by the school {{date}}",
+    "readOnlyTitle": "This is the school's finalized document",
+    "readOnlyBody": "It is read-only. Your private notes and analysis are never visible to the school."
+  }
+}

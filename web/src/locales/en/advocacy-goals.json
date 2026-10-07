@@ -1,0 +1,46 @@
+{
+  "card": {
+    "moveUp": "Move goal up",
+    "moveDown": "Move goal down",
+    "edit": "Edit goal",
+    "delete": "Delete goal"
+  },
+  "category": {
+    "none": "No category",
+    "academic": "Academic",
+    "behavioral": "Behavioral",
+    "services": "Services",
+    "placement": "Placement"
+  },
+  "form": {
+    "label": "Advocacy Goal",
+    "placeholder": "Describe your priority for your child (e.g., 'Improve reading fluency to grade level')",
+    "categoryLabel": "Category (optional)",
+    "minLengthError": "Goal must be at least 10 characters.",
+    "maxLengthError": "Goal must be {{max}} characters or fewer.",
+    "saveFailed": "Failed to save goal.",
+    "addGoal": "Add Goal",
+    "saveChanges": "Save Changes"
+  },
+  "emptyState": {
+    "title": "Define your priorities for {{childName}}",
+    "description": "When you analyze an IEP, we'll check whether these goals are addressed and flag any gaps.",
+    "addFirst": "Add Your First Goal"
+  },
+  "list": {
+    "readOnlyEmpty": "No advocacy goals have been set yet.",
+    "countOfTen": "{{count}}/10 goals",
+    "limitHint": " — Focused goals produce better analysis. Consider consolidating.",
+    "addGoal": "+ Add Goal",
+    "editTitle": "Edit goal",
+    "addTitle": "Add advocacy goal",
+    "createToast": "Goal added",
+    "createFailed": "Failed to create goal",
+    "updateToast": "Goal updated",
+    "updateFailed": "Failed to update goal",
+    "deleteToast": "Goal removed",
+    "removeDialogTitle": "Remove advocacy goal",
+    "removeDialogMessage": "Are you sure you want to remove this advocacy goal?",
+    "removeConfirm": "Remove goal"
+  }
+}

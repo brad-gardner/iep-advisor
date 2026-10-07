@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import type { EtrDocumentListItem } from '../types';
 import { EtrListRow } from './etr-list-row';
@@ -16,6 +17,7 @@ export function EtrListGroup({
   childLastName,
   etrs,
 }: EtrListGroupProps) {
+  const { t } = useTranslation('etr-documents');
   return (
     <Card className="p-4" data-testid="etr-list-group">
       <div className="flex items-center justify-between mb-3">
@@ -27,7 +29,7 @@ export function EtrListGroup({
           className="text-[12px] font-medium text-brand-teal-500 hover:text-brand-teal-600 transition-colors"
           data-testid="etr-group-profile-link"
         >
-          View profile
+          {t('listGroup.viewProfile')}
         </Link>
       </div>
       <div className="space-y-1">

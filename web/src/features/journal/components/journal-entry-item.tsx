@@ -1,4 +1,5 @@
 import { Pencil } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Markdown } from '@/components/ui/markdown';
 import { AskAdvocateButton } from '@/features/advocate/components/ask-advocate-button';
@@ -20,6 +21,7 @@ interface JournalEntryItemProps {
 
 /** One dated update: day, tag chip, the note as rendered markdown, and edit / ask-the-advocate affordances. */
 export function JournalEntryItem({ entry, onEdit, canAsk = false, highlighted = false }: JournalEntryItemProps) {
+  const { t } = useTranslation('journal');
   const day = formatDate(entry.occurredOn);
   return (
     <li
@@ -46,9 +48,9 @@ export function JournalEntryItem({ entry, onEdit, canAsk = false, highlighted = 
             <AskAdvocateButton
               childId={entry.childProfileId}
               about={{ kind: 'journal', id: entry.id }}
-              label={`journal entry from ${day}`}
+              label={t('entryItem.askLabel', { day })}
               appearance="icon"
-              ariaLabel={`Ask the advocate about the update from ${day}`}
+              ariaLabel={t('entryItem.askAria', { day })}
               className="border-transparent"
               data-testid={`journal-entry-${entry.id}-ask`}
             />
@@ -58,7 +60,7 @@ export function JournalEntryItem({ entry, onEdit, canAsk = false, highlighted = 
               variant="ghost"
               size="sm"
               className="shrink-0"
-              aria-label={`Edit update from ${day}`}
+              aria-label={t('entryItem.editAria', { day })}
               onClick={() => onEdit(entry)}
               data-testid={`journal-entry-${entry.id}-edit`}
             >

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
@@ -6,7 +7,8 @@ import { RichTextEditor, isMarkdownOverLimit } from '@/components/ui/rich-text-e
 import { apiErrorMessage } from '@/lib/api-error';
 import { createDraftResponse } from '../api/shared-drafts-api';
 import { useDraftReviewContext } from '../hooks/draft-review-context';
-import { DRAFT_RESPONSE_KIND_LABELS, type DraftResponseKind } from '../types';
+import { draftResponseKindLabel } from '../lib/draft-response-kind-label';
+import type { DraftResponseKind } from '../types';
 
 interface RespondDialogProps {
   open: boolean;
@@ -34,6 +36,7 @@ export function RespondDialog({
   targetLabel,
   'data-testid': testId,
 }: RespondDialogProps) {
+  const { t } = useTranslation(['shared-drafts', 'common']);
   const ctx = useDraftReviewContext();
   const [kind, setKind] = useState<DraftResponseKind>('Agree');
   const [text, setText] = useState('');
@@ -42,6 +45,8 @@ export function RespondDialog({
 
   if (!ctx) return null;
 
+  // Click-triggered (never a mount effect), so translating inline here is
+  // safe — see `AcknowledgeControl` for the same reasoning.
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = text.trim();
@@ -56,20 +61,26 @@ export function RespondDialog({
         setText('');
         onClose();
       } else {
-        setError(res.message ?? 'Could not send your response.');
+        setError(res.message || t('respondDialog.submitError'));
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not send your response.'));
+      setError(apiErrorMessage(err, t('respondDialog.submitError')));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Modal open={open} onClose={onClose} preventClose={isSubmitting} title={`Respond: ${targetLabel}`} data-testid={testId}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      preventClose={isSubmitting}
+      title={t('respondDialog.title', { label: targetLabel })}
+      data-testid={testId}
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Notice variant="info" title="Sent to the school team">
-          Your response is visible to your child's whole school team, not just one person.
+        <Notice variant="info" title={t('respondDialog.sentToSchoolTitle')}>
+          {t('respondDialog.sentToSchoolBody')}
         </Notice>
 
         {error && (
@@ -79,7 +90,9 @@ export function RespondDialog({
         )}
 
         <fieldset>
-          <legend className="mb-1 block text-[13px] font-medium text-brand-slate-600">Response type</legend>
+          <legend className="mb-1 block text-[13px] font-medium text-brand-slate-600">
+            {t('respondDialog.responseTypeLegend')}
+          </legend>
           <div className="flex flex-wrap gap-3">
             {RESPOND_KINDS.map((k) => (
               <label key={k} className="inline-flex items-center gap-1.5 text-sm text-brand-slate-700">
@@ -91,14 +104,14 @@ export function RespondDialog({
                   onChange={() => setKind(k)}
                   data-testid={`${testId}-kind-${k}`}
                 />
-                {DRAFT_RESPONSE_KIND_LABELS[k]}
+                {draftResponseKindLabel(k)}
               </label>
             ))}
           </div>
         </fieldset>
 
         <RichTextEditor
-          label="Message"
+          label={t('respondDialog.messageLabel')}
           value={text}
           onChange={setText}
           maxLength={MAX_TEXT_LENGTH}
@@ -109,7 +122,7 @@ export function RespondDialog({
 
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
-            Cancel
+            {t('common:ui.cancel')}
           </Button>
           <Button
             type="submit"
@@ -117,7 +130,7 @@ export function RespondDialog({
             disabled={!text.trim() || isMarkdownOverLimit(text, MAX_TEXT_LENGTH)}
             data-testid={`${testId}-submit`}
           >
-            Send
+            {t('respondDialog.send')}
           </Button>
         </div>
       </form>

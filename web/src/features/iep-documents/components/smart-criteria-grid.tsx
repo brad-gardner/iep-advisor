@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { SmartAnalysis } from '@/types/api';
 
 interface SmartCriteriaGridProps {
@@ -16,19 +17,19 @@ const RATING_TEXT_COLORS: Record<string, string> = {
   red: 'text-brand-danger-700',
 };
 
-const CRITERIA_LABELS: { key: keyof SmartAnalysis; label: string }[] = [
-  { key: 'specific', label: 'Specific' },
-  { key: 'measurable', label: 'Measurable' },
-  { key: 'achievable', label: 'Achievable' },
-  { key: 'relevant', label: 'Relevant' },
-  { key: 'timeBound', label: 'Time-bound' },
-];
-
 export function SmartCriteriaGrid({ smartAnalysis }: SmartCriteriaGridProps) {
+  const { t } = useTranslation('iep-documents');
+  const CRITERIA_LABELS: { key: keyof SmartAnalysis; label: string }[] = [
+    { key: 'specific', label: t('smartGrid.specific') },
+    { key: 'measurable', label: t('smartGrid.measurable') },
+    { key: 'achievable', label: t('smartGrid.achievable') },
+    { key: 'relevant', label: t('smartGrid.relevant') },
+    { key: 'timeBound', label: t('smartGrid.timeBound') },
+  ];
   return (
     <div className="space-y-2">
       <h4 className="text-[10px] font-semibold text-brand-teal-500 uppercase tracking-wide">
-        SMART Analysis
+        {t('smartGrid.heading')}
       </h4>
       <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
         {CRITERIA_LABELS.map(({ key, label }) => {

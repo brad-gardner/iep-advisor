@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -17,6 +18,7 @@ export function CreateProgressReportForm({
   onCreated,
   onCancel,
 }: CreateProgressReportFormProps) {
+  const { t } = useTranslation("progress-reports");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [notes, setNotes] = useState("");
@@ -36,13 +38,13 @@ export function CreateProgressReportForm({
         notes: notes.trim() || undefined,
       });
       if (response.success) {
-        show({ message: "Progress report created", variant: "success" });
+        show({ message: t("createForm.createdToast"), variant: "success" });
         onCreated();
       } else {
-        setError(response.message || "Failed to create progress report");
+        setError(response.message || t("createForm.createFailed"));
       }
     } catch {
-      setError("An error occurred while creating the progress report");
+      setError(t("createForm.createError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -58,14 +60,14 @@ export function CreateProgressReportForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
-          label="Reporting Period Start"
+          label={t("createForm.periodStart")}
           type="date"
           value={periodStart}
           onChange={(e) => setPeriodStart(e.target.value)}
           data-testid="pr-period-start"
         />
         <Input
-          label="Reporting Period End"
+          label={t("createForm.periodEnd")}
           type="date"
           value={periodEnd}
           onChange={(e) => setPeriodEnd(e.target.value)}
@@ -74,20 +76,20 @@ export function CreateProgressReportForm({
       </div>
 
       <RichTextEditor
-        label="Notes (optional)"
+        label={t("createForm.notes")}
         value={notes}
         onChange={setNotes}
         minRows={3}
-        placeholder="Anything worth flagging about this report..."
+        placeholder={t("createForm.notesPlaceholder")}
         data-testid="pr-notes"
       />
 
       <div className="flex gap-2 justify-end">
         <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t("createForm.cancel")}
         </Button>
         <Button type="submit" loading={isSubmitting} data-testid="pr-submit">
-          Create
+          {t("createForm.create")}
         </Button>
       </div>
     </form>

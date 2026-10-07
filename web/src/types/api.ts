@@ -325,6 +325,8 @@ export interface MeetingPrepChecklist {
   generalTips: ChecklistItem[];
   errorMessage: string | null;
   createdAt: string;
+  /** The language this AI-generated checklist was written in (`AddAiArtifactLanguage`); null/unknown = English. */
+  generatedLanguage?: 'en' | 'es' | null;
 }
 
 export interface CheckItemRequest {

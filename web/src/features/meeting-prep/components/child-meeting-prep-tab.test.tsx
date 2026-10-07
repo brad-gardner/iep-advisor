@@ -20,8 +20,9 @@ vi.mock('../api/prep-questions-api', () => prepQuestionsApi);
 const toast = vi.hoisted(() => ({ show: vi.fn() }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => toast }));
 
-import { ChildMeetingPrepTab, QUESTION_ADDED_TOAST, QUESTION_EXISTS_TOAST } from './child-meeting-prep-tab';
-import { QUESTIONS_FORBIDDEN_MESSAGE } from '../hooks/use-parent-questions';
+import { ChildMeetingPrepTab } from './child-meeting-prep-tab';
+import { questionAddedToast, questionExistsToast } from '../lib/copy';
+import { questionsForbiddenMessage } from '../hooks/use-parent-questions';
 
 const child = (role: ChildProfile['role']): ChildProfile => ({
   id: 4,
@@ -120,7 +121,7 @@ describe('ChildMeetingPrepTab — parent questions', () => {
     expect(list).toHaveTextContent(QUESTION);
     expect(prepQuestionsApi.createPrepQuestion).toHaveBeenCalledTimes(1);
     expect(prepQuestionsApi.createPrepQuestion).toHaveBeenCalledWith(4, { text: QUESTION, source: 'advocate' });
-    expect(toast.show).toHaveBeenCalledWith({ message: QUESTION_ADDED_TOAST, variant: 'success' });
+    expect(toast.show).toHaveBeenCalledWith({ message: questionAddedToast(), variant: 'success' });
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/children/4/meeting-prep'));
     expect(screen.getByTestId('location')).not.toHaveTextContent('addQuestion');
     expect(toast.show).toHaveBeenCalledTimes(1);
@@ -132,7 +133,7 @@ describe('ChildMeetingPrepTab — parent questions', () => {
       data: question(7, QUESTION, { alreadyExisted: true }),
     });
     renderTab(`/children/4/meeting-prep?addQuestion=${encodeURIComponent(QUESTION)}`);
-    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: QUESTION_EXISTS_TOAST, variant: 'info' }));
+    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: questionExistsToast(), variant: 'info' }));
     expect(within(screen.getByTestId('parent-questions-list')).getAllByTestId('parent-question')).toHaveLength(1);
     expect(toast.show).toHaveBeenCalledTimes(1);
   });
@@ -140,7 +141,7 @@ describe('ChildMeetingPrepTab — parent questions', () => {
   it('does not round-trip a handed-off question already on the loaded list', async () => {
     prepQuestionsApi.listPrepQuestions.mockResolvedValue({ success: true, data: [question(7, QUESTION.toUpperCase())] });
     renderTab(`/children/4/meeting-prep?addQuestion=${encodeURIComponent(QUESTION)}`);
-    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: QUESTION_EXISTS_TOAST, variant: 'info' }));
+    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: questionExistsToast(), variant: 'info' }));
     expect(prepQuestionsApi.createPrepQuestion).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByTestId('location')).not.toHaveTextContent('addQuestion'));
   });
@@ -157,7 +158,7 @@ describe('ChildMeetingPrepTab — parent questions', () => {
     // reported at all, rather than the stale consumedRef silently eating it
     // (which would also leave `?addQuestion=` stuck in the URL).
     fireEvent.click(screen.getByTestId('relaunch'));
-    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: QUESTION_EXISTS_TOAST, variant: 'info' }));
+    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: questionExistsToast(), variant: 'info' }));
     await waitFor(() => expect(screen.getByTestId('location')).not.toHaveTextContent('addQuestion'));
     expect(prepQuestionsApi.createPrepQuestion).toHaveBeenCalledTimes(1);
   });
@@ -234,7 +235,7 @@ describe('ChildMeetingPrepTab — parent questions', () => {
     await waitFor(() => expect(screen.getByTestId('parent-questions-list')).toHaveTextContent('Who collects the progress data?'));
     expect(prepQuestionsApi.createPrepQuestion).toHaveBeenCalledWith(4, { text: 'Who collects the progress data?', source: 'parent' });
     expect(input).toHaveValue('');
-    expect(toast.show).toHaveBeenCalledWith({ message: QUESTION_ADDED_TOAST, variant: 'success' });
+    expect(toast.show).toHaveBeenCalledWith({ message: questionAddedToast(), variant: 'success' });
 
     fireEvent.change(input, { target: { value: 'who collects the progress data?' } });
     fireEvent.submit(form);
@@ -349,7 +350,7 @@ describe('ChildMeetingPrepTab — parent questions', () => {
     renderTab('/children/4/meeting-prep');
     const list = await screen.findByTestId('parent-questions-list');
     fireEvent.click(within(list).getByRole('checkbox', { name: QUESTION }));
-    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: QUESTIONS_FORBIDDEN_MESSAGE, variant: 'error' }));
+    await waitFor(() => expect(toast.show).toHaveBeenCalledWith({ message: questionsForbiddenMessage(), variant: 'error' }));
     await waitFor(() => expect(screen.queryByTestId('parent-questions-form')).not.toBeInTheDocument());
     expect(within(list).queryByRole('button')).not.toBeInTheDocument();
     expect(within(list).getByRole('checkbox', { name: QUESTION })).not.toBeChecked();

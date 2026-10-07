@@ -61,4 +61,7 @@ export interface UpdateWorkspaceEntryRequest {
 
 export interface InterviewSuggestionDto {
   suggestion: string;
+  /** Language the AI generated this suggestion in — drives `GeneratedLanguageNotice`
+   *  when it differs from the viewer's. Null/absent on a pre-i18n-migration record = English. */
+  generatedLanguage?: string | null;
 }

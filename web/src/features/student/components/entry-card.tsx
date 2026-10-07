@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ export function EntryCard({
   onSetShareable,
   onDelete,
 }: EntryCardProps) {
+  const { t } = useTranslation('student');
   const [editing, setEditing] = useState(false);
   const testId = `entry-${entry.id}`;
 
@@ -31,7 +33,7 @@ export function EntryCard({
         <EntryEditor
           initialContent={entry.content}
           initialShareable={entry.isShareable}
-          submitLabel="Save"
+          submitLabel={t('entryEditor.saveLabel')}
           testIdPrefix={testId}
           onCancel={() => setEditing(false)}
           onSubmit={async (content, isShareable) => {
@@ -58,7 +60,7 @@ export function EntryCard({
             data-testid={`${testId}-edit`}
           >
             <Pencil className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
-            Edit
+            {t('entryCard.edit')}
           </Button>
           <Button
             type="button"
@@ -69,7 +71,7 @@ export function EntryCard({
             data-testid={`${testId}-delete`}
           >
             <Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
-            Delete
+            {t('entryCard.delete')}
           </Button>
         </div>
       </div>

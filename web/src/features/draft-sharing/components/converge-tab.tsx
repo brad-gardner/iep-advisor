@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import type { DocumentInstanceDetailDto, DocumentInstanceStatus } from '@/features/document-authoring/types';
 import { ConvergePanel } from './converge-panel';
@@ -17,11 +18,12 @@ const STATUS_VARIANT: Record<DocumentInstanceStatus, 'neutral' | 'warning' | 'su
 /** The document page's "Converge" tab (`?tab=converge`): same document
  *  identity heading as the Edit tab, with the converge aggregate below. */
 export function ConvergeTab({ detail, onShowEditor }: ConvergeTabProps) {
+  const { t } = useTranslation('draft-sharing');
   return (
     <div className="space-y-6" data-testid="converge-tab">
       <div className="flex items-center gap-3">
         <h1 className="font-serif text-2xl text-brand-slate-800">{detail.documentTypeDisplayName}</h1>
-        <Badge variant={STATUS_VARIANT[detail.status]}>{detail.status}</Badge>
+        <Badge variant={STATUS_VARIANT[detail.status]}>{t(`documentStatus.${detail.status}`)}</Badge>
       </div>
       <ConvergePanel
         instanceId={detail.id}

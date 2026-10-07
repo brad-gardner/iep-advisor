@@ -1,11 +1,11 @@
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
-import {
-  DOCUMENT_STATE_LABELS,
-  EVALUATION_TYPE_LABELS,
-  type EtrDocumentListItem,
-} from '../types';
+import { formatDate } from '@/lib/format-date';
+import { documentStatusLabel } from '@/lib/document-status-label';
+import { evaluationTypeLabel, documentStateLabel } from '../lib/document-labels';
+import type { EtrDocumentListItem } from '../types';
 
 interface EtrListRowProps {
   etr: EtrDocumentListItem;
@@ -19,18 +19,12 @@ const STATUS_VARIANTS: Record<string, 'neutral' | 'warning' | 'success' | 'error
   error: 'error',
 };
 
-function formatDate(value: string | null): string {
-  if (!value) return '';
-  return new Date(value).toLocaleDateString();
-}
-
 export function EtrListRow({ etr }: EtrListRowProps) {
-  const evalLabel = etr.evaluationType
-    ? EVALUATION_TYPE_LABELS[etr.evaluationType] || etr.evaluationType
-    : 'Evaluation';
+  const { t } = useTranslation(['etr-documents', 'iep-documents']);
+  const evalLabel = etr.evaluationType ? evaluationTypeLabel(etr.evaluationType) : t('listRow.evaluationFallback');
   const evalDate = etr.evaluationDate
     ? formatDate(etr.evaluationDate)
-    : `Uploaded ${formatDate(etr.uploadDate)}`;
+    : t('listRow.uploaded', { date: formatDate(etr.uploadDate) });
 
   return (
     <Link
@@ -46,10 +40,10 @@ export function EtrListRow({ etr }: EtrListRowProps) {
           <Badge variant="neutral">{evalLabel}</Badge>
           {etr.documentState && (
             <Badge variant={etr.documentState === 'final' ? 'success' : 'neutral'}>
-              {DOCUMENT_STATE_LABELS[etr.documentState] || etr.documentState}
+              {documentStateLabel(etr.documentState)}
             </Badge>
           )}
-          <Badge variant={STATUS_VARIANTS[etr.status] || 'neutral'}>{etr.status}</Badge>
+          <Badge variant={STATUS_VARIANTS[etr.status] || 'neutral'}>{documentStatusLabel(etr.status)}</Badge>
         </div>
         {etr.fileName && (
           <p className="mt-0.5 text-[11px] text-brand-slate-500 truncate">{etr.fileName}</p>

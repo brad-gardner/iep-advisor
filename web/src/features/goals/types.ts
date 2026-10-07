@@ -4,13 +4,8 @@
 
 export const GOAL_RECORD_STATUSES = ['Active', 'Met', 'NotMet', 'Retired', 'Carried'] as const;
 export type GoalRecordStatus = (typeof GOAL_RECORD_STATUSES)[number];
-export const GOAL_RECORD_STATUS_LABELS: Record<GoalRecordStatus, string> = {
-  Active: 'Active',
-  Met: 'Met',
-  NotMet: 'Not met',
-  Retired: 'Retired',
-  Carried: 'Carried',
-};
+// Translated display labels moved to `lib/status-label.ts` (`goalStatusLabel`)
+// — see `docs/i18n/README.md`'s "Display-label helpers" pattern.
 
 export interface GoalObservationDto {
   id: number;

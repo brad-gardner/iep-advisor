@@ -1,5 +1,6 @@
 import { apiClient } from '@/lib/api-client';
 import { getToken, removeToken } from '@/lib/auth';
+import i18n from '@/lib/i18n';
 import type { ApiResponse } from '@/types/api';
 import type {
   AdvocateChildContextDto,
@@ -82,8 +83,13 @@ export interface StreamAdvocateMessageHandlers {
   signal?: AbortSignal;
 }
 
-export const ADVOCATE_UNAVAILABLE_MESSAGE = 'The advocate could not answer right now. Please try again in a moment.';
-const RATE_LIMITED_MESSAGE = "You're sending messages quickly — wait a moment and try again.";
+// A live `i18n.t()` call (not a frozen constant) so a language switch
+// mid-session is reflected immediately — see `docs/i18n/README.md`'s
+// "Display-label helpers" pattern. Exported as a function so a cross-file
+// caller (`use-advocate-thread.ts`) reads the active language too.
+export function advocateUnavailableMessage(): string {
+  return i18n.t('advocate:api.unavailable');
+}
 
 /**
  * The body of a failed POST. Validation failures may arrive either as our
@@ -122,19 +128,19 @@ async function toRequestError(response: Response): Promise<AdvocateRequestError>
   const body = await readFailureBody(response);
   switch (response.status) {
     case 400:
-      return new AdvocateRequestError(400, 'validation', failureMessage(body, 'That message could not be sent.'));
+      return new AdvocateRequestError(400, 'validation', failureMessage(body, i18n.t('advocate:api.validationFallback')));
     case 403:
-      return new AdvocateRequestError(403, 'forbidden', failureMessage(body, "You can't ask the advocate about this child."));
+      return new AdvocateRequestError(403, 'forbidden', failureMessage(body, i18n.t('advocate:api.forbiddenFallback')));
     case 404:
-      return new AdvocateRequestError(404, 'not_found', failureMessage(body, 'This conversation is no longer available.'));
+      return new AdvocateRequestError(404, 'not_found', failureMessage(body, i18n.t('advocate:api.notFoundFallback')));
     case 429:
       // The usage cap answers with our envelope and a message; the endpoint
       // rate limiter answers with an empty body.
       return body && typeof body === 'object' && 'message' in body
-        ? new AdvocateRequestError(429, 'usage_cap', failureMessage(body, "You've used all of this year's advocate messages."))
-        : new AdvocateRequestError(429, 'rate_limited', RATE_LIMITED_MESSAGE);
+        ? new AdvocateRequestError(429, 'usage_cap', failureMessage(body, i18n.t('advocate:api.usageCapFallback')))
+        : new AdvocateRequestError(429, 'rate_limited', i18n.t('advocate:api.rateLimited'));
     default:
-      return new AdvocateRequestError(response.status, 'unavailable', failureMessage(body, ADVOCATE_UNAVAILABLE_MESSAGE));
+      return new AdvocateRequestError(response.status, 'unavailable', failureMessage(body, advocateUnavailableMessage()));
   }
 }
 
@@ -177,11 +183,11 @@ export async function streamAdvocateMessage(
   if (response.status === 401) {
     removeToken();
     window.location.href = '/login';
-    throw new AdvocateRequestError(401, 'unauthorized', 'Please sign in again.');
+    throw new AdvocateRequestError(401, 'unauthorized', i18n.t('advocate:api.signInAgain'));
   }
   if (!response.ok) throw await toRequestError(response);
   if (!response.body) {
-    onError({ code: 'unavailable', message: ADVOCATE_UNAVAILABLE_MESSAGE });
+    onError({ code: 'unavailable', message: advocateUnavailableMessage() });
     return;
   }
 
@@ -226,7 +232,7 @@ export async function streamAdvocateMessage(
         settle();
         onError({
           code: frame?.code ?? 'unavailable',
-          message: frame?.message || ADVOCATE_UNAVAILABLE_MESSAGE,
+          message: frame?.message || advocateUnavailableMessage(),
         });
         break;
       }
@@ -236,5 +242,5 @@ export async function streamAdvocateMessage(
   });
 
   // The connection dropped without a terminal frame — treat it like the server's own `error`.
-  if (!settled) onError({ code: 'unavailable', message: ADVOCATE_UNAVAILABLE_MESSAGE });
+  if (!settled) onError({ code: 'unavailable', message: advocateUnavailableMessage() });
 }

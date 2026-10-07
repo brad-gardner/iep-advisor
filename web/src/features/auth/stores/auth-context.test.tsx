@@ -295,6 +295,14 @@ describe('language sync races', () => {
     expect(getPreLoginLanguage()).toBeNull();
     expect(screen.getByTestId('probe-result')).toHaveTextContent('"success":true');
     expect(authApi.updateProfile).not.toHaveBeenCalled();
+    // todos/248 P2: `syncLanguagePreference` must have superseded the
+    // still-pending `changeLanguage('es')` with its own `changeLanguage('en')`
+    // the moment the English account signed in — comparing only
+    // `i18n.language` (unchanged while 'es' was still loading) skipped that
+    // call, letting the late 'es' load win once released. The active
+    // language must stay the signed-in account's own, not whatever was
+    // merely pending pre-login.
+    expect(i18n.language).toBe('en');
 
     readSpy.mockRestore();
   });
@@ -331,6 +339,14 @@ describe('language sync races', () => {
 
     // It must never revert the UI to English.
     expect(i18n.language).toBe('es');
+    // todos/248 P3: the stale response's own `preferredLanguage: 'en'` must
+    // not revert the STORED user state either, even though
+    // `syncLanguagePreference`'s generation guard already stopped it from
+    // reverting the screen — `loadUser` used to `setUser(response.data)`
+    // unconditionally, overwriting the just-saved 'es' back to 'en' in state
+    // (and in `localStorage`) despite the display staying correct.
+    expect(screen.getByTestId('probe-user')).toHaveTextContent('es');
+    expect(JSON.parse(getStoredUser() ?? '{}')).toMatchObject({ preferredLanguage: 'es' });
   });
 
   it('keeps an explicit switch when it races a background PUT for a null (first-sign-in) preference, sending it last', async () => {
@@ -370,6 +386,70 @@ describe('language sync races', () => {
     expect(authApi.updateProfile).toHaveBeenNthCalledWith(2, { preferredLanguage: 'es' });
     expect(i18n.language).toBe('es');
     expect(getPreLoginLanguage()).toBeNull();
+  });
+
+  it("backfills a null-preference sign-in with an explicit pre-login choice whose chunk is still loading, not the browser default (todos/248 P3)", async () => {
+    const user = userEvent.setup();
+    renderProbe();
+    await screen.findByText('signed-out');
+
+    // Same gating setup as the delayed-chunk tests above: evict cached
+    // Spanish resources and hold the backend's 'es' read open.
+    const esResources = i18n.store.data.es as { common?: unknown; auth?: unknown } | undefined;
+    if (esResources) {
+      delete esResources.common;
+      delete esResources.auth;
+    }
+
+    const backend = getBackend();
+    const originalRead = backend.read.bind(backend);
+    const releaseEsFns: (() => void)[] = [];
+    const readSpy = vi.spyOn(backend, 'read').mockImplementation((language, namespace, cb) => {
+      if (language === 'es') {
+        const gate = new Promise<void>((resolve) => {
+          releaseEsFns.push(resolve);
+        });
+        void gate.then(() => originalRead(language, namespace, cb));
+        return;
+      }
+      originalRead(language, namespace, cb);
+    });
+
+    // Click Spanish while signed out — `setLanguage('es')`'s own
+    // `changeLanguage('es')` is now gated, still pending. Its pre-login key
+    // is NOT written yet — `setPreLoginLanguage` only runs once that call's
+    // `changeLanguage` resolves — so `getPreLoginLanguage()` still reads
+    // null, even though this visitor already explicitly chose Spanish.
+    await user.click(screen.getByRole('button', { name: 'switch' }));
+    expect(getPreLoginLanguage()).toBeNull();
+
+    // A brand-new account (no saved preference yet) signs in on this same,
+    // still-signed-out device before that chunk resolves.
+    const newUser = makeUser({ id: 9, email: 'new@example.com', preferredLanguage: null });
+    authApi.login.mockResolvedValueOnce({ success: true, data: { token: 'new-jwt', user: newUser } });
+    authApi.updateProfile.mockResolvedValue({ success: true, data: { ...newUser, preferredLanguage: 'es' } });
+
+    await user.click(screen.getByRole('button', { name: 'login' }));
+
+    // The backfill must use the choice this visitor already made (still
+    // held only in `pendingExplicitChoiceRef`, since `getPreLoginLanguage()`
+    // has nothing yet) — never the browser's default, which this jsdom
+    // environment doesn't report as Spanish.
+    await waitFor(() =>
+      expect(authApi.updateProfile).toHaveBeenCalledWith({ preferredLanguage: 'es' })
+    );
+
+    // Let the gated 'es' chunk load finish — both the original click's
+    // `changeLanguage('es')` and the backfill's own share the same
+    // in-flight load (i18next dedupes concurrent loads of the same
+    // language/namespace), so there are still only two reads to release.
+    await waitFor(() => expect(releaseEsFns.length).toBe(2));
+    releaseEsFns.forEach((release) => release());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(i18n.language).toBe('es');
+
+    readSpy.mockRestore();
   });
 });
 

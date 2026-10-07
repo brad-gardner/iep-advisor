@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Notice } from '@/components/ui/notice';
@@ -26,6 +27,7 @@ interface RemoveGoalDialogProps {
  * this dialog only validates and hands back the trimmed reason.
  */
 export function RemoveGoalDialog({ open, goalLabel, loading = false, error, onConfirm, onCancel }: RemoveGoalDialogProps) {
+  const { t } = useTranslation(['goals', 'common']);
   const [reason, setReason] = useState('');
   const trimmed = reason.trim();
   const canSubmit = trimmed.length >= MIN_REASON_LENGTH && !isMarkdownOverLimit(reason, REASON_MAX_LENGTH);
@@ -46,13 +48,13 @@ export function RemoveGoalDialog({ open, goalLabel, loading = false, error, onCo
       open={open}
       onClose={handleCancel}
       preventClose={loading}
-      title="Remove goal"
+      title={t('goals:removeGoalDialog.title')}
       size="sm"
       data-testid="remove-goal-dialog"
       footer={
         <>
           <Button variant="ghost" onClick={handleCancel} disabled={loading} data-testid="remove-goal-dialog-cancel">
-            Cancel
+            {t('common:ui.cancel')}
           </Button>
           <Button
             variant="danger"
@@ -61,15 +63,14 @@ export function RemoveGoalDialog({ open, goalLabel, loading = false, error, onCo
             disabled={!canSubmit}
             data-testid="remove-goal-dialog-confirm"
           >
-            Remove goal
+            {t('goals:removeGoalDialog.confirm')}
           </Button>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <p className="text-sm text-brand-slate-600">
-          Removing "{goalLabel || 'this goal'}" retires it from the student's record. This is kept as
-          part of the goal's history and cannot be undone from here.
+          {t('goals:removeGoalDialog.bodyText', { goalLabel: goalLabel || t('goals:removeGoalDialog.defaultGoalLabel') })}
         </p>
 
         {error && (
@@ -79,7 +80,7 @@ export function RemoveGoalDialog({ open, goalLabel, loading = false, error, onCo
         )}
 
         <RichTextEditor
-          label="Reason for removing this goal *"
+          label={t('goals:removeGoalDialog.reasonLabel')}
           value={reason}
           onChange={setReason}
           minRows={3}
@@ -87,7 +88,7 @@ export function RemoveGoalDialog({ open, goalLabel, loading = false, error, onCo
           required
           data-testid="remove-goal-dialog-reason"
         />
-        <p className="text-xs text-brand-slate-500">At least {MIN_REASON_LENGTH} characters.</p>
+        <p className="text-xs text-brand-slate-500">{t('goals:removeGoalDialog.minLengthHint', { min: MIN_REASON_LENGTH })}</p>
       </form>
     </Modal>
   );

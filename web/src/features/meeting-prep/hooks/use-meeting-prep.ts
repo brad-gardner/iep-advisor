@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import i18n from "@/lib/i18n";
 import type { MeetingPrepChecklist } from "@/types/api";
 import {
   getChecklistsByChild,
@@ -195,7 +196,11 @@ export function useMeetingPrep(
           (prevStatus === "generating" || prevStatus === "pending") &&
           next.status === "completed"
         ) {
-          show({ message: "Meeting prep ready", variant: "success" });
+          // `i18n.t` directly (not the `useTranslation` hook): this fires from a
+          // polling callback, not render, and must not sit in that callback's own
+          // dependency array (see docs/i18n/README.md's "never has `t` in its
+          // dependency array" gotcha) — a language switch must not restart polling.
+          show({ message: i18n.t('meeting-prep:toast.checklistReady'), variant: "success" });
         }
         prevStatusRef.current = next.status;
       }
